@@ -19,7 +19,7 @@ from pathlib import Path
 from .fidelity import IMAGE_MIN_AREA, norm
 from .ingestion import printed_pdf_path
 from .settings import Settings, read_api_key
-from .store import dumps, open_db, utcnow, write_jsonl_atomic
+from .store import LockHeld, ProcessLock, dumps, open_db, utcnow, write_jsonl_atomic
 
 LOCAL_MODEL = "PaddlePaddle/PaddleOCR-VL-1.6"
 LOCAL_REVISION = "c5630abae1d940eafe0697512a0325494b02ab42"
@@ -67,10 +67,12 @@ def expected_chars(image) -> float:
     return glyphs * CHARS_PER_BLOB
 
 
-def fallback_reasons(text: str, mean_prob: float, looped: bool, expected: float) -> list[str]:
+def fallback_reasons(text: str, mean_prob: float, looped: bool, expected: float, truncated: bool = False) -> list[str]:
     reasons = []
     if looped:
         reasons.append("loop")
+    if truncated:
+        reasons.append("truncated")  # ran out of tokens: the rest of the image was never read
     if mean_prob < MIN_MEAN_PROB:
         reasons.append("low_confidence")
     length = len(norm(text))
@@ -143,8 +145,9 @@ class LocalOCR:
         new = g.sequences[0][start:]
         text = self.proc.decode(new, skip_special_tokens=True)
         probs = [torch.softmax(s[0].float(), -1)[t].item() for s, t in zip(g.scores, new)]
+        # The loop stop fires on a multiple of 16 before the limit; only running out of tokens reaches it.
         return {"text": text.strip(), "mean_prob": round(sum(probs) / max(len(probs), 1), 4),
-                "looped": looping(text.splitlines())}
+                "looped": looping(text.splitlines()), "truncated": len(new) >= MAX_NEW_TOKENS}
 
 
 # ---------------------------------------------------------------- Gemini fallback
@@ -169,29 +172,38 @@ def spent_micro(ledger: Path) -> int:
 
 
 def _append(ledger: Path, row: dict) -> None:
-    # ponytail: single writer (one OCR run at a time); a file lock is the upgrade if runs ever overlap.
+    # Only a GeminiReader inside its `with` block appends, and it holds the ledger lock for that whole time.
     ledger.parent.mkdir(parents=True, exist_ok=True)
     with ledger.open("a", encoding="utf-8") as f:
         f.write(dumps({**row, "at": utcnow()}) + "\n")
 
 
 class GeminiReader:
-    """Owns one HTTP client for a run. Every call is reserved at worst case before dispatch and settled after."""
+    """Owns, for one `with` block, the ledger lock and one HTTP client. The lock makes the cap check and the
+    reservation one step across processes: a second reader on the same data directory is refused. Every call is
+    reserved at worst case before dispatch and settled after."""
 
     def __init__(self, settings: Settings):
         self.key = read_api_key("GEMINI_API_KEY")
         if not self.key:
             raise OcrError("GEMINI_API_KEY is not configured")
         self.ledger = ledger_path(settings)
+        self.lock: ProcessLock | None = None
 
     def __enter__(self) -> "GeminiReader":
         import httpx
 
+        try:
+            self.lock = ProcessLock(self.ledger.parent / "gemini-ledger.lock")
+        except LockHeld:
+            raise OcrError("another process is spending from the Gemini ledger") from None
         self.http = httpx.Client(timeout=120, headers={"x-goog-api-key": self.key})
         return self
 
     def __exit__(self, *exc) -> None:
         self.http.close()
+        self.lock.release()
+        self.lock = None
 
     def _post(self, action: str, body: dict) -> dict:
         r = self.http.post(f"{GEMINI_URL}:{action}", json=body)
@@ -200,6 +212,8 @@ class GeminiReader:
         return r.json()
 
     def read(self, png: bytes, region: str) -> str:
+        if self.lock is None:
+            raise OcrError("GeminiReader.read outside its with block holds no ledger lock")
         parts = [{"inlineData": {"mimeType": "image/png", "data": base64.b64encode(png).decode()}},
                  {"text": GEMINI_PROMPT}]
         contents = [{"role": "user", "parts": parts}]
@@ -240,6 +254,7 @@ def load(settings: Settings, source_hash: str) -> list[dict]:
 
 
 ANCHOR_MIN = 6  # normalized characters of nearby print text needed to place an image
+MERGE_VERSION = "anchor-2"  # placement algorithm; part of the extraction fingerprint
 
 
 def _anchors(doc, pno: int, bbox: list[float]) -> tuple[str, str]:
@@ -320,12 +335,14 @@ def merge(settings: Settings, source_hash: str, raw: list[dict], rendering: Path
         out += after.get(k, [])
         if k < len(raw):
             out.append(raw[k])
-    digest = hashlib.sha256(dumps([[r["digest"], r["engine"], r["text"]] for r in ready]).encode()).hexdigest()
-    return out, warnings, f"ocr-{digest[:8]}"
+    # The revision identity covers what was added and where: the same text placed elsewhere is another revision.
+    added = sorted([k, e["path"], e["raw_text"], e["location"]] for k, es in after.items() for e in es)
+    digest = hashlib.sha256(dumps([MERGE_VERSION, OCR_VERSION, added]).encode()).hexdigest()
+    return out, warnings, f"ocr-{digest[:12]}"
 
 
 def _reasons(local: dict) -> list[str]:
-    return fallback_reasons(local["text"], local["mean_prob"], local["looped"], local["expected"])
+    return fallback_reasons(local["text"], local["mean_prob"], local["looped"], local["expected"], local["truncated"])
 
 
 def _final(row: dict) -> bool:
@@ -364,17 +381,22 @@ def run(settings: Settings, source_hashes: list[str] | None = None, gemini: bool
                 continue
             totals["sources"] += 1
             path = cache_path(settings, src["source_hash"])
+            rendering = "hancom_print" if src["format"] == "hwp" else "original"
             done = {(r["page"], tuple(r["bbox"])): r for r in load(settings, src["source_hash"])}
+            visited: set[tuple] = set()
             rows = []
             for reg in regions(pdf):
                 totals["regions"] += 1
-                prev = done.get((reg["page"], tuple(reg["bbox"]))) or known.get(reg["digest"])
+                key = (reg["page"], tuple(reg["bbox"]))
+                visited.add(key)
+                cached = done.get(key)
+                # Same place is not same picture: a regenerated rendering can hold other pixels there.
+                prev = cached if cached and cached["digest"] == reg["digest"] else known.get(reg["digest"])
                 if prev and _final(prev):
-                    rows.append({**prev, "page": reg["page"], "bbox": reg["bbox"]})
+                    rows.append({**prev, "page": reg["page"], "bbox": reg["bbox"], "rendering": rendering})
                     totals["reused"] += 1
                     continue
-                row = {"page": reg["page"], "bbox": reg["bbox"], "digest": reg["digest"],
-                       "rendering": "hancom_print" if src["format"] == "hwp" else "original"}
+                row = {"page": reg["page"], "bbox": reg["bbox"], "digest": reg["digest"], "rendering": rendering}
                 if prev:  # a local read that failed the test: no need to run the GPU again
                     first = prev["local"]
                 else:
@@ -392,7 +414,8 @@ def run(settings: Settings, source_hashes: list[str] | None = None, gemini: bool
                 known[reg["digest"]] = row
                 totals[row["status"]] += 1
                 rows.append(row)
-                write_jsonl_atomic(path, rows)
+                # A checkpoint keeps the cached rows not reached yet: an interrupted run must not lose paid reads.
+                write_jsonl_atomic(path, rows + [r for k, r in done.items() if k not in visited])
             write_jsonl_atomic(path, rows)
             print(dumps({"source_hash": src["source_hash"][:16], "regions": len(rows),
                          "statuses": sorted(r["status"] for r in rows)}), flush=True)

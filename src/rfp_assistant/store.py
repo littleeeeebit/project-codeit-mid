@@ -270,6 +270,42 @@ def set_app_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
     )
 
 
+class LockHeld(RuntimeError):
+    pass
+
+
+class ProcessLock:
+    """Exclusive, non-blocking lock on one file for the life of one process's owner; released by `release()` or
+    by the operating system when the process dies."""
+
+    def __init__(self, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self._f = open(path, "a+b")
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                self._f.seek(0)
+                msvcrt.locking(self._f.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(self._f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            self._f.close()
+            raise LockHeld(str(path)) from None
+
+    def release(self) -> None:
+        if self._f.closed:
+            return
+        if os.name == "nt":
+            import msvcrt
+
+            self._f.seek(0)
+            msvcrt.locking(self._f.fileno(), msvcrt.LK_UNLCK, 1)
+        self._f.close()
+
+
 def dumps(value) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
 

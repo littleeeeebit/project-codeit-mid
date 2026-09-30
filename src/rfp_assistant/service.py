@@ -9,7 +9,6 @@ from __future__ import annotations
 import atexit
 import hashlib
 import json
-import os
 import re
 import threading
 import uuid
@@ -24,7 +23,7 @@ from .ingestion import CODE_RE, QUARANTINE_TEXT, nfc, printed_pdf_path, record_r
 from .retrieval import Analyzer, KeywordIndex, RetrievalError, best_chunk_per_extraction
 from .retrieval import retrieve as _retrieve
 from .settings import Settings, read_api_key
-from .store import dumps, init_schema, open_db, tx, utcnow
+from .store import LockHeld, ProcessLock, dumps, init_schema, open_db, tx, utcnow
 
 
 class ServiceError(RuntimeError):
@@ -35,37 +34,6 @@ class GatewayLockError(ServiceError):
     pass
 
 
-class _ProcessLock:
-    """Exclusive owner of the real paid gateway for one data directory."""
-
-    def __init__(self, path: Path) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        self._f = open(path, "a+b")
-        try:
-            if os.name == "nt":
-                import msvcrt
-
-                self._f.seek(0)
-                msvcrt.locking(self._f.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-
-                fcntl.flock(self._f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            self._f.close()
-            raise GatewayLockError("another process already owns the paid gateway for this data directory") from None
-
-    def release(self) -> None:
-        if self._f.closed:
-            return
-        if os.name == "nt":
-            import msvcrt
-
-            self._f.seek(0)
-            msvcrt.locking(self._f.fileno(), msvcrt.LK_UNLCK, 1)
-        self._f.close()
-
-
 class Resources:
     """Process-wide owner. provider='fake' never builds a real SDK client, whatever keys the host has."""
 
@@ -73,7 +41,7 @@ class Resources:
         self.settings = settings
         init_schema(settings.db_path)
         budget.ensure_budget_row(settings.db_path)
-        self._lock: _ProcessLock | None = None
+        self._lock: ProcessLock | None = None
         self.transport: generation.Transport | None = transport
         self.provider_note = ""
         if transport is None and settings.provider == "fake":
@@ -81,7 +49,11 @@ class Resources:
         elif transport is None:
             key = read_api_key("OPENAI_API_KEY")
             if key:
-                self._lock = _ProcessLock(settings.data_dir / "gateway.lock")
+                try:
+                    self._lock = ProcessLock(settings.data_dir / "gateway.lock")
+                except LockHeld:
+                    raise GatewayLockError(
+                        "another process already owns the paid gateway for this data directory") from None
                 self.recovered = budget.recover(settings.db_path)  # no older worker can still dispatch
                 self.transport = generation.OpenAITransport(key, settings.request_timeout_seconds)
             else:
