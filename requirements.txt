@@ -1,0 +1,26 @@
+# Python 3.12, conda env `rfp-assistant`, NVIDIA GPU (CUDA 13.0 wheels, driver >= 580).
+# Versions pinned after a Windows smoke import on 2026-09-30.
+--extra-index-url https://download.pytorch.org/whl/cu130
+
+# Original parsing (HWP structured XML via pyhwp, PDF via PyMuPDF)
+pymupdf==1.28.2
+pyhwp==0.1b15
+
+# Korean keyword retrieval
+kiwipiepy==0.24.0
+rank_bm25==0.2.2
+
+# Generation, embeddings, token counting, dense scoring
+openai==3.22.1
+tiktoken==0.14.0
+numpy==2.5.3
+
+# Interfaces
+streamlit==1.64.0
+
+# ZoneInfo("Asia/Seoul") on Windows
+tzdata==2026.4; sys_platform == "win32"
+
+# Local reranker on GPU (BAAI/bge-reranker-v2-m3)
+torch==2.14.0+cu130
+sentence-transformers==6.1.0
