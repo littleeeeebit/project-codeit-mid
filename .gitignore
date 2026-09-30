@@ -1,0 +1,23 @@
+../.env
+.env
+.claude/
+.codex/
+.wiki/installed-agents.json
+.wiki/trajectory.jsonl
+.wiki/review/
+
+# Original dataset and local application artifacts
+/원본 데이터/
+/.idea/
+/.venv/
+/.venv-converter/
+/.runtime/
+/models/
+__pycache__/
+*.py[cod]
+
+# Local secrets and wiki synchronization state
+.env.*
+.streamlit/secrets.toml
+.wiki/.sync
+.wiki/wiki-revision
