@@ -213,6 +213,30 @@ class MergeTest(unittest.TestCase):
         self.assertTrue(raw[0]["location"].get("section_path"))  # the heading opens a section after the picture
         self.assertEqual(out[0]["location"]["section_path"], [])
 
+    def test_an_unplaced_picture_belongs_to_no_section(self):
+        import pymupdf
+
+        from rfp_assistant import ingestion
+        from rfp_assistant.store import write_jsonl_atomic
+
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = SimpleNamespace(data_dir=Path(tmp))
+            pdf = Path(tmp) / "doc.pdf"
+            with pymupdf.open() as doc:
+                page = doc.new_page()
+                for y, text in ((60, "1. Overview"), (90, "Figure network layout"), (230, "See the figure above"),
+                                (300, "Figure network layout"), (330, "See the figure above"),
+                                (500, "2. Appendix"), (530, "Closing notes of the appendix")):
+                    page.insert_text((72, y), text, fontsize=11)
+                image(page, (72, 110, 472, 210))
+                doc.save(pdf)
+            raw, _, _ = ingestion.parse_pdf(pdf)
+            write_jsonl_atomic(ocr.cache_path(settings, "h"), [read(pdf, 1, [72.0, 110.0, 472.0, 210.0])])
+            out, warnings, _ = ocr.merge(settings, "h", raw, pdf)
+        self.assertEqual(warnings, [{"code": "ocr_unplaced", "count": 1}])
+        self.assertTrue(raw[-1]["location"].get("section_path"))  # the last element sits in 2. Appendix
+        self.assertEqual((out[-1]["kind"], out[-1]["location"]["section_path"]), ("image_text", []))
+
     def test_a_picture_on_a_rotated_page_is_rendered_where_it_is_seen(self):
         import pymupdf
 

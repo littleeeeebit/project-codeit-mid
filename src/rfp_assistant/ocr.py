@@ -268,7 +268,7 @@ def load(settings: Settings, source_hash: str) -> list[dict]:
 
 
 ANCHOR_MIN = 6  # normalized characters of nearby print text needed to place an image
-MERGE_VERSION = "anchor-4"  # placement algorithm; part of the extraction fingerprint
+MERGE_VERSION = "anchor-5"  # placement algorithm; part of the extraction fingerprint
 
 
 def _anchors(doc, pno: int, bbox: list[float]) -> tuple[tuple[str, int], tuple[str, int]]:
@@ -347,9 +347,10 @@ def merge(settings: Settings, source_hash: str, raw: list[dict], rendering: Path
             near = (r["page"] - 0.5) / len(doc)
             k = _find(texts, pages, up, True, near)
             pos = k + 1 if k is not None else _find(texts, pages, down, False, near)
+            # Unplaced (appended at the end) or before the first element: no section is known for it.
+            before = raw[pos - 1]["location"] if pos else {}
             if pos is None:
                 pos, unplaced = len(raw), unplaced + 1
-            before = raw[pos - 1]["location"] if pos > 0 else {}  # before the first element: no section yet
             after.setdefault(pos, []).append({
                 "path": f"ocr/p{r['page']}/i{i}", "kind": "image_text", "parent": None, "raw_text": r["text"],
                 "location": {"format": "image_ocr", "rendering": r["rendering"], "page": r["page"], "bbox": r["bbox"],
