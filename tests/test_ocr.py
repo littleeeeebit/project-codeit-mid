@@ -237,6 +237,36 @@ class RunTest(unittest.TestCase):
         self.assertEqual(self.gemini_reads, ["t"])
         self.assertEqual(ocr.load(self.settings, "h")[0]["status"], "gemini")
 
+    def test_a_local_read_cached_before_truncation_was_recorded_is_read_again(self):
+        from rfp_assistant.store import write_jsonl_atomic
+
+        self.cached(1, "old", "local", "옛 판독")
+        rows = ocr.load(self.settings, "h")
+        del rows[0]["local"]["truncated"]
+        write_jsonl_atomic(ocr.cache_path(self.settings, "h"), rows)
+        self.assertFalse(ocr._final(rows[0]))
+        self.run_ocr([self.region(1, "old")], gemini=False)
+        self.assertEqual(len(self.local_reads), 1)
+        self.assertEqual(ocr.load(self.settings, "h")[0]["text"], "새 판독")
+
+    def test_a_second_run_is_refused_while_one_writes_the_cache(self):
+        from rfp_assistant.store import ProcessLock
+
+        lock = ProcessLock(self.settings.data_dir / "ocr" / "run.lock")
+        try:
+            with self.assertRaisesRegex(ocr.OcrError, "another OCR run"):
+                self.run_ocr([self.region(1, "a")], gemini=False)
+        finally:
+            lock.release()
+        self.assertEqual(self.local_reads, [])
+
+    def test_a_picture_repeated_unresolved_is_sent_to_gemini_once(self):
+        self.cached(1, "r", "unresolved", "흐림")
+        self.cached(2, "r", "unresolved", "흐림")
+        self.run_ocr([self.region(1, "r"), self.region(2, "r")])
+        self.assertEqual(self.gemini_reads, ["r"])
+        self.assertEqual([r["status"] for r in ocr.load(self.settings, "h")], ["gemini", "gemini"])
+
 
 class GeminiLedgerTest(unittest.TestCase):
     def setUp(self):
@@ -280,6 +310,24 @@ class GeminiLedgerTest(unittest.TestCase):
             first.read(b"png", "a")  # outside its with block
         with second:  # released on exit
             pass
+
+    def test_a_reader_that_fails_to_start_releases_the_ledger(self):
+        failed = self.reader()  # kept alive, so garbage collection cannot release the lock for it
+        with mock.patch("httpx.Client", side_effect=RuntimeError("no client")):
+            with self.assertRaises(RuntimeError):
+                failed.__enter__()
+        with self.reader():
+            pass
+
+    def test_a_blocked_or_unfinished_response_is_not_a_read(self):
+        usage = {"usageMetadata": {"promptTokenCount": 1000, "candidatesTokenCount": 0}}
+        blocked = {"promptFeedback": {"blockReason": "OTHER"}, **usage}
+        unfinished = {"candidates": [{"content": {"parts": [{"text": ""}]}}], **usage}
+        with self.reader([{"totalTokens": 1000}, blocked, {"totalTokens": 1000}, unfinished]) as r:
+            with self.assertRaisesRegex(ocr.OcrError, "blocked OTHER"):
+                r.read(b"png", "a")
+            with self.assertRaisesRegex(ocr.OcrError, "finish None"):
+                r.read(b"png", "b")
 
 
 if __name__ == "__main__":

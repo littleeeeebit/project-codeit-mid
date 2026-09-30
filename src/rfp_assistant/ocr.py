@@ -197,13 +197,20 @@ class GeminiReader:
             self.lock = ProcessLock(self.ledger.parent / "gemini-ledger.lock")
         except LockHeld:
             raise OcrError("another process is spending from the Gemini ledger") from None
-        self.http = httpx.Client(timeout=120, headers={"x-goog-api-key": self.key})
+        try:
+            self.http = httpx.Client(timeout=120, headers={"x-goog-api-key": self.key})
+        except BaseException:  # __exit__ never runs when __enter__ fails
+            self.lock.release()
+            self.lock = None
+            raise
         return self
 
     def __exit__(self, *exc) -> None:
-        self.http.close()
-        self.lock.release()
-        self.lock = None
+        try:
+            self.http.close()
+        finally:
+            self.lock.release()
+            self.lock = None
 
     def _post(self, action: str, body: dict) -> dict:
         r = self.http.post(f"{GEMINI_URL}:{action}", json=body)
@@ -231,8 +238,12 @@ class GeminiReader:
         out_tokens = usage.get("candidatesTokenCount", 0) + usage.get("thoughtsTokenCount", 0)
         _append(self.ledger, {"event": "settled", "call_id": call_id, "usage": usage,
                               "micro": _micro(usage.get("promptTokenCount", input_tokens), out_tokens)})
-        candidate = (data.get("candidates") or [{}])[0]
-        if candidate.get("finishReason") not in ("STOP", None):
+        # A blocked prompt has no candidate; only a finished one is a read (an image with no text finishes empty).
+        candidates = data.get("candidates") or []
+        if not candidates:
+            raise OcrError(f"gemini blocked {data.get('promptFeedback', {}).get('blockReason')}")
+        candidate = candidates[0]
+        if candidate.get("finishReason") != "STOP":
             raise OcrError(f"gemini finish {candidate.get('finishReason')}")
         return "".join(p.get("text", "") for p in candidate.get("content", {}).get("parts", [])).strip()
 
@@ -342,6 +353,8 @@ def merge(settings: Settings, source_hash: str, raw: list[dict], rendering: Path
 
 
 def _reasons(local: dict) -> list[str]:
+    if "truncated" not in local:  # read before truncation was recorded: not trusted, read again locally
+        return ["unrecorded_truncation"]
     return fallback_reasons(local["text"], local["mean_prob"], local["looped"], local["expected"], local["truncated"])
 
 
@@ -362,14 +375,25 @@ def _known(settings: Settings) -> dict[str, dict]:
 
 def run(settings: Settings, source_hashes: list[str] | None = None, gemini: bool = True) -> dict:
     """OCR every image region of every parsed source (or the named ones); resumable per region."""
-    from PIL import Image
-
     with open_db(settings.db_path) as conn:
         srcs = [dict(r) for r in conn.execute(
             "SELECT source_hash, format, original_path FROM sources WHERE parse_status = 'parsed' "
             "ORDER BY source_hash")]
     if source_hashes:
         srcs = [s for s in srcs if s["source_hash"] in set(source_hashes)]
+    try:  # every cache writer, local-only included, or one run's checkpoint overwrites another's paid reads
+        run_lock = ProcessLock(settings.data_dir / "ocr" / "run.lock")
+    except LockHeld:
+        raise OcrError("another OCR run is writing the cache") from None
+    try:
+        return _run(settings, srcs, gemini)
+    finally:
+        run_lock.release()
+
+
+def _run(settings: Settings, srcs: list[dict], gemini: bool) -> dict:
+    from PIL import Image
+
     known = _known(settings)
     totals = {"sources": 0, "regions": 0, "local": 0, "gemini": 0, "reused": 0, "unresolved": 0, "no_rendering": 0}
     reader = GeminiReader(settings) if gemini else None
@@ -391,13 +415,16 @@ def run(settings: Settings, source_hashes: list[str] | None = None, gemini: bool
                 visited.add(key)
                 cached = done.get(key)
                 # Same place is not same picture: a regenerated rendering can hold other pixels there.
-                prev = cached if cached and cached["digest"] == reg["digest"] else known.get(reg["digest"])
+                same = cached if cached and cached["digest"] == reg["digest"] else None
+                other = known.get(reg["digest"])
+                # A finished read of this picture anywhere beats an unfinished one here: no second paid read.
+                prev = next((r for r in (same, other) if r and _final(r)), same or other)
                 if prev and _final(prev):
                     rows.append({**prev, "page": reg["page"], "bbox": reg["bbox"], "rendering": rendering})
                     totals["reused"] += 1
                     continue
                 row = {"page": reg["page"], "bbox": reg["bbox"], "digest": reg["digest"], "rendering": rendering}
-                if prev:  # a local read that failed the test: no need to run the GPU again
+                if prev and "truncated" in prev["local"]:  # a local read that failed the test: no GPU again
                     first = prev["local"]
                 else:
                     image = Image.open(io.BytesIO(reg["png"])).convert("RGB")
