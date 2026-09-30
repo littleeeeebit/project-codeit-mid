@@ -167,6 +167,52 @@ class MergeTest(unittest.TestCase):
         self.assertEqual((out[k - 1]["location"]["page"], out[k - 1]["raw_text"].strip()), (2, "Figure 1 network layout"))
         self.assertEqual(warnings, [])
 
+    def test_a_caption_repeated_on_the_same_page_leaves_the_lower_anchor_to_place_the_picture(self):
+        import pymupdf
+
+        from rfp_assistant import ingestion
+        from rfp_assistant.store import write_jsonl_atomic
+
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = SimpleNamespace(data_dir=Path(tmp))
+            pdf = Path(tmp) / "doc.pdf"
+            with pymupdf.open() as doc:
+                page = doc.new_page()
+                for y, text in ((80, "Figure network layout"), (230, "Paragraph after the first figure"),
+                                (300, "Figure network layout"), (400, "Paragraph in the middle"),
+                                (600, "Figure network layout"), (700, "Paragraph at the end")):
+                    page.insert_text((72, y), text, fontsize=11)
+                image(page, (72, 100, 472, 200))
+                doc.save(pdf)
+            raw, _, _ = ingestion.parse_pdf(pdf)
+            write_jsonl_atomic(ocr.cache_path(settings, "h"), [read(pdf, 1, [72.0, 100.0, 472.0, 200.0])])
+            out, warnings, _ = ocr.merge(settings, "h", raw, pdf)
+        k = next(i for i, e in enumerate(out) if e["kind"] == "image_text")
+        self.assertEqual(out[k + 1]["raw_text"].strip(), "Paragraph after the first figure")
+        self.assertEqual(warnings, [])
+
+    def test_a_picture_before_the_first_heading_belongs_to_no_section(self):
+        import pymupdf
+
+        from rfp_assistant import ingestion
+        from rfp_assistant.store import write_jsonl_atomic
+
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = SimpleNamespace(data_dir=Path(tmp))
+            pdf = Path(tmp) / "doc.pdf"
+            with pymupdf.open() as doc:
+                page = doc.new_page()
+                image(page, (72, 40, 472, 190))
+                page.insert_text((72, 220), "1. Requirements", fontsize=11)
+                page.insert_text((72, 250), "The system shall keep an audit log", fontsize=11)
+                doc.save(pdf)
+            raw, _, _ = ingestion.parse_pdf(pdf)
+            write_jsonl_atomic(ocr.cache_path(settings, "h"), [read(pdf, 1, [72.0, 40.0, 472.0, 190.0])])
+            out, _, _ = ocr.merge(settings, "h", raw, pdf)
+        self.assertEqual(out[0]["kind"], "image_text")
+        self.assertTrue(raw[0]["location"].get("section_path"))  # the heading opens a section after the picture
+        self.assertEqual(out[0]["location"]["section_path"], [])
+
     def test_a_picture_on_a_rotated_page_is_rendered_where_it_is_seen(self):
         import pymupdf
 

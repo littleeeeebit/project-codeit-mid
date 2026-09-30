@@ -268,7 +268,7 @@ def load(settings: Settings, source_hash: str) -> list[dict]:
 
 
 ANCHOR_MIN = 6  # normalized characters of nearby print text needed to place an image
-MERGE_VERSION = "anchor-3"  # placement algorithm; part of the extraction fingerprint
+MERGE_VERSION = "anchor-4"  # placement algorithm; part of the extraction fingerprint
 
 
 def _anchors(doc, pno: int, bbox: list[float]) -> tuple[tuple[str, int], tuple[str, int]]:
@@ -304,14 +304,17 @@ def _anchors(doc, pno: int, bbox: list[float]) -> tuple[tuple[str, int], tuple[s
 def _find(texts: list[str], pages: list[int | None], anchor: tuple[str, int], tail: bool,
           near: float) -> int | None:
     """Index of the element holding the anchor (its tail or head, longest first). Elements with a page (PDF, the
-    Hancom print) must be on the anchor's page; without pages (pyhwp), of several hits the one whose place in the
-    document is nearest the image's (a heading also appears in the contents)."""
+    Hancom print) must be the only one on the anchor's page: elements keep no box, so two hits there are ambiguous
+    and give none. Without pages (pyhwp), of several hits the one whose place in the document is nearest the
+    image's (a heading also appears in the contents)."""
     text, page = anchor
     for n in (40, 20, 10):
         piece = text[-n:] if tail else text[:n]
         if len(piece) < ANCHOR_MIN:
             return None
         hits = [k for k, t in enumerate(texts) if piece in t and pages[k] in (None, page)]
+        if len(hits) > 1 and pages[hits[0]] is not None:
+            return None
         if hits:
             return min(hits, key=lambda k: abs(k / len(texts) - near))
     return None
@@ -346,7 +349,7 @@ def merge(settings: Settings, source_hash: str, raw: list[dict], rendering: Path
             pos = k + 1 if k is not None else _find(texts, pages, down, False, near)
             if pos is None:
                 pos, unplaced = len(raw), unplaced + 1
-            before = raw[min(max(pos - 1, 0), len(raw) - 1)]["location"] if raw else {}
+            before = raw[pos - 1]["location"] if pos > 0 else {}  # before the first element: no section yet
             after.setdefault(pos, []).append({
                 "path": f"ocr/p{r['page']}/i{i}", "kind": "image_text", "parent": None, "raw_text": r["text"],
                 "location": {"format": "image_ocr", "rendering": r["rendering"], "page": r["page"], "bbox": r["bbox"],
