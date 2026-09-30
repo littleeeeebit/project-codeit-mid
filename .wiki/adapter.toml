@@ -1,0 +1,8 @@
+agents = ["claude", "codex"]
+
+[slots]
+review_dir = ".wiki/review"
+gate_cmd = "git diff --check"
+live_cmd = "open a new host session in this repository and confirm wiki hooks and the options question UI"
+server_stop = "Ctrl+C in the terminal that started the server"
+scratch_dirs = ".wiki/review/"

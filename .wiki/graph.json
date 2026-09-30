@@ -1,0 +1,445 @@
+{
+ "ns": "repo",
+ "repo": "project-codeit-mid",
+ "nodes_from": ".wiki/corpus.json",
+ "edges": [
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/rag/budget.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/rag/chunking.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/rag/delivery-plan.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/rag/evaluation.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/rag/frontend.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/rag/golden-dataset.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/rag/index.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/rag/preprocessing.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/rag/project-and-data.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/rag/prompts.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/rag/reranking.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/rag/retrieval.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/rag/sources.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/plan/end-to-end/1-guarded-vertical-slice.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/plan/end-to-end/3-workflows-and-operations.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/plan/end-to-end/5-team-operation.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/plan/end-to-end/implementation-contracts.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/1-guarded-vertical-slice.md",
+   "b": "docs/rag/budget.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/1-guarded-vertical-slice.md",
+   "b": "docs/rag/chunking.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/1-guarded-vertical-slice.md",
+   "b": "docs/rag/preprocessing.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/1-guarded-vertical-slice.md",
+   "b": "docs/rag/project-and-data.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/1-guarded-vertical-slice.md",
+   "b": "docs/rag/prompts.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/1-guarded-vertical-slice.md",
+   "b": "docs/plan/end-to-end/0-overview.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/1-guarded-vertical-slice.md",
+   "b": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/1-guarded-vertical-slice.md",
+   "b": "docs/plan/end-to-end/implementation-contracts.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "b": "docs/rag/chunking.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "b": "docs/rag/evaluation.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "b": "docs/rag/preprocessing.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "b": "docs/rag/reranking.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "b": "docs/rag/retrieval.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "b": "docs/plan/end-to-end/1-guarded-vertical-slice.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "b": "docs/plan/end-to-end/3-workflows-and-operations.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "b": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "b": "docs/plan/end-to-end/implementation-contracts.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/3-workflows-and-operations.md",
+   "b": "docs/rag/budget.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/3-workflows-and-operations.md",
+   "b": "docs/rag/frontend.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/3-workflows-and-operations.md",
+   "b": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/3-workflows-and-operations.md",
+   "b": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/3-workflows-and-operations.md",
+   "b": "docs/plan/end-to-end/implementation-contracts.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "b": "docs/rag/delivery-plan.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "b": "docs/rag/evaluation.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "b": "docs/rag/golden-dataset.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "b": "docs/plan/end-to-end/5-team-operation.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "b": "docs/plan/end-to-end/implementation-contracts.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/5-team-operation.md",
+   "b": "docs/rag/budget.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/5-team-operation.md",
+   "b": "docs/rag/evaluation.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/5-team-operation.md",
+   "b": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/5-team-operation.md",
+   "b": "docs/plan/end-to-end/implementation-contracts.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/implementation-contracts.md",
+   "b": "docs/plan/end-to-end/0-overview.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/chunking.md",
+   "b": "docs/rag/budget.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/delivery-plan.md",
+   "b": "docs/rag/chunking.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/delivery-plan.md",
+   "b": "docs/rag/golden-dataset.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/delivery-plan.md",
+   "b": "docs/rag/preprocessing.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/delivery-plan.md",
+   "b": "docs/rag/project-and-data.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/evaluation.md",
+   "b": "docs/rag/golden-dataset.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/golden-dataset.md",
+   "b": "docs/rag/budget.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/golden-dataset.md",
+   "b": "docs/rag/evaluation.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/plan/end-to-end/0-overview.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/rag/architecture.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/rag/budget.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/rag/chunking.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/rag/delivery-plan.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/rag/evaluation.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/rag/frontend.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/rag/golden-dataset.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/rag/preprocessing.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/rag/project-and-data.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/rag/prompts.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/rag/reranking.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/rag/retrieval.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/index.md",
+   "b": "docs/rag/sources.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/preprocessing.md",
+   "b": "docs/rag/evaluation.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/prompts.md",
+   "b": "docs/rag/budget.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/sources.md",
+   "b": "docs/rag/project-and-data.md",
+   "kind": "link"
+  },
+  {
+   "a": ".wiki/rag-research",
+   "b": "docs/plan/end-to-end/0-overview.md",
+   "kind": "reads",
+   "cross": true
+  },
+  {
+   "a": ".wiki/rag-research",
+   "b": "docs/rag/index.md",
+   "kind": "reads",
+   "cross": true
+  },
+  {
+   "a": ".wiki/rag-research",
+   "b": "docs/plan/end-to-end/0-overview.md",
+   "kind": "reads",
+   "cross": true
+  },
+  {
+   "a": ".wiki/rag-research",
+   "b": "docs/rag/budget.md",
+   "kind": "reads",
+   "cross": true
+  },
+  {
+   "a": ".wiki/rag-research",
+   "b": "docs/rag/delivery-plan.md",
+   "kind": "reads",
+   "cross": true
+  },
+  {
+   "a": ".wiki/rag-research",
+   "b": "docs/rag/index.md",
+   "kind": "reads",
+   "cross": true
+  },
+  {
+   "a": ".wiki/rag-research",
+   "b": "docs/rag/project-and-data.md",
+   "kind": "reads",
+   "cross": true
+  },
+  {
+   "a": ".wiki/rag-research",
+   "b": "프로젝트 개요.md",
+   "kind": "reads",
+   "cross": true
+  }
+ ],
+ "orphans": [],
+ "counts": {
+  "docs": 22,
+  "linked": 16,
+  "read": 6,
+  "orphans": 0,
+  "pages": 1,
+  "decisions": 1,
+  "injectable_decisions": 0
+ }
+}
