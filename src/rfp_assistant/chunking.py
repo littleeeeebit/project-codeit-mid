@@ -9,7 +9,7 @@ from functools import lru_cache
 
 from .ingestion import CODE_RE
 
-CHUNKER_VERSION = "structural-3"
+CHUNKER_VERSION = "structural-4"  # 4: tokenizer-offset windows, links between pieces of one split element
 LABEL_LINES = 2  # title lines carried into the table below them
 LABEL_CHARS = 60
 TARGET_TOKENS = 700
@@ -29,10 +29,57 @@ def count_tokens(text: str) -> int:
     return len(_encoding().encode(text))
 
 
-def chunker_fingerprint() -> str:
-    info = {"v": CHUNKER_VERSION, "target": TARGET_TOKENS, "hard": HARD_TOKENS, "overlap": OVERLAP_TOKENS,
-            "tokenizer": TOKENIZER}
+FIXED_VERSION = "fixed-1"
+# name -> (window tokens, overlap tokens); None is the structural chunker
+PROFILES: dict[str, tuple[int, int] | None] = {
+    "structural": None, "fixed-256-32": (256, 32), "fixed-512-64": (512, 64), "fixed-800-96": (800, 96)}
+
+
+def chunker_fingerprint(profile: str = "structural") -> str:
+    if profile not in PROFILES:
+        raise ValueError(f"unknown chunk profile {profile!r}; choose from {sorted(PROFILES)}")
+    if PROFILES[profile] is None:
+        info = {"v": CHUNKER_VERSION, "target": TARGET_TOKENS, "hard": HARD_TOKENS, "overlap": OVERLAP_TOKENS,
+                "tokenizer": TOKENIZER}
+    else:
+        size, overlap = PROFILES[profile]
+        info = {"v": FIXED_VERSION, "size": size, "overlap": overlap, "tokenizer": TOKENIZER}
     return hashlib.sha256(json.dumps(info, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def build_profile(elements: list[dict], extraction_id: str, profile: str) -> tuple[list[dict], list[dict]]:
+    """Chunks for one extraction under a named profile. The requirement inventory always comes from the source
+    structure, so exhaustive lists do not depend on the chunking under comparison."""
+    chunks, inventory = build_chunks(elements, extraction_id)
+    if PROFILES[profile] is None:
+        return chunks, inventory
+    size, overlap = PROFILES[profile]
+    return build_fixed_chunks(elements, extraction_id, size, overlap, chunker_fingerprint(profile)), inventory
+
+
+def build_fixed_chunks(elements: list[dict], extraction_id: str, size: int, overlap: int, fp: str) -> list[dict]:
+    """Baseline token windows over the same element order as the structural chunker (contents entries
+    excluded), within one extraction revision. No headings are added; every window maps back to raw spans."""
+    parts: list[tuple[dict, int, int]] = []
+    text = ""
+    for el in elements:
+        if el["kind"] == "toc" or not el["raw_text"].strip():
+            continue
+        if text:
+            text += "\n"
+        parts.append((el, len(text), len(text) + len(el["raw_text"])))
+        text += el["raw_text"]
+    b = _Builder(extraction_id, fp)
+    for cs, ce in _windows(text, size, overlap):
+        spans = [{"element_id": el["element_id"], "start": max(cs, es) - es, "end": min(ce, ee) - es}
+                 for el, es, ee in parts if es < ce and cs < ee and min(ce, ee) > max(cs, es)]
+        if not spans:
+            continue
+        first = next(el for el, es, ee in parts if el["element_id"] == spans[0]["element_id"])
+        codes = list(dict.fromkeys(CODE_RE.findall(text[cs:ce])))
+        b.add("", text[cs:ce], spans, "fixed", codes[0] if len(codes) == 1 else None,
+              first["location"].get("section_path", []))
+    return b.linked()
 
 
 def _heading(section_path: list[str]) -> str:
@@ -87,7 +134,7 @@ class _Builder:
         self.chunks: list[dict] = []
 
     def add(self, heading: str, body: str, spans: list[dict], chunk_type: str, requirement_key: str | None,
-            section_path: list[str]) -> None:
+            section_path: list[str], split_group: str | None = None) -> None:
         payload = f"{heading}\n{body}".strip() if heading else body.strip()
         if not payload:
             return
@@ -102,23 +149,53 @@ class _Builder:
             "chunk_type": chunk_type,
             "requirement_key": requirement_key,
             "section_path": section_path,
+            "split_group": split_group,
         })
+
+    def linked(self) -> list[dict]:
+        """Pieces of one oversized element or row know each other, so packing can keep a condition with its
+        fact or report that it could not."""
+        groups: dict[str, list[str]] = {}
+        for c in self.chunks:
+            if c["split_group"]:
+                groups.setdefault(c["split_group"], []).append(c["chunk_id"])
+        for c in self.chunks:
+            group = groups.get(c.pop("split_group") or "", [])
+            c["linked"] = [x for x in group if x != c["chunk_id"]]
+        return self.chunks
+
+
+def _windows(text: str, size: int, overlap: int) -> list[tuple[int, int]]:
+    """Character ranges of token windows over `text`. Offsets come from the tokenizer's own character map, so
+    a window never starts inside a multi-byte character; each range is shrunk until it fits `size` tokens."""
+    enc = _encoding()
+    ids = enc.encode(text)
+    if not ids:
+        return []
+    _, offsets = enc.decode_with_offsets(ids)
+    ranges, start = [], 0
+    step = max(1, size - overlap)
+    while start < len(ids):
+        end = min(start + size, len(ids))
+        cs = offsets[start]
+        ce = offsets[end] if end < len(ids) else len(text)
+        while cs < ce and text[cs].isspace():  # payloads are stripped; count what is actually stored
+            cs += 1
+        while ce > cs and text[ce - 1].isspace():
+            ce -= 1
+        while ce > cs + 1 and count_tokens(text[cs:ce]) > size:
+            ce -= 1
+        if ce > cs:
+            ranges.append((cs, ce))
+        if end >= len(ids):
+            break
+        start += step
+    return ranges
 
 
 def _split_prose(text: str, budget: int) -> list[tuple[int, int]]:
     """Character ranges of token windows with overlap for one oversized element."""
-    enc = _encoding()
-    ids = enc.encode(text)
-    ranges, start = [], 0
-    step = budget - OVERLAP_TOKENS
-    while start < len(ids):
-        piece = ids[start:start + budget]
-        prefix_chars = len(enc.decode(ids[:start]))
-        ranges.append((prefix_chars, prefix_chars + len(enc.decode(piece))))
-        if start + budget >= len(ids):
-            break
-        start += step
-    return ranges
+    return _windows(text, budget, OVERLAP_TOKENS)
 
 
 def build_chunks(elements: list[dict], extraction_id: str) -> tuple[list[dict], list[dict]]:
@@ -153,7 +230,8 @@ def build_chunks(elements: list[dict], extraction_id: str) -> tuple[list[dict], 
             flush()
             for start, end in _split_prose(el["raw_text"], HARD_TOKENS - head_tokens - 8):
                 b.add(heading, el["raw_text"][start:end],
-                      [{"element_id": el["element_id"], "start": start, "end": end}], "image_text", None, path)
+                      [{"element_id": el["element_id"], "start": start, "end": end}], "image_text", None, path,
+                      el["element_id"])
             continue
         if kind in ("paragraph", "heading") or (kind == "table" and el["table"]["rows"] * el["table"]["cols"] == 1):
             text = el["raw_text"].strip()
@@ -167,7 +245,8 @@ def build_chunks(elements: list[dict], extraction_id: str) -> tuple[list[dict], 
                 flush()
                 for start, end in _split_prose(el["raw_text"], HARD_TOKENS - head_tokens - 8):
                     b.add(heading, el["raw_text"][start:end],
-                          [{"element_id": el["element_id"], "start": start, "end": end}], "prose", None, path)
+                          [{"element_id": el["element_id"], "start": start, "end": end}], "prose", None, path,
+                          el["element_id"])
                 continue
             buf.append(el)
             buf_tokens += tokens
@@ -204,14 +283,15 @@ def build_chunks(elements: list[dict], extraction_id: str) -> tuple[list[dict], 
         group: list[tuple[int, str]] = []
         group_tokens = 0
 
-        def emit(group: list[tuple[int, str]]) -> None:
+        def emit(group: list[tuple[int, str]], split_group: str | None = None) -> None:
             if not group:
                 return
             body = "\n".join(x for x in (fixed, *[line for _, line in group]) if x)
             row_ids = ([header_r] if header_r is not None else []) + [r for r, _ in group]
             keys = list(dict.fromkeys(CODE_RE.findall("\n".join(line for _, line in group))))
             key = codes[0] if ctype == "requirement_detail" else (keys[0] if len(keys) == 1 else None)
-            b.add(heading, body, label_spans + [{"element_id": el["element_id"], "rows": row_ids}], ctype, key, path)
+            b.add(heading, body, label_spans + [{"element_id": el["element_id"], "rows": row_ids}], ctype, key, path,
+                  split_group)
 
         for r, line in body_rows:
             t = count_tokens(line) + 1
@@ -221,11 +301,11 @@ def build_chunks(elements: list[dict], extraction_id: str) -> tuple[list[dict], 
             if t + fixed_tokens > HARD_TOKENS:  # one oversized row: split its text
                 for start, end in _split_prose(line, HARD_TOKENS - fixed_tokens - 8):
                     group = [(r, line[start:end])]
-                    emit(group)
+                    emit(group, f"{el['element_id']}/r{r}")
                 group, group_tokens = [], 0
                 continue
             group.append((r, line))
             group_tokens += t
         emit(group)
     flush()
-    return b.chunks, inventory
+    return b.linked(), inventory

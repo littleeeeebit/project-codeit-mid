@@ -16,11 +16,12 @@ from dataclasses import asdict
 from pathlib import Path
 
 from . import auth, budget, fidelity, generation, gold
+from . import dense as dense_mod
 from .auth import require, require_any
 from .contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, EvidenceUnit, EvidenceView,
                         ManagedDownload, Principal, RetrievalResult)
-from .ingestion import CODE_RE, QUARANTINE_TEXT, nfc, printed_pdf_path, record_review
-from .retrieval import Analyzer, KeywordIndex, RetrievalError, best_chunk_per_extraction
+from .ingestion import CODE_RE, QUARANTINE_TEXT, nfc, printed_pdf_path, record_review, resolutions_by_doc
+from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, RetrievalError, best_chunk_per_extraction, scope_rows
 from .retrieval import retrieve as _retrieve
 from .settings import Settings, read_api_key
 from .store import LockHeld, ProcessLock, dumps, init_schema, open_db, tx, utcnow
@@ -60,21 +61,74 @@ class Resources:
                 self.provider_note = "OPENAI_API_KEY is not configured; paid generation is unavailable"
         self.analyzer = Analyzer()
         self._index: KeywordIndex | None = None
+        self._dense: dense_mod.DenseIndex | None = None
+        self._reranker = None
+        self._reranker_key: tuple | None = None
+        self._dense_failed: tuple | None = None
+        self.stage_errors: dict[str, str] = {}
         self._index_lock = threading.Lock()
         self._closed = False
         atexit.register(self.close)
 
+    def serving(self) -> dict:
+        """The activated retrieval configuration (`activate-run`), or the keyword default before any selection."""
+        from .store import get_app_setting
+
+        with open_db(self.settings.db_path) as conn:
+            run = get_app_setting(conn, "active_run")
+            active = get_app_setting(conn, "active_index")
+        if run:
+            return json.loads(run)
+        return {"run_id": None, "mode": self.settings.retrieval_mode, "index_version": active,
+                "dense_version": None, "reranker": None, "fallback_mode": "kiwi_bm25"}
+
     def index(self) -> KeywordIndex | None:
         with self._index_lock:
-            from .store import get_app_setting
-
-            with open_db(self.settings.db_path) as conn:
-                active = get_app_setting(conn, "active_index")
+            active = self.serving()["index_version"]
             if active is None:
                 return None
             if self._index is None or self._index.version != active:
                 self._index = KeywordIndex.load(self.settings, active)
             return self._index
+
+    def dense(self) -> dense_mod.DenseIndex | None:
+        """Loaded and verified once per version. A mismatch leaves it unloaded so retrieval falls back to the
+        keyword mode with the reason in its trace; no corpus rebuild happens during a question."""
+        version = self.serving().get("dense_version")
+        if not version:
+            return None
+        idx = self.index()
+        with self._index_lock:
+            if self._dense is not None and self._dense.version == version and idx is not None \
+                    and self._dense.base_index_version == idx.version:
+                return self._dense
+            if self._dense_failed == (version, idx.version if idx else None):
+                return None  # verified once and refused; a new activation or restart checks again
+            try:
+                self._dense = dense_mod.DenseIndex.load(self.settings, version, base=idx)
+                self.stage_errors.pop("dense", None)
+            except dense_mod.DenseError as exc:
+                self._dense = None
+                self._dense_failed = (version, idx.version if idx else None)
+                self.stage_errors["dense"] = str(exc)[:300]
+            return self._dense
+
+    def reranker(self):
+        cfg = self.serving().get("reranker")
+        if not cfg:
+            return None
+        key = (cfg.get("model"), cfg.get("revision"))
+        with self._index_lock:
+            if self._reranker_key != key:
+                self._reranker_key = key
+                s = self.settings.with_(reranker_model=cfg.get("model") or self.settings.reranker_model,
+                                        reranker_revision=cfg.get("revision") or "")
+                self._reranker, info = dense_mod.load_reranker(s)
+                if self._reranker is None:
+                    self.stage_errors["reranker"] = info.get("error", "unavailable")
+                else:
+                    self.stage_errors.pop("reranker", None)
+            return self._reranker
 
     def close(self) -> None:
         if self._closed:
@@ -106,6 +160,7 @@ def _doc_rows(res: Resources, doc_ids: list[str] | None = None) -> list[dict]:
         rows = conn.execute(
             "SELECT d.*, s.format, s.parse_status, s.review_status, s.reason_code, s.active_extraction_id "
             "FROM documents d JOIN sources s ON s.source_hash = d.active_source_hash ORDER BY d.csv_row_id").fetchall()
+        resolutions = resolutions_by_doc(conn)
     out = []
     for r in rows:
         if doc_ids is not None and r["doc_id"] not in doc_ids:
@@ -113,6 +168,7 @@ def _doc_rows(res: Resources, doc_ids: list[str] | None = None) -> list[dict]:
         d = dict(r)
         d["meta"] = json.loads(d.pop("normalized_metadata_json"))
         d["quality"] = json.loads(d.pop("quality_json"))
+        d["resolutions"] = resolutions.get(d["doc_id"], {})
         d.pop("raw_metadata_json")
         out.append(d)
     return out
@@ -146,8 +202,9 @@ def search_projects(res: Resources, principal: Principal, filters: dict, query: 
     parsed_only = filters.get("parsed_only", False)
     items = []
     for d in docs:
-        m = d["meta"]
-        conflicts = {c["field"] for c in d["quality"].get("provenance_conflicts", [])}
+        # A written owner/reviewer resolution supplies the filter value; the competing values stay visible.
+        m = {**d["meta"], **{f: r["value"] for f, r in d["resolutions"].items()}}
+        conflicts = {c["field"] for c in d["quality"].get("provenance_conflicts", [])} - set(d["resolutions"])
         if inst and inst not in (m["institution"] or ""):
             continue
         if amount_min is not None or amount_max is not None:  # unknown amounts never satisfy a range
@@ -188,18 +245,36 @@ def search_projects(res: Resources, principal: Principal, filters: dict, query: 
         "indexed": _indexed(res, d["active_extraction_id"]),
         "unavailable_reason": QUARANTINE_TEXT.get(d["reason_code"] or ""),
         "flags": d["quality"]["flags"], "conflicts": d["quality"].get("provenance_conflicts", []),
-        "snippet": snip,
+        "resolutions": d["resolutions"], "snippet": snip,
     } for _, _, d, snip in ranked[:limit]]
 
 
-def retrieve(res: Resources, principal: Principal, question: str, scope: list[DocRef]) -> RetrievalResult:
+def retrieve(res: Resources, principal: Principal, question: str, scope: list[DocRef], *,
+             request_id: str | None = None, allow_paid: bool = False) -> RetrievalResult:
+    """Serves the activated mode. A dense query vector comes from the cache, or through the gateway only when
+    the caller is a paid request (`allow_paid`); an empty scope never pays for one."""
     require_any(principal, "consultant", "verifier")
     docs = _resolve_scope(res, scope)
     idx = res.index()
     if idx is None:
         raise ServiceError("검색 색인이 아직 없습니다.")
-    return _retrieve(res.settings, idx, res.analyzer, question,
-                     [(DocRef(d["doc_id"], d["active_source_hash"]), d["active_extraction_id"]) for d in docs])
+    cfg = res.serving()
+    pairs = [(DocRef(d["doc_id"], d["active_source_hash"]), d["active_extraction_id"]) for d in docs]
+    dense = qvec = qinfo = None
+    if cfg["mode"] in DENSE_MODES:
+        dense = res.dense()
+        if dense is not None and scope_rows(idx, pairs):
+            qvec, qinfo = dense_mod.query_vector(res.settings, res.transport, question, request_id=request_id,
+                                                 member_id=principal.member_id, purpose="interactive",
+                                                 allow_paid=allow_paid)
+    result = _retrieve(res.settings, idx, res.analyzer, question, pairs, mode=cfg["mode"], dense=dense,
+                       query_vector=qvec, reranker=res.reranker() if cfg["mode"] == "hybrid_rerank" else None,
+                       rerank_depth=(cfg.get("reranker") or {}).get("depth"))
+    result.query_embedding = qinfo
+    wanted = {"dense"} | ({"reranker"} if cfg["mode"] == "hybrid_rerank" else set())
+    if cfg["mode"] in DENSE_MODES:
+        result.limitations += [f"{stage}_unavailable" for stage in res.stage_errors if stage in wanted]
+    return result
 
 
 # ---------------------------------------------------------------- answers
@@ -233,17 +308,23 @@ def _evidence_map(evidence: list[EvidenceUnit]) -> dict[str, dict]:
     return {e.evidence_id: asdict(e) for e in evidence}
 
 
-def prepare_answer(res: Resources, principal: Principal, question: str, scope: list[DocRef], as_of: str) -> dict:
-    """Retrieval plus exact prompt counting and the maximum reservation estimate. Free."""
+def prepare_answer(res: Resources, principal: Principal, question: str, scope: list[DocRef], as_of: str, *,
+                   request_id: str | None = None, allow_paid: bool = False) -> dict:
+    """Retrieval plus exact prompt counting and the maximum reservation estimate. Free unless `allow_paid`
+    lets a dense mode pay for an uncached query embedding."""
     require_any(principal, "consultant", "verifier")
     docs = _resolve_scope(res, scope)
-    retrieval = retrieve(res, principal, question, scope)
+    retrieval = retrieve(res, principal, question, scope, request_id=request_id, allow_paid=allow_paid)
     messages = generation.build_messages(question, as_of, [_doc_brief(d) for d in docs], retrieval.evidence,
                                          retrieval.limitations)
     rf = generation.answer_json_schema()
     tokens = generation.count_request_tokens(messages, rf, res.settings.framing_margin_tokens)
     est = budget.estimate(res.settings.db_path, res.settings.generation_model, tokens,
                           res.settings.generation_max_output_tokens)
+    qe = retrieval.query_embedding or {}
+    if qe.get("cache") == "miss" and not qe.get("attempt_id"):  # a paid answer would embed the query first
+        est += budget.estimate(res.settings.db_path, res.settings.embedding_model,
+                               dense_mod.count_embedding_tokens(question) + dense_mod.QUERY_MARGIN_TOKENS, 0)
     return {"retrieval": retrieval, "messages": messages, "response_format": rf, "input_tokens": tokens,
             "estimate_micro_usd": est, "docs": docs}
 
@@ -300,16 +381,21 @@ def answer(res: Resources, principal: Principal, request: AnswerRequest) -> Answ
                     missing_fields=[{"doc_id": doc["doc_id"], "field": "document",
                                      "reason": "ingestion_unavailable"}])
     try:
-        prep = prepare_answer(res, principal, question, request.scope, request.as_of)
+        prep = prepare_answer(res, principal, question, request.scope, request.as_of, request_id=request_id,
+                              allow_paid=True)
     except (RetrievalError, budget.BudgetError) as exc:
         return done("technical_error", "검색 또는 비용 추정에 실패했습니다.", request_status="failed", error=str(exc))
     retrieval: RetrievalResult = prep["retrieval"]
+    embed_attempts = [retrieval.query_embedding["attempt_id"]] if (retrieval.query_embedding or {}).get(
+        "attempt_id") else []
     trace["retrieval"] = asdict(retrieval)
     trace["input_tokens_estimate"] = prep["input_tokens"]
     evidence_map = _evidence_map(retrieval.evidence)
     if not retrieval.evidence:
         return done("insufficient_evidence", "선택한 문서에서 질문과 관련된 근거를 찾지 못했습니다.",
-                    missing_fields=[{"doc_id": doc["doc_id"], "field": "answer", "reason": "not_found_in_context"}])
+                    missing_fields=[{"doc_id": doc["doc_id"], "field": "answer", "reason": "not_found_in_context"}],
+                    attempt_ids=embed_attempts,
+                    billing_state=(retrieval.query_embedding or {}).get("billing", "none") if embed_attempts else "none")
 
     admission = budget.reserve(s.db_path, request_id=request_id, member_id=principal.member_id, stage="generation",
                                purpose="interactive", model=s.generation_model, input_tokens=prep["input_tokens"],
@@ -317,12 +403,14 @@ def answer(res: Resources, principal: Principal, request: AnswerRequest) -> Answ
     trace["admission"] = admission
     if not admission["admitted"]:
         return done("budget_blocked", "공유 사용 한도 또는 유료 호출 설정 때문에 답변 생성을 시작하지 않았습니다. "
-                    "검색과 원문 열람은 계속 사용할 수 있습니다.", evidence=evidence_map, error=admission["reason"])
+                    "검색과 원문 열람은 계속 사용할 수 있습니다.", evidence=evidence_map, error=admission["reason"],
+                    attempt_ids=embed_attempts)
     attempt_id = admission["attempt_id"]
+    attempt_ids = embed_attempts + [attempt_id]
     if res.transport is None:
         budget.release(s.db_path, attempt_id, "provider_unavailable")
         return done("technical_error", "유료 모델 연결이 설정되지 않았습니다.", request_status="failed",
-                    evidence=evidence_map, attempt_ids=[attempt_id], billing_state="released",
+                    evidence=evidence_map, attempt_ids=attempt_ids, billing_state="released",
                     error=res.provider_note)
     budget.mark_dispatching(s.db_path, attempt_id)
     try:
@@ -338,7 +426,7 @@ def answer(res: Resources, principal: Principal, request: AnswerRequest) -> Answ
             budget.mark_unknown(s.db_path, attempt_id, str(exc))
             billing = "unknown"
         return done("technical_error", "모델 호출에 실패했습니다. 자동으로 다시 시도하지 않습니다.",
-                    request_status="failed", evidence=evidence_map, attempt_ids=[attempt_id], billing_state=billing,
+                    request_status="failed", evidence=evidence_map, attempt_ids=attempt_ids, billing_state=billing,
                     error=str(exc)[:300])
     if response.usage is None:
         budget.mark_unknown(s.db_path, attempt_id, "provider returned no usage")
@@ -354,12 +442,12 @@ def answer(res: Resources, principal: Principal, request: AnswerRequest) -> Answ
     except generation.TechnicalError as exc:
         trace["raw_output"] = (response.content or "")[:4000]
         return done("technical_error", "모델 응답을 검증하지 못했습니다. 비용은 기록되었으며 자동 재시도는 하지 않습니다.",
-                    request_status="failed", evidence=evidence_map, attempt_ids=[attempt_id], billing_state=billing,
+                    request_status="failed", evidence=evidence_map, attempt_ids=attempt_ids, billing_state=billing,
                     error=str(exc)[:300])
     return done(payload.status, payload.summary, claims=[c.model_dump() for c in payload.claims],
                 missing_fields=[m.model_dump() for m in payload.missing_fields],
                 conflicts=[c.model_dump() for c in payload.conflicts], next_action=payload.next_action,
-                evidence=evidence_map, attempt_ids=[attempt_id], billing_state=billing)
+                evidence=evidence_map, attempt_ids=attempt_ids, billing_state=billing)
 
 
 def _stored_quote(res: Resources, e: EvidenceUnit) -> str | None:
@@ -433,6 +521,7 @@ def verifier_trace(res: Resources, principal: Principal, question: str, scope: l
     return {"retrieval": asdict(r), "query_tokens": res.analyzer.tokens(question), "codes": codes,
             "input_tokens": prep["input_tokens"], "estimate_micro_usd": prep["estimate_micro_usd"],
             "index_version": idx.version if idx else None, "review_scope": idx.review_scope if idx else None,
+            "serving": res.serving(), "stage_errors": dict(res.stage_errors),
             "docs": [{k: d[k] for k in ("doc_id", "filename", "parse_status", "review_status", "reason_code")}
                      for d in prep["docs"]]}
 

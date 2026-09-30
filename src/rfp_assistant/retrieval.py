@@ -8,7 +8,7 @@ import shutil
 import threading
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import metadata
 from pathlib import Path
 
@@ -62,10 +62,34 @@ def analyzer_fingerprint(analyzer: Analyzer) -> str:
     return hashlib.sha256(json.dumps(info, sort_keys=True).encode()).hexdigest()[:16]
 
 
+
+
+class WhitespaceAnalyzer:
+    """K0 baseline: NFC, lowercase, split on whitespace, strip surrounding punctuation. Requirement codes are
+    served by the separate exact lookup, as in K1."""
+
+    version = "whitespace-1"
+    PUNCT = "\"'()[]{}<>.,:;!?·•○◦□■-–—「」『』《》〈〉“”‘’"
+
+    def tokens(self, text: str) -> list[str]:
+        return [t for t in (w.strip(self.PUNCT) for w in nfc(text).lower().split()) if t]
+
+
+# Run labels of the phase-2 comparison -> retrieval modes
+RUN_MODES = {"K0": "whitespace_bm25", "K1": "kiwi_bm25", "D": "dense", "H": "hybrid", "HR": "hybrid_rerank"}
+MODES = tuple(RUN_MODES.values())
+DENSE_MODES = ("dense", "hybrid", "hybrid_rerank")
+LINKED_EXTRA_UNITS = 2  # sibling pieces of a split element packed with a selected piece
+IDF_POLICY = "global"  # IDF over the whole index; rows outside the scope are masked before ranking
+
+
 # ---------------------------------------------------------------- index build
 
 
-def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreviewed: bool = False) -> dict:
+def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreviewed: bool = False,
+                        profile: str = "structural", activate: bool = True) -> dict:
+    """Immutable index for one chunk profile. `activate` moves the keyword pointer (the phase-1 default path);
+    once `activate-run` has recorded a selection, only another activation changes what serves users."""
     allowed = ("auto_verified", "sample_checked", "reviewed") + (
         ("unreviewed", "auto_flagged") if include_unreviewed else ())
     with open_db(settings.db_path) as conn:
@@ -74,7 +98,8 @@ def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreview
             f"AND review_status IN ({','.join('?' * len(allowed))}) ORDER BY source_hash", allowed)]
     if not sources:
         raise RetrievalError("no parsed sources match the review policy; record reviews or pass --include-unreviewed")
-    config = {"chunker": chunking.chunker_fingerprint(), "analyzer": analyzer_fingerprint(analyzer),
+    config = {"chunker": chunking.chunker_fingerprint(profile), "profile": profile,
+              "analyzer": analyzer_fingerprint(analyzer), "idf": IDF_POLICY,
               "review_scope": "reviewed_only" if not include_unreviewed else "includes_unreviewed",
               "extractions": [s["active_extraction_id"] for s in sources]}
     source_set_hash = hashlib.sha256("".join(s["source_hash"] for s in sources).encode()).hexdigest()
@@ -83,13 +108,15 @@ def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreview
     with open_db(settings.db_path) as conn:
         row = conn.execute("SELECT state FROM indexes WHERE index_version = ?", (version,)).fetchone()
     if row and row["state"] == "ready" and final_dir.exists():
-        with open_db(settings.db_path) as conn, tx(conn, immediate=True):
-            set_app_setting(conn, "active_index", version)
-        return {"index_version": version, "reused": True}
+        if activate:
+            with open_db(settings.db_path) as conn, tx(conn, immediate=True):
+                set_app_setting(conn, "active_index", version)
+        return {"index_version": version, "reused": True, "profile": profile, "activated": activate}
 
     chunks, inventory = [], []
     for s in sources:
-        c, inv = chunking.build_chunks(load_elements(settings, s["active_extraction_id"]), s["active_extraction_id"])
+        c, inv = chunking.build_profile(load_elements(settings, s["active_extraction_id"]), s["active_extraction_id"],
+                                        profile)
         chunks += c
         inventory += [{**r, "extraction_id": s["active_extraction_id"]} for r in inv]
     tokens = [{"chunk_id": c["chunk_id"], "tokens": analyzer.tokens(c["payload"])} for c in chunks]
@@ -134,9 +161,11 @@ def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreview
             [(version, r["extraction_id"], r["requirement_key"], r["source_form"], r["kind"], r["element_id"],
               r["name"]) for r in inventory],
         )
-        set_app_setting(conn, "active_index", version)
+        if activate:
+            set_app_setting(conn, "active_index", version)
     return {"index_version": version, "reused": False, "chunks": len(chunks), "requirements": len(inventory),
-            "review_scope": config["review_scope"], "sources": len(sources)}
+            "review_scope": config["review_scope"], "sources": len(sources), "profile": profile,
+            "activated": activate}
 
 
 # ---------------------------------------------------------------- loaded index
@@ -147,9 +176,22 @@ class KeywordIndex:
     version: str
     review_scope: str
     chunks: list[dict]
-    bm25: BM25Okapi
+    bm25: BM25Okapi  # K1: Kiwi tokens persisted with the index
     rows_by_extraction: dict[str, list[int]]
     elements: dict[tuple[str, str], dict]
+    profile: str = "structural"
+    manifest_hash: str = ""
+    _extra_bm25: dict = field(default_factory=dict, repr=False)
+
+    def __post_init__(self) -> None:
+        self.row_of = {c["chunk_id"]: i for i, c in enumerate(self.chunks)}
+
+    def bm25_for(self, analyzer) -> BM25Okapi:
+        """K0 and other comparison analyzers: built once per loaded index from the same payload rows."""
+        if analyzer.version not in self._extra_bm25:
+            self._extra_bm25[analyzer.version] = BM25Okapi([analyzer.tokens(c["payload"]) or ["∅"]
+                                                            for c in self.chunks])
+        return self._extra_bm25[analyzer.version]
 
     @classmethod
     def load(cls, settings: Settings, version: str | None = None) -> "KeywordIndex":
@@ -162,6 +204,8 @@ class KeywordIndex:
         if hashlib.sha256(manifest_path.read_bytes()).hexdigest() != row["manifest_hash"]:
             raise RetrievalError("index manifest hash mismatch")
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest["config"].get("kind") == "dense":
+            raise RetrievalError(f"{version} is a dense matrix, not a keyword index")
         for name, digest in manifest["files"].items():
             if hashlib.sha256((manifest_path.parent / name).read_bytes()).hexdigest() != digest:
                 raise RetrievalError(f"index file hash mismatch: {name}")
@@ -177,7 +221,8 @@ class KeywordIndex:
             for e in load_elements(settings, extraction_id):
                 elements[(extraction_id, e["element_id"])] = e
         return cls(version, manifest["config"]["review_scope"], chunks,
-                   BM25Okapi([t["tokens"] or ["∅"] for t in tokens]), rows, elements)
+                   BM25Okapi([t["tokens"] or ["∅"] for t in tokens]), rows, elements,
+                   manifest["config"].get("profile", "structural"), row["manifest_hash"])
 
 
 # ---------------------------------------------------------------- retrieval
@@ -215,14 +260,60 @@ def _overlaps(a: dict, b: dict) -> bool:
     return False
 
 
+def scope_rows(index: KeywordIndex, scope: list[tuple[DocRef, str]]) -> list[int]:
+    """Index rows the selected scope admits. Callers check this before paying for a query embedding."""
+    return [i for extraction_id in dict.fromkeys(x for _, x in scope)
+            for i in index.rows_by_extraction.get(extraction_id, [])]
+
+
+def rank_lexical(index: KeywordIndex, analyzer, question: str, allowed: list[int], k: int,
+                 whitespace: bool = False) -> list[tuple[int, float]]:
+    """BM25 over admitted rows only. No shared token: empty, never arbitrary zero-score rows. Ties by chunk ID."""
+    qtokens = analyzer.tokens(question)
+    if not allowed or not qtokens:
+        return []
+    bm25 = index.bm25_for(analyzer) if whitespace else index.bm25
+    scores = bm25.get_batch_scores(qtokens, allowed)
+    ranked = sorted(((i, float(s)) for i, s in zip(allowed, scores) if s > 0),
+                    key=lambda x: (-x[1], index.chunks[x[0]]["chunk_id"]))
+    return ranked[:k]
+
+
+def rrf_fuse(ranked_ids: list[list[str]], k: int = 60) -> list[tuple[str, float]]:
+    """Reciprocal rank fusion: sum(1 / (k + rank)), ranks from one; a list that lacks an ID contributes zero and
+    an ID repeated inside one list votes once. Ties by chunk ID."""
+    scores: dict[str, float] = {}
+    for ids in ranked_ids:
+        for rank, cid in enumerate(dict.fromkeys(ids), start=1):
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (k + rank)
+    return sorted(scores.items(), key=lambda x: (-x[1], x[0]))
+
+
 def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, question: str,
-             scope: list[tuple[DocRef, str]]) -> RetrievalResult:
-    """scope pairs each selected DocRef with its active extraction ID; nothing outside it can be scored."""
+             scope: list[tuple[DocRef, str]], *, mode: str | None = None, dense=None, query_vector=None,
+             reranker=None, rerank_depth: int | None = None) -> RetrievalResult:
+    """scope pairs each selected DocRef with its active extraction ID; nothing outside it can be scored.
+
+    Modes: whitespace_bm25 (K0), kiwi_bm25 (K1), dense (D), hybrid (H: K1 + D by RRF), hybrid_rerank (HR). A mode
+    whose dense matrix, query vector or reranker is unavailable falls back and says so in `fallback`."""
     t0 = time.perf_counter()
     trace_id = str(uuid.uuid4())
+    mode = mode or settings.retrieval_mode
+    if mode not in MODES:
+        raise RetrievalError(f"unknown retrieval mode {mode!r}")
+    fallback = None
+    if mode in DENSE_MODES:
+        problem = ("dense_index_unavailable" if dense is None else
+                   "dense_index_mismatch" if dense.base_index_version != index.version else
+                   "query_vector_unavailable" if query_vector is None else None)
+        if problem:
+            fallback, mode = f"{mode}->kiwi_bm25:{problem}", "kiwi_bm25"
+    if mode == "hybrid_rerank" and reranker is None:
+        fallback, mode = "hybrid_rerank->hybrid:reranker_unavailable", "hybrid"
+
     by_extraction = {extraction_id: ref for ref, extraction_id in scope}
-    allowed = [i for extraction_id in by_extraction for i in index.rows_by_extraction.get(extraction_id, [])]
-    limitations = []
+    allowed = scope_rows(index, scope)
+    limitations = [f"idf:{IDF_POLICY}"]
     if index.review_scope != "reviewed_only":
         limitations.append("index_includes_unreviewed_sources")
     missing = [ref.doc_id for ref, x in scope if x not in index.rows_by_extraction]
@@ -232,49 +323,74 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
     codes = list(dict.fromkeys(CODE_RE.findall(nfc(question))))
     exact = []
     for code in codes:
-        hits = [i for i in allowed if index.chunks[i]["requirement_key"] == code]
-        hits.sort(key=lambda i: index.chunks[i]["chunk_type"] != "requirement_detail")
+        hits = sorted((i for i in allowed if index.chunks[i]["requirement_key"] == code),
+                      key=lambda i: (index.chunks[i]["chunk_type"] != "requirement_detail", i))
         exact += hits
+        details = {_core(index.chunks[i]["spans"])[0]["element_id"] for i in hits
+                   if index.chunks[i]["chunk_type"] == "requirement_detail"}
         if not hits:
             limitations.append(f"code_not_found:{code}")
-        elif index.chunks[hits[0]]["chunk_type"] != "requirement_detail":
+        elif not details:
             limitations.append(f"code_detail_unavailable:{code}")
+        elif len(details) > 1:
+            limitations.append(f"code_ambiguous:{code}")
     t1 = time.perf_counter()
-    qtokens = analyzer.tokens(question)
-    scores = index.bm25.get_batch_scores(qtokens, allowed) if allowed and qtokens else []
-    ranked = sorted(zip(allowed, scores), key=lambda x: -x[1])
-    bm25 = [(i, float(s)) for i, s in ranked if s > 0][:BM25_TOP_K]
+    k = settings.channel_top_k
+    lexical: list[tuple[int, float]] = []
+    lexical_channel = "bm25_ws" if mode == "whitespace_bm25" else "bm25"
+    if mode != "dense":
+        lex_analyzer = WhitespaceAnalyzer() if mode == "whitespace_bm25" else analyzer
+        lexical = rank_lexical(index, lex_analyzer, question, allowed, k, whitespace=mode == "whitespace_bm25")
     t2 = time.perf_counter()
+    dense_ranked: list[tuple[int, float]] = []
+    if mode in DENSE_MODES:
+        dense_ranked = dense.search(query_vector, allowed, k)
+    t3 = time.perf_counter()
 
-    candidates = [{"chunk_id": index.chunks[i]["chunk_id"], "channel": "exact", "rank": r + 1, "score": None,
-                   "row": i} for r, i in enumerate(exact)]
-    candidates += [{"chunk_id": index.chunks[i]["chunk_id"], "channel": "bm25", "rank": r + 1, "score": round(s, 4),
-                    "row": i} for r, (i, s) in enumerate(bm25)]
+    cid = lambda i: index.chunks[i]["chunk_id"]  # noqa: E731
+    candidates = [{"chunk_id": cid(i), "channel": "exact", "rank": r + 1, "score": None} for r, i in enumerate(exact)]
+    candidates += [{"chunk_id": cid(i), "channel": lexical_channel, "rank": r + 1, "score": round(s, 4)}
+                   for r, (i, s) in enumerate(lexical)]
+    candidates += [{"chunk_id": cid(i), "channel": "dense", "rank": r + 1, "score": round(s, 4)}
+                   for r, (i, s) in enumerate(dense_ranked)]
+    if mode in ("hybrid", "hybrid_rerank"):
+        fused = rrf_fuse([[cid(i) for i, _ in lexical], [cid(i) for i, _ in dense_ranked]],
+                         settings.rrf_k)[:settings.fused_top_k]
+        candidates += [{"chunk_id": c, "channel": "rrf", "rank": r + 1, "score": round(s, 6)}
+                       for r, (c, s) in enumerate(fused)]
+        ordered = [index.row_of[c] for c, _ in fused]
+    else:
+        ordered = [i for i, _ in (dense_ranked if mode == "dense" else lexical)]
+    t4 = time.perf_counter()
+    rerank_info = None
+    if mode == "hybrid_rerank":
+        depth = min(rerank_depth or settings.fused_top_k, len(ordered))
+        pool = ordered[:depth]
+        scored, rerank_info = reranker.rerank(question, [index.chunks[i] for i in pool])
+        admitted = set(pool)
+        reranked = [pool[p] for p, _ in scored if 0 <= p < len(pool) and pool[p] in admitted]
+        candidates += [{"chunk_id": cid(pool[p]), "channel": "rerank", "rank": r + 1, "score": round(s, 6)}
+                       for r, (p, s) in enumerate(scored) if 0 <= p < len(pool)]
+        ordered = list(dict.fromkeys(reranked + ordered[depth:]))
+    t5 = time.perf_counter()
+    ranking = list(dict.fromkeys(exact + ordered))  # exact identifier matches stay ahead of every ranker
+
     evidence: list[EvidenceUnit] = []
     excluded = []
     used_tokens = 0
     picked: list[dict] = []
-    seen_rows: set[int] = set()
-    for cand in candidates:
-        i = cand["row"]
-        if i in seen_rows:
-            continue
-        seen_rows.add(i)
-        chunk = index.chunks[i]
-        if exact and chunk["requirement_key"] and chunk["requirement_key"] not in codes:
-            # An explicit code was asked; another requirement (e.g. SFR-0010 for SFR-001) is a collision.
-            excluded.append({"chunk_id": chunk["chunk_id"], "reason": "other_requirement_code"})
-            continue
+    picked_ids: set[str] = set()
+
+    def admit(chunk: dict, limit: int, linked: bool) -> str | None:
+        nonlocal used_tokens
+        if codes and chunk["requirement_key"] and chunk["requirement_key"] not in codes:
+            return "other_requirement_code"  # e.g. SFR-0010 when SFR-001 was asked
         if len(evidence) >= settings.evidence_max_units:
-            excluded.append({"chunk_id": chunk["chunk_id"], "reason": "unit_limit"})
-            continue
-        if any(_overlaps(chunk, p) for p in picked):
-            excluded.append({"chunk_id": chunk["chunk_id"], "reason": "duplicate_span"})
-            continue
-        limit = settings.evidence_target_tokens if evidence else settings.evidence_max_tokens
+            return "unit_limit"
+        if not linked and any(_overlaps(chunk, p) for p in picked):
+            return "duplicate_span"
         if used_tokens + chunk["token_count"] > limit:
-            excluded.append({"chunk_id": chunk["chunk_id"], "reason": "token_budget"})
-            continue
+            return "token_budget"
         ref = by_extraction[chunk["extraction_id"]]
         evidence.append(EvidenceUnit(
             evidence_id=f"E{len(evidence) + 1}", doc_id=ref.doc_id, source_hash=ref.source_hash,
@@ -282,17 +398,53 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
             element_ids=[s["element_id"] for s in chunk["spans"]], quote=chunk["body"],
             location=_location(index, chunk), token_count=chunk["token_count"]))
         picked.append(chunk)
+        picked_ids.add(chunk["chunk_id"])
         used_tokens += chunk["token_count"]
-    for c in candidates:
-        c.pop("row")
+        return None
+
+    for i in ranking:
+        chunk = index.chunks[i]
+        if chunk["chunk_id"] in picked_ids:
+            continue
+        if chunk["extraction_id"] not in by_extraction:  # defensive: a ranker returned an out-of-scope row
+            excluded.append({"chunk_id": chunk["chunk_id"], "reason": "outside_scope"})
+            continue
+        limit = settings.evidence_target_tokens if evidence else settings.evidence_max_tokens
+        reason = admit(chunk, limit, linked=False)
+        if reason:
+            excluded.append({"chunk_id": chunk["chunk_id"], "reason": reason})
+            continue
+        # The rest of a split element or row may carry its condition. Nearest pieces first, within the evidence
+        # target and LINKED_EXTRA_UNITS, so one long paragraph cannot crowd out every other candidate; a piece
+        # left out is reported rather than silently dropped.
+        here = index.row_of[chunk["chunk_id"]]
+        siblings = sorted((index.row_of[o] for o in chunk.get("linked") or [] if o in index.row_of),
+                          key=lambda r: (abs(r - here), r))
+        added = 0
+        for r in siblings:
+            other = index.chunks[r]
+            if other["chunk_id"] in picked_ids:
+                continue
+            reason = "linked_unit_limit" if added >= LINKED_EXTRA_UNITS else admit(
+                other, settings.evidence_target_tokens, linked=True)
+            if reason:
+                limitations.append(f"linked_evidence_missing:{chunk['chunk_id']}:{reason}")
+                break
+            added += 1
+    t6 = time.perf_counter()
+    ms = lambda a, b: round((b - a) * 1000, 1)  # noqa: E731
+    timings = {"exact": ms(t0, t1), "lexical": ms(t1, t2), "dense": ms(t2, t3), "fuse": ms(t3, t4),
+               "rerank": ms(t4, t5), "pack": ms(t5, t6), "total": ms(t0, t6)}
+    if rerank_info:
+        limitations += [f"rerank:{k}={v}" for k, v in rerank_info.items() if k in ("truncated", "windows")]
     return RetrievalResult(
-        mode=settings.retrieval_mode, scope=[ref for ref, _ in scope], exact_matches=[c for c in candidates
-                                                                                     if c["channel"] == "exact"],
+        mode=mode, scope=[ref for ref, _ in scope],
+        exact_matches=[c for c in candidates if c["channel"] == "exact"],
         candidates=candidates, evidence=evidence, excluded=excluded,
-        limitations=limitations + ["expansion:none(phase-1)"], evidence_tokens=used_tokens,
-        timings_ms={"exact": round((t1 - t0) * 1000, 1), "bm25": round((t2 - t1) * 1000, 1),
-                    "total": round((time.perf_counter() - t0) * 1000, 1)},
-        trace_id=trace_id, index_version=index.version)
+        limitations=limitations + ["expansion:linked_split_pieces"], evidence_tokens=used_tokens,
+        timings_ms=timings, trace_id=trace_id, index_version=index.version,
+        ranking=[cid(i) for i in ranking], fallback=fallback,
+        dense_version=dense.version if mode in DENSE_MODES else None)
 
 
 def best_chunk_per_extraction(index: KeywordIndex, analyzer: Analyzer, query: str) -> dict[str, tuple[float, str]]:

@@ -1,6 +1,6 @@
 # RFP assistant (입찰메이트)
 
-Internal assistant for historical Korean RFPs: search projects, select one document, ask a scoped question, receive one metered grounded answer, and open the original evidence. The plan lives in [docs/plan/end-to-end](docs/plan/end-to-end/0-overview.md); this README covers setup and launch for what is implemented (phase 1).
+Internal assistant for historical Korean RFPs: search projects, select one document, ask a scoped question, receive one metered grounded answer, and open the original evidence. The plan lives in [docs/plan/end-to-end](docs/plan/end-to-end/0-overview.md); this README covers setup and launch for what is implemented (phases 1 and 2).
 
 ## Environment
 
@@ -89,6 +89,39 @@ python -m rfp_assistant.cli gold repin --batch <new-id>   # after a parser revis
 python -m rfp_assistant.cli validate-gold --dataset dev-pilot   # approved rows only
 ```
 
+## Phase 2: corpus coverage and retrieval selection
+
+Plan: [2-corpus-and-retrieval.md](docs/plan/end-to-end/2-corpus-and-retrieval.md). The order below goes from free work to the one paid maintenance step. Angle-bracket values come from the previous command's output.
+
+```powershell
+python -m rfp_assistant.cli ingest --profile all             # every unique original once; unchanged inputs are reused
+python -m rfp_assistant.cli import-reviews --file C:\abs\reviews.jsonl
+python -m rfp_assistant.cli recover-source --doc-id <id> --converted-file C:\abs\converted.pdf --review-file C:\abs\recovery.json
+python -m rfp_assistant.cli identity                         # CSV institution/title versus the original's own cues
+python -m rfp_assistant.cli resolve-metadata --doc-id <id> --field institution --value '"기관명"' --rationale "..." --evidence "공고문 1쪽" --actor <name>
+python -m rfp_assistant.cli build-keyword --reviewed-only                         # structural profile
+python -m rfp_assistant.cli build-keyword --reviewed-only --profile fixed-512-64  # comparison profile, never serves users
+python -m rfp_assistant.cli evaluate-retrieval --dataset dev-pilot --runs K0,K1   # free lexical comparison
+python -m rfp_assistant.cli evaluate-retrieval --dataset dev-pilot --runs K1 --index <fixed index version>
+python -m rfp_assistant.cli plan-embeddings --index <keyword index version>       # tokens and maximum spend, no call
+python -m rfp_assistant.cli build-dense --index <keyword index version> --estimate-id <id>   # paid, stop the UI first
+python -m rfp_assistant.cli evaluate-retrieval --dataset dev-pilot --runs D,H --allow-paid-queries
+python -m rfp_assistant.cli trial-reranker --dataset dev-pilot --candidate-counts 10,20
+python -m rfp_assistant.cli activate-run --run-id <run id> --decision-file C:\abs\decision.json
+python -m rfp_assistant.cli report --phase 2                 # .runtime/releases/phase-2/report.md
+python -m rfp_assistant.cli check --phase 2 --provider fake  # every automated invariant, temporary state, no key
+```
+
+- **Ingest.** A source is parsed again only when its original, parser revision, native print, OCR cache or HWP converter changed (`--force` overrides). Every result, with timing and automatic diagnostics (`short_output`, `no_tables`, `thin_tail`, `blank_pages`, `replacement_characters`, `parser_warnings`, start/middle/end probes), is written to `.runtime/reports/ingest-*.json`. The diagnostics point at problems; they never mark a source reviewed. One crashing file is recorded as `error` and the run continues (exit code 1).
+- **Reviews.** `import-reviews` takes JSON or JSONL records: `doc_id` (or `source_hash`), `extraction_id` (must be the active revision), `reviewer`, `status`, `locations` (`[{"element_id": ...}]` from that extraction), `checks`, `limitations` (a list, empty when none were found) and, for `reviewed`, `coverage.sections`. One invalid record imports nothing.
+- **Recovery.** For a quarantined original, `recover-source` takes an approved PDF conversion and a review JSON with `reviewer`, `method`, `compared_locations`, `fidelity_passed` and `mapping_limitations`. A failed comparison keeps the quarantine. A passed one becomes a new extraction revision (pages refer to the converted PDF) that stays `unreviewed` until `import-reviews` checks it against its own element IDs. The original and its failure stay recorded. HWPX recovery is refused until a real artifact needs a parser.
+- **Identity.** Byte-identical associations share one extraction and one vector per payload but keep their own metadata and scope. A conflicting field keeps both values visible. `resolve-metadata` records a canonical value with a written rationale; search filters then use it. Evaluation families group byte-identical files and related revisions (same notice number).
+- **Chunk profiles.** `structural` (default) and the fixed baselines `fixed-256-32`, `fixed-512-64`, `fixed-800-96` use the same element order and source-span maps. A piece of an oversized element or row is linked to its siblings: packing keeps the condition with its fact or reports `linked_evidence_missing`. The structural chunker version changed in phase 2, so rebuild the keyword index once. The phase-1 index stays on disk for rollback and issued citations.
+- **Runs.** K0 is whitespace BM25, K1 Kiwi BM25, D dense only, H is K1 and D fused by RRF (`1/(60+rank)`), and HR is H plus the local reranker. Runs are retrieval only, frozen by dataset hash, index manifest, analyzer, dense version and limits, and stored under `.runtime/runs/<run_id>/` (`config.json`, `traces.jsonl`, `scores.json`, `report.md`). Metrics are graded against source spans: hit@k, recall and complete coverage, nDCG@5, MRR, packed-context coverage, qualifier losses, code checks, wrong-scope candidates, latency and Wilson intervals. A configuration that already has scores is reused (`--force` reruns it). Only independently reviewed dev rows are scored. Skipped rows are listed with their reason.
+- **Embeddings.** `plan-embeddings` counts unique payloads with `cl100k_base`, subtracts verified cache hits and stores an estimate bound to the index, model, dimensions, payload set, rates and batch limits (24 h). `build-dense` refuses a stale or over-envelope estimate. It reserves and settles each bounded batch in the `embedding` envelope and keeps a failure's settled batches cached. It never resends an unknown outcome: while any embedding attempt's billing is unknown, `build-dense` refuses and paid evaluation queries stop until the attempt is reconciled. The matrix is published only after every row is verified. Query vectors are cached by text, model and dimensions. Free retrieval uses only cached ones. A paid answer embeds an uncached query through the gateway, and evaluation does so only with `--allow-paid-queries` (`gold_eval` envelope).
+- **Reranker.** Optional: `pip install -e .[reranker]` (or the pinned `requirements.txt`). Set `reranker_revision` to the model card's commit hash in the `RFP_CONFIG_FILE` JSON. An unpinned, missing or failing model records the bypass. The trial scores the frozen H pool at each depth and measures warm latency alone and under six concurrent users. It passes only with nDCG@5 +0.03, no new critical failure and at most +1 s p95.
+- **Activation.** The decision JSON names `run_id`, `mode` (the run's mode), `decided_by`, `rationale` and optionally `finalist_run_id` (the other retrieval finalist for phase 4). `activate-run` verifies the index and matrix and requires a passed gate for HR. It switches serving in one transaction and keeps the history in `activations`. Until then the keyword default serves. If the matrix fails verification or a query vector is unavailable, serving falls back to K1 and the trace records why.
+
 ## Access and paid use
 
 There is no login: every visitor gets the consultant, verification and question-review screens. The name in the sidebar (default `owner`) is recorded on paid requests and review decisions; it attributes work but does not authenticate anyone. Anyone who can reach the server can spend the budget, so keep `--server.address 127.0.0.1` unless everyone on that network may do so.
@@ -115,4 +148,4 @@ Recorded before any distribution decision:
 
 ## Layout
 
-`src/rfp_assistant/` holds one package: `settings`, `contracts`, `store`, `auth`, `ingestion`, `chunking`, `retrieval`, `budget`, `generation` (the only SDK call site), `service`, `ui`, `cli`, `evaluation`. `app.py` launches the consultant and verifier pages. Tests are standard `unittest` under `tests/`.
+`src/rfp_assistant/` holds one package: `settings`, `contracts`, `store`, `auth`, `ingestion`, `chunking`, `retrieval`, `dense` (embedding cache, matrix, reranker), `budget`, `generation` (the only SDK call site), `service`, `ui`, `cli`, `evaluation`. `app.py` launches the consultant and verifier pages. Tests are standard `unittest` under `tests/`.

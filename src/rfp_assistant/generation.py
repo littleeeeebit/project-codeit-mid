@@ -58,9 +58,18 @@ class ProviderResponse:
     response_id: str | None
 
 
+@dataclass
+class EmbeddingResponse:
+    vectors: list[list[float]]  # one per input, in input order
+    usage: dict | None  # prompt_tokens (billed input); None when the provider reported none
+    response_id: str | None = None  # the embeddings endpoint returns no response ID
+
+
 class Transport(Protocol):
     def chat(self, *, model: str, messages: list[dict], response_format: dict, max_completion_tokens: int,
              reasoning_effort: str) -> ProviderResponse: ...
+
+    def embed(self, *, model: str, inputs: list[str], dimensions: int) -> EmbeddingResponse: ...
 
     def close(self) -> None: ...
 
@@ -105,6 +114,21 @@ class OpenAITransport:
         return ProviderResponse(choice.message.content, getattr(choice.message, "refusal", None),
                                 choice.finish_reason, usage, resp.id)
 
+    def embed(self, *, model, inputs, dimensions) -> EmbeddingResponse:
+        o = self._openai
+        try:
+            resp = self._client.embeddings.create(model=model, input=inputs, dimensions=dimensions,
+                                                  encoding_format="float")
+        except (o.AuthenticationError, o.PermissionDeniedError, o.BadRequestError, o.NotFoundError,
+                o.RateLimitError, o.UnprocessableEntityError) as exc:
+            raise ProviderError(f"{type(exc).__name__}: {exc}", pre_execution=True) from None
+        except o.OpenAIError as exc:
+            raise ProviderError(f"{type(exc).__name__}: {exc}", pre_execution=False) from None
+        data = sorted(resp.data, key=lambda d: d.index)
+        usage = {"prompt_tokens": resp.usage.prompt_tokens, "total_tokens": resp.usage.total_tokens} \
+            if resp.usage is not None else None
+        return EmbeddingResponse([list(d.embedding) for d in data], usage, None)
+
     def close(self) -> None:
         self._client.close()
 
@@ -112,9 +136,12 @@ class OpenAITransport:
 class FakeTransport:
     """Test seam: never touches the network or a key. `responder(messages) -> ProviderResponse | Exception`."""
 
-    def __init__(self, responder: Callable[[list[dict]], ProviderResponse | Exception] | None = None) -> None:
+    def __init__(self, responder: Callable[[list[dict]], ProviderResponse | Exception] | None = None,
+                 embedder: Callable[[list[str], int], EmbeddingResponse | Exception] | None = None) -> None:
         self.responder = responder or _echo_first_evidence
+        self.embedder = embedder or fake_embeddings
         self.calls: list[dict] = []
+        self.embed_calls: list[dict] = []
         self.closed = False
 
     def chat(self, *, model, messages, response_format, max_completion_tokens, reasoning_effort) -> ProviderResponse:
@@ -124,8 +151,35 @@ class FakeTransport:
             raise result
         return result
 
+    def embed(self, *, model, inputs, dimensions) -> EmbeddingResponse:
+        self.embed_calls.append({"model": model, "inputs": list(inputs), "dimensions": dimensions})
+        result = self.embedder(list(inputs), dimensions)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
     def close(self) -> None:
         self.closed = True
+
+
+def fake_embeddings(inputs: list[str], dimensions: int) -> EmbeddingResponse:
+    """Deterministic character-bigram hashing vectors: texts sharing Korean bigrams score higher, so dense and
+    hybrid tests exercise real ranking without a key. Usage counts the embedding model's tokens."""
+    import hashlib as _h
+
+    import numpy as np
+
+    from .dense import count_embedding_tokens
+
+    vectors = []
+    for text in inputs:
+        v = np.zeros(dimensions, dtype=np.float64)
+        compact = "".join(text.split())
+        for a, b in zip(compact, compact[1:]):
+            d = _h.blake2b(f"{a}{b}".encode(), digest_size=8).digest()
+            v[int.from_bytes(d[:4], "little") % dimensions] += 1.0 if d[4] & 1 else -1.0
+        vectors.append(v.tolist())
+    return EmbeddingResponse(vectors, {"prompt_tokens": sum(count_embedding_tokens(t) for t in inputs)}, None)
 
 
 def _echo_first_evidence(messages: list[dict]) -> ProviderResponse:
