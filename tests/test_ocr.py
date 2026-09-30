@@ -25,6 +25,22 @@ class OcrRulesTest(unittest.TestCase):
         self.assertEqual(ocr.fallback_reasons(text, 0.99, False, 100, truncated=True), ["truncated"])
 
 
+def image(page, rect, color=(255, 255, 255)):
+    import pymupdf
+
+    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 100, 50), False)
+    pix.set_rect(pix.irect, color)
+    page.insert_image(pymupdf.Rect(rect), pixmap=pix, keep_proportion=False)  # fills the rect exactly
+
+
+def read(pdf, page, bbox, text="WEB 서버", status="local"):
+    """A cache row for the region of `pdf` at (page, bbox), carrying that region's real digest."""
+    digest = next(r["digest"] for r in ocr.regions(pdf) if (r["page"], r["bbox"]) == (page, bbox))
+    local = {"text": text, "mean_prob": 0.99, "looped": status != "local", "expected": 5, "truncated": False}
+    return {"page": page, "bbox": bbox, "digest": digest, "rendering": "original", "engine": ocr.LOCAL_ENGINE,
+            "text": text, "local": local, "reasons": [] if status == "local" else ["loop"], "status": status}
+
+
 class MergeTest(unittest.TestCase):
     def test_image_text_lands_between_the_text_around_the_picture_and_chunks_on_its_own(self):
         import pymupdf
@@ -39,19 +55,14 @@ class MergeTest(unittest.TestCase):
             with pymupdf.open() as doc:
                 page = doc.new_page()
                 page.insert_text((72, 100), "System overview figure follows", fontsize=11)
-                pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 200, 100), False)
-                pix.set_rect(pix.irect, (255, 255, 255))
-                page.insert_image(pymupdf.Rect(72, 120, 472, 320), pixmap=pix)
+                image(page, (72, 120, 472, 320))
                 page.insert_text((72, 350), "Next paragraph after the figure", fontsize=11)
+                image(page, (72, 400, 472, 500), (0, 0, 0))
                 doc.save(pdf)
             raw, _, _ = ingestion.parse_pdf(pdf)
-            local = {"text": "WEB 서버", "mean_prob": 0.99, "looped": False, "expected": 5, "truncated": False}
             write_jsonl_atomic(ocr.cache_path(settings, "h"), [
-                {"page": 1, "bbox": [72, 120, 472, 320], "digest": "d", "rendering": "original",
-                 "engine": ocr.LOCAL_ENGINE, "text": "WEB 서버", "local": local, "reasons": [], "status": "local"},
-                {"page": 1, "bbox": [72, 400, 472, 500], "digest": "e", "rendering": "original",
-                 "engine": ocr.LOCAL_ENGINE, "text": "미해결", "local": {**local, "looped": True},
-                 "reasons": ["loop"], "status": "unresolved"}])
+                read(pdf, 1, [72.0, 120.0, 472.0, 320.0]),
+                read(pdf, 1, [72.0, 400.0, 472.0, 500.0], "미해결", "unresolved")])
             out, warnings, suffix = ocr.merge(settings, "h", raw, pdf)
         self.assertEqual([e["kind"] for e in out], ["paragraph", "image_text", "paragraph"])
         self.assertEqual(out[1]["location"]["format"], "image_ocr")
@@ -78,10 +89,7 @@ class MergeTest(unittest.TestCase):
                 doc.new_page().insert_text((72, 100), "Closing section after the form", fontsize=11)
                 doc.save(pdf)
             raw, _, _ = ingestion.parse_pdf(pdf)
-            local = {"text": "서약서", "mean_prob": 0.99, "looped": False, "expected": 3, "truncated": False}
-            write_jsonl_atomic(ocr.cache_path(settings, "h"), [
-                {"page": 2, "bbox": [36, 36, 559, 806], "digest": "d", "rendering": "original",
-                 "engine": ocr.LOCAL_ENGINE, "text": "서약서", "local": local, "reasons": [], "status": "local"}])
+            write_jsonl_atomic(ocr.cache_path(settings, "h"), [read(pdf, 2, [36.0, 36.0, 559.0, 806.0], "서약서")])
             out, warnings, _ = ocr.merge(settings, "h", raw, pdf)
         self.assertEqual([e["raw_text"].strip()[:8] for e in out], ["Attached", "서약서", "Closing "])
         self.assertEqual(warnings, [])
@@ -92,9 +100,6 @@ class MergeTest(unittest.TestCase):
         from rfp_assistant import ingestion
         from rfp_assistant.store import write_jsonl_atomic
 
-        local = {"text": "WEB 서버", "mean_prob": 0.99, "looped": False, "expected": 5, "truncated": False}
-        row = {"page": 1, "digest": "d", "rendering": "original", "engine": ocr.LOCAL_ENGINE, "text": "WEB 서버",
-               "local": local, "reasons": [], "status": "local"}
         suffixes, orders = [], []
         with tempfile.TemporaryDirectory() as tmp:
             settings = SimpleNamespace(data_dir=Path(tmp))
@@ -103,17 +108,79 @@ class MergeTest(unittest.TestCase):
                 with pymupdf.open() as doc:
                     page = doc.new_page()
                     page.insert_text((72, 220), "Paragraph in the middle of the page", fontsize=11)
-                    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 100, 50), False)
-                    pix.set_rect(pix.irect, (255, 255, 255))
-                    page.insert_image(pymupdf.Rect(72, y, 472, y + 150), pixmap=pix)
+                    image(page, (72, y, 472, y + 150))
                     doc.save(pdf)
                 raw, _, _ = ingestion.parse_pdf(pdf)
-                write_jsonl_atomic(ocr.cache_path(settings, "h"), [{**row, "bbox": [72, y, 472, y + 150]}])
+                write_jsonl_atomic(ocr.cache_path(settings, "h"), [read(pdf, 1, [72.0, y, 472.0, y + 150.0])])
                 out, _, suffix = ocr.merge(settings, "h", raw, pdf)
                 orders.append([e["kind"] for e in out])
                 suffixes.append(suffix)
         self.assertEqual(orders, [["image_text", "paragraph"], ["paragraph", "image_text"]])
         self.assertNotEqual(suffixes[0], suffixes[1])
+
+    def test_a_read_of_a_region_the_rendering_no_longer_has_is_stale_not_a_crash(self):
+        import pymupdf
+
+        from rfp_assistant import ingestion
+        from rfp_assistant.store import write_jsonl_atomic
+
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = SimpleNamespace(data_dir=Path(tmp))
+            pdf = Path(tmp) / "doc.pdf"
+            with pymupdf.open() as doc:
+                doc.new_page().insert_text((72, 100), "First page", fontsize=11)
+                image(doc.new_page(), (72, 120, 472, 320))
+                doc.save(pdf)
+            row = read(pdf, 2, [72.0, 120.0, 472.0, 320.0])
+            with pymupdf.open() as doc:  # the reprint fits on one page
+                doc.new_page().insert_text((72, 100), "First page", fontsize=11)
+                doc.save(pdf)
+            raw, _, _ = ingestion.parse_pdf(pdf)
+            write_jsonl_atomic(ocr.cache_path(settings, "h"), [row])
+            out, warnings, suffix = ocr.merge(settings, "h", raw, pdf)
+        self.assertEqual((out, suffix), (raw, ""))
+        self.assertEqual(warnings, [{"code": "ocr_stale", "count": 1}])
+
+    def test_a_caption_repeated_on_another_page_does_not_take_the_picture(self):
+        import pymupdf
+
+        from rfp_assistant import ingestion
+        from rfp_assistant.store import write_jsonl_atomic
+
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = SimpleNamespace(data_dir=Path(tmp))
+            pdf = Path(tmp) / "doc.pdf"
+            with pymupdf.open() as doc:
+                doc.new_page().insert_text((72, 100), "Opening remarks", fontsize=11)
+                page = doc.new_page()
+                page.insert_text((72, 100), "Figure 1 network layout", fontsize=11)
+                image(page, (72, 120, 472, 320))
+                page = doc.new_page()  # dense: its middle is the middle of the element list, like page 2 of 3
+                for i in range(30):
+                    text = "Figure 1 network layout" if i == 15 else f"Line {i:02d} of the appendix"
+                    page.insert_text((72, 60 + 24 * i), text, fontsize=11)
+                doc.save(pdf)
+            raw, _, _ = ingestion.parse_pdf(pdf)
+            write_jsonl_atomic(ocr.cache_path(settings, "h"), [read(pdf, 2, [72.0, 120.0, 472.0, 320.0])])
+            out, warnings, _ = ocr.merge(settings, "h", raw, pdf)
+        k = next(i for i, e in enumerate(out) if e["kind"] == "image_text")
+        self.assertEqual((out[k - 1]["location"]["page"], out[k - 1]["raw_text"].strip()), (2, "Figure 1 network layout"))
+        self.assertEqual(warnings, [])
+
+    def test_a_picture_on_a_rotated_page_is_rendered_where_it_is_seen(self):
+        import pymupdf
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf = Path(tmp) / "doc.pdf"
+            with pymupdf.open() as doc:
+                page = doc.new_page()
+                image(page, (72, 120, 472, 320), (255, 0, 0))
+                page.set_rotation(90)
+                doc.save(pdf)
+            (reg,) = ocr.regions(pdf)
+            pix = pymupdf.Pixmap(reg["png"])
+        self.assertEqual(reg["bbox"], [72.0, 120.0, 472.0, 320.0])  # unrotated, like the words anchors come from
+        self.assertEqual(pix.pixel(pix.width // 2, pix.height // 2), (255, 0, 0))
 
 
 class RunTest(unittest.TestCase):
@@ -284,7 +351,8 @@ class GeminiLedgerTest(unittest.TestCase):
 
     def test_settled_call_costs_its_usage_and_an_unknown_outcome_costs_worst_case(self):
         ok = {"candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": "제안요청서"}]}}],
-              "usageMetadata": {"promptTokenCount": 1000, "candidatesTokenCount": 100, "thoughtsTokenCount": 20}}
+              "usageMetadata": {"promptTokenCount": 1000, "candidatesTokenCount": 100, "thoughtsTokenCount": 20,
+                                "totalTokenCount": 1120}}
         with self.reader([{"totalTokens": 1000}, ok, {"totalTokens": 1000}, ocr.OcrError("HTTP 500")]) as r:
             self.assertEqual(r.read(b"png", "a"), "제안요청서")
             settled = ocr._micro(1000, 120)
@@ -292,6 +360,12 @@ class GeminiLedgerTest(unittest.TestCase):
             with self.assertRaises(ocr.OcrError):
                 r.read(b"png", "b")
             self.assertEqual(ocr.spent_micro(r.ledger), settled + ocr._micro(1000, ocr.GEMINI_MAX_OUTPUT))
+
+    def test_a_read_without_billing_figures_stays_charged_at_worst_case(self):
+        ok = {"candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": "제안요청서"}]}}]}
+        with self.reader([{"totalTokens": 1000}, ok]) as r:
+            self.assertEqual(r.read(b"png", "a"), "제안요청서")
+            self.assertEqual(ocr.spent_micro(r.ledger), ocr._micro(1000, ocr.GEMINI_MAX_OUTPUT))
 
     def test_a_call_that_could_pass_the_cap_is_never_sent(self):
         with self.reader([{"totalTokens": 1000}]) as r:

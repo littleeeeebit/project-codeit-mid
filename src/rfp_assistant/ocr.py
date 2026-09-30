@@ -83,19 +83,20 @@ def fallback_reasons(text: str, mean_prob: float, looped: bool, expected: float,
 
 
 def regions(pdf: Path) -> list[dict]:
-    """Raster images covering at least IMAGE_MIN_AREA of their page, rendered at DPI as PNG."""
+    """Raster images covering at least IMAGE_MIN_AREA of their page, rendered at DPI as PNG. Boxes are in unrotated
+    page coordinates, like the words the anchors come from; only the render clip is rotated."""
     import pymupdf
 
     out, seen = [], set()
     with pymupdf.open(pdf) as doc:
         for page in doc:
             for info in page.get_image_info():
-                rect = pymupdf.Rect(info["bbox"]) & page.rect
+                rect = pymupdf.Rect(info["bbox"]) & (page.rect * page.derotation_matrix)
                 key = (page.number, *(round(v) for v in rect))
                 if rect.is_empty or key in seen or abs(rect) / abs(page.rect) < IMAGE_MIN_AREA:
                     continue
                 seen.add(key)
-                png = page.get_pixmap(clip=rect, dpi=DPI).tobytes("png")
+                png = page.get_pixmap(clip=rect * page.rotation_matrix, dpi=DPI).tobytes("png")
                 out.append({"page": page.number + 1, "bbox": [round(v, 1) for v in rect],
                             "digest": hashlib.sha256(png).hexdigest()[:24], "png": png})
     return out
@@ -235,9 +236,11 @@ class GeminiReader:
         data = self._post("generateContent", {"contents": contents, "generationConfig": {
             "temperature": 0, "maxOutputTokens": GEMINI_MAX_OUTPUT, "thinkingConfig": {"thinkingLevel": "minimal"}}})
         usage = data.get("usageMetadata", {})
-        out_tokens = usage.get("candidatesTokenCount", 0) + usage.get("thoughtsTokenCount", 0)
-        _append(self.ledger, {"event": "settled", "call_id": call_id, "usage": usage,
-                              "micro": _micro(usage.get("promptTokenCount", input_tokens), out_tokens)})
+        # Settled only on billing figures: total = prompt + candidates + thoughts (so an empty read shows its
+        # zero output). Without them the reservation stands at worst case.
+        if "promptTokenCount" in usage and "totalTokenCount" in usage:
+            _append(self.ledger, {"event": "settled", "call_id": call_id, "usage": usage, "micro": _micro(
+                usage["promptTokenCount"], usage["totalTokenCount"] - usage["promptTokenCount"])})
         # A blocked prompt has no candidate; only a finished one is a read (an image with no text finishes empty).
         candidates = data.get("candidates") or []
         if not candidates:
@@ -265,12 +268,13 @@ def load(settings: Settings, source_hash: str) -> list[dict]:
 
 
 ANCHOR_MIN = 6  # normalized characters of nearby print text needed to place an image
-MERGE_VERSION = "anchor-2"  # placement algorithm; part of the extraction fingerprint
+MERGE_VERSION = "anchor-3"  # placement algorithm; part of the extraction fingerprint
 
 
-def _anchors(doc, pno: int, bbox: list[float]) -> tuple[str, str]:
-    """Normalized print text right above and right below the image: within its column, else anywhere on the
-    page, else the end of an earlier page and the start of a later one (a page that is only a picture)."""
+def _anchors(doc, pno: int, bbox: list[float]) -> tuple[tuple[str, int], tuple[str, int]]:
+    """(text, page) of the normalized print text right above and right below the image: within its column, else
+    anywhere on the page, else the end of an earlier page and the start of a later one (a page that is only a
+    picture)."""
     x0, y0, x1, y1 = bbox
 
     def lines(page, column: bool) -> tuple[list[str], list[str]]:
@@ -287,22 +291,27 @@ def _anchors(doc, pno: int, bbox: list[float]) -> tuple[str, str]:
     for column in (True, False):
         above, below = lines(page, column)
         if above or below:
-            return (above[-1] if above else ""), (below[0] if below else "")
-    up = next((t[-1] for t in (doc[k].get_text().split("\n") for k in range(pno - 2, max(pno - 5, -1), -1))
-               for t in [[norm(x) for x in t if len(norm(x)) >= ANCHOR_MIN]] if t), "")
-    down = next((t[0] for t in (doc[k].get_text().split("\n") for k in range(pno, min(pno + 3, len(doc))))
-                 for t in [[norm(x) for x in t if len(norm(x)) >= ANCHOR_MIN]] if t), "")
+            return ((above[-1] if above else ""), pno), ((below[0] if below else ""), pno)
+
+    def text(k: int) -> list[str]:
+        return [norm(x) for x in doc[k].get_text().split("\n") if len(norm(x)) >= ANCHOR_MIN]
+
+    up = next(((t[-1], k + 1) for k in range(pno - 2, max(pno - 5, -1), -1) for t in [text(k)] if t), ("", 0))
+    down = next(((t[0], k + 1) for k in range(pno, min(pno + 3, len(doc))) for t in [text(k)] if t), ("", 0))
     return up, down
 
 
-def _find(texts: list[str], anchor: str, tail: bool, near: float) -> int | None:
-    """Index of the element holding the anchor (its tail or head, longest first); of several, the one whose
-    place in the document is nearest the image's (a heading also appears in the contents)."""
+def _find(texts: list[str], pages: list[int | None], anchor: tuple[str, int], tail: bool,
+          near: float) -> int | None:
+    """Index of the element holding the anchor (its tail or head, longest first). Elements with a page (PDF, the
+    Hancom print) must be on the anchor's page; without pages (pyhwp), of several hits the one whose place in the
+    document is nearest the image's (a heading also appears in the contents)."""
+    text, page = anchor
     for n in (40, 20, 10):
-        piece = anchor[-n:] if tail else anchor[:n]
+        piece = text[-n:] if tail else text[:n]
         if len(piece) < ANCHOR_MIN:
             return None
-        hits = [k for k, t in enumerate(texts) if piece in t]
+        hits = [k for k, t in enumerate(texts) if piece in t and pages[k] in (None, page)]
         if hits:
             return min(hits, key=lambda k: abs(k / len(texts) - near))
     return None
@@ -314,23 +323,27 @@ def merge(settings: Settings, source_hash: str, raw: list[dict], rendering: Path
     fingerprint suffix); the suffix is empty when there is nothing to add."""
     import pymupdf
 
+    # Only reads of a region this rendering still has, same pixels at the same place: a reprint can move pages.
+    current = {(r["page"], tuple(r["bbox"]), r["digest"]) for r in regions(rendering)}
     rows = load(settings, source_hash)
-    ready = [r for r in rows if _final(r) and r["text"].strip()]
+    live = [r for r in rows if (r["page"], tuple(r["bbox"]), r["digest"]) in current]
+    ready = [r for r in live if _final(r) and r["text"].strip()]
     warnings = []
-    unresolved = sum(not _final(r) for r in rows)
-    if unresolved:
-        warnings.append({"code": "ocr_unresolved", "count": unresolved})
+    for code, count in (("ocr_stale", len(rows) - len(live)), ("ocr_unresolved", sum(not _final(r) for r in live))):
+        if count:
+            warnings.append({"code": code, "count": count})
     if not ready:
         return raw, warnings, ""
     texts = [norm(e["raw_text"]) for e in raw]
+    pages = [e["location"].get("page") for e in raw]
     after: dict[int, list] = {}  # insert position -> elements
     unplaced = 0
     with pymupdf.open(rendering) as doc:
         for i, r in enumerate(ready):
             up, down = _anchors(doc, r["page"], r["bbox"])
             near = (r["page"] - 0.5) / len(doc)
-            k = _find(texts, up, True, near)
-            pos = k + 1 if k is not None else _find(texts, down, False, near)
+            k = _find(texts, pages, up, True, near)
+            pos = k + 1 if k is not None else _find(texts, pages, down, False, near)
             if pos is None:
                 pos, unplaced = len(raw), unplaced + 1
             before = raw[min(max(pos - 1, 0), len(raw) - 1)]["location"] if raw else {}
