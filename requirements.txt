@@ -24,3 +24,6 @@ tzdata==2026.4; sys_platform == "win32"
 # Local reranker on GPU (BAAI/bge-reranker-v2-m3)
 torch==2.14.0+cu130
 sentence-transformers==6.1.0
+
+# Local OCR of image regions (PaddlePaddle/PaddleOCR-VL-1.6 via transformers; its image processor needs torchvision)
+torchvision==0.29.0+cu130

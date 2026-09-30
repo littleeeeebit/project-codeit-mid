@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rfp-assistant"
+version = "0.1.0"
+description = "Internal RFP discovery and grounded Q&A assistant for 입찰메이트"
+requires-python = ">=3.12"
+# Exact pins live in requirements.txt (the lock generated from the smoke-tested environment).
+dependencies = [
+    "pymupdf",
+    "pyhwp",
+    "kiwipiepy",
+    "rank_bm25",
+    "openai",
+    "pydantic",
+    "tiktoken",
+    "numpy",
+    "streamlit",
+    "tzdata; sys_platform == 'win32'",
+]
+
+[project.scripts]
+rfp-assistant = "rfp_assistant.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

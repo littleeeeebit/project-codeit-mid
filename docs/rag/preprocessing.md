@@ -26,11 +26,28 @@ Fallback: when an approved Hancom installation is available, export the affected
 
 Use [PyMuPDF text blocks and table extraction](https://pymupdf.readthedocs.io/en/latest/recipes-text.html) on every page. Its documentation describes reading-order controls and `Page.find_tables()`. Reading-order sorting alone cannot prove correct table associations, especially across pages or merged cells. Keep page number, bounding boxes, and the original text; verify units and footnotes against the rendered page.
 
-If a page renders text but extraction yields blank text, replacement glyphs, or implausible content, investigate missing character mappings and consider OCR. Changing a PDF string's encoding will not repair missing glyph-to-Unicode mappings. [PyMuPDF's OCR guidance](https://pymupdf.readthedocs.io/en/latest/recipes-ocr.html) uses separately installed Tesseract and recommends reusing the OCR result. OCR only the affected pages, once, and cache by source hash plus OCR configuration.
+If a page renders text but extraction yields blank text, replacement glyphs, or implausible content, investigate missing character mappings and use the OCR route below. Changing a PDF string's encoding will not repair missing glyph-to-Unicode mappings. Do not replace a good text layer with OCR simply because the document is Korean.
 
-Use Korean and English OCR language data and inspect digits, dates, `0/O`, requirement codes, and currency symbols. The [official Tesseract language repository](https://github.com/tesseract-ocr/tessdata_best) supplies model files. Do not replace a good text layer with OCR simply because the document is Korean.
+## Text inside images
 
-[Docling](https://github.com/docling-project/docling) is an alternative for PDF layout, tables, and local OCR. Trial it on pages where the lighter extractor demonstrably fails. Its documented format support does not establish reliable binary HWP ingestion. Avoid downloading and running heavyweight models on all documents before this comparison.
+Decided 2026-09-30: a local OCR model reads every image region; only the regions it fails on go to Gemini. No general VLM runs locally. The corpus is digital, so images are embedded pictures, not scans.
+
+1. Regions. Raster images on the page (`page.get_image_info()`, at least `IMAGE_MIN_AREA` of the page): for HWP on the Hancom print, for PDF on the original. Vector drawings such as WMF are not raster images; the print renders their text into the text layer, which the fidelity check compares. Each region is rendered clean at 150 dpi.
+2. Local OCR: PaddleOCR-VL 1.6, prompt `OCR:`, greedy, stopped on a loop (12 identical lines, or 48 lines with at most 8 distinct).
+3. Fallback test, per region, from signals available without the truth: the loop stop fired; mean token probability below 0.90; or the output is longer than 20 times the ink estimate, or longer than 5 times and over 500 characters. The ink estimate is 0.39 characters per glyph-sized connected component (correlation 0.99 with the true length on text regions).
+4. Gemini (`gemini-3.5-flash-lite`, $0.30 / $2.50 per 1M input / output tokens) reads only flagged regions, and its text replaces the OCR text for that region. Spend has its own hard cap of $0.50, separate from the OpenAI budget. A call is refused when its worst-case cost would pass the cap, and a call whose outcome is unknown is charged at worst case.
+5. Output: element kind `image_text`, with page, box and engine (`paddleocr-vl-1.6` or the Gemini model) in its location. Cached by source hash plus OCR configuration. OCR text has no independent witness and is labelled machine-read wherever it is cited.
+
+Benchmark behind these choices: 80 print regions whose text layer is the truth.
+
+| Model | Korean 3-gram recall | 3-gram precision | CER | s/region |
+|---|---|---|---|---|
+| PaddleOCR-VL 1.6 | 0.78 | 0.85 | 0.31 | 6.1 |
+| GLM-OCR | 0.62 | 0.64 | 0.35 | 8.1 |
+
+The thresholds were first fitted on those text regions (0.95 confidence, 0.8–1.5 times the ink). On the corpus's real images they flagged 365 of 438 distinct images: charts, diagrams, maps, logos and scanned forms behave differently. They were refitted on 50 random real regions, with Gemini's read as the reference and "failed" meaning an order-free character F1 below 0.8 against it. 16 of 50 local reads failed, as runaway repetition, loops, garbled map or diagram labels, or near-empty output. The rule above flags all 16, plus 4 good reads. A shortfall against the ink is not used, because contents pages with dotted leaders read perfectly at 0.2–0.6 of the estimate. Across the corpus it flags 193 of 463 distinct images. The fit rests on 50 samples; confident misreads of single characters are not caught.
+
+[Docling](https://github.com/docling-project/docling) is an alternative for PDF layout and tables. Its documented format support does not establish reliable binary HWP ingestion.
 
 ## Korean preservation and output contract
 

@@ -4,6 +4,11 @@
  "nodes_from": ".wiki/corpus.json",
  "edges": [
   {
+   "a": "README.md",
+   "b": "docs/plan/end-to-end/0-overview.md",
+   "kind": "link"
+  },
+  {
    "a": "docs/plan/end-to-end/0-overview.md",
    "b": "docs/rag/budget.md",
    "kind": "link"
@@ -131,6 +136,11 @@
   {
    "a": "docs/plan/end-to-end/1-guarded-vertical-slice.md",
    "b": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/1-guarded-vertical-slice.md",
+   "b": "README.md",
    "kind": "link"
   },
   {
@@ -384,6 +394,12 @@
    "kind": "link"
   },
   {
+   "a": ".wiki/gold-drafting",
+   "b": "docs/rag/golden-dataset.md",
+   "kind": "reads",
+   "cross": true
+  },
+  {
    "a": ".wiki/rag-research",
    "b": "docs/plan/end-to-end/0-overview.md",
    "kind": "reads",
@@ -434,11 +450,11 @@
  ],
  "orphans": [],
  "counts": {
-  "docs": 22,
+  "docs": 23,
   "linked": 16,
-  "read": 6,
+  "read": 7,
   "orphans": 0,
-  "pages": 1,
+  "pages": 2,
   "decisions": 1,
   "injectable_decisions": 0
  }
