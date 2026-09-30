@@ -151,11 +151,12 @@ Server checks include allowlisted evidence IDs; matching claim document/source s
 ```text
 reserved -> dispatching -> settled
                      \-> unknown -> settled or reconciled
+reconciled -> settled (late usage with atomic compensation)
 reserved -> released  (dispatch never began, conclusively)
 dispatching -> released (confirmed provider rejection before execution only)
 ```
 
-Mark `dispatching` durably before the network call. Crash between this write and actual dispatch is conservatively unknown on recovery. `reserved` with no dispatch marker can be released after exclusive recovery confirms no old worker can dispatch it. Never retry an unknown attempt automatically. Final usage may settle a row from `dispatching` or `unknown` exactly once.
+Mark `dispatching` durably before the network call. Crash between this write and actual dispatch is conservatively unknown on recovery. `reserved` with no dispatch marker can be released after exclusive recovery confirms no old worker can dispatch it. Never retry an unknown attempt automatically. Final usage may settle a row from `dispatching`, `unknown` or `reconciled` exactly once; a `reconciled` row requires the compensating adjustment below.
 
 Costs are integer microdollars, conservatively rounded after computing each attempt with Decimal rates. Settled cost counts uncached input, cached input and output once; embeddings use reported input only. Category totals and the global cap update in the same transaction.
 
@@ -174,7 +175,7 @@ The shared SDK client has retries disabled and a finite timeout. Creation, concu
 
 Reconciliation records a nonoverlapping closed interval and matching provider project scope. Compute provider total minus already-settled local cost for that interval, record the adjustment and watermark atomically, and add later local costs normally. Store explicitly covered attempt IDs and evidence that the provider's finalized interval covers them; only those unknown attempts move to `reconciled` and release their reservation. Boundary-spanning or otherwise unconfirmed attempts retain conservative pending reserves, visibly distinct from settled spending.
 
-When usage later settles an explicitly covered attempt, append a compensating negative adjustment of its measured local cost in the same transaction: the provider reconciliation already counted it. Use a unique correction identity such as `late-settlement:<attempt_id>` so duplicate completion cannot apply compensation twice. Preserve the original aggregate adjustment and token evidence. Re-importing a reconciliation is harmless; a changed finalized provider total requires a separate owner correction rather than overwriting history.
+When final usage arrives for an explicitly covered `reconciled` attempt, atomically transition it to `settled`, store its raw usage and measured cost, and append a compensating negative adjustment of that cost: the provider reconciliation already counted it. Use a unique correction identity such as `late-settlement:<attempt_id>` so duplicate completion cannot apply compensation twice. Preserve the original aggregate adjustment and token evidence. Re-importing a reconciliation is harmless; a changed finalized provider total requires a separate owner correction rather than overwriting history.
 
 ## Authentication and local maintenance
 
