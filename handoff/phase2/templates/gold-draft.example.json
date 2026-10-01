@@ -1,0 +1,16 @@
+{
+  "id": null,
+  "type": "numeric_qualifier",
+  "split": "dev",
+  "family": null,
+  "doc_id": null,
+  "source_hash": null,
+  "extraction_id": null,
+  "question": "",
+  "answerable": true,
+  "critical": true,
+  "evidence": [{"element_id": null, "quote": ""}],
+  "drafted_by": "",
+  "reviewed_by": null,
+  "reviewed_at": null
+}

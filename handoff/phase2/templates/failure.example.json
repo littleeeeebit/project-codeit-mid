@@ -1,0 +1,17 @@
+{
+  "status": "template_only",
+  "case_id": null,
+  "stage": "ingestion|retrieval|packing",
+  "doc_id": null,
+  "source_hash": null,
+  "extraction_id": null,
+  "element_id": null,
+  "page": null,
+  "run_id": null,
+  "question_id": null,
+  "expected_behavior": null,
+  "observed_behavior": null,
+  "reproduction_command": [],
+  "original_checked_by": null,
+  "regression_test": null
+}

@@ -1,0 +1,10 @@
+{
+  "D1": {"choice": "A", "reason": "Keep original data and the single authoritative ledger local."},
+  "D2": {"action": "retain_existing_configuration", "confirmed_by": null, "confirmed_at": null,
+    "note": "Read budget-status.json and the latest Phase 1 report. Do not reset prior use or rerun configure-budget by default."},
+  "D3": {"choice": "pending", "index_version": null, "estimate_id": null, "max_cost_micro_usd": null,
+    "query_cost_envelope_micro_usd": null, "approved_by": null, "approved_at": null},
+  "D4": {"choice": "pending", "model": "BAAI/bge-reranker-v2-m3", "revision": null,
+    "device": null, "gpu_model": null, "vram_gb": null, "driver": null, "approved_by": null},
+  "note": "Pending means no authorization. An approved embedding build alone does not approve paid evaluation query misses."
+}

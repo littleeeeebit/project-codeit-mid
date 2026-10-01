@@ -1,0 +1,11 @@
+{
+  "doc_id": null,
+  "extraction_id": null,
+  "reviewer": "",
+  "status": "unreviewed",
+  "locations": [],
+  "checks": {},
+  "coverage": {"sections": []},
+  "limitations": ["Template only; no original inspection has been performed."],
+  "findings": {}
+}

@@ -1,0 +1,20 @@
+{
+  "status": "read_only_diagnostic",
+  "synthetic_row_imported": false,
+  "current_quarantined_documents": 0,
+  "unconditionally_required_types": [
+    "converter_unavailable",
+    "late_content",
+    "missing_metadata",
+    "provenance_conflict",
+    "repeated_code",
+    "table_fact"
+  ],
+  "operational_types": [
+    "converter_unavailable"
+  ],
+  "checker_errors_for_synthetic_converter_row_on_parsed_source": [
+    "diagnostic-only: converter case refers to a document that is not quarantined"
+  ],
+  "conclusion": "No current source can satisfy the mandatory converter_unavailable pilot type."
+}
