@@ -49,7 +49,7 @@ Owner preparation recorded in review round 17 (2026-10-01), still with 0 paid ca
 - The owner selected the project OpenAI account and at most $0.10 of additional spending; a read-only model-access check passed. The isolated ledger holds $0.160623 of historical spend under a $0.260623 cap, with purpose envelopes and unknown-billing stops still applying. The planned real configuration is gpt-6-luna on OpenAI with a 1,000-token output cap; the review UI is still on the fake provider.
 - On the reviewer's host, a generic redaction mask missed an unlisted `Authorization`/`Bearer` credential. Receipts holding such a value must be checked before they are published; none were published here.
 
-Still open: the owner's settings save and exact-head server records, independent original review and freeze of the pilot rows, independently reviewed real gold-2 development and sealed sets, real retrieval/answer/sealed runs with pool review, an identified permitted API account and budget scope with paid cost/usage/latency measurements, live-ledger migration and recovery, and real member and operational evidence.
+Still open: the owner's settings save and exact-head server records, independent original review and freeze of the pilot rows, independently reviewed real gold-2 development and sealed sets, real retrieval/answer/sealed runs with pool review, paid cost/usage/latency measurements within the selected $0.10, live-ledger migration and verified recovery (the final backup after the final ledger and evaluation changes), and real member and operational evidence.
 
 ## Decisions made during implementation (for owner review)
 
