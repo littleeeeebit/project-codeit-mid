@@ -102,3 +102,14 @@ python -m rfp_assistant.cli report --phase 3                          # .runtime
 ```
 
 `load-check` builds its own temporary corpus and ledger and never touches `RFP_DATA_DIR`. Only `--save` writes its JSON result next to the phase-3 report. A real paid smoke test is a separate owner-approved action with an explicit estimate. It cannot reproduce the races these fake checks exercise.
+
+## 8. Managed verification
+
+`verification.json` is the repository's verification contract: the major-flow checklist, the documents each flow implements, and the exact commands that check it. `tools/verify.py` executes it and writes a receipt bound to the commit. Every command uses the fake provider. The runner removes `OPENAI_API_KEY` and `RFP_*` from child environments and keeps temporary files inside the receipt directory.
+
+1. `python tools/verify.py approve-template > verification.local.json`. Inspect `_commands_to_inspect`, fill `approval.approved_by`, keep only the command IDs you allow, and delete `_commands_to_inspect`. The file is git-ignored and not secret. A changed `verification.json` has a new SHA-256, so it needs a new approval.
+2. Optional: set `real_corpus` to an **isolated copy** of the originals and runtime (`isolated_copy: true`, an HWP and a PDF document ID, and a question). The runner refuses the authoritative `.runtime`. Without it, `real-corpus-frozen` is recorded as skipped.
+3. `python tools/verify.py run` runs every flow; use `--flow F5-controlled-stop` or `--command signal-stop` to narrow it. The receipt is `.runtime/verification/<UTC>-<sha7>/receipt.json`, with one log per command. On Windows, `signal-stop` sends a real `CTRL_C_EVENT` to a hidden console child.
+4. Manual browser steps: `python tools/verify.py prepare-ui --corpus fixture` (or `real-corpus`) prints how to launch an isolated fake-provider app. Complete `manual-template.json` from the receipt directory with the observer, results (`pass`, `fail`, `blocked`, `not_applicable`), observations and screenshot paths. Then run `python tools/verify.py record-manual <receipt dir> <file>`. Results for another commit are refused.
+
+`summary.complete` becomes true only when every command passed and every manual step passed or was not applicable. Nothing in the receipt is inferred.
