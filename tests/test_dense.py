@@ -552,6 +552,31 @@ class PopulationAndGateTest(unittest.TestCase):
         self.assertEqual(rec["selected"], again["run_id"])  # matching population: compared normally
         self.assertEqual(rec["finalist"], d["run_id"])
 
+    def test_the_trial_uses_the_h_run_matching_todays_population(self):
+        s = self.env.settings
+        q1 = self.row("q1", "기관D", "%좌석%", "도서관 좌석 예약 시스템을 구축한다.", "도서관 좌석 예약은 무엇인가?")
+        q2 = self.row("q2", "기관A", "%하자보수%", self.QUOTE, "검수 후 하자 보수 기간은 얼마인가?")
+        self.write([q1, q2])
+        h_a = self.evaluate(["H"])["H"]["run_id"]
+        original = (s.files_dir / "기관D_도서관 좌석 예약.pdf").read_bytes()
+        self.revise("기관D_도서관 좌석 예약.pdf", ["제안요청서", "Ⅰ. 사업 안내", "열람실 좌석 배정 시스템을 구축한다."])
+        h_b = self.evaluate(["H"])["H"]["run_id"]
+        self.assertNotEqual(h_a, h_b)
+        (s.files_dir / "기관D_도서관 좌석 예약.pdf").write_bytes(original)  # back to population A
+        ingestion.import_manifest(s)
+        ingestion.ingest(s)
+        self.assertEqual(self.evaluate(["H"])["H"]["run_id"], h_a)
+        calls = len(self.transport.embed_calls)
+        report = evaluation.trial_reranker(s, fixtures.analyzer(), "dev-pilot", [20], reranker=IdentityReranker(),
+                                           load_info=IdentityReranker.info, users=2)
+        self.assertEqual(report["h_run"], h_a)
+        self.assertEqual(len(self.transport.embed_calls), calls)
+        shutil.rmtree(s.data_dir / "runs" / h_a)  # no H over today's population: the rerun instruction stays
+        with self.assertRaises(evaluation.EvaluationError) as ctx:
+            evaluation.trial_reranker(s, fixtures.analyzer(), "dev-pilot", [20], reranker=IdentityReranker(),
+                                      load_info=IdentityReranker.info, users=2)
+        self.assertIn("run evaluate-retrieval with H", str(ctx.exception))
+
     def test_equal_sized_but_different_question_sets_differ(self):
         q2 = self.row("q2", "기관A", "%하자보수%", self.QUOTE, "검수 후 하자 보수 기간은 얼마인가?")
         rows, skipped = [q2], []

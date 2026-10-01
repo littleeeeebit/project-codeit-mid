@@ -85,6 +85,21 @@ class HandoffTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 kit.export_run(root / "runtime", out, "../escape")
 
+    def test_export_keeps_the_evaluated_population_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for run_id, population in (("D-a", "a" * 64), ("D-b", "b" * 64)):
+                run = root / "runtime" / "runs" / run_id
+                run.mkdir(parents=True)
+                kit.write_json(run / "config.json", {"mode": "dense", "eval_version": "retrieval-eval-3",
+                                                     "population_sha256": population, "population_size": 24})
+                kit.write_json(run / "scores.json", {"status": "complete"})
+                (run / "traces.jsonl").write_text("", encoding="utf-8")
+                kit.export_run(root / "runtime", root / "out", run_id)
+            exported = {r: kit.read_json(root / "out" / "runs" / r / "config.json") for r in ("D-a", "D-b")}
+            self.assertEqual((exported["D-a"]["population_sha256"], exported["D-a"]["population_size"]), ("a" * 64, 24))
+            self.assertNotEqual(exported["D-a"]["population_sha256"], exported["D-b"]["population_sha256"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,7 +17,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TRACE_FIELDS = ("id", "type", "critical", "question", "metrics", "code_check", "wrong_scope",
                 "ranking", "packed", "fallback", "limitations", "timings_ms", "evidence_tokens")
-CONFIG_FIELDS = ("eval_version", "label", "mode", "dataset", "dataset_sha256", "index_version",
+CONFIG_FIELDS = ("eval_version", "label", "mode", "dataset", "dataset_sha256", "population_sha256",
+                 "population_size", "index_version",
                  "index_manifest_hash", "profile", "analyzer", "dense_version", "embedding", "limits",
                  "reranker", "rerank_depth", "h_run")
 SCORE_FIELDS = ("status", "reason", "aggregate", "profile_stats", "query_embedding", "gate", "load",

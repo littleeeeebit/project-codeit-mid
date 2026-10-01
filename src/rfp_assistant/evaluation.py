@@ -694,7 +694,9 @@ def load_run(settings: Settings, run_id: str) -> tuple[dict, dict]:
             json.loads((d / "scores.json").read_text(encoding="utf-8")))
 
 
-def _latest_run(settings: Settings, label: str, dataset_sha: str, index_version: str) -> str | None:
+def _latest_run(settings: Settings, label: str, dataset_sha: str, index_version: str,
+                population: str | None = None) -> str | None:
+    """Newest complete current-policy run matching dataset bytes, index and, when given, evaluated population."""
     base = settings.data_dir / "runs"
     found = []
     for d in base.glob(f"{label}-*") if base.exists() else []:
@@ -704,6 +706,7 @@ def _latest_run(settings: Settings, label: str, dataset_sha: str, index_version:
             continue
         if (config.get("eval_version") == EVAL_VERSION and config["dataset_sha256"] == dataset_sha
                 and config["index_version"] == index_version
+                and (population is None or config.get("population_sha256") == population)
                 and scores.get("status") == "complete"):
             found.append((scores.get("created_at", ""), d.name))
     return max(found)[1] if found else None
@@ -724,9 +727,12 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
     with open_db(settings.db_path) as conn:
         index_version = index_version or get_app_setting(conn, "active_index")
     index = KeywordIndex.load(settings, index_version)
-    h_run = _latest_run(settings, "H", dataset_sha, index.version)
+    # A newer H over another population (e.g. before a source revision was reverted) must not shadow the one
+    # matching today's population.
+    h_run = _latest_run(settings, "H", dataset_sha, index.version, population_identity(rows, skipped))
     if h_run is None:
-        raise EvaluationError("no complete frozen H run for this dataset and index; run evaluate-retrieval with H")
+        raise EvaluationError("no complete frozen H run for this dataset, index and evaluated population; "
+                              "run evaluate-retrieval with H")
     h_config, h_scores = load_run(settings, h_run)
     if h_config.get("population_sha256") != population_identity(rows, skipped):
         raise EvaluationError("the evaluated population changed since the frozen H run; rerun H before the trial")
