@@ -784,8 +784,9 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
 
         def one(row):
             t0 = time.perf_counter()
-            _execute(trial_settings, index, analyzer, [row], "hybrid_rerank", dense, vectors, reranker, depth)
-            return (time.perf_counter() - t0) * 1000
+            (r,) = _execute(trial_settings, index, analyzer, [row], "hybrid_rerank", dense, vectors, reranker, depth)
+            timings = r.get("timings_ms") or {}
+            return ((time.perf_counter() - t0) * 1000, timings.get("rerank_queue"), timings.get("rerank_infer"))
 
         def base(row):
             t0 = time.perf_counter()
@@ -793,7 +794,10 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
             return (time.perf_counter() - t0) * 1000
 
         with ThreadPoolExecutor(max_workers=users) as pool:
-            loaded = list(pool.map(one, passage * max(1, users // max(1, len(passage)))))
+            measured = list(pool.map(one, passage * max(1, users // max(1, len(passage)))))
+            loaded = [m[0] for m in measured]
+            queue = [m[1] for m in measured if m[1] is not None]
+            infer = [m[2] for m in measured if m[2] is not None]
             unranked = list(pool.map(base, passage * max(1, users // max(1, len(passage)))))
         agg = aggregate(results, skipped)
         new_critical = sorted(set(agg["critical_failures"]) - base_critical)
@@ -807,11 +811,15 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
         config = {**h_config, "label": "HR", "mode": "hybrid_rerank", "h_run": h_run,
                   "eval_version": EVAL_VERSION,
                   "reranker": {k: load_info.get(k) for k in ("model", "revision", "device", "max_length",
-                                                              "max_concurrency")},
+                                                              "max_concurrency", "precision")},
                   "rerank_depth": depth}
         run_id = f"HR-{hashlib.sha256(dumps(config).encode()).hexdigest()[:10]}"
         scores = {"status": "complete", "aggregate": agg, "gate": gate, "created_at": utcnow(),
                   "latency_ms": {"rerank_alone_p50": percentile(alone, 0.5), "rerank_alone_p95": percentile(alone, 0.95),
+                                 "queue_p95_under_load": percentile(queue, 0.95),
+                                 "infer_p95_under_load": percentile(infer, 0.95),
+                                 "truncated_pairs": sum((r.get("timings_ms") or {}).get("rerank_truncated") or 0
+                                                        for r in results),
                                  "hr_under_load_p95": percentile(loaded, 0.95),
                                  "h_under_load_p95": percentile(unranked, 0.95)},
                   "load": load_info}

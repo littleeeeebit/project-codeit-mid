@@ -210,6 +210,19 @@ class ValidationApplicabilityTest(unittest.TestCase):
         report = self.validate(self.dataset() + [self.converter("기관A")])  # a parsed document
         self.assertTrue(any("not quarantined" in e for e in report["errors"]))
 
+    def test_a_converter_candidate_goes_stale_when_its_document_is_recovered(self):
+        s = self.env.settings
+        row = {**self.converter("기관E"), "id": "dp-023", "reviewed_by": None}
+        path = self.root / "batch.jsonl"
+        store.write_jsonl_atomic(path, [row])
+        gold.submit(s, path, "b-ops", "dev-pilot", "agent-a")
+        self.assertEqual(gold.status(s)["pending_invalid"], [])
+        self.recover_everything()
+        (stale,) = gold.status(s)["pending_invalid"]
+        self.assertEqual(stale["candidate_id"], "dp-023")
+        self.assertTrue(any("not quarantined" in e for e in stale["errors"]))
+        self.assertTrue(gold.candidate(s, "dp-023")["current_errors"])
+
     def test_existing_row_checks_still_apply(self):
         self.recover_everything()
         bad = self.dataset()

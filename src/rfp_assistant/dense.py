@@ -560,6 +560,12 @@ class LocalReranker:
         t0 = time.perf_counter()
         self.model = CrossEncoder(settings.reranker_model, revision=settings.reranker_revision,
                                   max_length=settings.reranker_max_length, device=device)
+        self.precision = settings.reranker_precision
+        if self.precision == "fp16":
+            if "cuda" not in str(getattr(self.model, "device", "")):
+                raise DenseError("fp16 reranking is only supported on a CUDA device")
+            inner = getattr(self.model, "model", self.model)  # the Hugging Face module inside the cross-encoder
+            inner.half()
         self.cold_load_seconds = round(time.perf_counter() - t0, 2)
         self.max_length = settings.reranker_max_length
         self._sem = threading.BoundedSemaphore(settings.reranker_max_concurrency)
@@ -571,7 +577,7 @@ class LocalReranker:
                 versions[pkg] = None
         self.info = {"model": settings.reranker_model, "revision": settings.reranker_revision,
                      "device": str(getattr(self.model, "device", device)), "max_length": self.max_length,
-                     "max_concurrency": settings.reranker_max_concurrency,
+                     "max_concurrency": settings.reranker_max_concurrency, "precision": self.precision,
                      "cold_load_seconds": self.cold_load_seconds, "rss_before_mb": rss0, "rss_after_mb": _rss_mb(),
                      "versions": versions, "license": _model_license(settings)}
         try:

@@ -205,6 +205,16 @@ class IdentityReranker:
         return [(i, float(-i)) for i in range(len(chunks))], {"truncated": 0}
 
 
+class TimedReranker(IdentityReranker):
+    """Reports the queue/inference split and truncation the way LocalReranker does."""
+
+    info = {**IdentityReranker.info, "precision": "fp16"}
+
+    def rerank(self, question, chunks):
+        order, _ = super().rerank(question, chunks)
+        return order, {"truncated": 1, "queue_ms": 7.5, "infer_ms": 2.5}
+
+
 class DemotingReranker(FakeReranker):
     """Pushes the chunks that mention 하자보수 to the end."""
 
@@ -403,6 +413,24 @@ class EvaluationRunTest(unittest.TestCase):
             decision = {**draft, "decided_by": "owner", "rationale": "x"}
             (Path(self.tmp.name) / "d2.json").write_text(json.dumps(decision), encoding="utf-8")
             evaluation.activate_run(s, runs["H"], Path(self.tmp.name) / "d2.json")
+
+    def test_trial_reports_queue_inference_truncation_and_precision(self):
+        s = self.env.settings
+        evaluation.evaluate_retrieval(s, fixtures.analyzer(), self.transport, "dev-pilot", ["H"],
+                                      allow_paid_queries=True)
+        report = evaluation.trial_reranker(s, fixtures.analyzer(), "dev-pilot", [20], reranker=TimedReranker(),
+                                           load_info=TimedReranker.info, users=2)
+        run = report["depths"][20]["run_id"]
+        config, scores = evaluation.load_run(s, run)
+        latency = scores["latency_ms"]
+        self.assertEqual((latency["queue_p95_under_load"], latency["infer_p95_under_load"]), (7.5, 2.5))
+        self.assertGreater(latency["truncated_pairs"], 0)
+        self.assertEqual(config["reranker"]["precision"], "fp16")
+        traces = read_jsonl(s.data_dir / "runs" / run / "traces.jsonl")
+        self.assertTrue(any((t.get("timings_ms") or {}).get("rerank_queue") == 7.5 for t in traces))
+        with self.assertRaises(Exception):
+            from rfp_assistant.settings import validate
+            validate(s.with_(reranker_precision="int4"))
 
     def test_missing_query_usage_stops_paid_evaluation_queries(self):
         no_usage = generation.FakeTransport(embedder=lambda inputs, dims: generation.EmbeddingResponse(
@@ -725,7 +753,13 @@ class ServingTest(unittest.TestCase):
             self.assertEqual(self.res.reranker().max_length, 1024)
             first = self.res.reranker()
             self.assertIs(self.res.reranker(), first)
-        self.assertEqual(loads, [512, 1024])
+            with store.open_db(self.env.settings.db_path) as conn, store.tx(conn, immediate=True):
+                run = json.loads(get_app_setting(conn, "active_run"))
+                run["reranker"]["precision"] = "fp16"
+                store.set_app_setting(conn, "active_run", json.dumps(run))
+            self.assertIsNot(self.res.reranker(), first)  # a precision change reloads the model
+            self.assertEqual(self.res.run_settings().reranker_precision, "fp16")
+        self.assertEqual(loads, [512, 1024, 1024])
 
     def test_answer_billing_reports_every_paid_stage(self):
         no_usage = generation.FakeTransport(embedder=lambda inputs, dims: generation.EmbeddingResponse(

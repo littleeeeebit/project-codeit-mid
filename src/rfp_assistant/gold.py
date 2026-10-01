@@ -414,6 +414,12 @@ def sync(settings: Settings) -> int:
     return len(expected)
 
 
+def current_errors(checker: RowChecker, row: dict) -> list[str]:
+    """What the shared row checks say about a candidate today: a source can be re-parsed or recovered after the
+    candidate was drafted (e.g. a converter case whose document is now parsed)."""
+    return checker.check(row, str(row.get("id")))
+
+
 def status(settings: Settings) -> dict:
     with open_db(settings.db_path) as conn:
         counts = {f"{r[0]}:{r[1]}": r[2] for r in conn.execute(
@@ -421,8 +427,15 @@ def status(settings: Settings) -> dict:
         pending_inference = [r[0] for r in conn.execute(
             "SELECT candidate_id FROM gold_candidates WHERE status = 'rejected' AND inference_json IS NULL "
             "ORDER BY decided_at")]
+        checker = RowChecker(settings, conn)
+        pending_invalid = []
+        for r in conn.execute("SELECT candidate_id, row_json FROM gold_candidates WHERE status = 'pending' "
+                              "ORDER BY submitted_at, candidate_id"):
+            errors = current_errors(checker, json.loads(r["row_json"]))
+            if errors:
+                pending_invalid.append({"candidate_id": r["candidate_id"], "errors": errors})
     return {"counts": counts, "rejection_wiki": str(rejections_dir(settings) / "index.md"),
-            "pending_inference": pending_inference}
+            "pending_inference": pending_inference, "pending_invalid": pending_invalid}
 
 
 # ---------------------------------------------------------------- review screen reads
@@ -445,7 +458,8 @@ def candidate(settings: Settings, candidate_id: str) -> dict:
         row = json.loads(c["row_json"])
         return {"candidate_id": candidate_id, "status": c["status"], "row": row, "row_sha256": c["row_sha256"],
                 "drafted_by": c["drafted_by"], "batch_id": c["batch_id"], "dataset": c["dataset"],
-                "operational": row.get("type") in OPERATIONAL_TYPES, "context": source_context(conn, row)}
+                "operational": row.get("type") in OPERATIONAL_TYPES, "context": source_context(conn, row),
+                "current_errors": current_errors(RowChecker(settings, conn), row)}
 
 
 def recent(settings: Settings, limit: int = 20) -> list[dict]:

@@ -64,6 +64,7 @@ class Settings:
     reranker_revision: str = ""  # commit hash from the model card; the trial refuses to load an unpinned model
     reranker_max_length: int = 512
     reranker_max_concurrency: int = 1
+    reranker_precision: str = "fp32"  # "fp16" halves weights on a CUDA device; part of the trial/serving identity
     request_timeout_seconds: float = 60.0
     converter_timeout_seconds: float = 300.0
     framing_margin_tokens: int = 200
@@ -153,6 +154,8 @@ def validate(s: Settings) -> None:
         raise SettingsError(f"embedding_batch_inputs must be within 1..{EMBEDDING_MAX_INPUTS_PER_REQUEST}")
     if not 1 <= s.embedding_batch_tokens <= EMBEDDING_MAX_TOKENS_PER_REQUEST:
         raise SettingsError(f"embedding_batch_tokens must be within 1..{EMBEDDING_MAX_TOKENS_PER_REQUEST}")
+    if s.reranker_precision not in ("fp32", "fp16"):
+        raise SettingsError("reranker_precision must be 'fp32' or 'fp16'")
     if s.rrf_k < 1 or s.channel_top_k < 1 or s.fused_top_k < 1 or s.reranker_max_concurrency < 1:
         raise SettingsError("rrf_k, top-k depths and reranker concurrency must be positive")
     s.data_dir.mkdir(parents=True, exist_ok=True)

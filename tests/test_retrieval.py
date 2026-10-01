@@ -6,7 +6,7 @@ from unittest import mock
 
 from rank_bm25 import BM25Okapi
 
-from rfp_assistant import chunking, ingestion, service
+from rfp_assistant import chunking, ingestion, retrieval, service
 from rfp_assistant.auth import AuthError
 from rfp_assistant.contracts import DocRef
 from rfp_assistant.retrieval import KeywordIndex, retrieve, rrf_fuse
@@ -251,6 +251,84 @@ class SplitRowGradingTest(unittest.TestCase):
         self.assertTrue(all(("부가가치세 별도" in c["body"]) == (g == 2) for c, g in zip(pieces, grades)))
         header = {"element_id": el["element_id"], "quote": "내용"}
         self.assertEqual({evaluation.grade(c, header, el) for c in pieces}, {2})
+
+
+
+def _sections(sections: list[tuple[str, list[str]]]) -> list[dict]:
+    body = "".join(f"<Paragraph><LineSeg><Text>{t}</Text></LineSeg></Paragraph>"
+                   for heading, paras in sections for t in (heading, *paras))
+    xml = f"<HwpDoc><BodyText><SectionDef><ColumnSet>{body}</ColumnSet></SectionDef></BodyText></HwpDoc>"
+    return ingestion.walk_hwp(ET.fromstring(xml))
+
+
+class ObservedNumericMissTest(unittest.TestCase):
+    """Synthetic shapes of the live misses dp-005, dp-020 (spacing) and dp-014 (restated project name)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.settings = Settings(source_dir=Path(self.tmp.name), data_dir=Path(self.tmp.name), hwp_converter=None,
+                                 provider="fake")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def first(self, index, question, x="xa"):
+        r = retrieve(self.settings, index, fixtures.analyzer(), question, [(DocRef("A", "ha"), x)])
+        return r, (r.evidence[0].quote if r.evidence else "")
+
+    def test_spaced_forms_match_unspaced_questions_without_touching_evidence(self):
+        late = "지체 상금율은 계약금액의 1천분의 1.5로 한다."
+        cost = "사 업 비 : 130,000,000원 (부가가치세 포함)"
+        els = ingestion.finalize_elements(_sections([
+            ("1. 일반 사항", ["포상금 지급 기준은 별도로 정한다.", "지체 없이 감독관에게 통보하여야 한다."]),
+            ("2. 사업 개요", ["사업 범위와 비용 산정 방식은 별첨을 따른다."]),
+            ("3. 계약 조건", [late]),
+            ("4. 예산", [cost])]), "xa")
+        index = _index({"xa": els})
+        r, quote = self.first(index, "지체상금율은 얼마인가?")
+        self.assertIn(late, quote)  # raw evidence keeps the source spelling
+        r, quote = self.first(index, "사업비는 얼마인가?")
+        self.assertIn(cost, quote)
+        self.assertTrue(any(late in e["raw_text"] for e in els))
+
+    def test_a_restated_project_name_does_not_drown_the_asked_fact(self):
+        title = "한빛대학교 차세대 포털 학사 정보시스템 구축사업"
+        budget = "사업 예산은 금 1,200,000,000원이며 대금은 기성 검사 후 30일 이내 지급한다."
+        filler = " ".join(f"세부 지급 절차 {i}단계는 계약 일반조건에 따른다." for i in range(15))
+        sections = [(f"{i + 1}. {title} 과업{i}", [f"{title} 과업 {i}의 예산 범위와 지급 대상 내용을 기술한다."])
+                    for i in range(12)]
+        sections.insert(9, ("10. 대금", [f"{budget} {filler}"]))
+        els = ingestion.finalize_elements(_sections(sections), "xa")
+        index = _index({"xa": els})
+        long_q = f"{title}의 사업 예산과 대금 지급 조건은?"
+        r, quote = self.first(index, long_q)
+        self.assertIn(budget, quote)
+        self.assertTrue(any(x.startswith("scope_redundant_terms:") for x in r.limitations))
+        r_short, quote_short = self.first(index, "사업 예산과 대금 지급 조건은?")
+        self.assertIn(budget, quote_short)
+        # without the rule the restated name outranks the fact (the observed failure)
+        an = fixtures.analyzer()
+        plain = retrieval.rank_lexical(index, an, long_q, index.rows_by_extraction["xa"], 20)
+        rank = next(n for n, (i, _) in enumerate(plain, 1) if budget in index.chunks[i]["payload"])
+        self.assertGreater(rank, 5)
+
+    def test_codes_digits_and_negations_are_never_dropped(self):
+        index = _index({"xa": ingestion.finalize_elements(_sections(
+            [(f"{i + 1}. 항목{i}", [f"공통 문구 SFR-001 1천 불가 내용 {i}"]) for i in range(10)]), "xa")})
+        drop = retrieval.scope_redundant_terms(index, fixtures.analyzer().tokens("공통 문구 SFR-001 1천 불가"),
+                                               index.rows_by_extraction["xa"], set())
+        self.assertNotIn("code:SFR-001", drop)
+        self.assertFalse({"1", "불가"} & drop)
+        self.assertIn("공통", drop)
+        # nothing is dropped when no other term would remain
+        self.assertEqual(retrieval.scope_redundant_terms(index, ["공통", "문구"], index.rows_by_extraction["xa"],
+                                                         set()), set())
+
+    def test_restated_metadata_terms_come_from_the_selected_documents(self):
+        env = fixtures.make_env(Path(self.tmp.name) / "env", paid=False, index=False)
+        terms = retrieval.scope_metadata_terms(env.settings, fixtures.analyzer(), [env.refs["기관A"].doc_id])
+        self.assertTrue({"통합", "구축", "기관"} <= terms)  # CSV title and institution of 기관A
+        self.assertEqual(retrieval.scope_metadata_terms(self.settings, fixtures.analyzer(), ["x"]), set())
 
 
 if __name__ == "__main__":

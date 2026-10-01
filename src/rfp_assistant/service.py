@@ -100,6 +100,8 @@ class Resources:
             changes["reranker_max_length"] = rr["max_length"]
         if rr.get("max_concurrency"):  # the bound the six-user latency gate was measured with
             changes["reranker_max_concurrency"] = rr["max_concurrency"]
+        if rr.get("precision"):
+            changes["reranker_precision"] = rr["precision"]
         known = set(Settings.__dataclass_fields__)
         return self.settings.with_(**{k: v for k, v in changes.items() if k in known})
 
@@ -141,7 +143,8 @@ class Resources:
         s = self.run_settings().with_(reranker_model=cfg.get("model") or self.settings.reranker_model,
                                       reranker_revision=cfg.get("revision") or "")
         # Everything the loaded model's inference depends on; depth alone needs no reload.
-        key = (s.reranker_model, s.reranker_revision, s.reranker_max_length, s.reranker_max_concurrency)
+        key = (s.reranker_model, s.reranker_revision, s.reranker_max_length, s.reranker_max_concurrency,
+               s.reranker_precision)
         with self._index_lock:
             if self._reranker_key != key:
                 self._reranker_key = key

@@ -401,6 +401,8 @@ def _gold_candidate(st, res, principal, c: dict, categories: dict) -> None:
                 f"{(doc.get('format') or '').upper()} · {REVIEW_TEXT.get(doc.get('review_status'), '')}")
     if doc.get("review_status") in REVIEW_WARNING:
         st.warning(REVIEW_WARNING[doc["review_status"]])
+    for err in c.get("current_errors") or []:  # e.g. a converter case whose document has since been recovered
+        st.error(f"현재 원문 상태와 맞지 않습니다: {plain(err)}")
     if doc.get("unavailable_reason"):
         st.error(doc["unavailable_reason"])
     if doc.get("doc_id"):

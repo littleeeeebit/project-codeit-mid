@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
+import sqlite3
 import threading
 import time
 import uuid
@@ -21,13 +23,51 @@ from .settings import Settings
 from .store import dumps, get_app_setting, open_db, read_jsonl, set_app_setting, tx, utcnow, write_jsonl_atomic, \
     write_text_atomic
 
-ANALYZER_VERSION = "kiwi-bm25-1"
+ANALYZER_VERSION = "kiwi-bm25-2"  # 2: spacing normalization of the analysis copy, scope-redundant query terms
 KEEP_TAGS = {"NNG", "NNP", "NNB", "NR", "NP", "SL", "SN", "SH", "XR", "VV", "VA", "XPN"}
 NEGATIONS = {"않", "안", "못", "없", "아니", "불가", "금지"}
 # Small reviewed domain dictionary; extend only from observed query failures.
 USER_WORDS = ["제안요청서", "요구사항", "하자보수", "하자담보", "부가가치세", "공동수급", "분담이행", "공동이행",
               "입찰참가자격", "기술평가", "가격평가", "지체상금", "사업수행계획서", "산출물", "유지관리", "정보시스템"]
 BM25_TOP_K = 20
+# Spelling variants observed in this corpus, applied to the analysis copy of both indexed and query text (never to
+# stored evidence). Extend only from an observed retrieval failure with a fixture.
+SPACING_ALIASES = {"지체 상금": "지체상금", "사업 비": "사업비", "계약 보증금": "계약보증금", "하자 보수": "하자보수"}
+HANGUL_SYLLABLE = re.compile(r"^[가-힣]$")
+PLAIN_HANGUL_WORD = re.compile(r"^[가-힣]+$")
+LETTER_SPACED_MAX = 6
+
+
+def normalize_for_analysis(text: str) -> str:
+    """Analysis copy only. Collapses letter-spaced headings ("사 업 비 :" -> "사업비 :"): a run of 2..6
+    single-syllable tokens whose neighbours are not plain Hangul words, so ordinary prose ("그 외 사항") stays as
+    written. Then applies SPACING_ALIASES. Requirement codes, digits and negations are unaffected."""
+    out_lines = []
+    for line in text.split("\n"):
+        toks = line.split(" ")
+        res, i = [], 0
+        while i < len(toks):
+            j = i
+            while j < len(toks) and HANGUL_SYLLABLE.match(toks[j]):
+                j += 1
+            run = j - i
+            before = res[-1] if res else ""
+            after = toks[j] if j < len(toks) else ""
+            if (2 <= run <= LETTER_SPACED_MAX and not PLAIN_HANGUL_WORD.match(before)
+                    and not PLAIN_HANGUL_WORD.match(after)):
+                res.append("".join(toks[i:j]))
+                i = j
+            elif run:
+                res.extend(toks[i:j])
+                i = j
+            else:
+                res.append(toks[i])
+                i += 1
+        out_lines.append(" ".join(res))
+    text = "\n".join(out_lines)
+    for variant, canonical in SPACING_ALIASES.items():
+        text = text.replace(variant, canonical)
+    return text
 
 
 class RetrievalError(RuntimeError):
@@ -48,9 +88,9 @@ class Analyzer:
 
     def tokens(self, text: str) -> list[str]:
         text = nfc(text)
-        out = [f"code:{c}" for c in CODE_RE.findall(text)]
+        out = [f"code:{c}" for c in CODE_RE.findall(text)]  # from the text as written
         with self._lock:
-            toks = self._kiwi.tokenize(text)
+            toks = self._kiwi.tokenize(normalize_for_analysis(text))
         for t in toks:
             if t.tag in KEEP_TAGS or t.form in NEGATIONS:
                 out.append(t.form.lower())
@@ -58,7 +98,8 @@ class Analyzer:
 
 
 def analyzer_fingerprint(analyzer: Analyzer) -> str:
-    info = {"analyzer": analyzer.version, "words": USER_WORDS, "tags": sorted(KEEP_TAGS)}
+    info = {"analyzer": analyzer.version, "words": USER_WORDS, "tags": sorted(KEEP_TAGS),
+            "aliases": SPACING_ALIASES, "letter_spaced_max": LETTER_SPACED_MAX, "query_policy": QUERY_POLICY}
     return hashlib.sha256(json.dumps(info, sort_keys=True).encode()).hexdigest()[:16]
 
 
@@ -271,10 +312,60 @@ def scope_rows(index: KeywordIndex, scope: list[tuple[DocRef, str]]) -> list[int
             for i in index.rows_by_extraction.get(extraction_id, [])]
 
 
+QUERY_POLICY = "scope-redundant-1"
+SCOPE_MIN_ROWS = 8  # below this a scope-local frequency says nothing
+METADATA_RESTATEMENT_MIN = 2  # a question restating the selected project name repeats at least two of its terms
+
+
+def _protected(token: str) -> bool:
+    return token.startswith("code:") or any(ch.isdigit() for ch in token) or token in NEGATIONS
+
+
+def scope_metadata_terms(settings: Settings, analyzer, doc_ids: list[str]) -> set[str]:
+    """Analyzer tokens of the selected documents' own title and institution (CSV values and recorded resolutions)."""
+    if not doc_ids:
+        return set()
+    try:
+        with open_db(settings.db_path) as conn:
+            rows = conn.execute(
+                f"SELECT doc_id, normalized_metadata_json FROM documents WHERE doc_id IN "
+                f"({','.join('?' * len(doc_ids))})", doc_ids).fetchall()
+            resolved = conn.execute(
+                f"SELECT value_json FROM metadata_resolutions WHERE field IN ('title', 'institution') AND doc_id IN "
+                f"({','.join('?' * len(doc_ids))})", doc_ids).fetchall()
+    except sqlite3.Error:  # an index used without a manifest database (unit fixtures)
+        return set()
+    texts = []
+    for r in rows:
+        meta = json.loads(r["normalized_metadata_json"])
+        texts += [meta.get("title") or "", meta.get("institution") or ""]
+    texts += [str(json.loads(r["value_json"])) for r in resolved]
+    return {t for text in texts for t in analyzer.tokens(text) if not _protected(t)}
+
+
+def scope_redundant_terms(index: KeywordIndex, qtokens: list[str], allowed: list[int],
+                          metadata_terms: set[str]) -> set[str]:
+    """Query terms that cannot discriminate inside the selected scope and only drown the asked fact:
+    - terms present in more than half of the scope's chunks (their scope-local BM25 IDF is not positive);
+    - the selected project's own title/institution terms, when the question restates that name (two or more).
+    Codes, digits and negations are never dropped, and nothing is dropped if no other term would remain."""
+    terms = {t for t in qtokens if not _protected(t)}
+    drop: set[str] = set()
+    if len(allowed) >= SCOPE_MIN_ROWS:
+        freqs = index.bm25.doc_freqs
+        for t in terms:
+            if sum(1 for i in allowed if t in freqs[i]) * 2 > len(allowed):
+                drop.add(t)
+    restated = terms & metadata_terms
+    if len(restated) >= METADATA_RESTATEMENT_MIN:
+        drop |= restated
+    return drop if any(t not in drop for t in qtokens) else set()
+
+
 def rank_lexical(index: KeywordIndex, analyzer, question: str, allowed: list[int], k: int,
-                 whitespace: bool = False) -> list[tuple[int, float]]:
+                 whitespace: bool = False, drop: set[str] | None = None) -> list[tuple[int, float]]:
     """BM25 over admitted rows only. No shared token: empty, never arbitrary zero-score rows. Ties by chunk ID."""
-    qtokens = analyzer.tokens(question)
+    qtokens = [t for t in analyzer.tokens(question) if t not in (drop or ())]
     if not allowed or not qtokens:
         return []
     bm25 = index.bm25_for(analyzer) if whitespace else index.bm25
@@ -346,7 +437,14 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
     lexical_channel = "bm25_ws" if mode == "whitespace_bm25" else "bm25"
     if mode != "dense":
         lex_analyzer = WhitespaceAnalyzer() if mode == "whitespace_bm25" else analyzer
-        lexical = rank_lexical(index, lex_analyzer, question, allowed, k, whitespace=mode == "whitespace_bm25")
+        drop: set[str] = set()
+        if mode != "whitespace_bm25":  # K0 stays the plain documented baseline
+            drop = scope_redundant_terms(index, analyzer.tokens(question), allowed, scope_metadata_terms(
+                settings, analyzer, list(dict.fromkeys(ref.doc_id for ref, _ in scope))))
+            if drop:
+                limitations.append("scope_redundant_terms:" + ",".join(sorted(drop)))
+        lexical = rank_lexical(index, lex_analyzer, question, allowed, k, whitespace=mode == "whitespace_bm25",
+                               drop=drop)
     t2 = time.perf_counter()
     dense_ranked: list[tuple[int, float]] = []
     if mode in DENSE_MODES:
@@ -443,6 +541,10 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
                "rerank": ms(t4, t5), "pack": ms(t5, t6), "total": ms(t0, t6)}
     if rerank_info:
         limitations += [f"rerank:{k}={v}" for k, v in rerank_info.items() if k in ("truncated", "windows")]
+        # queue time (waiting for the bounded model) and inference time, so latency gates show where time goes
+        for key in ("queue_ms", "infer_ms", "truncated"):
+            if rerank_info.get(key) is not None:
+                timings[f"rerank_{key.removesuffix('_ms')}"] = rerank_info[key]
     return RetrievalResult(
         mode=mode, scope=[ref for ref, _ in scope],
         exact_matches=[c for c in candidates if c["channel"] == "exact"],
