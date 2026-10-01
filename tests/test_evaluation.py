@@ -272,6 +272,52 @@ class MetricFixtureTest(unittest.TestCase):
         self.assertEqual((evaluation.recommend(pilot)["status"], evaluation.recommend(pilot)["selected"]),
                          ("final", "H-run"))
 
+    def test_the_reviewers_occurrence_and_cells_are_the_target(self):
+        """Review round 11 (F10): a repeated quote is scored at the occurrence the reviewer approved."""
+        raw = "이전 계약 하자보수: 12개월. 현재 계약 하자보수: 12개월."
+        q = "12개월"
+        first, second = raw.index(q), raw.rindex(q)
+        els = {("x", "p"): {"raw_text": raw, "table": None}}
+        at = lambda p, n=len(q): {"extraction_id": "x", "spans": [{"element_id": "p", "start": p, "end": p + n}]}  # noqa: E731
+        pinned = {"group_id": "g1", "doc_id": "d", "alternatives": [
+            {"element_id": "p", "quote": q, "extraction_id": "x", "offsets": [second, second + len(q)]}]}
+        row = {**gold_row([pinned]), "evidence_groups": [pinned]}
+        m = evaluation.score_row(row, [at(second)], [at(second)], els)
+        self.assertEqual((m["hit@20"], m["recall@20"], m["ndcg@5"], m["packed_complete"], m["unlabelled@5"]),
+                         (1, 1.0, 1.0, 1, 0))
+        self.assertEqual(evaluation.score_row(row, [at(first)], [], els)["recall@20"], 0.0)
+        # offsets with context: the occurrence inside them is the target
+        context = {**pinned["alternatives"][0], "offsets": [raw.index("현재"), len(raw)]}
+        self.assertEqual(evaluation.grade(at(second), context, els[("x", "p")]), 2)
+        self.assertEqual(evaluation.grade(at(first), context, els[("x", "p")]), 0)
+        self.assertEqual(evaluation.grade(at(second, 2), context, els[("x", "p")]), 1)  # part of the approved one
+        # dedup compares the approved coverage: the first occurrence is no repeat of the second
+        self.assertEqual(evaluation.dedup_ranking([at(second), at(first)], [pinned], els)[1], 0)
+        # a coordinate-free (older) alternative keeps the first occurrence
+        free = {k: v for k, v in pinned["alternatives"][0].items() if k != "offsets"}
+        self.assertEqual(evaluation.grade(at(first), free, els[("x", "p")]), 2)
+
+    def test_named_cells_pick_the_approved_row(self):
+        cells = [{"row": 0, "col": 0, "text": "이전 계약"}, {"row": 0, "col": 1, "text": "12개월"},
+                 {"row": 1, "col": 0, "text": "현재 계약"}, {"row": 1, "col": 1, "text": "12개월"}]
+        el = {"raw_text": "이전 계약 | 12개월\n현재 계약 | 12개월", "table": {"cells": cells}}
+        rows = lambda *r: {"extraction_id": "x", "spans": [{"element_id": "t", "rows": list(r)}]}  # noqa: E731
+        unit = {"element_id": "t", "quote": "12개월", "extraction_id": "x", "cells": [[1, 1]]}
+        self.assertEqual([evaluation.grade(rows(1), unit, el), evaluation.grade(rows(0), unit, el)], [2, 1])
+        free = {k: v for k, v in unit.items() if k != "cells"}
+        self.assertEqual(evaluation.grade(rows(1), free, el), 1)  # without cells both rows are the target
+        by_offsets = {**free, "offsets": [el["raw_text"].rindex("12개월"), len(el["raw_text"])]}
+        self.assertEqual(evaluation.grade(rows(1), by_offsets, el), 2)
+        # fragments of the approved row: the named cell's characters only
+        line = dict(evaluation.table_rows(el))[1]
+        a = line.rindex("12개월")
+        piece = lambda r, s, e: {"extraction_id": "x", "spans": [  # noqa: E731
+            {"element_id": "t", "rows": [r], "fragment": {"row": r, "start": s, "end": e}}]}
+        self.assertEqual(evaluation.grade(piece(1, a, len(line)), unit, el), 2)
+        self.assertEqual(evaluation.grade(piece(1, a, a + 2), unit, el), 1)
+        self.assertEqual(evaluation.grade(piece(0, 0, len(line)), unit, el), 1)  # same table, not the approved row
+        self.assertEqual(evaluation.coverage(piece(1, a, a + 2), unit, el), frozenset(("f", 1, i) for i in range(a, a + 2)))
+
     def test_ndcg_matches_the_hand_calculation_and_mrr(self):
         import math
 

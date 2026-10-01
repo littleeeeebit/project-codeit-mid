@@ -212,8 +212,8 @@ def validate_gold(settings: Settings, name: str) -> dict:
 EVAL_VERSION = "retrieval-eval-4"
 # Gold-2 runs record their ranking policy, so a run scored under another deduplication rule is never reused.
 # 1: repeats keyed by alternative and grade; 2: repeats keyed by the source coverage a chunk carries;
-# 3: nDCG@5 counted in judged group units, the unit of its ideal.
-GOLD_RANKING_POLICY = "gold2-group-units-3"
+# 3: nDCG@5 counted in judged group units, the unit of its ideal; 4: grading targets the reviewer's offsets/cells.
+GOLD_RANKING_POLICY = "gold2-pinned-coordinates-4"
 RANK_DEPTH = 20
 CRITICAL_CODE_TYPES = {"repeated_code", "requirement_detail", "exact_identifier"}
 CRITICAL_EVIDENCE_TYPES = {"numeric_qualifier"}  # an amount/date/VAT condition must reach the packed context
@@ -348,14 +348,19 @@ def row_scope(row: dict) -> list[tuple]:
 
 def row_groups(row: dict) -> list[dict]:
     """Required evidence groups; each group is one fact, satisfied by any of its alternative source spans. A pilot
-    row's evidence units are groups of one alternative each."""
+    row's evidence units are groups of one alternative each. Gold-2 alternatives carry the reviewer's `offsets`
+    and `cells`, which pick the approved occurrence when a quote repeats."""
     if is_gold_row(row):
         return [{"group_id": g["group_id"], "doc_id": g.get("doc_id"),
                  "alternatives": [{"element_id": a["element_id"], "quote": a["quote"],
-                                   "extraction_id": a["extraction_id"]} for a in g.get("alternatives") or []]}
+                                   "extraction_id": a["extraction_id"],
+                                   **{k: a[k] for k in ("offsets", "cells") if a.get(k) is not None}}
+                                  for a in g.get("alternatives") or []]}
                 for g in row.get("evidence_groups") or []]
+    # pilot units keep the phase-2 quote matching (retrieval-eval-4): reviewer coordinates are a gold-2 policy
     return [{"group_id": u.get("element_id"), "doc_id": row.get("doc_id"),
-             "alternatives": [{**u, "extraction_id": row.get("extraction_id")}]} for u in row.get("evidence") or []]
+             "alternatives": [{**{k: v for k, v in u.items() if k not in ("offsets", "cells")},
+                               "extraction_id": row.get("extraction_id")}]} for u in row.get("evidence") or []]
 
 
 def row_families(row: dict) -> list[str]:
@@ -411,16 +416,9 @@ def _quote_range(text: str, quote: str) -> tuple[int, int] | None:
     return (m.start(), m.end()) if m else None
 
 
-def _quote_rows(element: dict, quote: str) -> set[int]:
-    """Table rows holding the quote: a single cell, or across cells/rows of the rendered table text (the
-    `raw_text` the gold validator accepts, one line per nonempty row)."""
-    cells = (element.get("table") or {}).get("cells", [])
-    rows: set[int] = set()
-    for c in cells:
-        if _quote_range(c["text"], quote):
-            rows.update(range(c["row"], c["row"] + max(1, c.get("rowspan", 1))))
-    if rows:
-        return rows
+def _rendered_rows(cells: list[dict]) -> tuple[str, list[tuple[int, int, int]]]:
+    """The table text the gold validator accepts (one line per nonempty row, cells joined by ` | `) and each row's
+    (row, start, end) in it."""
     by_row: dict[int, list[dict]] = {}
     for c in cells:
         by_row.setdefault(c["row"], []).append(c)
@@ -431,15 +429,87 @@ def _quote_rows(element: dict, quote: str) -> set[int]:
             text += ("\n" if text else "")
             spans.append((r, len(text), len(text) + len(line)))
             text += line
+    return text, spans
+
+
+def _quote_rows(element: dict, quote: str) -> set[int]:
+    """Table rows holding the quote: a single cell, or across cells/rows of the rendered table text (the
+    `raw_text` the gold validator accepts, one line per nonempty row)."""
+    cells = (element.get("table") or {}).get("cells", [])
+    rows: set[int] = set()
+    for c in cells:
+        if _quote_range(c["text"], quote):
+            rows.update(range(c["row"], c["row"] + max(1, c.get("rowspan", 1))))
+    if rows:
+        return rows
+    text, spans = _rendered_rows(cells)
     rng = _quote_range(text, quote)
     if rng:
         rows = {r for r, a, b in spans if a < rng[1] and rng[0] < b}
     return rows
 
 
+def _offsets(unit: dict) -> tuple[int, int] | None:
+    o = unit.get("offsets")
+    return (o[0], o[1]) if isinstance(o, list) and len(o) == 2 and all(isinstance(x, int) for x in o) else None
+
+
+def text_target(unit: dict, element: dict) -> tuple[int, int] | None:
+    """The approved occurrence of the quote in the element text: searched only inside the reviewer's `offsets`
+    when the alternative has them (the range may include context), otherwise the first occurrence (older,
+    coordinate-free alternatives)."""
+    o = _offsets(unit)
+    if o is None:
+        return _quote_range(element["raw_text"], unit["quote"])
+    rng = _quote_range(element["raw_text"][o[0]:o[1]], unit["quote"])
+    return (o[0] + rng[0], o[0] + rng[1]) if rng else None
+
+
+def row_target(unit: dict, element: dict) -> set[int]:
+    """The approved table rows: the rows of the reviewer's `cells` (with their row spans) when given, else the
+    rows the reviewer's `offsets` cover in the rendered table text, else every row holding the quote."""
+    cells = (element.get("table") or {}).get("cells", [])
+    wanted = unit.get("cells")
+    if wanted:
+        by_pos = {(c["row"], c["col"]): c for c in cells}
+        rows: set[int] = set()
+        for rc in wanted:
+            c = by_pos.get(tuple(rc)) if isinstance(rc, list) and len(rc) == 2 else None
+            if c:
+                rows.update(range(c["row"], c["row"] + max(1, c.get("rowspan", 1))))
+        return rows
+    o = _offsets(unit)
+    if o is not None:
+        text, spans = _rendered_rows(cells)
+        if text == element.get("raw_text"):
+            rng = _quote_range(text[o[0]:o[1]], unit["quote"])
+            if rng:
+                a, b = o[0] + rng[0], o[0] + rng[1]
+                return {r for r, x, y in spans if x < b and a < y}
+    return _quote_rows(element, unit["quote"])
+
+
+def fragment_target(unit: dict, element: dict, row: int) -> tuple[int, int] | None:
+    """The approved quote inside one row's rendered line (what a row fragment's offsets refer to): None when the
+    row is not an approved row; inside the named cell's segment when `cells` name one in this row."""
+    if row not in row_target(unit, element):
+        return None
+    line = dict(table_rows(element)).get(row, "")
+    for rc in unit.get("cells") or []:
+        if isinstance(rc, list) and len(rc) == 2 and rc[0] == row:
+            text = next((c["text"].strip() for c in element["table"]["cells"]
+                         if (c["row"], c["col"]) == (rc[0], rc[1])), "")
+            at = line.find(text) if text else -1
+            rng = _quote_range(line[at:at + len(text)], unit["quote"]) if at >= 0 else None
+            if rng:
+                return (at + rng[0], at + rng[1])
+    return _quote_range(line, unit["quote"])
+
+
 def grade(chunk: dict, unit: dict, element: dict | None) -> int:
-    """2: the chunk carries the whole quoted evidence; 1: it carries part of the same element around it;
-    0: unrelated. Judged on source spans, so any chunking is scored against the same target."""
+    """2: the chunk carries the whole approved evidence; 1: it carries part of the same element around it;
+    0: unrelated. Judged on source spans against the reviewer's coordinates (`text_target`, `row_target`,
+    `fragment_target`), so any chunking is scored against the same approved occurrence."""
     if element is None:
         return 0
     best = 0
@@ -449,25 +519,24 @@ def grade(chunk: dict, unit: dict, element: dict | None) -> int:
         if "rows" in span and span.get("fragment"):
             # One piece of an oversized row: only the characters this piece carries count.
             frag = span["fragment"]
-            line = dict(table_rows(element)).get(frag["row"], "") if element.get("table") else ""
-            rng = _quote_range(line, unit["quote"])
+            rng = fragment_target(unit, element, frag["row"]) if element.get("table") else None
             if rng:
                 if frag["start"] <= rng[0] and rng[1] <= frag["end"]:
                     return 2
                 if frag["start"] < rng[1] and rng[0] < frag["end"]:
                     best = max(best, 1)
                 continue
-            rows = _quote_rows(element, unit["quote"])  # e.g. the header row repeated with every piece
+            rows = row_target(unit, element)  # e.g. the header row repeated with every piece
             if rows and rows <= set(span["rows"]) - {frag["row"]}:
                 return 2
             best = max(best, 1)
         elif "rows" in span:
-            rows = _quote_rows(element, unit["quote"])
+            rows = row_target(unit, element)
             if rows and rows <= set(span["rows"]):
                 return 2
             best = max(best, 1)
         else:
-            rng = _quote_range(element["raw_text"], unit["quote"])
+            rng = text_target(unit, element)
             if rng and span["start"] <= rng[0] and rng[1] <= span["end"]:
                 return 2
             if rng is None or (span["start"] < rng[1] and rng[0] < span["end"]):
@@ -521,8 +590,8 @@ def group_grade(chunk: dict, group: dict, elements: dict) -> int:
 
 
 def coverage(chunk: dict, unit: dict, element: dict | None) -> frozenset | None:
-    """The part of a quoted evidence span a chunk carries, as comparable atoms: character offsets of the quote in
-    the element text, quoted table rows, or character offsets of the quote inside one row fragment. None when it
+    """The part of the approved evidence a chunk carries (the same targets `grade` uses), as comparable atoms:
+    character offsets of the quote in the element text, quoted table rows, or character offsets of the quote inside one row fragment. None when it
     cannot be located (the chunk then never counts as a repeat)."""
     if element is None:
         return None
@@ -532,22 +601,21 @@ def coverage(chunk: dict, unit: dict, element: dict | None) -> frozenset | None:
             continue
         if "rows" in span and span.get("fragment"):
             frag = span["fragment"]
-            line = dict(table_rows(element)).get(frag["row"], "") if element.get("table") else ""
-            rng = _quote_range(line, unit["quote"])
+            rng = fragment_target(unit, element, frag["row"]) if element.get("table") else None
             if rng:
                 atoms.update(("f", frag["row"], i) for i in range(max(rng[0], frag["start"]), min(rng[1], frag["end"])))
                 continue
-            rows = _quote_rows(element, unit["quote"])
+            rows = row_target(unit, element)
             if not rows:
                 return None
             atoms.update(("r", r) for r in rows & (set(span["rows"]) - {frag["row"]}))
         elif "rows" in span:
-            rows = _quote_rows(element, unit["quote"])
+            rows = row_target(unit, element)
             if not rows:
                 return None
             atoms.update(("r", r) for r in rows & set(span["rows"]))
         else:
-            rng = _quote_range(element["raw_text"], unit["quote"])
+            rng = text_target(unit, element)
             if rng is None:
                 return None
             atoms.update(("c", i) for i in range(max(rng[0], span["start"]), min(rng[1], span["end"])))
