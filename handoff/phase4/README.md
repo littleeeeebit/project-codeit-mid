@@ -22,8 +22,8 @@ The authoritative release evidence must be produced on the owner host with the r
 
 | Command | Outcome |
 | --- | --- |
-| `check --phase 4 --provider fake --save` | Passed: 53 tests. See `checks/check-4.json`. |
-| `check --phase all --provider fake --save` | Passed: 241 tests (the 199 earlier ones plus 42 new). See `checks/check-all.json`. |
+| `check --phase 4 --provider fake --save` | Passed: 55 tests. See `checks/check-4.json`. |
+| `check --phase all --provider fake --save` | Passed: 243 tests (the 199 earlier ones plus 44 new). See `checks/check-all.json`. |
 | `python -B tools/verification/phase4_walkthrough.py <work>` | Passed: 31 of 31 CLI steps, including the refused approval without inspection, the refused sealed `evaluate-retrieval`, a finalist run, a replan with 0 remaining rows, the release freeze, one sealed run and its refused repeat, a fake latency sample, backup and a passing restore check. See `synthetic/phase4-walkthrough.json`. |
 | `release-report --latest` (on that synthetic runtime) | `limited`: the saved full check was not part of that runtime, multi-evidence coverage and negative handling had no sealed denominator, there was no real latency sample, and the sealed set is a 1-row pilot. See `synthetic/release-report.md`. |
 | Browser (headless Chromium, Streamlit on the synthetic runtime) | 평가 tab, estimate, gold-2 review, refused approval without the attestation and a 390 px layout without horizontal scroll. See `screenshots/20–24`. Keyboard, contrast and screen-reader checks were not repeated for these additions. |

@@ -1,23 +1,22 @@
-# Release report F-447177efb2
+# Release report F-f1ff66cca4
 
-Generated 2026-10-01T13:37:53.788844+00:00 from `data/` state. Every figure is read from recorded evidence; anything not run is listed as missing. This command never generates an answer.
+Generated 2026-10-01T13:44:05.721923+00:00 from `data/` state. Every figure is read from recorded evidence; anything not run is listed as missing. This command never generates an answer.
 
 ## Decision: **limited**
 
 - hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)
 - quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})
-- quality target missed: citation precision >= 0.95 (unjudged links count as unsupported) ({'numerator': 0, 'denominator': 1, 'rate': 0.0, 'wilson95': [0.0, 0.7935]})
 - quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})
 - quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)
 - evidence is sealed pilot, not a sealed evaluation of reviewed gold
 
 ## Release manifest
 
-- code: Git `a8e14ccf26236d82a6be5a8071e1e58fdc4be352` (uncommitted changes: False), package source `76c3427193e9d787`; metric code `013dccb6f7c2cae2`
-- model gpt-6-luna, reasoning low, output cap 2000, prompt grounded-answer-3, rates openai-standard-gpt-6-luna-2026-09-30, settings `ce4d0a85fd385cb2`
-- serving: run `K1-8d339b59c3` (kiwi_bm25), keyword index `3b8946626d887beb`, dense `None`, reranker None; fallback kiwi_bm25
+- code: Git `1e2e5f1caff84ecd16c72db38697334781733895` (uncommitted changes: False), package source `59a4c53a046ac42c`; metric code `83d48301dc5f307d`
+- model gpt-6-luna, reasoning low, output cap 2000, prompt grounded-answer-3, rates openai-standard-gpt-6-luna-2026-09-30, settings `65986a4f6b4255ee`
+- serving: run `K1-ef4c8775fe` (kiwi_bm25), keyword index `7e81650f2d99475b`, dense `None`, reranker None; fallback kiwi_bm25
 - dependencies: requirements-lock.txt `060fd9cdbdc949a3`; hardware {'platform': 'Linux-6.18.44-fc-v50-x86_64-with-glibc2.39', 'machine': 'x86_64', 'python': '3.12.3', 'cpu_count': 4}
-- freeze: {'freeze_id': 'F-447177efb2', 'frozen_at': '2026-10-01T13:37:29.847471+00:00', 'selected_run_id': 'K1-8d339b59c3', 'decided_by': 'owner', 'post_test': False}
+- freeze: {'freeze_id': 'F-f1ff66cca4', 'frozen_at': '2026-10-01T13:43:41.802425+00:00', 'selected_run_id': 'K1-ef4c8775fe', 'decided_by': 'owner', 'post_test': False}
 
 ## Coverage
 
@@ -28,26 +27,26 @@ Generated 2026-10-01T13:37:53.788844+00:00 from `data/` state. Every figure is r
 
 ## Datasets
 
-- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}; frozen `4d8895c4c84c` (current True)
-- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}; frozen `3b07c5aef6c5` (current True)
+- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}; frozen `b9480db7ce00` (current True)
+- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}; frozen `0dad8757e941` (current True)
 
 ## Retrieval runs (development, retrieval only)
 
 | Run | Mode | Scored | hit@20 single | complete@20 multi | nDCG@5 | MRR | Critical | Wrong scope | p95 ms |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `K0-609a5f8773` | whitespace_bm25 | 3 | 0.5 (1/2) | 0.0 | 0.5377 | 0.6667 | ['dev-amount', 'dev-deadline'] | 0 | 0.37 |
-| `K1-8d339b59c3` | kiwi_bm25 | 3 | 1.0 (2/2) | 1.0 | 1.0 | 1.0 | [] | 0 | 1674.45 |
+| `K0-84c52d1b32` | whitespace_bm25 | 3 | 0.5 (1/2) | 0.0 | 0.5377 | 0.6667 | ['dev-amount', 'dev-deadline'] | 0 | 0.46 |
+| `K1-ef4c8775fe` | kiwi_bm25 | 3 | 1.0 (2/2) | 1.0 | 1.0 | 1.0 | [] | 0 | 1767.7 |
 
 ## Answer evaluation
 
-- development run `A-f01333b1afc5` (complete): see `runs/A-f01333b1afc5/report.md`
-  - `K1-8d339b59c3` (kiwi_bm25) 4/4: claims 0.6667 (n=3), critical wrong 0, citation precision lower bound 0.0, negatives 0.0 (n=1), cost $0.000385
-  - `K0-609a5f8773` (whitespace_bm25) 4/4: claims 0.3333 (n=3), critical wrong 0, citation precision lower bound 0.0, negatives 1.0 (n=1), cost $0.000187
-- sealed run `S-00a50ba492d2` (sealed test, complete) under freeze `F-447177efb2`
+- development run `A-341ef1e7218a` (complete): see `runs/A-341ef1e7218a/report.md`
+  - `K1-ef4c8775fe` (kiwi_bm25) 4/4: claims 0.6667 (n=3), critical wrong 0, citation precision lower bound 1.0, negatives 0.0 (n=1), cost $0.000385
+  - `K0-84c52d1b32` (whitespace_bm25) 4/4: claims 0.3333 (n=3), critical wrong 0, citation precision lower bound 1.0, negatives 1.0 (n=1), cost $0.000187
+- sealed run `S-cb29df41a38f` (sealed test, complete) under freeze `F-f1ff66cca4`
 
 ## Latency
 
-- fake sample `L-7625f6126aab`: n=12, failures 0, warm p50/p95 82.9/114.15 ms (n=6), cold first wave 131.9 ms, 6 users × 2 waves
+- fake sample `L-69e7266be34d`: n=12, failures 0, warm p50/p95 89.65/109.25 ms (n=6), cold first wave 123.3 ms, 6 users × 2 waves
 
 ## Checks
 
@@ -66,7 +65,7 @@ Generated 2026-10-01T13:37:53.788844+00:00 from `data/` state. Every figure is r
 | single-evidence hit@20 >= 0.90 | met | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
 | multi-evidence complete coverage@20 >= 0.80 | not measured | {'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None} |
 | required-claim correctness >= 0.90 | met | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
-| citation precision >= 0.95 (unjudged links count as unsupported) | **missed** | {'numerator': 0, 'denominator': 1, 'rate': 0.0, 'wilson95': [0.0, 0.7935]} |
+| citation precision >= 0.95 (unjudged links count as unsupported) | met | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
 | negative/ambiguous handling >= 0.90 | not measured | {'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None} |
 | full-answer p95 < 15 s at six users (real provider) | not measured | no real latency sample |
 
@@ -79,8 +78,8 @@ Generated 2026-10-01T13:37:53.788844+00:00 from `data/` state. Every figure is r
 
 ## Mentor walkthrough
 
-- not recorded for this candidate: follow docs/operations/runbook.md §10.6 and save `releases/F-447177efb2/walkthrough-results.json`
+- not recorded for this candidate: follow docs/operations/runbook.md §10.6 and save `releases/F-f1ff66cca4/walkthrough-results.json`
 
 ## Restore drills
 
-- 2026-10-01T13:37:53.453825+00:00: passed — backup `backup-1`, spent $0.001805, pending $0.000000, unknown $0.000000, prior use $0.000000
+- 2026-10-01T13:44:05.415859+00:00: passed — backup `backup-1`, spent $0.001805, pending $0.000000, unknown $0.000000, prior use $0.000000

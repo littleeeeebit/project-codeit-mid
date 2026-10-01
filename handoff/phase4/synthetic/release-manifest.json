@@ -1,36 +1,35 @@
 {
- "release_id": "F-447177efb2",
- "generated_at": "2026-10-01T13:37:53.788844+00:00",
+ "release_id": "F-f1ff66cca4",
+ "generated_at": "2026-10-01T13:44:05.721923+00:00",
  "status": "limited",
  "reasons": [
   "hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)",
   "quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
-  "quality target missed: citation precision >= 0.95 (unjudged links count as unsupported) ({'numerator': 0, 'denominator': 1, 'rate': 0.0, 'wilson95': [0.0, 0.7935]})",
   "quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
   "quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)",
   "evidence is sealed pilot, not a sealed evaluation of reviewed gold"
  ],
  "evidence_label": "sealed pilot",
  "code": {
-  "source_sha256": "76c3427193e9d7875a1a5b320d0c2257c522a960335a8efcefae2a18cd6ed864",
-  "git_revision": "a8e14ccf26236d82a6be5a8071e1e58fdc4be352",
+  "source_sha256": "59a4c53a046ac42c0113d53a3fd33bc20e74498436ebf92b4b69bf6ba4eaf732",
+  "git_revision": "1e2e5f1caff84ecd16c72db38697334781733895",
   "git_dirty": false
  },
- "metric_code_sha256": "013dccb6f7c2cae25a9c9a835412d5e345a0d8deae8c36a9199ceb55ddec8abb",
- "settings_fingerprint": "ce4d0a85fd385cb2",
+ "metric_code_sha256": "83d48301dc5f307d70f862aeb62b8300f619327afe27de6aadaff379b7bb87b3",
+ "settings_fingerprint": "65986a4f6b4255ee",
  "model": "gpt-6-luna",
  "reasoning_effort": "low",
  "max_output_tokens": 2000,
  "prompt_version": "grounded-answer-3",
  "rate_version": "openai-standard-gpt-6-luna-2026-09-30",
  "active_run": {
-  "activated_at": "2026-10-01T13:37:17.166534+00:00",
+  "activated_at": "2026-10-01T13:43:29.097419+00:00",
   "dense_version": null,
   "embedding": null,
   "eval_version": "retrieval-eval-4",
   "fallback_mode": "kiwi_bm25",
   "finalist_run_id": null,
-  "index_version": "3b8946626d887beb",
+  "index_version": "7e81650f2d99475b",
   "label": "K1",
   "limits": {
    "channel_top_k": 20,
@@ -42,22 +41,22 @@
   },
   "mode": "kiwi_bm25",
   "reranker": null,
-  "run_id": "K1-8d339b59c3"
+  "run_id": "K1-ef4c8775fe"
  },
- "active_index": "3b8946626d887beb",
+ "active_index": "7e81650f2d99475b",
  "datasets": {
   "dev": {
-   "dataset_sha256": "4d8895c4c84c017e63ae0a0aa535f59950fdea659501551311951e915c7cc524",
+   "dataset_sha256": "b9480db7ce004ced9b36c280ed87409470277c5a6ea860a466af43f5a24161cf",
    "rows": 4,
    "label": "pilot",
-   "review_log_sha256": "3fb4438a9479bc543d3b7f6136b096414ab2586f63603b110ce943d10628903d",
+   "review_log_sha256": "d3a02f16e3c606a747da4f474c67e30132bbeda28b86ae3ac03e32caaffa5b05",
    "current": true
   },
   "test": {
-   "dataset_sha256": "3b07c5aef6c53311ded171cb385a079d402dbfb4accae16fe498eea93fd9d6ca",
+   "dataset_sha256": "0dad8757e9410475aca0ea5c2f5153429272e0b2cca447ec4c57f37fb0935d02",
    "rows": 1,
    "label": "pilot",
-   "review_log_sha256": "6f76f91ff44ca9088e3d111513041f9fb1b1df907398180916b348deb61e6bed",
+   "review_log_sha256": "dbe3d2e549cbcc19c72d333c0735c5e50a9b435d6fa22eab8938169d4c5815b3",
    "current": true
   }
  },
@@ -69,9 +68,9 @@
   "cpu_count": 4
  },
  "freeze": {
-  "freeze_id": "F-447177efb2",
-  "frozen_at": "2026-10-01T13:37:29.847471+00:00",
-  "selected_run_id": "K1-8d339b59c3",
+  "freeze_id": "F-f1ff66cca4",
+  "frozen_at": "2026-10-01T13:43:41.802425+00:00",
+  "selected_run_id": "K1-ef4c8775fe",
   "decided_by": "owner",
   "post_test": false
  }
