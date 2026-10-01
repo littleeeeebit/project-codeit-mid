@@ -6,6 +6,7 @@ fields forbidden, lowercase IDs, `api`/`browser`/`command` kinds, a command, imp
 
 import importlib.util
 import inspect
+from contextlib import closing
 import json
 import os
 import re
@@ -101,8 +102,12 @@ class EvidenceTest(unittest.TestCase):
                "WIKI_VERIFICATION_HEAD": verify.git_head(), "OPENAI_API_KEY": "sk-never-passed"}
         out = subprocess.run([sys.executable, "-B", "tools/verify.py", "budget-recovery"], cwd=REPO, env=env,
                              capture_output=True, text=True, timeout=600).stdout
-        [block] = fenced(out, "local-evidence")
+        tail = "\n".join(out.splitlines()[-80:])  # what the service keeps of a command's output
+        [block] = fenced(tail, "local-evidence")
+        self.assertEqual(fenced(out, "local-evidence"), [block])
         self.assertTrue(out.rstrip().endswith("```"))
+        last = out.rstrip().splitlines()[-3:]  # opening fence, one compact JSON line, closing fence
+        self.assertEqual((last[0], last[2], json.loads(last[1])), ("```local-evidence", "```", block))
         self.assertEqual(set(block), {"head", "flow", "environment_id", "test_scope", "observations"})
         self.assertEqual((block["flow"], block["environment_id"], block["test_scope"], block["head"]),
                          ("budget-recovery", "env-1", "scope-1", verify.git_head()))
@@ -137,10 +142,10 @@ class DatasetCopyTest(unittest.TestCase):
                 self.assertTrue(corpus["kind"].startswith("configured"))
                 copy = Path(corpus["data_dir"])
                 self.assertNotEqual(copy.resolve(), data.resolve())
-                with sqlite3.connect(copy / "rfp.sqlite3") as conn:
+                with closing(sqlite3.connect(copy / "rfp.sqlite3")) as conn, conn:
                     conn.execute("INSERT INTO audit_events(event_id, actor, action, target, reason, details_json, "
                                  "created_at) VALUES ('e', 'a', 'x', 't', 'r', '{}', 'now')")
-                with sqlite3.connect(data / "rfp.sqlite3") as conn:
+                with closing(sqlite3.connect(data / "rfp.sqlite3")) as conn:
                     self.assertEqual(conn.execute("SELECT COUNT(*) FROM audit_events WHERE event_id = 'e'")
                                      .fetchone()[0], 0)
                 self.assertEqual((copy / "indexes").resolve(), (data / "indexes").resolve())
@@ -148,6 +153,66 @@ class DatasetCopyTest(unittest.TestCase):
                 ctx.close()
             self.assertFalse((copy / "indexes").exists())  # the link is gone ...
             self.assertTrue((data / "indexes").is_dir())  # ... and what it pointed to is not
+
+
+class OwnerConfigTest(unittest.TestCase):
+    """The service copies the owner's env_file to the checkout's `.env` and does not export it."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = Path(self.tmp.name) / "checkout"
+        self.repo.mkdir()
+        self.env = fixtures.make_env(Path(self.tmp.name) / "corpus")
+        clean = {k: v for k, v in os.environ.items() if not k.startswith(("RFP_", "WIKI_VERIFICATION_"))}
+        self.patches = [mock.patch.dict(os.environ, clean, clear=True), mock.patch.object(verify, "REPO", self.repo)]
+        for patch in self.patches:
+            patch.start()
+
+    def tearDown(self):
+        for patch in reversed(self.patches):
+            patch.stop()
+        self.tmp.cleanup()
+
+    def write_env(self, **values):
+        lines = ["# owner env_file", "OPENAI_API_KEY=sk-must-not-be-read"]
+        lines += [f'{k}="{v}"' for k, v in values.items()]
+        (self.repo / ".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def test_the_copied_env_file_alone_selects_the_corpus_and_origin(self):
+        self.write_env(RFP_SOURCE_DIR=self.env.settings.source_dir, RFP_DATA_DIR=self.env.settings.data_dir,
+                       RFP_VERIFY_ORIGIN="http://127.0.0.1:8799")
+        ctx = verify.Context("t")
+        try:
+            self.assertNotIn("OPENAI_API_KEY", ctx.config)
+            self.assertEqual((ctx.config["RFP_VERIFY_ORIGIN"], ctx.config_source["RFP_DATA_DIR"]),
+                             ("http://127.0.0.1:8799", ".env"))
+            corpus = ctx.dataset()
+            self.assertEqual(corpus["kind"], "configured corpus from .env (isolated copy)")
+            self.assertEqual(corpus["source_dir"], str(self.env.settings.source_dir.resolve()))
+            self.assertNotIn("OPENAI_API_KEY", ctx.env)
+        finally:
+            ctx.close()
+
+    def test_the_env_file_wins_over_an_inherited_variable(self):
+        self.write_env(RFP_SOURCE_DIR=self.env.settings.source_dir, RFP_DATA_DIR=self.env.settings.data_dir)
+        with mock.patch.dict(os.environ, {"RFP_DATA_DIR": "/somewhere/else"}):
+            values, source = verify.owner_config()
+        self.assertEqual((values["RFP_DATA_DIR"], source["RFP_DATA_DIR"]), (str(self.env.settings.data_dir), ".env"))
+
+    def test_missing_prerequisites_fail_instead_of_falling_back_to_fixtures(self):
+        cases = [({"RFP_SOURCE_DIR": self.env.settings.source_dir}, "RFP_DATA_DIR not set"),
+                 ({"RFP_SOURCE_DIR": self.env.settings.source_dir, "RFP_DATA_DIR": Path(self.tmp.name) / "none"},
+                  "rfp.sqlite3 missing"),
+                 ({}, "dataset flow without a corpus")]
+        for values, message in cases:
+            self.write_env(**values)
+            with mock.patch.dict(os.environ, {"WIKI_VERIFICATION_ENVIRONMENT": "owner-env"}):
+                ctx = verify.Context("t")
+                try:
+                    with self.assertRaisesRegex(RuntimeError, message):
+                        ctx.dataset()
+                finally:
+                    ctx.close()
 
 
 def _browser_available() -> bool:
@@ -166,7 +231,7 @@ class BrowserFlowTest(unittest.TestCase):
         env = {k: v for k, v in env.items() if k not in ("RFP_SOURCE_DIR", "RFP_DATA_DIR")}
         proc = subprocess.run([sys.executable, "-B", "tools/verify.py", "consultant-answer"], cwd=REPO, env=env,
                               capture_output=True, text=True, timeout=900)
-        [block] = fenced(proc.stdout, "local-evidence")
+        [block] = fenced("\n".join(proc.stdout.splitlines()[-80:]), "local-evidence")  # the service's tail
         self.assertEqual(proc.returncode, 0, json.dumps(block["observations"], ensure_ascii=False))
         self.assertEqual(block["build_head"], verify.git_head())
         self.assertEqual({a["action"] for a in block["actions"]} >= {"click 근거 E1 once"}, True)

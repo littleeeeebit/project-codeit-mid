@@ -425,6 +425,137 @@
      "expected": "Generating from the frozen run completes with one generation attempt whose reservation does not exceed the displayed maximum"
     }
    ]
+  },
+  {
+   "id": "six-sessions",
+   "title": "Six concurrent browser sessions share one budget",
+   "kind": "browser",
+   "command": "python -B tools/verify.py six-sessions",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tests/test_generation.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "six-attributed",
+     "expected": "Six sessions with different typed names each submit once; every request finishes attributed to its own name with at most one generation attempt and no open reservation"
+    },
+    {
+     "id": "shared-reservation-visible",
+     "expected": "While the first session's request is running, another session's sidebar shows the shared reservation within the polling interval"
+    }
+   ]
+  },
+  {
+   "id": "cap-exhaustion",
+   "title": "Exhausted cap: audited owner action, blocked paid answers, working free routes",
+   "kind": "browser",
+   "command": "python -B tools/verify.py cap-exhaustion",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tests/test_generation.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "reasonless-refused",
+     "expected": "An owner adjustment without a reason is refused and records nothing"
+    },
+    {
+     "id": "adjustment-audited",
+     "expected": "An owner adjustment with a reason is recorded and appears in the audit log tab"
+    },
+    {
+     "id": "paid-blocked-at-cap",
+     "expected": "At the exhausted cap a consultant's paid question is blocked before any attempt and the cap warning is shown"
+    },
+    {
+     "id": "free-routes-and-polling",
+     "expected": "At the cap an original still downloads, and polling and a reload create no attempt"
+    }
+   ]
+  },
+  {
+   "id": "accessibility",
+   "title": "Keyboard use, focus, contrast and narrow layout",
+   "kind": "browser",
+   "command": "python -B tools/verify.py accessibility",
+   "paths": [
+    "DESIGN.md",
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tests/test_generation.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "keyboard-only",
+     "expected": "With the keyboard only, a document is selected, a question typed and submitted, and the answer's first evidence opened"
+    },
+    {
+     "id": "focus-visible",
+     "expected": "Every control reached by Tab shows a visible focus indicator"
+    },
+    {
+     "id": "contrast",
+     "expected": "Every visible text has a contrast ratio of at least 4.5:1 against its background"
+    },
+    {
+     "id": "narrow-layout",
+     "expected": "At a 390 px wide viewport the page does not scroll horizontally and the answer status is shown as text"
+    }
+   ]
   }
  ]
 }

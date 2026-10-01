@@ -41,4 +41,4 @@ Two fragments only read: the allowance strip every 2 s and the owned request eve
 
 ## Accessibility and text
 
-All labels and answers are in Korean, with labelled inputs. States are spelled out in text next to any color: 대기 중, 처리 중, 근거 부족, 확인 필요, 근거 충돌, 사용 한도로 차단, 기술 오류, 취소됨, 중단됨. Source and model text is escaped before rendering, and no unsafe HTML is used. There are no uncalibrated confidence percentages.
+All labels and answers are in Korean, with labelled inputs. The theme's primary color (`.streamlit/config.toml`, `#B3261E`) keeps white button text above 4.5:1; Streamlit's default red does not. Tables meant to be read, such as metadata facts and the audit log, use static cells rather than the canvas grid. States are spelled out in text next to any color: 대기 중, 처리 중, 근거 부족, 확인 필요, 근거 충돌, 사용 한도로 차단, 기술 오류, 취소됨, 중단됨. Source and model text is escaped before rendering, and no unsafe HTML is used. There are no uncalibrated confidence percentages.

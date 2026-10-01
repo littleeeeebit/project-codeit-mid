@@ -576,7 +576,20 @@ def _history(st, res, principal) -> None:
             return (f"{v.created_at[:16].replace('T', ' ')} · {REQUEST_TEXT.get(v.status, v.status)} · "
                     f"{v.question[:40] or v.mode} · {rid[:8]}")
 
-        choice = st.selectbox("요청", list(by_id), format_func=label, index=None, placeholder="다시 볼 요청을 고르세요")
+        # The chosen request ID is kept per typed name. A label carries the live status, so another request
+        # finishing changes the options; the choice must survive that and is cleared only when it is gone.
+        pick_key, widget_key = f"history-pick-{principal.member_id}", f"history-{principal.member_id}"
+        picked = st.session_state.get(pick_key)
+        if picked not in by_id:
+            picked = st.session_state[pick_key] = None
+        options = list(by_id)
+
+        def remember() -> None:
+            st.session_state[pick_key] = st.session_state.get(widget_key)
+
+        choice = st.selectbox("요청", options, format_func=label, index=options.index(picked) if picked else None,
+                              placeholder="다시 볼 요청을 고르세요", key=widget_key, on_change=remember)
+        choice = choice if choice in by_id else picked
         if choice:
             v = by_id[choice]
             st.info("이전 요청입니다. 현재 화면의 질문에 대한 답변이 아닙니다. 범위: "
@@ -890,9 +903,12 @@ def admin_page(st, res, principal) -> None:
                 except (service.ServiceError, budget.BudgetError, auth.AuthError) as exc:
                     st.error(str(exc))
     with tabs[4]:
-        st.dataframe([{"시각": e["created_at"][:19], "작업자": e["actor"], "작업": e["action"], "대상": e["target"],
-                       "사유": e["reason"]} for e in service.audit_events(res, principal)],
-                     hide_index=True, width="stretch")
+        events = service.audit_events(res, principal)
+        if not events:
+            st.caption("기록된 관리 작업이 없습니다.")
+        else:  # static cells: readable by assistive technology and text search, unlike the canvas grid
+            st.table([{"시각": e["created_at"][:19], "작업자": e["actor"], "작업": e["action"], "대상": e["target"],
+                       "사유": e["reason"]} for e in events])
 
 
 # ---------------------------------------------------------------- dataset question review

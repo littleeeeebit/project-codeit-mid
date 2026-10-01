@@ -303,6 +303,33 @@ class ScopeOwnershipTest(Base):
             shown += [b.key[len("exp-"):] for b in app.get("download_button") if b.key.startswith("exp-")]
         self.assertEqual(sorted(shown), sorted(rids))
 
+    def test_the_chosen_history_request_survives_another_request_finishing(self):
+        """Review finding: option labels carry the live status, so another request finishing changed the
+        unkeyed selectbox and cleared the choice; the older request's answer disappeared."""
+        from streamlit.testing.v1 import AppTest
+
+        self.transport.gate.set()
+        older, newer = (service.submit_answer(self.res, self.env.consultant, req(self.a, gen=f"g-{i}")) for i in (1, 2))
+        for rid in (older, newer):
+            self.wait_done(rid)
+
+        def status(rid, value):
+            with store.open_db(self.settings.db_path) as conn:
+                conn.execute("UPDATE requests SET status = ? WHERE request_id = ?", (value, rid))
+
+        status(newer, "running")
+        app = AppTest.from_string("import streamlit as st\nfrom rfp_assistant import ui\n"
+                                  "ui._history(st, st.session_state.res, st.session_state.principal)\n")
+        app.session_state["res"], app.session_state["principal"] = self.res, self.env.consultant
+        app.run(timeout=30)
+        app.selectbox[0].select(older).run(timeout=30)
+        exports = lambda: [b.key for b in app.get("download_button") if b.key.startswith("exp-")]  # noqa: E731
+        self.assertEqual(exports(), [f"exp-{older}"])
+        status(newer, "completed")  # only the other row's label changes
+        app.run(timeout=30)
+        self.assertFalse(app.exception, [e.message for e in app.exception])
+        self.assertEqual((app.selectbox[0].value, exports()), (older, [f"exp-{older}"]))
+
     def test_evidence_of_an_older_history_request_opens_in_the_history(self):
         from streamlit.testing.v1 import AppTest
 

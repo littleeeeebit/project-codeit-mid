@@ -1,0 +1,4 @@
+# Theme: the primary color carries white button text, so it must keep at least 4.5:1 contrast
+# (#B3261E with white is about 6.6:1; Streamlit's default #FF4B4B is about 3.3:1).
+[theme]
+primaryColor = "#B3261E"
