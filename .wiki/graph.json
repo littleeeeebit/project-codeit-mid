@@ -4,6 +4,21 @@
  "nodes_from": ".wiki/corpus.json",
  "edges": [
   {
+   "a": "DESIGN.md",
+   "b": "docs/plan/end-to-end/3-workflows-and-operations.md",
+   "kind": "link"
+  },
+  {
+   "a": "README.md",
+   "b": "DESIGN.md",
+   "kind": "link"
+  },
+  {
+   "a": "README.md",
+   "b": "docs/operations/runbook.md",
+   "kind": "link"
+  },
+  {
    "a": "README.md",
    "b": "docs/plan/end-to-end/0-overview.md",
    "kind": "link"
@@ -225,6 +240,16 @@
   },
   {
    "a": "docs/plan/end-to-end/3-workflows-and-operations.md",
+   "b": "DESIGN.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/3-workflows-and-operations.md",
+   "b": "docs/operations/runbook.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/3-workflows-and-operations.md",
    "b": "docs/plan/end-to-end/implementation-contracts.md",
    "kind": "link"
   },
@@ -246,6 +271,11 @@
   {
    "a": "docs/plan/end-to-end/4-evaluation-and-release.md",
    "b": "docs/plan/end-to-end/5-team-operation.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "b": "docs/operations/runbook.md",
    "kind": "link"
   },
   {
@@ -306,6 +336,11 @@
   {
    "a": "docs/rag/evaluation.md",
    "b": "docs/rag/golden-dataset.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/frontend.md",
+   "b": "DESIGN.md",
    "kind": "link"
   },
   {
@@ -460,12 +495,12 @@
  ],
  "orphans": [],
  "counts": {
-  "docs": 23,
-  "linked": 16,
+  "docs": 25,
+  "linked": 18,
   "read": 7,
   "orphans": 0,
   "pages": 2,
-  "decisions": 4,
+  "decisions": 5,
   "injectable_decisions": 1
  }
 }
