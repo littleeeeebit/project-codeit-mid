@@ -2067,18 +2067,27 @@ def review_log_path(settings: Settings, name: str) -> Path:
     return dataset_path(settings, name).with_name("review-log.jsonl" if name == "dev" else f"{name}-review-log.jsonl")
 
 
-def export_review_log(settings: Settings, name: str) -> tuple[Path, str]:
-    """The append-only review decisions behind a dataset (first decisions and second reviews), oldest first."""
-    from .store import write_jsonl_atomic
-
+def _review_log_text(settings: Settings, name: str) -> str:
     with open_db(settings.db_path) as conn:
         rows = [dict(r) for r in conn.execute(
             "SELECT r.review_id, r.candidate_id, r.reviewer, r.kind, r.decision, r.original_inspected, r.note, "
             "r.created_at FROM gold_reviews r JOIN gold_candidates c ON c.candidate_id = r.candidate_id "
             "WHERE c.dataset = ? ORDER BY r.created_at, r.review_id", (name,))]
+    return "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
+
+
+def export_review_log(settings: Settings, name: str) -> tuple[Path, str]:
+    """The append-only review decisions behind a dataset (first decisions and second reviews), oldest first,
+    rendered from the database."""
+    text = _review_log_text(settings, name)
     path = review_log_path(settings, name)
-    write_jsonl_atomic(path, rows)
-    return path, hashlib.sha256(path.read_bytes()).hexdigest()
+    write_text_atomic(path, text)
+    return path, hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _families_sha(settings: Settings) -> str | None:
+    fam_path = settings.data_dir / "datasets" / "families.json"
+    return hashlib.sha256(fam_path.read_bytes()).hexdigest() if fam_path.exists() else None
 
 
 def freeze_dataset(settings: Settings, name: str, actor: str, reason: str) -> dict:
@@ -2090,12 +2099,11 @@ def freeze_dataset(settings: Settings, name: str, actor: str, reason: str) -> di
     if not report["ok"]:
         raise EvaluationError(f"{name} does not validate ({len(report['errors'])} errors); freeze refused")
     log_path, log_sha = export_review_log(settings, name)
-    fam_path = settings.data_dir / "datasets" / "families.json"
     manifest = {"dataset": name, "schema": GOLD_SCHEMA, "dataset_sha256": report["dataset_sha256"],
                 "rows": report["rows"], "label": report["label"], "targets": report["targets"],
                 "metadata_stratum": report["metadata_stratum"], "answerability": report["answerability"],
                 "source_positions": report["source_positions"], "review_log_sha256": log_sha,
-                "families_sha256": hashlib.sha256(fam_path.read_bytes()).hexdigest() if fam_path.exists() else None,
+                "families_sha256": _families_sha(settings),
                 "frozen_by": actor, "reason": reason.strip(), "frozen_at": utcnow()}
     write_text_atomic(gold_manifest_path(settings, name), json.dumps(manifest, ensure_ascii=False, indent=1))
     record_audit(settings, actor, "freeze_dataset", name, reason, {k: manifest[k] for k in (
@@ -2104,13 +2112,25 @@ def freeze_dataset(settings: Settings, name: str, actor: str, reason: str) -> di
 
 
 def frozen_dataset(settings: Settings, name: str) -> dict | None:
-    """The frozen manifest, with `current` telling whether today's dataset bytes are still the frozen ones."""
+    """The frozen manifest with `current`: today's dataset bytes, family map, review log file and the review history
+    in the database are all still the frozen ones. `changed` names whatever differs."""
     path = gold_manifest_path(settings, name)
     if not path.exists():
         return None
     manifest = json.loads(path.read_text(encoding="utf-8"))
-    data = dataset_path(settings, name)
-    manifest["current"] = data.exists() and hashlib.sha256(data.read_bytes()).hexdigest() == manifest["dataset_sha256"]
+    data, log = dataset_path(settings, name), review_log_path(settings, name)
+    sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest() if p.exists() else None  # noqa: E731
+    changed = []
+    if sha(data) != manifest["dataset_sha256"]:
+        changed.append("dataset")
+    if _families_sha(settings) != manifest.get("families_sha256"):
+        changed.append("family map")
+    if sha(log) != manifest.get("review_log_sha256"):
+        changed.append("review log file")
+    if hashlib.sha256(_review_log_text(settings, name).encode("utf-8")).hexdigest() != manifest.get("review_log_sha256"):
+        changed.append("review history in the database")
+    manifest["changed"] = changed
+    manifest["current"] = not changed
     return manifest
 
 

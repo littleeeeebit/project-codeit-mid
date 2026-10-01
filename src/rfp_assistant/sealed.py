@@ -51,19 +51,66 @@ def _snapshot(settings: Settings) -> dict:
             "dev": dev, "test": test}
 
 
-def completed_sealed_runs(settings: Settings, test_sha: str | None = None) -> list[dict]:
+def sealed_exposures(settings: Settings, test_sha: str) -> list[dict]:
+    """Every sealed run that ever started on this test set, finished or not: its run directory (config written at
+    start) and the durable `sealed_run_started` audit event. Exposure is per test-set identity, not per freeze."""
+    found: dict[str, dict] = {}
     base = settings.data_dir / "sealed" / "runs"
-    out = []
     for d in sorted(base.iterdir()) if base.exists() else []:
         try:
             config = json.loads((d / "config.json").read_text(encoding="utf-8"))
-            scores = json.loads((d / "scores.json").read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        if scores.get("status") == "complete" and (test_sha is None or config.get("dataset_sha256") == test_sha):
-            out.append({"run_id": d.name, "label": config.get("label"), "freeze_id": config.get("freeze_id"),
-                        "dataset_sha256": config.get("dataset_sha256"), "scored_at": scores.get("scored_at")})
-    return out
+        if config.get("dataset_sha256") == test_sha:
+            scores_path = d / "scores.json"
+            status = json.loads(scores_path.read_text(encoding="utf-8")).get("status") if scores_path.exists() \
+                else "started"
+            found[d.name] = {"run_id": d.name, "label": config.get("label"), "freeze_id": config.get("freeze_id"),
+                             "status": status}
+    with open_db(settings.db_path) as conn:
+        events = conn.execute("SELECT target, details_json FROM audit_events WHERE action = 'sealed_run_started'"
+                              ).fetchall()
+    for e in events:
+        details = json.loads(e["details_json"])
+        if details.get("test_sha256") == test_sha and e["target"] not in found:
+            found[e["target"]] = {"run_id": e["target"], "freeze_id": details.get("freeze_id"), "status": "started",
+                                  "label": "post-test regression" if details.get("post_test_regression")
+                                  else "sealed test"}
+    return list(found.values())
+
+
+def _selection_problems(settings: Settings, active: dict, answer_run_id: str, dev: dict | None) -> tuple[list, dict | None]:
+    """The development answer run must have evaluated this very candidate: the activated serving configuration, the
+    current prompt, model, reasoning and output cap, and the frozen development set."""
+    from . import answers
+
+    problems: list[str] = []
+    d = answers.run_dir(settings, answer_run_id)
+    try:
+        scores = json.loads((d / "scores.json").read_text(encoding="utf-8"))
+        config = json.loads((d / "config.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return [f"development answer run {answer_run_id} not found"], None
+    run_id = (active or {}).get("run_id")
+    if config.get("action") != "answer-finalists" or scores.get("status") != "complete":
+        return [f"{answer_run_id} is not a complete development answer run"], None
+    used = next((f for f in config.get("finalists") or [] if f.get("run_id") == run_id), None)
+    if used is None or run_id not in scores.get("finalists", {}):
+        return [f"{answer_run_id} did not answer with {run_id}"], None
+    if active and answers._finalist_identity(used) != answers._finalist_identity(active):
+        problems.append(f"{answer_run_id} answered with another configuration of {run_id} than the activated one")
+    for key, now in (("prompt_version", generation.PROMPT_VERSION), ("model", settings.generation_model),
+                     ("reasoning_effort", settings.generation_reasoning_effort),
+                     ("max_output_tokens", settings.generation_max_output_tokens)):
+        if config.get(key) != now:
+            problems.append(f"{answer_run_id} used {key} {config.get(key)!r}, the candidate uses {now!r}")
+    if dev is None or config.get("dataset_sha256") != dev.get("dataset_sha256"):
+        problems.append(f"{answer_run_id} evaluated another development set than the frozen one")
+    selection = {"answer_run_id": answer_run_id, "finalists": {
+        k: {m: v[m] for m in ("mode", "required_claim_correctness", "critical_wrong", "negative_handling",
+                              "citation_precision_lower_bound", "latency_ms", "cost")}
+        for k, v in scores["finalists"].items()}, "comparison": scores.get("selection")}
+    return problems, selection
 
 
 def freeze_release(settings: Settings, principal: Principal, run_id: str, answer_run_id: str, decided_by: str,
@@ -72,8 +119,6 @@ def freeze_release(settings: Settings, principal: Principal, run_id: str, answer
     test sets are validated, frozen and unchanged since; a development answer run compared that run; and the owner
     states who decided and why. Writes `releases/<freeze_id>/freeze.json` and an audit event."""
     principal = auth.require(principal, "sealed_evaluator")
-    from . import answers
-
     problems = []
     if not decided_by.strip() or not rationale.strip():
         problems.append("the selection needs decided_by and a rationale")
@@ -92,25 +137,13 @@ def freeze_release(settings: Settings, principal: Principal, run_id: str, answer
         if m is None:
             problems.append(f"{name} is not frozen; run freeze-dataset --dataset {name}")
         elif not m["current"]:
-            problems.append(f"{name} changed since it was frozen; validate and freeze it again")
-    selection = None
-    try:
-        scores = json.loads((answers.run_dir(settings, answer_run_id) / "scores.json").read_text(encoding="utf-8"))
-        config = json.loads((answers.run_dir(settings, answer_run_id) / "config.json").read_text(encoding="utf-8"))
-        if config.get("action") != "answer-finalists" or scores.get("status") != "complete":
-            problems.append(f"{answer_run_id} is not a complete development answer run")
-        elif run_id not in scores["finalists"]:
-            problems.append(f"{answer_run_id} did not answer with {run_id}")
-        else:
-            selection = {"answer_run_id": answer_run_id, "finalists": {
-                k: {m: v[m] for m in ("mode", "required_claim_correctness", "critical_wrong", "negative_handling",
-                                      "citation_precision_lower_bound", "latency_ms", "cost")}
-                for k, v in scores["finalists"].items()}, "comparison": scores.get("selection")}
-    except (OSError, json.JSONDecodeError, EvaluationError):
-        problems.append(f"development answer run {answer_run_id} not found")
+            problems.append(f"{name} changed since it was frozen ({', '.join(m['changed'])}); validate and freeze it "
+                            "again")
+    selection_problems, selection = _selection_problems(settings, active, answer_run_id, snap["dev"])
+    problems += selection_problems
     if problems:
         raise SealedError("freeze refused: " + "; ".join(problems))
-    previous = completed_sealed_runs(settings, snap["test"]["dataset_sha256"])
+    previous = sealed_exposures(settings, snap["test"]["dataset_sha256"])
     body = {"selected_run_id": run_id, "serving": {k: v for k, v in active.items()
                                                    if k not in ("activated_at",)},
             "dev_manifest": {k: snap["dev"][k] for k in ("dataset_sha256", "rows", "label", "review_log_sha256",
@@ -146,9 +179,13 @@ def freeze_problems(settings: Settings, freeze: dict) -> list[str]:
         if snap[key] != freeze[key]:
             problems.append(f"{key} changed since the freeze")
     for name in ("dev", "test"):
-        m = snap[name]
-        if m is None or not m["current"] or m["dataset_sha256"] != freeze[f"{name}_manifest"]["dataset_sha256"]:
-            problems.append(f"the {name} set is not the frozen one")
+        m, frozen = snap[name], freeze[f"{name}_manifest"]
+        if m is None:
+            problems.append(f"the {name} set has no frozen manifest")
+        elif not m["current"]:
+            problems.append(f"the {name} set changed since it was frozen ({', '.join(m['changed'])})")
+        elif any(m.get(k) != frozen.get(k) for k in ("dataset_sha256", "review_log_sha256", "families_sha256")):
+            problems.append(f"the {name} set was frozen again since the release freeze; freeze the release again")
     return problems
 
 
@@ -171,22 +208,25 @@ def begin(settings: Settings, est: dict, actor: str, reason: str | None) -> None
     if scores_path.exists() and json.loads(scores_path.read_text(encoding="utf-8")).get("status") == "complete":
         raise SealedError(f"sealed run {run_id} is already complete; its result stands. A further run on this test set "
                           "is a post-test regression: plan it with --post-test-regression and run it with --reason")
-    first = [r for r in completed_sealed_runs(settings, freeze["test_manifest"]["dataset_sha256"])
-             if r["label"] == "sealed test"]
+    test_sha = freeze["test_manifest"]["dataset_sha256"]
+    first = [r for r in sealed_exposures(settings, test_sha) if r["label"] == "sealed test" and r["run_id"] != run_id]
     if est.get("post_test_regression"):
-        if not first:
-            raise SealedError("no untouched sealed result exists for this test set yet; run it without the "
-                              "post-test flag")
+        if not first and not freeze.get("post_test"):
+            raise SealedError("this test set has not been exposed yet; run it without the post-test flag")
         if not (reason or "").strip():
             raise SealedError("a post-test regression run needs --reason")
-    elif first:
-        raise SealedError(f"the untouched sealed result {first[0]['run_id']} already exists; a further run on this "
-                          "test set is a post-test regression (plan it with --post-test-regression and a reason), and "
-                          "a new reliability claim needs a fresh independently sealed set")
+    elif first or freeze.get("post_test"):
+        exposed = first[0] if first else {"run_id": "an earlier run", "status": "started"}
+        raise SealedError(f"this test set was already exposed by sealed run {exposed['run_id']} "
+                          f"({exposed['status']}); only that run may resume, unchanged, under its own freeze. Any "
+                          "other run on this test set is a post-test regression (plan it with "
+                          "--post-test-regression and a reason), and a new reliability claim needs a fresh "
+                          "independently sealed set")
     if not (d / "config.json").exists():
         evaluation.record_audit(settings, actor, "sealed_run_started", run_id,
                                 reason or "sealed evaluation of the frozen release candidate",
                                 {"freeze_id": freeze["freeze_id"], "estimate_id": est["estimate_id"],
+                                 "test_sha256": test_sha,
                                  "max_micro_usd": est["max_micro_usd"],
                                  "post_test_regression": bool(est.get("post_test_regression"))})
 

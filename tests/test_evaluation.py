@@ -550,6 +550,87 @@ class SealedTest(Phase4Case):
         finally:
             res.close()
 
+    def frozen_release(self, transport) -> dict:
+        _, dev = self.answer_run(transport, runs=[self.k1])
+        evaluation.freeze_dataset(self.s, "dev", "owner", "dev frozen")
+        evaluation.freeze_dataset(self.s, "test", "owner", "test frozen")
+        freeze = self.freeze(dev["run_id"])
+        self.freeze_id = freeze["freeze_id"]
+        return freeze
+
+    def test_frozen_family_map_and_review_history_are_enforced(self):
+        """Review round 1 (F3): every digest the freeze recorded is checked at admission, not only the JSONL."""
+        freeze = self.frozen_release(FakeTransport())
+        fam_path = self.s.data_dir / "datasets" / "families.json"
+        original = fam_path.read_bytes()
+        fams = json.loads(original)
+        dev_f = next(f for f in fams["families"].values() if f["split"] == "dev")
+        test_f = next(f for f in fams["families"].values() if f["split"] == "test")
+        dev_f["related_sources"] = [test_f["source_hash"]]
+        fam_path.write_text(json.dumps(fams), encoding="utf-8")
+        self.assertTrue(evaluation.validate_gold_v2(self.s, "dev")["errors"])
+        self.assertEqual(evaluation.frozen_dataset(self.s, "dev")["changed"], ["family map"])
+        self.assertTrue(sealed.freeze_problems(self.s, freeze))
+        with self.assertRaisesRegex(answers.AnswerEvalError, "freeze no longer holds"):
+            answers.plan_run(self.s, "sealed", freeze_id=freeze["freeze_id"])
+        fam_path.write_bytes(original)
+        self.assertEqual(sealed.freeze_problems(self.s, freeze), [])
+        log = evaluation.review_log_path(self.s, "test")
+        log.write_text(log.read_text(encoding="utf-8") + '{"review_id": "forged"}\n', encoding="utf-8")
+        self.assertIn("review log file", evaluation.frozen_dataset(self.s, "test")["changed"])
+        evaluation.export_review_log(self.s, "test")
+        with store.open_db(self.s.db_path) as conn:  # a decision recorded after the freeze
+            conn.execute("INSERT INTO gold_candidates(candidate_id, batch_id, batch_sha256, dataset, row_json, "
+                         "row_sha256, question_key, drafted_by, submitted_at) VALUES ('late-r1', 'b', 'x', 'dev', "
+                         "'{}', 'x', 'k', 'a', '2026-10-01')")
+            conn.execute("INSERT INTO gold_reviews(review_id, candidate_id, reviewer, kind, decision, created_at) "
+                         "VALUES ('r1', 'late-r1', 'p', 'decision', 'approve', '2026-10-01')")
+        self.assertIn("review history in the database", evaluation.frozen_dataset(self.s, "dev")["changed"])
+        self.assertTrue(any("dev set changed" in p for p in sealed.freeze_problems(self.s, freeze)))
+
+    def test_an_interrupted_sealed_run_is_already_an_exposure(self):
+        """Review round 1 (F4): a partial sealed run exposes the test set; a retuned candidate cannot run it again
+        as an untouched test, while the original run may resume unchanged."""
+        second = p4.row(self.env, "test-seat-2", "열람 공간 예약 시스템은 무엇을 하는 사업인가요?", "기관D",
+                        split="test", groups=[p4.group(self.env, "g1", "기관D", ("%좌석%", p4.SEATS))],
+                        claims=[p4.claim("c1", ["g1"], {"type": "text", "patterns": ["도서관"]})])
+        p4.write(self.env, "test", store.read_jsonl(evaluation.dataset_path(self.s, "test")) + [second])
+        freeze = self.frozen_release(FakeTransport())
+        calls = {"n": 0}
+
+        def flaky(messages):
+            calls["n"] += 1
+            if calls["n"] > 1:
+                return ProviderError("APITimeoutError (injected)", pre_execution=False)
+            return generation._echo_first_evidence(messages)
+
+        first = self.sealed_run(FakeTransport(flaky))
+        self.assertEqual(first["status"], "partial")
+        self.assertEqual(sum(r["status"] == "done" for r in answers.load_progress(self.s, first["run_id"]).values()), 1)
+        with mock.patch.object(generation, "PROMPT_VERSION", "grounded-answer-tuned"):
+            self.assertTrue(sealed.freeze_problems(self.s, freeze))  # the tuned candidate breaks the old freeze
+            _, dev = self.answer_run(FakeTransport(), runs=[self.k1])
+            tuned = self.freeze(dev["run_id"])
+            self.assertTrue(tuned["post_test"])
+            self.assertEqual([e["status"] for e in tuned["earlier_sealed_runs"]], ["partial"])
+            self.freeze_id = tuned["freeze_id"]
+            with self.assertRaisesRegex(sealed.SealedError, "already exposed"):
+                self.sealed_run(FakeTransport())
+            post = self.sealed_run(FakeTransport(), post_test=True, reason="tuned prompt after an interrupted run")
+            config = json.loads((answers.run_dir(self.s, post["run_id"]) / "config.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["label"], "post-test regression")
+        self.freeze_id = freeze["freeze_id"]  # the untouched run resumes under its own, unchanged freeze
+        resumed = self.sealed_run(FakeTransport())
+        self.assertEqual(resumed["run_id"], first["run_id"])
+
+    def test_selection_evidence_must_be_the_current_candidates(self):
+        with mock.patch.object(generation, "PROMPT_VERSION", "grounded-answer-other"):
+            _, dev = self.answer_run(FakeTransport(), runs=[self.k1])
+        evaluation.freeze_dataset(self.s, "dev", "owner", "dev frozen")
+        evaluation.freeze_dataset(self.s, "test", "owner", "test frozen")
+        with self.assertRaisesRegex(sealed.SealedError, "prompt_version"):
+            self.freeze(dev["run_id"])
+
     def test_freeze_then_one_sealed_run_then_only_labeled_regressions(self):
         transport = FakeTransport()
         _, dev = self.answer_run(transport, runs=[self.k1])
