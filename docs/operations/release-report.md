@@ -17,8 +17,8 @@ This file is the shareable summary. The authoritative report is generated on the
 
 | Check | Where | Outcome |
 | --- | --- | --- |
-| `check --phase 4 --provider fake` | Cloud, temporary state | 55 tests passed |
-| `check --phase all --provider fake` | Cloud, temporary state | 243 tests passed |
+| `check --phase 4 --provider fake` | Cloud, temporary state | 56 tests passed |
+| `check --phase all --provider fake` | Cloud, temporary state | 244 tests passed |
 | Phase-4 CLI walkthrough (`tools/verification/phase4_walkthrough.py`) | Cloud, fixture corpus, fake provider | 31/31 steps passed |
 | Browser check of the 평가 tab and gold-2 review | Cloud, headless Chromium, synthetic runtime | rendered; approval refused without the inspection attestation; no horizontal scroll at 390 px |
 | Paid calls | — | none; $0 spent |

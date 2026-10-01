@@ -27,7 +27,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.37,
+   "seconds": 0.32,
    "tail": "}"
   },
   {
@@ -48,7 +48,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.29,
+   "seconds": 0.28,
    "tail": "}"
   },
   {
@@ -69,7 +69,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.31,
+   "seconds": 0.29,
    "tail": "}"
   },
   {
@@ -108,7 +108,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.29,
+   "seconds": 0.27,
    "tail": "}"
   },
   {
@@ -168,7 +168,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.28,
+   "seconds": 0.3,
    "tail": "}"
   },
   {
@@ -188,7 +188,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.29,
+   "seconds": 0.3,
    "tail": "}"
   },
   {
@@ -202,7 +202,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.28,
+   "seconds": 0.27,
    "tail": "}"
   },
   {
@@ -216,7 +216,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.27,
+   "seconds": 0.29,
    "tail": "}"
   },
   {
@@ -234,7 +234,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.28,
+   "seconds": 0.27,
    "tail": "}"
   },
   {
@@ -252,7 +252,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.32,
+   "seconds": 0.28,
    "tail": "}"
   },
   {
@@ -268,7 +268,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 3.9,
+   "seconds": 3.79,
    "tail": "]"
   },
   {
@@ -284,7 +284,7 @@
    "exit": 1,
    "expected_exit": 1,
    "ok": true,
-   "seconds": 1.22,
+   "seconds": 1.28,
    "tail": "error: the test split is sealed: it is evaluated once, by sealed-run under a release freeze, never by evaluate-retrieval or plan-run"
   },
   {
@@ -293,14 +293,14 @@
     "cli",
     "draft-activation",
     "--runs",
-    "K0-d122347d73,K1-6c37f7268e",
+    "K0-480d0206c9,K1-a40883b509",
     "--out",
     "<work>/phase4/decision.json"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.31,
+   "seconds": 0.32,
    "tail": "}"
   },
   {
@@ -309,14 +309,14 @@
     "cli",
     "activate-run",
     "--run-id",
-    "K1-6c37f7268e",
+    "K1-a40883b509",
     "--decision-file",
     "<work>/phase4/decision.json"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.29,
+   "seconds": 0.3,
    "tail": "}"
   },
   {
@@ -329,12 +329,12 @@
     "--dataset",
     "dev",
     "--runs",
-    "K1-6c37f7268e,K0-d122347d73"
+    "K1-a40883b509,K0-480d0206c9"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 4.12,
+   "seconds": 4.35,
    "tail": "}"
   },
   {
@@ -343,14 +343,14 @@
     "cli",
     "run-answers",
     "--estimate-id",
-    "5e6212d74ce2",
+    "b5155a47d387",
     "--actor",
     "owner"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 3.92,
+   "seconds": 4.29,
    "tail": "}"
   },
   {
@@ -363,12 +363,12 @@
     "--dataset",
     "dev",
     "--runs",
-    "K1-6c37f7268e,K0-d122347d73"
+    "K1-a40883b509,K0-480d0206c9"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 3.67,
+   "seconds": 3.78,
    "tail": "}"
   },
   {
@@ -377,12 +377,12 @@
     "cli",
     "export-review",
     "--run-id",
-    "A-21a97d3b0e9a"
+    "A-3e0ab6e52116"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.3,
+   "seconds": 0.28,
    "tail": "}"
   },
   {
@@ -391,9 +391,9 @@
     "cli",
     "freeze-release",
     "--run-id",
-    "K1-6c37f7268e",
+    "K1-a40883b509",
     "--answer-run",
-    "A-21a97d3b0e9a",
+    "A-3e0ab6e52116",
     "--decided-by",
     "owner",
     "--rationale",
@@ -402,7 +402,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.37,
+   "seconds": 0.3,
    "tail": "}"
   },
   {
@@ -413,12 +413,12 @@
     "--action",
     "sealed",
     "--freeze-id",
-    "F-bebe0d4d54"
+    "F-126bacca0d"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 4.05,
+   "seconds": 3.84,
    "tail": "}"
   },
   {
@@ -427,14 +427,14 @@
     "cli",
     "run-answers",
     "--estimate-id",
-    "b59df8c958af",
+    "b43d07d997e7",
     "--actor",
     "owner"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 3.83,
+   "seconds": 4.64,
    "tail": "}"
   },
   {
@@ -445,12 +445,12 @@
     "--action",
     "sealed",
     "--freeze-id",
-    "F-bebe0d4d54"
+    "F-126bacca0d"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 3.7,
+   "seconds": 5.57,
    "tail": "}"
   },
   {
@@ -459,15 +459,15 @@
     "cli",
     "run-answers",
     "--estimate-id",
-    "96317d4b896b",
+    "8eca0fa207f8",
     "--actor",
     "owner"
    ],
    "exit": 1,
    "expected_exit": 1,
    "ok": true,
-   "seconds": 3.94,
-   "tail": "error: sealed run S-2d91c6332548 is already complete; its result stands. A further run on this test set is a post-test regression: plan it with --post-test-regression and run it with --reason"
+   "seconds": 4.51,
+   "tail": "error: sealed run S-d2784be48a71 is already complete; its result stands. A further run on this test set is a post-test regression: plan it with --post-test-regression and run it with --reason"
   },
   {
    "step": "plan latency sample",
@@ -484,7 +484,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 3.71,
+   "seconds": 4.49,
    "tail": "}"
   },
   {
@@ -493,14 +493,14 @@
     "cli",
     "latency-run",
     "--estimate-id",
-    "e9e284acfbbd",
+    "85569e82d874",
     "--actor",
     "owner"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 4.05,
+   "seconds": 4.23,
    "tail": "}"
   },
   {
@@ -516,7 +516,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.31,
+   "seconds": 0.35,
    "tail": "}"
   },
   {
@@ -532,7 +532,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.29,
+   "seconds": 0.28,
    "tail": "}"
   },
   {
@@ -545,8 +545,8 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.35,
-   "tail": "<work>/phase4/data/releases/F-bebe0d4d54/report.md"
+   "seconds": 0.34,
+   "tail": "<work>/phase4/data/releases/F-126bacca0d/report.md"
   }
  ],
  "passed": true,
@@ -558,5 +558,5 @@
   "quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)",
   "evidence is sealed pilot, not a sealed evaluation of reviewed gold"
  ],
- "release_report": "<work>/phase4/data/releases/F-bebe0d4d54/report.md"
+ "release_report": "<work>/phase4/data/releases/F-126bacca0d/report.md"
 }
