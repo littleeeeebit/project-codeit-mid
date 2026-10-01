@@ -816,8 +816,13 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
     principal = _checkpoint(res, request_id, principal)
     admission = budget.reserve(s.db_path, request_id=request_id, member_id=principal.member_id, stage="generation",
                                purpose="interactive", model=s.generation_model, input_tokens=prep["input_tokens"],
-                               max_output_tokens=s.generation_max_output_tokens, count_method=generation.COUNT_METHOD)
+                               max_output_tokens=s.generation_max_output_tokens, count_method=generation.COUNT_METHOD,
+                               ceiling_micro_usd=frozen["estimate_micro_usd"] if frozen is not None else None)
     trace["admission"] = admission
+    if admission["reason"] == "above_consented_maximum":
+        return done("clarification_required", "요금 설정이 바뀌어 예약 금액이 검증 실행에서 동의한 최대 비용을 넘습니다. "
+                    "새 검증 실행을 만든 뒤 다시 생성하세요. (유료 호출 없음)", request_status="failed",
+                    evidence=evidence_map, error=admission["reason"], **common)
     if not admission["admitted"]:
         return done("budget_blocked", "공유 사용 한도 또는 유료 호출 설정 때문에 답변 생성을 시작하지 않았습니다. "
                     "검색과 원문 열람은 계속 사용할 수 있습니다.", evidence=evidence_map, error=admission["reason"],

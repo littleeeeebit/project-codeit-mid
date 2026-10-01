@@ -158,8 +158,10 @@ def estimate(db: Path, model: str, input_tokens: int, max_output_tokens: int) ->
 
 
 def reserve(db: Path, *, request_id: str, member_id: str, stage: str, purpose: str, model: str, input_tokens: int,
-            max_output_tokens: int, count_method: str) -> dict:
-    """Atomic admission. Returns {'admitted': bool, 'attempt_id', 'reserved_micro_usd', 'reason'}."""
+            max_output_tokens: int, count_method: str, ceiling_micro_usd: int | None = None) -> dict:
+    """Atomic admission. Returns {'admitted': bool, 'attempt_id', 'reserved_micro_usd', 'reason'}.
+    `ceiling_micro_usd` is a maximum the user consented to: a reservation above it (e.g. rates reconfigured since
+    the estimate) is refused in the same transaction that would have admitted it."""
     attempt_id = str(uuid.uuid4())
     try:
         with open_db(db) as conn, tx(conn, immediate=True):
@@ -175,6 +177,9 @@ def reserve(db: Path, *, request_id: str, member_id: str, stage: str, purpose: s
             if purpose not in envelopes:
                 return {"admitted": False, "reason": "unknown_purpose", "attempt_id": None}
             amount = max_cost(rates, input_tokens, max_output_tokens)
+            if ceiling_micro_usd is not None and amount > ceiling_micro_usd:
+                return {"admitted": False, "reason": "above_consented_maximum", "attempt_id": None,
+                        "reserved_micro_usd": amount, "ceiling_micro_usd": ceiling_micro_usd}
             totals = _totals(conn)
             available = row["cap_micro_usd"] - totals["spent"] - totals["pending"]
             if available < amount:

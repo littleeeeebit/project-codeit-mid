@@ -555,11 +555,16 @@ def _history(st, res, principal) -> None:
         if not views:
             st.caption("아직 요청이 없습니다.")
             return
-        labels = {f"{v.created_at[:16].replace('T', ' ')} · {REQUEST_TEXT.get(v.status, v.status)} · "
-                  f"{v.question[:40] or v.mode}": v for v in views}
-        choice = st.selectbox("요청", list(labels), index=None, placeholder="다시 볼 요청을 고르세요")
+        by_id = {v.request_id: v for v in views}  # option values are request IDs: equal labels never merge
+
+        def label(rid: str) -> str:
+            v = by_id[rid]
+            return (f"{v.created_at[:16].replace('T', ' ')} · {REQUEST_TEXT.get(v.status, v.status)} · "
+                    f"{v.question[:40] or v.mode} · {rid[:8]}")
+
+        choice = st.selectbox("요청", list(by_id), format_func=label, index=None, placeholder="다시 볼 요청을 고르세요")
         if choice:
-            v = labels[choice]
+            v = by_id[choice]
             st.info("이전 요청입니다. 현재 화면의 질문에 대한 답변이 아닙니다. 범위: "
                     + ", ".join(f"{s['doc_id'][:8]}@{s['source_hash'][:8]}" for s in v.scope)
                     + f" · 기준일 {v.as_of} · 방식 {v.mode}")

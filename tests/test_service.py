@@ -279,6 +279,30 @@ class ScopeOwnershipTest(Base):
         self.assertFalse(any(placeholder in c.value for c in app.caption), [c.value for c in app.caption])
         self.assertEqual(len([b for b in app.get("download_button") if b.key.startswith("evdl-")]), 1)  # once
 
+    def test_requests_with_the_same_history_label_stay_separately_selectable(self):
+        """Review finding: history options were keyed by their label (minute, status, question prefix), so two
+        same-question requests in one minute collapsed into one."""
+        from streamlit.testing.v1 import AppTest
+
+        self.transport.gate.set()
+        rids = [service.submit_answer(self.res, self.env.consultant, req(self.a, gen=f"gen-{i}")) for i in (1, 2)]
+        for rid in rids:
+            self.assertEqual(self.wait_done(rid).result.status, "answered")
+        with store.open_db(self.settings.db_path) as conn:
+            conn.execute("UPDATE requests SET created_at = '2026-10-01T08:00:30+00:00'")
+        app = AppTest.from_string("import streamlit as st\nfrom rfp_assistant import ui\n"
+                                  "ui._history(st, st.session_state.res, st.session_state.principal)\n")
+        app.session_state["res"], app.session_state["principal"] = self.res, self.env.consultant
+        app.run(timeout=30)
+        box = app.selectbox[0]
+        self.assertEqual(len(box.options), 2)
+        shown = []
+        for option in list(box.options):
+            app.selectbox[0].select(option).run(timeout=30)
+            self.assertFalse(app.exception, [e.message for e in app.exception])
+            shown += [b.key[len("exp-"):] for b in app.get("download_button") if b.key.startswith("exp-")]
+        self.assertEqual(sorted(shown), sorted(rids))
+
     def test_evidence_of_an_older_history_request_opens_in_the_history(self):
         from streamlit.testing.v1 import AppTest
 
@@ -889,6 +913,27 @@ class VerifierTest(Base):
         self.assertEqual(trace["input_tokens_estimate"], frozen["input_tokens"])  # the estimate shown applies
         reserved = sum(a["reserved_micro_usd"] for a in self.attempts() if a["request_id"] == rid)
         self.assertEqual(reserved, frozen["estimate_micro_usd"])
+
+    def test_a_rate_change_after_the_estimate_cannot_reserve_above_the_consented_maximum(self):
+        """Review finding: the ceiling was compared before `budget.reserve`, which reads the rates again; rates
+        doubled in between reserved, dispatched and settled above the displayed maximum."""
+        self.transport.gate.set()
+        frozen = self._frozen_run()
+        real = budget.reserve
+
+        def doubled_rates_then_reserve(db, **kw):
+            with store.open_db(db) as conn:
+                rates = json.loads(conn.execute("SELECT rates_json FROM budget_settings WHERE id = 1").fetchone()[0])
+                rates[kw["model"]] = {k: str(2 * float(v)) for k, v in rates[kw["model"]].items()}
+                conn.execute("UPDATE budget_settings SET rates_json = ? WHERE id = 1", (json.dumps(rates),))
+            return real(db, **kw)
+
+        with mock.patch.object(budget, "reserve", side_effect=doubled_rates_then_reserve):
+            result = service.answer(self.res, self.env.verifier, AnswerRequest(
+                "k", "g", Q, [self.a], as_of="2026-09-30", config_id=frozen["config"]["config_id"],
+                verifier_run_id=frozen["run_id"]))
+        self.assertEqual((result.status, result.error), ("clarification_required", "above_consented_maximum"))
+        self.assertEqual((self.transport.calls, self.attempts()), ([], []))
 
     def test_an_outdated_frozen_configuration_is_refused_before_anything_is_queued(self):
         frozen = self._frozen_run()
