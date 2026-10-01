@@ -1,13 +1,14 @@
 import json
 import tempfile
 import unittest
+import unittest.mock
 import uuid
 from pathlib import Path
 
 from rfp_assistant import budget, dense, evaluation, generation, ingestion, service, store
 from rfp_assistant.contracts import AnswerRequest
 from rfp_assistant.retrieval import KeywordIndex, build_keyword_index
-from rfp_assistant.store import get_app_setting
+from rfp_assistant.store import get_app_setting, read_jsonl
 from tests import fixtures
 
 
@@ -196,6 +197,21 @@ class FakeReranker:
         return [(i, scores[i]) for i in order], {"truncated": 0}
 
 
+class IdentityReranker:
+    info = {"model": "identity", "revision": "1" * 40, "device": "cpu", "max_length": 512}
+
+    def rerank(self, question, chunks):
+        return [(i, float(-i)) for i in range(len(chunks))], {"truncated": 0}
+
+
+class DemotingReranker(FakeReranker):
+    """Pushes the chunks that mention 하자보수 to the end."""
+
+    def rerank(self, question, chunks):
+        order, info = super().rerank(question, chunks)
+        return list(reversed(order)), info
+
+
 class EvaluationRunTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -233,6 +249,46 @@ class EvaluationRunTest(unittest.TestCase):
             {"row": 2, "col": 0, "text": "사업기간"}, {"row": 2, "col": 1, "text": "계약일로부터 6개월"}]}}
         self.assertEqual(evaluation.grade({"spans": [{"element_id": "t", "rows": [0, 2]}]},
                                           {"element_id": "t", "quote": "사업기간 | 계약일로부터 6개월"}, table), 2)
+
+    def test_trial_runs_with_the_frozen_h_settings_not_the_process_settings(self):
+        s = self.env.settings
+        evaluation.evaluate_retrieval(s, fixtures.analyzer(), self.transport, "dev-pilot", ["H"],
+                                      allow_paid_queries=True)
+        calls = len(self.transport.embed_calls)
+        other = s.with_(evidence_max_units=1, embedding_dimensions=256)
+        report = evaluation.trial_reranker(other, fixtures.analyzer(), "dev-pilot", [20], reranker=IdentityReranker(),
+                                           load_info=IdentityReranker.info, users=2)
+        self.assertEqual(len(self.transport.embed_calls), calls)  # vectors read from H's cache, nothing paid
+        hr_config, _ = evaluation.load_run(s, report["depths"][20]["run_id"])
+        h_config, _ = evaluation.load_run(s, report["h_run"])
+        self.assertEqual((hr_config["limits"], hr_config["embedding"]), (h_config["limits"], h_config["embedding"]))
+        traces = lambda run: {t["id"]: t["packed"] for t in read_jsonl(s.data_dir / "runs" / run / "traces.jsonl")
+                              if "packed" in t}  # noqa: E731
+        self.assertEqual(traces(report["depths"][20]["run_id"]), traces(report["h_run"]))  # same limits applied
+        self.assertTrue(any(len(v) > 1 for v in traces(report["h_run"]).values()))
+
+    def test_losing_numeric_evidence_is_a_new_critical_failure(self):
+        rows = [json.loads(x) for x in evaluation.dataset_path(self.env.settings, "dev-pilot").read_text(
+            encoding="utf-8").splitlines()]
+        rows[0]["type"] = "numeric_qualifier"  # q1: 하자보수 기간 12개월
+        evaluation.dataset_path(self.env.settings, "dev-pilot").write_text(
+            "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+        s = self.env.settings.with_(evidence_max_units=1)
+        evaluation.evaluate_retrieval(s, fixtures.analyzer(), self.transport, "dev-pilot", ["H"],
+                                      allow_paid_queries=True)
+        bad = evaluation.trial_reranker(s, fixtures.analyzer(), "dev-pilot", [20], reranker=DemotingReranker(),
+                                        load_info=DemotingReranker.info, users=2)["depths"][20]
+        self.assertIn("q1", bad["new_critical_failures"])
+        self.assertFalse(bad["passed"])
+        good = evaluation.trial_reranker(s, fixtures.analyzer(), "dev-pilot", [20], reranker=IdentityReranker(),
+                                         load_info=IdentityReranker.info, users=2)["depths"][20]
+        self.assertEqual(good["new_critical_failures"], [])
+        # the rule itself: a better average cannot hide a numeric row whose evidence left the packed context
+        lost = {"id": "n", "type": "numeric_qualifier", "metrics": {"packed_complete": 0}}
+        kept = {"id": "n", "type": "numeric_qualifier", "metrics": {"packed_complete": 1}}
+        flagged = {"id": "c", "type": "condition", "critical": True, "metrics": {"packed_complete": 0}}
+        self.assertEqual(evaluation.critical_failures([lost, flagged]), ["c", "n"])
+        self.assertEqual(evaluation.critical_failures([kept]), [])
 
     def test_missing_query_usage_stops_paid_evaluation_queries(self):
         no_usage = generation.FakeTransport(embedder=lambda inputs, dims: generation.EmbeddingResponse(
@@ -361,6 +417,60 @@ class ServingTest(unittest.TestCase):
         self.assertEqual(hit["csv_metadata"], {"institution": "기관C"})
         (hit,) = service.search_projects(self.res, self.env.consultant, {"institution": "Canonical"}, "")
         self.assertEqual(hit["institution"], "Canonical Agency")
+
+    def test_reranker_reloads_when_its_input_length_changes(self):
+        loads = []
+
+        class Loaded:
+            def __init__(self, s):
+                self.max_length = s.reranker_max_length
+
+        def fake_load(s):
+            loads.append(s.reranker_max_length)
+            return Loaded(s), {}
+
+        def select(length):
+            with store.open_db(self.env.settings.db_path) as conn, store.tx(conn, immediate=True):
+                run = json.loads(get_app_setting(conn, "active_run"))
+                run["reranker"] = {"model": "m", "revision": "r", "max_length": length, "depth": 20}
+                store.set_app_setting(conn, "active_run", json.dumps(run))
+
+        with unittest.mock.patch.object(dense, "load_reranker", side_effect=fake_load):
+            select(512)
+            self.assertEqual(self.res.reranker().max_length, 512)
+            select(1024)
+            self.assertEqual(self.res.reranker().max_length, 1024)
+            first = self.res.reranker()
+            self.assertIs(self.res.reranker(), first)
+        self.assertEqual(loads, [512, 1024])
+
+    def test_answer_billing_reports_every_paid_stage(self):
+        no_usage = generation.FakeTransport(embedder=lambda inputs, dims: generation.EmbeddingResponse(
+            generation.fake_embeddings(inputs, dims).vectors, None))
+        res = service.Resources(self.env.settings, transport=no_usage)
+        try:
+            r = service.answer(res, self.env.consultant, AnswerRequest(
+                idempotency_key=str(uuid.uuid4()), generation_id="g", question="처음 묻는 하자보수 질문",
+                scope=[self.env.refs["기관A"]]))
+        finally:
+            res.close()
+        with store.open_db(self.env.settings.db_path) as conn:
+            stages = {a["stage"]: a["state"] for a in conn.execute(
+                "SELECT stage, state FROM attempts WHERE request_id = ?", (r.request_id,))}
+        self.assertEqual(stages, {"embedding": "unknown", "generation": "settled"})
+        self.assertEqual((r.status, r.billing_state, len(r.attempt_ids)), ("answered", "unknown", 2))
+        real = budget.reserve
+
+        def no_generation(*args, **kw):
+            if kw.get("stage") == "generation":
+                return {"admitted": False, "reason": "cap_exhausted", "attempt_id": None}
+            return real(*args, **kw)
+
+        with unittest.mock.patch.object(budget, "reserve", side_effect=no_generation):
+            r = service.answer(self.res, self.env.consultant, AnswerRequest(
+                idempotency_key=str(uuid.uuid4()), generation_id="g", question="또 다른 하자보수 질문",
+                scope=[self.env.refs["기관A"]]))
+        self.assertEqual((r.status, r.billing_state, len(r.attempt_ids)), ("budget_blocked", "settled", 1))
 
     def test_free_retrieval_never_pays_for_a_query_vector(self):
         ref = self.env.refs["기관A"]

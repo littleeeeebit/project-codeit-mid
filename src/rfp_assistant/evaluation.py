@@ -184,6 +184,7 @@ def validate_gold(settings: Settings, name: str) -> dict:
 EVAL_VERSION = "retrieval-eval-1"
 RANK_DEPTH = 20
 CRITICAL_CODE_TYPES = {"repeated_code", "requirement_detail"}
+CRITICAL_EVIDENCE_TYPES = {"numeric_qualifier"}  # an amount/date/VAT condition must reach the packed context
 NDCG_AT = 5
 GATE_NDCG_GAIN = 0.03
 GATE_ADDED_P95_MS = 1000.0
@@ -341,7 +342,8 @@ def score_row(row: dict, ranking: list[dict], packed: list[dict], elements: dict
         "ndcg@5": round(min(1.0, dcg / sum(2 / math.log2(j + 1) for j in range(1, min(n, NDCG_AT) + 1))), 4), "mrr": round(1 / first_full, 4) if first_full else 0.0,
         "packed_recall": round(sum(g == 2 for g in packed_grades) / n, 4),
         "packed_complete": int(all(g == 2 for g in packed_grades)),
-        "qualifier_loss": sum(g == 1 for g in packed_grades), "unit_grades@20": top20,
+        "qualifier_loss": sum(g == 1 for g in packed_grades), "packed_missing": sum(g == 0 for g in packed_grades),
+        "unit_grades@20": top20,
         "missing_units": [u["element_id"] for u, g in zip(units, top20) if g < 2],
     }
 
@@ -354,6 +356,20 @@ def code_check(row: dict, packed: list[dict]) -> dict | None:
     first = packed[0] if packed else None
     ok = bool(first and first.get("requirement_key") in codes)
     return {"codes": codes, "ok": ok, "first_key": first.get("requirement_key") if first else None}
+
+
+def critical_failures(results: list[dict], rows: dict | None = None) -> list[str]:
+    """Question IDs failing a critical check: an explicit code without its own block first, a candidate outside
+    the scope, or a numeric/qualifier (or explicitly `critical`) row whose required evidence is not completely in
+    the packed context, whether partly cut (grade 1) or wholly missing (grade 0)."""
+    out = []
+    for r in results:
+        row = (rows or {}).get(r.get("id"), r)
+        critical_row = row.get("type") in CRITICAL_EVIDENCE_TYPES or bool(row.get("critical"))
+        if ((r.get("code_check") and not r["code_check"]["ok"]) or r.get("wrong_scope")
+                or (critical_row and r.get("metrics") and not r["metrics"]["packed_complete"])):
+            out.append(r["id"])
+    return sorted(set(out), key=str)
 
 
 def aggregate(results: list[dict], skipped: list[dict]) -> dict:
@@ -387,8 +403,8 @@ def aggregate(results: list[dict], skipped: list[dict]) -> dict:
         "qualifier_losses": sum(r["metrics"]["qualifier_loss"] for r in passage),
         "wrong_scope_candidates": sum(r.get("wrong_scope", 0) for r in results),
         "code_checks": {"ok": sum(c["ok"] for c in codes), "n": len(codes)},
-        "critical_failures": [r["id"] for r in results if r.get("code_check") and not r["code_check"]["ok"]]
-        + [r["id"] for r in results if r.get("wrong_scope")],
+        "critical_failures": critical_failures(results),
+        "missing_in_packed": sum(r["metrics"]["packed_missing"] for r in passage),
         "latency_ms": {"p50": percentile(latencies, 0.5), "p95": percentile(latencies, 0.95), "n": len(latencies)},
         "fallbacks": sorted({r["fallback"] for r in results if r.get("fallback")}),
         "by_type": by_type,
@@ -462,7 +478,8 @@ def _execute(settings: Settings, index, analyzer, rows: list[dict], mode: str, d
 
     results = []
     for row in rows:
-        out = {"id": row.get("id"), "type": row.get("type"), "question": row.get("question")}
+        out = {"id": row.get("id"), "type": row.get("type"), "critical": bool(row.get("critical")),
+               "question": row.get("question")}
         if not is_passage_row(row):
             results.append(out)  # metadata, operational and unanswerable rows: reported, not ranked
             continue
@@ -510,7 +527,8 @@ def run_report_md(run_id: str, config: dict, scores: dict) -> str:
               f"{agg['packed_complete']['wilson95']} |",
               f"| nDCG@5 (mean) | {agg['ndcg@5']} | {agg['passage_rows']} | |",
               f"| MRR (mean) | {agg['mrr']} | {agg['passage_rows']} | |", "",
-              f"- qualifier losses in packed context: {agg['qualifier_losses']}",
+              f"- qualifier losses in packed context: {agg['qualifier_losses']} partly cut, "
+              f"{agg.get('missing_in_packed', 0)} wholly missing",
               f"- code checks: {agg['code_checks']['ok']}/{agg['code_checks']['n']}; critical failures: "
               f"{agg['critical_failures'] or 'none'}",
               f"- wrong-scope candidates: {agg['wrong_scope_candidates']}",
@@ -673,12 +691,19 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
     if h_run is None:
         raise EvaluationError("no complete frozen H run for this dataset and index; run evaluate-retrieval with H")
     h_config, h_scores = load_run(settings, h_run)
+    from .retrieval import analyzer_fingerprint
+
+    if h_config["analyzer"] != analyzer_fingerprint(analyzer):
+        raise EvaluationError("the analyzer differs from the frozen H run; rerun H before the trial")
+    # Retrieval runs exactly as H was frozen; only the reranker is new. A changed retrieval setting needs a new H.
+    trial_settings = settings.with_(**h_config["limits"], embedding_model=h_config["embedding"]["model"],
+                                    embedding_dimensions=h_config["embedding"]["dims"])
     h_traces = {t["id"]: t for t in read_jsonl(_run_dir(settings, h_run) / "traces.jsonl")}
     dense = dense_mod.DenseIndex.load(settings, h_config["dense_version"], base=index)
     vectors = {}
     for row in rows:
         if is_passage_row(row):
-            vec, _ = dense_mod.query_vector(settings, None, row["question"], request_id=None, member_id="owner-cli",
+            vec, _ = dense_mod.query_vector(trial_settings, None, row["question"], request_id=None, member_id="owner-cli",
                                             purpose="gold_eval", allow_paid=False)
             if vec is None:
                 raise EvaluationError("a frozen H query vector is missing from the cache; rerun H")
@@ -697,12 +722,13 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
     passage = [r for r in rows if is_passage_row(r)]
     # Warm once, then measure the reranking stage alone and under concurrent load.
     if passage:
-        _execute(settings, index, analyzer, passage[:1], "hybrid_rerank", dense, vectors, reranker, max(depths))
+        _execute(trial_settings, index, analyzer, passage[:1], "hybrid_rerank", dense, vectors, reranker, max(depths))
     base_ndcg = h_scores["aggregate"]["ndcg@5"] or 0.0
-    base_critical = set(h_scores["aggregate"]["critical_failures"])
+    by_id = {r.get("id"): r for r in rows}
+    base_critical = set(critical_failures(list(h_traces.values()), by_id))  # same rule for both sides
     best = None
     for depth in depths:
-        results = _execute(settings, index, analyzer, rows, "hybrid_rerank", dense, vectors, reranker, depth)
+        results = _execute(trial_settings, index, analyzer, rows, "hybrid_rerank", dense, vectors, reranker, depth)
         for r in results:  # the pool must be exactly the frozen H candidates
             if r.get("metrics"):
                 frozen = [c["chunk_id"] for c in h_traces[r["id"]]["candidates"] if c["channel"] == "rrf"][:depth]
@@ -713,12 +739,12 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
 
         def one(row):
             t0 = time.perf_counter()
-            _execute(settings, index, analyzer, [row], "hybrid_rerank", dense, vectors, reranker, depth)
+            _execute(trial_settings, index, analyzer, [row], "hybrid_rerank", dense, vectors, reranker, depth)
             return (time.perf_counter() - t0) * 1000
 
         def base(row):
             t0 = time.perf_counter()
-            _execute(settings, index, analyzer, [row], "hybrid", dense, vectors)
+            _execute(trial_settings, index, analyzer, [row], "hybrid", dense, vectors)
             return (time.perf_counter() - t0) * 1000
 
         with ThreadPoolExecutor(max_workers=users) as pool:

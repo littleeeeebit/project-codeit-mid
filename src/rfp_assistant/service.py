@@ -130,12 +130,13 @@ class Resources:
         cfg = self.serving().get("reranker")
         if not cfg:
             return None
-        key = (cfg.get("model"), cfg.get("revision"))
+        s = self.run_settings().with_(reranker_model=cfg.get("model") or self.settings.reranker_model,
+                                      reranker_revision=cfg.get("revision") or "")
+        # Everything the loaded model's inference depends on; depth alone needs no reload.
+        key = (s.reranker_model, s.reranker_revision, s.reranker_max_length, s.reranker_max_concurrency)
         with self._index_lock:
             if self._reranker_key != key:
                 self._reranker_key = key
-                s = self.run_settings().with_(reranker_model=cfg.get("model") or self.settings.reranker_model,
-                                              reranker_revision=cfg.get("revision") or "")
                 self._reranker, info = dense_mod.load_reranker(s)
                 if self._reranker is None:
                     self.stage_errors["reranker"] = info.get("error", "unavailable")
@@ -320,8 +321,20 @@ def _input_hash(request: AnswerRequest) -> str:
     return hashlib.sha256(dumps(data).encode()).hexdigest()
 
 
+BILLING_PRECEDENCE = ("unknown", "pending", "reconciled", "settled", "released")
+
+
 def _finish(res: Resources, request_id: str, result: AnswerResult, trace: dict, status: str) -> AnswerResult:
+    """The request's attempts and overall billing state come from the ledger, so every paid stage (query embedding
+    and generation) is reported on every exit path. Unknown wins over settled; open reservations show as pending."""
     with open_db(res.settings.db_path) as conn, tx(conn, immediate=True):
+        attempts = conn.execute("SELECT attempt_id, stage, state FROM attempts WHERE request_id = ? "
+                                "ORDER BY created_at", (request_id,)).fetchall()
+        states = {"reserved": "pending", "dispatching": "pending"}
+        overall = {states.get(a["state"], a["state"]) for a in attempts}
+        result.attempt_ids = [a["attempt_id"] for a in attempts]
+        result.billing_state = next((b for b in BILLING_PRECEDENCE if b in overall), "none")
+        trace["billing"] = [dict(a) for a in attempts]
         conn.execute("UPDATE requests SET status = ?, trace_json = ?, result_json = ?, updated_at = ? "
                      "WHERE request_id = ?", (status, dumps(trace), dumps(asdict(result)), utcnow(), request_id))
     return result
