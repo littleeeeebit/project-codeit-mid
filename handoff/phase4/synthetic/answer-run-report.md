@@ -1,10 +1,10 @@
-# Answer run A-d1c7d4b327ab (development finalists)
+# Answer run A-f01333b1afc5 (development finalists)
 
-- dataset `dev` (`12face89bb1b`), population `d19db954e33a`, status **complete**
-- model gpt-6-luna (reasoning low), prompt grounded-answer-3, output cap 2000; code `a944ef3e704d` dirty=False
+- dataset `dev` (`4d8895c4c84c`), population `67a88cb87d43`, status **complete**
+- model gpt-6-luna (reasoning low), prompt grounded-answer-3, output cap 2000; code `a8e14ccf2623` dirty=False
 - blind reviews applied: 0
 
-## Finalist `K1-b7f86f6c33` (kiwi_bm25): 4/4 rows
+## Finalist `K1-8d339b59c3` (kiwi_bm25): 4/4 rows
 
 | Metric | Value |
 | --- | --- |
@@ -26,9 +26,9 @@
 | technical outcomes | none |
 | scope leaks | 0 |
 | settled cost | $0.000385 (retried rows 0) |
-| latency p50/p95 ms | 18.9/22.98 (n=4, sequential, single process, one call at a time) |
+| latency p50/p95 ms | 21.7/27.58 (n=4, sequential, single process, one call at a time) |
 
-## Finalist `K0-cef258864f` (whitespace_bm25): 4/4 rows
+## Finalist `K0-609a5f8773` (whitespace_bm25): 4/4 rows
 
 | Metric | Value |
 | --- | --- |
@@ -50,20 +50,20 @@
 | technical outcomes | none |
 | scope leaks | 0 |
 | settled cost | $0.000187 (retried rows 0) |
-| latency p50/p95 ms | 14.95/20.3 (n=4, sequential, single process, one call at a time) |
+| latency p50/p95 ms | 16.6/23.81 (n=4, sequential, single process, one call at a time) |
 
 ## Finalist comparison
 
 ```json
 {
- "baseline": "K1-b7f86f6c33",
- "candidate": "K0-cef258864f",
+ "baseline": "K1-8d339b59c3",
+ "candidate": "K0-609a5f8773",
  "claim_correctness_gain": -0.3334,
  "negative_handling_gain": 1.0,
  "new_critical_wrong": [],
  "p95_ms": [
-  22.98,
-  20.3
+  27.58,
+  23.81
  ],
  "settled_micro_usd": [
   385,

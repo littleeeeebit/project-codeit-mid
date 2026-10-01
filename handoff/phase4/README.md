@@ -22,8 +22,8 @@ The authoritative release evidence must be produced on the owner host with the r
 
 | Command | Outcome |
 | --- | --- |
-| `check --phase 4 --provider fake --save` | Passed: 50 tests. See `checks/check-4.json`. |
-| `check --phase all --provider fake --save` | Passed: 238 tests (the 199 earlier ones plus 39 new). See `checks/check-all.json`. |
+| `check --phase 4 --provider fake --save` | Passed: 53 tests. See `checks/check-4.json`. |
+| `check --phase all --provider fake --save` | Passed: 241 tests (the 199 earlier ones plus 42 new). See `checks/check-all.json`. |
 | `python -B tools/verification/phase4_walkthrough.py <work>` | Passed: 31 of 31 CLI steps, including the refused approval without inspection, the refused sealed `evaluate-retrieval`, a finalist run, a replan with 0 remaining rows, the release freeze, one sealed run and its refused repeat, a fake latency sample, backup and a passing restore check. See `synthetic/phase4-walkthrough.json`. |
 | `release-report --latest` (on that synthetic runtime) | `limited`: the saved full check was not part of that runtime, multi-evidence coverage and negative handling had no sealed denominator, there was no real latency sample, and the sealed set is a 1-row pilot. See `synthetic/release-report.md`. |
 | Browser (headless Chromium, Streamlit on the synthetic runtime) | 평가 tab, estimate, gold-2 review, refused approval without the attestation and a 390 px layout without horizontal scroll. See `screenshots/20–24`. Keyboard, contrast and screen-reader checks were not repeated for these additions. |
@@ -36,7 +36,7 @@ The authoritative release evidence must be produced on the owner host with the r
 4. No paid judge. The plan allows a calibrated, sampled LLM judge; none is implemented or planned, so judge cost is always 0. Blind human review covers text claims and unjudged citations.
 5. Sealed rows never reach a screen. Their review, freeze and run are owner CLI actions; the 평가 tab shows only the sealed row count and freeze state, and the dev validation report withholds sealed IDs.
 6. Evaluation identity. Answer-run requests use the member `evaluation-job` (so a resume under another typed name finds the same idempotency keys) and the `gold_eval` envelope.
-7. A repaired release needs a new freeze. A post-test regression run requires `--post-test-regression` and `--reason`; a new reliability claim needs a newly drafted, independently sealed test set.
+7. Exposure is per test set (review round 1). Any sealed run that started, finished or not, exposes the set: only that run may resume, unchanged, under its own freeze, and every later freeze or run on the set is a labeled post-test regression. Every digest a freeze records (dataset, family map, review-log file and the database review history) is checked at plan, start and resume. A repaired release needs a new freeze. A post-test regression run requires `--post-test-regression` and `--reason`; a new reliability claim needs a newly drafted, independently sealed test set.
 
 ## Owner steps on the local host
 
