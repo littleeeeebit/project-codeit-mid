@@ -291,6 +291,15 @@ class ObservedNumericMissTest(unittest.TestCase):
         self.assertIn(cost, quote)
         self.assertTrue(any(late in e["raw_text"] for e in els))
 
+    def test_vat_abbreviation_matches_the_written_out_form(self):
+        cost = "총 사업비는 금 450,000,000원(부가가치세 포함)으로 한다."
+        els = ingestion.finalize_elements(_sections([
+            ("1. 개요", ["사업 범위는 지도 서비스 고도화이다.", "세금계산서는 검수 후 발행한다."]),
+            ("2. 포함 사항", ["유지보수 비용은 포함 여부를 협의한다."]),
+            ("3. 예산", [cost])]), "xa")
+        r, quote = self.first(_index({"xa": els}), "사업비와 부가세 포함 여부는?")
+        self.assertIn(cost, quote)  # raw evidence keeps 부가가치세 as written
+
     def test_a_restated_project_name_does_not_drown_the_asked_fact(self):
         title = "한빛대학교 차세대 포털 학사 정보시스템 구축사업"
         budget = "사업 예산은 금 1,200,000,000원이며 대금은 기성 검사 후 30일 이내 지급한다."

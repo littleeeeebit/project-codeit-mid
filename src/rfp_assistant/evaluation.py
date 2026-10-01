@@ -196,7 +196,8 @@ def validate_gold(settings: Settings, name: str) -> dict:
 # recorded under another version are history, not evidence, and are neither compared against nor activated.
 # 2: row-fragment grading, numeric/qualifier critical failures, trial frozen to H, recorded reranker concurrency.
 # 3: runs bind the evaluated population (scored rows and their pinned evidence), not only the dataset bytes.
-EVAL_VERSION = "retrieval-eval-3"
+# 4: runs require an index matching the current analyzer/query policy and its frozen metadata snapshot.
+EVAL_VERSION = "retrieval-eval-4"
 RANK_DEPTH = 20
 CRITICAL_CODE_TYPES = {"repeated_code", "requirement_detail"}
 CRITICAL_EVIDENCE_TYPES = {"numeric_qualifier"}  # an amount/date/VAT condition must reach the packed context
@@ -603,6 +604,10 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
         index = KeywordIndex.load(settings, index_version)
     except RetrievalError as exc:
         raise EvaluationError(str(exc)) from None
+    from .retrieval import index_compatibility
+
+    if index_compatibility(index, analyzer):
+        raise EvaluationError(index_compatibility(index, analyzer))
     dense, dense_error = None, None
     if any(x in ("D", "H") for x in labels):
         version = _ready_dense_for(settings, index.version)
@@ -727,6 +732,10 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
     with open_db(settings.db_path) as conn:
         index_version = index_version or get_app_setting(conn, "active_index")
     index = KeywordIndex.load(settings, index_version)
+    from .retrieval import index_compatibility
+
+    if index_compatibility(index, analyzer):
+        raise EvaluationError(index_compatibility(index, analyzer))
     # A newer H over another population (e.g. before a source revision was reverted) must not shadow the one
     # matching today's population.
     h_run = _latest_run(settings, "H", dataset_sha, index.version, population_identity(rows, skipped))
@@ -885,6 +894,10 @@ def run_errors(settings: Settings, run_id: str) -> list[str]:
         index = KeywordIndex.load(settings, config["index_version"])
         if index.manifest_hash != config["index_manifest_hash"]:
             errors.append("keyword index manifest changed since the run")
+        from .retrieval import index_compatibility
+
+        if index_compatibility(index):
+            errors.append(index_compatibility(index))
     except RetrievalError as exc:
         errors.append(f"keyword index not ready: {exc}")
         index = None

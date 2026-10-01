@@ -307,6 +307,11 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
                        query_vector=qvec, reranker=res.reranker() if cfg["mode"] == "hybrid_rerank" else None,
                        rerank_depth=(cfg.get("reranker") or {}).get("depth"))
     result.query_embedding = qinfo
+    from .retrieval import index_compatibility
+
+    outdated = index_compatibility(idx, res.analyzer)
+    if outdated:  # still served (search must keep working) but never silently: rebuild and re-evaluate
+        result.limitations.append(f"index_outdated:{outdated}")
     wanted = {"dense"} | ({"reranker"} if cfg["mode"] == "hybrid_rerank" else set())
     if cfg["mode"] in DENSE_MODES:
         result.limitations += [f"{stage}_unavailable" for stage in res.stage_errors if stage in wanted]

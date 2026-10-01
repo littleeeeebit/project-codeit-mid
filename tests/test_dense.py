@@ -729,6 +729,54 @@ class PopulationAndGateTest(unittest.TestCase):
         self.assertFalse(g["frozen K0/K1 comparison under the current policy"])
 
 
+
+class IndexUpgradeTest(unittest.TestCase):
+    """An index and runs recorded under an earlier query policy must be rebuilt, not silently reused."""
+
+    def test_runs_on_an_index_from_an_earlier_query_policy_require_a_rebuild(self):
+        from rfp_assistant import retrieval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with unittest.mock.patch.object(retrieval, "QUERY_POLICY", "scope-redundant-1"):
+                env = fixtures.make_env(Path(tmp))  # keyword index built under the earlier policy
+                transport = generation.FakeTransport()
+                _plan_and_build(env, transport)
+                _dataset(env)
+                s = env.settings
+                old = {o["label"]: o for o in evaluation.evaluate_retrieval(
+                    s, fixtures.analyzer(), transport, "dev-pilot", ["K1"])}["K1"]
+            old_index = _index_version(s)
+            with self.assertRaises(evaluation.EvaluationError) as ctx:  # no silent reuse of the old frozen run
+                evaluation.evaluate_retrieval(s, fixtures.analyzer(), transport, "dev-pilot", ["K1"],
+                                              index_version=old_index)
+            self.assertIn("rebuild it with build-keyword", str(ctx.exception))
+            self.assertTrue(any("rebuild" in e for e in evaluation.run_errors(s, old["run_id"])))
+            decision = Path(tmp) / "decision.json"
+            decision.write_text(json.dumps({"run_id": old["run_id"], "mode": "kiwi_bm25", "decided_by": "owner",
+                                            "rationale": "old"}), encoding="utf-8")
+            with self.assertRaises(evaluation.EvaluationError):
+                evaluation.activate_run(s, old["run_id"], decision)
+            res = service.Resources(s, transport=transport)
+            try:
+                r = service.retrieve(res, env.consultant, "하자보수 기간", [env.refs["기관A"]])
+            finally:
+                res.close()
+            self.assertTrue(any(x.startswith("index_outdated:") for x in r.limitations))  # served, but flagged
+            rebuilt = build_keyword_index(s, fixtures.analyzer(), activate=False)["index_version"]
+            self.assertNotEqual(rebuilt, old_index)
+            self.assertTrue((s.data_dir / "indexes" / old_index / "manifest.json").exists())  # kept for citations
+            self.assertEqual(dense.plan_embeddings(s, rebuilt)["payloads_to_embed"], 0)  # vectors are reused
+            new = {o["label"]: o for o in evaluation.evaluate_retrieval(
+                s, fixtures.analyzer(), transport, "dev-pilot", ["K1"], index_version=rebuilt)}["K1"]
+            self.assertEqual(evaluation.run_errors(s, new["run_id"]), [])
+
+    def test_an_index_without_the_metadata_snapshot_is_incompatible(self):
+        from rfp_assistant import retrieval
+
+        index = KeywordIndex("legacy", "reviewed_only", [], None, {}, {}, has_metadata_snapshot=False)
+        self.assertIn("predates the frozen title/institution snapshot", retrieval.index_compatibility(index))
+
+
 class ServingTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

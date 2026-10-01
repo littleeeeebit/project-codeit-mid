@@ -31,7 +31,8 @@ USER_WORDS = ["제안요청서", "요구사항", "하자보수", "하자담보",
 BM25_TOP_K = 20
 # Spelling variants observed in this corpus, applied to the analysis copy of both indexed and query text (never to
 # stored evidence). Extend only from an observed retrieval failure with a fixture.
-SPACING_ALIASES = {"지체 상금": "지체상금", "사업 비": "사업비", "계약 보증금": "계약보증금", "하자 보수": "하자보수"}
+SPACING_ALIASES = {"지체 상금": "지체상금", "사업 비": "사업비", "계약 보증금": "계약보증금", "하자 보수": "하자보수",
+                   "부가세": "부가가치세"}  # last: abbreviation observed in dp-020 (rank 7 -> 1 when expanded)
 HANGUL_SYLLABLE = re.compile(r"^[가-힣]$")
 PLAIN_HANGUL_WORD = re.compile(r"^[가-힣]+$")
 LETTER_SPACED_MAX = 6
@@ -96,9 +97,13 @@ class Analyzer:
         return out
 
 
-def analyzer_fingerprint(analyzer: Analyzer) -> str:
-    info = {"analyzer": analyzer.version, "words": USER_WORDS, "tags": sorted(KEEP_TAGS),
-            "aliases": SPACING_ALIASES, "letter_spaced_max": LETTER_SPACED_MAX, "query_policy": QUERY_POLICY}
+def analyzer_fingerprint(analyzer: Analyzer | None = None) -> str:
+    """Analyzer version, dictionary, tags and query policy. Without an instance it describes the current code."""
+    version = analyzer.version if analyzer is not None else \
+        f"{ANALYZER_VERSION}:kiwipiepy-{metadata.version('kiwipiepy')}"
+    info = {"analyzer": version, "words": USER_WORDS, "tags": sorted(KEEP_TAGS),
+            "aliases": SPACING_ALIASES, "letter_spaced_max": LETTER_SPACED_MAX, "query_policy": QUERY_POLICY,
+            "scope_min_rows": SCOPE_MIN_ROWS, "metadata_restatement_min": METADATA_RESTATEMENT_MIN}
     return hashlib.sha256(json.dumps(info, sort_keys=True).encode()).hexdigest()[:16]
 
 
@@ -231,6 +236,8 @@ class KeywordIndex:
     profile: str = "structural"
     manifest_hash: str = ""
     scope_terms: dict = field(default_factory=dict)  # doc_id -> title/institution terms frozen at build
+    analyzer_fp: str | None = None  # analyzer fingerprint the index tokens were built with
+    has_metadata_snapshot: bool = True
     _extra_bm25: dict = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
@@ -275,7 +282,8 @@ class KeywordIndex:
             else {}
         return cls(version, manifest["config"]["review_scope"], chunks,
                    BM25Okapi([t["tokens"] or ["∅"] for t in tokens]), rows, elements,
-                   manifest["config"].get("profile", "structural"), row["manifest_hash"], scope_terms)
+                   manifest["config"].get("profile", "structural"), row["manifest_hash"], scope_terms,
+                   manifest["config"].get("analyzer"), "metadata_terms" in manifest["config"])
 
 
 # ---------------------------------------------------------------- retrieval
@@ -318,13 +326,28 @@ def _overlaps(a: dict, b: dict) -> bool:
     return False
 
 
+def index_compatibility(index: KeywordIndex, analyzer=None) -> str | None:
+    """Why this index cannot reproduce the current query policy, or None. An index built by another analyzer or
+    query policy, or before title/institution terms were frozen into it, would be queried with different
+    inputs than it was built (and measured) with."""
+    if not index.has_metadata_snapshot:
+        return (f"keyword index {index.version} predates the frozen title/institution snapshot; rebuild it with "
+                "build-keyword (cached embeddings are reused)")
+    if index.analyzer_fp is not None and index.analyzer_fp != analyzer_fingerprint(analyzer):
+        return (f"keyword index {index.version} was built with analyzer/query policy {index.analyzer_fp}, not the "
+                f"current {analyzer_fingerprint(analyzer)}; rebuild it with build-keyword (cached embeddings are "
+                "reused)")
+    return None
+
+
 def scope_rows(index: KeywordIndex, scope: list[tuple[DocRef, str]]) -> list[int]:
     """Index rows the selected scope admits. Callers check this before paying for a query embedding."""
     return [i for extraction_id in dict.fromkeys(x for _, x in scope)
             for i in index.rows_by_extraction.get(extraction_id, [])]
 
 
-QUERY_POLICY = "scope-redundant-1"
+# 2: dropping only while a kept term still matches the scope; title/institution terms frozen into the index.
+QUERY_POLICY = "scope-redundant-2"
 SCOPE_MIN_ROWS = 8  # below this a scope-local frequency says nothing
 METADATA_RESTATEMENT_MIN = 2  # a question restating the selected project name repeats at least two of its terms
 
