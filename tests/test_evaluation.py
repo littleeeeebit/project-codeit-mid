@@ -52,7 +52,8 @@ class MetricFixtureTest(unittest.TestCase):
         ranking = [chunk("amount", 0, 30), chunk("alt", 0, 20)]
         m = evaluation.score_row(row, ranking, ranking, ELS)
         self.assertEqual((m["units"], m["recall@20"], m["hit@20"]), (1, 1.0, 1))
-        self.assertEqual(m["graded@5"], [2, 0])  # the second alternative earns nothing more
+        # another alternative of a credited fact is a different passage: it keeps its rank and earns nothing
+        self.assertEqual((m["graded@5"], m["duplicates_removed"]), ([2, 0], 0))
 
     def test_amount_without_vat_note_is_incomplete(self):
         row = gold_row([AMOUNT_G, VAT_G])
@@ -148,9 +149,29 @@ class MetricFixtureTest(unittest.TestCase):
         a = evaluation.score_row(row, [chunk("amount", 0, 30), chunk("amount", 5, 30)], [], ELS)
         b = evaluation.score_row(row, [chunk("amount", 0, 30)], [], ELS)
         c = evaluation.score_row(row, [chunk("amount", 3, 40)], [], ELS)  # another chunking of the same span
-        self.assertEqual(a["graded@5"], [2, 0])
+        self.assertEqual((a["graded@5"], a["duplicates_removed"]), ([2], 1))
         self.assertEqual((a["recall@20"], a["ndcg@5"]), (b["recall@20"], b["ndcg@5"]))
         self.assertEqual((b["recall@20"], b["ndcg@5"]), (c["recall@20"], c["ndcg@5"]))
+
+    def test_repeated_spans_do_not_consume_rank_positions(self):
+        """Review round 4 (F7): overlapping repeats of a credited span are removed before rank cutoffs, so they
+        neither push a second group down nor out of the top five; an unrelated chunk still costs its position."""
+        row = gold_row([AMOUNT_G, VAT_G])
+        clean = evaluation.score_row(row, [chunk("amount", 0, 30), chunk("vat", 0, 8)], [], ELS)
+        interleaved = evaluation.score_row(row, [chunk("amount", 0, 30), chunk("amount", 5, 30),
+                                                 chunk("vat", 0, 8)], [], ELS)
+        crossing = evaluation.score_row(row, [chunk("amount", 0, 30)] + [chunk("amount", i, 30) for i in range(1, 5)]
+                                        + [chunk("vat", 0, 8)], [], ELS)
+        for m in (interleaved, crossing):
+            self.assertEqual((m["ndcg@5"], m["graded@5"], m["recall@20"], m["mrr"]),
+                             (clean["ndcg@5"], clean["graded@5"], clean["recall@20"], clean["mrr"]))
+        self.assertEqual((interleaved["duplicates_removed"], crossing["duplicates_removed"]), (1, 4))
+        miss = evaluation.score_row(row, [chunk("amount", 0, 30), chunk("alt", 0, 5), chunk("vat", 0, 8)], [], ELS)
+        self.assertEqual((miss["graded@5"], miss["duplicates_removed"]), ([2, 0, 1], 0))
+        self.assertLess(miss["ndcg@5"], clean["ndcg@5"])
+        # packed figures stay faithful to what was packed, repeats included
+        packed = evaluation.score_row(row, [], [chunk("amount", 0, 30), chunk("amount", 5, 30)], ELS)
+        self.assertEqual((packed["packed_grades"], packed["packed_complete"]), ([2, 0], 0))
 
     def test_ndcg_matches_the_hand_calculation_and_mrr(self):
         import math
@@ -394,6 +415,7 @@ class GoldRetrievalTest(Phase4Case):
         self.assertTrue(evaluation.validate_gold(self.s, "dev")["ok"])
         (k1,) = evaluation.evaluate_retrieval(self.s, fixtures.analyzer(), None, "dev", ["K1"])
         config, scores = evaluation.load_run(self.s, k1["run_id"])
+        self.assertEqual(config["ranking_policy"], evaluation.GOLD_RANKING_POLICY)  # gold-2 ranking is deduplicated
         agg = scores["aggregate"]
         self.assertEqual(agg["passage_rows"], 4)
         self.assertEqual(agg["ndcg_eligible_rows"], 3)  # the comparison has no single ranking

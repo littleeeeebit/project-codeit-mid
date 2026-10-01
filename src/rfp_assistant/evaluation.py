@@ -210,6 +210,8 @@ def validate_gold(settings: Settings, name: str) -> dict:
 # 3: runs bind the evaluated population (scored rows and their pinned evidence), not only the dataset bytes.
 # 4: runs require an index matching the current analyzer/query policy and its frozen metadata snapshot.
 EVAL_VERSION = "retrieval-eval-4"
+# Gold-2 runs record their ranking policy, so a run scored before span deduplication is never reused.
+GOLD_RANKING_POLICY = "gold2-dedup-spans-1"
 RANK_DEPTH = 20
 CRITICAL_CODE_TYPES = {"repeated_code", "requirement_detail", "exact_identifier"}
 CRITICAL_EVIDENCE_TYPES = {"numeric_qualifier"}  # an amount/date/VAT condition must reach the packed context
@@ -501,12 +503,42 @@ def group_grade(chunk: dict, group: dict, elements: dict) -> int:
                default=0)
 
 
+def dedup_ranking(ranking: list[dict], groups: list[dict], elements: dict) -> tuple[list[dict], int]:
+    """Canonical ranking for gold-2 ranked metrics: a chunk that only repeats a source span already credited
+    higher up (an overlapping passage over the same alternative, at no higher grade) is removed before rank
+    positions and cutoffs apply. A chunk supporting nothing stays as a rank-consuming zero; a chunk adding support
+    (a new group or a fuller span) stays; and so does a chunk carrying another alternative of a credited fact,
+    which is a different passage, not a repeat (it grades 0). Returns the ranking and the number removed."""
+    seen: dict[tuple[int, int], int] = {}
+    credited = [0] * len(groups)
+    out, removed = [], 0
+    for chunk in ranking:
+        alt = {(j, i): grade(chunk, a, elements.get((a["extraction_id"], a["element_id"])))
+               for j, g in enumerate(groups) for i, a in enumerate(g["alternatives"])}
+        hits = {k: v for k, v in alt.items() if v}
+        best = [max((v for (j, _), v in hits.items() if j == n), default=0) for n in range(len(groups))]
+        if hits and all(v <= seen.get(k, 0) for k, v in hits.items()) \
+                and not any(b > c for b, c in zip(best, credited)):
+            removed += 1
+            continue
+        for k, v in hits.items():
+            seen[k] = max(seen.get(k, 0), v)
+        credited = [max(b, c) for b, c in zip(best, credited)]
+        out.append(chunk)
+    return out, removed
+
+
 def score_row(row: dict, ranking: list[dict], packed: list[dict], elements: dict,
               groups: list[dict] | None = None) -> dict:
     """Ranked metrics for one passage row. Each required evidence group is credited once, at the first rank where
     it reaches its grade: overlapping chunks repeating one fact earn nothing more. Ideal DCG places one complete
-    group per rank (capped at 1 when a single chunk carries several groups)."""
+    group per rank (capped at 1 when a single chunk carries several groups). Gold-2 rows are ranked after
+    `dedup_ranking`, so repeats do not consume positions; pilot rows keep the phase-2 raw ranking so frozen
+    `retrieval-eval-4` runs stay comparable. Packed-context figures always use what was actually packed."""
     units = groups if groups is not None else row_groups(row)
+    removed = None
+    if is_gold_row(row):
+        ranking, removed = dedup_ranking(ranking, units, elements)
     credited = [0] * len(units)
     dcg, first_full = 0.0, None
     for rank, chunk in enumerate(ranking[:RANK_DEPTH], start=1):
@@ -536,7 +568,7 @@ def score_row(row: dict, ranking: list[dict], packed: list[dict], elements: dict
         "unit_grades@20": top20,
         "missing_units": [u["group_id"] for u, g in zip(units, top20) if g < 2],
         "packed_grades": packed_grades,
-    } | (_gold_ndcg(ranking, units, elements) if is_gold_row(row) else {})
+    } | ({"duplicates_removed": removed} if removed is not None else {}) | (_gold_ndcg(ranking, units, elements) if is_gold_row(row) else {})
 
 
 def _gold_ndcg(ranking: list[dict], groups: list[dict], elements: dict) -> dict:
@@ -859,7 +891,9 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
     summaries = []
     for label in labels:
         config = _frozen_config(settings, label, dataset, dataset_sha, index, dense, analyzer,
-                                population=(population_identity(rows, skipped), len(rows)))
+                                population=(population_identity(rows, skipped), len(rows)),
+                                extra={"ranking_policy": GOLD_RANKING_POLICY}
+                                if any(is_gold_row(r) for r in rows) else None)
         run_id = f"{label}-{hashlib.sha256(dumps(config).encode()).hexdigest()[:10]}"
         d = _run_dir(settings, run_id)
         if (d / "scores.json").exists() and not force:
