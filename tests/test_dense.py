@@ -189,7 +189,7 @@ def _dataset(env) -> list[dict]:
 class FakeReranker:
     """Promotes chunks mentioning 하자보수, and takes measurable but small time."""
 
-    info = {"model": "fake-reranker", "revision": "0" * 40, "device": "cpu", "max_length": 512}
+    info = {"model": "fake-reranker", "revision": "0" * 40, "device": "cpu", "max_length": 512, "max_concurrency": 1}
 
     def rerank(self, question, chunks):
         scores = [float("하자보수" in c["payload"]) for c in chunks]
@@ -198,7 +198,7 @@ class FakeReranker:
 
 
 class IdentityReranker:
-    info = {"model": "identity", "revision": "1" * 40, "device": "cpu", "max_length": 512}
+    info = {"model": "identity", "revision": "1" * 40, "device": "cpu", "max_length": 512, "max_concurrency": 1}
 
     def rerank(self, question, chunks):
         return [(i, float(-i)) for i in range(len(chunks))], {"truncated": 0}
@@ -289,6 +289,75 @@ class EvaluationRunTest(unittest.TestCase):
         flagged = {"id": "c", "type": "condition", "critical": True, "metrics": {"packed_complete": 0}}
         self.assertEqual(evaluation.critical_failures([lost, flagged]), ["c", "n"])
         self.assertEqual(evaluation.critical_failures([kept]), [])
+
+    def _trial(self, concurrency: int) -> str:
+        info = {**IdentityReranker.info, "max_concurrency": concurrency}
+        report = evaluation.trial_reranker(self.env.settings, fixtures.analyzer(), "dev-pilot", [20],
+                                           reranker=IdentityReranker(), load_info=info, users=2)
+        return report["depths"][20]["run_id"]
+
+    def _force_gate(self, run_id: str, eval_version: str | None = None) -> None:
+        """Stand-in for a passing trial (the tiny fixture cannot improve nDCG@5 by 0.03)."""
+        d = self.env.settings.data_dir / "runs" / run_id
+        scores = json.loads((d / "scores.json").read_text(encoding="utf-8"))
+        scores["gate"]["passed"] = True
+        (d / "scores.json").write_text(json.dumps(scores, ensure_ascii=False), encoding="utf-8")
+        if eval_version is not None:
+            config = json.loads((d / "config.json").read_text(encoding="utf-8"))
+            config["eval_version"] = eval_version
+            (d / "config.json").write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
+
+    def test_a_gate_recorded_under_an_older_policy_cannot_be_activated_or_served(self):
+        s = self.env.settings
+        evaluation.evaluate_retrieval(s, fixtures.analyzer(), self.transport, "dev-pilot", ["H"],
+                                      allow_paid_queries=True)
+        legacy, current = self._trial(1), None
+        self._force_gate(legacy, "retrieval-eval-1")
+        decision = Path(self.tmp.name) / "decision.json"
+        decision.write_text(json.dumps({"run_id": legacy, "mode": "hybrid_rerank", "decided_by": "owner",
+                                        "rationale": "old pass"}), encoding="utf-8")
+        with self.assertRaises(evaluation.EvaluationError) as ctx:
+            evaluation.activate_run(s, legacy, decision)
+        self.assertIn("evaluation policy", str(ctx.exception))
+        current = self._trial(2)
+        self._force_gate(current)
+        decision.write_text(json.dumps({"run_id": current, "mode": "hybrid_rerank", "decided_by": "owner",
+                                        "rationale": "current pass"}), encoding="utf-8")
+        active = evaluation.activate_run(s, current, decision)
+        self.assertEqual((active["mode"], active["reranker"]["max_concurrency"]), ("hybrid_rerank", 2))
+        # an HR selection made under a superseded policy keeps hybrid retrieval but stops reranking
+        with store.open_db(s.db_path) as conn, store.tx(conn, immediate=True):
+            store.set_app_setting(conn, "active_run", json.dumps({**active, "eval_version": "retrieval-eval-1"}))
+        res = service.Resources(s, transport=self.transport)
+        try:
+            served = res.serving()
+        finally:
+            res.close()
+        self.assertEqual((served["mode"], served["reranker"], served["stale_policy"]),
+                         ("hybrid", None, "retrieval-eval-1"))
+
+    def test_the_measured_reranker_concurrency_is_frozen_and_served(self):
+        s = self.env.settings
+        evaluation.evaluate_retrieval(s, fixtures.analyzer(), self.transport, "dev-pilot", ["H"],
+                                      allow_paid_queries=True)
+        one, two = self._trial(1), self._trial(2)
+        self.assertNotEqual(one, two)  # the bound is part of the run identity
+        self.assertEqual(evaluation.load_run(s, one)[0]["reranker"]["max_concurrency"], 1)
+        self._force_gate(one)
+        decision = Path(self.tmp.name) / "decision.json"
+        decision.write_text(json.dumps({"run_id": one, "mode": "hybrid_rerank", "decided_by": "owner",
+                                        "rationale": "test"}), encoding="utf-8")
+        evaluation.activate_run(s, one, decision)
+        seen = []
+        res = service.Resources(s.with_(reranker_max_concurrency=6), transport=self.transport)
+        try:
+            with unittest.mock.patch.object(dense, "load_reranker",
+                                            side_effect=lambda st: seen.append(st) or (IdentityReranker(), {})):
+                self.assertIsNotNone(res.reranker())
+            self.assertEqual(res.run_settings().reranker_max_concurrency, 1)
+        finally:
+            res.close()
+        self.assertEqual([(x.reranker_max_concurrency, x.reranker_max_length) for x in seen], [(1, 512)])
 
     def test_missing_query_usage_stops_paid_evaluation_queries(self):
         no_usage = generation.FakeTransport(embedder=lambda inputs, dims: generation.EmbeddingResponse(

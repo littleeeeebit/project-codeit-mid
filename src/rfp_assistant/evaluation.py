@@ -181,7 +181,10 @@ def validate_gold(settings: Settings, name: str) -> dict:
 
 # ================================================================ phase 2: frozen retrieval comparison
 
-EVAL_VERSION = "retrieval-eval-1"
+# Scoring and promotion policy. Bump whenever grading, critical checks or the HR gate change: runs and gates
+# recorded under another version are history, not evidence, and are neither compared against nor activated.
+# 2: row-fragment grading, numeric/qualifier critical failures, trial frozen to H, recorded reranker concurrency.
+EVAL_VERSION = "retrieval-eval-2"
 RANK_DEPTH = 20
 CRITICAL_CODE_TYPES = {"repeated_code", "requirement_detail"}
 CRITICAL_EVIDENCE_TYPES = {"numeric_qualifier"}  # an amount/date/VAT condition must reach the packed context
@@ -666,7 +669,8 @@ def _latest_run(settings: Settings, label: str, dataset_sha: str, index_version:
             config, scores = load_run(settings, d.name)
         except (EvaluationError, json.JSONDecodeError):
             continue
-        if (config["dataset_sha256"] == dataset_sha and config["index_version"] == index_version
+        if (config.get("eval_version") == EVAL_VERSION and config["dataset_sha256"] == dataset_sha
+                and config["index_version"] == index_version
                 and scores.get("status") == "complete"):
             found.append((scores.get("created_at", ""), d.name))
     return max(found)[1] if found else None
@@ -760,7 +764,9 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
                 "pilot_rows": agg["passage_rows"],
                 "note": "pilot-sized sample: review a marginal gain on the larger dev set before final release"}
         config = {**h_config, "label": "HR", "mode": "hybrid_rerank", "h_run": h_run,
-                  "reranker": {k: load_info.get(k) for k in ("model", "revision", "device", "max_length")},
+                  "eval_version": EVAL_VERSION,
+                  "reranker": {k: load_info.get(k) for k in ("model", "revision", "device", "max_length",
+                                                              "max_concurrency")},
                   "rerank_depth": depth}
         run_id = f"HR-{hashlib.sha256(dumps(config).encode()).hexdigest()[:10]}"
         scores = {"status": "complete", "aggregate": agg, "gate": gate, "created_at": utcnow(),
@@ -798,8 +804,13 @@ def activate_run(settings: Settings, run_id: str, decision_path: Path, actor: st
             errors.append(f"decision requires {key!r}")
     if scores.get("status") != "complete":
         errors.append("the run is not complete")
+    if config.get("eval_version") != EVAL_VERSION:
+        errors.append(f"the run was scored under evaluation policy {config.get('eval_version')!r}, not "
+                      f"{EVAL_VERSION!r}; rerun the comparison (and the reranker trial) — cached vectors are reused")
     if config["mode"] == "hybrid_rerank" and not (scores.get("gate") or {}).get("passed"):
         errors.append("the reranker did not pass its promotion gate; keep the bypass")
+    if config["mode"] == "hybrid_rerank" and not (config.get("reranker") or {}).get("max_concurrency"):
+        errors.append("the trial recorded no reranker concurrency bound; rerun trial-reranker")
     try:
         index = KeywordIndex.load(settings, config["index_version"])
         if index.manifest_hash != config["index_manifest_hash"]:
@@ -818,6 +829,7 @@ def activate_run(settings: Settings, run_id: str, decision_path: Path, actor: st
               "index_version": config["index_version"], "dense_version": config.get("dense_version"),
               "reranker": {**config["reranker"], "depth": config["rerank_depth"]} if config.get("reranker") else None,
               "embedding": config.get("embedding"), "limits": config.get("limits"),
+              "eval_version": config["eval_version"],
               "fallback_mode": "kiwi_bm25", "finalist_run_id": decision.get("finalist_run_id"),
               "activated_at": utcnow()}
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):

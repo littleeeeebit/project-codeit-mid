@@ -23,6 +23,7 @@ from .contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, Evi
 from .ingestion import CODE_RE, QUARANTINE_TEXT, nfc, printed_pdf_path, record_review, resolutions_by_doc
 from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extraction, scope_rows
 from .retrieval import retrieve as _retrieve
+from .evaluation import EVAL_VERSION
 from .settings import Settings, read_api_key
 from .store import LockHeld, ProcessLock, dumps, init_schema, open_db, tx, utcnow
 
@@ -78,7 +79,12 @@ class Resources:
             run = get_app_setting(conn, "active_run")
             active = get_app_setting(conn, "active_index")
         if run:
-            return json.loads(run)
+            cfg = json.loads(run)
+            if cfg["mode"] == "hybrid_rerank" and cfg.get("eval_version") != EVAL_VERSION:
+                # Promoted under a superseded gate: keep hybrid retrieval, drop the reranker until a current
+                # trial passes and is activated.
+                cfg = {**cfg, "mode": "hybrid", "reranker": None, "stale_policy": cfg.get("eval_version")}
+            return cfg
         return {"run_id": None, "mode": self.settings.retrieval_mode, "index_version": active,
                 "dense_version": None, "reranker": None, "fallback_mode": "kiwi_bm25"}
 
@@ -92,6 +98,8 @@ class Resources:
         rr = cfg.get("reranker") or {}
         if rr.get("max_length"):
             changes["reranker_max_length"] = rr["max_length"]
+        if rr.get("max_concurrency"):  # the bound the six-user latency gate was measured with
+            changes["reranker_max_concurrency"] = rr["max_concurrency"]
         known = set(Settings.__dataclass_fields__)
         return self.settings.with_(**{k: v for k, v in changes.items() if k in known})
 
