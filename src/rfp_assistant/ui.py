@@ -365,6 +365,7 @@ def _set_current(st, current: dict | None) -> None:
 
 
 def _answer_area(st, res, principal) -> None:
+    st.session_state.pop("shown_request", None)
     stale = st.session_state.pop("pending_abandon", None)
     if stale:
         try:
@@ -400,6 +401,7 @@ def _answer_area(st, res, principal) -> None:
             st.caption("이 요청은 현재 선택과 다른 질문이어서 표시하지 않습니다. '내 최근 요청'에서 볼 수 있습니다.")
             return
         st.divider()
+        st.session_state["shown_request"] = v.request_id  # its evidence opens in this panel, not in the history
         render_result(st, res, principal, v)
 
     _panel()
@@ -441,8 +443,9 @@ def render_answer(st, res, principal, r, v=None, ns: str = "cur") -> None:
         st.markdown(f"**{i}. [{kind}]** {plain(claim['text'])}" + (f"  \n{plain(doc)}" if doc else ""))
         buttons = st.columns(max(1, len(claim["evidence_ids"])))
         for col, eid in zip(buttons, claim["evidence_ids"]):
-            if eid in r.evidence and col.button(f"근거 {eid}", key=f"ev-{ns}-{r.request_id}-{i}-{eid}"):
-                st.session_state["evidence_open"] = (r.request_id, eid)
+            if eid in r.evidence:  # a callback runs before the rerun, so every panel renders the choice at once
+                col.button(f"근거 {eid}", key=f"ev-{ns}-{r.request_id}-{i}-{eid}", on_click=_open_evidence,
+                           args=(st, r.request_id, eid))
     if r.missing_fields:
         st.markdown("**확인되지 않은 정보**")
         for m in r.missing_fields:
@@ -459,6 +462,10 @@ def render_answer(st, res, principal, r, v=None, ns: str = "cur") -> None:
                                                      else ""))
         st.caption(f"요청 {r.request_id[:8]} · {REQUEST_TEXT.get(v.status, v.status)} · "
                    f"{BILLING_TEXT.get(v.billing_state, v.billing_state)} · {cost}")
+
+
+def _open_evidence(st, request_id: str, evidence_id: str) -> None:
+    st.session_state["evidence_open"] = (request_id, evidence_id)
 
 
 def _doc_label(r, doc_id: str) -> str:
@@ -490,16 +497,19 @@ def _render_inventory(st, r, ns: str = "cur") -> None:
     rows = [{"근거": i["evidence_id"], "코드": i["source_form"], "구분": "상세" if i["kind"] == "detail" else "요약",
              "이름": i["name"] or "", "위치": location_text(i["location"]) if i["location"] else ""}
             for i in inv["items"]]
-    event = st.dataframe(rows, hide_index=True, width="stretch", on_select="rerun", selection_mode="single-row",
-                         key=f"inv-{ns}-{r.request_id}")
-    picked = event.selection.rows if event and event.selection else []
-    if picked:
-        st.session_state["evidence_open"] = (r.request_id, rows[picked[0]]["근거"])
+    key = f"inv-{ns}-{r.request_id}"
+
+    def picked():
+        chosen = st.session_state[key].selection.rows
+        if chosen:
+            _open_evidence(st, r.request_id, rows[chosen[0]]["근거"])
+
+    st.dataframe(rows, hide_index=True, width="stretch", on_select=picked, selection_mode="single-row", key=key)
     if inv["repeated_detail_codes"]:
         st.caption("같은 코드의 상세 행이 여러 번 나옵니다: " + plain(", ".join(inv["repeated_detail_codes"])))
 
 
-def _evidence_panel(st, res, principal, r) -> None:
+def _evidence_panel(st, res, principal, r, ns: str = "cur") -> None:
     opened = st.session_state.get("evidence_open")
     if not opened or opened[0] != r.request_id:
         if r.evidence:
@@ -522,7 +532,7 @@ def _evidence_panel(st, res, principal, r) -> None:
             try:
                 dl = service.original_download(res, principal, view.doc_id, view.source_hash)
                 st.download_button("이 근거의 원문 파일 받기", dl.data, file_name=dl.filename, mime=dl.mime,
-                                   key=f"evdl-{r.request_id}-{view.evidence_id}")
+                                   key=f"evdl-{ns}-{r.request_id}-{view.evidence_id}")
             except (service.ServiceError, auth.AuthError) as exc:
                 st.caption(plain(str(exc)))
 
@@ -555,6 +565,8 @@ def _history(st, res, principal) -> None:
                     + f" · 기준일 {v.as_of} · 방식 {v.mode}")
             if v.result is not None:
                 render_answer(st, res, principal, v.result, v, ns="hist")
+                if st.session_state.get("shown_request") != v.request_id:  # not already open above
+                    _evidence_panel(st, res, principal, v.result, ns="hist")
                 st.download_button("요청 기록 내보내기(JSON)", json.dumps(
                     service.export_request(res, principal, v.request_id), ensure_ascii=False, indent=1),
                     file_name=f"request-{v.request_id[:8]}.json", mime="application/json",
@@ -603,7 +615,10 @@ def _trace_tab(st, res, principal) -> None:
     serving = res.serving()
     modes = list(dict.fromkeys([serving["mode"], "kiwi_bm25", "whitespace_bm25", "dense", "hybrid", "hybrid_rerank"]))
     mode = c1.selectbox("검색 방식", modes, format_func=lambda m: MODE_TEXT.get(m, m), key="vmode")
-    units = c2.number_input("근거 최대 개수", 1, res.settings.evidence_max_units, res.settings.evidence_max_units)
+    pair = len(docs) == 2  # a balanced comparison needs one unit per document
+    units = c2.number_input("근거 최대 개수", 2 if pair else 1, res.settings.evidence_max_units,
+                            res.settings.evidence_max_units,
+                            help="두 문서 비교는 문서마다 1개 이상이 필요해 최소 2개입니다." if pair else None)
     target = c3.number_input("근거 목표 토큰", 200, res.settings.evidence_max_tokens,
                              res.settings.evidence_target_tokens, step=100)
     limits = {}
@@ -639,8 +654,9 @@ def _render_run(st, res, principal, t: dict) -> None:
                + plain(" ".join(t["query_tokens"])) + (f" · 코드 {', '.join(t['codes'])}" if t["codes"] else ""))
     st.caption(f"3. 채널 순위 · 요청 모드 {t['config']['mode']} → 실제 {r['mode']} · 대체 {r.get('fallback') or '없음'} · "
                f"질의 벡터 {qe.get('cache', '-')}"
-               + (f" (캐시 없음: 유료 요청이면 {usd(t.get('query_embedding_estimate_micro_usd'))})"
-                  if qe.get("cache") == "miss" else ""))
+               + (f" (캐시 없음 → 대체 검색으로 고정. 일반 질문이면 질의 임베딩 "
+                  f"{usd(t.get('query_embedding_estimate_micro_usd'))}가 추가되지만, 아래 생성은 이 고정 근거를 쓰므로 "
+                  "임베딩을 하지 않습니다)" if qe.get("cache") == "miss" else ""))
     st.caption("점수는 각 채널 내부 순위용 값이며 답변 신뢰도가 아닙니다.")
     st.dataframe(r["candidates"], hide_index=True, width="stretch")
     st.caption(f"4. 선택된 근거 {len(r['evidence'])}개 · 근거 토큰 {r['evidence_tokens']} · 최종 입력 추정 "
@@ -674,9 +690,9 @@ def _render_run(st, res, principal, t: dict) -> None:
         except service.ServiceError as exc:
             st.warning(str(exc))
             return
-    st.caption(f"생성은 이 실행의 설정 {t['config']['config_id']}(검색 {t['config']['mode']}, 한도 "
-               f"{plain(json.dumps(t['config']['limits'], ensure_ascii=False))})과 기준일 {t.get('as_of') or '-'}로 "
-               "다시 검색해 실행합니다.")
+    st.caption(f"생성은 다시 검색하지 않고 위 4단계의 고정 근거 {len(r['evidence'])}개와 기준일 "
+               f"{t.get('as_of') or '-'}로 실행합니다(설정 {t['config']['config_id']}). 예약은 아래 최대 예상 비용을 "
+               "넘지 않으며, 넘게 되면 호출 없이 거절됩니다.")
     agree = st.checkbox(f"이 범위로 유료 답변 생성을 1회 실행합니다 (최대 예상 {usd(est)})", key=f"vagree-{t['run_id']}")
     if st.button("유료 답변 생성", disabled=not agree, key=f"vbtn-{t['run_id']}") and gen_key not in st.session_state:
         scope = [DocRef(s["doc_id"], s["source_hash"]) for s in t["scope"]]
@@ -684,7 +700,7 @@ def _render_run(st, res, principal, t: dict) -> None:
             st.session_state[gen_key] = service.submit_answer(res, principal, AnswerRequest(
                 idempotency_key=gen_key, generation_id=gen_key, question=t["question"], scope=scope,
                 mode="compare" if len(scope) == 2 else "single", as_of=t.get("as_of") or date.today().isoformat(),
-                config_id=t["config"]["config_id"]))
+                config_id=t["config"]["config_id"], verifier_run_id=t["run_id"]))
         except (service.ServiceError, auth.AuthError) as exc:
             st.error(str(exc))
     if gen_key in st.session_state:

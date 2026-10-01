@@ -6,6 +6,7 @@ controlled. Gates make races deterministic instead of sleeping.
 
 import json
 import sqlite3
+import sys
 import tempfile
 import threading
 import unittest
@@ -270,6 +271,30 @@ class ScopeOwnershipTest(Base):
         keys = [b.key for b in app.button if b.key and b.key.startswith("ev-")]
         self.assertTrue(any(k.startswith("ev-cur-") for k in keys) and any(k.startswith("ev-hist-") for k in keys),
                         keys)
+        placeholder = "근거 버튼을 누르면"
+        self.assertTrue(any(placeholder in c.value for c in app.caption))
+        next(b for b in app.button if b.key.startswith("ev-hist-")).click().run(timeout=30)  # one click
+        self.assertFalse(app.exception, [e.message for e in app.exception])
+        self.assertEqual(app.session_state["evidence_open"], (rid, "E1"))
+        self.assertFalse(any(placeholder in c.value for c in app.caption), [c.value for c in app.caption])
+        self.assertEqual(len([b for b in app.get("download_button") if b.key.startswith("evdl-")]), 1)  # once
+
+    def test_evidence_of_an_older_history_request_opens_in_the_history(self):
+        from streamlit.testing.v1 import AppTest
+
+        self.transport.gate.set()
+        old = service.submit_answer(self.res, self.env.consultant, req(self.a, gen="gen-old"))
+        self.assertEqual(self.wait_done(old).result.status, "answered")
+        app = AppTest.from_string("import streamlit as st\nfrom rfp_assistant import ui\n"
+                                  "ui._answer_area(st, st.session_state.res, st.session_state.principal)\n"
+                                  "ui._history(st, st.session_state.res, st.session_state.principal)\n")
+        app.session_state["res"], app.session_state["principal"] = self.res, self.env.consultant
+        app.run(timeout=30)  # nothing current on screen
+        app.selectbox[0].select(app.selectbox[0].options[0]).run(timeout=30)
+        next(b for b in app.button if (b.key or "").startswith("ev-hist-")).click().run(timeout=30)
+        self.assertFalse(app.exception, [e.message for e in app.exception])
+        self.assertEqual([b.key[:9] for b in app.get("download_button") if b.key.startswith("evdl-")],
+                         ["evdl-hist"])
 
     def test_a_late_answer_cannot_attach_to_a_changed_scope_but_still_settles(self):
         target_a = ui.target_key([(self.a.doc_id, self.a.source_hash)], Q, "single", "2026-09-30")
@@ -379,6 +404,70 @@ class ShutdownRestartTest(Base):
                 service.Resources(self.settings, transport=FakeTransport(), recover=True)
         finally:
             res2.close()
+
+
+SIGINT_CHILD = """
+import json, signal, sys, threading, time
+from pathlib import Path
+from rfp_assistant import service
+from rfp_assistant.contracts import AnswerRequest
+from rfp_assistant.generation import FakeTransport
+from tests import fixtures
+
+env = fixtures.make_env(Path(sys.argv[1]))
+res = service.Resources(env.settings.with_(shutdown_wait_seconds=10), transport=FakeTransport(), recover=True)
+prepare = service.prepare_answer
+
+def slow(*a, **kw):  # retrieval finishes, then the signal arrives before generation
+    out = prepare(*a, **kw)
+    print("PREPARED", flush=True)
+    time.sleep(1.5)
+    return out
+
+service.prepare_answer = slow
+stopping = threading.Event()
+signal.signal(signal.SIGINT, lambda *a: stopping.set())  # like Streamlit: the handler ends the server loop
+rid = service.submit_answer(res, env.consultant, AnswerRequest(
+    "sigint", "sigint", "하자보수 기간은 얼마인가요?", [env.refs["기관A"]], as_of="2026-09-30"))
+print(json.dumps({"request_id": rid, "db": str(env.settings.db_path)}), flush=True)
+stopping.wait(30)
+"""  # the main thread returns: interpreter exit is the only shutdown trigger, as with a real Ctrl+C
+
+
+class SignalStopTest(unittest.TestCase):
+    @unittest.skipIf(sys.platform == "win32", "POSIX signal delivery; Windows is checked with CTRL_C_EVENT locally")
+    def test_sigint_stops_a_running_request_before_its_next_paid_stage(self):
+        """Review finding: shutdown hung off ordinary atexit, which runs only after the executor joined its
+        workers, so a request running at Ctrl+C still reserved, dispatched and settled its generation."""
+        import os
+        import signal
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {**os.environ, "PYTHONPATH": os.pathsep.join([str(Path("src").resolve()), str(Path(".").resolve())])}
+            child = subprocess.Popen([sys.executable, "-c", SIGINT_CHILD, tmp], stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE, text=True, env=env)
+            try:
+                info, prepared = None, False
+                for line in child.stdout:  # other libraries may print too; wait for both markers
+                    if line.startswith("{"):
+                        info = json.loads(line)
+                    prepared = prepared or line.strip() == "PREPARED"
+                    if info and prepared:
+                        break
+                self.assertTrue(info and prepared, child.stderr.read() if child.poll() is not None else "")
+                child.send_signal(signal.SIGINT)
+                _, err = child.communicate(timeout=60)
+            finally:
+                if child.poll() is None:
+                    child.kill()
+            self.assertEqual(child.returncode, 0, err)
+            with store.open_db(Path(info["db"])) as conn:
+                row = conn.execute("SELECT status, result_json FROM requests WHERE request_id = ?",
+                                   (info["request_id"],)).fetchone()
+                attempts = conn.execute("SELECT COUNT(*) FROM attempts").fetchone()[0]
+            self.assertEqual((row["status"], json.loads(row["result_json"])["status"], attempts),
+                             ("interrupted", "interrupted", 0))
 
 
 # ---------------------------------------------------------------- shared budget under six users
@@ -793,22 +882,31 @@ class VerifierTest(Base):
         self.assertEqual(view.result.status, "answered")
         trace = json.loads(service.get_request(self.res, self.env.verifier, rid)["trace_json"])
         self.assertEqual(trace["retrieval"]["mode"], frozen["retrieval"]["mode"])
-        self.assertEqual(trace["config"]["retrieval"], {"mode": "whitespace_bm25", "limits": {"evidence_max_units": 1}})
+        self.assertEqual(trace["config"]["verifier_run_id"], frozen["run_id"])
         key = lambda e: (e["extraction_id"], tuple(e["element_ids"]))  # noqa: E731
         self.assertEqual([key(e) for e in trace["retrieval"]["evidence"]],
                          [key(e) for e in frozen["retrieval"]["evidence"]])
         self.assertEqual(trace["input_tokens_estimate"], frozen["input_tokens"])  # the estimate shown applies
+        reserved = sum(a["reserved_micro_usd"] for a in self.attempts() if a["request_id"] == rid)
+        self.assertEqual(reserved, frozen["estimate_micro_usd"])
 
     def test_an_outdated_frozen_configuration_is_refused_before_anything_is_queued(self):
         frozen = self._frozen_run()
         serving = {**self.res.serving(), "run_id": "a-later-activation"}
-        request = AnswerRequest("k", "g", Q, [self.a], as_of="2026-09-30", config_id=frozen["config"]["config_id"])
+        request = AnswerRequest("k", "g", Q, [self.a], as_of="2026-09-30", config_id=frozen["config"]["config_id"],
+                                verifier_run_id=frozen["run_id"])
         with mock.patch.object(self.res, "serving", return_value=serving):
             with self.assertRaises(service.ServiceError):
                 service.submit_answer(self.res, self.env.verifier, request)
-        with self.assertRaises(service.ServiceError):  # an unknown configuration is refused too
-            service.submit_answer(self.res, self.env.verifier, AnswerRequest("k2", "g", Q, [self.a],
-                                                                             config_id="vc-000000000000"))
+        refused = [  # unknown run, a configuration without its run, another question / scope / date
+            AnswerRequest("k2", "g", Q, [self.a], as_of="2026-09-30", verifier_run_id="vr-000000000000"),
+            AnswerRequest("k3", "g", Q, [self.a], as_of="2026-09-30", config_id=frozen["config"]["config_id"]),
+            AnswerRequest("k4", "g", "다른 질문", [self.a], as_of="2026-09-30", verifier_run_id=frozen["run_id"]),
+            AnswerRequest("k5", "g", Q, [self.d], as_of="2026-09-30", verifier_run_id=frozen["run_id"]),
+            AnswerRequest("k6", "g", Q, [self.a], as_of="2026-10-01", verifier_run_id=frozen["run_id"])]
+        for bad in refused:
+            with self.assertRaises(service.ServiceError):
+                service.submit_answer(self.res, self.env.verifier, bad)
         self.assertEqual((self.attempts(), self.transport.calls), ([], []))
 
     def test_corrections_append_with_quoted_original_and_never_touch_sealed_labels(self):

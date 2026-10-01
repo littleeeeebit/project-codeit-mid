@@ -93,7 +93,19 @@ class Resources:
         self._runner_lock = threading.Lock()
         self._closed = False
         closer = weakref.WeakMethod(self.close)  # atexit must not keep every Resources (and its index) alive
-        atexit.register(lambda: (closer() or (lambda: None))())
+
+        def stop() -> None:
+            (closer() or (lambda: None))()
+
+        # A controlled stop (Streamlit's SIGINT/SIGTERM handler ends the server loop, then the interpreter exits)
+        # must close while the workers are still alive, so their next paid stage sees the stop. Ordinary atexit
+        # runs only after `concurrent.futures` has joined every worker; threading's exit hooks run before that
+        # join, newest first, so this one precedes the executor's own (registered at import).
+        try:
+            threading._register_atexit(stop)
+        except (AttributeError, RuntimeError):  # no such hook, or the interpreter is already shutting down
+            pass
+        atexit.register(stop)
 
     def _own(self, settings: Settings) -> None:
         try:
@@ -469,9 +481,7 @@ def _config_snapshot(res: Resources, request: AnswerRequest) -> dict:
     idx = res.index()
     with open_db(res.settings.db_path) as conn:
         rate_version = conn.execute("SELECT rate_version FROM budget_settings WHERE id = 1").fetchone()[0]
-    vcfg = _stored_verifier_config(res, request.config_id) if request.config_id != "default" else None
-    return {"config_id": request.config_id,
-            "retrieval": {"mode": vcfg["mode"], "limits": vcfg["limits"]} if vcfg else None,
+    return {"config_id": request.config_id, "verifier_run_id": request.verifier_run_id or None,
             "index_version": idx.version if idx else None,
             "serving": {k: v for k, v in res.serving().items() if k in ("run_id", "mode", "dense_version")},
             "prompt_version": generation.PROMPT_VERSION, "model": res.settings.generation_model,
@@ -482,7 +492,7 @@ def _config_snapshot(res: Resources, request: AnswerRequest) -> dict:
 
 def _input_hash(request: AnswerRequest) -> str:
     data = {"q": nfc(request.question), "scope": [asdict(s) for s in request.scope], "mode": request.mode,
-            "as_of": request.as_of, "config": request.config_id}
+            "as_of": request.as_of, "config": request.config_id, "run": request.verifier_run_id}
     return hashlib.sha256(dumps(data).encode()).hexdigest()
 
 
@@ -547,7 +557,7 @@ def prepare_answer(res: Resources, principal: Principal, question: str, scope: l
 
 
 def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retrieval: RetrievalResult,
-            mode: str) -> dict:
+            mode: str, price_query_embedding: bool = True) -> dict:
     messages = generation.build_messages(question, as_of, [_doc_brief(d) for d in docs], retrieval.evidence,
                                          retrieval.limitations, mode=mode)
     rf = generation.answer_json_schema()
@@ -556,7 +566,8 @@ def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retriev
         est = budget.estimate(res.settings.db_path, res.settings.generation_model, tokens,
                               res.settings.generation_max_output_tokens)
         qe = retrieval.query_embedding or {}
-        if qe.get("cache") == "miss" and not qe.get("attempt_id"):  # a paid answer would embed the query first
+        if price_query_embedding and qe.get("cache") == "miss" and not qe.get("attempt_id"):
+            # a paid answer that retrieves again would embed the query first
             est += budget.estimate(res.settings.db_path, res.settings.embedding_model,
                                    dense_mod.count_embedding_tokens(question) + dense_mod.QUERY_MARGIN_TOKENS, 0)
     except budget.BudgetError:
@@ -590,15 +601,14 @@ def _validate_request(res: Resources, request: AnswerRequest) -> str:
         raise ServiceError("기본 정보 조회는 문서를 한두 개 선택해야 합니다.")
     if not request.idempotency_key or len(request.idempotency_key) > 100 or len(request.generation_id) > 100:
         raise ServiceError("요청 식별자가 올바르지 않습니다.")
-    if request.config_id != "default" and request.mode not in PAID_MODES:
-        raise ServiceError("검증 설정은 답변 생성 요청에만 적용됩니다.")
-    resolve_verifier_config(res, request.config_id)  # unknown or outdated: refused before anything is queued
+    _frozen_run_for(res, request, question)  # unknown, mismatched or outdated: refused before anything is queued
     return question
 
 
 def _request_snapshot(principal: Principal, request: AnswerRequest, question: str) -> dict:
     return {"question": question, "scope": [asdict(r) for r in request.scope], "mode": request.mode,
-            "as_of": request.as_of, "config_id": request.config_id, "generation_id": request.generation_id,
+            "as_of": request.as_of, "config_id": request.config_id, "verifier_run_id": request.verifier_run_id,
+            "generation_id": request.generation_id,
             "idempotency_key": request.idempotency_key, "capabilities": sorted(principal.capabilities)}
 
 
@@ -692,7 +702,8 @@ def run_queued(res: Resources, request_id: str) -> None:
     snap = json.loads(row["request_json"])
     request = AnswerRequest(idempotency_key=snap["idempotency_key"], generation_id=snap["generation_id"],
                             question=snap["question"], scope=[DocRef(**r) for r in snap["scope"]],
-                            mode=snap["mode"], as_of=snap["as_of"], config_id=snap["config_id"])
+                            mode=snap["mode"], as_of=snap["as_of"], config_id=snap["config_id"],
+                            verifier_run_id=snap.get("verifier_run_id", ""))
     principal = Principal(row["member_id"], frozenset(snap["capabilities"]))
     _execute(res, principal, request_id, request, snap["question"])
 
@@ -768,22 +779,28 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
                                      "이 문서는 아직 검색 색인에 포함되지 않았습니다.")
         return done("ingestion_unavailable", f"원문 전체를 확인할 수 없어 답변하지 않습니다. {reason}",
                     missing_fields=missing_unavailable)
-    # A frozen verifier run's configuration is applied, not just recorded: the same mode and limits the run's
-    # estimate was computed with (refused, unpaid, when serving changed since it was frozen).
-    vcfg = resolve_verifier_config(res, request.config_id) or {"mode": None, "limits": None}
+    # A frozen verifier run is generated from exactly the evidence it shows: no new retrieval, so no query
+    # embedding is paid and a cache miss cannot switch it to another mode (refused when serving changed since).
+    frozen = _frozen_run_for(res, request, question)
     principal = _checkpoint(res, request_id, principal)  # the query embedding may be the first paid stage
     try:
-        if request.mode == "compare":
-            prep = _prepare_compare(res, principal, question, docs, request.as_of, request_id, mode=vcfg["mode"],
-                                    limits=vcfg["limits"])
+        if frozen is not None:
+            prep = _frozen_prep(res, question, request, docs, frozen)
+        elif request.mode == "compare":
+            prep = _prepare_compare(res, principal, question, docs, request.as_of, request_id)
         else:
             prep = prepare_answer(res, principal, question, request.scope, request.as_of, request_id=request_id,
-                                  allow_paid=True, mode=vcfg["mode"], limits=vcfg["limits"] or None)
+                                  allow_paid=True)
     except _Stop:
         raise
     except Exception as exc:  # noqa: BLE001
         return done("technical_error", "검색 또는 비용 추정에 실패했습니다.", request_status="failed",
                     error=f"{type(exc).__name__}: {exc}"[:300])
+    if frozen is not None and (prep["estimate_micro_usd"] is None or frozen["estimate_micro_usd"] is None
+                               or prep["estimate_micro_usd"] > frozen["estimate_micro_usd"]):
+        # e.g. a metadata resolution recorded since lengthened the prompt: the consented maximum no longer holds
+        return done("clarification_required", "검증 실행 이후 프롬프트가 바뀌어 동의한 최대 비용을 넘을 수 있습니다. "
+                    "새 검증 실행을 만든 뒤 다시 생성하세요. (유료 호출 없음)", request_status="failed")
     retrieval: RetrievalResult = prep["retrieval"]
     trace["retrieval"] = asdict(retrieval)
     trace["input_tokens_estimate"] = prep["input_tokens"]
@@ -866,7 +883,7 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
 
 def _prepare_compare(res: Resources, principal: Principal, question: str, docs: list[dict], as_of: str,
                      request_id: str | None, allow_paid: bool = True, mode: str | None = None,
-                     limits: dict | None = None) -> dict:
+                     limits: dict | None = None, price_query_embedding: bool = True) -> dict:
     """One scoped subquery per selected document (the same question; no paid rewriting). Each starts with up to
     three evidence units and half the evidence target; unused room is redistributed only after both had a
     coverage attempt, and the global ceiling still holds. Each side reports evidence or its limitation.
@@ -937,7 +954,7 @@ def _prepare_compare(res: Resources, principal: Principal, question: str, docs: 
         timings_ms=timings, trace_id=str(uuid.uuid4()), index_version=first_r.index_version if first_r else None,
         ranking=ranking, fallback=first_r.fallback if first_r else None,
         dense_version=first_r.dense_version if first_r else None, query_embedding=query_embedding)
-    prep = _priced(res, question, as_of, docs, merged, "compare")
+    prep = _priced(res, question, as_of, docs, merged, "compare", price_query_embedding)
     prep["coverage"] = coverage
     return prep
 
@@ -1257,6 +1274,41 @@ def resolve_verifier_config(res: Resources, config_id: str) -> dict | None:
     return cfg
 
 
+def _frozen_run_for(res: Resources, request: AnswerRequest, question: str) -> dict | None:
+    """The frozen verifier run a paid request generates from, checked against the request: same question, scope,
+    answer mode and as-of date, and a configuration that still describes the current serving state."""
+    if not request.verifier_run_id:
+        if request.config_id != "default":
+            raise ServiceError("검증 설정은 고정된 검증 실행으로만 적용됩니다. (유료 호출 없음)")
+        return None
+    if request.mode not in PAID_MODES:
+        raise ServiceError("검증 실행은 답변 생성 요청에만 적용됩니다.")
+    with open_db(res.settings.db_path) as conn:
+        row = conn.execute("SELECT * FROM verifier_runs WHERE run_id = ?", (request.verifier_run_id,)).fetchone()
+    if row is None:
+        raise ServiceError("없는 검증 실행입니다. (유료 호출 없음)")
+    cfg, trace = json.loads(row["config_json"]), json.loads(row["trace_json"])
+    scope = [(s["doc_id"], s["source_hash"]) for s in json.loads(row["scope_json"])]
+    if (request.config_id not in ("default", cfg["config_id"]) or row["question"] != question
+            or scope != [(r.doc_id, r.source_hash) for r in request.scope]
+            or request.mode != ("compare" if len(scope) == 2 else "single")
+            or request.as_of != trace.get("as_of", request.as_of)):
+        raise ServiceError("요청이 검증 실행의 질문·범위·기준일과 다릅니다. (유료 호출 없음)")
+    resolve_verifier_config(res, cfg["config_id"])
+    return {"config": cfg, **trace}
+
+
+def _frozen_prep(res: Resources, question: str, request: AnswerRequest, docs: list[dict], frozen: dict) -> dict:
+    """Prices the frozen run's own evidence (same prompt, same count) instead of retrieving again."""
+    r = frozen["retrieval"]
+    retrieval = RetrievalResult(**{**r, "scope": [DocRef(**s) for s in r["scope"]],
+                                   "evidence": [EvidenceUnit(**e) for e in r["evidence"]]})
+    prep = _priced(res, question, request.as_of, docs, retrieval, request.mode, price_query_embedding=False)
+    if frozen.get("coverage"):
+        prep["coverage"] = frozen["coverage"]
+    return prep
+
+
 def _embedding_estimate(res: Resources, question: str) -> int | None:
     try:
         return budget.estimate(res.settings.db_path, res.settings.embedding_model,
@@ -1278,10 +1330,10 @@ def verifier_trace(res: Resources, principal: Principal, question: str, scope: l
     docs = _resolve_scope(res, scope)
     if len(scope) == 2:
         prep = _prepare_compare(res, principal, question, docs, as_of, None, allow_paid=False, mode=cfg["mode"],
-                                limits=cfg["limits"])
+                                limits=cfg["limits"], price_query_embedding=False)
     elif len(scope) == 1:
         r = retrieve(res, principal, question, scope, limits=cfg["limits"] or None, mode=cfg["mode"])
-        prep = _priced(res, question, as_of, docs, r, "single")
+        prep = _priced(res, question, as_of, docs, r, "single", price_query_embedding=False)
     else:
         raise ServiceError("문서를 한두 개 선택하세요.")
     r: RetrievalResult = prep["retrieval"]

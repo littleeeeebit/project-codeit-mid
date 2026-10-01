@@ -67,6 +67,7 @@ class AnswerRequest:
     mode: Literal["single", "compare", "metadata", "inventory"] = "single"
     as_of: str = ""
     config_id: str = "default"
+    verifier_run_id: str = ""  # generate from this frozen verifier run's evidence (its config_id is then implied)
 
 
 @dataclass

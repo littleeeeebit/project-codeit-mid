@@ -816,6 +816,32 @@ class ServingTest(unittest.TestCase):
                                   (result.request_id,)).fetchone()[0]
         self.assertEqual(status, "completed")
 
+    def test_generation_from_a_frozen_cache_miss_run_uses_its_fallback_evidence_and_estimate(self):
+        """Review finding: the free run fell back to kiwi_bm25 on a query-vector miss, but its paid generation
+        embedded the query and re-retrieved with hybrid: other evidence and a reservation above the estimate."""
+        v = self.env.verifier
+        a, d = self.env.refs["기관A"], self.env.refs["기관D"]
+        for mode, question, refs in (("single", "하자보수 기간을 알려 주세요: 새로운 검증", [a]),
+                                     ("compare", "하자보수 기간을 비교해 주세요: 새로운 검증", [a, d])):
+            frozen = service.verifier_trace(self.res, v, question, refs, "2026-09-30")
+            self.assertEqual(frozen["retrieval"]["query_embedding"]["cache"], "miss")
+            embeds = len(self.transport.embed_calls)
+            result = service.answer(self.res, v, AnswerRequest(
+                str(uuid.uuid4()), "g", question, refs, mode=mode, as_of="2026-09-30",
+                config_id=frozen["config"]["config_id"], verifier_run_id=frozen["run_id"]))
+            self.assertEqual(result.status, "answered", result.error)
+            trace = json.loads(service.get_request(self.res, v, result.request_id)["trace_json"])
+            key = lambda run: [(e["doc_id"], e["extraction_id"], e["element_ids"])  # noqa: E731
+                               for e in run["retrieval"]["evidence"]]
+            self.assertEqual((trace["retrieval"]["mode"], key(trace), trace["input_tokens_estimate"]),
+                             (frozen["retrieval"]["mode"], key(frozen), frozen["input_tokens"]))
+            self.assertEqual(len(self.transport.embed_calls), embeds)  # no query embedding was paid
+            with store.open_db(self.env.settings.db_path) as conn:
+                rows = conn.execute("SELECT stage, reserved_micro_usd FROM attempts WHERE request_id = ?",
+                                    (result.request_id,)).fetchall()
+            self.assertEqual([r["stage"] for r in rows], ["generation"])
+            self.assertLessEqual(sum(r["reserved_micro_usd"] for r in rows), frozen["estimate_micro_usd"])
+
     def test_a_query_vector_of_another_size_falls_back_without_scoring(self):
         from rfp_assistant.retrieval import retrieve
 
