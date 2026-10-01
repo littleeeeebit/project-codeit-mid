@@ -1,164 +1,430 @@
 {
-  "schema": "project-codeit-mid/verification",
-  "schema_version": 1,
-  "phase": 3,
-  "title": "Phase 3: usable workflows and six-user operational correctness",
-  "runner": "tools/verify.py",
-  "receipts_dir": ".runtime/verification",
-  "local_settings_file": "verification.local.json",
-  "safety": {
-    "paid_calls": "forbidden: every command uses the fake provider; OPENAI_API_KEY and RFP_* variables are removed from every child environment",
-    "data": "fixtures and runtimes are created under the receipt directory; real-corpus checks require an isolated copy declared in the local settings and never the authoritative .runtime",
-    "network": "none required",
-    "secrets": "none required or recorded",
-    "approval": "the runner refuses to execute until verification.local.json approves this file's SHA-256 and the command IDs to run"
-  },
-  "contracts": [
-    {"id": "phase3-plan", "path": "docs/plan/end-to-end/3-workflows-and-operations.md",
-     "sections": ["Interface specification", "Ordered implementation", "Automated gate", "Browser verification", "Exit and handoff"]},
-    {"id": "implementation-contracts", "path": "docs/plan/end-to-end/implementation-contracts.md",
-     "sections": ["Service entry points", "Budget state machine", "Access and local maintenance", "Handoff format"]},
-    {"id": "runbook", "path": "docs/operations/runbook.md",
-     "sections": ["4. Request execution and controlled stop", "5. Budget recovery", "6. Cap and pacing", "7. Checks", "8. Managed verification"]},
-    {"id": "design", "path": "DESIGN.md", "sections": []},
-    {"id": "phase3-handoff", "path": "handoff/phase3/README.md", "sections": []}
-  ],
-  "local_settings": {
-    "description": "Owner-supplied and git-ignored. Run `python tools/verify.py approve-template` for a starting file; nothing in it is secret.",
-    "required": {
-      "approval.approved_by": "name of the person who inspected the commands below",
-      "approval.contract_sha256": "SHA-256 of this verification.json as printed by `approve-template`; a changed contract needs a new approval",
-      "approval.commands": "command IDs the owner allows the runner to execute"
-    },
-    "optional": {
-      "python": "interpreter for every command (default: the one running tools/verify.py)",
-      "tiktoken_cache_dir": "offline tokenizer cache passed to commands as TIKTOKEN_CACHE_DIR",
-      "real_corpus.source_dir": "isolated copy of the originals (absolute path)",
-      "real_corpus.data_dir": "isolated copy of the runtime database and index (absolute path, never the authoritative .runtime)",
-      "real_corpus.isolated_copy": "must be true: the owner confirms both directories are copies",
-      "real_corpus.hwp_doc_id": "parsed and indexed HWP document for real-corpus checks",
-      "real_corpus.pdf_doc_id": "parsed and indexed PDF document for real-corpus checks",
-      "real_corpus.question": "question that finds evidence in both documents",
-      "browser": "name, version and viewport used for manual steps; copied into the receipt"
+ "version": 1,
+ "contracts": [
+  "docs/plan/end-to-end/3-workflows-and-operations.md",
+  "docs/plan/end-to-end/implementation-contracts.md"
+ ],
+ "prose_paths": [
+  "README.md",
+  "DESIGN.md",
+  "docs/operations/runbook.md",
+  "handoff/phase3/README.md"
+ ],
+ "flows": [
+  {
+   "id": "access",
+   "title": "Open access with attribution; role declarations hold at the service",
+   "kind": "command",
+   "command": "python -B tools/verify.py access",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tests/test_generation.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "role-declarations",
+     "expected": "Visitor, authorization and verifier-role tests pass: narrower principals are refused and sealed rows are never served"
     }
+   ]
   },
-  "commands": [
-    {"id": "diff-check", "argv": ["git", "diff", "--check"], "timeout_s": 60,
-     "purpose": "whitespace gate on the working tree"},
-    {"id": "phase3-gate", "argv": ["{python}", "-B", "-m", "rfp_assistant.cli", "check", "--phase", "3", "--provider", "fake"],
-     "timeout_s": 900, "purpose": "phase 3 service, budget and request-state gate"},
-    {"id": "full-suite", "argv": ["{python}", "-B", "-m", "unittest", "discover", "-s", "tests", "-t", "."],
-     "timeout_s": 1800, "purpose": "every repository test"},
-    {"id": "load-six", "argv": ["{python}", "-B", "-m", "rfp_assistant.cli", "load-check", "--users", "6", "--provider", "fake"],
-     "timeout_s": 900, "purpose": "six concurrent members against one temporary ledger"},
-    {"id": "load-six-timeouts", "argv": ["{python}", "-B", "-m", "rfp_assistant.cli", "load-check", "--users", "6", "--provider", "fake", "--fail-every", "3"],
-     "timeout_s": 900, "purpose": "injected post-dispatch timeouts stay unknown and are never retried"},
-    {"id": "signal-stop", "argv": ["{python}", "-B", "tools/verification/signal_stop.py", "{run_dir}"],
-     "timeout_s": 300, "purpose": "native Ctrl+C (Windows CTRL_C_EVENT, POSIX SIGINT) stops a running request before its next paid stage"},
-    {"id": "real-corpus-frozen", "argv": ["{python}", "-B", "tools/verification/real_corpus_frozen.py", "{run_dir}"],
-     "timeout_s": 900, "requires": ["real_corpus"],
-     "purpose": "frozen verifier runs on the isolated real corpus generate from exactly their evidence and estimate"},
-    {"id": "tests-access", "tests": ["tests.test_service.VisitorTest", "tests.test_service.AuthorizationTest",
-                                      "tests.test_generation.AnswerFlowTest.test_verifier_actions_require_the_role"],
-     "timeout_s": 600, "purpose": "open visitor, role declarations, sealed rows"},
-    {"id": "tests-requests", "tests": ["tests.test_service.SubmissionTest", "tests.test_service.QueueTest",
-                                        "tests.test_service.CancellationTest"],
-     "timeout_s": 600, "purpose": "idempotent submission, bounded queue, cancellation"},
-    {"id": "tests-ownership", "tests": ["tests.test_service.ScopeOwnershipTest"],
-     "timeout_s": 600, "purpose": "late answers, history and evidence panels"},
-    {"id": "tests-stop", "tests": ["tests.test_service.ShutdownRestartTest", "tests.test_service.SignalStopTest"],
-     "timeout_s": 600, "purpose": "controlled stop, restart recovery, dispatch guard"},
-    {"id": "tests-budget", "tests": ["tests.test_service.SixUserBudgetTest", "tests.test_service.PacingTest",
-                                      "tests.test_service.SearchFilterTest.test_only_the_highest_cap_warning_is_shown",
-                                      "tests.test_budget"],
-     "timeout_s": 600, "purpose": "shared cap, fail-closed ledger, pacing"},
-    {"id": "tests-reconcile", "tests": ["tests.test_service.ReconciliationTest"],
-     "timeout_s": 600, "purpose": "provider interval reconciliation and owner settlement"},
-    {"id": "tests-modes", "tests": ["tests.test_service.ModesTest", "tests.test_service.SearchFilterTest",
-                                     "tests.test_generation.AnswerFlowTest"],
-     "timeout_s": 600, "purpose": "single, comparison, metadata and inventory answers"},
-    {"id": "tests-sources", "tests": ["tests.test_service.SourceAndExportTest", "tests.test_generation.SafetyTest"],
-     "timeout_s": 600, "purpose": "managed downloads, evidence warnings, redacted exports"},
-    {"id": "tests-verifier", "tests": ["tests.test_service.VerifierTest", "tests.test_dense.ServingTest"],
-     "timeout_s": 900, "purpose": "frozen runs, configurations, frozen generation, serving fallbacks"}
-  ],
-  "flows": [
-    {"id": "F1-access", "title": "Open access with attribution; role declarations hold at the service",
-     "contracts": ["phase3-plan#Ordered implementation", "implementation-contracts#Access and local maintenance"],
-     "commands": ["tests-access"],
-     "manual": [
-       {"id": "F1-m1", "scope": "fixture", "do": "Open the app in two browsers with different typed names; visit every page.",
-        "expect": "No login form; every page opens; each request, review and audit event shows the typed name."}
-     ]},
-    {"id": "F2-consultant-answer", "title": "Search, select, ask and open original evidence",
-     "contracts": ["phase3-plan#Consultant work screen", "phase3-plan#Browser verification"],
-     "commands": ["tests-modes", "tests-sources"],
-     "manual": [
-       {"id": "F2-m1", "scope": "real-corpus", "do": "Search a long Korean title; select an HWP; ask; open table evidence; download the managed original.",
-        "expect": "Titles wrap; filters and historical notice show; evidence opens at the cited table; the download equals the original and keeps its Korean filename in a desktop browser."},
-       {"id": "F2-m2", "scope": "real-corpus", "do": "Switch to a PDF; open a citation on a late physical page; try an ambiguous code without scope and a quarantined source if one exists.",
-        "expect": "The late page opens with original content; the ambiguous code asks for scope; a quarantined source is refused without a paid call."}
-     ]},
-    {"id": "F3-compare-and-free-modes", "title": "Balanced comparison, metadata view and requirement inventory",
-     "contracts": ["phase3-plan#5. Complete deterministic modes and balanced comparisons"],
-     "commands": ["tests-modes"],
-     "manual": [
-       {"id": "F3-m1", "scope": "real-corpus", "do": "Compare two selected RFPs; open basic information and the requirement list for each.",
-        "expect": "Both documents contribute facts or explicit limitations; unknown, 0원 and conflicting values stay distinct; the inventory states what it covers."}
-     ]},
-    {"id": "F4-request-ownership", "title": "Background requests, stale answers and history",
-     "contracts": ["phase3-plan#2. Move long paid execution out of UI reruns", "phase3-plan#3. Give UI state explicit ownership"],
-     "commands": ["tests-requests", "tests-ownership", "load-six"],
-     "manual": [
-       {"id": "F4-m1", "scope": "fixture", "do": "With fake_delay_seconds set, ask, then change scope or question before the answer arrives; submit twice; reload; open the request from 내 최근 요청.",
-        "expect": "No stale answer attaches; one request and one attempt exist; history shows every request separately and its evidence opens on the first click; the attempt settles."}
-     ]},
-    {"id": "F5-controlled-stop", "title": "Controlled stop and conservative restart",
-     "contracts": ["runbook#4. Request execution and controlled stop", "implementation-contracts#Budget state machine"],
-     "commands": ["tests-stop", "signal-stop"],
-     "manual": []},
-    {"id": "F6-shared-budget", "title": "Six users share one cap; status stays live during calls",
-     "contracts": ["phase3-plan#4. Implement reactive, read-only status", "phase3-plan#Automated gate", "runbook#6. Cap and pacing"],
-     "commands": ["tests-budget", "load-six", "load-six-timeouts"],
-     "manual": [
-       {"id": "F6-m1", "scope": "fixture", "do": "In a second session start a delayed call; watch the first session's budget.",
-        "expect": "The first session's budget changes within the polling interval; reservation, settled and unknown cost are distinguished."},
-       {"id": "F6-m2", "scope": "fixture", "do": "Reach a temporary test cap; keep browsing, refresh and poll; try an admin action without a reason.",
-        "expect": "Generation blocks; free browsing works; refresh and polling create no attempts; the reasonless action is refused; every recorded action is in the audit log."}
-     ]},
-    {"id": "F7-recovery", "title": "Reconciliation, owner settlement and unknown attempts",
-     "contracts": ["runbook#5. Budget recovery", "phase3-plan#7. Execute budget reconciliation and recovery scenarios"],
-     "commands": ["tests-reconcile", "tests-budget"],
-     "manual": []},
-    {"id": "F8-verifier", "title": "Frozen verifier runs, comparison, corrections and frozen generation",
-     "contracts": ["phase3-plan#Verification entry", "runbook#4. Request execution and controlled stop"],
-     "commands": ["tests-verifier", "real-corpus-frozen"],
-     "manual": [
-       {"id": "F8-m1", "scope": "real-corpus", "do": "Make a single and a two-document verifier run (two documents with an evidence limit of 2); generate from each with the fake provider.",
-        "expect": "The form enforces at least two units for two documents; generation uses the run's evidence and date; the reservation is within the displayed maximum."}
-     ]},
-    {"id": "F9-accessibility", "title": "Keyboard, focus, contrast and narrow layout",
-     "contracts": ["phase3-plan#Browser verification", "design"],
-     "commands": [],
-     "manual": [
-       {"id": "F9-m1", "scope": "fixture", "do": "Use only the keyboard through ask, evidence and history; check status labels, contrast and a narrow (390 px) viewport; save screenshots.",
-        "expect": "Every control is reachable with visible focus; states are labelled in text; content is readable without horizontal scrolling."}
-     ]},
-    {"id": "F10-gates", "title": "Repository gates",
-     "contracts": ["phase3-plan#Automated gate", "runbook#7. Checks"],
-     "commands": ["diff-check", "phase3-gate", "full-suite"],
-     "manual": []}
-  ],
-  "automated_gate_scenarios": {
-    "Six users reserve near cap": ["tests-budget", "load-six"],
-    "Same request submitted twice across reruns": ["tests-requests"],
-    "Scope/question changes during delayed answer": ["tests-ownership"],
-    "Queued versus running cancellation": ["tests-requests"],
-    "A narrower in-process principal calls a verifier/budget/sealed function; the verifier page asks for sealed rows": ["tests-access"],
-    "Retry after billed failure": ["tests-budget"],
-    "Crash after dispatch marker; duplicate completion after restart": ["tests-stop", "tests-budget"],
-    "Provider interval adjustment imported twice, then late usage": ["tests-reconcile"],
-    "Ledger unavailable, price unknown, cost exceeds reservation": ["tests-budget"],
-    "Exhausted cap and repeated polling": ["tests-budget"]
+  {
+   "id": "question-modes",
+   "title": "Single, comparison, metadata and inventory answers with safe sources",
+   "kind": "command",
+   "command": "python -B tools/verify.py question-modes",
+   "paths": [
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/ingestion.py",
+    "src/rfp_assistant/retrieval.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "tests/fixtures.py",
+    "tests/test_generation.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "answer-modes",
+     "expected": "Mode, comparison, search-filter and answer-flow tests pass"
+    },
+    {
+     "id": "sources-and-exports",
+     "expected": "Managed-download, evidence-warning, redaction and provider-safety tests pass"
+    }
+   ]
+  },
+  {
+   "id": "request-lifecycle",
+   "title": "Background requests: idempotent submission, cancellation, ownership and history",
+   "kind": "command",
+   "command": "python -B tools/verify.py request-lifecycle",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/cli.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/ops.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "submission-and-cancellation",
+     "expected": "Submission, queue and cancellation tests pass"
+    },
+    {
+     "id": "ownership-and-history",
+     "expected": "Scope-ownership and history tests pass"
+    },
+    {
+     "id": "six-user-load",
+     "expected": "load-check --users 6 with the fake provider passes"
+    }
+   ]
+  },
+  {
+   "id": "controlled-stop",
+   "title": "Controlled stop and conservative restart",
+   "kind": "command",
+   "command": "python -B tools/verify.py controlled-stop",
+   "paths": [
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/dense.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "tests/fixtures.py",
+    "tests/test_service.py",
+    "tools/verification/signal_stop.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "stop-and-recovery",
+     "expected": "Shutdown, restart-recovery, dispatch-guard and signal tests pass"
+    },
+    {
+     "id": "native-ctrl-c",
+     "expected": "A request running at a native Ctrl+C ends interrupted with zero paid attempts and the process exits 0"
+    }
+   ]
+  },
+  {
+   "id": "shared-budget",
+   "title": "Six users share one cap; the ledger fails closed",
+   "kind": "command",
+   "command": "python -B tools/verify.py shared-budget",
+   "paths": [
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/cli.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/ops.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "tests/fixtures.py",
+    "tests/test_budget.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "budget-ledger",
+     "expected": "Six-user budget, pacing, cap-warning and ledger tests pass"
+    },
+    {
+     "id": "six-user-load",
+     "expected": "load-check --users 6 with the fake provider passes"
+    },
+    {
+     "id": "injected-timeouts",
+     "expected": "load-check --users 6 --fail-every 3 passes: timed-out attempts stay unknown and are never retried"
+    }
+   ]
+  },
+  {
+   "id": "budget-recovery",
+   "title": "Reconciliation and owner settlement of unknown attempts",
+   "kind": "command",
+   "command": "python -B tools/verify.py budget-recovery",
+   "paths": [
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/cli.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "tests/fixtures.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "reconciliation",
+     "expected": "Reconciliation and owner-settlement tests pass"
+    }
+   ]
+  },
+  {
+   "id": "verifier-runs",
+   "title": "Frozen verifier runs and generation from frozen evidence",
+   "kind": "command",
+   "command": "python -B tools/verify.py verifier-runs",
+   "paths": [
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/dense.py",
+    "src/rfp_assistant/evaluation.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/retrieval.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "tests/fixtures.py",
+    "tests/test_dense.py",
+    "tests/test_service.py",
+    "tools/verification/real_corpus_frozen.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "verifier-unit",
+     "expected": "Verifier and serving tests pass"
+    },
+    {
+     "id": "frozen-generation-on-corpus",
+     "expected": "On an isolated copy of the configured corpus, single, pair and two-unit whitespace frozen runs generate with the same mode, evidence, quotes and token estimate, one generation attempt each and a reservation equal to the displayed maximum"
+    }
+   ]
+  },
+  {
+   "id": "repository-gates",
+   "title": "Repository gates",
+   "kind": "command",
+   "command": "python -B tools/verify.py repository-gates",
+   "paths": [
+    "DESIGN.md",
+    "README.md",
+    "app.py",
+    "docs/*",
+    "handoff/*",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/*",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "tests/*",
+    "tests/fixtures.py",
+    "tools/*",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "whitespace",
+     "expected": "git diff --check reports nothing"
+    },
+    {
+     "id": "phase3-gate",
+     "expected": "check --phase 3 --provider fake passes"
+    },
+    {
+     "id": "full-suite",
+     "expected": "The full unittest discovery passes"
+    }
+   ]
+  },
+  {
+   "id": "consultant-answer",
+   "title": "Consultant asks one question and opens the original evidence in a browser",
+   "kind": "browser",
+   "command": "python -B tools/verify.py consultant-answer",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/ingestion.py",
+    "src/rfp_assistant/retrieval.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "no-login",
+     "expected": "The served app opens on the consultant page without a login form"
+    },
+    {
+     "id": "grounded-answer",
+     "expected": "Selecting a document and asking returns a grounded fake-provider answer whose single generation attempt settles"
+    },
+    {
+     "id": "evidence-first-click",
+     "expected": "One click on the first evidence button opens its quote in the evidence panel"
+    },
+    {
+     "id": "managed-download",
+     "expected": "The evidence panel's original download is byte-identical to a managed source file"
+    }
+   ]
+  },
+  {
+   "id": "request-history",
+   "title": "Two requests with the same question stay separately reviewable from the history",
+   "kind": "browser",
+   "command": "python -B tools/verify.py request-history",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "separate-requests",
+     "expected": "Two submissions of the same question appear as two separate history choices"
+    },
+    {
+     "id": "history-evidence-first-click",
+     "expected": "Selecting the older request in the history and clicking its evidence once opens that evidence"
+    }
+   ]
+  },
+  {
+   "id": "verifier-generation",
+   "title": "Verifier freezes a run and generates from it in a browser",
+   "kind": "browser",
+   "command": "python -B tools/verify.py verifier-generation",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/retrieval.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "frozen-run",
+     "expected": "A free search-only verifier run is frozen and shown with its evidence and maximum estimate"
+    },
+    {
+     "id": "generation-within-consent",
+     "expected": "Generating from the frozen run completes with one generation attempt whose reservation does not exceed the displayed maximum"
+    }
+   ]
   }
+ ]
 }

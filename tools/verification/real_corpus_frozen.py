@@ -1,4 +1,4 @@
-"""Frozen verifier runs on the owner's isolated real-corpus copy generate from exactly their evidence.
+"""Frozen verifier runs on an isolated corpus copy (prepared by tools/verify.py) generate from exactly their evidence.
 
 For the configured HWP and PDF: a single-document run, a two-document run and a two-document `whitespace_bm25`
 run limited to 2 evidence units. Each is frozen with `verifier_trace`, then generated through the verifier page's
@@ -7,7 +7,7 @@ same `(doc_id, extraction_id, element_ids)` and quotes, same input-token estimat
 whose reservation equals the displayed maximum, and no query embedding. Writes verifier runs and fake ledger rows
 into the declared copy only. Writes `<run_dir>/real-corpus-frozen.json`; exit 0 only when every case passes.
 
-    python tools/verification/real_corpus_frozen.py <run_dir>     # inputs from <run_dir>/inputs.json
+    python tools/verification/real_corpus_frozen.py <run_dir>     # inputs.json written by the verifier-runs flow
 """
 
 from __future__ import annotations

@@ -8,15 +8,17 @@ Every source or model string is rendered through `plain` (Markdown/HTML escaped)
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import re
+import subprocess
 import uuid
 from datetime import date
 
 from . import auth, budget, service
 from .contracts import AnswerRequest, DocRef
-from .settings import load_settings
+from .settings import REPO_ROOT, load_settings
 
 STATUS_TEXT = {
     "answered": "답변",
@@ -140,6 +142,7 @@ def main() -> None:
     with st.sidebar:
         name = st.text_input("이름 (사용·검토 기록용)", value="owner", max_chars=40, key="member_name")
         st.caption("로그인 없이 사용합니다. 이름은 요청·검토·관리 작업의 기록용입니다.")
+        st.caption(f"빌드 {build_head()}")  # the served code's commit, for verification evidence
     principal = auth.visitor(name)
     pages = [st.Page(lambda: consultant_page(st, res, principal), title="컨설턴트", url_path="consultant", default=True),
              st.Page(lambda: verifier_page(st, res, principal), title="검증", url_path="verify"),
@@ -148,6 +151,17 @@ def main() -> None:
     with st.sidebar:
         budget_widget(st, res, principal)
     st.navigation(pages).run()
+
+
+@functools.lru_cache(maxsize=1)
+def build_head() -> str:
+    """The commit this server process loaded (read once at first render), or `unknown` outside a checkout."""
+    try:
+        out = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    head = out.stdout.strip()
+    return head if out.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", head) else "unknown"
 
 
 def budget_widget(st, res, principal) -> None:

@@ -105,11 +105,13 @@ python -m rfp_assistant.cli report --phase 3                          # .runtime
 
 ## 8. Managed verification
 
-`verification.json` is the repository's verification contract: the major-flow checklist, the documents each flow implements, and the exact commands that check it. `tools/verify.py` executes it and writes a receipt bound to the commit. Every command uses the fake provider. The runner removes `OPENAI_API_KEY` and `RFP_*` from child environments and keeps temporary files inside the receipt directory.
+`verification.json` is the manifest for the local verification service (`wiki-agent/local-verification`). It lists the committed contracts, the prose documents, and every major flow. Each flow has a kind (`command` or `browser`), one command, the impacted paths, the environments it uses, and the assertions it must observe. Each flow command is `python -B tools/verify.py <flow-id>`. Its last output is exactly one `local-evidence` block: the head, flow, `environment_id`, `test_scope`, and one observation per assertion (`id`, the exact `expected`, the observed `actual`, `pass`). Browser flows also record the requests sent to the served origin, the browser tool, the build head read from the served app's sidebar (`빌드 <sha>`), and the browser actions.
 
-1. `python tools/verify.py approve-template > verification.local.json`. Inspect `_commands_to_inspect`, fill `approval.approved_by`, keep only the command IDs you allow, and delete `_commands_to_inspect`. The file is git-ignored and not secret. A changed `verification.json` has a new SHA-256, so it needs a new approval.
-2. Optional: set `real_corpus` to an **isolated copy** of the originals and runtime (`isolated_copy: true`, an HWP and a PDF document ID, and a question). The runner refuses the authoritative `.runtime`. Without it, `real-corpus-frozen` is recorded as skipped.
-3. `python tools/verify.py run` runs every flow; use `--flow F5-controlled-stop` or `--command signal-stop` to narrow it. The receipt is `.runtime/verification/<UTC>-<sha7>/receipt.json`, with one log per command. On Windows, `signal-stop` sends a real `CTRL_C_EVENT` to a hidden console child.
-4. Manual browser steps: `python tools/verify.py prepare-ui --corpus fixture` (or `real-corpus`) prints how to launch an isolated fake-provider app. Complete `manual-template.json` from the receipt directory with the observer, results (`pass`, `fail`, `blocked`, `not_applicable`), observations and screenshot paths. Then run `python tools/verify.py record-manual <receipt dir> <file>`. Results for another commit are refused.
-
-`summary.complete` becomes true only when every command passed and every manual step passed or was not applicable. Nothing in the receipt is inferred.
+- **Owner settings** live in `.wiki/verification.local.json`, saved through the local review settings and bound to the manifest digest. The file is git-ignored, and the implementer never supplies it. The `env_file` it names may set `RFP_SOURCE_DIR`/`RFP_DATA_DIR` for the corpus.
+  - Dataset flows read that corpus through an isolated copy. The database is backed up into a temporary runtime and the artifact folders are linked read-only. Requests, verifier runs and fake ledger rows never reach the configured runtime.
+  - Without a configured corpus, the fixture corpus is used, and the observation says which one ran.
+  - Optional: `RFP_VERIFY_QUESTION`, `RFP_VERIFY_HWP_DOC_ID` and `RFP_VERIFY_PDF_DOC_ID`.
+- **Provider:** every flow uses the fake provider. `OPENAI_API_KEY` is removed from child processes.
+- **Browser flows** serve the app on `RFP_VERIFY_ORIGIN` (default `http://127.0.0.1:8765`; include it in `allowed_origins`). They drive the app with Playwright (`pip install -e .[verify]`). `RFP_VERIFY_BROWSER_EXECUTABLE` selects a browser binary; otherwise Playwright's Chromium and then the installed Chrome are tried.
+- **On Windows**, `controlled-stop` sends a real `CTRL_C_EVENT` to a hidden console child.
+- `python -B tools/verify.py --list` shows the flows.
