@@ -1,10 +1,10 @@
-# Answer run A-c7203ff76482 (development finalists)
+# Answer run A-e15212d8c13e (development finalists)
 
-- dataset `dev` (`bd818db806c3`), population `99f419748b8b`, status **complete**
-- model gpt-6-luna (reasoning low), prompt grounded-answer-3, output cap 2000; code `91cb989af046` dirty=False
+- dataset `dev` (`b5e2df5ef7c0`), population `dcb6cd446227`, status **complete**
+- model gpt-6-luna (reasoning low), prompt grounded-answer-3, output cap 2000; code `796c4e176b94` dirty=False
 - blind reviews applied: 0
 
-## Finalist `K1-3a436a8e2a` (kiwi_bm25): 4/4 rows
+## Finalist `K1-f5b26e4852` (kiwi_bm25): 4/4 rows
 
 | Metric | Value |
 | --- | --- |
@@ -25,10 +25,10 @@
 | metadata stratum | n/a (0 eligible) |
 | technical outcomes | none |
 | scope leaks | 0 |
-| settled cost (ledger, every attempt) | $0.000385; earlier attempts $0.000000, pending $0.000000, unknown $0.000000, reconciled attempts 0, retried rows 0 |
-| latency p50/p95 ms | 19.5/23.68 (n=4, sequential, single process, one call at a time) |
+| settled cost (ledger, every attempt) | $0.000386; earlier attempts $0.000000, pending $0.000000, unknown $0.000000, reconciled attempts 0, retried rows 0 |
+| latency p50/p95 ms | 21.15/24.46 (n=4, sequential, single process, one call at a time) |
 
-## Finalist `K0-2517cf0dc5` (whitespace_bm25): 4/4 rows
+## Finalist `K0-9abbc718ff` (whitespace_bm25): 4/4 rows
 
 | Metric | Value |
 | --- | --- |
@@ -50,23 +50,23 @@
 | technical outcomes | none |
 | scope leaks | 0 |
 | settled cost (ledger, every attempt) | $0.000187; earlier attempts $0.000000, pending $0.000000, unknown $0.000000, reconciled attempts 0, retried rows 0 |
-| latency p50/p95 ms | 15.1/21.31 (n=4, sequential, single process, one call at a time) |
+| latency p50/p95 ms | 16.4/22.02 (n=4, sequential, single process, one call at a time) |
 
 ## Finalist comparison
 
 ```json
 {
- "baseline": "K1-3a436a8e2a",
- "candidate": "K0-2517cf0dc5",
+ "baseline": "K1-f5b26e4852",
+ "candidate": "K0-9abbc718ff",
  "claim_correctness_gain": -0.3334,
  "negative_handling_gain": 1.0,
  "new_critical_wrong": [],
  "p95_ms": [
-  23.68,
-  21.31
+  24.46,
+  22.02
  ],
  "settled_micro_usd": [
-  385,
+  386,
   187
  ],
  "note": "development evidence for the owner's selection; small denominators: read the intervals"
