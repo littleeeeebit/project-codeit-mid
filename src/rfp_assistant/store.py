@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
-SCHEMA_VERSION = 4  # 4: extraction reuse keys, metadata resolutions, embedding estimates, run activations
+SCHEMA_VERSION = 5  # 5: background requests, sessions, audit events, corrections, verifier runs
 BUSY_TIMEOUT_MS = 5000
 
 SOURCES_DDL = """
@@ -135,8 +135,13 @@ CREATE TABLE IF NOT EXISTS requests (
     result_json TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
+    request_json TEXT,
+    session_id TEXT,
+    mode TEXT,
+    cancel_requested INTEGER NOT NULL DEFAULT 0,
     UNIQUE (member_id, idempotency_key)
 );
+CREATE INDEX IF NOT EXISTS requests_status ON requests(status);
 CREATE TABLE IF NOT EXISTS attempts (
     attempt_id TEXT PRIMARY KEY,
     request_id TEXT NOT NULL REFERENCES requests(request_id),
@@ -232,6 +237,54 @@ CREATE TABLE IF NOT EXISTS embedding_estimates (
     created_at TEXT NOT NULL,
     expires_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sessions (
+    session_id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    member_revision TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT,
+    revoke_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS sessions_member ON sessions(member_id);
+CREATE TABLE IF NOT EXISTS login_failures (
+    failure_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_key TEXT NOT NULL,
+    at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS login_failures_key ON login_failures(member_key, at);
+CREATE TABLE IF NOT EXISTS audit_events (
+    event_id TEXT PRIMARY KEY,
+    actor TEXT NOT NULL,
+    action TEXT NOT NULL,
+    target TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    details_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS corrections (
+    correction_id TEXT PRIMARY KEY,
+    reviewer TEXT NOT NULL,
+    dataset TEXT,
+    row_id TEXT,
+    run_id TEXT,
+    request_id TEXT,
+    reason TEXT NOT NULL,
+    quote TEXT NOT NULL,
+    evidence_json TEXT NOT NULL,
+    proposal_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS verifier_runs (
+    run_id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    config_id TEXT NOT NULL,
+    config_json TEXT NOT NULL,
+    question TEXT NOT NULL,
+    scope_json TEXT NOT NULL,
+    trace_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS activations (
     activation_id TEXT PRIMARY KEY,
     run_id TEXT NOT NULL,
@@ -242,6 +295,10 @@ CREATE TABLE IF NOT EXISTS activations (
     created_at TEXT NOT NULL
 );
 """
+
+
+REQUEST_COLUMNS_V5 = {"request_json": "TEXT", "session_id": "TEXT", "mode": "TEXT",
+                      "cancel_requested": "INTEGER NOT NULL DEFAULT 0"}
 
 
 def utcnow() -> str:
@@ -288,6 +345,11 @@ def init_schema(db_path: Path) -> int:
                 + "INSERT INTO sources_v3 SELECT * FROM sources; DROP TABLE sources;"
                   "ALTER TABLE sources_v3 RENAME TO sources; COMMIT;")
             conn.execute("PRAGMA foreign_keys = ON")
+        if 0 < version < 5:  # phase 3 request columns; existing rows keep their history
+            have = {r[1] for r in conn.execute("PRAGMA table_info(requests)")}
+            for column, ddl in REQUEST_COLUMNS_V5.items():
+                if column not in have:
+                    conn.execute(f"ALTER TABLE requests ADD COLUMN {column} {ddl}")
         conn.executescript(SCHEMA)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         return SCHEMA_VERSION

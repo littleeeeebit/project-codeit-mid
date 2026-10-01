@@ -5,6 +5,7 @@ Every source or model string is rendered through `plain` (Markdown/HTML escaped)
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import uuid
@@ -70,6 +71,23 @@ def location_text(loc: dict) -> str:
     if loc.get("table_ordinal"):
         parts.append(f"표 {loc['table_ordinal']}")
     return " · ".join(parts) + " (쪽 번호 없음: 원문 파일에서 확인)"
+
+
+# ---------------------------------------------------------------- request ownership (pure, tested)
+
+
+def target_key(scope: list[tuple[str, str]], question: str, mode: str, as_of: str) -> str:
+    """Identity of what the screen currently asks: selected (doc_id, source_hash) pairs, question, mode, date."""
+    data = {"scope": [list(x) for x in scope], "q": " ".join((question or "").split()), "mode": mode, "as_of": as_of}
+    return hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+
+
+def may_attach(owned: dict | None, current_target: str, view) -> bool:
+    """A request's outcome may render on the current answer panel only while the screen still asks exactly what
+    it asked: same request, generation and target, and not cancelled. Otherwise it stays history."""
+    return bool(owned and view is not None and owned.get("target") == current_target
+                and owned.get("request_id") == view.request_id and owned.get("generation_id") == view.generation_id
+                and not view.cancel_requested and view.status != "cancelled")
 
 
 # ---------------------------------------------------------------- shell
