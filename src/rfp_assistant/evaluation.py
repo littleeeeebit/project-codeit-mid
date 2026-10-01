@@ -210,8 +210,9 @@ def validate_gold(settings: Settings, name: str) -> dict:
 # 3: runs bind the evaluated population (scored rows and their pinned evidence), not only the dataset bytes.
 # 4: runs require an index matching the current analyzer/query policy and its frozen metadata snapshot.
 EVAL_VERSION = "retrieval-eval-4"
-# Gold-2 runs record their ranking policy, so a run scored before span deduplication is never reused.
-GOLD_RANKING_POLICY = "gold2-dedup-spans-1"
+# Gold-2 runs record their ranking policy, so a run scored under another deduplication rule is never reused.
+# 1: repeats keyed by alternative and grade; 2: repeats keyed by the source coverage a chunk carries.
+GOLD_RANKING_POLICY = "gold2-dedup-coverage-2"
 RANK_DEPTH = 20
 CRITICAL_CODE_TYPES = {"repeated_code", "requirement_detail", "exact_identifier"}
 CRITICAL_EVIDENCE_TYPES = {"numeric_qualifier"}  # an amount/date/VAT condition must reach the packed context
@@ -503,26 +504,72 @@ def group_grade(chunk: dict, group: dict, elements: dict) -> int:
                default=0)
 
 
+def coverage(chunk: dict, unit: dict, element: dict | None) -> frozenset | None:
+    """The part of a quoted evidence span a chunk carries, as comparable atoms: character offsets of the quote in
+    the element text, quoted table rows, or character offsets of the quote inside one row fragment. None when it
+    cannot be located (the chunk then never counts as a repeat)."""
+    if element is None:
+        return None
+    atoms: set = set()
+    for span in chunk["spans"]:
+        if span["element_id"] != unit["element_id"]:
+            continue
+        if "rows" in span and span.get("fragment"):
+            frag = span["fragment"]
+            line = dict(table_rows(element)).get(frag["row"], "") if element.get("table") else ""
+            rng = _quote_range(line, unit["quote"])
+            if rng:
+                atoms.update(("f", frag["row"], i) for i in range(max(rng[0], frag["start"]), min(rng[1], frag["end"])))
+                continue
+            rows = _quote_rows(element, unit["quote"])
+            if not rows:
+                return None
+            atoms.update(("r", r) for r in rows & (set(span["rows"]) - {frag["row"]}))
+        elif "rows" in span:
+            rows = _quote_rows(element, unit["quote"])
+            if not rows:
+                return None
+            atoms.update(("r", r) for r in rows & set(span["rows"]))
+        else:
+            rng = _quote_range(element["raw_text"], unit["quote"])
+            if rng is None:
+                return None
+            atoms.update(("c", i) for i in range(max(rng[0], span["start"]), min(rng[1], span["end"])))
+    return frozenset(atoms)
+
+
 def dedup_ranking(ranking: list[dict], groups: list[dict], elements: dict) -> tuple[list[dict], int]:
-    """Canonical ranking for gold-2 ranked metrics: a chunk that only repeats a source span already credited
-    higher up (an overlapping passage over the same alternative, at no higher grade) is removed before rank
-    positions and cutoffs apply. A chunk supporting nothing stays as a rank-consuming zero; a chunk adding support
-    (a new group or a fuller span) stays; and so does a chunk carrying another alternative of a credited fact,
-    which is a different passage, not a repeat (it grades 0). Returns the ranking and the number removed."""
-    seen: dict[tuple[int, int], int] = {}
+    """Canonical ranking for gold-2 ranked metrics: a chunk that only repeats source coverage already credited
+    higher up is removed before rank positions and cutoffs apply. A supporting alternative is a repeat when that
+    alternative's complete span was already credited, or when the characters/rows of it this chunk carries were
+    all carried by earlier chunks; two different pieces of one quote are distinct support and both stay. A chunk
+    supporting nothing stays as a rank-consuming zero; a chunk adding group support stays; another alternative of
+    a credited fact is a different passage and stays (grading 0). Returns the ranking and the number removed."""
+    full: set[tuple[int, int]] = set()
+    seen: dict[tuple[int, int], set] = {}
     credited = [0] * len(groups)
     out, removed = [], 0
     for chunk in ranking:
-        alt = {(j, i): grade(chunk, a, elements.get((a["extraction_id"], a["element_id"])))
-               for j, g in enumerate(groups) for i, a in enumerate(g["alternatives"])}
-        hits = {k: v for k, v in alt.items() if v}
+        hits, cover = {}, {}
+        for j, g in enumerate(groups):
+            for i, a in enumerate(g["alternatives"]):
+                el = elements.get((a["extraction_id"], a["element_id"]))
+                v = grade(chunk, a, el)
+                if v:
+                    hits[(j, i)] = v
+                    cover[(j, i)] = coverage(chunk, a, el) if v == 1 else None
         best = [max((v for (j, _), v in hits.items() if j == n), default=0) for n in range(len(groups))]
-        if hits and all(v <= seen.get(k, 0) for k, v in hits.items()) \
-                and not any(b > c for b, c in zip(best, credited)):
+        repeat = bool(hits) and not any(b > c for b, c in zip(best, credited)) and all(
+            k in full or (v == 1 and cover[k] is not None and cover[k] <= seen.get(k, set()))
+            for k, v in hits.items())
+        if repeat:
             removed += 1
             continue
         for k, v in hits.items():
-            seen[k] = max(seen.get(k, 0), v)
+            if v == 2:
+                full.add(k)
+            elif cover[k] is not None:
+                seen.setdefault(k, set()).update(cover[k])
         credited = [max(b, c) for b, c in zip(best, credited)]
         out.append(chunk)
     return out, removed

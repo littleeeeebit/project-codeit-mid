@@ -169,9 +169,32 @@ class MetricFixtureTest(unittest.TestCase):
         miss = evaluation.score_row(row, [chunk("amount", 0, 30), chunk("alt", 0, 5), chunk("vat", 0, 8)], [], ELS)
         self.assertEqual((miss["graded@5"], miss["duplicates_removed"]), ([2, 0, 1], 0))
         self.assertLess(miss["ndcg@5"], clean["ndcg@5"])
+        # Review round 6: two disjoint pieces of one quote are distinct partial support, not a repeat
+        left, right = chunk("vat", 6, 10), chunk("vat", 10, 16)
+        halves = evaluation.score_row(row, [left, right, chunk("amount", 0, 30)], [], ELS)
+        self.assertEqual((halves["duplicates_removed"], halves["graded@5"], halves["mrr"]), (0, [1, 0, 2], 0.3333))
+        again = evaluation.score_row(row, [left, right, chunk("vat", 7, 9), chunk("amount", 0, 30)], [], ELS)
+        self.assertEqual((again["duplicates_removed"], again["mrr"]), (1, 0.3333))  # inside covered characters
         # packed figures stay faithful to what was packed, repeats included
         packed = evaluation.score_row(row, [], [chunk("amount", 0, 30), chunk("amount", 5, 30)], ELS)
         self.assertEqual((packed["packed_grades"], packed["packed_complete"]), ([2, 0], 0))
+
+    def test_pieces_of_one_table_cell_are_distinct_partial_support(self):
+        cells = [{"row": 0, "col": 0, "text": "항목"}, {"row": 0, "col": 1, "text": "금액"},
+                 {"row": 1, "col": 0, "text": "사업비"}, {"row": 1, "col": 1, "text": "총 사업비 130,000,000원 부가세 포함"}]
+        els = {("x", "t"): {"raw_text": "", "table": {"cells": cells}}}
+        line = "사업비 | 총 사업비 130,000,000원 부가세 포함"
+        quote = "130,000,000원 부가세 포함"
+        a = line.index(quote)
+        piece = lambda start, end: {"extraction_id": "x", "spans": [  # noqa: E731
+            {"element_id": "t", "rows": [0, 1], "fragment": {"row": 1, "start": start, "end": end}}]}
+        groups = [grp("g1", ("t", quote))]
+        first, second, inner = piece(a, a + 6), piece(a + 6, len(line)), piece(a + 1, a + 4)
+        self.assertEqual([evaluation.group_grade(c, groups[0], els) for c in (first, second, inner)], [1, 1, 1])
+        ranking, removed = evaluation.dedup_ranking([first, second, inner], groups, els)
+        self.assertEqual((ranking, removed), ([first, second], 1))
+        whole = piece(0, len(line))
+        self.assertEqual(evaluation.dedup_ranking([whole, first], groups, els), ([whole], 1))
 
     def test_ndcg_matches_the_hand_calculation_and_mrr(self):
         import math
