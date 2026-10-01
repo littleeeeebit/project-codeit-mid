@@ -127,7 +127,7 @@
   "dev": {
    "dataset": "dev",
    "schema": "gold-2",
-   "dataset_sha256": "51734545cbe5b188fdad54a1a3729afc2461d2cbf93e1b3f9e38d80b4c47d5ad",
+   "dataset_sha256": "5a75deecad5cfab94b0da48200604003b66542efb4b156c0701cb802afd82fff",
    "rows": 4,
    "label": "pilot",
    "targets": {
@@ -185,18 +185,18 @@
     "late": 2,
     "none": 1
    },
-   "review_log_sha256": "9d889506f52a328662c6f6c75e2b6b80e68e96000826e2a350ff51a05e577e92",
-   "families_sha256": "fbc7b17a85f013ac0ec47b78a85fb3a2b03ae5a7b398136ebdabeec85562ddbc",
+   "review_log_sha256": "d207264b83be599dcafbba62b07a8f536d00cff9d49e0d4007f22d46d37fb263",
+   "families_sha256": "8e75320a97b5a4022c8c7fad759de06bd2a7ab8c4d53011956681fde618c785e",
    "frozen_by": "owner",
    "reason": "walkthrough",
-   "frozen_at": "2026-10-01T14:13:42.957080+00:00",
+   "frozen_at": "2026-10-01T14:24:35.352241+00:00",
    "changed": [],
    "current": true
   },
   "test": {
    "dataset": "test",
    "schema": "gold-2",
-   "dataset_sha256": "47c1d87073f2b3d56ac712f95d25d859704b1575acf7e62f7a48f033a8a7f852",
+   "dataset_sha256": "5ec57825ac3954434be69bb28696aa6ed939f95437f8abc678c08910f506382f",
    "rows": 1,
    "label": "pilot",
    "targets": {
@@ -254,21 +254,21 @@
     "late": 1,
     "none": 0
    },
-   "review_log_sha256": "d59081e36a6eb336cad32dd89d6f8833a26192ea91dcb2377a2c217ebc722f72",
-   "families_sha256": "fbc7b17a85f013ac0ec47b78a85fb3a2b03ae5a7b398136ebdabeec85562ddbc",
+   "review_log_sha256": "32a6bad4b8ad021b36b7c9ac83a0ee391209c1a99aa85177276bcad728fe0241",
+   "families_sha256": "8e75320a97b5a4022c8c7fad759de06bd2a7ab8c4d53011956681fde618c785e",
    "frozen_by": "owner",
    "reason": "walkthrough",
-   "frozen_at": "2026-10-01T14:13:43.239020+00:00",
+   "frozen_at": "2026-10-01T14:24:35.651263+00:00",
    "changed": [],
    "current": true
   }
  },
  "retrieval_runs": [
   {
-   "run_id": "K0-480d0206c9",
+   "run_id": "K0-25ff8f426e",
    "label": "K0",
    "mode": "whitespace_bm25",
-   "dataset_sha256": "51734545cbe5b188fdad54a1a3729afc2461d2cbf93e1b3f9e38d80b4c47d5ad",
+   "dataset_sha256": "5a75deecad5cfab94b0da48200604003b66542efb4b156c0701cb802afd82fff",
    "population_size": 4,
    "scored": 3,
    "hit@20": {
@@ -307,17 +307,17 @@
    "wrong_scope": 0,
    "latency_ms": {
     "p50": 0.1,
-    "p95": 0.37,
+    "p95": 0.46,
     "n": 3
    },
    "query_cost_micro_usd": null,
    "blocking": []
   },
   {
-   "run_id": "K1-a40883b509",
+   "run_id": "K1-0b21c1af14",
    "label": "K1",
    "mode": "kiwi_bm25",
-   "dataset_sha256": "51734545cbe5b188fdad54a1a3729afc2461d2cbf93e1b3f9e38d80b4c47d5ad",
+   "dataset_sha256": "5a75deecad5cfab94b0da48200604003b66542efb4b156c0701cb802afd82fff",
    "population_size": 4,
    "scored": 3,
    "hit@20": {
@@ -353,7 +353,7 @@
    "wrong_scope": 0,
    "latency_ms": {
     "p50": 1.0,
-    "p95": 1704.7,
+    "p95": 1714.42,
     "n": 3
    },
    "query_cost_micro_usd": null,
@@ -362,12 +362,12 @@
  ],
  "answer_runs": [
   {
-   "run_id": "A-3e0ab6e52116",
+   "run_id": "A-ef6357509fc2",
    "label": "development finalists",
    "status": "complete",
    "stop_reason": null,
    "finalists": {
-    "K1-a40883b509": {
+    "K1-0b21c1af14": {
      "mode": "kiwi_bm25",
      "completed": 4,
      "of": 4,
@@ -520,8 +520,8 @@
       "per_question_micro_usd": 96.2
      },
      "latency_ms": {
-      "p50": 21.2,
-      "p95": 24.79,
+      "p50": 24.55,
+      "p95": 28.77,
       "n": 4,
       "condition": "sequential, single process, one call at a time"
      },
@@ -579,8 +579,8 @@
       "critical_failures": [],
       "missing_in_packed": 0,
       "latency_ms": {
-       "p50": 1.4,
-       "p95": 1.4,
+       "p50": 1.2,
+       "p95": 1.38,
        "n": 3
       },
       "fallbacks": [],
@@ -638,7 +638,7 @@
       }
      }
     },
-    "K0-480d0206c9": {
+    "K0-25ff8f426e": {
      "mode": "whitespace_bm25",
      "completed": 4,
      "of": 4,
@@ -789,8 +789,8 @@
       "per_question_micro_usd": 46.8
      },
      "latency_ms": {
-      "p50": 16.7,
-      "p95": 22.49,
+      "p50": 17.55,
+      "p95": 26.96,
       "n": 4,
       "condition": "sequential, single process, one call at a time"
      },
@@ -852,7 +852,7 @@
       "missing_in_packed": 2,
       "latency_ms": {
        "p50": 0.2,
-       "p95": 0.29,
+       "p95": 0.38,
        "n": 3
       },
       "fallbacks": [],
@@ -912,14 +912,14 @@
     }
    },
    "selection": {
-    "baseline": "K1-a40883b509",
-    "candidate": "K0-480d0206c9",
+    "baseline": "K1-0b21c1af14",
+    "candidate": "K0-25ff8f426e",
     "claim_correctness_gain": -0.3334,
     "negative_handling_gain": 1.0,
     "new_critical_wrong": [],
     "p95_ms": [
-     24.79,
-     22.49
+     28.77,
+     26.96
     ],
     "settled_micro_usd": [
      385,
@@ -931,13 +931,13 @@
  ],
  "sealed_runs": [
   {
-   "run_id": "S-d2784be48a71",
+   "run_id": "S-0286b139ce8d",
    "label": "sealed test",
-   "freeze_id": "F-126bacca0d",
+   "freeze_id": "F-f0f1cb0136",
    "status": "complete",
    "stop_reason": null,
    "finalists": {
-    "K1-a40883b509": {
+    "K1-0b21c1af14": {
      "mode": "kiwi_bm25",
      "completed": 1,
      "of": 1,
@@ -1067,8 +1067,8 @@
       "per_question_micro_usd": 85.0
      },
      "latency_ms": {
-      "p50": 43.7,
-      "p95": 43.7,
+      "p50": 26.2,
+      "p95": 26.2,
       "n": 1,
       "condition": "sequential, single process, one call at a time"
      },
@@ -1123,8 +1123,8 @@
       "critical_failures": [],
       "missing_in_packed": 0,
       "latency_ms": {
-       "p50": 1.9,
-       "p95": 1.9,
+       "p50": 1.4,
+       "p95": 1.4,
        "n": 1
       },
       "fallbacks": [],
@@ -1150,13 +1150,13 @@
      }
     }
    },
-   "scored_at": "2026-10-01T14:14:10.050339+00:00"
+   "scored_at": "2026-10-01T14:25:02.640859+00:00"
   }
  ],
  "latency": [
   {
-   "run_id": "L-6eda5c26c78e",
-   "estimate_id": "85569e82d874",
+   "run_id": "L-0bf2ac75f057",
+   "estimate_id": "bf152623d994",
    "actor": "owner",
    "provider": "fake",
    "users": 6,
@@ -1165,55 +1165,55 @@
    "n": 12,
    "failures": 0,
    "all_ms": {
-    "p50": 129.05,
-    "p95": 162.9,
+    "p50": 105.3,
+    "p95": 144.69,
     "n": 12
    },
    "warm_ms": {
-    "p50": 101.0,
-    "p95": 135.78,
+    "p50": 93.8,
+    "p95": 123.22,
     "n": 6,
     "note": "waves after the first"
    },
-   "cold_wave_ms": 176.3,
+   "cold_wave_ms": 159.7,
    "waves": [
     {
      "wave": 1,
-     "wall_ms": 176.3,
+     "wall_ms": 159.7,
      "requests": [
       {
        "question_id": "dev-warranty",
-       "ms": 125.7,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-amount",
-       "ms": 132.4,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-deadline",
-       "ms": 133.4,
+       "ms": 104.1,
        "status": "answered",
        "billing": "settled"
       },
       {
        "question_id": "dev-warranty",
-       "ms": 141.1,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-amount",
-       "ms": 152.6,
+       "ms": 106.5,
        "status": "answered",
        "billing": "settled"
       },
       {
        "question_id": "dev-deadline",
-       "ms": 175.5,
+       "ms": 111.1,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-amount",
+       "ms": 118.6,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-deadline",
+       "ms": 132.9,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-amount",
+       "ms": 159.1,
        "status": "answered",
        "billing": "settled"
       }
@@ -1221,41 +1221,41 @@
     },
     {
      "wave": 2,
-     "wall_ms": 143.3,
+     "wall_ms": 130.9,
      "requests": [
       {
-       "question_id": "dev-deadline",
-       "ms": 88.2,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-warranty",
-       "ms": 90.5,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-deadline",
-       "ms": 99.1,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-warranty",
-       "ms": 102.9,
+       "question_id": "dev-amount",
+       "ms": 73.7,
        "status": "answered",
        "billing": "settled"
       },
       {
        "question_id": "dev-amount",
-       "ms": 117.1,
+       "ms": 84.8,
        "status": "answered",
        "billing": "settled"
       },
       {
-       "question_id": "dev-amount",
-       "ms": 142.0,
+       "question_id": "dev-deadline",
+       "ms": 91.1,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-warranty",
+       "ms": 96.5,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-warranty",
+       "ms": 102.6,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-deadline",
+       "ms": 130.1,
        "status": "answered",
        "billing": "settled"
       }
@@ -1263,9 +1263,9 @@
     }
    ],
    "serving": {
-    "run_id": "K1-a40883b509",
+    "run_id": "K1-0b21c1af14",
     "mode": "kiwi_bm25",
-    "index_version": "79debd8b66f91dc9"
+    "index_version": "5299607e93a32f7d"
    },
    "hardware": {
     "platform": "Linux-6.18.44-fc-v50-x86_64-with-glibc2.39",
@@ -1274,11 +1274,11 @@
     "cpu_count": 4
    },
    "code": {
-    "source_sha256": "4a73fd972fb7314e4118e0272f6b2dc30248598109f26adda00df6aaee3bacf0",
-    "git_revision": "76104d1fd52c1693c2b24bfbf19ed8861fe11b60",
+    "source_sha256": "47a87b78c66f2efa02abdfa621c6929ce5d68b9790ef766fbee7ee4bb7e3c03c",
+    "git_revision": "5c23a991cf23dd485b8a5eaf42272abd034a4df3",
     "git_dirty": false
    },
-   "recorded_at": "2026-10-01T14:14:28.950099+00:00",
+   "recorded_at": "2026-10-01T14:25:17.557961+00:00",
    "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
   }
  ],

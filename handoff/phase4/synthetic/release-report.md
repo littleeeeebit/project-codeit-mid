@@ -1,6 +1,6 @@
-# Release report F-126bacca0d
+# Release report F-f0f1cb0136
 
-Generated 2026-10-01T14:14:30.164628+00:00 from `data/` state. Every figure is read from recorded evidence; anything not run is listed as missing. This command never generates an answer.
+Generated 2026-10-01T14:25:18.756791+00:00 from `data/` state. Every figure is read from recorded evidence; anything not run is listed as missing. This command never generates an answer.
 
 ## Decision: **limited**
 
@@ -12,11 +12,11 @@ Generated 2026-10-01T14:14:30.164628+00:00 from `data/` state. Every figure is r
 
 ## Release manifest
 
-- code: Git `76104d1fd52c1693c2b24bfbf19ed8861fe11b60` (uncommitted changes: False), package source `4a73fd972fb7314e`; metric code `fa53570261d80c6f`
-- model gpt-6-luna, reasoning low, output cap 2000, prompt grounded-answer-3, rates openai-standard-gpt-6-luna-2026-09-30, settings `a9152d1ca446276c`
-- serving: run `K1-a40883b509` (kiwi_bm25), keyword index `79debd8b66f91dc9`, dense `None`, reranker None; fallback kiwi_bm25
+- code: Git `5c23a991cf23dd485b8a5eaf42272abd034a4df3` (uncommitted changes: False), package source `47a87b78c66f2efa`; metric code `63087ad3a89853cd`
+- model gpt-6-luna, reasoning low, output cap 2000, prompt grounded-answer-3, rates openai-standard-gpt-6-luna-2026-09-30, settings `081d77fe8995754d`
+- serving: run `K1-0b21c1af14` (kiwi_bm25), keyword index `5299607e93a32f7d`, dense `None`, reranker None; fallback kiwi_bm25
 - dependencies: requirements-lock.txt `060fd9cdbdc949a3`; hardware {'platform': 'Linux-6.18.44-fc-v50-x86_64-with-glibc2.39', 'machine': 'x86_64', 'python': '3.12.3', 'cpu_count': 4}
-- freeze: {'freeze_id': 'F-126bacca0d', 'frozen_at': '2026-10-01T14:14:01.928077+00:00', 'selected_run_id': 'K1-a40883b509', 'decided_by': 'owner', 'post_test': False}
+- freeze: {'freeze_id': 'F-f0f1cb0136', 'frozen_at': '2026-10-01T14:24:54.469121+00:00', 'selected_run_id': 'K1-0b21c1af14', 'decided_by': 'owner', 'post_test': False}
 
 ## Coverage
 
@@ -27,26 +27,26 @@ Generated 2026-10-01T14:14:30.164628+00:00 from `data/` state. Every figure is r
 
 ## Datasets
 
-- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}; frozen `51734545cbe5` (current True)
-- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}; frozen `47c1d87073f2` (current True)
+- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}; frozen `5a75deecad5c` (current True)
+- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}; frozen `5ec57825ac39` (current True)
 
 ## Retrieval runs (development, retrieval only)
 
 | Run | Mode | Scored | hit@20 single | complete@20 multi | nDCG@5 | MRR | Critical | Wrong scope | p95 ms |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `K0-480d0206c9` | whitespace_bm25 | 3 | 0.5 (1/2) | 0.0 | 0.5377 | 0.6667 | ['dev-amount', 'dev-deadline'] | 0 | 0.37 |
-| `K1-a40883b509` | kiwi_bm25 | 3 | 1.0 (2/2) | 1.0 | 1.0 | 1.0 | [] | 0 | 1704.7 |
+| `K0-25ff8f426e` | whitespace_bm25 | 3 | 0.5 (1/2) | 0.0 | 0.5377 | 0.6667 | ['dev-amount', 'dev-deadline'] | 0 | 0.46 |
+| `K1-0b21c1af14` | kiwi_bm25 | 3 | 1.0 (2/2) | 1.0 | 1.0 | 1.0 | [] | 0 | 1714.42 |
 
 ## Answer evaluation
 
-- development run `A-3e0ab6e52116` (complete): see `runs/A-3e0ab6e52116/report.md`
-  - `K1-a40883b509` (kiwi_bm25) 4/4: claims 0.6667 (n=3), critical wrong 0, citation precision lower bound 1.0, negatives 0.0 (n=1), cost $0.000385
-  - `K0-480d0206c9` (whitespace_bm25) 4/4: claims 0.3333 (n=3), critical wrong 0, citation precision lower bound 1.0, negatives 1.0 (n=1), cost $0.000187
-- sealed run `S-d2784be48a71` (sealed test, complete) under freeze `F-126bacca0d`
+- development run `A-ef6357509fc2` (complete): see `runs/A-ef6357509fc2/report.md`
+  - `K1-0b21c1af14` (kiwi_bm25) 4/4: claims 0.6667 (n=3), critical wrong 0, citation precision lower bound 1.0, negatives 0.0 (n=1), cost $0.000385
+  - `K0-25ff8f426e` (whitespace_bm25) 4/4: claims 0.3333 (n=3), critical wrong 0, citation precision lower bound 1.0, negatives 1.0 (n=1), cost $0.000187
+- sealed run `S-0286b139ce8d` (sealed test, complete) under freeze `F-f0f1cb0136`
 
 ## Latency
 
-- fake sample `L-6eda5c26c78e`: n=12, failures 0, warm p50/p95 101.0/135.78 ms (n=6), cold first wave 176.3 ms, 6 users × 2 waves
+- fake sample `L-0bf2ac75f057`: n=12, failures 0, warm p50/p95 93.8/123.22 ms (n=6), cold first wave 159.7 ms, 6 users × 2 waves
 
 ## Checks
 
@@ -78,8 +78,8 @@ Generated 2026-10-01T14:14:30.164628+00:00 from `data/` state. Every figure is r
 
 ## Mentor walkthrough
 
-- not recorded for this candidate: follow docs/operations/runbook.md §10.6 and save `releases/F-126bacca0d/walkthrough-results.json`
+- not recorded for this candidate: follow docs/operations/runbook.md §10.6 and save `releases/F-f0f1cb0136/walkthrough-results.json`
 
 ## Restore drills
 
-- 2026-10-01T14:14:29.845699+00:00: passed — backup `backup-1`, spent $0.001805, pending $0.000000, unknown $0.000000, prior use $0.000000
+- 2026-10-01T14:25:18.415568+00:00: passed — backup `backup-1`, spent $0.001805, pending $0.000000, unknown $0.000000, prior use $0.000000
