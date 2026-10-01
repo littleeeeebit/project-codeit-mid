@@ -127,7 +127,7 @@
   "dev": {
    "dataset": "dev",
    "schema": "gold-2",
-   "dataset_sha256": "5a75deecad5cfab94b0da48200604003b66542efb4b156c0701cb802afd82fff",
+   "dataset_sha256": "5397e5ffff441cef55b8f83dbfbec320f453a27e8010f9295c4b08955bfc68e4",
    "rows": 4,
    "label": "pilot",
    "targets": {
@@ -185,18 +185,18 @@
     "late": 2,
     "none": 1
    },
-   "review_log_sha256": "d207264b83be599dcafbba62b07a8f536d00cff9d49e0d4007f22d46d37fb263",
-   "families_sha256": "8e75320a97b5a4022c8c7fad759de06bd2a7ab8c4d53011956681fde618c785e",
+   "review_log_sha256": "cbe0b194a93050e5cf429ab1638289d8749f7915851b392846f1d06850becce8",
+   "families_sha256": "2452a8f178661c05f758ad4592ce3cbf5236f85d0fdeac1188106dc2cf7c1cd7",
    "frozen_by": "owner",
    "reason": "walkthrough",
-   "frozen_at": "2026-10-01T14:24:35.352241+00:00",
+   "frozen_at": "2026-10-01T15:29:06.009995+00:00",
    "changed": [],
    "current": true
   },
   "test": {
    "dataset": "test",
    "schema": "gold-2",
-   "dataset_sha256": "5ec57825ac3954434be69bb28696aa6ed939f95437f8abc678c08910f506382f",
+   "dataset_sha256": "75bbc29147f3a86ddecc0b4c8fbb089f153c27587a2b7da6b70435ec5d783c63",
    "rows": 1,
    "label": "pilot",
    "targets": {
@@ -254,21 +254,21 @@
     "late": 1,
     "none": 0
    },
-   "review_log_sha256": "32a6bad4b8ad021b36b7c9ac83a0ee391209c1a99aa85177276bcad728fe0241",
-   "families_sha256": "8e75320a97b5a4022c8c7fad759de06bd2a7ab8c4d53011956681fde618c785e",
+   "review_log_sha256": "4cac7c05fefe44f3f5df0bb87530dbfa13189fe28c0a9f205884405277a771b6",
+   "families_sha256": "2452a8f178661c05f758ad4592ce3cbf5236f85d0fdeac1188106dc2cf7c1cd7",
    "frozen_by": "owner",
    "reason": "walkthrough",
-   "frozen_at": "2026-10-01T14:24:35.651263+00:00",
+   "frozen_at": "2026-10-01T15:29:06.296353+00:00",
    "changed": [],
    "current": true
   }
  },
  "retrieval_runs": [
   {
-   "run_id": "K0-25ff8f426e",
+   "run_id": "K0-3359719023",
    "label": "K0",
    "mode": "whitespace_bm25",
-   "dataset_sha256": "5a75deecad5cfab94b0da48200604003b66542efb4b156c0701cb802afd82fff",
+   "dataset_sha256": "5397e5ffff441cef55b8f83dbfbec320f453a27e8010f9295c4b08955bfc68e4",
    "population_size": 4,
    "scored": 3,
    "hit@20": {
@@ -307,17 +307,17 @@
    "wrong_scope": 0,
    "latency_ms": {
     "p50": 0.1,
-    "p95": 0.46,
+    "p95": 0.37,
     "n": 3
    },
    "query_cost_micro_usd": null,
    "blocking": []
   },
   {
-   "run_id": "K1-0b21c1af14",
+   "run_id": "K1-d3eaa7ed7f",
    "label": "K1",
    "mode": "kiwi_bm25",
-   "dataset_sha256": "5a75deecad5cfab94b0da48200604003b66542efb4b156c0701cb802afd82fff",
+   "dataset_sha256": "5397e5ffff441cef55b8f83dbfbec320f453a27e8010f9295c4b08955bfc68e4",
    "population_size": 4,
    "scored": 3,
    "hit@20": {
@@ -352,8 +352,8 @@
    "critical_failures": [],
    "wrong_scope": 0,
    "latency_ms": {
-    "p50": 1.0,
-    "p95": 1714.42,
+    "p50": 0.9,
+    "p95": 1719.09,
     "n": 3
    },
    "query_cost_micro_usd": null,
@@ -362,12 +362,12 @@
  ],
  "answer_runs": [
   {
-   "run_id": "A-ef6357509fc2",
+   "run_id": "A-327d834b539a",
    "label": "development finalists",
    "status": "complete",
    "stop_reason": null,
    "finalists": {
-    "K1-0b21c1af14": {
+    "K1-d3eaa7ed7f": {
      "mode": "kiwi_bm25",
      "completed": 4,
      "of": 4,
@@ -520,8 +520,8 @@
       "per_question_micro_usd": 96.2
      },
      "latency_ms": {
-      "p50": 24.55,
-      "p95": 28.77,
+      "p50": 23.25,
+      "p95": 24.54,
       "n": 4,
       "condition": "sequential, single process, one call at a time"
      },
@@ -580,7 +580,7 @@
       "missing_in_packed": 0,
       "latency_ms": {
        "p50": 1.2,
-       "p95": 1.38,
+       "p95": 1.29,
        "n": 3
       },
       "fallbacks": [],
@@ -635,10 +635,15 @@
        "non_passage_rows": 0,
        "types": [],
        "skipped": []
+      },
+      "ndcg_pool": {
+       "judged_units": "required evidence groups (predeclared source spans)",
+       "unlabelled_top5_passages": 1,
+       "blind_review_of_unlabelled": "not implemented"
       }
      }
     },
-    "K0-25ff8f426e": {
+    "K0-3359719023": {
      "mode": "whitespace_bm25",
      "completed": 4,
      "of": 4,
@@ -789,8 +794,8 @@
       "per_question_micro_usd": 46.8
      },
      "latency_ms": {
-      "p50": 17.55,
-      "p95": 26.96,
+      "p50": 17.65,
+      "p95": 24.16,
       "n": 4,
       "condition": "sequential, single process, one call at a time"
      },
@@ -851,8 +856,8 @@
       ],
       "missing_in_packed": 2,
       "latency_ms": {
-       "p50": 0.2,
-       "p95": 0.38,
+       "p50": 0.3,
+       "p95": 0.39,
        "n": 3
       },
       "fallbacks": [],
@@ -907,19 +912,24 @@
        "non_passage_rows": 0,
        "types": [],
        "skipped": []
+      },
+      "ndcg_pool": {
+       "judged_units": "required evidence groups (predeclared source spans)",
+       "unlabelled_top5_passages": 1,
+       "blind_review_of_unlabelled": "not implemented"
       }
      }
     }
    },
    "selection": {
-    "baseline": "K1-0b21c1af14",
-    "candidate": "K0-25ff8f426e",
+    "baseline": "K1-d3eaa7ed7f",
+    "candidate": "K0-3359719023",
     "claim_correctness_gain": -0.3334,
     "negative_handling_gain": 1.0,
     "new_critical_wrong": [],
     "p95_ms": [
-     28.77,
-     26.96
+     24.54,
+     24.16
     ],
     "settled_micro_usd": [
      385,
@@ -931,13 +941,13 @@
  ],
  "sealed_runs": [
   {
-   "run_id": "S-0286b139ce8d",
+   "run_id": "S-d46d4f2ebe7f",
    "label": "sealed test",
-   "freeze_id": "F-f0f1cb0136",
+   "freeze_id": "F-b71a9beabd",
    "status": "complete",
    "stop_reason": null,
    "finalists": {
-    "K1-0b21c1af14": {
+    "K1-d3eaa7ed7f": {
      "mode": "kiwi_bm25",
      "completed": 1,
      "of": 1,
@@ -1067,8 +1077,8 @@
       "per_question_micro_usd": 85.0
      },
      "latency_ms": {
-      "p50": 26.2,
-      "p95": 26.2,
+      "p50": 25.1,
+      "p95": 25.1,
       "n": 1,
       "condition": "sequential, single process, one call at a time"
      },
@@ -1146,17 +1156,22 @@
        "non_passage_rows": 0,
        "types": [],
        "skipped": []
+      },
+      "ndcg_pool": {
+       "judged_units": "required evidence groups (predeclared source spans)",
+       "unlabelled_top5_passages": 0,
+       "blind_review_of_unlabelled": "not implemented"
       }
      }
     }
    },
-   "scored_at": "2026-10-01T14:25:02.640859+00:00"
+   "scored_at": "2026-10-01T15:29:32.218026+00:00"
   }
  ],
  "latency": [
   {
-   "run_id": "L-0bf2ac75f057",
-   "estimate_id": "bf152623d994",
+   "run_id": "L-8ce8c7c0881d",
+   "estimate_id": "382d68d520bb",
    "actor": "owner",
    "provider": "fake",
    "users": 6,
@@ -1165,55 +1180,55 @@
    "n": 12,
    "failures": 0,
    "all_ms": {
-    "p50": 105.3,
-    "p95": 144.69,
+    "p50": 122.6,
+    "p95": 167.98,
     "n": 12
    },
    "warm_ms": {
-    "p50": 93.8,
-    "p95": 123.22,
+    "p50": 83.3,
+    "p95": 104.3,
     "n": 6,
     "note": "waves after the first"
    },
-   "cold_wave_ms": 159.7,
+   "cold_wave_ms": 174.2,
    "waves": [
     {
      "wave": 1,
-     "wall_ms": 159.7,
+     "wall_ms": 174.2,
      "requests": [
       {
-       "question_id": "dev-warranty",
-       "ms": 104.1,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-warranty",
-       "ms": 106.5,
+       "question_id": "dev-amount",
+       "ms": 135.1,
        "status": "answered",
        "billing": "settled"
       },
       {
        "question_id": "dev-deadline",
-       "ms": 111.1,
+       "ms": 137.1,
        "status": "answered",
        "billing": "settled"
       },
       {
-       "question_id": "dev-amount",
-       "ms": 118.6,
+       "question_id": "dev-warranty",
+       "ms": 149.3,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-warranty",
+       "ms": 151.1,
        "status": "answered",
        "billing": "settled"
       },
       {
        "question_id": "dev-deadline",
-       "ms": 132.9,
+       "ms": 163.3,
        "status": "answered",
        "billing": "settled"
       },
       {
        "question_id": "dev-amount",
-       "ms": 159.1,
+       "ms": 173.7,
        "status": "answered",
        "billing": "settled"
       }
@@ -1221,41 +1236,41 @@
     },
     {
      "wave": 2,
-     "wall_ms": 130.9,
+     "wall_ms": 112.2,
      "requests": [
       {
-       "question_id": "dev-amount",
-       "ms": 73.7,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-amount",
-       "ms": 84.8,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
        "question_id": "dev-deadline",
-       "ms": 91.1,
+       "ms": 64.5,
        "status": "answered",
        "billing": "settled"
       },
       {
        "question_id": "dev-warranty",
-       "ms": 96.5,
+       "ms": 75.0,
        "status": "answered",
        "billing": "settled"
       },
       {
        "question_id": "dev-warranty",
-       "ms": 102.6,
+       "ms": 80.8,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-amount",
+       "ms": 85.8,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-amount",
+       "ms": 86.9,
        "status": "answered",
        "billing": "settled"
       },
       {
        "question_id": "dev-deadline",
-       "ms": 130.1,
+       "ms": 110.1,
        "status": "answered",
        "billing": "settled"
       }
@@ -1263,9 +1278,9 @@
     }
    ],
    "serving": {
-    "run_id": "K1-0b21c1af14",
+    "run_id": "K1-d3eaa7ed7f",
     "mode": "kiwi_bm25",
-    "index_version": "5299607e93a32f7d"
+    "index_version": "3623697e79494269"
    },
    "hardware": {
     "platform": "Linux-6.18.44-fc-v50-x86_64-with-glibc2.39",
@@ -1274,11 +1289,11 @@
     "cpu_count": 4
    },
    "code": {
-    "source_sha256": "47a87b78c66f2efa02abdfa621c6929ce5d68b9790ef766fbee7ee4bb7e3c03c",
-    "git_revision": "5c23a991cf23dd485b8a5eaf42272abd034a4df3",
+    "source_sha256": "6b1c3af46a3d6565fce99df9cd5488ad31f23d7566bf3d41a40b90cb34890a0c",
+    "git_revision": "53774a884c62825c8bb3cc4916fa9a8a958a511c",
     "git_dirty": false
    },
-   "recorded_at": "2026-10-01T14:25:17.557961+00:00",
+   "recorded_at": "2026-10-01T15:29:47.127047+00:00",
    "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
   }
  ],
