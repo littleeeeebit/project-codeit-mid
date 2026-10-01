@@ -24,10 +24,10 @@ On a wide screen the order is:
 
 Streamlit columns stack on narrow screens, so the same order holds there.
 
-- **Results** are bordered cards, not a grid. A long Korean title wraps in full, so similar projects stay distinguishable. Each card carries the recorded institution, an explicit conflict warning, a KRW amount (unknown stays distinct from 0원), the publication and closing dates, and the source review state. Nothing on a card says a bid is open now.
-- **Selection** uses a checkbox per card, with at most two. One selected project allows a grounded question (paid), a basic-information view (free) or a requirement list (free). Two allow a balanced comparison (paid) or a basic-information comparison (free). The selected titles, source versions (hash prefix) and as-of date sit next to the question.
-- **Answer.** A short conclusion comes first, then source facts and labelled inferences, unknown/conflicting data and the next verification action. A technical failure appears in its own error block, never as a domain answer. Each claim's evidence buttons open the evidence panel: the exact quote, neighbouring elements with the cited ones in bold, the location (PDF physical page, or HWP section/table without invented page numbers), source review warnings, and the original download.
-- **Cost of this request.** The panel shows the reserved maximum while the request runs, the settled cost after it, and an unknown pending cost after an interruption.
+- Results are bordered cards, not a grid. A long Korean title wraps in full, so similar projects stay distinguishable. Each card carries the recorded institution, an explicit conflict warning, a KRW amount (unknown stays distinct from 0원), the publication and closing dates, and the source review state. Nothing on a card says a bid is open now.
+- Selection uses a checkbox per card, with at most two. One selected project allows a grounded question (paid), a basic-information view (free) or a requirement list (free). Two allow a balanced comparison (paid) or a basic-information comparison (free). The selected titles, source versions (hash prefix) and as-of date sit next to the question.
+- Answer. A short conclusion comes first, then source facts and labelled inferences, unknown/conflicting data and the next verification action. A technical failure appears in its own error block, never as a domain answer. Each claim's evidence buttons open the evidence panel: the exact quote, neighbouring elements with the cited ones in bold, the location (PDF physical page, or HWP section/table without invented page numbers), source review warnings, and the original download.
+- Cost of this request. The panel shows the reserved maximum while the request runs, the settled cost after it, and an unknown pending cost after an interruption.
 
 ## Request ownership
 

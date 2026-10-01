@@ -1,6 +1,6 @@
 # Phase 3 handoff: workflows and operations
 
-This folder records what the Cloud implementation of the [phase 3 plan](../../docs/plan/end-to-end/3-workflows-and-operations.md) built and checked. **There is no login** (owner decision, reaffirmed 2026-10-01; the plan, contracts, overview and phase 1/4/5 documents were updated to match). All evidence here is **synthetic**: the fake provider, the four-document test fixture corpus and typed visitor names. No paid call was made, no original document or local runtime was used, and **$0 was spent**.
+This folder records what the Cloud implementation of the [phase 3 plan](../../docs/plan/end-to-end/3-workflows-and-operations.md) built and checked. There is no login (owner decision, reaffirmed 2026-10-01; the plan, contracts, overview and phase 1/4/5 documents were updated to match). All evidence here is **synthetic**: the fake provider, the four-document test fixture corpus and typed visitor names. No paid call was made, no original document or local runtime was used, and $0 was spent.
 
 The authoritative `.runtime/releases/phase-3/report.md` must be produced on the owner host with `report --phase 3` once that host's own checks have run. The [runbook](../../docs/operations/runbook.md) gives the operating procedure.
 
@@ -47,9 +47,9 @@ The phase-3 scenario table maps to tests in `tests/test_service.py`:
 
 ## Decisions made during implementation (for owner review)
 
-1. **No login, everywhere.** The owner reaffirmed the phase-1 decision for phase 3. The earlier account, token and session requirement was removed from the phase 3 plan, the shared contracts, the overview and the phase 1/4/5 documents, and from the code. Network reach is the only access control, so the deployment decides who can spend and administer.
-2. **Changing the screen does not cancel running work.** Changing scope, mode or date detaches the old request and cancels it only while it is still queued. A running request finishes and stays in history, so its billing settles.
-3. **Free modes need no question.** Basic information and requirement lists take no question text. Their requests are still persisted for history and export.
+1. No login, everywhere. The owner reaffirmed the phase-1 decision for phase 3. The earlier account, token and session requirement was removed from the phase 3 plan, the shared contracts, the overview and the phase 1/4/5 documents, and from the code. Network reach is the only access control, so the deployment decides who can spend and administer.
+2. Changing the screen does not cancel running work. Changing scope, mode or date detaches the old request and cancels it only while it is still queued. A running request finishes and stays in history, so its billing settles.
+3. Free modes need no question. Basic information and requirement lists take no question text. Their requests are still persisted for history and export.
 
 ## Owner steps on the local host
 
