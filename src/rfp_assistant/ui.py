@@ -141,6 +141,10 @@ def _results_table(st, items: list[dict], key: str):
     return items[sel[0]] if sel else None
 
 
+MODE_TEXT = {"whitespace_bm25": "키워드(공백 분리)", "kiwi_bm25": "키워드(형태소 분석)", "dense": "의미 검색",
+             "hybrid": "키워드와 의미 검색 결합", "hybrid_rerank": "키워드와 의미 검색 결합 후 재정렬"}
+
+
 def consultant_page(st, res, principal) -> None:
     st.title("RFP 검색과 근거 기반 질문")
     st.caption("제공된 과거 공고(2021-10 ~ 2025-02) 기준입니다. 현재 입찰 가능 여부는 이 자료로 판단할 수 없습니다.")
@@ -174,7 +178,10 @@ def consultant_page(st, res, principal) -> None:
     if item.get("snippet"):
         st.markdown(plain(item["snippet"]))
     for c in item["conflicts"]:
-        st.warning(f"같은 원문 파일에 연결된 다른 공고와 '{c['field']}' 값이 다릅니다. 원문과 공고를 확인하세요.")
+        resolved = item.get("resolutions", {}).get(c["field"])
+        note = (f" 검토자가 확인한 값: {plain(json.dumps(resolved['value'], ensure_ascii=False))} "
+                f"(근거: {plain(resolved['evidence'])})" if resolved else " 원문과 공고를 확인하세요.")
+        st.warning(f"같은 원문 파일에 연결된 다른 공고와 '{c['field']}' 값이 다릅니다.{note}")
     if item["review_status"] in REVIEW_WARNING and item["indexed"]:
         st.warning(REVIEW_WARNING[item["review_status"]])
     dl = service.original_download(res, principal, item["doc_id"], item["source_hash"])
@@ -182,6 +189,7 @@ def consultant_page(st, res, principal) -> None:
     if not item["indexed"]:
         st.error(item.get("unavailable_reason") or "이 문서는 아직 질문용 색인에 포함되지 않았습니다.")
         return
+    st.caption(f"검색 방식: {MODE_TEXT.get(res.serving()['mode'], res.serving()['mode'])}")
     with st.form("ask"):
         question = st.text_area("질문", max_chars=res.settings.question_max_characters,
                                 placeholder="예: 하자보수 기간과 조건은 무엇인가요?")
@@ -266,12 +274,16 @@ def verifier_page(st, res, principal) -> None:
             return
         t = vt["trace"]
         r = t["retrieval"]
+        qe = r.get("query_embedding") or {}
+        st.caption(f"운영 설정 {t['serving'].get('run_id') or '기본(키워드)'} · 요청 모드 {t['serving']['mode']} · "
+                   f"대체 {r.get('fallback') or '없음'} · 의미 행렬 {r.get('dense_version') or '-'} · "
+                   f"질의 벡터 {qe.get('cache', '-')}")
         st.caption(f"색인 {t['index_version']} ({t['review_scope']}) · 모드 {r['mode']} · "
                    f"소요 {r['timings_ms']['total']}ms · 근거 토큰 {r['evidence_tokens']} · "
                    f"최종 입력 추정 {t['input_tokens']} 토큰")
         st.markdown("**질의 토큰**: " + plain(" ".join(t["query_tokens"])))
         st.markdown("**제한 사항**: " + plain(", ".join(r["limitations"]) or "없음"))
-        st.markdown("**후보 순위 (exact / BM25)**")
+        st.markdown("**후보 순위 (채널별: exact / bm25 / dense / rrf / rerank)**")
         st.dataframe(r["candidates"], hide_index=True, width="stretch")
         st.markdown("**선택된 근거**")
         for e in r["evidence"]:
@@ -389,6 +401,8 @@ def _gold_candidate(st, res, principal, c: dict, categories: dict) -> None:
                 f"{(doc.get('format') or '').upper()} · {REVIEW_TEXT.get(doc.get('review_status'), '')}")
     if doc.get("review_status") in REVIEW_WARNING:
         st.warning(REVIEW_WARNING[doc["review_status"]])
+    for err in c.get("current_errors") or []:  # e.g. a converter case whose document has since been recovered
+        st.error(f"현재 원문 상태와 맞지 않습니다: {plain(err)}")
     if doc.get("unavailable_reason"):
         st.error(doc["unavailable_reason"])
     if doc.get("doc_id"):

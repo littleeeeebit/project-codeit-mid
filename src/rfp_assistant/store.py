@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4  # 4: extraction reuse keys, metadata resolutions, embedding estimates, run activations
 BUSY_TIMEOUT_MS = 5000
 
 SOURCES_DDL = """
@@ -206,6 +206,41 @@ CREATE TABLE IF NOT EXISTS gold_candidates (
     inference_json TEXT
 );
 CREATE INDEX IF NOT EXISTS gold_candidates_status ON gold_candidates(dataset, status);
+CREATE TABLE IF NOT EXISTS extraction_inputs (
+    source_hash TEXT PRIMARY KEY REFERENCES sources(source_hash),
+    input_key TEXT NOT NULL,
+    extraction_id TEXT NOT NULL,
+    artifact_sha256 TEXT NOT NULL,
+    stats_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS metadata_resolutions (
+    resolution_id TEXT PRIMARY KEY,
+    doc_id TEXT NOT NULL REFERENCES documents(doc_id),
+    field TEXT NOT NULL,
+    value_json TEXT NOT NULL,
+    rationale TEXT NOT NULL,
+    evidence TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS embedding_estimates (
+    estimate_id TEXT PRIMARY KEY,
+    index_version TEXT NOT NULL,  -- no FK: rebuilding an index version must not be blocked by old estimates
+    fingerprint TEXT NOT NULL,
+    estimate_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS activations (
+    activation_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    config_json TEXT NOT NULL,
+    decision_json TEXT NOT NULL,
+    previous_json TEXT,
+    actor TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -311,13 +346,18 @@ def dumps(value) -> str:
 
 
 def write_text_atomic(path: Path, text: str) -> None:
-    """UTF-8 without BOM, written to a sibling temporary file then renamed. On Windows the rename fails while any
-    other process (a reader, an antivirus scan) has the target open, so it is retried for up to ~3 s."""
+    """UTF-8 without BOM, written to a sibling temporary file then renamed."""
+    write_bytes_atomic(path, text.encode("utf-8"))
+
+
+def write_bytes_atomic(path: Path, data: bytes) -> None:
+    """Written to a sibling temporary file then renamed. On Windows the rename fails while any other process
+    (a reader, an antivirus scan) has the target open, so it is retried for up to ~3 s."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
-            f.write(text)
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
         for attempt in range(16):
             try:
                 os.replace(tmp, path)

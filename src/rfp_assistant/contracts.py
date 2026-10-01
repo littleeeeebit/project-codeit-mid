@@ -52,6 +52,10 @@ class RetrievalResult:
     timings_ms: dict
     trace_id: str
     index_version: str | None
+    ranking: list[str] = field(default_factory=list)  # pre-pack order (exact first), kept apart from packed evidence
+    fallback: str | None = None  # "<asked mode>-><served mode>:<reason>" when a stage was unavailable
+    dense_version: str | None = None
+    query_embedding: dict | None = None  # cache hit or paid attempt for the query vector
 
 
 @dataclass

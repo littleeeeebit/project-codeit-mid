@@ -1,0 +1,12 @@
+{
+  "collected_at": "2026-10-01T01:17:16.8832493Z",
+  "cpu": [
+    "12th Gen Intel(R) Core(TM) i7-12700F"
+  ],
+  "ram_bytes": 68523839488,
+  "gpu_query": "nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader",
+  "gpu_observation": [
+    "NVIDIA GeForce RTX 3080, 10240 MiB, 591.86"
+  ],
+  "inference_performed": false
+}

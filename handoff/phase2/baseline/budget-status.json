@@ -1,0 +1,35 @@
+{
+  "status": "single_read_only_snapshot",
+  "settings": [
+    {
+      "allowance_micro_usd": 5000000,
+      "cap_micro_usd": 5000000,
+      "project_start": "2026-09-30",
+      "project_end": "2026-10-28",
+      "paid_enabled": 1,
+      "prior_use_recorded": 1,
+      "rate_version": "openai-standard-gpt-6-luna-2026-09-30",
+      "revision": 2
+    }
+  ],
+  "attempt_totals": [
+    {
+      "purpose": "interactive",
+      "stage": "generation",
+      "state": "settled",
+      "count": 1,
+      "reserved_micro_usd": 1422,
+      "settled_micro_usd": 482
+    }
+  ],
+  "adjustments": [
+    {
+      "correction_key": "prior-use-baseline",
+      "amount_micro_usd": 0,
+      "scope": "allowance",
+      "created_at": "2026-09-30T06:33:18.082130+00:00"
+    }
+  ],
+  "open_attempts": [],
+  "note": "Micro-USD integers; reservations are not settled spend. Reconciliation adjustments are separate."
+}

@@ -3,8 +3,9 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from unittest import mock
 
-from rfp_assistant import chunking, ingestion, store
+from rfp_assistant import chunking, evaluation, ingestion, store
 from rfp_assistant.settings import Settings
 from tests import fixtures
 
@@ -160,6 +161,239 @@ class ManifestTest(unittest.TestCase):
             s = Settings(source_dir=source, data_dir=Path(tmp) / "d", hwp_converter=None, provider="fake")
             with self.assertRaises(ingestion.IngestionError):
                 ingestion.read_manifest_csv(s)
+
+
+
+class IncrementalIngestTest(unittest.TestCase):
+    def test_unchanged_corpus_is_not_reconverted_and_one_changed_source_is(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = fixtures.make_env(Path(tmp), paid=False, index=False)
+            s = env.settings
+            with store.open_db(s.db_path) as conn:
+                before = {r["source_hash"]: r["active_extraction_id"] for r in conn.execute(
+                    "SELECT source_hash, active_extraction_id FROM sources")}
+            with mock.patch.object(ingestion, "parse_pdf", side_effect=AssertionError("reconverted")):
+                again = ingestion.ingest(s)
+            self.assertTrue(all(r.get("reused") for r in again if r["status"] in ("parsed", "quarantined")))
+            with store.open_db(s.db_path) as conn:
+                after = {r["source_hash"]: r["active_extraction_id"] for r in conn.execute(
+                    "SELECT source_hash, active_extraction_id FROM sources")}
+            self.assertEqual(before, after)
+            # Change one original: only it is parsed again; the others stay reused.
+            (s.files_dir / "기관D_도서관 좌석 예약.pdf").write_bytes(
+                fixtures.make_pdf([["제안요청서", "Ⅰ. 사업 안내", "열람실 좌석 배정 시스템을 구축한다."]]))
+            ingestion.import_manifest(s)
+            calls = []
+            real = ingestion.parse_pdf
+            with mock.patch.object(ingestion, "parse_pdf", side_effect=lambda p: calls.append(p) or real(p)):
+                results = ingestion.ingest(s)
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(sum(not r.get("reused") for r in results if r["status"] == "parsed"), 1)
+            # A converter that appears later retries the quarantined HWP instead of reusing its failure.
+            conv = Path(tmp) / "hwp5proc.exe"
+            conv.write_bytes(b"converter")
+            with mock.patch.object(ingestion, "run_hwp_converter", return_value=("hwp_converter_failed", "")) as run:
+                results = ingestion.ingest(s.with_(hwp_converter=conv))
+            hwp = [r for r in results if r["filename"].endswith(".hwp")][0]
+            self.assertEqual((run.call_count, hwp["status"], hwp.get("reused")), (1, "quarantined", None))
+
+    def test_a_parser_crash_is_recorded_per_source_and_the_run_continues(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = fixtures.make_env(Path(tmp), paid=False, index=False)
+            with mock.patch.object(ingestion, "parse_pdf", side_effect=MemoryError("boom")):
+                results = ingestion.ingest(env.settings, force=True)
+            errors = [r for r in results if r["status"] == "error"]
+            self.assertEqual(len(errors), 3)  # A and its byte-identical copy share one result, plus D
+            self.assertIn("MemoryError", errors[0]["reason"])
+            self.assertTrue(any(r["status"] == "quarantined" for r in results))  # the HWP still got its status
+
+    def test_diagnostics_point_at_problems_without_granting_review(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = fixtures.make_env(Path(tmp), paid=False, index=False)
+            with store.open_db(env.settings.db_path) as conn:
+                stats = json.loads(conn.execute("SELECT stats_json FROM extraction_inputs WHERE extraction_id != ''"
+                                                ).fetchone()[0])
+            d = stats["diagnostics"]
+            self.assertIn("short_output", d["flags"])
+            self.assertEqual(set(d["probes"]), {"start", "middle", "end"})
+            self.assertGreater(d["pages"], 0)
+
+
+class ReviewImportTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.env = fixtures.make_env(Path(self.tmp.name), paid=False, index=False)
+        s = self.env.settings
+        ref = self.env.refs["기관D"]
+        with store.open_db(s.db_path) as conn:
+            self.extraction = conn.execute("SELECT active_extraction_id FROM sources WHERE source_hash = ?",
+                                           (ref.source_hash,)).fetchone()[0]
+            self.element = conn.execute("SELECT element_id FROM elements WHERE extraction_id = ?",
+                                        (self.extraction,)).fetchone()[0]
+        self.record = {"doc_id": ref.doc_id, "extraction_id": self.extraction, "reviewer": "reviewer-2",
+                       "status": "reviewed", "locations": [{"element_id": self.element}],
+                       "checks": {"text": "match"}, "coverage": {"sections": ["Ⅰ. 사업 안내"]}, "limitations": []}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write(self, records) -> Path:
+        path = Path(self.tmp.name) / "reviews.jsonl"
+        path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records), encoding="utf-8")
+        return path
+
+    def test_valid_review_is_appended_with_its_coverage(self):
+        out = ingestion.import_reviews(self.env.settings, self.write([self.record]))
+        self.assertEqual(out["imported"], 1)
+        cov = {c["source_hash"]: c for c in ingestion.review_coverage(self.env.settings)}
+        row = cov[self.env.refs["기관D"].source_hash]
+        self.assertEqual((row["review_status"], row["reviewer"], row["review_is_current"]),
+                         ("reviewed", "reviewer-2", True))
+        self.assertEqual(row["coverage"], {"sections": ["Ⅰ. 사업 안내"]})
+
+    def test_stale_revision_unknown_location_or_missing_reviewer_imports_nothing(self):
+        bad = [dict(self.record, extraction_id="old-revision"),
+               dict(self.record, locations=[{"element_id": "not-there"}]),
+               dict(self.record, reviewer=" "),
+               dict(self.record, checks={})]
+        for rec in bad:
+            with self.assertRaises(ingestion.IngestionError):
+                ingestion.import_reviews(self.env.settings, self.write([self.record, rec]))
+        with store.open_db(self.env.settings.db_path) as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM reviews WHERE reviewer = 'reviewer-2'").fetchone()[0], 0)
+
+    def test_converter_success_alone_cannot_become_reviewed(self):
+        quarantined = self.env.refs["기관E"]
+        rec = {"doc_id": quarantined.doc_id, "extraction_id": None, "reviewer": "r", "status": "reviewed",
+               "locations": [], "checks": {"x": 1}, "limitations": []}
+        with self.assertRaises(ingestion.IngestionError):
+            ingestion.import_reviews(self.env.settings, self.write([rec]))
+
+
+class RecoveryTest(unittest.TestCase):
+    def test_approved_conversion_becomes_a_new_revision_and_keeps_the_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = fixtures.make_env(Path(tmp), paid=False, index=False)
+            s = env.settings
+            ref = env.refs["기관E"]
+            converted = Path(tmp) / "converted.pdf"
+            converted.write_bytes(fixtures.make_pdf([["재난 관리 시스템", "Ⅰ. 사업 안내", "상황 전파 기능을 제공한다."]]))
+            review = Path(tmp) / "review.json"
+            review.write_text(json.dumps({"reviewer": "owner", "method": "hancom_pdf_export",
+                                          "compared_locations": [{"page": 1}], "fidelity_passed": False,
+                                          "mapping_limitations": "converted PDF pages"}), encoding="utf-8")
+            out = ingestion.recover_source(s, ref.doc_id, converted, review)
+            self.assertEqual(out["status"], "quarantined")  # a failed comparison keeps the quarantine
+            review.write_text(json.dumps({"reviewer": "owner", "method": "hancom_pdf_export",
+                                          "compared_locations": [{"page": 1}], "fidelity_passed": True,
+                                          "mapping_limitations": "converted PDF pages"}), encoding="utf-8")
+            out = ingestion.recover_source(s, ref.doc_id, converted, review)
+            self.assertEqual(out["status"], "parsed")
+            with store.open_db(s.db_path) as conn:
+                src = conn.execute("SELECT * FROM sources WHERE source_hash = ?", (ref.source_hash,)).fetchone()
+                rec = json.loads(conn.execute("SELECT recovery_json FROM extractions WHERE extraction_id = ?",
+                                              (src["active_extraction_id"],)).fetchone()[0])
+            # coverage of the new revision is claimed only by a review against its own elements
+            self.assertEqual((src["parse_status"], src["review_status"]), ("parsed", "unreviewed"))
+            self.assertEqual(rec["original_hash"], ref.source_hash)
+            self.assertEqual(rec["previous_failure"]["reason_code"], "hwp_converter_missing")
+            self.assertEqual(ingestion.sha256_file(s.files_dir / "기관E_재난 관리 시스템.hwp"), ref.source_hash)
+            # A later ingest keeps the registered recovery instead of failing the conversion again.
+            again = [r for r in ingestion.ingest(s) if r["doc_id"] == ref.doc_id][0]
+            self.assertEqual(again["status"], "recovered")
+            hwpx = Path(tmp) / "c.hwpx"
+            hwpx.write_bytes(b"PK")
+            with self.assertRaises(ingestion.IngestionError):
+                ingestion.recover_source(s, env.refs["기관D"].doc_id, hwpx, review)
+
+
+class IdentityTest(unittest.TestCase):
+    def test_original_cues_are_compared_with_csv_and_resolutions_are_recorded(self):
+        els = ingestion.finalize_elements([
+            {"path": "p0", "kind": "paragraph", "parent": None, "raw_text": "사업명 : 통합 정보시스템 구축",
+             "location": {}},
+            {"path": "t0", "kind": "table", "parent": None, "raw_text": "",
+             "table": {"rows": 1, "cols": 2, "cells": [{"row": 0, "col": 0, "text": "발주기관"},
+                                                       {"row": 0, "col": 1, "text": "기관A"}]}, "location": {}}],
+            "x")
+        cues = ingestion.original_cues(els)
+        self.assertEqual(cues["title"][0]["value"], "통합 정보시스템 구축")
+        self.assertEqual(cues["institution"][0]["value"], "기관A")
+        with tempfile.TemporaryDirectory() as tmp:
+            env = fixtures.make_env(Path(tmp), paid=False, index=False)
+            s = env.settings
+            report = {r["doc_id"]: r for r in ingestion.identity_report(s)}
+            a, c = report[env.refs["기관A"].doc_id], report[env.refs["기관C"].doc_id]
+            self.assertEqual(a["original"], c["original"])  # shared bytes share cues
+            self.assertIn("institution", {x["field"] for x in c["provenance_conflicts"]})
+            with self.assertRaises(ingestion.IngestionError):
+                ingestion.resolve_metadata(s, c["doc_id"], "institution", "기관A", "", "notice p1", "owner")
+            with self.assertRaises(ingestion.IngestionError):
+                ingestion.resolve_metadata(s, c["doc_id"], "amount_krw", "많음", "r", "e", "owner")
+            with self.assertRaises(ingestion.IngestionError):  # a date must be ISO text like the CSV values
+                ingestion.resolve_metadata(s, c["doc_id"], "bid_close", {"value": "2024/06/11", "precision": "date"},
+                                           "r", "e", "owner")
+            ingestion.resolve_metadata(s, c["doc_id"], "bid_close", {"value": "2024-06-11", "precision": "date"},
+                                       "공고문 마감일", "notice p1", "owner")
+            ingestion.resolve_metadata(s, c["doc_id"], "institution", "기관A", "공고문 1쪽 기관명", "notice p1", "owner")
+            again = {r["doc_id"]: r for r in ingestion.identity_report(s)}[c["doc_id"]]
+            self.assertEqual(again["resolutions"]["institution"]["value"], "기관A")
+            self.assertTrue(again["provenance_conflicts"])  # the competing values stay visible
+
+
+class FamilyTest(unittest.TestCase):
+    def test_related_revisions_join_one_family(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rows = [list(r) for r in fixtures.ROWS]
+            rows[2][0] = rows[0][0]  # 기관D shares 기관A's notice number: a related revision
+            source = fixtures.write_corpus(Path(tmp), rows)
+            s = Settings(source_dir=source, data_dir=Path(tmp) / "data", hwp_converter=None, provider="fake")
+            s.data_dir.mkdir()
+            store.init_schema(s.db_path)
+            ingestion.import_manifest(s)
+            evaluation.assign_families(s)
+            fams = json.loads((s.data_dir / "datasets" / "families.json").read_text(encoding="utf-8"))["families"]
+            with store.open_db(s.db_path) as conn:
+                ids = {r["filename"][:3]: r["doc_id"] for r in conn.execute("SELECT doc_id, filename FROM documents")}
+            fam = [f for f in fams.values() if ids["기관A"] in f["doc_ids"]][0]
+            self.assertTrue({ids["기관A"], ids["기관C"], ids["기관D"]} <= set(fam["doc_ids"]))
+            self.assertEqual(len(fam["related_sources"]), 1)
+
+
+class RevisionIdentityTest(unittest.TestCase):
+    def test_different_output_under_one_parser_fingerprint_is_a_new_revision(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = fixtures.make_env(Path(tmp), paid=False, index=False)
+            s = env.settings
+            h = env.refs["기관D"].source_hash
+            with store.open_db(s.db_path) as conn:
+                old = conn.execute("SELECT active_extraction_id, review_status FROM sources WHERE source_hash = ?",
+                                   (h,)).fetchone()
+                old_artifact = Path(conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?",
+                                                 (old[0],)).fetchone()[0])
+            self.assertEqual(old[1], "sample_checked")
+            ingestion.ingest(s, [env.refs["기관D"].doc_id], force=True)  # identical output: same revision, review kept
+            with store.open_db(s.db_path) as conn:
+                same = conn.execute("SELECT active_extraction_id, review_status FROM sources WHERE source_hash = ?",
+                                    (h,)).fetchone()
+            self.assertEqual(tuple(same), tuple(old))
+            real = ingestion.parse_pdf
+
+            def changed(path):
+                els, warnings, reason = real(path)
+                els[-1]["raw_text"] += " (변경된 변환 결과)"
+                return els, warnings, reason
+
+            with mock.patch.object(ingestion, "parse_pdf", side_effect=changed):
+                ingestion.ingest(s, [env.refs["기관D"].doc_id], force=True)
+            with store.open_db(s.db_path) as conn:
+                new = conn.execute("SELECT active_extraction_id, review_status FROM sources WHERE source_hash = ?",
+                                   (h,)).fetchone()
+                old_rows = conn.execute("SELECT COUNT(*) FROM elements WHERE extraction_id = ?", (old[0],)).fetchone()[0]
+            self.assertNotEqual(new[0], old[0])
+            self.assertEqual(new[1], "unreviewed")  # a reviewed text does not vouch for different text
+            self.assertGreater(old_rows, 0)  # the old revision stays for pinned gold rows and citations
+            self.assertNotIn("변경된", old_artifact.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

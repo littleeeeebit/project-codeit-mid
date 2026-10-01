@@ -7,7 +7,10 @@ import hashlib
 import json
 import re
 import subprocess
+import shutil
 import tempfile
+import time
+import traceback
 import unicodedata
 import uuid
 import xml.etree.ElementTree as ET
@@ -620,14 +623,95 @@ def finalize_elements(raw_elements: list[dict], extraction_id: str) -> list[dict
     return out
 
 
-def ingest_source(settings: Settings, source_hash: str) -> dict:
+def input_key(settings: Settings, src) -> str:
+    """Everything a parse depends on: original bytes, parser revision, the native print and the OCR cache.
+    An unchanged key means a rerun would reproduce the same extraction, so it is reused instead."""
+    from .ocr import cache_path  # ocr imports this module
+
+    printed = printed_pdf_path(settings, src["source_hash"])
+    ocr_rows = cache_path(settings, src["source_hash"])
+    info = {"source": src["source_hash"], "parser": parser_fingerprint(src["format"]),
+            "printed": sha256_file(printed) if printed.exists() else None,
+            "ocr": sha256_file(ocr_rows) if ocr_rows.exists() else None}
+    if src["format"] == "hwp":  # installing or replacing the converter retries a failed conversion
+        conv = settings.hwp_converter
+        info["converter"] = [str(conv), conv.stat().st_size, conv.stat().st_mtime_ns] \
+            if conv is not None and Path(conv).is_file() else None
+        info["converter_timeout"] = settings.converter_timeout_seconds
+    return hashlib.sha256(dumps(info).encode()).hexdigest()
+
+
+def diagnose(elements: list[dict], warnings: list[dict]) -> dict:
+    """Automatic content checks. They point a reviewer at problems; none of them is a fidelity pass."""
+    kinds: dict[str, int] = {}
+    for e in elements:
+        kinds[e["kind"]] = kinds.get(e["kind"], 0) + 1
+    tables = [e for e in elements if e["kind"] == "table"]
+    chars = [len(e["raw_text"].strip()) for e in elements]
+    total = sum(chars)
+    codes = {c for e in elements for c in CODE_RE.findall(e["raw_text"])}
+    pages = {e["location"].get("page") for e in elements} - {None}
+    sections = {e["location"].get("section") for e in elements} - {None}
+    body = [e for e in elements if e["raw_text"].strip() and e["kind"] != "toc"]
+
+    def probe(e: dict) -> dict:
+        return {"element_id": e["element_id"], "kind": e["kind"], "text": search_text(e["raw_text"])[:80]}
+
+    tail = sum(chars[len(chars) - max(1, len(chars) // 10):]) if chars else 0
+    flags = []
+    if total < 2000:
+        flags.append("short_output")
+    if elements and not tables:
+        flags.append("no_tables")
+    if total and tail / total < 0.01:
+        flags.append("thin_tail")
+    blank = [w.get("page") for w in warnings if w.get("code") == "page_blank_or_image"]
+    if blank:
+        flags.append("blank_pages")
+    if any(e.get("replacement_chars") for e in elements):
+        flags.append("replacement_characters")
+    if any(w.get("code") == "mupdf_warnings" for w in warnings):
+        flags.append("parser_warnings")
+    return {
+        "elements": len(elements), "kinds": kinds, "tables": len(tables),
+        "cells": sum(len(t["table"]["cells"]) for t in tables if t.get("table")), "chars": total,
+        "requirement_codes": len(codes), "pages": max(pages) if pages else None,
+        "sections": len(sections) if sections else None, "blank_pages": blank[:50],
+        "probes": {"start": probe(body[0]), "middle": probe(body[len(body) // 2]), "end": probe(body[-1])}
+        if body else {},
+        "flags": flags,
+    }
+
+
+def ingest_source(settings: Settings, source_hash: str, force: bool = False) -> dict:
     with open_db(settings.db_path) as conn:
         src = conn.execute("SELECT * FROM sources WHERE source_hash = ?", (source_hash,)).fetchone()
+        recovery = conn.execute(
+            "SELECT recovery_json FROM extractions WHERE extraction_id = ?", (src["active_extraction_id"],)
+        ).fetchone() if src is not None and src["active_extraction_id"] else None
+        prior = conn.execute("SELECT * FROM extraction_inputs WHERE source_hash = ?", (source_hash,)).fetchone()
     if src is None:
         raise IngestionError(f"unknown source {source_hash}")
     original = Path(src["original_path"])
     if sha256_file(original) != source_hash:
         raise IngestionError(f"original bytes changed for {original.name}; rerun manifest")
+    if recovery is not None and recovery["recovery_json"]:
+        # An owner-registered recovery artifact replaces a failed conversion; reparsing would only fail again.
+        return {"source_hash": source_hash, "status": "recovered", "extraction_id": src["active_extraction_id"]}
+    key = input_key(settings, src)
+    if not force and prior is not None and prior["input_key"] == key:
+        stats = json.loads(prior["stats_json"])
+        if src["parse_status"] == "quarantined" and not prior["extraction_id"]:
+            return {"source_hash": source_hash, "status": "quarantined", "reason": src["reason_code"], "reused": True}
+        with open_db(settings.db_path) as conn:
+            row = conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?",
+                               (prior["extraction_id"],)).fetchone()
+        artifact = Path(row["artifact_path"]) if row else None
+        if (src["parse_status"] == "parsed" and src["active_extraction_id"] == prior["extraction_id"]
+                and artifact is not None and artifact.exists() and sha256_file(artifact) == prior["artifact_sha256"]):
+            return {"source_hash": source_hash, "status": "parsed", "extraction_id": prior["extraction_id"],
+                    "reused": True, "diagnostic_flags": stats.get("diagnostics", {}).get("flags", [])}
+    started = time.perf_counter()
     fp = parser_fingerprint(src["format"])
     if src["format"] == "hwp":
         raw, warnings, reason = parse_hwp(settings, original)
@@ -652,6 +736,7 @@ def ingest_source(settings: Settings, source_hash: str) -> dict:
         warnings += more
         if suffix:
             fp = f"{fp}-{suffix}"
+    seconds = round(time.perf_counter() - started, 2)
     if reason:
         with open_db(settings.db_path) as conn, tx(conn, immediate=True):
             conn.execute(
@@ -659,15 +744,17 @@ def ingest_source(settings: Settings, source_hash: str) -> dict:
                 "warnings_json = ? WHERE source_hash = ?",
                 (reason, dumps(warnings), source_hash),
             )
-        return {"source_hash": source_hash, "status": "quarantined", "reason": reason}
-    extraction_id = hashlib.sha256(f"{source_hash}:{fp}".encode()).hexdigest()[:24]
-    elements = finalize_elements(raw, extraction_id)
+            _record_input(conn, source_hash, key, "", "", {"seconds": seconds, "reason": reason})
+        return {"source_hash": source_hash, "status": "quarantined", "reason": reason, "seconds": seconds}
+    extraction_id, elements, artifact = assign_revision(settings, source_hash, fp, raw)
     if any(e["replacement_chars"] for e in elements):
         warnings.append({"code": "replacement_characters",
                          "count": sum(e["replacement_chars"] for e in elements)})
-    artifact = settings.data_dir / "extracted" / source_hash / fp / "elements.jsonl"
-    write_jsonl_atomic(artifact, elements)
+    diagnostics = diagnose(elements, warnings)
+    stats = {"seconds": seconds, "diagnostics": diagnostics, "cues": original_cues(elements),
+             "warnings": [w["code"] for w in warnings]}
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
+        _record_input(conn, source_hash, key, extraction_id, sha256_file(artifact), stats)
         conn.execute(
             "INSERT OR IGNORE INTO extractions(extraction_id, source_hash, parser_fingerprint, artifact_path, created_at) "
             "VALUES (?, ?, ?, ?, ?)",
@@ -680,7 +767,7 @@ def ingest_source(settings: Settings, source_hash: str) -> dict:
             [(extraction_id, e["element_id"], e["source_order"], e["kind"], e["parent_id"], e["raw_text"],
               e["search_text"], dumps(e["location"]), dumps(e["table"]) if e["table"] else None) for e in elements],
         )
-        # A new parser revision resets review: parsed does not mean faithful.
+        # A new revision (parser or output) resets review: parsed does not mean faithful.
         review = src["review_status"] if src["active_extraction_id"] == extraction_id else "unreviewed"
         conn.execute(
             "UPDATE sources SET parse_status = 'parsed', active_extraction_id = ?, reason_code = NULL, "
@@ -689,7 +776,46 @@ def ingest_source(settings: Settings, source_hash: str) -> dict:
         )
     return {"source_hash": source_hash, "status": "parsed", "extraction_id": extraction_id,
             "elements": len(elements), "tables": sum(e["kind"] == "table" for e in elements),
-            "warnings": [w["code"] for w in warnings]}
+            "warnings": [w["code"] for w in warnings], "seconds": seconds,
+            "diagnostic_flags": diagnostics["flags"]}
+
+
+def assign_revision(settings: Settings, source_hash: str, fp: str, raw: list[dict]) -> tuple[str, list[dict], Path]:
+    """Extraction revision bound to the actual output, not only to the parser fingerprint: a different converter
+    or input can produce different text under the same fingerprint. Identical output keeps its revision (and its
+    review); different output gets a revision of its own beside the old one, whose artifact and element rows stay
+    for the traces, gold rows and citations pinned to them. Returns (extraction_id, elements, artifact path)."""
+    base = hashlib.sha256(f"{source_hash}:{fp}".encode()).hexdigest()[:24]
+    root = settings.data_dir / "extracted" / source_hash / fp
+    candidates = [(base, root / "elements.jsonl")]
+    elements = finalize_elements(raw, base)
+    with open_db(settings.db_path) as conn:
+        row = conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?", (base,)).fetchone()
+    if row is not None:
+        stored = Path(row["artifact_path"])
+        if not (stored.exists() and read_jsonl(stored) == json.loads(json.dumps(elements, ensure_ascii=False))):
+            digest = hashlib.sha256(dumps(elements).encode()).hexdigest()
+            content_id = hashlib.sha256(f"{source_hash}:{fp}:{digest}".encode()).hexdigest()[:24]
+            candidates = [(content_id, root / content_id / "elements.jsonl")]
+            elements = finalize_elements(raw, content_id)
+    extraction_id, artifact = candidates[0]
+    with open_db(settings.db_path) as conn:
+        known = conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?",
+                             (extraction_id,)).fetchone()
+    if known is not None:
+        artifact = Path(known["artifact_path"])
+    if not artifact.exists() or read_jsonl(artifact) != json.loads(json.dumps(elements, ensure_ascii=False)):
+        write_jsonl_atomic(artifact, elements)
+    return extraction_id, elements, artifact
+
+
+def _record_input(conn, source_hash: str, key: str, extraction_id: str, artifact_sha: str, stats: dict) -> None:
+    conn.execute(
+        "INSERT INTO extraction_inputs(source_hash, input_key, extraction_id, artifact_sha256, stats_json, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(source_hash) DO UPDATE SET input_key = excluded.input_key, "
+        "extraction_id = excluded.extraction_id, artifact_sha256 = excluded.artifact_sha256, "
+        "stats_json = excluded.stats_json, updated_at = excluded.updated_at",
+        (source_hash, key, extraction_id, artifact_sha, dumps(stats), utcnow()))
 
 
 def select_documents(settings: Settings, doc_ids: list[str] | None = None) -> list[dict]:
@@ -706,18 +832,34 @@ def select_documents(settings: Settings, doc_ids: list[str] | None = None) -> li
     return chosen
 
 
-def ingest(settings: Settings, doc_ids: list[str] | None = None) -> list[dict]:
+def ingest(settings: Settings, doc_ids: list[str] | None = None, force: bool = False) -> list[dict]:
+    """Every unique original once. One failing file is recorded with its error and the run continues; the
+    caller reports failures (the CLI exits nonzero) rather than dropping them."""
     results = []
     done: dict[str, dict] = {}
     for d in select_documents(settings, doc_ids):
         h = d["active_source_hash"]
         if h not in done:  # identical bytes share one extraction
             try:
-                done[h] = ingest_source(settings, h)
+                done[h] = ingest_source(settings, h, force=force)
             except IngestionError as exc:
                 done[h] = {"source_hash": h, "status": "error", "reason": str(exc)}
+            except Exception as exc:  # noqa: BLE001 - an unexpected parser crash stays visible per source
+                done[h] = {"source_hash": h, "status": "error", "reason": f"{type(exc).__name__}: {exc}"[:500],
+                           "traceback": traceback.format_exc()[-STDERR_LIMIT:]}
         results.append({"doc_id": d["doc_id"], "filename": d["filename"], **done[h]})
     return results
+
+
+def write_ingest_report(settings: Settings, results: list[dict]) -> Path:
+    counts: dict[str, int] = {}
+    for r in results:
+        key = r["status"] + ("_reused" if r.get("reused") else "")
+        counts[key] = counts.get(key, 0) + 1
+    report = {"created_at": utcnow(), "counts": counts, "results": results}
+    path = settings.data_dir / "reports" / f"ingest-{utcnow()[:19].replace(':', '')}.json"
+    write_text_atomic(path, json.dumps(report, ensure_ascii=False, indent=1, default=str))
+    return path
 
 
 # ---------------------------------------------------------------- reviews
@@ -792,6 +934,336 @@ def record_review(settings: Settings, source_hash: str, reviewer: str, status: s
         )
         conn.execute("UPDATE sources SET review_status = ? WHERE source_hash = ?", (status, source_hash))
     return review_id
+
+
+def _load_review_records(path: Path) -> list[dict]:
+    if not path.is_absolute():
+        raise IngestionError("review files are given by absolute path")
+    raw = path.read_bytes()
+    if raw.startswith(b"\xef\xbb\xbf"):
+        raise IngestionError("review files must be UTF-8 without BOM")
+    text = raw.decode("utf-8")
+    if path.suffix == ".jsonl":
+        return [json.loads(line) for line in text.splitlines() if line.strip()]
+    data = json.loads(text)
+    return data if isinstance(data, list) else [data]
+
+
+def _check_review(conn, rec: dict, tag: str) -> list[str]:
+    """A positive review names its reviewer, the exact extraction revision it compared and the element
+    locations that exist in it. Converter success alone never passes."""
+    errors = []
+    source_hash = rec.get("source_hash")
+    if not source_hash and rec.get("doc_id"):
+        row = conn.execute("SELECT active_source_hash FROM documents WHERE doc_id = ?", (rec["doc_id"],)).fetchone()
+        source_hash = row[0] if row else None
+    src = conn.execute("SELECT * FROM sources WHERE source_hash = ?", (source_hash,)).fetchone() if source_hash \
+        else None
+    if src is None:
+        return [f"{tag}: unknown document/source"]
+    rec["source_hash"] = source_hash
+    status = rec.get("status")
+    if status not in REVIEW_STATUSES:
+        errors.append(f"{tag}: status must be one of {REVIEW_STATUSES}")
+    if not str(rec.get("reviewer", "")).strip():
+        errors.append(f"{tag}: reviewer identity is required")
+    if rec.get("extraction_id") != src["active_extraction_id"]:
+        errors.append(f"{tag}: extraction_id is not the source's active revision (stale or missing)")
+    if status in ("sample_checked", "reviewed"):
+        if src["parse_status"] != "parsed":
+            errors.append(f"{tag}: only parsed sources can be marked checked")
+        locations = rec.get("locations") or []
+        if not locations:
+            errors.append(f"{tag}: a positive review must name the inspected locations")
+        for loc in locations:
+            eid = loc.get("element_id") if isinstance(loc, dict) else None
+            if not eid or conn.execute("SELECT 1 FROM elements WHERE extraction_id = ? AND element_id = ?",
+                                       (rec.get("extraction_id"), eid)).fetchone() is None:
+                errors.append(f"{tag}: location {loc!r} is not an element of the reviewed extraction")
+        if not isinstance(rec.get("checks"), dict) or not rec["checks"]:
+            errors.append(f"{tag}: a positive review records its checks")
+        if "limitations" not in rec:
+            errors.append(f"{tag}: record limitations (an empty list states that none were found)")
+    if status == "reviewed" and not (rec.get("coverage") or {}).get("sections"):
+        errors.append(f"{tag}: 'reviewed' declares the inspected sections in coverage.sections")
+    return errors
+
+
+def import_reviews(settings: Settings, path: Path) -> dict:
+    """Validate every record first, then append them all; one invalid record imports nothing."""
+    records = _load_review_records(path)
+    if not records:
+        raise IngestionError("review file holds no records")
+    with open_db(settings.db_path) as conn:
+        errors = [e for i, rec in enumerate(records, 1) for e in _check_review(conn, rec, f"record {i}")]
+    if errors:
+        raise IngestionError("; ".join(errors[:20]))
+    ids = []
+    for rec in records:
+        findings = {"checks": rec.get("checks", {}), "coverage": rec.get("coverage", {}),
+                    "limitations": rec.get("limitations", []), "findings": rec.get("findings", {}),
+                    "imported_from": path.name}
+        ids.append(record_review(settings, rec["source_hash"], rec["reviewer"], rec["status"],
+                                 rec.get("locations", []), findings))
+    return {"imported": len(ids), "review_ids": ids}
+
+
+def review_coverage(settings: Settings) -> list[dict]:
+    """Per source: current status and the latest human review's declared coverage and limitations."""
+    with open_db(settings.db_path) as conn:
+        sources = conn.execute(
+            "SELECT s.source_hash, s.format, s.parse_status, s.review_status, s.reason_code, s.active_extraction_id, "
+            "GROUP_CONCAT(d.filename, '; ') AS filenames FROM sources s JOIN documents d "
+            "ON d.active_source_hash = s.source_hash GROUP BY s.source_hash ORDER BY filenames").fetchall()
+        out = []
+        for s in sources:
+            review = conn.execute(
+                "SELECT reviewer, status, locations_json, findings_json, created_at, extraction_id FROM reviews "
+                "WHERE source_hash = ? ORDER BY created_at DESC LIMIT 1", (s["source_hash"],)).fetchone()
+            findings = json.loads(review["findings_json"]) if review else {}
+            out.append({
+                "source_hash": s["source_hash"], "filenames": s["filenames"], "format": s["format"],
+                "parse_status": s["parse_status"], "review_status": s["review_status"], "reason_code": s["reason_code"],
+                "reviewer": review["reviewer"] if review else None,
+                "reviewed_at": review["created_at"] if review else None,
+                "review_is_current": bool(review and review["extraction_id"] == s["active_extraction_id"]),
+                "locations": len(json.loads(review["locations_json"])) if review else 0,
+                "coverage": findings.get("coverage"), "limitations": findings.get("limitations"),
+            })
+    return out
+
+
+# ---------------------------------------------------------------- recovery of failed conversions
+
+
+def recovered_dir(settings: Settings, source_hash: str) -> Path:
+    return settings.data_dir / "recovered" / source_hash
+
+
+def recover_source(settings: Settings, doc_id: str, converted_file: Path, review_file: Path) -> dict:
+    """Registers an owner-approved conversion (PDF) of a quarantined original as another extraction revision.
+    The original and its failure stay recorded; a failed fidelity comparison keeps the quarantine."""
+    if not converted_file.is_absolute():
+        raise IngestionError("--converted-file must be an absolute path")
+    if not converted_file.is_file():
+        raise IngestionError("converted file not found")
+    suffix = converted_file.suffix.lower()
+    if suffix == ".hwpx":
+        raise IngestionError("HWPX recovery is not implemented: convert to PDF, or add an HWPX parser once a real "
+                             "recovery artifact needs it")
+    if suffix != ".pdf":
+        raise IngestionError("recovery artifacts must be PDF")
+    (review,) = _load_review_records(review_file)[:1] or [None]
+    if not isinstance(review, dict):
+        raise IngestionError("review file holds no record")
+    for key in ("reviewer", "method", "compared_locations", "mapping_limitations"):
+        if not review.get(key):
+            raise IngestionError(f"recovery review requires {key!r}")
+    if not isinstance(review.get("fidelity_passed"), bool):
+        raise IngestionError("recovery review requires fidelity_passed: true|false")
+    if not isinstance(review["compared_locations"], list):
+        raise IngestionError("compared_locations must be a list of the places compared (pages, tables, ...)")
+    with open_db(settings.db_path) as conn:
+        doc = conn.execute("SELECT active_source_hash FROM documents WHERE doc_id = ?", (doc_id,)).fetchone()
+        if doc is None:
+            raise IngestionError("unknown doc_id")
+        src = conn.execute("SELECT * FROM sources WHERE source_hash = ?", (doc[0],)).fetchone()
+    source_hash = src["source_hash"]
+    if src["parse_status"] != "quarantined":
+        raise IngestionError("only quarantined sources take a recovery artifact")
+    if sha256_file(Path(src["original_path"])) != source_hash:
+        raise IngestionError("original bytes changed; rerun manifest")
+    converted_hash = sha256_file(converted_file)
+    managed = recovered_dir(settings, source_hash) / f"{converted_hash}.pdf"
+    if not managed.exists():
+        managed.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(converted_file, managed)
+    if sha256_file(managed) != converted_hash:
+        raise IngestionError("managed copy of the converted file does not match its hash")
+    previous = {"reason_code": src["reason_code"], "warnings": json.loads(src["warnings_json"])}
+    recovery = {"original_hash": source_hash, "converted_hash": converted_hash, "converted_path": str(managed),
+                "method": review["method"], "reviewer": review["reviewer"],
+                "mapping_limitations": review["mapping_limitations"], "previous_failure": previous}
+    if not review["fidelity_passed"]:
+        record_review(settings, source_hash, review["reviewer"], "needs_recovery",
+                      review["compared_locations"], {"recovery_rejected": recovery,
+                                                     "findings": review.get("findings", {})})
+        return {"source_hash": source_hash, "status": "quarantined", "reason": "recovery_fidelity_failed"}
+    raw, warnings, reason = parse_pdf(managed)
+    if reason:
+        record_review(settings, source_hash, review["reviewer"], "needs_recovery", review["compared_locations"],
+                      {"recovery_unreadable": reason, "recovery": recovery})
+        return {"source_hash": source_hash, "status": "quarantined", "reason": f"recovery_{reason}"}
+    for e in raw:
+        e["location"]["format"] = "hwp_recovered_pdf"  # pages of the converted PDF, not of the original HWP
+    fp = f"{parser_fingerprint('pdf')}-recovered-{converted_hash[:12]}"
+    extraction_id, elements, artifact = assign_revision(settings, source_hash, fp, raw)
+    warnings = previous["warnings"] + warnings + [{"code": "recovered_from_artifact", "detail": previous["reason_code"],
+                                                   "converted_sha256": converted_hash}]
+    with open_db(settings.db_path) as conn, tx(conn, immediate=True):
+        conn.execute(
+            "INSERT OR IGNORE INTO extractions(extraction_id, source_hash, parser_fingerprint, artifact_path, "
+            "created_at, recovery_json) VALUES (?, ?, ?, ?, ?, ?)",
+            (extraction_id, source_hash, fp, str(artifact), utcnow(), dumps(recovery)))
+        conn.execute("DELETE FROM elements WHERE extraction_id = ?", (extraction_id,))
+        conn.executemany(
+            "INSERT INTO elements(extraction_id, element_id, source_order, kind, parent_id, raw_text, search_text, "
+            "location_json, table_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [(extraction_id, e["element_id"], e["source_order"], e["kind"], e["parent_id"], e["raw_text"],
+              e["search_text"], dumps(e["location"]), dumps(e["table"]) if e["table"] else None) for e in elements])
+        conn.execute(
+            "UPDATE sources SET parse_status = 'parsed', active_extraction_id = ?, reason_code = NULL, "
+            "review_status = 'unreviewed', warnings_json = ? WHERE source_hash = ?",
+            (extraction_id, dumps(warnings), source_hash))
+        _record_input(conn, source_hash, "recovery:" + converted_hash, extraction_id, sha256_file(artifact),
+                      {"diagnostics": diagnose(elements, warnings), "cues": original_cues(elements),
+                       "recovery": {k: recovery[k] for k in ("converted_hash", "method")}})
+        # The conversion comparison is recorded as an audit entry. Coverage of the new revision is claimed
+        # only by `import-reviews` against its own element IDs, so the source stays unreviewed until then.
+        conn.execute(
+            "INSERT INTO reviews(review_id, source_hash, extraction_id, reviewer, status, locations_json, "
+            "findings_json, created_at) VALUES (?, ?, ?, ?, 'unreviewed', ?, ?, ?)",
+            (review_id := str(uuid.uuid4()), source_hash, extraction_id, review["reviewer"],
+             dumps(review["compared_locations"]), dumps({"recovery": recovery, "findings": review.get("findings", {}),
+                                                         "limitations": [review["mapping_limitations"]]}), utcnow()))
+    return {"source_hash": source_hash, "status": "parsed", "extraction_id": extraction_id,
+            "elements": len(elements), "review_status": "unreviewed", "review_id": review_id,
+            "next": "import-reviews against this extraction before it enters --reviewed-only indexes"}
+
+
+# ---------------------------------------------------------------- identity cues and metadata provenance
+
+INSTITUTION_LABELS = ("발주기관", "수요기관", "주관기관", "발주처", "기관명", "발 주 기 관", "수 요 기 관")
+TITLE_LABELS = ("사업명", "용역명", "과제명", "사 업 명", "용 역 명")
+CUE_SCAN_ELEMENTS = 120
+LABEL_VALUE_RE = re.compile(r"^\s*[○◦·•\-\d.]*\s*(?P<label>[가-힣 ]{2,8}?)\s*[:：]\s*(?P<value>.{2,80})$")
+
+
+def _squash(text: str | None) -> str:
+    return re.sub(r"\s+", "", nfc(text or ""))
+
+
+def original_cues(elements: list[dict]) -> dict:
+    """Institution and title as the original states them near its start (label: value lines and label | value
+    table rows). These are provenance for comparison with the CSV row, never a silent replacement."""
+    cues: dict[str, list[dict]] = {"institution": [], "title": []}
+
+    def add(field: str, value: str, element_id: str) -> None:
+        value = search_text(value).strip(" :：")
+        if 2 <= len(value) <= 80 and value not in {c["value"] for c in cues[field]} and len(cues[field]) < 3:
+            cues[field].append({"value": value, "element_id": element_id})
+
+    def classify(label: str) -> str | None:
+        squashed = _squash(label)
+        if any(squashed == _squash(x) for x in INSTITUTION_LABELS):
+            return "institution"
+        if any(squashed == _squash(x) for x in TITLE_LABELS):
+            return "title"
+        return None
+
+    for e in elements[:CUE_SCAN_ELEMENTS]:
+        if e["kind"] == "table" and e.get("table"):
+            rows: dict[int, list[dict]] = {}
+            for c in e["table"]["cells"]:
+                rows.setdefault(c["row"], []).append(c)
+            for cells in rows.values():
+                cells = sorted(cells, key=lambda c: c["col"])
+                for a, b in zip(cells, cells[1:]):
+                    field = classify(a["text"])
+                    if field and b["text"].strip():
+                        add(field, b["text"], e["element_id"])
+        else:
+            for line in e["raw_text"].splitlines():
+                m = LABEL_VALUE_RE.match(line)
+                field = classify(m.group("label")) if m else None
+                if field:
+                    add(field, m.group("value"), e["element_id"])
+    return cues
+
+
+def _agrees(csv_value: str | None, cues: list[dict]) -> bool | None:
+    if not cues or not csv_value:
+        return None
+    a = _squash(csv_value)
+    return any(a in _squash(c["value"]) or _squash(c["value"]) in a for c in cues)
+
+
+def identity_report(settings: Settings) -> list[dict]:
+    """Per association: CSV values, the original's own cues, agreement, provenance conflicts and resolutions.
+    Byte-identical associations share one set of cues but keep their own CSV values."""
+    with open_db(settings.db_path) as conn:
+        docs = conn.execute(
+            "SELECT d.doc_id, d.filename, d.active_source_hash, d.normalized_metadata_json, d.quality_json, "
+            "i.stats_json FROM documents d LEFT JOIN extraction_inputs i ON i.source_hash = d.active_source_hash "
+            "ORDER BY d.csv_row_id").fetchall()
+        resolutions = resolutions_by_doc(conn)
+    out = []
+    for d in docs:
+        meta = json.loads(d["normalized_metadata_json"])
+        quality = json.loads(d["quality_json"])
+        cues = json.loads(d["stats_json"]).get("cues", {}) if d["stats_json"] else {}
+        out.append({
+            "doc_id": d["doc_id"], "filename": d["filename"], "source_hash": d["active_source_hash"],
+            "csv": {"institution": meta.get("institution"), "title": meta.get("title")},
+            "original": cues,
+            "agreement": {f: _agrees(meta.get(f), cues.get(f, [])) for f in ("institution", "title")},
+            "shared_source_with": quality.get("shared_source_with", []),
+            "provenance_conflicts": quality.get("provenance_conflicts", []),
+            "resolutions": resolutions.get(d["doc_id"], {}),
+        })
+    return out
+
+
+def resolutions_by_doc(conn) -> dict[str, dict[str, dict]]:
+    """Latest owner/reviewer resolution per (doc, field). History stays in the append-only table."""
+    out: dict[str, dict[str, dict]] = {}
+    for r in conn.execute("SELECT * FROM metadata_resolutions ORDER BY created_at"):
+        out.setdefault(r["doc_id"], {})[r["field"]] = {
+            "value": json.loads(r["value_json"]), "rationale": r["rationale"], "evidence": r["evidence"],
+            "actor": r["actor"], "at": r["created_at"]}
+    return out
+
+
+def _valid_when(v) -> bool:
+    """Same shape as normalized CSV dates: ISO date for date precision, ISO timestamp with offset otherwise."""
+    if not isinstance(v, dict) or not isinstance(v.get("value"), str):
+        return False
+    try:
+        if v.get("precision") == "date":
+            return date.fromisoformat(v["value"]).isoformat() == v["value"]
+        if v.get("precision") == "timestamp":
+            return datetime.fromisoformat(v["value"]).tzinfo is not None
+    except ValueError:
+        return False
+    return False
+
+
+def resolve_metadata(settings: Settings, doc_id: str, field: str, value, rationale: str, evidence: str,
+                     actor: str) -> str:
+    """Canonical value for one association's conflicting field, with a written source/notice rationale. The
+    competing CSV values stay recorded and visible; CSV order is never authority."""
+    if field not in CONFLICT_FIELDS:
+        raise IngestionError(f"field must be one of {CONFLICT_FIELDS}")
+    if not rationale.strip() or not evidence.strip() or not actor.strip():
+        raise IngestionError("a resolution needs a rationale, the source/notice evidence and the actor")
+    valid = {"amount_krw": lambda v: isinstance(v, int) and not isinstance(v, bool) and v >= 0,
+             "bid_close": _valid_when}.get(field, lambda v: isinstance(v, str) and v.strip() != "")
+    if not valid(value):
+        raise IngestionError(f"value has the wrong shape for {field} (amount_krw: integer KRW; bid_close: "
+                             '{"value": ISO text, "precision": "date"|"timestamp"}; others: text)')
+    resolution_id = str(uuid.uuid4())
+    with open_db(settings.db_path) as conn, tx(conn, immediate=True):
+        doc = conn.execute("SELECT quality_json FROM documents WHERE doc_id = ?", (doc_id,)).fetchone()
+        if doc is None:
+            raise IngestionError("unknown doc_id")
+        conflicts = {c["field"] for c in json.loads(doc["quality_json"]).get("provenance_conflicts", [])}
+        if field not in conflicts:
+            raise IngestionError(f"{field} has no recorded provenance conflict for this document")
+        conn.execute(
+            "INSERT INTO metadata_resolutions(resolution_id, doc_id, field, value_json, rationale, evidence, actor, "
+            "created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (resolution_id, doc_id, field, dumps(value), rationale, evidence, actor, utcnow()))
+    return resolution_id
 
 
 def printed_pdf_path(settings: Settings, source_hash: str) -> Path:

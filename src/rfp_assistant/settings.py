@@ -24,6 +24,13 @@ DEFAULT_RATES: dict[str, dict[str, str]] = {
 ALLOWED_GENERATION_MODELS = ("gpt-6-luna",)
 REASONING_EFFORTS = ("none", "low", "medium", "high", "xhigh", "max")
 ALLOWED_EMBEDDING_MODELS = ("text-embedding-3-small",)
+# Embedding endpoint limits as documented in the pinned SDK (openai 3.22.1, embedding_create_params.py):
+# 8192 tokens per input, at most 2048 inputs per array, 300,000 tokens summed across one request.
+EMBEDDING_MAX_TOKENS_PER_INPUT = 8192
+EMBEDDING_MAX_INPUTS_PER_REQUEST = 2048
+EMBEDDING_MAX_TOKENS_PER_REQUEST = 300_000
+EMBEDDING_MAX_DIMENSIONS = {"text-embedding-3-small": 1536}
+EMBEDDING_TOKENIZER = {"text-embedding-3-small": "cl100k_base"}
 
 
 class SettingsError(RuntimeError):
@@ -44,8 +51,20 @@ class Settings:
     evidence_max_units: int = 6
     generation_max_output_tokens: int = 2000  # includes reasoning tokens
     question_max_characters: int = 2000
-    retrieval_mode: str = "kiwi_bm25"
+    retrieval_mode: str = "kiwi_bm25"  # default until `activate-run` records a measured selection
     reranker_enabled: bool = False
+    embedding_dimensions: int = 1536
+    embedding_batch_inputs: int = 256
+    embedding_batch_tokens: int = 100_000
+    embedding_estimate_ttl_hours: int = 24
+    channel_top_k: int = 20  # BM25 top 20 and dense top 20
+    fused_top_k: int = 20
+    rrf_k: int = 60
+    reranker_model: str = "BAAI/bge-reranker-v2-m3"
+    reranker_revision: str = ""  # commit hash from the model card; the trial refuses to load an unpinned model
+    reranker_max_length: int = 512
+    reranker_max_concurrency: int = 1
+    reranker_precision: str = "fp32"  # "fp16" halves weights on a CUDA device; part of the trial/serving identity
     request_timeout_seconds: float = 60.0
     converter_timeout_seconds: float = 300.0
     framing_margin_tokens: int = 200
@@ -126,7 +145,21 @@ def validate(s: Settings) -> None:
     if not 0 < s.generation_max_output_tokens <= 8000:
         raise SettingsError("generation_max_output_tokens must be within 1..8000")
     if s.reranker_enabled:
-        raise SettingsError("the reranker is not available before phase 2 selection")
+        raise SettingsError("the reranker is enabled only through `activate-run` after its measured gate")
+    if s.retrieval_mode not in ("kiwi_bm25",):
+        raise SettingsError("retrieval_mode is the keyword default; other modes are activated with `activate-run`")
+    if not 1 <= s.embedding_dimensions <= EMBEDDING_MAX_DIMENSIONS.get(s.embedding_model, 0):
+        raise SettingsError("embedding_dimensions exceeds the model's native size")
+    if not 1 <= s.embedding_batch_inputs <= EMBEDDING_MAX_INPUTS_PER_REQUEST:
+        raise SettingsError(f"embedding_batch_inputs must be within 1..{EMBEDDING_MAX_INPUTS_PER_REQUEST}")
+    if not 1 <= s.embedding_batch_tokens <= EMBEDDING_MAX_TOKENS_PER_REQUEST:
+        raise SettingsError(f"embedding_batch_tokens must be within 1..{EMBEDDING_MAX_TOKENS_PER_REQUEST}")
+    if s.reranker_max_concurrency != 1:
+        raise SettingsError("reranker_max_concurrency must be 1 until per-worker tokenizer isolation exists")
+    if s.reranker_precision not in ("fp32", "fp16"):
+        raise SettingsError("reranker_precision must be 'fp32' or 'fp16'")
+    if s.rrf_k < 1 or s.channel_top_k < 1 or s.fused_top_k < 1 or s.reranker_max_concurrency < 1:
+        raise SettingsError("rrf_k, top-k depths and reranker concurrency must be positive")
     s.data_dir.mkdir(parents=True, exist_ok=True)
     if not os.access(s.data_dir, os.W_OK):
         raise SettingsError("runtime directory is not writable")

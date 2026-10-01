@@ -1,0 +1,3232 @@
+{
+  "documents": [
+    {
+      "doc_id": "02c0070d-948d-54da-8338-bc0ae6ae33ff",
+      "filename": "한국지식재산보호원_IP-NAVI  해외지식재산센터 사업관리 시스템 기능개.hwp",
+      "active_source_hash": "39764e6f48d6a5da152db618cc41c0533690f39cd8d53a1d34ea5567df4dfdfe"
+    },
+    {
+      "doc_id": "0380dcd1-197a-5c75-b537-30ce4ff6b305",
+      "filename": "한국수자원공사_건설통합시스템(CMS) 고도화.hwp",
+      "active_source_hash": "b72e04b492c062a5f18aaf0dbdba7da1b213b50a74b675aee61ed3acdd34dde0"
+    },
+    {
+      "doc_id": "047aee01-8b67-592e-bd92-c3c030a070d3",
+      "filename": "경기도 평택시_2024년도 평택시 버스정보시스템(BIS) 구축사업.hwp",
+      "active_source_hash": "36976f7d0e1b4cdea7933b87300a00ae610a6d4accc3cfe05fa6f2d8d4aac9d2"
+    },
+    {
+      "doc_id": "08cf86ce-d1ed-5f74-8d2b-fb212caaf53a",
+      "filename": "인천공항운영서비스(주)_인천공항운영서비스㈜ 차세대 ERP시스템 구축 .hwp",
+      "active_source_hash": "7581cb80dc8a7efd9a5da766decc927d7f2b6305566827e4394ded39b93e5e4c"
+    },
+    {
+      "doc_id": "09f7a464-9b3a-5ba5-b50c-88680fbe91f5",
+      "filename": "수협중앙회_수협중앙회 수산물사이버직매장 시스템 재구축 ISMP 수립 입.hwp",
+      "active_source_hash": "9e4be458556bd3273638a1e296f4ac000c5f091891083f49e6df94b7c109e663"
+    },
+    {
+      "doc_id": "0e57fb83-c6f6-56db-a0c7-0325729b0878",
+      "filename": "울산광역시_2024년 버스정보시스템 확대 구축 및 기능개선 용역.hwp",
+      "active_source_hash": "81be3527c867ebe3aab0eca565aefe2b6f15df667e913696f3f9e6e0627862f0"
+    },
+    {
+      "doc_id": "13bcc3de-9c6f-5af3-a36d-301e85006330",
+      "filename": "한국농어촌공사_아세안+3 식량안보정보시스템(AFSIS) 3단계 협력(캄보디아.hwp",
+      "active_source_hash": "062655938c5bef513ae61a06ada1c052192202a0a939cd96446c8bed5f32e935"
+    },
+    {
+      "doc_id": "16ba673b-16e7-50a2-b5a0-0ae7f83ce0ca",
+      "filename": "축산물품질평가원_축산물이력관리시스템 개선(정보화 사업).hwp",
+      "active_source_hash": "5e33811a52b0cad7638ce59e04885cf9f41796235a48181645e0fd0b5ed61c93"
+    },
+    {
+      "doc_id": "17bd6a5a-5fe0-5db7-80e7-c890765b8dc9",
+      "filename": "한국해양조사협회_2024년 항해용 간행물 품질관리 업무보조 시스템 구축.hwp",
+      "active_source_hash": "2999dd9e2f06db1b31d0ece80f69a31837d44724dd551008d5d7f04e8e50809d"
+    },
+    {
+      "doc_id": "19d1e81b-0570-589d-a35c-18b47d141606",
+      "filename": "국립인천해양박물관_국립인천해양박물관 해양자료관리시스템 구축 용.hwp",
+      "active_source_hash": "33503af4c7d7dd1883342ab29adcf221d508546385fe1e8b7fb0fd53a1633102"
+    },
+    {
+      "doc_id": "1acb05e9-521a-51ab-aa3b-c48fa6d0afb0",
+      "filename": "(사）한국대학스포츠협의회_KUSF 체육특기자 경기기록 관리시스템 개발.hwp",
+      "active_source_hash": "ea909335319f1aba3af4d141239e359ce1a583699a5015ffd4908dd97e9c6954"
+    },
+    {
+      "doc_id": "1b87398c-6a4b-5877-9b9b-5afa6861bda8",
+      "filename": "재단법인 광주연구원_광주정책연구아카이브(GPA) 시스템 개발.hwp",
+      "active_source_hash": "e764cea6134f3aa71308c4354d0ad655e51b31f17301138d372837dbd2f183df"
+    },
+    {
+      "doc_id": "1c60adb6-dcb9-5dff-9c62-2d5f696ca1d1",
+      "filename": "한국발명진흥회 입찰공고_2024년 건설기술에 관한 특허·실용신안 활용실.hwp",
+      "active_source_hash": "89dd99c161d36116682e5fd9feeee0d04e34d32ea3764c1bd9437dabb71d5d37"
+    },
+    {
+      "doc_id": "1c84ec87-74f0-5450-b322-a7f5ed3829d0",
+      "filename": "BioIN_의료기기산업 종합정보시스템(정보관리기관) 기능개선 사업(2차).hwp",
+      "active_source_hash": "20cdb1e78194ab2496ca941e3c9a4a2b74558dd007535964517584cab67be0a7"
+    },
+    {
+      "doc_id": "28581a33-76ae-5f91-afea-47d1854ac0c3",
+      "filename": "한국수자원공사_용인 첨단 시스템반도체 국가산단 용수공급사업 타당성.hwp",
+      "active_source_hash": "7498d7f03d29fdd0b24d84161ff1b906740976156d2f0b5f023e0ab62132c9f4"
+    },
+    {
+      "doc_id": "2e413de3-1c83-5a8d-b24e-3bcd0526b1cf",
+      "filename": "2025 구미 아시아육상경기선수권대회 조직위원회_2025 구미아시아육상경.hwp",
+      "active_source_hash": "30d5f1aa3b9a3363f296ac7ad539b7ab505f910ad8f9ccc49e41a38a2084400a"
+    },
+    {
+      "doc_id": "30cf7b69-fb33-542b-9eb0-01455482af94",
+      "filename": "문화체육관광부 국립민속박물관_2024년 국립민속박물관 민속아카이브 자.hwp",
+      "active_source_hash": "221133a3a63cc83d59755ed1f8526fd265688270b88a4608d4c63713987faa05"
+    },
+    {
+      "doc_id": "3184333d-5c6d-54f2-9f07-2a951c75801e",
+      "filename": "한국철도공사 (용역)_예약발매시스템 개량 ISMP 용역.hwp",
+      "active_source_hash": "79c3ff04b9a8d404d2455dd9bd598bd9d3461c8de69e57863519e6d5b7822229"
+    },
+    {
+      "doc_id": "3609fad3-f23a-576c-a1cc-7f8b0b67d2e4",
+      "filename": "수협중앙회_강릉어선안전조업국 상황관제시스템 구축.hwp",
+      "active_source_hash": "c61fb84faaca9e2581b56088610c51ec3e114f1c6d3c70ab256e0c39a2abe1ca"
+    },
+    {
+      "doc_id": "3b1e5eab-37f8-530e-be75-a6e72586f449",
+      "filename": "국가과학기술지식정보서비스_통합정보시스템 고도화 용역.hwp",
+      "active_source_hash": "fe07779f264abfd5f420f332adb65779a33142a5506581345f5cbe4803be53e8"
+    },
+    {
+      "doc_id": "3b40eb87-d9af-576d-88cc-48fddfc3aad8",
+      "filename": "경기도 안양시_호계체육관 배드민턴장 및 탁구장 예약시스템 구축 용역.hwp",
+      "active_source_hash": "e08a5267735388614b5ab94e073778ec2cd9f5e62bc1329aae2d114f31feafb9"
+    },
+    {
+      "doc_id": "3b5744b5-1332-5755-bdec-3d51a5997f51",
+      "filename": "재단법인경기도일자리재단_2025년 통합접수시스템 운영.hwp",
+      "active_source_hash": "c8d7860853ad983f2cadd1eb043be5fcbe6b02651b3b37b70645fe0d463f3bd5"
+    },
+    {
+      "doc_id": "3b8dfed0-4df6-5f65-bf58-54be553dec01",
+      "filename": "한국수자원공사_수도사업장 통합 사고분석솔루션 시범구축 용역.hwp",
+      "active_source_hash": "ea22ce3a5bacc5d4b3993c2ba237a6ce3a9d854157a30a8d54b6b9125a78b552"
+    },
+    {
+      "doc_id": "3cf16f88-a9b0-5fe0-8c11-480e65ee0b78",
+      "filename": "경기도사회서비스원_2024년 통합사회정보시스템 운영지원.hwp",
+      "active_source_hash": "e14d79c538b410f1b5a3fc87178ab1a8fbba47acb110744d4d591a128d77ff20"
+    },
+    {
+      "doc_id": "3d471026-a26a-54e3-8148-9b893d2c511f",
+      "filename": "대한상공회의소_기업 재생에너지 지원센터 홈페이지 개편 및 시스템 고.hwp",
+      "active_source_hash": "cc6618da42a71a3b6df6944a40ca6f5bed418330dadb49b8fbe632db511aba83"
+    },
+    {
+      "doc_id": "3dca0337-4546-5a29-acf2-8660426548dd",
+      "filename": "한국원자력연구원_한국원자력연구원 선량평가시스템 고도화.hwp",
+      "active_source_hash": "3b643668220fa1ccaec14adea446bb8b7c604c46dfd9b9b428936e6fb06178db"
+    },
+    {
+      "doc_id": "406d6a13-5452-5fb5-a72c-6f27499c1125",
+      "filename": "재단법인충북연구원_GIS통계 기반 재난안전데이터 분석ㆍ관리 시스템 구.hwp",
+      "active_source_hash": "daa36d8887441f8db552977046d80ca1f2b0843ded6f072a15e0a4567819255c"
+    },
+    {
+      "doc_id": "41f2abb8-9087-5ef9-b4b9-36e48fb54ccd",
+      "filename": "한국연구재단_2024년 대학산학협력활동 실태조사 시스템(UICC) 기능개선.hwp",
+      "active_source_hash": "16dfbd16166dcaf9907193b8ffa7433de35dc75ba22cd32dfcfe0ca23bb2d80e"
+    },
+    {
+      "doc_id": "4441f0fa-b3c1-599c-87e4-53538de20f77",
+      "filename": "국립중앙의료원_(긴급)「2024년도 차세대 응급의료 상황관리시스템 구축.hwp",
+      "active_source_hash": "3202249c472b8dcd40d433c9bfbe24d282f474f399855c0b3d671bf96044f76f"
+    },
+    {
+      "doc_id": "4517bdf1-298d-5d51-9a28-c7150df4669c",
+      "filename": "경상북도 봉화군_봉화군 재난통합관리시스템 고도화 사업(협상)(긴급).hwp",
+      "active_source_hash": "d2cceeb05f07ad57f1863d43c41d03767f9aa216caaa88fc53a90cf1564e37ef"
+    },
+    {
+      "doc_id": "4b27fd75-2ab4-547a-b7d7-30c7150df1ea",
+      "filename": "한국철도공사 (용역)_[재공고][긴급][협상형]운행정보기록 자동분석시스.hwp",
+      "active_source_hash": "04f3238a67dc5744cd145aa1763091c6a63aa3f58772a6914a3738284e66ed2b"
+    },
+    {
+      "doc_id": "4b360190-db80-5328-affd-c711ecd415d2",
+      "filename": "한국산업단지공단_산단 안전정보시스템 1차 구축 용역.hwp",
+      "active_source_hash": "26f21a03edb2114b8016a73eab52527718aa7e2c5d992fde11edb861d99270a5"
+    },
+    {
+      "doc_id": "501041c1-caa9-5edd-9fa6-142910ee5954",
+      "filename": "국민연금공단_2024년 이러닝시스템 운영 용역.hwp",
+      "active_source_hash": "7e07a7f9ecf4fea73d89ab882d7e43624844e54dc595213676ba1b4e9ad5d76f"
+    },
+    {
+      "doc_id": "5187e0b3-a53a-5075-9b07-cba2b870e5c4",
+      "filename": "파주도시관광공사_종량제봉투 판매관리 전산시스템 개선사업.hwp",
+      "active_source_hash": "74824a94acfdd7dcf3c865c70f607074196de1497417aea01bfe3d2e3f62a8b2"
+    },
+    {
+      "doc_id": "52a0955a-b308-5b77-8efc-79823278b8a7",
+      "filename": "한국연구재단_2024년 기초학문자료센터 시스템 운영 및 연구성과물 DB구.hwp",
+      "active_source_hash": "833369f0c999bf66347099c7f4d0cbccb20bf929d98921dfcb3cba8b4cf43aa9"
+    },
+    {
+      "doc_id": "52b13f2a-7553-5af8-986b-dc7f12b599f8",
+      "filename": "한국농어촌공사_네팔 수자원관리 정보화사업-Pilot 시스템 구축용역.hwp",
+      "active_source_hash": "cc5d401ebdfce98c11a4da7bac3b46f793e9bafb82f5aa01e6dc5fef545ceac1"
+    },
+    {
+      "doc_id": "5db20b2c-6d51-5bb2-9985-5bb5b300b7d0",
+      "filename": "한국철도공사 (용역)_모바일오피스 시스템 고도화 용역(총체 및 1차).hwp",
+      "active_source_hash": "23471b7d54ea79281b1aa609b935b737a8a4ecfd431a57d244947859a2d3faa2"
+    },
+    {
+      "doc_id": "5f31016d-226a-5de7-a250-74c8de62ec6d",
+      "filename": "경희대학교_[입찰공고] 산학협력단 정보시스템 운영 용역업체 선정.hwp",
+      "active_source_hash": "acdaa1c1f4aa266d483af45177edf8a324e1f9a23813e0f339971b9baaaa5959"
+    },
+    {
+      "doc_id": "61be69ea-56d6-56a1-a955-7934d7ae20ba",
+      "filename": "한국사회보장정보원_라오스 보건의료정보화 협력을 위한 사전타당성 조.hwp",
+      "active_source_hash": "4dd7233b8cd73add78d6652aeb3049d597414891aba48f847c4f5a9ee446540c"
+    },
+    {
+      "doc_id": "62c0dbc6-fa6c-5f72-abef-da918e0762e1",
+      "filename": "한국사학진흥재단_대학재정정보시스템(기본재산 및 기채 사후관리) 고.hwp",
+      "active_source_hash": "4a2337a0c5cf98973f0cc42fb34e0039888b0061bf8d666cb4edf3403fbe0a1a"
+    },
+    {
+      "doc_id": "65085736-ff71-55d2-9271-48961e3dd1e0",
+      "filename": "사단법인아시아물위원회사무국_우즈벡-키르기즈스탄 기후변화대응 스.hwp",
+      "active_source_hash": "0205e3319d99d17c7aff6808007ef34bfa5484d32b24a826ecda94de9eaabc52"
+    },
+    {
+      "doc_id": "651d1810-1050-59aa-9262-a32138f5411a",
+      "filename": "국가철도공단_철도인프라 디지털트윈 정보화전략계획(ISP) 수립 용역(변.hwp",
+      "active_source_hash": "57e14df9bfe2539e1ee57e351e2765da2f8bdd00cde8654609b7e3a4b5be3c79"
+    },
+    {
+      "doc_id": "67177804-ceb8-53d7-ab81-0ce5a6b24212",
+      "filename": "한국농수산식품유통공사_농산물가격안정기금 정부예산회계연계시스템 .hwp",
+      "active_source_hash": "7a90f371ade71abff5acaf4e842b86310eb7e61ad3b6f03deef351c01ef50353"
+    },
+    {
+      "doc_id": "699c487e-cd37-593b-9d01-3341d61f0003",
+      "filename": "대검찰청_아태 사이버범죄 역량강화 허브(APC-HUB) 홈페이지 및 온라인 교.hwp",
+      "active_source_hash": "ab2ae44bc4b640f8bb1ec3ee8083e43ccd6230eef4bb50cd8ab2f4e4db4bc3a8"
+    },
+    {
+      "doc_id": "6a6f639c-f1a0-5cf3-808c-43a6e7e18e57",
+      "filename": "고려대학교_차세대 포털·학사 정보시스템 구축사업.pdf",
+      "active_source_hash": "65c9785a157c8f554795a39912bac9b7e32d3431810d560ca0847d4ccdecc2ea"
+    },
+    {
+      "doc_id": "71cfcd0a-4147-570b-a639-ddb07d1e0c4e",
+      "filename": "인천광역시 동구_수도국산달동네박물관 전시해설 시스템 구축(협상에 .hwp",
+      "active_source_hash": "59a2e281cac9b5bb4b462cf3209f4af14c5a956e074ddd4355a620e69bcc1c59"
+    },
+    {
+      "doc_id": "77f61bae-5b42-52b8-b205-0d965af2621a",
+      "filename": "인천광역시_도시계획위원회 통합관리시스템 구축용역.hwp",
+      "active_source_hash": "7fd31853e9b51435be8b6f6c00e762e3bedfbc4a9305c28220b3670b1245c434"
+    },
+    {
+      "doc_id": "7889e793-ecfc-503d-8ed3-35cece50bc63",
+      "filename": "전북특별자치도 정읍시_정읍체육트레이닝센터 통합운영관리시스템 구.hwp",
+      "active_source_hash": "59f66e6cc4c7f4791630cd2c226faa728c3cee82f7574c977ca6af194ae939f6"
+    },
+    {
+      "doc_id": "80dd4034-f584-555d-b5b5-21242a195588",
+      "filename": "한국한의학연구원_통합정보시스템 고도화 용역.hwp",
+      "active_source_hash": "fe07779f264abfd5f420f332adb65779a33142a5506581345f5cbe4803be53e8"
+    },
+    {
+      "doc_id": "84998bf1-4393-5fb8-a7a4-2ce828d2da8a",
+      "filename": "대한적십자사 의료원_적십자병원 병원정보 재해복구시스템 구축 용역 .hwp",
+      "active_source_hash": "4b43476cd69b871b5f2ff4ee7ffb20f493452879ff93dea70ae96b9848862ca0"
+    },
+    {
+      "doc_id": "8684b102-b5ec-5f84-b083-38ba103dffdd",
+      "filename": "인천광역시_인천일자리플랫폼 정보시스템 구축 ISP 수립용역.hwp",
+      "active_source_hash": "e14e0343f11daea41c0c032da88827baba9b6263d1e307365fe0f2f928895406"
+    },
+    {
+      "doc_id": "86dcf91a-7247-5d90-b074-1028c7164d73",
+      "filename": "나노종합기술원_스마트 팹 서비스 활용체계 구축관련 설비온라인 시스.hwp",
+      "active_source_hash": "9145abf6cb0d67ba5476980e3a94458c3f609d0d08f63ecb305deb26e393ee2c"
+    },
+    {
+      "doc_id": "87f3416d-835a-5c24-8a29-2cafdfdd8a14",
+      "filename": "서울특별시 여성가족재단_(재공고, 협상) 서울 디지털성범죄 안심지원센.hwp",
+      "active_source_hash": "9d78c025d1b93fad2116bf8e5b58843e100daeacbf8f4263d2dad3619d9811d5"
+    },
+    {
+      "doc_id": "88c0371e-e60a-5b0f-b5bc-f673cdaa4bbc",
+      "filename": "재단법인 광주광역시 광주문화재단_2024년 광주문화예술통합플랫폼 시스.hwp",
+      "active_source_hash": "42579c6801b336059847c2d273beecd589c550a8816e00d25b62a92d30bae913"
+    },
+    {
+      "doc_id": "89bd8e1c-a757-5ece-a4e2-cf68e6b2e606",
+      "filename": "중앙선거관리위원회_2025년도 행정정보시스템 위탁운영사업.hwp",
+      "active_source_hash": "73abf8e4f78c36a19e2345a3e2a0be5afd0e8a5a1d27363f665e701b7ecade8d"
+    },
+    {
+      "doc_id": "89fc2c93-d8aa-5ff5-a168-6381b3aff753",
+      "filename": "광주과학기술원_실시간통합연구비관리시스템(RCMS)  연계 모듈 변경 사업.hwp",
+      "active_source_hash": "ece531219e5c92db319a0501511b6d3344b27c9620db2b0c1b29572159d4e332"
+    },
+    {
+      "doc_id": "8aa180de-ec1a-591e-88a7-4b27d51671ac",
+      "filename": "한국어촌어항공단_한국어촌어항공단 경영관리시스템(ERP·GW) 기능 고도.hwp",
+      "active_source_hash": "681a8b9dcd5ae12857eb770c8c75dde761b2f9bc6c151b34ff182e87c0c6d843"
+    },
+    {
+      "doc_id": "8e40386e-3f5b-5e72-80a2-f1cdb00b68de",
+      "filename": "한국수출입은행_(긴급) 모잠비크 마푸토 지능형교통시스템(ITS) 구축사업.hwp",
+      "active_source_hash": "afe7223ddc830810141de53336086aff4c084f4fbc74da6a2c555205b1581f37"
+    },
+    {
+      "doc_id": "909d6003-1818-5598-b149-6546a3fee8e7",
+      "filename": "한영대학_한영대학교 특성화 맞춤형 교육환경 구축 - 트랙운영 학사정보.hwp",
+      "active_source_hash": "1d7e80b4f717de629d0917b5e1412ffb7d913fb692bf3f1ec8eb4964b276e635"
+    },
+    {
+      "doc_id": "94512da3-9720-56aa-bd5b-184a15026be5",
+      "filename": "서울특별시교육청_서울특별시교육청 지능정보화전략계획(ISP) 수립(2차) .hwp",
+      "active_source_hash": "699085551ebca10d106afc3234ce1fa1292be6196727e5ace2c9331c5f4c59b4"
+    },
+    {
+      "doc_id": "95bad857-69c1-5405-a393-757499facf97",
+      "filename": "기초과학연구원_2025년도 중이온가속기용 극저온시스템 운전 용역.pdf",
+      "active_source_hash": "56e5a8ae813dbddfe5d46b5e5b6c0ea55ba121950217d0ef0aa8a0821f80bcce"
+    },
+    {
+      "doc_id": "95e12640-555b-5a84-a049-e43ba53b40a5",
+      "filename": "한국보건산업진흥원_의료기기산업 종합정보시스템(정보관리기관) 기능.hwp",
+      "active_source_hash": "20cdb1e78194ab2496ca941e3c9a4a2b74558dd007535964517584cab67be0a7"
+    },
+    {
+      "doc_id": "994e4232-bc65-5719-b7f3-402405ad8857",
+      "filename": "서민금융진흥원_서민금융진흥원 서민금융 채팅 상담시스템 구축.hwp",
+      "active_source_hash": "03d77a47a09a31bc44eb74fafe0a26fa5f0ad25a0ebac7f0a18c24275a1367cc"
+    },
+    {
+      "doc_id": "9c56f6be-8c30-5e5e-ac55-c88b38e8f7ff",
+      "filename": "고양도시관리공사_관산근린공원 다목적구장 홈페이지 및 회원 통합운영.hwp",
+      "active_source_hash": "18de0b4558edd93a1fbd4b97856b538baec299bbe6175a7a81fd94d6c2b6a7de"
+    },
+    {
+      "doc_id": "9cddd9a3-5875-5021-b93c-65eade2e05bc",
+      "filename": "서영대학교 산학협력단_전문대학 혁신지원사업 서영대학교 차세대 교육.hwp",
+      "active_source_hash": "3609538fc215aa6873373658963f52c63e7b6c4f06c48b141b013d65971be0e7"
+    },
+    {
+      "doc_id": "9d033aee-7b97-59b9-b0b1-07d1bea0d563",
+      "filename": "한국건강가정진흥원_2025년 아이돌봄인력 인적성 검사 정보시스템 운영.hwp",
+      "active_source_hash": "71b9814a26040f1acd78a88b7525e62ee6fe97316fc3f464eaf696de423bd62f"
+    },
+    {
+      "doc_id": "9d6fbdec-ea07-51bd-bb4b-d670137cc134",
+      "filename": "축산물품질평가원_꿀 품질평가 전산시스템 기능개선 사업.hwp",
+      "active_source_hash": "f5affba2118c729f9167a614e90d53a49aef7f481d8b2819516c5ac476ad2cb0"
+    },
+    {
+      "doc_id": "9e521f2d-6e02-5579-b4b4-f70c1828d1ef",
+      "filename": "대한장애인체육회_2025년 전국장애인체육대회 전산 및 시스템, 홈페이지 .hwp",
+      "active_source_hash": "341dca9191d85327dc975e35c13727e6e60be06211357a07eaa3612f205ba292"
+    },
+    {
+      "doc_id": "a0eff37d-d3c3-5d9f-b689-c2355f8a001b",
+      "filename": "을지대학교_을지대학교 비교과시스템 개발.hwp",
+      "active_source_hash": "379faf2f2da7e5fe11a2351ee94f8df4c220fe8d97ca8d981df1b0720bd0217f"
+    },
+    {
+      "doc_id": "a154d0a2-35d2-5a90-a297-c4ebe2ff7a8f",
+      "filename": "한국전기안전공사_전기안전 관제시스템 보안 모듈 개발 용역.hwp",
+      "active_source_hash": "6085df9b084e938bbf1be0b0c2cbc57e4d73b3c0c9c613af9017be1a9b41052a"
+    },
+    {
+      "doc_id": "a46e45f9-a772-5555-80b4-10ae598bbf92",
+      "filename": "그랜드코리아레저(주)_2024년도 GKL  그룹웨어 시스템 구축 용역.hwp",
+      "active_source_hash": "d58125735614f753ae3f05f0a57f506073166cf6cd6e5eae82162d4d25aa1c4e"
+    },
+    {
+      "doc_id": "a4aaae4a-0a68-54c2-be64-4c705278bc11",
+      "filename": "한국가스공사_[재공고]차세대 통합정보시스템(ERP) 구축.hwp",
+      "active_source_hash": "c892699f28ff5eb0243dc4d020e272cc50cd39acb90d6ee19c98a6932d5cdfb8"
+    },
+    {
+      "doc_id": "a55d440b-62ce-52f0-bd01-3044465ef408",
+      "filename": "서울특별시_2024년 지도정보 플랫폼 및 전문활용 연계 시스템 고도화 용.pdf",
+      "active_source_hash": "a6f6691e69197b5f7cdfbc3947fad8f6158dfde29d2a82d6d6429386ffab1999"
+    },
+    {
+      "doc_id": "a69b6cb3-a82a-57d8-ac40-bb901045d6c0",
+      "filename": "세종테크노파크_세종테크노파크 인사정보 전산시스템 구축 용역 입찰공.hwp",
+      "active_source_hash": "9a8fadfefd10feaca5cc58c320c25e41e5b1481e789903996d16193f9c9398dd"
+    },
+    {
+      "doc_id": "a846ee2d-9201-547a-ad86-daf28aacfe92",
+      "filename": "재단법인스포츠윤리센터_스포츠윤리센터 LMS(학습지원시스템) 기능개선.hwp",
+      "active_source_hash": "dec406c8211ed9bca53c6d337342b78990ccd8867356b9652a34df3d11cf76e5"
+    },
+    {
+      "doc_id": "ab7526f3-3864-53ec-b603-fab14a7d83cf",
+      "filename": "대전대학교_대전대학교 2024학년도 다층적 융합 학습경험 플랫폼(MILE) 전.hwp",
+      "active_source_hash": "f23a17ea8ed50eaefcadec19b554c821b6dded2e369d48c19b8ab7edd7fb4c89"
+    },
+    {
+      "doc_id": "b0adc781-3e61-5a67-8967-0d7209fb82d7",
+      "filename": "부산관광공사_경영정보시스템 기능개선.hwp",
+      "active_source_hash": "a501d0926830f0ff1c1eb0892fe0fd2857f917b4365a32b25777df88c0393d0f"
+    },
+    {
+      "doc_id": "b82e499f-d466-5908-89c3-afb8cbb37a13",
+      "filename": "케빈랩 주식회사_평택시 강소형 스마트시티 AI 기반의 영상감시 시스템 .hwp",
+      "active_source_hash": "4098c9b30df8fcdd6794bfff70db33f8805c057be972368f62b1c5a7131337bd"
+    },
+    {
+      "doc_id": "b9892fb3-cdc7-5280-a3e2-3ed93af77b02",
+      "filename": "조선대학교_(재공고)2024 조선대학교 SW중심대학 사업관리시스템(WeHub) 구.hwp",
+      "active_source_hash": "ab6dbebd700906de16c0119493635d345ba13079013a448e0e8b83041599e182"
+    },
+    {
+      "doc_id": "bbdb2e93-e32d-5057-84a3-29bea84f4e23",
+      "filename": "KOICA 전자조달_[긴급] [지문] [국제] 우즈베키스탄 열린 의정활동 상하원 .hwp",
+      "active_source_hash": "43128763d3b2ec7d693014dd98de6dc90411498f4d2c0c3ae3c56e0e75da44c4"
+    },
+    {
+      "doc_id": "bbf94893-3e64-5741-85cb-0f5a21d6505e",
+      "filename": "한국로봇산업진흥원_한국로봇산업진흥원 사업관리시스템 온라인평가 .hwp",
+      "active_source_hash": "aea2b41567689397f2c3fb5ac3091c26d4bd532aa6173b9cae4600e62b32fbe0"
+    },
+    {
+      "doc_id": "c666c44b-c791-5aea-a946-8bad53a806fc",
+      "filename": "(사)부산국제영화제_2024년 BIFF & ACFM 온라인서비스 재개발 및 행사지원시.hwp",
+      "active_source_hash": "bfa0ed2e678f004035e26321709cf36e546d2c4114ad0e6580697a55fe949e9d"
+    },
+    {
+      "doc_id": "cd4bb43d-d3da-57ed-9b9f-227c596dbee2",
+      "filename": "사단법인 보험개발원_실손보험 청구 전산화 시스템 구축 사업.hwp",
+      "active_source_hash": "723a3875c67c0ee21756b5841c6703694aa91c417c9d8d66d3b2050ea03daddf"
+    },
+    {
+      "doc_id": "cf7ddefd-d859-5c31-be92-386a25a55bd1",
+      "filename": "한국생산기술연구원_EIP3.0 고압가스 안전관리 시스템 구축 용역.hwp",
+      "active_source_hash": "ee02237767524272096aec544c09b90e3e89420661e5ad35dfd13158f57a9404"
+    },
+    {
+      "doc_id": "d299b3d4-570a-54c0-8044-fa9f7ce31637",
+      "filename": "한국산업인력공단_RFID기반 국가자격 시험 결과물 스마트 관리시스템 도.hwp",
+      "active_source_hash": "4fe0ecbc5e6a3d82dfda058cba3072fe1cbf8a3c70cb96f014514852a17c3946"
+    },
+    {
+      "doc_id": "d7b12062-8b0c-501b-924e-d708f1e549c1",
+      "filename": "국민연금공단_사업장 사회보험료 지원 고시 개정에 따른 정보시스템 보.hwp",
+      "active_source_hash": "9e7d457cd7643ef6db50430a0a5c3ef6bfaba5d43f3b68e5e0467366a9067ede"
+    },
+    {
+      "doc_id": "d7bff130-f9bc-500d-b9ef-c83b7aa53a5e",
+      "filename": "국방과학연구소_대용량 자료전송시스템 고도화.hwp",
+      "active_source_hash": "d2ab99f2543cabd8426b7cca27c818a9ebec9ea33eacddc5b1a8ce815a7f8b72"
+    },
+    {
+      "doc_id": "ddba4ac6-5a2a-55a9-ab2c-f65e2735c0c0",
+      "filename": "전북대학교_JST 공유대학(원) xAPI기반 LRS시스템 구축.hwp",
+      "active_source_hash": "17c0b08f516f8b484b3724badbaae77217e569aae096c130923ae86813ba2820"
+    },
+    {
+      "doc_id": "e6044c83-4d65-58d1-8c1e-8b235b7b4400",
+      "filename": "한국재정정보원_e나라도움 업무시스템 웹 접근성 컨설팅.hwp",
+      "active_source_hash": "fde88f734237f41c9df923a371a0e609664ec3e7baa926d2fd8f35f61288376d"
+    },
+    {
+      "doc_id": "e608bb5d-1df9-50b7-9e1a-3050229d7977",
+      "filename": "(사)벤처기업협회_2024년 벤처확인종합관리시스템 기능 고도화 용역사업 .hwp",
+      "active_source_hash": "3c832bf48d6778590797a18328a78282662cd111d6f3b0b4b06362b4fc514a18"
+    },
+    {
+      "doc_id": "e6fa61a5-737a-5b6b-b299-7b8d8ceec485",
+      "filename": "광주과학기술원_학사시스템 기능개선 사업.hwp",
+      "active_source_hash": "4b3541c9a4a70b36c86d0925f96b7b45dc2fafd5a3a1385b07cc06dc39863b0b"
+    },
+    {
+      "doc_id": "e97f31e2-8f3a-5e91-b6cb-ab6f8c396768",
+      "filename": "서울시립대학교_[사전공개] 학업성취도 다차원 종단분석 통합시스템 1차.pdf",
+      "active_source_hash": "cd81e943ce28db811cbad55454b5fd406b27d0660dbb2bcfe521cc05fc7b7576"
+    },
+    {
+      "doc_id": "ec7d0ea8-4f54-539e-8e50-0b7f3da4805c",
+      "filename": "한국수자원조사기술원_수문자료정보관리시스템(HDIMS) 재구축 용역(3단계.hwp",
+      "active_source_hash": "eece0536fdaa3d334dbe6851c498d9df62e0ba0c97192de4ddd0d526abc6803e"
+    },
+    {
+      "doc_id": "ed8c6afd-b03d-5551-a8aa-9f29948a3a20",
+      "filename": "재단법인 한국장애인문화예술원_2024년 장애인문화예술정보시스템 이음.hwp",
+      "active_source_hash": "ae221f72facb7985dc8743589f6c25e49004257b16b7f0c39543b9e54302dc21"
+    },
+    {
+      "doc_id": "eeb4df58-b788-506a-adff-3ac5fa70afcc",
+      "filename": "남서울대학교_[혁신-국고] 남서울대학교 스마트 정보시스템 활성화(학사.hwp",
+      "active_source_hash": "650e9ea409377a54e93a5cd1c2b6912e8fd464c816d68deb037bcb8fb01c5b75"
+    },
+    {
+      "doc_id": "ef505741-aa93-55a7-90e2-6b841409d31f",
+      "filename": "한국보육진흥원_연차별 자율 품질관리 시스템 기능개선.hwp",
+      "active_source_hash": "a05039972efdaafdcc365ad6728f0b6dce3b955bcd2756fa9b8b6458a285da78"
+    },
+    {
+      "doc_id": "efb5b795-c7ee-551a-b218-0beb084df03a",
+      "filename": "한국교육과정평가원_국가교육과정정보센터(NCIC) 시스템 운영 및 개선.hwp",
+      "active_source_hash": "2f63f2f038c647a705ee704bbb9fb5d175341ee14da57036c2da40bb45ed7ff4"
+    },
+    {
+      "doc_id": "fbe2356d-2f0e-569c-a54b-183ab17960dc",
+      "filename": "국방과학연구소_기록관리시스템 통합 활용 및 보안 환경 구축.hwp",
+      "active_source_hash": "d15a43620c223c82944898a857a824830520d7f86c800767ff0ed72f7d4c4cad"
+    },
+    {
+      "doc_id": "ff758b8c-11b2-52e3-a204-96042e6464cc",
+      "filename": "(재)예술경영지원센터_통합 정보시스템 구축 사전 컨설팅.hwp",
+      "active_source_hash": "8a468ba4c35ce9ea2ddc1458b0b06f5a95b84eb5f6268af79dee0d61c8845f87"
+    },
+    {
+      "doc_id": "ffb1cb0f-0061-5a36-96ab-db829ba9278e",
+      "filename": "한국생산기술연구원_2세대 전자조달시스템  기반구축사업.hwp",
+      "active_source_hash": "fe7ecad0b79023f54fbb7fd01efeeceb9282eea7a8dd2359853a03a81f1f8873"
+    }
+  ],
+  "sources": [
+    {
+      "source_hash": "0205e3319d99d17c7aff6808007ef34bfa5484d32b24a826ecda94de9eaabc52",
+      "format": "hwp",
+      "active_extraction_id": "a5b886e5eaeb26de55becf13",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 704,
+      "navigation_anchors": [
+        {
+          "element_id": "5b50fefb6d5e8123b6d3",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "f1eddfb0f01b078f1443",
+          "source_order": 352,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "db1acbbf483262d6c262",
+          "source_order": 703,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "03d77a47a09a31bc44eb74fafe0a26fa5f0ad25a0ebac7f0a18c24275a1367cc",
+      "format": "hwp",
+      "active_extraction_id": "65f3518d2cd949cb20b0ce4a",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 578,
+      "navigation_anchors": [
+        {
+          "element_id": "c4f07bb9bbaaaa9589c0",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "2ac423c6b98851e3adf8",
+          "source_order": 289,
+          "kind": "heading"
+        },
+        {
+          "element_id": "190a04f20e69b0e0fba7",
+          "source_order": 577,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "04f3238a67dc5744cd145aa1763091c6a63aa3f58772a6914a3738284e66ed2b",
+      "format": "hwp",
+      "active_extraction_id": "31bffa2f9cc88f39e581c4df",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 809,
+      "navigation_anchors": [
+        {
+          "element_id": "6f6f4b139977c07115ec",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "dbab8070ed5b33e353bb",
+          "source_order": 404,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "01b105b2cc3cc82c366d",
+          "source_order": 808,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "062655938c5bef513ae61a06ada1c052192202a0a939cd96446c8bed5f32e935",
+      "format": "hwp",
+      "active_extraction_id": "748a205810681e048c00fa10",
+      "parse_status": "parsed",
+      "review_status": "unreviewed",
+      "reason_code": null,
+      "element_count": 1695,
+      "navigation_anchors": [
+        {
+          "element_id": "e6b6625edc1d01c40621",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "ff5375131d58b4b22305",
+          "source_order": 847,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "cfe5e0e812bce247d949",
+          "source_order": 1694,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "16dfbd16166dcaf9907193b8ffa7433de35dc75ba22cd32dfcfe0ca23bb2d80e",
+      "format": "hwp",
+      "active_extraction_id": "7a93a510ec71bb62633221d4",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 607,
+      "navigation_anchors": [
+        {
+          "element_id": "a3f0fc2cb43658c786a7",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "a7b73e4839c5b28168ef",
+          "source_order": 303,
+          "kind": "heading"
+        },
+        {
+          "element_id": "ba793b56986b486692dd",
+          "source_order": 606,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "17c0b08f516f8b484b3724badbaae77217e569aae096c130923ae86813ba2820",
+      "format": "hwp",
+      "active_extraction_id": "621527c059968a0cb2372abc",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 477,
+      "navigation_anchors": [
+        {
+          "element_id": "61d1452f6a03bd5596a8",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "00c5e9419448737c0bb0",
+          "source_order": 238,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "f40a194bfa9a4cf80510",
+          "source_order": 476,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "18de0b4558edd93a1fbd4b97856b538baec299bbe6175a7a81fd94d6c2b6a7de",
+      "format": "hwp",
+      "active_extraction_id": "53ec2c8f83fd80715daeaa88",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 649,
+      "navigation_anchors": [
+        {
+          "element_id": "a2c39eeeace20fb46c51",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "8835d400e44c72fe6224",
+          "source_order": 324,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "eb7b409136edf627cc9b",
+          "source_order": 648,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "1d7e80b4f717de629d0917b5e1412ffb7d913fb692bf3f1ec8eb4964b276e635",
+      "format": "hwp",
+      "active_extraction_id": "8e2fd3218dd43998b3e67462",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 449,
+      "navigation_anchors": [
+        {
+          "element_id": "0322d49e675e8140a7fc",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "0d3df712205d1da32047",
+          "source_order": 224,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "3d94aab6c8415e38b22d",
+          "source_order": 448,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "20cdb1e78194ab2496ca941e3c9a4a2b74558dd007535964517584cab67be0a7",
+      "format": "hwp",
+      "active_extraction_id": "94024ff56e1914c449cccd9e",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 498,
+      "navigation_anchors": [
+        {
+          "element_id": "ffed84654e06b12b8fd7",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "4905ffebe48744c50ce3",
+          "source_order": 249,
+          "kind": "table"
+        },
+        {
+          "element_id": "ca889926076a5686b312",
+          "source_order": 497,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "221133a3a63cc83d59755ed1f8526fd265688270b88a4608d4c63713987faa05",
+      "format": "hwp",
+      "active_extraction_id": "99c48ec20c3fe4b69d56adb5",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 569,
+      "navigation_anchors": [
+        {
+          "element_id": "15f415f8db8250b285c0",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "a96c2af27825aebac29f",
+          "source_order": 284,
+          "kind": "heading"
+        },
+        {
+          "element_id": "0c4793917e00c021b8a1",
+          "source_order": 568,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "23471b7d54ea79281b1aa609b935b737a8a4ecfd431a57d244947859a2d3faa2",
+      "format": "hwp",
+      "active_extraction_id": "917a248470f2a9006c3e009f",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 885,
+      "navigation_anchors": [
+        {
+          "element_id": "ba1084fcd53d36a7a777",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "bd5951f104c04b3b2eb4",
+          "source_order": 442,
+          "kind": "heading"
+        },
+        {
+          "element_id": "9e8cd97a388ee5a0802c",
+          "source_order": 884,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "26f21a03edb2114b8016a73eab52527718aa7e2c5d992fde11edb861d99270a5",
+      "format": "hwp",
+      "active_extraction_id": "45fde62909432ccbdacfa947",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 547,
+      "navigation_anchors": [
+        {
+          "element_id": "788f179cbee0f017ebed",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "911e65a2d98b5e8bd1ed",
+          "source_order": 273,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "2a2be1ac7e9082480941",
+          "source_order": 546,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "2999dd9e2f06db1b31d0ece80f69a31837d44724dd551008d5d7f04e8e50809d",
+      "format": "hwp",
+      "active_extraction_id": "d352add402a0c5a052e29f99",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 731,
+      "navigation_anchors": [
+        {
+          "element_id": "4b66436d6a5d1c1fd454",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "b1d69279c293eaf7ddf6",
+          "source_order": 365,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "d4643359ea4a5c82dd96",
+          "source_order": 730,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "2f63f2f038c647a705ee704bbb9fb5d175341ee14da57036c2da40bb45ed7ff4",
+      "format": "hwp",
+      "active_extraction_id": "645ddae60f2360324f6fe002",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 441,
+      "navigation_anchors": [
+        {
+          "element_id": "dc8cae201e5639e01764",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "ce19baf2b927a3333e53",
+          "source_order": 220,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "6f08fc306801031aff11",
+          "source_order": 440,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "30d5f1aa3b9a3363f296ac7ad539b7ab505f910ad8f9ccc49e41a38a2084400a",
+      "format": "hwp",
+      "active_extraction_id": "fd2005892870989e9cb78a38",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 409,
+      "navigation_anchors": [
+        {
+          "element_id": "8fd2abceeea57993a912",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "557d9133d10dd7409353",
+          "source_order": 204,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "4db94a0f6a231c759e82",
+          "source_order": 408,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "3202249c472b8dcd40d433c9bfbe24d282f474f399855c0b3d671bf96044f76f",
+      "format": "hwp",
+      "active_extraction_id": "8dc98cf123d51e32896ec574",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 692,
+      "navigation_anchors": [
+        {
+          "element_id": "f8bb6fa807443365b4ee",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "68fd9774a1197a943285",
+          "source_order": 346,
+          "kind": "image_text"
+        },
+        {
+          "element_id": "cee2f6750cd00b9eb696",
+          "source_order": 691,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "33503af4c7d7dd1883342ab29adcf221d508546385fe1e8b7fb0fd53a1633102",
+      "format": "hwp",
+      "active_extraction_id": "048abf3c51a7f4ec50284714",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 522,
+      "navigation_anchors": [
+        {
+          "element_id": "af7008d643a659cca3f0",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "95836ba66c6a693d4dea",
+          "source_order": 261,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "0b6fa10fce2961f40008",
+          "source_order": 521,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "341dca9191d85327dc975e35c13727e6e60be06211357a07eaa3612f205ba292",
+      "format": "hwp",
+      "active_extraction_id": "6fd65210f9d1d8371af0e3c3",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 452,
+      "navigation_anchors": [
+        {
+          "element_id": "15aedd4feb86faa2595c",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "cfc70aa4f43a336413a8",
+          "source_order": 226,
+          "kind": "heading"
+        },
+        {
+          "element_id": "9b457cec1bd8aa3065c8",
+          "source_order": 451,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "3609538fc215aa6873373658963f52c63e7b6c4f06c48b141b013d65971be0e7",
+      "format": "hwp",
+      "active_extraction_id": "2372709e45835b73fc52c3f9",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 705,
+      "navigation_anchors": [
+        {
+          "element_id": "e05403226a8fa8c95189",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "893001c138a2e47053cf",
+          "source_order": 352,
+          "kind": "table"
+        },
+        {
+          "element_id": "2caab7929d9738d2539c",
+          "source_order": 704,
+          "kind": "heading"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "36976f7d0e1b4cdea7933b87300a00ae610a6d4accc3cfe05fa6f2d8d4aac9d2",
+      "format": "hwp",
+      "active_extraction_id": "4c5ce192b4481729689ae695",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 795,
+      "navigation_anchors": [
+        {
+          "element_id": "253467373f234733d399",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "aa41959473559ae7b9b6",
+          "source_order": 397,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "bf27a85d0dd408c50652",
+          "source_order": 794,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "379faf2f2da7e5fe11a2351ee94f8df4c220fe8d97ca8d981df1b0720bd0217f",
+      "format": "hwp",
+      "active_extraction_id": "99683880b62a037ae0729a2f",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 494,
+      "navigation_anchors": [
+        {
+          "element_id": "bee704e78127b0172734",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "17ed31cbd349718f7437",
+          "source_order": 247,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "7835dc46ded6a78d6f9c",
+          "source_order": 493,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "39764e6f48d6a5da152db618cc41c0533690f39cd8d53a1d34ea5567df4dfdfe",
+      "format": "hwp",
+      "active_extraction_id": "303e5e5daf36604297d30041",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 293,
+      "navigation_anchors": [
+        {
+          "element_id": "6906800a9c52bb8cccb0",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "f13a6aaab7a5072d1811",
+          "source_order": 146,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "38209c3279282cd5f330",
+          "source_order": 292,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "3b643668220fa1ccaec14adea446bb8b7c604c46dfd9b9b428936e6fb06178db",
+      "format": "hwp",
+      "active_extraction_id": "cdc72b3bacb1305fa61b1f10",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 332,
+      "navigation_anchors": [
+        {
+          "element_id": "11819585063101cb830b",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "f73e858031351901c2de",
+          "source_order": 166,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "5bad05557663692295c1",
+          "source_order": 331,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "3c832bf48d6778590797a18328a78282662cd111d6f3b0b4b06362b4fc514a18",
+      "format": "hwp",
+      "active_extraction_id": "cd02be572c01bc564fcbc320",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 700,
+      "navigation_anchors": [
+        {
+          "element_id": "ea578f29984338b668e2",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "7fe6e8c2a533290f0be6",
+          "source_order": 350,
+          "kind": "table"
+        },
+        {
+          "element_id": "583b7dcff64e32035c75",
+          "source_order": 699,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "4098c9b30df8fcdd6794bfff70db33f8805c057be972368f62b1c5a7131337bd",
+      "format": "hwp",
+      "active_extraction_id": "b78a18eaa9073dae08ef5ac2",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 529,
+      "navigation_anchors": [
+        {
+          "element_id": "c2a7f8c6cebec8989568",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "709ef0b99f0da254aa7d",
+          "source_order": 264,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "74817fe3fc4bb9671e16",
+          "source_order": 528,
+          "kind": "heading"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "42579c6801b336059847c2d273beecd589c550a8816e00d25b62a92d30bae913",
+      "format": "hwp",
+      "active_extraction_id": "5af92689f0f1bb51f06cae92",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 640,
+      "navigation_anchors": [
+        {
+          "element_id": "dbbfc6ccf763ea9757da",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "974a82ab770381b84533",
+          "source_order": 320,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "07f67e381a62878e5714",
+          "source_order": 639,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "43128763d3b2ec7d693014dd98de6dc90411498f4d2c0c3ae3c56e0e75da44c4",
+      "format": "hwp",
+      "active_extraction_id": "441c9a1e9159890d8693dc80",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 824,
+      "navigation_anchors": [
+        {
+          "element_id": "2a5fde122f1eacd6ddb0",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "ef7e0614e0e11e9e2210",
+          "source_order": 412,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "39fe433c974d0bab2950",
+          "source_order": 823,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "4a2337a0c5cf98973f0cc42fb34e0039888b0061bf8d666cb4edf3403fbe0a1a",
+      "format": "hwp",
+      "active_extraction_id": "c9e8868c45fb720629440d36",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 622,
+      "navigation_anchors": [
+        {
+          "element_id": "f4e510b97bc885e79093",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "3f0362fa385e545d2d77",
+          "source_order": 311,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "e9aeaf0a24410f876182",
+          "source_order": 621,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "4b3541c9a4a70b36c86d0925f96b7b45dc2fafd5a3a1385b07cc06dc39863b0b",
+      "format": "hwp",
+      "active_extraction_id": "eb996fb8540d7d545447feee",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 570,
+      "navigation_anchors": [
+        {
+          "element_id": "c9aab76fa14e6f9241ef",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "f5ed881262fa5dfad47d",
+          "source_order": 285,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "5e9186b7ba59eaaebfd6",
+          "source_order": 569,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "4b43476cd69b871b5f2ff4ee7ffb20f493452879ff93dea70ae96b9848862ca0",
+      "format": "hwp",
+      "active_extraction_id": "9319cb67294bdba9eb9109ef",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 381,
+      "navigation_anchors": [
+        {
+          "element_id": "c26e6ccc1b22b95621a5",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "e0d39b59cb6fea8f15dc",
+          "source_order": 190,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "31453f986834235c2581",
+          "source_order": 380,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "4dd7233b8cd73add78d6652aeb3049d597414891aba48f847c4f5a9ee446540c",
+      "format": "hwp",
+      "active_extraction_id": "6f4d3962e2a275c4a178d586",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 688,
+      "navigation_anchors": [
+        {
+          "element_id": "3de137684221c19df98e",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "82d7942f12e007864e1e",
+          "source_order": 344,
+          "kind": "table"
+        },
+        {
+          "element_id": "f0214c2a7c36f058bdcf",
+          "source_order": 687,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "4fe0ecbc5e6a3d82dfda058cba3072fe1cbf8a3c70cb96f014514852a17c3946",
+      "format": "hwp",
+      "active_extraction_id": "9e850b3a496173001cc44e1c",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 340,
+      "navigation_anchors": [
+        {
+          "element_id": "7c8dfb227678ee1891ef",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "c412722845a65169f01c",
+          "source_order": 170,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "c06993c43578567af91a",
+          "source_order": 339,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "56e5a8ae813dbddfe5d46b5e5b6c0ea55ba121950217d0ef0aa8a0821f80bcce",
+      "format": "pdf",
+      "active_extraction_id": "16e90f2df5e464fa9ad17122",
+      "parse_status": "parsed",
+      "review_status": "unreviewed",
+      "reason_code": null,
+      "element_count": 675,
+      "navigation_anchors": [
+        {
+          "element_id": "94bc1827e04e1b61946a",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "04b9273a3e246b9c5438",
+          "source_order": 337,
+          "kind": "heading"
+        },
+        {
+          "element_id": "be3f23d13663f550141e",
+          "source_order": 674,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "57e14df9bfe2539e1ee57e351e2765da2f8bdd00cde8654609b7e3a4b5be3c79",
+      "format": "hwp",
+      "active_extraction_id": "f074b8016a0e04d24d1deafd",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 618,
+      "navigation_anchors": [
+        {
+          "element_id": "15d74fb2f31a0d43ca08",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "63f5596377552d305cbc",
+          "source_order": 309,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "e0cf6832f7d7d416da56",
+          "source_order": 617,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "59a2e281cac9b5bb4b462cf3209f4af14c5a956e074ddd4355a620e69bcc1c59",
+      "format": "hwp",
+      "active_extraction_id": "40b246874f00962a4927b4d4",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 563,
+      "navigation_anchors": [
+        {
+          "element_id": "04c2ee5e97b90aa7bb8d",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "1663e5735561e1a23f9b",
+          "source_order": 281,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "9183350cbc235c4bf0d0",
+          "source_order": 562,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "59f66e6cc4c7f4791630cd2c226faa728c3cee82f7574c977ca6af194ae939f6",
+      "format": "hwp",
+      "active_extraction_id": "9ca60b8fbc80add181ab518f",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 794,
+      "navigation_anchors": [
+        {
+          "element_id": "e7b054631c9d2859bf84",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "fa1780dd8cc3832ade27",
+          "source_order": 397,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "80ef4502f17b39045a40",
+          "source_order": 793,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "5e33811a52b0cad7638ce59e04885cf9f41796235a48181645e0fd0b5ed61c93",
+      "format": "hwp",
+      "active_extraction_id": "293f7ad327ae1c27f13e8a9b",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 456,
+      "navigation_anchors": [
+        {
+          "element_id": "129ceb898c704b59ead9",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "3e2d91596b0881aad1d2",
+          "source_order": 228,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "f34dbd954064265d3282",
+          "source_order": 455,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "6085df9b084e938bbf1be0b0c2cbc57e4d73b3c0c9c613af9017be1a9b41052a",
+      "format": "hwp",
+      "active_extraction_id": "104b62e448d9696cdd710ae8",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 394,
+      "navigation_anchors": [
+        {
+          "element_id": "8b8a98bdb96f4c31225a",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "a7ad9d2aa0b0066ac24b",
+          "source_order": 197,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "006e145ef18c5d1d6cff",
+          "source_order": 393,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "650e9ea409377a54e93a5cd1c2b6912e8fd464c816d68deb037bcb8fb01c5b75",
+      "format": "hwp",
+      "active_extraction_id": "d961c302b7525bef2a10a533",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 507,
+      "navigation_anchors": [
+        {
+          "element_id": "2bdbe5a8a45ac1707619",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "b503b2097cf36eea76df",
+          "source_order": 253,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "9503db0d96abb767f4e2",
+          "source_order": 506,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "65c9785a157c8f554795a39912bac9b7e32d3431810d560ca0847d4ccdecc2ea",
+      "format": "pdf",
+      "active_extraction_id": "4c80bb2c739131e3de05b59e",
+      "parse_status": "parsed",
+      "review_status": "unreviewed",
+      "reason_code": null,
+      "element_count": 1461,
+      "navigation_anchors": [
+        {
+          "element_id": "52faa7501cd951990f0a",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "9cec32a926da24f3859c",
+          "source_order": 730,
+          "kind": "table"
+        },
+        {
+          "element_id": "79abfacc4baecf9ba7d3",
+          "source_order": 1460,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": {
+        "reviewer": "claude-agent (rendered-page comparison, 2026-09-30)",
+        "status": "sample_checked",
+        "created_at": "2026-09-30T05:55:52.459570+00:00",
+        "review_is_current": false,
+        "location_count": 4
+      }
+    },
+    {
+      "source_hash": "681a8b9dcd5ae12857eb770c8c75dde761b2f9bc6c151b34ff182e87c0c6d843",
+      "format": "hwp",
+      "active_extraction_id": "ddf324cf71e7aeebdcf0a8c9",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 659,
+      "navigation_anchors": [
+        {
+          "element_id": "64989533a937aab0ce9d",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "6660fe15e2d45d96dc2e",
+          "source_order": 329,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "fcde953b82dc4250433f",
+          "source_order": 658,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "699085551ebca10d106afc3234ce1fa1292be6196727e5ace2c9331c5f4c59b4",
+      "format": "hwp",
+      "active_extraction_id": "c726e9361b5e357c94f3a1b3",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 420,
+      "navigation_anchors": [
+        {
+          "element_id": "826509c487d50b38e964",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "8127116b03457822ce04",
+          "source_order": 210,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "946ebbe5a9358fcca1b5",
+          "source_order": 419,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "71b9814a26040f1acd78a88b7525e62ee6fe97316fc3f464eaf696de423bd62f",
+      "format": "hwp",
+      "active_extraction_id": "dcc792d783d18b07d1c09576",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 552,
+      "navigation_anchors": [
+        {
+          "element_id": "a7f47a717db489ae7c3b",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "ece20aa4cbcfe2ce50ac",
+          "source_order": 276,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "e3233fefd6b964b54f20",
+          "source_order": 551,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "723a3875c67c0ee21756b5841c6703694aa91c417c9d8d66d3b2050ea03daddf",
+      "format": "hwp",
+      "active_extraction_id": "973dca9c211f3e7611d04642",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 551,
+      "navigation_anchors": [
+        {
+          "element_id": "3c5d2792590807f1efa8",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "de1138f462ccf26089b8",
+          "source_order": 275,
+          "kind": "table"
+        },
+        {
+          "element_id": "3f28ae25a943f6c8bec1",
+          "source_order": 550,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "73abf8e4f78c36a19e2345a3e2a0be5afd0e8a5a1d27363f665e701b7ecade8d",
+      "format": "hwp",
+      "active_extraction_id": "c797b7832ba1d3ea9574169b",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 744,
+      "navigation_anchors": [
+        {
+          "element_id": "cae0cc9961ff9f35c84b",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "264848201af1b7031ea5",
+          "source_order": 372,
+          "kind": "table"
+        },
+        {
+          "element_id": "cd7e90828d5ce3533261",
+          "source_order": 743,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "74824a94acfdd7dcf3c865c70f607074196de1497417aea01bfe3d2e3f62a8b2",
+      "format": "hwp",
+      "active_extraction_id": "706dd864f170a9a4247fb1ac",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 732,
+      "navigation_anchors": [
+        {
+          "element_id": "32f410ef00c82e3d73ac",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "82144b232f28a8c11100",
+          "source_order": 366,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "9bf3c03675112104f204",
+          "source_order": 731,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "7498d7f03d29fdd0b24d84161ff1b906740976156d2f0b5f023e0ab62132c9f4",
+      "format": "hwp",
+      "active_extraction_id": "87e02b6d0cfd3dae8d53655d",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 879,
+      "navigation_anchors": [
+        {
+          "element_id": "d4a9aaeb986beed81bec",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "6f3ef57e70d4341d5327",
+          "source_order": 439,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "f74251f234578d8585dd",
+          "source_order": 878,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "7581cb80dc8a7efd9a5da766decc927d7f2b6305566827e4394ded39b93e5e4c",
+      "format": "hwp",
+      "active_extraction_id": "c1fc2a3256018e7d35559864",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 356,
+      "navigation_anchors": [
+        {
+          "element_id": "a963cc65f88c9bfbef27",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "9eb70d33f10abe6a31b9",
+          "source_order": 178,
+          "kind": "table"
+        },
+        {
+          "element_id": "9b1e0126d8cf32aed901",
+          "source_order": 355,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "79c3ff04b9a8d404d2455dd9bd598bd9d3461c8de69e57863519e6d5b7822229",
+      "format": "hwp",
+      "active_extraction_id": "0ca008079bcea49a09dac08c",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 684,
+      "navigation_anchors": [
+        {
+          "element_id": "c4c896d0dde5e70fb3a1",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "f4d197d8031a3fa45270",
+          "source_order": 342,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "8d05ba07e4d9197280b1",
+          "source_order": 683,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "7a90f371ade71abff5acaf4e842b86310eb7e61ad3b6f03deef351c01ef50353",
+      "format": "hwp",
+      "active_extraction_id": "87032c69e1df518eb012e7d9",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 491,
+      "navigation_anchors": [
+        {
+          "element_id": "2c830ee905257734d11d",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "9d63d9f3571707e2ea0b",
+          "source_order": 245,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "2ed2ebfd041bce98c138",
+          "source_order": 490,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "7e07a7f9ecf4fea73d89ab882d7e43624844e54dc595213676ba1b4e9ad5d76f",
+      "format": "hwp",
+      "active_extraction_id": "abc104d4d8cdba5a1beade41",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 494,
+      "navigation_anchors": [
+        {
+          "element_id": "6c3bd037ea227c252750",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "9897b71aa2be60c7a478",
+          "source_order": 247,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "5ece94bc87d5ab3a5078",
+          "source_order": 493,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "7fd31853e9b51435be8b6f6c00e762e3bedfbc4a9305c28220b3670b1245c434",
+      "format": "hwp",
+      "active_extraction_id": "1145c4a4761fd4d21c1f0ef2",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 521,
+      "navigation_anchors": [
+        {
+          "element_id": "e337cf9afb3f59d30dd1",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "eba2cde9595a479de13d",
+          "source_order": 260,
+          "kind": "heading"
+        },
+        {
+          "element_id": "af9b23f51f6759694e3d",
+          "source_order": 520,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "81be3527c867ebe3aab0eca565aefe2b6f15df667e913696f3f9e6e0627862f0",
+      "format": "hwp",
+      "active_extraction_id": "10cdf15b5aca10ce69f3c175",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 704,
+      "navigation_anchors": [
+        {
+          "element_id": "4fd10b174e3a30acb2fb",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "2420db911fe0465aa0cb",
+          "source_order": 352,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "68fa8299546a3688fad2",
+          "source_order": 703,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "833369f0c999bf66347099c7f4d0cbccb20bf929d98921dfcb3cba8b4cf43aa9",
+      "format": "hwp",
+      "active_extraction_id": "2ad015f1d853429ea12fad29",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 786,
+      "navigation_anchors": [
+        {
+          "element_id": "e097855b7f0198b39ee7",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "f7b2a9c6d738f9903e9a",
+          "source_order": 393,
+          "kind": "heading"
+        },
+        {
+          "element_id": "b9f75f75fe163b062f39",
+          "source_order": 785,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "89dd99c161d36116682e5fd9feeee0d04e34d32ea3764c1bd9437dabb71d5d37",
+      "format": "hwp",
+      "active_extraction_id": "ca923798426f2294ca097c9d",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 449,
+      "navigation_anchors": [
+        {
+          "element_id": "1a80b986bb684ce898ed",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "4814fe0338d1f11ecb82",
+          "source_order": 224,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "0ee359e4b2e5f8618da2",
+          "source_order": 448,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "8a468ba4c35ce9ea2ddc1458b0b06f5a95b84eb5f6268af79dee0d61c8845f87",
+      "format": "hwp",
+      "active_extraction_id": "70a35c1f5f336f97c79a7851",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 487,
+      "navigation_anchors": [
+        {
+          "element_id": "d92b4bcc2f55e070538a",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "8b52d763246e6d6995af",
+          "source_order": 243,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "9950cffc209dd84753d3",
+          "source_order": 486,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "9145abf6cb0d67ba5476980e3a94458c3f609d0d08f63ecb305deb26e393ee2c",
+      "format": "hwp",
+      "active_extraction_id": "98efe781e3d28baba4ea6c47",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 341,
+      "navigation_anchors": [
+        {
+          "element_id": "77843f42136a8a14fe29",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "2619c6c35ecab02430ed",
+          "source_order": 170,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "6341aaeeb281817af6a1",
+          "source_order": 340,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "9a8fadfefd10feaca5cc58c320c25e41e5b1481e789903996d16193f9c9398dd",
+      "format": "hwp",
+      "active_extraction_id": "9e63d81075318465ab05d6a7",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 549,
+      "navigation_anchors": [
+        {
+          "element_id": "42e84b9c069238160d96",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "cd38456a0225b196f825",
+          "source_order": 274,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "b1a1b82fcdcb3a366a70",
+          "source_order": 548,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "9d78c025d1b93fad2116bf8e5b58843e100daeacbf8f4263d2dad3619d9811d5",
+      "format": "hwp",
+      "active_extraction_id": "5266347a463a8150283a81c6",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 987,
+      "navigation_anchors": [
+        {
+          "element_id": "4e072ed20238ba6697ae",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "485092345a568b6f179f",
+          "source_order": 493,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "f837757cc5a9857e9167",
+          "source_order": 986,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "9e4be458556bd3273638a1e296f4ac000c5f091891083f49e6df94b7c109e663",
+      "format": "hwp",
+      "active_extraction_id": "644245167d4dbe287313cb2b",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 796,
+      "navigation_anchors": [
+        {
+          "element_id": "af5270deb0e0840119fe",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "83010c5313e0cad01549",
+          "source_order": 398,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "13a0532549df2278e831",
+          "source_order": 795,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "9e7d457cd7643ef6db50430a0a5c3ef6bfaba5d43f3b68e5e0467366a9067ede",
+      "format": "hwp",
+      "active_extraction_id": "e3fefb55a847cd267c48fe73",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 434,
+      "navigation_anchors": [
+        {
+          "element_id": "dd33dbb857777486ad92",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "fe106145ec809d2aac01",
+          "source_order": 217,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "0dcfb13af44fc7d9ca63",
+          "source_order": 433,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "a05039972efdaafdcc365ad6728f0b6dce3b955bcd2756fa9b8b6458a285da78",
+      "format": "hwp",
+      "active_extraction_id": "6d066ea94593a05f8d509572",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 441,
+      "navigation_anchors": [
+        {
+          "element_id": "93ac8d6577a00bc2f589",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "7bcc3d59234343f51050",
+          "source_order": 220,
+          "kind": "heading"
+        },
+        {
+          "element_id": "d27d3c3a9463b543abf5",
+          "source_order": 440,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "a501d0926830f0ff1c1eb0892fe0fd2857f917b4365a32b25777df88c0393d0f",
+      "format": "hwp",
+      "active_extraction_id": "99f5b8d104775c2a55b2052e",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 772,
+      "navigation_anchors": [
+        {
+          "element_id": "3a615cf9d2bf9b2c42f1",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "05755f98c472f720555e",
+          "source_order": 386,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "f6869e7d4a1d050fb2de",
+          "source_order": 771,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "a6f6691e69197b5f7cdfbc3947fad8f6158dfde29d2a82d6d6429386ffab1999",
+      "format": "pdf",
+      "active_extraction_id": "072071247296ed6693aa4b1c",
+      "parse_status": "parsed",
+      "review_status": "unreviewed",
+      "reason_code": null,
+      "element_count": 1451,
+      "navigation_anchors": [
+        {
+          "element_id": "09a9bc619f16f827a0fc",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "f52d17ce09ffa9fa5c59",
+          "source_order": 725,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "4825f8822b5fcd02ec14",
+          "source_order": 1450,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": {
+        "reviewer": "claude-agent (rendered-page comparison, 2026-09-30)",
+        "status": "sample_checked",
+        "created_at": "2026-09-30T05:55:52.963821+00:00",
+        "review_is_current": false,
+        "location_count": 2
+      }
+    },
+    {
+      "source_hash": "ab2ae44bc4b640f8bb1ec3ee8083e43ccd6230eef4bb50cd8ab2f4e4db4bc3a8",
+      "format": "hwp",
+      "active_extraction_id": "b4f59bf9c5798ebb01db25c8",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 383,
+      "navigation_anchors": [
+        {
+          "element_id": "12976d3f8cfa9d594f40",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "b462eaeb0ad39696045d",
+          "source_order": 191,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "333b01a1b3c0f55dbcfc",
+          "source_order": 382,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "ab6dbebd700906de16c0119493635d345ba13079013a448e0e8b83041599e182",
+      "format": "hwp",
+      "active_extraction_id": "2fcc37fd0e50fab4a8342b42",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 379,
+      "navigation_anchors": [
+        {
+          "element_id": "e73052c048d6b059a272",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "ffc0ba1bb4649b31d100",
+          "source_order": 189,
+          "kind": "heading"
+        },
+        {
+          "element_id": "5cb2aa83104616f1cff4",
+          "source_order": 378,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "acdaa1c1f4aa266d483af45177edf8a324e1f9a23813e0f339971b9baaaa5959",
+      "format": "hwp",
+      "active_extraction_id": "aed62a97ea862002c989fa41",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 527,
+      "navigation_anchors": [
+        {
+          "element_id": "bfd1c81406593af644f3",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "6d94fdef6328bfb28a79",
+          "source_order": 263,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "685e81298093253b3f9d",
+          "source_order": 526,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "ae221f72facb7985dc8743589f6c25e49004257b16b7f0c39543b9e54302dc21",
+      "format": "hwp",
+      "active_extraction_id": "740d9e3c7573b3ed8c04072b",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 426,
+      "navigation_anchors": [
+        {
+          "element_id": "2aec2829562529bfa0bd",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "b663cd044dec2a96d1b5",
+          "source_order": 213,
+          "kind": "table"
+        },
+        {
+          "element_id": "a7a5b1814effa476a342",
+          "source_order": 425,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "aea2b41567689397f2c3fb5ac3091c26d4bd532aa6173b9cae4600e62b32fbe0",
+      "format": "hwp",
+      "active_extraction_id": "3f76f0a505819760f244a820",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 470,
+      "navigation_anchors": [
+        {
+          "element_id": "57b87dfba3218ee367f9",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "2c439ff8da7a94cd2c12",
+          "source_order": 235,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "f3ff9a520290f4ac7e98",
+          "source_order": 469,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "afe7223ddc830810141de53336086aff4c084f4fbc74da6a2c555205b1581f37",
+      "format": "hwp",
+      "active_extraction_id": "977b59ddaf14fe5e80d08987",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 1165,
+      "navigation_anchors": [
+        {
+          "element_id": "4eae818adcc5438c34f3",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "b56629e8467d6d00fe88",
+          "source_order": 582,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "d7e7a2bffc60fd7423d3",
+          "source_order": 1164,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "b72e04b492c062a5f18aaf0dbdba7da1b213b50a74b675aee61ed3acdd34dde0",
+      "format": "hwp",
+      "active_extraction_id": "3f2c8216cec765e7f05d6edc",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 438,
+      "navigation_anchors": [
+        {
+          "element_id": "acf0bb21dc6b4cdb48af",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "388d5e82d57e10121f37",
+          "source_order": 219,
+          "kind": "table"
+        },
+        {
+          "element_id": "d27377b234525891ca9a",
+          "source_order": 437,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "bfa0ed2e678f004035e26321709cf36e546d2c4114ad0e6580697a55fe949e9d",
+      "format": "hwp",
+      "active_extraction_id": "a382797a8bcc2b25e0ab4cda",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 437,
+      "navigation_anchors": [
+        {
+          "element_id": "d11b85f751abc6fe1bb8",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "bdc2b6a60cd9fdd6d673",
+          "source_order": 218,
+          "kind": "table"
+        },
+        {
+          "element_id": "78862fdf0f260d5c36b4",
+          "source_order": 436,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "c61fb84faaca9e2581b56088610c51ec3e114f1c6d3c70ab256e0c39a2abe1ca",
+      "format": "hwp",
+      "active_extraction_id": "eadda28fb0ef62ad9dad18a2",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 449,
+      "navigation_anchors": [
+        {
+          "element_id": "7969ccae30143e1dd4b8",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "0b20bd2281baff8806b5",
+          "source_order": 224,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "ee9d86f2958db2b3ec1f",
+          "source_order": 448,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "c892699f28ff5eb0243dc4d020e272cc50cd39acb90d6ee19c98a6932d5cdfb8",
+      "format": "hwp",
+      "active_extraction_id": "e4bc17d0dfb172b8a6104b7a",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 306,
+      "navigation_anchors": [
+        {
+          "element_id": "dfb3076a2693bbbbcf62",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "23c6e2039639725e9f6e",
+          "source_order": 153,
+          "kind": "table"
+        },
+        {
+          "element_id": "1e5a3e01505f6b1e12e1",
+          "source_order": 305,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "c8d7860853ad983f2cadd1eb043be5fcbe6b02651b3b37b70645fe0d463f3bd5",
+      "format": "hwp",
+      "active_extraction_id": "a51429195643b91a0fbbee14",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 802,
+      "navigation_anchors": [
+        {
+          "element_id": "f335275b7e52c86c844c",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "eca6e072f8985ca3c0f1",
+          "source_order": 401,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "3ca007bbe8722c56a76f",
+          "source_order": 801,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "cc5d401ebdfce98c11a4da7bac3b46f793e9bafb82f5aa01e6dc5fef545ceac1",
+      "format": "hwp",
+      "active_extraction_id": "c5256a186b8bffb26d6e460e",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 574,
+      "navigation_anchors": [
+        {
+          "element_id": "2f043800492beade74fb",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "147583dde599eb77eed7",
+          "source_order": 287,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "a1fa5449e8daf7d6e008",
+          "source_order": 573,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "cc6618da42a71a3b6df6944a40ca6f5bed418330dadb49b8fbe632db511aba83",
+      "format": "hwp",
+      "active_extraction_id": "7e0317173b6cf341a3db9d40",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 430,
+      "navigation_anchors": [
+        {
+          "element_id": "ac6d6ac93b7a2b9bc321",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "0955738be6a8cf94b2fd",
+          "source_order": 215,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "c45c50215a28f290b4ce",
+          "source_order": 429,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "cd81e943ce28db811cbad55454b5fd406b27d0660dbb2bcfe521cc05fc7b7576",
+      "format": "pdf",
+      "active_extraction_id": "b3d170a27157ec249999a583",
+      "parse_status": "parsed",
+      "review_status": "unreviewed",
+      "reason_code": null,
+      "element_count": 1708,
+      "navigation_anchors": [
+        {
+          "element_id": "b2e821662508993eac2e",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "16be503bc09993d31080",
+          "source_order": 854,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "cb81a8fd62f1da0517e7",
+          "source_order": 1707,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "d15a43620c223c82944898a857a824830520d7f86c800767ff0ed72f7d4c4cad",
+      "format": "hwp",
+      "active_extraction_id": "332d3a80bcfc6bc921cd90f0",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 418,
+      "navigation_anchors": [
+        {
+          "element_id": "ac8386291b55f4e72fef",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "bd895e1fc6e72dbafd92",
+          "source_order": 209,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "d6c136ca9f971c076475",
+          "source_order": 417,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "d2ab99f2543cabd8426b7cca27c818a9ebec9ea33eacddc5b1a8ce815a7f8b72",
+      "format": "hwp",
+      "active_extraction_id": "1efdd78e8842db78b04d7f39",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 339,
+      "navigation_anchors": [
+        {
+          "element_id": "e9c610978ffb37408ddb",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "f2fd79be3bf7a7f61934",
+          "source_order": 169,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "4fb95b31ceedbee7420a",
+          "source_order": 338,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "d2cceeb05f07ad57f1863d43c41d03767f9aa216caaa88fc53a90cf1564e37ef",
+      "format": "hwp",
+      "active_extraction_id": "3cdec65d43bcad77d17219d4",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 660,
+      "navigation_anchors": [
+        {
+          "element_id": "25ea50fdb170b7ccc34d",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "03681d91b1b99bef19bf",
+          "source_order": 330,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "a80bec69fe1436b47b8e",
+          "source_order": 659,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "d58125735614f753ae3f05f0a57f506073166cf6cd6e5eae82162d4d25aa1c4e",
+      "format": "hwp",
+      "active_extraction_id": "602232cbdd7428064fac5142",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 700,
+      "navigation_anchors": [
+        {
+          "element_id": "fb715fc024a61a313049",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "278dec2d8283ac988432",
+          "source_order": 350,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "a26bcc81b3ad50646236",
+          "source_order": 699,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "daa36d8887441f8db552977046d80ca1f2b0843ded6f072a15e0a4567819255c",
+      "format": "hwp",
+      "active_extraction_id": "67cf2860360db9e75bf560fd",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 430,
+      "navigation_anchors": [
+        {
+          "element_id": "4321d2a3f2f7be87d6a2",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "7fc11d53afb908d41ef5",
+          "source_order": 215,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "2d797249652ca2d1085d",
+          "source_order": 429,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "dec406c8211ed9bca53c6d337342b78990ccd8867356b9652a34df3d11cf76e5",
+      "format": "hwp",
+      "active_extraction_id": "f7c5dc503a17ca320d113339",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 568,
+      "navigation_anchors": [
+        {
+          "element_id": "40d254398613b02904a9",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "1414cc1eb6ac6835294e",
+          "source_order": 284,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "4877e08c41ad5890123d",
+          "source_order": 567,
+          "kind": "heading"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "e08a5267735388614b5ab94e073778ec2cd9f5e62bc1329aae2d114f31feafb9",
+      "format": "hwp",
+      "active_extraction_id": "142d701a2037cbc4336cc070",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 623,
+      "navigation_anchors": [
+        {
+          "element_id": "b536489e773c4b794099",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "7cca35b87129f3a7be68",
+          "source_order": 311,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "9a032c1dafb9c5772a5b",
+          "source_order": 622,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "e14d79c538b410f1b5a3fc87178ab1a8fbba47acb110744d4d591a128d77ff20",
+      "format": "hwp",
+      "active_extraction_id": "24a8f44103c79a46729e4994",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 443,
+      "navigation_anchors": [
+        {
+          "element_id": "065fcd97d508a0574ad4",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "bfec558223fbefc34c36",
+          "source_order": 221,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "bd7771194a87b79340fd",
+          "source_order": 442,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "e14e0343f11daea41c0c032da88827baba9b6263d1e307365fe0f2f928895406",
+      "format": "hwp",
+      "active_extraction_id": "74d17b66ded475b058a84bf3",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 582,
+      "navigation_anchors": [
+        {
+          "element_id": "0a33f00039edc3125b87",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "ef1a736d77ed5ff0f775",
+          "source_order": 291,
+          "kind": "table"
+        },
+        {
+          "element_id": "f45a66488a1d354e8bfd",
+          "source_order": 581,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "e764cea6134f3aa71308c4354d0ad655e51b31f17301138d372837dbd2f183df",
+      "format": "hwp",
+      "active_extraction_id": "f6c98dd4a78e04634f088360",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 564,
+      "navigation_anchors": [
+        {
+          "element_id": "7b27a98245171796fe15",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "73079bd6a143a892c041",
+          "source_order": 282,
+          "kind": "heading"
+        },
+        {
+          "element_id": "34dde0a190e190b0b9f6",
+          "source_order": 563,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "ea22ce3a5bacc5d4b3993c2ba237a6ce3a9d854157a30a8d54b6b9125a78b552",
+      "format": "hwp",
+      "active_extraction_id": "937d46250b0699f564579e21",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 359,
+      "navigation_anchors": [
+        {
+          "element_id": "db9ba7381ef66fa5c9b9",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "0e27de2592c534fc562a",
+          "source_order": 179,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "31bc429748fea302c8c2",
+          "source_order": 358,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "ea909335319f1aba3af4d141239e359ce1a583699a5015ffd4908dd97e9c6954",
+      "format": "hwp",
+      "active_extraction_id": "15a0d92c6dff634df15f944e",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 451,
+      "navigation_anchors": [
+        {
+          "element_id": "c00bb4ada958ab5ff83d",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "436362926fa43907ddc1",
+          "source_order": 225,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "c57594d5a6e3c3b8b010",
+          "source_order": 450,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "ece531219e5c92db319a0501511b6d3344b27c9620db2b0c1b29572159d4e332",
+      "format": "hwp",
+      "active_extraction_id": "ee86b2e3d352c676aea98139",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 710,
+      "navigation_anchors": [
+        {
+          "element_id": "f3950e8b1b89791308b6",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "ef98f3eeb635eb09acf5",
+          "source_order": 355,
+          "kind": "heading"
+        },
+        {
+          "element_id": "008c1400b09a185c2b6c",
+          "source_order": 709,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "ee02237767524272096aec544c09b90e3e89420661e5ad35dfd13158f57a9404",
+      "format": "hwp",
+      "active_extraction_id": "0f0506c286eec0bc81b8ee1f",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 703,
+      "navigation_anchors": [
+        {
+          "element_id": "a8597d0a29d0be230dd5",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "5fb2a70911a9309b18d7",
+          "source_order": 351,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "31cc87aa01d3f8915ff3",
+          "source_order": 702,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "eece0536fdaa3d334dbe6851c498d9df62e0ba0c97192de4ddd0d526abc6803e",
+      "format": "hwp",
+      "active_extraction_id": "f2577684f8322633c3374772",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 437,
+      "navigation_anchors": [
+        {
+          "element_id": "9f0252e9c2182d55bfc4",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "a9f612dd90381d909847",
+          "source_order": 218,
+          "kind": "heading"
+        },
+        {
+          "element_id": "1afef9e02b5d83ed19b3",
+          "source_order": 436,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "f23a17ea8ed50eaefcadec19b554c821b6dded2e369d48c19b8ab7edd7fb4c89",
+      "format": "hwp",
+      "active_extraction_id": "9d7d5848c893fb2ecf918e6d",
+      "parse_status": "parsed",
+      "review_status": "unreviewed",
+      "reason_code": null,
+      "element_count": 1369,
+      "navigation_anchors": [
+        {
+          "element_id": "6f644234a6e298657ec7",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "ad4b369c52fce9f9588a",
+          "source_order": 684,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "dfe8c098e2c011f09594",
+          "source_order": 1368,
+          "kind": "image_text"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "f5affba2118c729f9167a614e90d53a49aef7f481d8b2819516c5ac476ad2cb0",
+      "format": "hwp",
+      "active_extraction_id": "7431b9a608520b5560f2ed61",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 463,
+      "navigation_anchors": [
+        {
+          "element_id": "6bf7d491f0e2e09edb54",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "8bd199f94122f741a8f7",
+          "source_order": 231,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "6fb639413b58bb045b01",
+          "source_order": 462,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "fde88f734237f41c9df923a371a0e609664ec3e7baa926d2fd8f35f61288376d",
+      "format": "hwp",
+      "active_extraction_id": "196b5f3df38bbe57e82ee8ea",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 565,
+      "navigation_anchors": [
+        {
+          "element_id": "86ec040fc605513f33e2",
+          "source_order": 0,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "6a4b915be2b05a4a850d",
+          "source_order": 282,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "1d2adb6be854ee568056",
+          "source_order": 564,
+          "kind": "table"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "fe07779f264abfd5f420f332adb65779a33142a5506581345f5cbe4803be53e8",
+      "format": "hwp",
+      "active_extraction_id": "12e281fc90956b9637f3a26a",
+      "parse_status": "parsed",
+      "review_status": "auto_verified",
+      "reason_code": null,
+      "element_count": 459,
+      "navigation_anchors": [
+        {
+          "element_id": "5a2afaf94ac02e169632",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "a827878fa3ce0f65e805",
+          "source_order": 229,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "4549d65bf396d9eacf23",
+          "source_order": 458,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    },
+    {
+      "source_hash": "fe7ecad0b79023f54fbb7fd01efeeceb9282eea7a8dd2359853a03a81f1f8873",
+      "format": "hwp",
+      "active_extraction_id": "f5a52a2fb13d9257a2bd790a",
+      "parse_status": "parsed",
+      "review_status": "auto_flagged",
+      "reason_code": null,
+      "element_count": 554,
+      "navigation_anchors": [
+        {
+          "element_id": "2b8b115d7db1765a7aa0",
+          "source_order": 0,
+          "kind": "table"
+        },
+        {
+          "element_id": "bf8df92eab658e1872cb",
+          "source_order": 277,
+          "kind": "paragraph"
+        },
+        {
+          "element_id": "c332b3a4a0bcf79fa594",
+          "source_order": 553,
+          "kind": "paragraph"
+        }
+      ],
+      "latest_review": null
+    }
+  ],
+  "indexes": [
+    {
+      "index_version": "84e58091f8c404ba",
+      "state": "ready",
+      "created_at": "2026-09-30T05:55:59.933127+00:00",
+      "config": {}
+    },
+    {
+      "index_version": "b6d4293dac6d6d4b",
+      "state": "ready",
+      "created_at": "2026-09-30T06:01:10.969700+00:00",
+      "config": {}
+    },
+    {
+      "index_version": "c5d29fb0a8f94ca0",
+      "state": "ready",
+      "created_at": "2026-09-30T06:34:28.357793+00:00",
+      "config": {}
+    },
+    {
+      "index_version": "c73632da6aee6338",
+      "state": "ready",
+      "created_at": "2026-09-30T08:39:35.308910+00:00",
+      "config": {}
+    },
+    {
+      "index_version": "f83d9326553cd628",
+      "state": "ready",
+      "created_at": "2026-09-30T09:49:03.725022+00:00",
+      "config": {}
+    },
+    {
+      "index_version": "9c0215ab56478100",
+      "state": "ready",
+      "created_at": "2026-09-30T10:05:58.153536+00:00",
+      "config": {}
+    },
+    {
+      "index_version": "89d22ed39f8f63bc",
+      "state": "ready",
+      "created_at": "2026-09-30T14:40:03.080892+00:00",
+      "config": {}
+    },
+    {
+      "index_version": "c407cee20d74eb45",
+      "state": "ready",
+      "created_at": "2026-09-30T15:13:23.343560+00:00",
+      "config": {}
+    },
+    {
+      "index_version": "8bdc9a0252fa0bb7",
+      "state": "ready",
+      "created_at": "2026-09-30T21:52:11.724141+00:00",
+      "config": {}
+    },
+    {
+      "index_version": "8d0ad3b69e542631",
+      "state": "ready",
+      "created_at": "2026-09-30T22:16:45.223298+00:00",
+      "config": {}
+    },
+    {
+      "index_version": "62bea0c9c27ad3e7",
+      "state": "ready",
+      "created_at": "2026-09-30T22:40:53.060935+00:00",
+      "config": {}
+    }
+  ]
+}

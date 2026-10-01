@@ -1,0 +1,2249 @@
+[
+  {
+    "extraction_id": "a5b886e5eaeb26de55becf13",
+    "source_hash": "0205e3319d99d17c7aff6808007ef34bfa5484d32b24a826ecda94de9eaabc52",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:29:58.844185+00:00",
+    "finding_counts": {
+      "total": 7
+    },
+    "locations": [
+      {
+        "element_id": "67da5b97a43aa9027df0",
+        "page": 11
+      },
+      {
+        "element_id": "67da5b97a43aa9027df0",
+        "page": 11
+      },
+      {
+        "element_id": "67da5b97a43aa9027df0",
+        "page": null
+      },
+      {
+        "element_id": "1e0aa300c42d5cb66989",
+        "page": null
+      },
+      {
+        "element_id": "1e0aa300c42d5cb66989",
+        "page": 17
+      },
+      {
+        "element_id": "1e0aa300c42d5cb66989",
+        "page": 17
+      },
+      {
+        "page": 11
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "65f3518d2cd949cb20b0ce4a",
+    "source_hash": "03d77a47a09a31bc44eb74fafe0a26fa5f0ad25a0ebac7f0a18c24275a1367cc",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:30:04.910657+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "de13001c3c980bfd004b",
+        "page": 80
+      },
+      {
+        "element_id": "57fed39ad52b4f579b69",
+        "page": 96
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "31bffa2f9cc88f39e581c4df",
+    "source_hash": "04f3238a67dc5744cd145aa1763091c6a63aa3f58772a6914a3738284e66ed2b",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:30:13.279227+00:00",
+    "finding_counts": {
+      "total": 3
+    },
+    "locations": [
+      {
+        "element_id": "bbd9044b66c8df442263",
+        "page": 46
+      },
+      {
+        "element_id": "bbd9044b66c8df442263",
+        "page": 47
+      },
+      {
+        "page": 1
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "7a93a510ec71bb62633221d4",
+    "source_hash": "16dfbd16166dcaf9907193b8ffa7433de35dc75ba22cd32dfcfe0ca23bb2d80e",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:30:19.258286+00:00",
+    "finding_counts": {
+      "total": 7
+    },
+    "locations": [
+      {
+        "element_id": "080fbc2decb2929dffe3",
+        "page": 12
+      },
+      {
+        "element_id": "03ae1140fe010745a3be",
+        "page": 16
+      },
+      {
+        "element_id": "a056f6ea668916643e18",
+        "page": 18
+      },
+      {
+        "element_id": "b961ed11c1350d8eedcf",
+        "page": 18
+      },
+      {
+        "element_id": "8f0e7c6c0ebca62de592",
+        "page": 96
+      },
+      {
+        "element_id": "772be417666a0d4fefae",
+        "page": 97
+      },
+      {
+        "element_id": "772be417666a0d4fefae",
+        "page": 97
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "621527c059968a0cb2372abc",
+    "source_hash": "17c0b08f516f8b484b3724badbaae77217e569aae096c130923ae86813ba2820",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:30:23.206587+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "53ec2c8f83fd80715daeaa88",
+    "source_hash": "18de0b4558edd93a1fbd4b97856b538baec299bbe6175a7a81fd94d6c2b6a7de",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:30:30.614584+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "8e2fd3218dd43998b3e67462",
+    "source_hash": "1d7e80b4f717de629d0917b5e1412ffb7d913fb692bf3f1ec8eb4964b276e635",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:30:33.993112+00:00",
+    "finding_counts": {
+      "total": 3
+    },
+    "locations": [
+      {
+        "element_id": "8cc9b58660ce24f60fcc",
+        "page": null
+      },
+      {
+        "element_id": "1eaaedcd0d9e33278e38",
+        "page": 8
+      },
+      {
+        "element_id": "1eaaedcd0d9e33278e38",
+        "page": 8
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "94024ff56e1914c449cccd9e",
+    "source_hash": "20cdb1e78194ab2496ca941e3c9a4a2b74558dd007535964517584cab67be0a7",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:30:40.446065+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "99c48ec20c3fe4b69d56adb5",
+    "source_hash": "221133a3a63cc83d59755ed1f8526fd265688270b88a4608d4c63713987faa05",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:30:47.283023+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "917a248470f2a9006c3e009f",
+    "source_hash": "23471b7d54ea79281b1aa609b935b737a8a4ecfd431a57d244947859a2d3faa2",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:30:57.945361+00:00",
+    "finding_counts": {
+      "total": 7
+    },
+    "locations": [
+      {
+        "element_id": "c534b3f669b2bde4ea7b",
+        "page": 112
+      },
+      {
+        "element_id": "1ea2684c615c88008464",
+        "page": 123
+      },
+      {
+        "element_id": "40a5813e45da3eed136c",
+        "page": 137
+      },
+      {
+        "element_id": "5b2585ccad6a338a39a9",
+        "page": null
+      },
+      {
+        "element_id": "5b2585ccad6a338a39a9",
+        "page": null
+      },
+      {
+        "element_id": "74badf9c4f5c1b6c2a3b",
+        "page": null
+      },
+      {
+        "page": 2
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "45fde62909432ccbdacfa947",
+    "source_hash": "26f21a03edb2114b8016a73eab52527718aa7e2c5d992fde11edb861d99270a5",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:31:06.810396+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "66bb7f12ab1daf2edc0a",
+        "page": 21
+      },
+      {
+        "element_id": "66bb7f12ab1daf2edc0a",
+        "page": 15
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "d352add402a0c5a052e29f99",
+    "source_hash": "2999dd9e2f06db1b31d0ece80f69a31837d44724dd551008d5d7f04e8e50809d",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:31:09.457571+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "96f15323bf111af2c563",
+        "page": 48
+      },
+      {
+        "element_id": "96f15323bf111af2c563",
+        "page": 48
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "645ddae60f2360324f6fe002",
+    "source_hash": "2f63f2f038c647a705ee704bbb9fb5d175341ee14da57036c2da40bb45ed7ff4",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:31:13.775072+00:00",
+    "finding_counts": {
+      "total": 3
+    },
+    "locations": [
+      {
+        "element_id": "802bce5dd06da93e22aa",
+        "page": null
+      },
+      {
+        "element_id": "802bce5dd06da93e22aa",
+        "page": null
+      },
+      {
+        "page": 22
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "fd2005892870989e9cb78a38",
+    "source_hash": "30d5f1aa3b9a3363f296ac7ad539b7ab505f910ad8f9ccc49e41a38a2084400a",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:31:16.637563+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "8dc98cf123d51e32896ec574",
+    "source_hash": "3202249c472b8dcd40d433c9bfbe24d282f474f399855c0b3d671bf96044f76f",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:31:24.950368+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "3218b3b309f29d6637c1",
+        "page": 24
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "048abf3c51a7f4ec50284714",
+    "source_hash": "33503af4c7d7dd1883342ab29adcf221d508546385fe1e8b7fb0fd53a1633102",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:31:30.402163+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "f55c2c9ec8e4794c551b",
+        "page": 37
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "6fd65210f9d1d8371af0e3c3",
+    "source_hash": "341dca9191d85327dc975e35c13727e6e60be06211357a07eaa3612f205ba292",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:31:36.557415+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "5486a8ae380fa60fe1ca",
+        "page": 20
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "2372709e45835b73fc52c3f9",
+    "source_hash": "3609538fc215aa6873373658963f52c63e7b6c4f06c48b141b013d65971be0e7",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:31:43.587655+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "e6cd55a676d4241dcca9",
+        "page": 14
+      },
+      {
+        "element_id": "9d4c6b9dccdf323c345d",
+        "page": 75
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "4c5ce192b4481729689ae695",
+    "source_hash": "36976f7d0e1b4cdea7933b87300a00ae610a6d4accc3cfe05fa6f2d8d4aac9d2",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:31:50.147124+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "64f86d05ad489f7bd79a",
+        "page": 113
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "99683880b62a037ae0729a2f",
+    "source_hash": "379faf2f2da7e5fe11a2351ee94f8df4c220fe8d97ca8d981df1b0720bd0217f",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:31:55.177765+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "d6b170ed5a0650a2f963",
+        "page": 70
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "303e5e5daf36604297d30041",
+    "source_hash": "39764e6f48d6a5da152db618cc41c0533690f39cd8d53a1d34ea5567df4dfdfe",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:31:59.669159+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "cdc72b3bacb1305fa61b1f10",
+    "source_hash": "3b643668220fa1ccaec14adea446bb8b7c604c46dfd9b9b428936e6fb06178db",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:32:01.918890+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "cd02be572c01bc564fcbc320",
+    "source_hash": "3c832bf48d6778590797a18328a78282662cd111d6f3b0b4b06362b4fc514a18",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:32:09.668220+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "9cd95100c3709d84eae8",
+        "page": 10
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "b78a18eaa9073dae08ef5ac2",
+    "source_hash": "4098c9b30df8fcdd6794bfff70db33f8805c057be972368f62b1c5a7131337bd",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:32:12.290134+00:00",
+    "finding_counts": {
+      "total": 10
+    },
+    "locations": [
+      {
+        "element_id": "046f6944da59a3fdaefc",
+        "page": 18
+      },
+      {
+        "element_id": "4946b971f49e10fd3061",
+        "page": 35
+      },
+      {
+        "element_id": "0516993c1f6ba86ec04e",
+        "page": null
+      },
+      {
+        "element_id": "0516993c1f6ba86ec04e",
+        "page": null
+      },
+      {
+        "element_id": "0516993c1f6ba86ec04e",
+        "page": null
+      },
+      {
+        "element_id": "0516993c1f6ba86ec04e",
+        "page": null
+      },
+      {
+        "element_id": "dd20ff13b9da2e82fb40",
+        "page": null
+      },
+      {
+        "element_id": "dd20ff13b9da2e82fb40",
+        "page": null
+      },
+      {
+        "element_id": "dd20ff13b9da2e82fb40",
+        "page": null
+      },
+      {
+        "element_id": "dd20ff13b9da2e82fb40",
+        "page": null
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "5af92689f0f1bb51f06cae92",
+    "source_hash": "42579c6801b336059847c2d273beecd589c550a8816e00d25b62a92d30bae913",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:32:16.720273+00:00",
+    "finding_counts": {
+      "total": 3
+    },
+    "locations": [
+      {
+        "element_id": "a427594dbf97a470205b",
+        "page": 15
+      },
+      {
+        "element_id": "9e811f4b8bbab4ee9d1d",
+        "page": null
+      },
+      {
+        "element_id": "2753b33160febfa95b21",
+        "page": 40
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "441c9a1e9159890d8693dc80",
+    "source_hash": "43128763d3b2ec7d693014dd98de6dc90411498f4d2c0c3ae3c56e0e75da44c4",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:32:28.997145+00:00",
+    "finding_counts": {
+      "total": 9
+    },
+    "locations": [
+      {
+        "element_id": "fed0f0ab7e97700fcf74",
+        "page": 22
+      },
+      {
+        "element_id": "918471c450bff75a081a",
+        "page": 41
+      },
+      {
+        "element_id": "d1c3359b2cd72fe51577",
+        "page": 59
+      },
+      {
+        "element_id": "bd2d58f8a63a8868bf05",
+        "page": null
+      },
+      {
+        "element_id": "d73a5613293c52ec44f8",
+        "page": 118
+      },
+      {
+        "element_id": "d73a5613293c52ec44f8",
+        "page": 118
+      },
+      {
+        "element_id": "dcb40ad44eed55b10b19",
+        "page": null
+      },
+      {
+        "element_id": "00ba99f04a0c24636f43",
+        "page": null
+      },
+      {
+        "element_id": "7b2ec5af83f8f2391b76",
+        "page": 144
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "c9e8868c45fb720629440d36",
+    "source_hash": "4a2337a0c5cf98973f0cc42fb34e0039888b0061bf8d666cb4edf3403fbe0a1a",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:32:37.950162+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "page": 57
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "eb996fb8540d7d545447feee",
+    "source_hash": "4b3541c9a4a70b36c86d0925f96b7b45dc2fafd5a3a1385b07cc06dc39863b0b",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:32:41.449118+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "9319cb67294bdba9eb9109ef",
+    "source_hash": "4b43476cd69b871b5f2ff4ee7ffb20f493452879ff93dea70ae96b9848862ca0",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:32:44.962215+00:00",
+    "finding_counts": {
+      "total": 3
+    },
+    "locations": [
+      {
+        "element_id": "0fba4acce6a8e88d17bc",
+        "page": 16
+      },
+      {
+        "element_id": "f517692b06fb8617e1eb",
+        "page": 31
+      },
+      {
+        "page": 66
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "6f4d3962e2a275c4a178d586",
+    "source_hash": "4dd7233b8cd73add78d6652aeb3049d597414891aba48f847c4f5a9ee446540c",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:32:49.451883+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "6bce78f3b9897cc5f9a8",
+        "page": 55
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "9e850b3a496173001cc44e1c",
+    "source_hash": "4fe0ecbc5e6a3d82dfda058cba3072fe1cbf8a3c70cb96f014514852a17c3946",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:32:52.672165+00:00",
+    "finding_counts": {
+      "total": 15
+    },
+    "locations": [
+      {
+        "element_id": "40e3bd0259d461012e32",
+        "page": 14
+      },
+      {
+        "element_id": "40e3bd0259d461012e32",
+        "page": 14
+      },
+      {
+        "element_id": "40e3bd0259d461012e32",
+        "page": 14
+      },
+      {
+        "element_id": "40e3bd0259d461012e32",
+        "page": 14
+      },
+      {
+        "element_id": "ef797b35e84d5c1352c6",
+        "page": 15
+      },
+      {
+        "element_id": "ef797b35e84d5c1352c6",
+        "page": 15
+      },
+      {
+        "element_id": "ef797b35e84d5c1352c6",
+        "page": 15
+      },
+      {
+        "element_id": "ef797b35e84d5c1352c6",
+        "page": 17
+      },
+      {
+        "element_id": "ef797b35e84d5c1352c6",
+        "page": 17
+      },
+      {
+        "element_id": "ef797b35e84d5c1352c6",
+        "page": 15
+      },
+      {
+        "element_id": "97df851c29c64b728453",
+        "page": 15
+      },
+      {
+        "element_id": "97df851c29c64b728453",
+        "page": 15
+      },
+      {
+        "element_id": "97df851c29c64b728453",
+        "page": 17
+      },
+      {
+        "element_id": "97df851c29c64b728453",
+        "page": 17
+      },
+      {
+        "page": 15
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "f074b8016a0e04d24d1deafd",
+    "source_hash": "57e14df9bfe2539e1ee57e351e2765da2f8bdd00cde8654609b7e3a4b5be3c79",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:32:55.687016+00:00",
+    "finding_counts": {
+      "total": 3
+    },
+    "locations": [
+      {
+        "element_id": "c11013d2b947fe0f49be",
+        "page": null
+      },
+      {
+        "element_id": "c11013d2b947fe0f49be",
+        "page": 22
+      },
+      {
+        "page": 21
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "40b246874f00962a4927b4d4",
+    "source_hash": "59a2e281cac9b5bb4b462cf3209f4af14c5a956e074ddd4355a620e69bcc1c59",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:33:01.005167+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "334c56fb5f053545f308",
+        "page": null
+      },
+      {
+        "element_id": "334c56fb5f053545f308",
+        "page": null
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "9ca60b8fbc80add181ab518f",
+    "source_hash": "59f66e6cc4c7f4791630cd2c226faa728c3cee82f7574c977ca6af194ae939f6",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:33:08.885526+00:00",
+    "finding_counts": {
+      "total": 7
+    },
+    "locations": [
+      {
+        "element_id": "f1e608b49bcec13a2df9",
+        "page": 52
+      },
+      {
+        "element_id": "7145570d3989571112f9",
+        "page": null
+      },
+      {
+        "element_id": "7145570d3989571112f9",
+        "page": null
+      },
+      {
+        "element_id": "add83a38481556b17528",
+        "page": null
+      },
+      {
+        "element_id": "add83a38481556b17528",
+        "page": null
+      },
+      {
+        "element_id": "24cc8572381d60d7311b",
+        "page": null
+      },
+      {
+        "element_id": "24cc8572381d60d7311b",
+        "page": null
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "293f7ad327ae1c27f13e8a9b",
+    "source_hash": "5e33811a52b0cad7638ce59e04885cf9f41796235a48181645e0fd0b5ed61c93",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:33:14.859912+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "104b62e448d9696cdd710ae8",
+    "source_hash": "6085df9b084e938bbf1be0b0c2cbc57e4d73b3c0c9c613af9017be1a9b41052a",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:33:19.571395+00:00",
+    "finding_counts": {
+      "total": 3
+    },
+    "locations": [
+      {
+        "element_id": "61e74aa0f6b6ef27f138",
+        "page": 34
+      },
+      {
+        "page": 26
+      },
+      {
+        "page": 27
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "d961c302b7525bef2a10a533",
+    "source_hash": "650e9ea409377a54e93a5cd1c2b6912e8fd464c816d68deb037bcb8fb01c5b75",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:33:26.766172+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "45a36a06942e5defb4c3",
+        "page": 41
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "ddf324cf71e7aeebdcf0a8c9",
+    "source_hash": "681a8b9dcd5ae12857eb770c8c75dde761b2f9bc6c151b34ff182e87c0c6d843",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:33:35.391005+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "37d8eb8e773dd9e133c0",
+        "page": 19
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "c726e9361b5e357c94f3a1b3",
+    "source_hash": "699085551ebca10d106afc3234ce1fa1292be6196727e5ace2c9331c5f4c59b4",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:33:50.674462+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "200087cf6fffc2dc1496",
+        "page": 2
+      },
+      {
+        "element_id": "4b107f81da264bf637ce",
+        "page": 37
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "dcc792d783d18b07d1c09576",
+    "source_hash": "71b9814a26040f1acd78a88b7525e62ee6fe97316fc3f464eaf696de423bd62f",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:33:55.507382+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "4677b1a2b2b9ab0bfed2",
+        "page": 4
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "973dca9c211f3e7611d04642",
+    "source_hash": "723a3875c67c0ee21756b5841c6703694aa91c417c9d8d66d3b2050ea03daddf",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:34:01.066027+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "02ec3706af3cba472883",
+        "page": 25
+      },
+      {
+        "page": 22
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "c797b7832ba1d3ea9574169b",
+    "source_hash": "73abf8e4f78c36a19e2345a3e2a0be5afd0e8a5a1d27363f665e701b7ecade8d",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:34:10.714587+00:00",
+    "finding_counts": {
+      "total": 7
+    },
+    "locations": [
+      {
+        "element_id": "c9c96c3c69c1747a35d0",
+        "page": null
+      },
+      {
+        "element_id": "42e2fa2f67058d7d3b0f",
+        "page": 29
+      },
+      {
+        "element_id": "42e2fa2f67058d7d3b0f",
+        "page": 3
+      },
+      {
+        "element_id": "f080dd7eb8c9111cdf9e",
+        "page": 84
+      },
+      {
+        "element_id": "a462a63dfa22b02d0bd9",
+        "page": 98
+      },
+      {
+        "element_id": "a462a63dfa22b02d0bd9",
+        "page": 98
+      },
+      {
+        "element_id": "64208265301551870b85",
+        "page": 98
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "706dd864f170a9a4247fb1ac",
+    "source_hash": "74824a94acfdd7dcf3c865c70f607074196de1497417aea01bfe3d2e3f62a8b2",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:34:16.301419+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "84d7e0b27115d692ee2e",
+        "page": 36
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "87e02b6d0cfd3dae8d53655d",
+    "source_hash": "7498d7f03d29fdd0b24d84161ff1b906740976156d2f0b5f023e0ab62132c9f4",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:34:18.097800+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "c1fc2a3256018e7d35559864",
+    "source_hash": "7581cb80dc8a7efd9a5da766decc927d7f2b6305566827e4394ded39b93e5e4c",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:34:22.617084+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "b5cb0140f0bce28887d5",
+        "page": 32
+      },
+      {
+        "element_id": "b5cb0140f0bce28887d5",
+        "page": 32
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "0ca008079bcea49a09dac08c",
+    "source_hash": "79c3ff04b9a8d404d2455dd9bd598bd9d3461c8de69e57863519e6d5b7822229",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:34:32.907116+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "485e72a12333d417b49e",
+        "page": 5
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "87032c69e1df518eb012e7d9",
+    "source_hash": "7a90f371ade71abff5acaf4e842b86310eb7e61ad3b6f03deef351c01ef50353",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:34:39.224626+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "123e600d835cf92120d9",
+        "page": 42
+      },
+      {
+        "element_id": "123e600d835cf92120d9",
+        "page": 43
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "abc104d4d8cdba5a1beade41",
+    "source_hash": "7e07a7f9ecf4fea73d89ab882d7e43624844e54dc595213676ba1b4e9ad5d76f",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:34:44.414850+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "page": 6
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "1145c4a4761fd4d21c1f0ef2",
+    "source_hash": "7fd31853e9b51435be8b6f6c00e762e3bedfbc4a9305c28220b3670b1245c434",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:34:51.391065+00:00",
+    "finding_counts": {
+      "total": 4
+    },
+    "locations": [
+      {
+        "element_id": "4cd201171fab24055a31",
+        "page": 22
+      },
+      {
+        "element_id": "a629c2badaae6a938310",
+        "page": 22
+      },
+      {
+        "element_id": "af21a8ad0d0ad6433ce6",
+        "page": 29
+      },
+      {
+        "element_id": "af21a8ad0d0ad6433ce6",
+        "page": 29
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "10cdf15b5aca10ce69f3c175",
+    "source_hash": "81be3527c867ebe3aab0eca565aefe2b6f15df667e913696f3f9e6e0627862f0",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:34:59.202992+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "d069512b5bdbaf8ccca2",
+        "page": null
+      },
+      {
+        "page": 3
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "2ad015f1d853429ea12fad29",
+    "source_hash": "833369f0c999bf66347099c7f4d0cbccb20bf929d98921dfcb3cba8b4cf43aa9",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:35:04.310632+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "414a5c09a3017478da59",
+        "page": 30
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "ca923798426f2294ca097c9d",
+    "source_hash": "89dd99c161d36116682e5fd9feeee0d04e34d32ea3764c1bd9437dabb71d5d37",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:35:14.438767+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "70a35c1f5f336f97c79a7851",
+    "source_hash": "8a468ba4c35ce9ea2ddc1458b0b06f5a95b84eb5f6268af79dee0d61c8845f87",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:35:18.460099+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "98efe781e3d28baba4ea6c47",
+    "source_hash": "9145abf6cb0d67ba5476980e3a94458c3f609d0d08f63ecb305deb26e393ee2c",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:35:25.461769+00:00",
+    "finding_counts": {
+      "total": 7
+    },
+    "locations": [
+      {
+        "page": 3
+      },
+      {
+        "page": 12
+      },
+      {
+        "page": 17
+      },
+      {
+        "page": 46
+      },
+      {
+        "page": 50
+      },
+      {
+        "page": 54
+      },
+      {
+        "page": 55
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "9e63d81075318465ab05d6a7",
+    "source_hash": "9a8fadfefd10feaca5cc58c320c25e41e5b1481e789903996d16193f9c9398dd",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:35:32.335281+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "55f54277c5a82b603c12",
+        "page": 49
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "5266347a463a8150283a81c6",
+    "source_hash": "9d78c025d1b93fad2116bf8e5b58843e100daeacbf8f4263d2dad3619d9811d5",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:35:44.030605+00:00",
+    "finding_counts": {
+      "total": 4
+    },
+    "locations": [
+      {
+        "element_id": "35092b033c2fd6c6b540",
+        "page": 15
+      },
+      {
+        "element_id": "1ed39a786f4e814ce8f9",
+        "page": 62
+      },
+      {
+        "page": 51
+      },
+      {
+        "page": 52
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "644245167d4dbe287313cb2b",
+    "source_hash": "9e4be458556bd3273638a1e296f4ac000c5f091891083f49e6df94b7c109e663",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:35:48.253783+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "574796e18ce3876b060b",
+        "page": 60
+      },
+      {
+        "element_id": "13a0532549df2278e831",
+        "page": 89
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "e3fefb55a847cd267c48fe73",
+    "source_hash": "9e7d457cd7643ef6db50430a0a5c3ef6bfaba5d43f3b68e5e0467366a9067ede",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:35:52.313367+00:00",
+    "finding_counts": {
+      "total": 7
+    },
+    "locations": [
+      {
+        "element_id": "cf58c587a6bbef274a17",
+        "page": null
+      },
+      {
+        "element_id": "4811dda8385cbca2f3b2",
+        "page": 40
+      },
+      {
+        "element_id": "392ef383d65b7ab0f01b",
+        "page": 49
+      },
+      {
+        "element_id": "245235be9cca061344de",
+        "page": 65
+      },
+      {
+        "element_id": "80ad356bb488bff4ec2c",
+        "page": 68
+      },
+      {
+        "page": 14
+      },
+      {
+        "page": 15
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "6d066ea94593a05f8d509572",
+    "source_hash": "a05039972efdaafdcc365ad6728f0b6dce3b955bcd2756fa9b8b6458a285da78",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:35:57.326021+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "61e35fd0d066bd8047b1",
+        "page": 71
+      },
+      {
+        "element_id": "cd5d96cc181c83d83168",
+        "page": 77
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "99f5b8d104775c2a55b2052e",
+    "source_hash": "a501d0926830f0ff1c1eb0892fe0fd2857f917b4365a32b25777df88c0393d0f",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:36:02.577375+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "8439c01cdaaeb320a9ae",
+        "page": 78
+      },
+      {
+        "element_id": "45a28b9431088756f918",
+        "page": 89
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "b4f59bf9c5798ebb01db25c8",
+    "source_hash": "ab2ae44bc4b640f8bb1ec3ee8083e43ccd6230eef4bb50cd8ab2f4e4db4bc3a8",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:36:06.696134+00:00",
+    "finding_counts": {
+      "total": 5
+    },
+    "locations": [
+      {
+        "element_id": "333be37abe94baacc2ed",
+        "page": 23
+      },
+      {
+        "element_id": "ea858a7632bae35d84fb",
+        "page": 25
+      },
+      {
+        "element_id": "cc52229a5a878037bd13",
+        "page": 27
+      },
+      {
+        "element_id": "b18bcdbf4b003674ba38",
+        "page": 54
+      },
+      {
+        "page": 65
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "2fcc37fd0e50fab4a8342b42",
+    "source_hash": "ab6dbebd700906de16c0119493635d345ba13079013a448e0e8b83041599e182",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:36:10.927178+00:00",
+    "finding_counts": {
+      "total": 10
+    },
+    "locations": [
+      {
+        "element_id": "8b61af17255d292cea25",
+        "page": 36
+      },
+      {
+        "element_id": "02a50f4cdaf07848d059",
+        "page": null
+      },
+      {
+        "element_id": "6d3204a78e2214416156",
+        "page": null
+      },
+      {
+        "element_id": "1264800b6b91d370fdd4",
+        "page": 39
+      },
+      {
+        "element_id": "1264800b6b91d370fdd4",
+        "page": 39
+      },
+      {
+        "element_id": "4a9cd1d43bb822bb3db6",
+        "page": 49
+      },
+      {
+        "element_id": "4a9cd1d43bb822bb3db6",
+        "page": 49
+      },
+      {
+        "element_id": "4a9cd1d43bb822bb3db6",
+        "page": 49
+      },
+      {
+        "element_id": "4a9cd1d43bb822bb3db6",
+        "page": 49
+      },
+      {
+        "element_id": "db87485dcce9517b8bf1",
+        "page": 50
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "aed62a97ea862002c989fa41",
+    "source_hash": "acdaa1c1f4aa266d483af45177edf8a324e1f9a23813e0f339971b9baaaa5959",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:36:13.575768+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "page": 3
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "740d9e3c7573b3ed8c04072b",
+    "source_hash": "ae221f72facb7985dc8743589f6c25e49004257b16b7f0c39543b9e54302dc21",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:36:19.427251+00:00",
+    "finding_counts": {
+      "total": 8
+    },
+    "locations": [
+      {
+        "element_id": "00ef9c1118cc461dccb3",
+        "page": null
+      },
+      {
+        "element_id": "823bf83aa1beea5e5487",
+        "page": 9
+      },
+      {
+        "element_id": "823bf83aa1beea5e5487",
+        "page": null
+      },
+      {
+        "element_id": "e0b219545b170c4a8c42",
+        "page": null
+      },
+      {
+        "element_id": "7c9b1948ba8743f52b1a",
+        "page": null
+      },
+      {
+        "page": 13
+      },
+      {
+        "page": 16
+      },
+      {
+        "page": 35
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "3f76f0a505819760f244a820",
+    "source_hash": "aea2b41567689397f2c3fb5ac3091c26d4bd532aa6173b9cae4600e62b32fbe0",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:36:23.155382+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "977b59ddaf14fe5e80d08987",
+    "source_hash": "afe7223ddc830810141de53336086aff4c084f4fbc74da6a2c555205b1581f37",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:36:31.573479+00:00",
+    "finding_counts": {
+      "total": 22
+    },
+    "locations": [
+      {
+        "element_id": "2cf8910f192cbef1878e",
+        "page": null
+      },
+      {
+        "element_id": "7545face91c785426882",
+        "page": 23
+      },
+      {
+        "element_id": "6f80132b6a17097d3116",
+        "page": 23
+      },
+      {
+        "element_id": "f90f5c0698e60d170d32",
+        "page": 23
+      },
+      {
+        "element_id": "01ea5aadf036cc73f088",
+        "page": 23
+      },
+      {
+        "element_id": "0a01da5a2e60882344c6",
+        "page": 23
+      },
+      {
+        "element_id": "0a01da5a2e60882344c6",
+        "page": 23
+      },
+      {
+        "element_id": "ad7bdb6a372d2d034ac3",
+        "page": 24
+      },
+      {
+        "element_id": "5e7843c0e329e9a702db",
+        "page": 24
+      },
+      {
+        "element_id": "5525fdf6ca292a20944c",
+        "page": 24
+      },
+      {
+        "element_id": "757375dfef200849e050",
+        "page": 25
+      },
+      {
+        "element_id": "757375dfef200849e050",
+        "page": 25
+      },
+      {
+        "element_id": "88f2abdc940ad4770912",
+        "page": 31
+      },
+      {
+        "element_id": "88f2abdc940ad4770912",
+        "page": null
+      },
+      {
+        "element_id": "88f2abdc940ad4770912",
+        "page": null
+      },
+      {
+        "element_id": "3d54b0dd924e460c6162",
+        "page": 42
+      },
+      {
+        "element_id": "10615015504324b95bee",
+        "page": 55
+      },
+      {
+        "element_id": "3f99ad037c339af3843b",
+        "page": 90
+      },
+      {
+        "element_id": "3f99ad037c339af3843b",
+        "page": 90
+      },
+      {
+        "element_id": "3f99ad037c339af3843b",
+        "page": 90
+      },
+      {
+        "element_id": "d7e7a2bffc60fd7423d3",
+        "page": 17
+      },
+      {
+        "page": 31
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "3f2c8216cec765e7f05d6edc",
+    "source_hash": "b72e04b492c062a5f18aaf0dbdba7da1b213b50a74b675aee61ed3acdd34dde0",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:36:41.081964+00:00",
+    "finding_counts": {
+      "total": 11
+    },
+    "locations": [
+      {
+        "element_id": "5e46312a0a3b07df26fc",
+        "page": null
+      },
+      {
+        "element_id": "5e46312a0a3b07df26fc",
+        "page": null
+      },
+      {
+        "element_id": "5e46312a0a3b07df26fc",
+        "page": null
+      },
+      {
+        "element_id": "37f67aeb299fe68cf195",
+        "page": null
+      },
+      {
+        "element_id": "37f67aeb299fe68cf195",
+        "page": null
+      },
+      {
+        "element_id": "37f67aeb299fe68cf195",
+        "page": null
+      },
+      {
+        "element_id": "6ef6bf3366002ad53b2e",
+        "page": null
+      },
+      {
+        "element_id": "6ef6bf3366002ad53b2e",
+        "page": null
+      },
+      {
+        "element_id": "22aa6d51186eb81f2699",
+        "page": null
+      },
+      {
+        "element_id": "e11744e6659c07be7915",
+        "page": 68
+      },
+      {
+        "page": 25
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "a382797a8bcc2b25e0ab4cda",
+    "source_hash": "bfa0ed2e678f004035e26321709cf36e546d2c4114ad0e6580697a55fe949e9d",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:36:45.770867+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "eadda28fb0ef62ad9dad18a2",
+    "source_hash": "c61fb84faaca9e2581b56088610c51ec3e114f1c6d3c70ab256e0c39a2abe1ca",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:36:54.169499+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "e05e55997cb5e534a519",
+        "page": 6
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "e4bc17d0dfb172b8a6104b7a",
+    "source_hash": "c892699f28ff5eb0243dc4d020e272cc50cd39acb90d6ee19c98a6932d5cdfb8",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:37:01.806926+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "a51429195643b91a0fbbee14",
+    "source_hash": "c8d7860853ad983f2cadd1eb043be5fcbe6b02651b3b37b70645fe0d463f3bd5",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:37:08.979922+00:00",
+    "finding_counts": {
+      "total": 3
+    },
+    "locations": [
+      {
+        "element_id": "fd9486036a16a003ef83",
+        "page": 46
+      },
+      {
+        "element_id": "f361e900580c43485716",
+        "page": 47
+      },
+      {
+        "element_id": "ac483d1b12cb75d7cc5f",
+        "page": 91
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "c5256a186b8bffb26d6e460e",
+    "source_hash": "cc5d401ebdfce98c11a4da7bac3b46f793e9bafb82f5aa01e6dc5fef545ceac1",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:37:21.573232+00:00",
+    "finding_counts": {
+      "total": 4
+    },
+    "locations": [
+      {
+        "element_id": "8d760103ea55e03fcfd1",
+        "page": 4
+      },
+      {
+        "element_id": "0f452ab03f537f0ca2da",
+        "page": 4
+      },
+      {
+        "element_id": "4c0466e920e8d3d6f3c8",
+        "page": 45
+      },
+      {
+        "element_id": "d3aaacb0a13a31f86ac7",
+        "page": 46
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "7e0317173b6cf341a3db9d40",
+    "source_hash": "cc6618da42a71a3b6df6944a40ca6f5bed418330dadb49b8fbe632db511aba83",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:37:28.146210+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "a753476235a3bd56f7d6",
+        "page": null
+      },
+      {
+        "element_id": "a436a11439aa8023a56e",
+        "page": 25
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "332d3a80bcfc6bc921cd90f0",
+    "source_hash": "d15a43620c223c82944898a857a824830520d7f86c800767ff0ed72f7d4c4cad",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:37:32.703014+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "1efdd78e8842db78b04d7f39",
+    "source_hash": "d2ab99f2543cabd8426b7cca27c818a9ebec9ea33eacddc5b1a8ce815a7f8b72",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:37:37.091761+00:00",
+    "finding_counts": {
+      "total": 3
+    },
+    "locations": [
+      {
+        "element_id": "1b129c882fbc39447923",
+        "page": 43
+      },
+      {
+        "page": 14
+      },
+      {
+        "page": 15
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "3cdec65d43bcad77d17219d4",
+    "source_hash": "d2cceeb05f07ad57f1863d43c41d03767f9aa216caaa88fc53a90cf1564e37ef",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:37:40.427863+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "602232cbdd7428064fac5142",
+    "source_hash": "d58125735614f753ae3f05f0a57f506073166cf6cd6e5eae82162d4d25aa1c4e",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:37:50.323895+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "page": 3
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "67cf2860360db9e75bf560fd",
+    "source_hash": "daa36d8887441f8db552977046d80ca1f2b0843ded6f072a15e0a4567819255c",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:37:53.149344+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "7fc11d53afb908d41ef5",
+        "page": 35
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "f7c5dc503a17ca320d113339",
+    "source_hash": "dec406c8211ed9bca53c6d337342b78990ccd8867356b9652a34df3d11cf76e5",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:37:59.097354+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "142d701a2037cbc4336cc070",
+    "source_hash": "e08a5267735388614b5ab94e073778ec2cd9f5e62bc1329aae2d114f31feafb9",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:38:07.468165+00:00",
+    "finding_counts": {
+      "total": 5
+    },
+    "locations": [
+      {
+        "element_id": "37ca1bffc65c098100a3",
+        "page": 5
+      },
+      {
+        "element_id": "d7139f921d14eb952d6f",
+        "page": 6
+      },
+      {
+        "element_id": "d7139f921d14eb952d6f",
+        "page": 6
+      },
+      {
+        "element_id": "a1cbcc4d1657105c4d88",
+        "page": null
+      },
+      {
+        "element_id": "a1cbcc4d1657105c4d88",
+        "page": 21
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "24a8f44103c79a46729e4994",
+    "source_hash": "e14d79c538b410f1b5a3fc87178ab1a8fbba47acb110744d4d591a128d77ff20",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:38:13.518265+00:00",
+    "finding_counts": {
+      "total": 8
+    },
+    "locations": [
+      {
+        "element_id": "ae7c0fe5599aea9a07d0",
+        "page": 60
+      },
+      {
+        "element_id": "ae7c0fe5599aea9a07d0",
+        "page": null
+      },
+      {
+        "page": 107
+      },
+      {
+        "page": 108
+      },
+      {
+        "page": 109
+      },
+      {
+        "page": 113
+      },
+      {
+        "page": 114
+      },
+      {
+        "page": 115
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "74d17b66ded475b058a84bf3",
+    "source_hash": "e14e0343f11daea41c0c032da88827baba9b6263d1e307365fe0f2f928895406",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:38:21.232783+00:00",
+    "finding_counts": {
+      "total": 6
+    },
+    "locations": [
+      {
+        "element_id": "3159a961847cb109d6fd",
+        "page": 3
+      },
+      {
+        "page": 35
+      },
+      {
+        "page": 37
+      },
+      {
+        "page": 38
+      },
+      {
+        "page": 39
+      },
+      {
+        "page": 41
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "f6c98dd4a78e04634f088360",
+    "source_hash": "e764cea6134f3aa71308c4354d0ad655e51b31f17301138d372837dbd2f183df",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:38:29.081035+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "937d46250b0699f564579e21",
+    "source_hash": "ea22ce3a5bacc5d4b3993c2ba237a6ce3a9d854157a30a8d54b6b9125a78b552",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:38:36.257836+00:00",
+    "finding_counts": {
+      "total": 3
+    },
+    "locations": [
+      {
+        "element_id": "dfe83914af14dc42c5f9",
+        "page": 9
+      },
+      {
+        "element_id": "9a8d3e677a35f82dcb28",
+        "page": 25
+      },
+      {
+        "page": 22
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "15a0d92c6dff634df15f944e",
+    "source_hash": "ea909335319f1aba3af4d141239e359ce1a583699a5015ffd4908dd97e9c6954",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:38:44.166016+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "ee86b2e3d352c676aea98139",
+    "source_hash": "ece531219e5c92db319a0501511b6d3344b27c9620db2b0c1b29572159d4e332",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:38:47.951458+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "f6e826649f8cce71ce6f",
+        "page": null
+      },
+      {
+        "element_id": "51a445ccf3123f8dc46b",
+        "page": 40
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "0f0506c286eec0bc81b8ee1f",
+    "source_hash": "ee02237767524272096aec544c09b90e3e89420661e5ad35dfd13158f57a9404",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:38:55.420878+00:00",
+    "finding_counts": {
+      "total": 19
+    },
+    "locations": [
+      {
+        "element_id": "f4bd6f8b00c3a5f3c63b",
+        "page": 63
+      },
+      {
+        "element_id": "f4bd6f8b00c3a5f3c63b",
+        "page": 45
+      },
+      {
+        "element_id": "0e22174a98243a383f3c",
+        "page": 62
+      },
+      {
+        "element_id": "0e22174a98243a383f3c",
+        "page": 63
+      },
+      {
+        "element_id": "592114338b64a4ccf911",
+        "page": 64
+      },
+      {
+        "element_id": "c728e6593063c3846232",
+        "page": 70
+      },
+      {
+        "element_id": "c728e6593063c3846232",
+        "page": 70
+      },
+      {
+        "element_id": "c728e6593063c3846232",
+        "page": 70
+      },
+      {
+        "element_id": "c728e6593063c3846232",
+        "page": null
+      },
+      {
+        "element_id": "c728e6593063c3846232",
+        "page": 70
+      },
+      {
+        "element_id": "7c99888d8038cfbe703a",
+        "page": 20
+      },
+      {
+        "element_id": "7c99888d8038cfbe703a",
+        "page": 70
+      },
+      {
+        "element_id": "7c99888d8038cfbe703a",
+        "page": 70
+      },
+      {
+        "element_id": "7c99888d8038cfbe703a",
+        "page": 98
+      },
+      {
+        "element_id": "7c99888d8038cfbe703a",
+        "page": 70
+      },
+      {
+        "element_id": "590e666b3f42c5065223",
+        "page": 84
+      },
+      {
+        "element_id": "151929c9c64c95065d7c",
+        "page": 95
+      },
+      {
+        "page": 63
+      },
+      {
+        "page": 70
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "f2577684f8322633c3374772",
+    "source_hash": "eece0536fdaa3d334dbe6851c498d9df62e0ba0c97192de4ddd0d526abc6803e",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:39:04.493783+00:00",
+    "finding_counts": {
+      "total": 2
+    },
+    "locations": [
+      {
+        "element_id": "a7ac4a17ff31711ed739",
+        "page": null
+      },
+      {
+        "element_id": "a7ac4a17ff31711ed739",
+        "page": null
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "7431b9a608520b5560f2ed61",
+    "source_hash": "f5affba2118c729f9167a614e90d53a49aef7f481d8b2819516c5ac476ad2cb0",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:39:11.960609+00:00",
+    "finding_counts": {
+      "total": 1
+    },
+    "locations": [
+      {
+        "element_id": "99efad07a37a8ae5e252",
+        "page": 22
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "196b5f3df38bbe57e82ee8ea",
+    "source_hash": "fde88f734237f41c9df923a371a0e609664ec3e7baa926d2fd8f35f61288376d",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:39:18.329437+00:00",
+    "finding_counts": {
+      "total": 6
+    },
+    "locations": [
+      {
+        "element_id": "ffb7e41d4ac0d94f514d",
+        "page": 85
+      },
+      {
+        "element_id": "ffb7e41d4ac0d94f514d",
+        "page": 81
+      },
+      {
+        "element_id": "4deb4d5aab92acdf2ce1",
+        "page": 65
+      },
+      {
+        "page": 18
+      },
+      {
+        "page": 19
+      },
+      {
+        "page": 98
+      }
+    ],
+    "is_current": true
+  },
+  {
+    "extraction_id": "12e281fc90956b9637f3a26a",
+    "source_hash": "fe07779f264abfd5f420f332adb65779a33142a5506581345f5cbe4803be53e8",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_verified",
+    "created_at": "2026-09-30T22:39:24.572066+00:00",
+    "finding_counts": {
+      "total": 0
+    },
+    "locations": [],
+    "is_current": true
+  },
+  {
+    "extraction_id": "f5a52a2fb13d9257a2bd790a",
+    "source_hash": "fe7ecad0b79023f54fbb7fd01efeeceb9282eea7a8dd2359853a03a81f1f8873",
+    "method": "hancom-print-textlayer-1",
+    "verdict": "auto_flagged",
+    "created_at": "2026-09-30T22:39:29.014730+00:00",
+    "finding_counts": {
+      "total": 3
+    },
+    "locations": [
+      {
+        "element_id": "ac29b1af63ef7f986f75",
+        "page": 8
+      },
+      {
+        "element_id": "ac29b1af63ef7f986f75",
+        "page": 8
+      },
+      {
+        "page": 8
+      }
+    ],
+    "is_current": true
+  }
+]
