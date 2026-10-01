@@ -282,10 +282,9 @@ def get_resources(settings: Settings) -> Resources:
 
 
 def _authorize(res: Resources, principal: Principal | None, *capabilities: str) -> Principal:
-    """Revalidates a session principal (expiry, revocation, current account capabilities) and checks one of the
-    capabilities. Every public function calls this, including cached and read-only ones."""
-    current = auth.refresh(res.settings, principal)
-    return require_any(current, *capabilities)
+    """States which role a public function serves. There is no login: the UI's visitor holds every capability;
+    in-process callers (CLI, tests) may pass narrower principals."""
+    return require_any(principal, *capabilities)
 
 
 # ---------------------------------------------------------------- scope and metadata
@@ -480,7 +479,7 @@ FREE_MODES = ("metadata", "inventory")
 
 
 class _Stop(Exception):
-    """A checkpoint before a paid stage refused to continue (cancellation or an ended session)."""
+    """A checkpoint before a paid stage refused to continue (the request was cancelled)."""
 
     def __init__(self, status: str, request_status: str, summary: str) -> None:
         super().__init__(summary)
@@ -602,12 +601,12 @@ def _create(res: Resources, principal: Principal, request: AnswerRequest, questi
             before_insert()
         conn.execute(
             "INSERT INTO requests(request_id, member_id, idempotency_key, generation_id, input_hash, config_hash, "
-            "scope_json, status, trace_json, created_at, updated_at, request_json, session_id, mode) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "scope_json, status, trace_json, created_at, updated_at, request_json, mode) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (request_id, principal.member_id, request.idempotency_key, request.generation_id, input_hash,
              hashlib.sha256(dumps(config).encode()).hexdigest(), dumps([asdict(x) for x in request.scope]), status,
              dumps({"config": config}), utcnow(), utcnow(), dumps(_request_snapshot(principal, request, question)),
-             principal.session_id, request.mode))
+             request.mode))
     return request_id, None
 
 
@@ -663,8 +662,8 @@ def _fail_unscheduled(res: Resources, request_id: str, request: AnswerRequest, e
 
 
 def run_queued(res: Resources, request_id: str) -> None:
-    """Worker body: claims queued -> running exactly once, rebuilds the principal from the persisted snapshot,
-    revalidates its session and executes. Never touches UI state."""
+    """Worker body: claims queued -> running exactly once, rebuilds the principal from the persisted snapshot
+    and executes. Never touches UI state."""
     with open_db(res.settings.db_path) as conn, tx(conn, immediate=True):
         claimed = conn.execute("UPDATE requests SET status = 'running', updated_at = ? WHERE request_id = ? "
                                "AND status = 'queued' AND cancel_requested = 0", (utcnow(), request_id)).rowcount
@@ -675,23 +674,19 @@ def run_queued(res: Resources, request_id: str) -> None:
     request = AnswerRequest(idempotency_key=snap["idempotency_key"], generation_id=snap["generation_id"],
                             question=snap["question"], scope=[DocRef(**r) for r in snap["scope"]],
                             mode=snap["mode"], as_of=snap["as_of"], config_id=snap["config_id"])
-    principal = Principal(row["member_id"], frozenset(snap["capabilities"]), row["session_id"])
+    principal = Principal(row["member_id"], frozenset(snap["capabilities"]))
     _execute(res, principal, request_id, request, snap["question"])
 
 
 def _checkpoint(res: Resources, request_id: str, principal: Principal) -> Principal:
-    """Before every newly dispatched paid stage: a cancelled request or an ended session stops here. Already
-    dispatched work still settles; this only prevents the next dispatch."""
+    """Before every newly dispatched paid stage: a cancelled request stops here. Already dispatched work still
+    settles; this only prevents the next dispatch."""
     with open_db(res.settings.db_path) as conn:
         cancelled = conn.execute("SELECT cancel_requested FROM requests WHERE request_id = ?",
                                  (request_id,)).fetchone()[0]
     if cancelled:
         raise _Stop("cancelled", "cancelled", "요청이 취소되어 다음 유료 단계를 시작하지 않았습니다.")
-    try:
-        return _authorize(res, principal, "consultant", "verifier")
-    except auth.AuthError:
-        raise _Stop("auth_required", "failed",
-                    "로그인이 만료되었거나 권한이 바뀌어 다음 유료 단계를 시작하지 않았습니다.") from None
+    return principal
 
 
 def _execute(res: Resources, principal: Principal, request_id: str, request: AnswerRequest,
@@ -1347,11 +1342,11 @@ def list_corrections(res: Resources, principal: Principal) -> list[dict]:
 
 _SECRET_RE = re.compile(r"(sk-[A-Za-z0-9_\-]{8,}|Bearer\s+\S+)")
 _PATH_RE = re.compile(r"([A-Za-z]:\\[^\s\"']+|/(?:home|root|Users|tmp|mnt|var)/[^\s\"']+)")
-_REDACT_KEYS = {"session_id", "original_path", "artifact_path", "messages", "token", "token_sha256", "api_key"}
+_REDACT_KEYS = {"original_path", "artifact_path", "messages", "api_key"}
 
 
 def redact(value):
-    """Exports: drop credentials, sessions and unrestricted local paths; keep stable IDs, hashes and locations."""
+    """Exports: drop credentials and unrestricted local paths; keep stable IDs, hashes and locations."""
     if isinstance(value, dict):
         return {k: redact(v) for k, v in value.items() if k not in _REDACT_KEYS}
     if isinstance(value, list):
@@ -1482,26 +1477,6 @@ def audit_events(res: Resources, principal: Principal, limit: int = 50) -> list[
         rows = conn.execute("SELECT * FROM audit_events ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
     return [{**{k: r[k] for k in r.keys() if k != "details_json"}, "details": json.loads(r["details_json"])}
             for r in rows]
-
-
-def members_overview(res: Resources, principal: Principal) -> dict:
-    principal = _authorize(res, principal, "budget_admin")
-    with open_db(res.settings.db_path) as conn:
-        active = {r[0]: r[1] for r in conn.execute(
-            "SELECT member_id, COUNT(*) FROM sessions WHERE revoked_at IS NULL AND expires_at > ? GROUP BY member_id",
-            (auth.clock().isoformat(),))}
-    return {"mode": auth.mode(res.settings),
-            "members": [{**m, "active_sessions": active.get(m["member_id"], 0)}
-                        for m in auth.list_members(res.settings)]}
-
-
-def revoke_member_sessions(res: Resources, principal: Principal, member_id: str, reason: str) -> int:
-    principal = _authorize(res, principal, "budget_admin")
-    _require_reason(reason)
-    count = auth.revoke_sessions(res.settings, member_id, reason)
-    with open_db(res.settings.db_path) as conn, tx(conn, immediate=True):
-        _audit(conn, principal.member_id, "revoke_sessions", member_id, reason, {"sessions": count})
-    return count
 
 
 def gold_queue(res: Resources, principal: Principal) -> dict:

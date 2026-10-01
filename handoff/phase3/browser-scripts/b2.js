@@ -1,15 +1,15 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const SP = process.argv[2];
-const tokens = JSON.parse(fs.readFileSync(SP + '/env/tokens.json'));
 const URL = 'http://127.0.0.1:8601/';
 const log = (...a) => console.log(...a);
-async function login(page, who) {
+async function login(page, who) {  // no login: type the attribution name in the sidebar
   await page.goto(URL);
-  await page.getByLabel('이름(계정)').fill(who);
-  await page.getByLabel('접속 토큰').fill(tokens[who]);
-  await page.getByRole('button', { name: '로그인' }).click();
-  await page.getByText('로그인됨').first().waitFor({ timeout: 20000 });
+  const box = page.getByLabel('이름 (사용·검토 기록용)');
+  await box.waitFor({ timeout: 30000 });
+  await box.fill(who);
+  await box.press('Enter');
+  await page.waitForTimeout(1200);
 }
 async function pending(page) {
   const t = await page.locator('section[data-testid="stSidebar"]').innerText();

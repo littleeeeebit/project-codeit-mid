@@ -1,16 +1,11 @@
 const { chromium } = require('playwright');
 const fs = require('fs'); const crypto = require('crypto');
 const SP = process.argv[2];
-const tokens = JSON.parse(fs.readFileSync(SP + '/env/tokens.json'));
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
   const page = await (await browser.newContext({ acceptDownloads: true, viewport: { width: 1400, height: 1000 } })).newPage();
   await page.goto('http://127.0.0.1:8601/');
-  const who = tokens['kim'] ? 'kim' : 'owner';
-  await page.getByLabel('이름(계정)').fill(who);
-  await page.getByLabel('접속 토큰').fill(tokens[who]);
-  await page.getByRole('button', { name: '로그인' }).click();
-  await page.getByText('로그인됨').first().waitFor({ timeout: 20000 });
+  await page.getByLabel('이름 (사용·검토 기록용)').waitFor({ timeout: 30000 });
   await page.getByText('선택', { exact: true }).nth(0).click();
   const [d] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '원문 파일 받기' }).first().click()]);
   const path = SP + '/dl.bin'; await d.saveAs(path);

@@ -42,7 +42,7 @@ Split families before drafting. Group byte-identical sources, revisions and stro
 | Revision/duplicate conflict | 12 | 6 | 6 |
 | Total | 120 | 60 | 60 |
 
-Metadata-only direct questions have their own stratum and are excluded from passage retrieval denominators. Add converter failures, interrupted calls and authorization races to a separate operational suite; do not inflate source-unanswerability scores with them.
+Metadata-only direct questions have their own stratum and are excluded from passage retrieval denominators. Add converter failures, interrupted calls and request-ownership races to a separate operational suite; do not inflate source-unanswerability scores with them.
 
 ## Ordered work
 
@@ -101,7 +101,7 @@ Model or prompt comparisons are separate development experiments. If testing `gp
 
 ### 5. Run the sealed evaluation once after selection
 
-1. Freeze release-candidate config, code/source fingerprint, dataset/review hashes and metric code. A `sealed_evaluator` verifies freeze completeness and an estimated run budget.
+1. Freeze release-candidate config, code/source fingerprint, dataset/review hashes and metric code. The owner, running the sealed job from the CLI (no login exists; the `sealed_evaluator` capability is the job's declared role), verifies freeze completeness and an estimated run budget.
 2. Start one recorded sealed run for the chosen candidate. Persist each completed question/attempt. On interruption, resume only unfinished rows with conclusively known billing status; unknown paid attempts need reconciliation, not automatic replay.
 3. Capture original trace/output, independently reviewed scores and failure categories. Do not edit prompts/retrieval settings from sealed answers and call the resulting rerun an untouched test.
 4. If a discovered critical bug requires a repair, preserve the first result, label any subsequent run as post-test regression, and plan a fresh independently sealed set for a new reliability claim.
@@ -125,7 +125,7 @@ Before handoff, implement the minimal owner `backup` and paid-disabled staging `
 | `coverage report` | All 100 associations, parsed/reviewed/quarantined counts, review scope, recovery findings and metadata conflicts |
 | `evaluation report` | Actual run matrix, metric definitions/denominators/intervals, original failure examples, limitations and paid totals |
 | `budget report` | Prior-use baseline, local settled/pending amounts, external adjustments, project dates/envelopes and reconciliation freshness |
-| `runbook` | Setup, secret provisioning, exact shared launch/access, index activation/rollback, backup/restore, unknown-attempt recovery and shutdown |
+| `runbook` | Setup, API-key placement, exact shared launch and network exposure (no login), index activation/rollback, backup/restore, unknown-attempt recovery and shutdown |
 | `mentor walkthrough` | Search → select → question → claim/evidence → original → shared cost; separate verifier trace/comparison and failure-state example |
 
 Keep sanitized shareable reports in `docs/operations/` and runtime details in the common artifact tree. Screenshots and metrics must come from actual runs. README links the overview, phase outcomes/runbook, source limitations and the currently active retrieval mode.

@@ -26,7 +26,6 @@ Settings resolve from the repository location, never the working directory. Opti
 | `RFP_CONFIG_FILE` | none | JSON with nonsecret `Settings` fields (unknown keys are rejected) |
 | `RFP_HWP_CONVERTER` | env `Scripts\hwp5proc.exe` | HWP → XML converter |
 | `OPENAI_API_KEY` | none | Process environment, then the repository `.env`, then `.streamlit/secrets.toml`; never printed |
-| `RFP_ACCOUNTS_FILE` | `<RFP_DATA_DIR>/private/accounts.json` | Private member token digests and roles; its presence switches the app to token login |
 
 Without `OPENAI_API_KEY` the app still runs: search, filters, evidence browsing and retrieval traces are free; paid generation reports that the provider is unavailable. `provider: "fake"` in the config file never builds a real SDK client.
 
@@ -44,7 +43,6 @@ python -m rfp_assistant.cli build-keyword --include-unreviewed   # operating ind
 python -m rfp_assistant.cli check --phase 1 --provider fake   # automated invariants in temporary state, no key
 python -m rfp_assistant.cli check --phase 3 --provider fake   # service, budget and request-state gate
 python -m rfp_assistant.cli load-check --users 6 --provider fake   # six concurrent members, temporary ledger
-python -m rfp_assistant.cli accounts provision --member-id <id> --capabilities consultant   # token shown once
 python -m streamlit run app.py --server.address 127.0.0.1
 ```
 
@@ -133,7 +131,7 @@ python -m rfp_assistant.cli check --phase 2 --provider fake  # every automated i
 
 ## Access and paid use
 
-Without an accounts file the app keeps the phase-1 open mode: the typed sidebar name only attributes work, it grants the consultant and verifier screens but never budget administration or sealed data, and the UI refuses to run on anything but a loopback address. Once the owner provisions members (`accounts provision`), every visitor logs in with a member ID and a personal random token. Sessions are server-side with an 8-hour expiry, revocable, and revalidated on every service call and before every paid stage. Roles: `consultant`, `verifier` (traces, frozen runs, corrections, question review), `budget_admin` (사용량 관리: unknown billing, reconciliation, adjustments, paid on/off, sessions, audit) and `sealed_evaluator` (phase 4 only). See the [runbook](docs/operations/runbook.md) before giving anyone network access.
+There is no login (owner decision, reaffirmed for phase 3): every visitor gets the consultant, verification, question-review and 사용량 관리 (budget administration) screens. The name in the sidebar (default `owner`) is recorded on paid requests, review decisions, corrections and audited owner actions; it attributes work but does not authenticate anyone. Anyone who can reach the server can spend the budget and use the admin page, so keep `--server.address 127.0.0.1` unless everyone on that network may do so (see the [runbook](docs/operations/runbook.md)).
 
 Paid answers run in the background on a bounded executor (6 workers, 12 admitted requests); the page polls read-only status every second and shows the reserved maximum, the settled cost or the unknown pending cost of its own request. A request is persisted under its idempotency key before it runs, so reruns and double clicks never start a second call. An answer renders only while the screen still asks exactly what it asked (same documents, question, mode and date); otherwise it stays in "내 최근 요청" as history and its billing still settles. Two selected documents allow a balanced comparison (each side retrieved within half the evidence budget, an answer that drops a side is rejected); basic information (typed CSV values with unknown/zero/conflict states) and the structured requirement list are free.
 

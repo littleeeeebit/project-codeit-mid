@@ -1,15 +1,15 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const SP = process.argv[2];
-const tokens = JSON.parse(fs.readFileSync(SP + '/env/tokens.json'));
 const URL = 'http://127.0.0.1:8601/';
 const log = (...a) => console.log(...a);
-async function login(page, who) {
+async function login(page, who) {  // no login: type the attribution name in the sidebar
   await page.goto(URL);
-  await page.getByLabel('이름(계정)').fill(who);
-  await page.getByLabel('접속 토큰').fill(tokens[who]);
-  await page.getByRole('button', { name: '로그인' }).click();
-  await page.getByText('로그인됨').first().waitFor({ timeout: 20000 });
+  const box = page.getByLabel('이름 (사용·검토 기록용)');
+  await box.waitFor({ timeout: 30000 });
+  await box.fill(who);
+  await box.press('Enter');
+  await page.waitForTimeout(1200);
 }
 const main = p => p.locator('[data-testid="stMain"]');
 (async () => {
@@ -52,9 +52,9 @@ const main = p => p.locator('[data-testid="stMain"]');
   await kim.goto(URL + 'verify');
   await kim.waitForTimeout(2500);
   const vtxt = await main(kim).innerText();
-  log('consultant at /verify sees verifier content:', vtxt.includes('검색 경로와 근거 추적'));
+  log('visitor at /verify sees verifier content (open by design):', vtxt.includes('검색 경로와 근거 추적'));
   await kim.goto(URL + 'admin');
   await kim.waitForTimeout(2500);
-  log('consultant at /admin sees admin content:', (await main(kim).innerText()).includes('사용량 관리'));
+  log('visitor at /admin sees admin content (open by design):', (await main(kim).innerText()).includes('사용량 관리'));
   await browser.close();
 })();

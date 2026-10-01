@@ -68,10 +68,7 @@ class Settings:
     request_timeout_seconds: float = 60.0
     converter_timeout_seconds: float = 300.0
     framing_margin_tokens: int = 200
-    # Phase 3 operation: private member accounts (absent file = the phase-1 open localhost mode), session expiry,
-    # the bounded background executor and a fake-provider delay that makes races observable in browser checks.
-    accounts_file: Path | None = None
-    session_hours: int = 8
+    # Phase 3 operation: the bounded background executor and a fake-provider delay that makes races observable.
     request_workers: int = 6
     request_admission: int = 12  # admitted unfinished (queued + running) requests across the process
     shutdown_wait_seconds: float = 20.0
@@ -89,11 +86,6 @@ class Settings:
     @property
     def db_path(self) -> Path:
         return self.data_dir / "rfp.sqlite3"
-
-    @property
-    def accounts_path(self) -> Path:
-        """Private member records (token digests, capabilities). Never part of the nonsecret configuration."""
-        return self.accounts_file or self.data_dir / "private" / "accounts.json"
 
     def fingerprint(self) -> str:
         data = asdict(self)
@@ -128,9 +120,7 @@ def load_settings(**overrides) -> Settings:
     source = os.environ.get("RFP_SOURCE_DIR")
     data = os.environ.get("RFP_DATA_DIR")
     conv = os.environ.get("RFP_HWP_CONVERTER")
-    accounts = os.environ.get("RFP_ACCOUNTS_FILE")
     values = dict(
-        accounts_file=_abs_path("RFP_ACCOUNTS_FILE", accounts) if accounts else None,
         source_dir=_abs_path("RFP_SOURCE_DIR", source) if source else REPO_ROOT / "원본 데이터",
         data_dir=_abs_path("RFP_DATA_DIR", data) if data else REPO_ROOT / ".runtime",
         hwp_converter=_abs_path("RFP_HWP_CONVERTER", conv) if conv else default_converter(),
@@ -139,8 +129,6 @@ def load_settings(**overrides) -> Settings:
     unknown = set(config) - known
     if unknown:
         raise SettingsError(f"unknown configuration keys: {sorted(unknown)}")
-    if "accounts_file" in config:  # secrets live in a separately provisioned file, never the operational config
-        raise SettingsError("accounts_file is set through RFP_ACCOUNTS_FILE, not the operational configuration")
     values.update(config)
     values.update(overrides)
     settings = Settings(**values)
@@ -179,8 +167,6 @@ def validate(s: Settings) -> None:
         raise SettingsError("rrf_k, top-k depths and reranker concurrency must be positive")
     if not 1 <= s.request_workers <= 6 or not s.request_workers <= s.request_admission <= 48:
         raise SettingsError("request_workers must be 1..6 and request_admission within workers..48")
-    if not 1 <= s.session_hours <= 24:
-        raise SettingsError("session_hours must be within 1..24")
     if s.fake_delay_seconds and s.provider != "fake":
         raise SettingsError("fake_delay_seconds applies only to provider 'fake'")
     if not 0 <= s.fake_delay_seconds <= 120 or not 0 <= s.shutdown_wait_seconds <= 300:

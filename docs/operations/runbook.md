@@ -7,32 +7,17 @@ Run the commands with the project environment's interpreter from any directory. 
 ## 1. One owner, one data directory
 
 - One process owns `RFP_DATA_DIR` at a time. The serving app and every paid CLI job take `gateway.lock` there. A second owner is refused with `GatewayLockError`. Stop the UI before paid maintenance (`build-dense`, `evaluate-retrieval --allow-paid-queries`).
-- The ledger, sessions, requests, audit events and corrections all live in `rfp.sqlite3` on a local disk. A network share is outside the contract.
-- Private member records live in `RFP_ACCOUNTS_FILE`, by default `<RFP_DATA_DIR>/private/accounts.json`. That file is ignored by Git with the rest of `.runtime/`. The operational config (`RFP_CONFIG_FILE`) must not contain secrets and rejects an `accounts_file` key.
+- The ledger, requests, audit events and corrections all live in `rfp.sqlite3` on a local disk. A network share is outside the contract.
+- The operational config (`RFP_CONFIG_FILE`) holds no secrets. `OPENAI_API_KEY` stays in the server environment, `.env` or Streamlit secrets.
 
-## 2. Access modes
+## 2. Access: no login
 
-| Mode | When | What it allows |
-| --- | --- | --- |
-| Open (no accounts file) | The phase-1 owner decision, a single person on one machine | Consultant and verifier screens under a typed name that only attributes work. Budget administration and sealed data are unavailable. The UI refuses to run unless `--server.address` is `127.0.0.1`, `localhost` or `::1`. |
-| Token (accounts file exists) | Any shared use | Login with member ID plus a personal random token. Server sessions last 8 h (`session_hours`). Roles are checked on every service call. |
+There is no login (owner decision 2026-09-30, reaffirmed for phase 3 on 2026-10-01). Every visitor gets every page: 컨설턴트, 검증, 질문 검토 and 사용량 관리. The sidebar name (default `owner`) is recorded on requests, attempts, reviews, corrections and audit events.
 
-Provision members on the owner host. Each token is printed **once**: deliver it privately (in person or through an encrypted messenger) and never in a shared channel or document.
-
-```powershell
-python -m rfp_assistant.cli accounts provision --member-id kim --capabilities consultant
-python -m rfp_assistant.cli accounts provision --member-id lee --capabilities consultant,verifier
-python -m rfp_assistant.cli accounts provision --member-id owner --capabilities consultant,verifier,budget_admin
-python -m rfp_assistant.cli accounts list
-```
-
-- **Rotate** a token by running `provision` again for the same member. The old token and all of that member's sessions stop working.
-- **Disable or enable** a member: `accounts disable --member-id kim` or `accounts enable --member-id kim`. Disabling ends that member's sessions.
-- **End sessions without rotating:** `accounts revoke-sessions --member-id kim --reason "..."`. Omit `--member-id` to end everyone's sessions. The admin page has the same action with an audit event.
-- **Failed logins:** five failures per account in 15 minutes lock that account for the rest of the window. Unknown names share a global limit. Every failure shows the same message.
-- **`sealed_evaluator`:** grant it only for the phase-4 freeze procedure. Verifiers never see sealed test rows.
-
-A browser reload starts a new Streamlit session, so the member logs in again. The session ID is deliberately not put in the URL. A paid request that is already running still settles on the server.
+- **Attribution, not authentication.** Per-member spend in the sidebar is only as accurate as the names people type. Ask each member to use one consistent name.
+- **Network reach is the access control.** Anyone who can open the page can spend the allowance and use the admin page. Admin actions still require a reason and leave an audit event with the typed name; there is still no bulk release of unknown billing.
+- **Sealed test rows** are never served to the verifier page. Only the phase-4 freeze procedure, run by the owner from the CLI, reads `sealed/`.
+- A browser reload resets the sidebar name to `owner`; retype it. Running requests still settle on the server, and the reloaded page shows them under "내 최근 요청" for that name.
 
 ## 3. Launch
 
@@ -42,12 +27,12 @@ Local development and single-host use:
 python -m streamlit run app.py --server.address 127.0.0.1
 ```
 
-**Team access is an owner decision.** No host, TLS endpoint or tunnel has been configured or verified by this phase. Use one of these patterns. Never bind an open-mode (no accounts) server to `0.0.0.0`.
+**Team access is an owner decision.** No host, tunnel or network has been configured or verified by this phase. Because there is no login, binding to `0.0.0.0` exposes spending and administration to everyone on that network. Choose deliberately:
 
 - **Keep Streamlit on `127.0.0.1`** and give members an encrypted path to it. Examples: an SSH local forward (`ssh -L 8501:127.0.0.1:8501 <owner-host>`), or an existing organization VPN.
-- **Put a TLS reverse proxy in front of `127.0.0.1:8501`** on the team host, with token mode enabled.
+- **Bind to a trusted team network only** (`--server.address <team-network address>`) when every person on that network may spend the allowance.
 
-Record the chosen host, access method and who holds tokens in the phase-3 report (`report --phase 3`) once it exists.
+Record the chosen host and who can reach it in the phase-3 report (`report --phase 3`) once it exists.
 
 Paid generation stays disabled until `configure-budget` records the dates, prior use, allowance and cap (see the README). Fake-provider demonstrations use a config file with `{"provider": "fake"}` and optionally `"fake_delay_seconds": 4`. Such a config never builds a real SDK client.
 
@@ -68,7 +53,7 @@ Paid generation stays disabled until `configure-budget` records the dates, prior
 
 ## 5. Budget recovery
 
-The admin page (사용량 관리, `budget_admin` only) and the CLI show the same state:
+The admin page (사용량 관리) and the CLI show the same state:
 
 ```powershell
 python -m rfp_assistant.cli budget-status

@@ -12,7 +12,7 @@ An implementing agent reads this overview, the shared contracts, its phase docum
 
 | Order | Document | Assignment |
 | --- | --- | --- |
-| Common | [Implementation contracts](implementation-contracts.md) | One package/service, shared records, stable evidence, ledger and authorization |
+| Common | [Implementation contracts](implementation-contracts.md) | One package/service, shared records, stable evidence, ledger and role checks (no login) |
 | 1 | [Guarded vertical slice](1-guarded-vertical-slice.md) | Original HWP/PDF to scoped answer, evidence, metered usage and both minimal entry points |
 | 2 | [Corpus and retrieval](2-corpus-and-retrieval.md) | Full manifest/review coverage, incremental artifacts and measured keyword/dense/reranker selection |
 | 3 | [Workflows and operations](3-workflows-and-operations.md) | Consultant/verifier completion, responsive requests, six-user spending and recovery correctness |
@@ -37,7 +37,8 @@ This corpus supports historical discovery and document Q&A. Fresh opportunity co
 | 2026-09-30 | Six members share $20 for more than three weeks | All paid stages and experiments use one gateway and cumulative ledger |
 | 2026-09-30 | Usage percentage must be intuitive and update in real time | Money-based progress is primary; reservations and token details remain visible |
 | 2026-09-30 | Research ingestion, chunking, architecture, gold data, retrieval, prompts, reranking, evaluation, and frontend before implementation | Reuse the documents under `docs/rag/`; phase checks reference their domain-specific rules |
-| 2026-09-30 | Separate verification and practical-use frontends | Distinct entry points and server authorization, sharing the same pipeline |
+| 2026-09-30 | Separate verification and practical-use frontends | Distinct entry points sharing the same pipeline |
+| 2026-09-30, reaffirmed 2026-10-01 | No login | Every visitor gets every screen; a typed name attributes work; network reach is the only access control |
 | 2026-09-30 | Write the overall plan under `docs/plan/end-to-end` using the reference plans | This numbered overview defines phase ownership and contracts without creating application scaffolding |
 | Session instruction | Write UTF-8 without BOM | All new documents, extracted artifacts, and exports use this encoding; read the existing CSV with `utf-8-sig` |
 
@@ -72,7 +73,7 @@ flowchart TD
     S --> C[Structural chunks and requirement inventory]
     C --> B[Kiwi BM25 index]
     C --> D[Shared persisted embedding matrix]
-    U[Consultant or authorized verifier] --> Q[Question, document scope and as-of date]
+    U[Consultant or verifier] --> Q[Question, document scope and as-of date]
     Q --> M[Metadata lookup and free source browsing]
     Q --> B
     Q --> E[Reserve query embedding through gateway]
@@ -103,7 +104,7 @@ Metadata lookup, keyword search, requirement inventory browsing, and citation op
 | Fusion | RRF with `1 / (60 + rank)`, ranks starting at one | A frozen development comparison supports another setting |
 | Reranker | Trial local `BAAI/bge-reranker-v2-m3`; explicit bypass | Quality and warm latency gates pass on available hardware |
 | Answer generation | `gpt-4o-mini`, one Chat Completions call with strict structured output | A controlled `gpt-4.1-mini` comparison repairs measured errors affordably |
-| Frontends | Two authorized Streamlit entry points in one application package | Browser-tested requirements exceed the shared application's capabilities |
+| Frontends | Two Streamlit entry points in one application package, no login | Browser-tested requirements exceed the shared application's capabilities |
 | Observation | Persisted traces and ledger exports | Trace volume warrants Langfuse; existing proxy infrastructure makes LiteLLM practical |
 
 Dependencies and exact versions are pinned during implementation after a Windows smoke check. The smallest useful alternative remains original ingestion, scoped BM25, one grounded answer, and the ledger. Every additional component must preserve that path.
@@ -119,8 +120,8 @@ Agree on these before the six workstreams connect. Keep them as small typed reco
 | Source element | Stable element ID within a source version; section path, text/table representation, requirement code, and original location |
 | Evidence | Document/version plus element and quoted span or cell coordinates; PDF physical page/bounding box where available, HWP section/table location without invented page numbers |
 | Chunk and index | Chunk ID is configuration-dependent; source evidence is stable. Index manifest binds source hashes, parser/chunker settings, embedding model/dimensions, and row ordering |
-| Request | Authenticated member, request ID, generation ID, attempt ID, mode, document/version scope, as-of date, and configuration snapshot |
-| Answer | Supported claims with evidence IDs, conditions, unknowns, conflicts, and status; every citation resolves to authorized original evidence |
+| Request | Attributed member name, request ID, generation ID, attempt ID, mode, document/version scope, as-of date, and configuration snapshot |
+| Answer | Supported claims with evidence IDs, conditions, unknowns, conflicts, and status; every citation resolves to managed original evidence |
 | Trace | Stage outputs, ranks/scores, selected evidence, final token count, model/prompt/index versions, timings, errors, and paid attempt identities |
 | Usage | Raw provider usage, model/rate snapshot, estimated and settled microdollar cost, reservation, member/purpose, response ID, billing state, and reconciliation watermark |
 
@@ -130,7 +131,7 @@ An answer attaches to the scope captured when its request began. Changing the se
 
 ### Shared resource ownership
 
-Create the SDK client and immutable index resources once through the shared service's bootstrap/resource cache, rather than on every Streamlit rerun. The service owns their lifecycle; sessions supply authenticated attribution and scope. Verify supported concurrent client use before sharing it; bound local reranker work to available hardware. Open and explicitly close database connections per operation, keeping transactions out of network inference.
+Create the SDK client and immutable index resources once through the shared service's bootstrap/resource cache, rather than on every Streamlit rerun. The service owns their lifecycle; sessions supply the typed name for attribution and the scope. Verify supported concurrent client use before sharing it; bound local reranker work to available hardware. Open and explicitly close database connections per operation, keeping transactions out of network inference.
 
 On controlled shutdown, stop accepting paid work, finish or persist outstanding attempt states, and close the SDK client through its owner. A crash cannot guarantee cleanup, so startup recovers unresolved reservations. Browser disconnection neither closes shared resources nor establishes a zero-cost attempt.
 
@@ -159,7 +160,7 @@ The primary indicator is cumulative dollar cost divided by $20, because input, o
 
 Use a $16 operational cap and actual project start/end dates. A 28-day horizon is only a planning example. Record prior allowance spending before enabling calls and scale allocations to the real remainder. This cumulative allowance does not reset when a provider's monthly budget resets.
 
-Every paid stage follows one contract: authenticate → count bounded input/output → reserve atomically → persist attempt → dispatch → settle once. Reserve query embeddings before dense search; reserve generation after final evidence packing, assuming uncached input plus maximum output. Use a short SQLite `BEGIN IMMEDIATE` transaction and release its lock before inference. Account for every retry, disabling or bounding hidden SDK retries.
+Every paid stage follows one contract: attribute → count bounded input/output → reserve atomically → persist attempt → dispatch → settle once. Reserve query embeddings before dense search; reserve generation after final evidence packing, assuming uncached input plus maximum output. Use a short SQLite `BEGIN IMMEDIATE` transaction and release its lock before inference. Account for every retry, disabling or bounding hidden SDK retries.
 
 Settlement replaces a reservation with measured cost and returns the unused portion atomically. Duplicate completion cannot bill twice. Disconnects, timeouts, cancellations, or missing final usage remain pending/unknown until reconciled; TTL expiration alone cannot release them. Persist price snapshots and use integer microdollars or Decimal. Recover pending attempts on restart.
 
@@ -172,9 +173,9 @@ Direct academy-key use outside the gateway is invisible until reconciliation. Ve
 | Interface | Working increment | Completion evidence |
 | --- | --- | --- |
 | Consultant | Search/filters, readable project list, explicit selected scope, grounded answer, conditions/unknowns, clickable evidence and original download, persistent budget status | A consultant finds a late-document requirement and verifies its answer in the correct original without interpreting retrieval scores |
-| Verification | Authorized retrieval-only default, stage trace, frozen configuration/run comparison, reviewed labels/corrections and exports; separate estimated paid actions | A reviewer reproduces a failure, distinguishes ingestion from retrieval/generation, and compares runs without accidental paid calls |
+| Verification | Retrieval-only default, stage trace, frozen configuration/run comparison, reviewed labels/corrections and exports; separate estimated paid actions | A reviewer reproduces a failure, distinguishes ingestion from retrieval/generation, and compares runs without accidental paid calls |
 
-Both entry points exist in the first slice; expand their workflows in phase 3. Verification controls and sealed labels require server authorization. Hidden navigation is insufficient. Use Korean UI labels and answers, readable long titles, accessible controls, and explicit loading, insufficient-evidence, clarification, conflict, budget-blocked, and error states.
+Both entry points exist in the first slice; expand their workflows in phase 3. There is no login; sealed labels are never served to the verifier page, and owner actions require a reason and an audit event. Use Korean UI labels and answers, readable long titles, accessible controls, and explicit loading, insufficient-evidence, clarification, conflict, budget-blocked, and error states.
 
 During implementation, validate purpose/layout first, then real-browser spacing and interactions, typography, accessible colors, and remaining space. Do not claim visual measurements before a browser check. The [frontend plan](../../rag/frontend.md) owns detailed state, polling, accessibility, and acceptance scenarios.
 
@@ -186,7 +187,7 @@ These are dependency milestones within a two-to-three-day schedule, not four add
 | --- | --- | --- | --- |
 | [1. Guarded vertical slice](1-guarded-vertical-slice.md) | Day 1 | One supported HWP and PDF through structural ingestion, scoped BM25, both basic entry points, evidence navigation, one metered answer, and a visible failure state | A reviewed late-document/table fact is answered and opened in each original; the gateway exists before the first paid call; all 100 records have manifest status |
 | [2. Corpus coverage and retrieval comparison](2-corpus-and-retrieval.md) | Day 1–2 | Shared full-source artifacts, quality-reviewed supported coverage, duplicate/provenance handling, structural chunks, exact lookup; dense/hybrid and reranker trials | Report actual reviewed coverage and unresolved files; freeze pilot runs and choose the active retriever from quality, latency, and cost |
-| [3. Usable consultant and verification workflows](3-workflows-and-operations.md) | Day 2 | Filters, unknown/conflict handling, scoped comparisons, requirement inventory, frozen traces/exports, role checks, shared live usage, interruption/restart behavior | Browser scenarios pass; six sessions do not overspend or attach stale answers to new scopes; exhausted-budget free paths still work |
+| [3. Usable consultant and verification workflows](3-workflows-and-operations.md) | Day 2 | Filters, unknown/conflict handling, scoped comparisons, requirement inventory, frozen traces/exports, audited owner actions (no login), shared live usage, interruption/restart behavior | Browser scenarios pass; six sessions do not overspend or attach stale answers to new scopes; exhausted-budget free paths still work |
 | [4. Evaluation and release evidence](4-evaluation-and-release.md) | Day 2–3 | Reviewed gold expansion, controlled finalist generation, sealed evaluation where ready, integrated mentor demonstration and handoff | Record metrics, denominators, costs, versions, coverage, failure examples, and unresolved risks; label pilot-only evidence accurately |
 | [5. Shared team operation](5-team-operation.md) | Remaining weeks | Persistent deployment, backups/restore, provider reconciliation, measured regressions and final handoff | Owner and backup owner can operate/recover without resetting allowance or duplicating paid work |
 
@@ -194,7 +195,7 @@ These are dependency milestones within a two-to-three-day schedule, not four add
 
 Timebox structured HWP converter and representative table checks to the first two hours. Reuse the research route, inspect original content, and put the two known failures into a recovery queue. Build stable source evidence, typed metadata, scoped Korean BM25, and original browsing.
 
-Before any paid call, configure dates/cap, prior spending, member authentication, and reservation/settlement. Recheck current model access and pricing at implementation time. Prepare 24 independently reviewed development questions, including table and late-document facts. Complete the smallest consultant question/evidence screen and verifier retrieval trace, then demonstrate a metered grounded answer from HWP and PDF.
+Before any paid call, configure dates/cap, prior spending, and reservation/settlement. Recheck current model access and pricing at implementation time. Prepare 24 independently reviewed development questions, including table and late-document facts. Complete the smallest consultant question/evidence screen and verifier retrieval trace, then demonstrate a metered grounded answer from HWP and PDF.
 
 Early demonstration scope may be a reviewed subset, labeled explicitly. A 100-file manifest is required immediately; wider reviewed source coverage belongs to phase 2. The first slice includes every layer rather than waiting for the final day to connect the frontend.
 
@@ -226,7 +227,7 @@ If only two days are available or review remains unfinished, release the support
 | Retrieval | Chunking, Kiwi BM25, exact codes, dense matrix, fusion/reranker comparisons | One index manifest and scoped retrieval result contract |
 | Generation and budget | Prompt/output validation, paid-call gateway, ledger, pricing/reconciliation | Request/attempt identities and exactly-once settlement |
 | Consultant frontend | Search, selection, answers/evidence, live allowance | Calls shared services; owns current-screen generation state |
-| Verification frontend | Traces, frozen run controls, authorized paid actions, exports | Same pipeline and versions; no independent spending counter |
+| Verification frontend | Traces, frozen run controls, explicitly estimated paid actions, exports | Same pipeline and versions; no independent spending counter |
 | Gold and evaluation | Source-family split, reviewed labels, metric definitions, release report | Stable original evidence labels, sealed access, recorded costs |
 
 These are proposed team responsibilities, not work already assigned. Source identity and gateway contracts are the first coordination task. Split review of 120 target questions as 20 per member, with an independent second check for disputed deadlines, amounts, institutions, and mandatory conditions.
@@ -239,12 +240,12 @@ All values below are proposed targets. Actual results, sample counts, and failur
 | --- | --- |
 | Ingestion | Every record has status; claimed supported coverage has original fidelity checks; unresolved files and provenance conflicts are visible |
 | Retrieval | Answerable single-evidence hit@20 ≥ 90%; multi-evidence complete coverage@20 ≥ 80%; report per-type results and wrong-document/version errors |
-| Answers | Reviewed required-claim correctness ≥ 90%; citation precision ≥ 95%; authorized source links resolve; inspect unsupported claims separately |
+| Answers | Reviewed required-claim correctness ≥ 90%; citation precision ≥ 95%; managed source links resolve; inspect unsupported claims separately |
 | Negative/ambiguous cases | Correct handling ≥ 90%, distinguishing absence, ambiguity, conflict, unavailable parsing, and retrieval failure; report unnecessary refusals |
 | Critical facts and scope | No observed wrong deadline, amount, mandatory condition, or institution, and no selected-scope leakage in reviewed cases |
 | Runtime | Measure warm/cold behavior and six-user concurrency; initial warm p95 targets are retrieval < 2 seconds and full answer < 15 seconds |
 | Budget | Every paid stage/retry is accounted for; atomic reservations enforce the cap; unresolved billing stays conservative; free routes survive exhaustion |
-| Frontend | Both roles complete their workflows; stale results, unauthorized actions, unsafe paths, and refresh-triggered paid calls are prevented |
+| Frontend | Both workflows complete; stale results, unsafe paths, unaudited owner actions and refresh-triggered paid calls are prevented |
 
 Report binary numerators/denominators and Wilson intervals; use document-family bootstrap intervals for ranked metrics when practical. A 60-question test changes by about 1.67 percentage points per question and cannot establish universal reliability. Include indexing, generation, retries, and judging in cost totals; record configuration and hardware with latency.
 
@@ -259,7 +260,7 @@ The release handoff contains a run/configuration manifest, ingestion coverage/re
 | Conflicting institution/deadline metadata | Phase 2 | Preserve provenance and show conflict until original/notice review resolves it |
 | Korean retrieval quality and dense benefit | Phases 2 and 4 | Scoped Kiwi BM25 remains the usable baseline |
 | Local reranker memory, Windows loading, and concurrent latency | Phase 2 | Bypass reranking if its gate fails |
-| Hosting/authentication and shared-client concurrency | Phases 1 and 3 | One controlled team deployment; no unauthenticated member attribution or private-key browsers |
+| Hosting, network exposure and shared-client concurrency | Phases 1 and 3 | One controlled team deployment without login; its network reach decides who can spend; no private-key browsers |
 | Gold review time and sealed-test sample size | Phase 4 | Deliver accurately labeled pilot evidence and continue independent review |
 | Billing reconciliation access and external-key spending | Phases 1 and 3, then ongoing | Dated owner exports/manual adjustments; visibly stale or incomplete provider reconciliation |
 

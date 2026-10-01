@@ -10,7 +10,7 @@ import tempfile
 import threading
 import unittest
 import uuid
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from unittest import mock
 
@@ -83,77 +83,28 @@ class Base(unittest.TestCase):
             return dict(conn.execute("SELECT * FROM requests WHERE request_id = ?", (request_id,)).fetchone())
 
 
-# ---------------------------------------------------------------- accounts and sessions
+# ---------------------------------------------------------------- no login: roles are declarations
 
 
-class AuthTest(Base):
-    def setUp(self):
-        super().setUp()
-        self.token = auth.provision(self.settings, "kim", ["consultant"])
-        self.vtoken = auth.provision(self.settings, "lee", ["consultant", "verifier"])
-
-    def test_login_creates_a_server_session_with_current_capabilities(self):
-        self.assertEqual(auth.mode(self.settings), "token")
-        p = auth.login(self.settings, "kim", self.token)
-        self.assertTrue(p.session_id)
-        self.assertEqual(p.capabilities, frozenset({"consultant"}))
-        self.assertTrue(service.search_projects(self.res, p, {}, "", limit=5))
-        raw = self.settings.accounts_path.read_text(encoding="utf-8")
-        self.assertNotIn(self.token, raw)  # only the digest is stored
-
-    def test_failed_logins_are_generic_and_bounded_per_account(self):
-        for _ in range(auth.MAX_MEMBER_FAILURES):
-            with self.assertRaises(auth.AuthError) as cm:
-                auth.login(self.settings, "kim", "wrong")
-            self.assertEqual(str(cm.exception), auth.LOGIN_FAILED)
-        with self.assertRaises(auth.AuthError):  # locked even with the right token inside the window
-            auth.login(self.settings, "kim", self.token)
-        with self.assertRaises(auth.AuthError) as cm:  # unknown names fail with the same text
-            auth.login(self.settings, "nobody", self.token)
-        self.assertEqual(str(cm.exception), auth.LOGIN_FAILED)
-        later = auth.clock() + auth.FAILURE_WINDOW + timedelta(minutes=1)
-        with mock.patch.object(auth, "clock", return_value=later):
-            self.assertEqual(auth.login(self.settings, "kim", self.token).member_id, "kim")
-
-    def test_expiry_revocation_and_changed_capabilities_end_sessions(self):
-        p = auth.login(self.settings, "kim", self.token)
-        later = auth.clock() + timedelta(hours=self.settings.session_hours, minutes=1)
-        with mock.patch.object(auth, "clock", return_value=later):
-            with self.assertRaises(auth.AuthError):
-                service.search_projects(self.res, p, {}, "")
-        p = auth.login(self.settings, "kim", self.token)
-        auth.set_enabled(self.settings, "kim", False)
-        with self.assertRaises(auth.AuthError):
-            service.budget_snapshot(self.res, p)
-        auth.set_enabled(self.settings, "kim", True)
-        v = auth.login(self.settings, "lee", self.vtoken)
-        auth.provision(self.settings, "lee", ["consultant"])  # rotated token and narrowed role
-        with self.assertRaises(auth.AuthError):
-            service.verifier_runs(self.res, v)
-        p = auth.login(self.settings, "kim", self.token)
-        auth.logout(self.settings, p.session_id)
-        with self.assertRaises(auth.AuthError):
-            service.request_status(self.res, p, "x")
-
-    def test_a_forged_principal_cannot_borrow_capabilities_through_a_session(self):
-        p = auth.login(self.settings, "kim", self.token)
-        forged = Principal("kim", frozenset({"consultant", "verifier", "budget_admin"}), p.session_id)
-        with self.assertRaises(auth.AuthError):
-            service.unresolved_attempts(self.res, forged)
-        other = Principal("lee", frozenset({"verifier"}), p.session_id)
-        with self.assertRaises(auth.AuthError):
-            service.verifier_runs(self.res, other)
-
-    def test_open_mode_never_grants_administration_or_sealed_data(self):
-        self.settings.accounts_path.unlink()
-        self.assertEqual(auth.mode(self.settings), "open")
-        p = auth.open_principal("visitor")
-        self.assertFalse(p.can("budget_admin") or p.can("sealed_evaluator"))
-        with self.assertRaises(auth.AuthError):
-            service.reconcile(self.res, p, {})
+class VisitorTest(Base):
+    def test_the_visitor_name_attributes_work_and_every_screen_is_open(self):
+        v = auth.visitor("  박  ")
+        self.assertEqual(v.member_id, "박")
+        self.assertEqual(auth.visitor("").member_id, "owner")
+        self.assertTrue(all(v.can(c) for c in ("consultant", "verifier", "budget_admin", "sealed_evaluator")))
+        self.transport.gate.set()
+        rid = service.submit_answer(self.res, v, req(self.a))
+        view = self.wait_done(rid, principal=v)
+        self.assertEqual((view.member_id, view.result.status), ("박", "answered"))
+        self.assertEqual(budget.snapshot(self.settings.db_path).per_member, {"박": view.settled_micro_usd})
+        self.assertEqual(service.unresolved_attempts(self.res, v), [])  # the admin page works for a visitor
+        with self.assertRaises(auth.AuthError):  # sealed rows stay out of the verifier screen for everyone
+            service.dataset_rows(self.res, v, "test")
 
 
 class AuthorizationTest(Base):
+    # Without login the UI visitor holds every role; these checks keep each service function's declared role
+    # enforceable for narrower in-process principals (CLI jobs, tests, a future login).
     def test_consultant_is_denied_every_privileged_action_at_the_service(self):
         c = self.env.consultant
         calls = [
@@ -293,38 +244,6 @@ class CancellationTest(Base):
             view = self.wait_done(rid)
         self.assertEqual((view.status, view.result.status), ("cancelled", "cancelled"))
         self.assertEqual((self.attempts(), self.transport.calls), ([], []))
-
-
-class SessionBetweenStagesTest(Base):
-    def setUp(self):
-        super().setUp()
-        token = auth.provision(self.settings, "kim", ["consultant"])
-        self.p = auth.login(self.settings, "kim", token)
-
-    def test_revocation_between_stages_prevents_the_next_dispatch(self):
-        real = service.prepare_answer
-
-        def revoke_after_retrieval(res, principal, *a, **kw):
-            out = real(res, principal, *a, **kw)
-            auth.revoke_sessions(self.settings, "kim", "test")
-            return out
-
-        self.transport.gate.set()
-        with mock.patch.object(service, "prepare_answer", revoke_after_retrieval):
-            rid = service.submit_answer(self.res, self.p, req(self.a))
-            view = self.wait_done(rid, principal=self.env.verifier)
-        self.assertEqual((view.status, view.result.status), ("failed", "auth_required"))
-        self.assertEqual((self.attempts(), self.transport.calls), ([], []))
-
-    def test_usage_of_an_already_dispatched_call_settles_after_logout(self):
-        rid = service.submit_answer(self.res, self.p, req(self.a))
-        self.assertTrue(self.transport.entered.acquire(timeout=10))
-        auth.logout(self.settings, self.p.session_id)
-        self.transport.gate.set()
-        view = self.wait_done(rid, principal=self.env.verifier)
-        self.assertEqual(view.billing_state, "settled")
-        [a] = self.attempts()
-        self.assertEqual(a["state"], "settled")
 
 
 class ScopeOwnershipTest(Base):
@@ -726,16 +645,14 @@ class SourceAndExportTest(Base):
             service.original_download(self.res, c, self.d.doc_id, self.d.source_hash)
 
     def test_evidence_view_carries_review_state_and_exports_are_redacted(self):
-        token = auth.provision(self.settings, "kim", ["consultant"])
-        p = auth.login(self.settings, "kim", token)
-        v = self.wait_done(service.submit_answer(self.res, p, req(self.a)), principal=self.env.verifier)
+        p = auth.visitor("kim")
+        v = self.wait_done(service.submit_answer(self.res, p, req(self.a)), principal=p)
         view = service.open_evidence(self.res, p, v.request_id, "E1")
         self.assertEqual(view.source_hash, self.a.source_hash)
         self.assertTrue(view.download_available)
         export = service.export_request(self.res, p, v.request_id)
         text = json.dumps(export, ensure_ascii=False)
-        self.assertNotIn(p.session_id, text)
-        self.assertNotIn(token, text)
+        self.assertNotIn("sk-", text)
         self.assertNotIn(str(self.settings.data_dir), text)
         self.assertNotIn(str(self.settings.source_dir), text)
         ev = export["result"]["evidence"]["E1"]

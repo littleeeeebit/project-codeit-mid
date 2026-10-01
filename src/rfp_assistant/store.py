@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
-SCHEMA_VERSION = 5  # 5: background requests, sessions, audit events, corrections, verifier runs
+SCHEMA_VERSION = 5  # 5: background requests, audit events, corrections, verifier runs
 BUSY_TIMEOUT_MS = 5000
 
 SOURCES_DDL = """
@@ -136,7 +136,6 @@ CREATE TABLE IF NOT EXISTS requests (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     request_json TEXT,
-    session_id TEXT,
     mode TEXT,
     cancel_requested INTEGER NOT NULL DEFAULT 0,
     UNIQUE (member_id, idempotency_key)
@@ -237,22 +236,6 @@ CREATE TABLE IF NOT EXISTS embedding_estimates (
     created_at TEXT NOT NULL,
     expires_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS sessions (
-    session_id TEXT PRIMARY KEY,
-    member_id TEXT NOT NULL,
-    member_revision TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    expires_at TEXT NOT NULL,
-    revoked_at TEXT,
-    revoke_reason TEXT
-);
-CREATE INDEX IF NOT EXISTS sessions_member ON sessions(member_id);
-CREATE TABLE IF NOT EXISTS login_failures (
-    failure_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    member_key TEXT NOT NULL,
-    at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS login_failures_key ON login_failures(member_key, at);
 CREATE TABLE IF NOT EXISTS audit_events (
     event_id TEXT PRIMARY KEY,
     actor TEXT NOT NULL,
@@ -297,7 +280,7 @@ CREATE TABLE IF NOT EXISTS activations (
 """
 
 
-REQUEST_COLUMNS_V5 = {"request_json": "TEXT", "session_id": "TEXT", "mode": "TEXT",
+REQUEST_COLUMNS_V5 = {"request_json": "TEXT", "mode": "TEXT",
                       "cancel_requested": "INTEGER NOT NULL DEFAULT 0"}
 
 

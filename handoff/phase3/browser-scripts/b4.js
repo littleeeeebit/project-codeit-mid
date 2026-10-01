@@ -1,15 +1,15 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const SP = process.argv[2];
-const tokens = JSON.parse(fs.readFileSync(SP + '/env/tokens.json'));
 const URL = 'http://127.0.0.1:8601/';
 const log = (...a) => console.log(...a);
-async function login(page, who) {
+async function login(page, who) {  // no login: type the attribution name in the sidebar
   await page.goto(URL);
-  await page.getByLabel('이름(계정)').fill(who);
-  await page.getByLabel('접속 토큰').fill(tokens[who]);
-  await page.getByRole('button', { name: '로그인' }).click();
-  await page.getByText('로그인됨').first().waitFor({ timeout: 20000 });
+  const box = page.getByLabel('이름 (사용·검토 기록용)');
+  await box.waitFor({ timeout: 30000 });
+  await box.fill(who);
+  await box.press('Enter');
+  await page.waitForTimeout(1200);
 }
 const main = p => p.locator('[data-testid="stMain"]');
 (async () => {
@@ -18,18 +18,14 @@ const main = p => p.locator('[data-testid="stMain"]');
   const kim = await ctx.newPage();
   kim.on('pageerror', e => log('PAGEERROR', e.message));
   await login(kim, 'kim');
-  for (const path of ['verify', 'admin', 'review']) {
+  for (const [path, marker] of [['verify', '검색 경로와 근거 추적'], ['admin', '미확정 비용'], ['review', '질문 검토']]) {
     await kim.goto(URL + path);
-    await kim.getByLabel('접속 토큰').waitFor({ timeout: 20000 });
-    log(`reload of /${path} asks for login again`);
-    await kim.getByLabel('이름(계정)').fill('kim');
-    await kim.getByLabel('접속 토큰').fill(tokens['kim']);
-    await kim.getByRole('button', { name: '로그인' }).click();
-    await kim.getByText('로그인됨').first().waitFor({ timeout: 20000 });
-    await kim.waitForTimeout(1500);
-    const t = await main(kim).innerText();
-    log(`consultant at /${path}:`, t.includes('검색 경로와 근거 추적') || t.includes('사용량 관리') && t.includes('미확정 비용') || t.includes('질문 검토') ? 'PRIVILEGED CONTENT VISIBLE' : 'no privileged content', '|', t.slice(0, 60).replace(/\n/g, ' '));
+    await kim.getByLabel('이름 (사용·검토 기록용)').waitFor({ timeout: 30000 });
+    await kim.waitForTimeout(2000);
+    const name = await kim.getByLabel('이름 (사용·검토 기록용)').inputValue();
+    log(`deep link /${path}: page opens without login:`, (await main(kim).innerText()).includes(marker), '| name after reload:', name);
   }
+  await login(kim, 'kim');
   // verifier: free trace, frozen run, comparison
   const lee = await (await browser.newContext({ viewport: { width: 1400, height: 1000 } })).newPage();
   lee.on('pageerror', e => log('PAGEERROR', e.message));

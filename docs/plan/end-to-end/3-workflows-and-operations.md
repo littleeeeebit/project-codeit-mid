@@ -1,6 +1,8 @@
 # Phase 3 — usable workflows and six-user operational correctness
 
-Goal: complete the consultant and verification experiences on one shared pipeline, with responsive allowance status, authorized actions, trustworthy evidence navigation and correct request/billing behavior across six concurrent sessions.
+Goal: complete the consultant and verification experiences on one shared pipeline, with responsive allowance status, attributed and audited actions, trustworthy evidence navigation and correct request/billing behavior across six concurrent sessions.
+
+Access decision (owner, 2026-09-30; reaffirmed for this phase on 2026-10-01): **there is no login.** Every visitor reaches every screen; a typed name only attributes paid requests, reviews and owner actions. Earlier versions of this phase required owner-provisioned accounts, tokens and sessions; that requirement is withdrawn. Network reach of the application is the only access control, so the deployment decides who can use and spend.
 
 Expected window: day 2. The minimal pages already exist from phase 1. Enter with their actual handoff and the active/fallback retrieval configuration from [phase 2](2-corpus-and-retrieval.md). Dense/reranker availability is not a prerequisite for this phase's core workflows.
 
@@ -8,7 +10,7 @@ Expected window: day 2. The minimal pages already exist from phase 1. Enter with
 
 Read [shared contracts](implementation-contracts.md), [frontend research](../../rag/frontend.md), [budget research](../../rag/budget.md) and both preceding handoffs. Inspect current `app.py`, `ui.py`, `auth.py`, `service.py`, `generation.py`, `budget.py` and `store.py` before editing them. Do not create a second API/frontend stack.
 
-Extend those files and create `tests/test_service.py` for request ownership, authorization and concurrency. Add `DESIGN.md` before substantial layout changes and `docs/operations/runbook.md` for actual deployment/recovery commands. Follow the frontend design skill when implementation begins; this planning task does not choose a palette or claim browser measurements.
+Extend those files and create `tests/test_service.py` for request ownership, role declarations and concurrency. Add `DESIGN.md` before substantial layout changes and `docs/operations/runbook.md` for actual deployment/recovery commands. Follow the frontend design skill when implementation begins; this planning task does not choose a palette or claim browser measurements.
 
 ## Interface specification
 
@@ -30,22 +32,22 @@ User-facing text is Korean. Do not put chunk IDs, model names or retrieval score
 
 ### Verification entry
 
-Authorize before rendering or loading verifier data. Choose a reviewed dev question or scoped manual query, a versioned config and an explicit action. Retrieval-only is the default. Freeze each result under a run ID; changing controls does not relabel an old run.
+The verifier page is open to every visitor like the other pages. Choose a reviewed dev question or scoped manual query, a versioned config and an explicit action. Retrieval-only is the default. Freeze each result under a run ID; changing controls does not relabel an old run.
 
 Display ingestion/review state → source elements → chunks/analyzer/filter scope → channel ranks/RRF/reranker → expanded/packed evidence and token count → validated answer/claims → token/cost/attempt state. Score labels state their meaning; they are not user confidence.
 
 Provide independent actions for retrieval, estimated generation, label correction, export and controlled comparison. Dense retrieval can incur a query embedding charge: show that estimate/cache status even though answer generation is off. Gold drafting, LLM judging and index builds are additional explicitly costed owner/verifier actions, not automatic side effects of viewing a dataset row.
 
-Ordinary verifier access excludes sealed test questions/labels and budget administration. A dedicated `sealed_evaluator` action runs final evaluation only under the phase-4 freeze procedure. Exports redact keys, token credentials, private identity details and unrestricted local paths. Cross-member traces require verifier authority; consultant requests remain scoped to their session/member.
+The verifier screen never loads sealed test questions/labels: they stay in `sealed/` and only the phase-4 freeze procedure (an owner CLI job) reads them. Budget administration is a separate page whose every action requires a reason and writes an audit event with the typed name. Exports redact keys and unrestricted local paths. Without login, the per-member request history is a convenience view keyed by the typed name, not a privacy boundary.
 
 ## Ordered implementation
 
-### 1. Strengthen server identity and authorization
+### 1. Keep access open, attribution and roles explicit
 
-1. Revalidate configured account roles and token hashes. Provision six owner-controlled identities; never let a free-text member selector determine billing authority. Fake users can operate only against the fake transport.
-2. Validate session expiry/revocation in public service functions and before each newly dispatched paid stage. An already dispatched call still settles after logout/revocation; authorization does not erase its charge.
-3. Restrict verifier, budget-admin, source download and sealed-data actions separately. Validate permission on cached reads as well as fresh computations. A hidden page is not a security check.
-4. Keep development bound to localhost. For team access, document the actual host, encrypted access method and private token distribution. Do not expose an unauthenticated service on `0.0.0.0` merely to make six browsers connect. Existing organization login may replace token login only with verified role mapping.
+1. No accounts, tokens, sessions or login screen. The sidebar name (default `owner`) is recorded on requests, attempts, reviews, corrections and audit events. It is attribution, not authentication; per-member spend is only as accurate as the names people type.
+2. Keep the capability checks in every public service function as declarations of the role each function serves. The UI visitor holds every capability; CLI jobs and tests may pass narrower principals, and a future login could reuse the same checks.
+3. Server-side safety that does not depend on identity stays mandatory: managed `(doc_id, source_hash)` downloads only, sealed rows never served to the verifier page, owner actions require a reason and leave an audit event, no bulk release of unknown billing.
+4. Document the actual host and who can reach it. Without login, binding to `0.0.0.0` lets anyone on that network spend the allowance and use the admin page; the owner decides that exposure explicitly (localhost, a trusted team network or a tunnel).
 
 ### 2. Move long paid execution out of UI reruns
 
@@ -60,11 +62,11 @@ Extend the service with `submit_answer(principal, request) -> request_id`, `requ
 
 ### 3. Give UI state explicit ownership
 
-Session state contains authenticated session ID, selected scope/version, mode, as-of date, current question hash, generation ID and active request ID. Submission generates a fresh generation/idempotency ID once; reruns reuse it and never resubmit automatically.
+Session state contains the visitor name, selected scope/version, mode, as-of date, current question hash, generation ID and active request ID. Submission generates a fresh generation/idempotency ID once; reruns reuse it and never resubmit automatically.
 
 Capture a request's state on submission. Changing scope, question, mode or date invalidates its permission to attach to the current answer panel. Polling may store its historical outcome, but displays it only if request/generation/scope hashes still match. Clear previous answer/evidence before a new request begins or target changes. A failed request cannot leave an old answer under a new title.
 
-Navigating away/logout cancels screen ownership and requests cancellation of queued work. Backend workers finish billing independently. Reopening a permitted prior request can show its immutable scope snapshot explicitly; it does not transform it into the current query's answer.
+Navigating away or changing the target cancels screen ownership and requests cancellation of queued work. Backend workers finish billing independently. Reopening a permitted prior request can show its immutable scope snapshot explicitly; it does not transform it into the current query's answer.
 
 ### 4. Implement reactive, read-only status
 
@@ -84,7 +86,7 @@ Each document contributes evidence or an explicit missing/unavailable entry. A g
 
 ### 6. Complete source navigation and safe exports
 
-Construct citation targets from the persisted evidence map. Resolve original download through the current principal and `(doc_id, source_hash)` allowlist; reject arbitrary filenames/paths, traversal and source-version mismatch. Serve a bounded excerpt, surrounding section and original download; an optional PDF viewer must navigate physical pages accurately before it replaces the basic evidence panel.
+Construct citation targets from the persisted evidence map. Resolve original download through the managed `(doc_id, source_hash)` allowlist; reject arbitrary filenames/paths, traversal and source-version mismatch. Serve a bounded excerpt, surrounding section and original download; an optional PDF viewer must navigate physical pages accurately before it replaces the basic evidence panel.
 
 Escape model/source markup and keep unsafe HTML disabled. Do not expose hidden table text as active UI code. Display source warning/review status alongside evidence. Saved trace exports carry stable locations and hashes, not only mutable chunk IDs.
 
@@ -92,7 +94,7 @@ Verifier corrections append reviewer/time/reason, quoted original evidence and a
 
 ### 7. Execute budget reconciliation and recovery scenarios
 
-Implement owner-only reconciliation import with interval/project identity, dated provider evidence and unique reconciliation ID. Compare provider cost with the same local closed interval; resolve overlapping unknown attempts and record late-usage compensation as defined in the contract. Never add the entire provider total on top of existing settled costs.
+Implement owner reconciliation import (admin page or CLI, reason and audit event required) with interval/project identity, dated provider evidence and unique reconciliation ID. Compare provider cost with the same local closed interval; resolve overlapping unknown attempts and record late-usage compensation as defined in the contract. Never add the entire provider total on top of existing settled costs.
 
 Provide a recovery view showing unknown attempts, their reserved amounts, dispatch times, stage/member and evidence. Owner actions require a reason and create an audit event. “Release all older than one hour” is not an allowed operation. If provider scope/admin access is unavailable, show that limitation and use dated owner exports.
 
@@ -106,8 +108,7 @@ Introduce `check --phase 3 --provider fake` and `load-check --users 6 --provider
 | Same request submitted twice across reruns | One persisted request/paid attempt; changing payload under its key is a conflict |
 | Scope/question changes during delayed answer | Late result cannot render under new scope; billed attempt still settles |
 | Queued versus running cancellation | Queued request never dispatches; active unknown call retains reservation until evidence arrives |
-| Login expiry/revocation between paid stages | No next dispatch; already received usage still settles |
-| Consultant tries verifier/budget/sealed action directly | Service denial even if navigation is bypassed |
+| A narrower in-process principal calls a verifier/budget/sealed function; the verifier page asks for sealed rows | Service denial; sealed rows are never served to the page |
 | Retry after billed failure | New explicit attempt/reservation; old cost remains counted |
 | Crash after dispatch marker; duplicate completion after restart | Conservative recovery and exactly-once accounting |
 | Provider interval adjustment imported twice, then late usage | No duplicated adjustment or late settlement double count |
@@ -118,20 +119,20 @@ Fake delays should make races observable and deterministic. Test actual database
 
 ## Browser verification
 
-Run separate consultant and verifier sessions, including six active tabs/sessions. Record viewport, account role, active configuration and observed outcomes. The minimum walkthrough is:
+Run consultant and verifier workflows in separate browser sessions, including six active tabs/sessions with different typed names. Record viewport, workflow, active configuration and observed outcomes. The minimum walkthrough is:
 
 1. Search a long Korean title; verify wrapping, filters and historical notice. Select HWP, ask, open table evidence and download the managed original.
 2. Switch to PDF; open a citation on a late physical page and inspect original content. Try an ambiguous code without scope and a known quarantined source.
 3. Compare two selected RFPs; ensure both contribute facts or limitations. Exercise missing amount/date and conflicting institution/deadline.
-4. Delay a fake provider response; change scope/question, then confirm no stale answer attaches. Submit twice, navigate away, logout and inspect backend settlement.
+4. Delay a fake provider response; change scope/question, then confirm no stale answer attaches. Submit twice, navigate away, reload and inspect backend settlement.
 5. In another session, initiate a call; confirm the first session's budget changes within the polling interval while a request is running. Distinguish reservation, settled cost and unknown cost.
-6. Reach the temporary test cap; confirm generation blocks, free browsing works, refresh/polling creates no calls and unauthorized pages/actions remain denied.
+6. Reach the temporary test cap; confirm generation blocks, free browsing works, refresh/polling creates no calls, and an admin action without a reason is refused and every recorded action appears in the audit log.
 7. Use keyboard navigation, focus/status labels, readable contrast and narrow layout. Save screenshots for layout/behavior evidence; no UI screenshot is claimed before this run.
 
 Use the fake transport for failures/load. A bounded real consultant smoke through the production gateway is separate, explicitly estimated, and cannot recreate every race at the team's expense. Streaming is optional; if introduced, test missing final usage/refusal/truncation and never mark partial JSON complete.
 
 ## Exit and handoff
 
-Both authorized workflows operate on the same source/index/gateway, six-user tests pass, budget refresh remains responsive during long calls, and source navigation/browser checks are recorded. README and runbook give the real launch/access/recovery procedure. Record unresolved hardware latency, hosting or authorization blockers honestly.
+Both workflows operate on the same source/index/gateway, six-user tests pass, budget refresh remains responsive during long calls, and source navigation/browser checks are recorded. README and runbook give the real launch/network-exposure/recovery procedure. Record unresolved hardware latency or hosting blockers honestly.
 
 Write `.runtime/releases/phase-3/report.md` with role/browser matrix, fake concurrency/recovery outcomes, measured latency and polling behavior, screenshots, actual paid smoke cost, selected config and remaining envelopes. Pass this operational baseline and reviewed correction log to [phase 4](4-evaluation-and-release.md).

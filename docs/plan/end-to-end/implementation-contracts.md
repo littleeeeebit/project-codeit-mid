@@ -11,14 +11,14 @@ Use an editable Python package named `rfp_assistant`, installed from a root `pyp
 | `settings.py` | Absolute paths, validated limits, model/rate configuration, configuration fingerprint | Phase 1 |
 | `contracts.py` | Request/result records and strict answer schema | Phase 1 |
 | `store.py` | SQLite initialization, bounded transactions, source/trace queries | Phase 1 |
-| `auth.py` | Server-owned principal, session validation, roles and account revocation | Phase 1 |
+| `auth.py` | Principal and capability checks; the no-login visitor principal | Phase 1 |
 | `ingestion.py` | CSV manifest, converter invocation, HWP/PDF element extraction and review records | Phase 1 |
 | `chunking.py` | Structural chunks, exact requirement inventory, source-span mappings | Phase 1 |
 | `retrieval.py` | Same analyzer at indexing/query time; scope filters, exact codes, ranked results | Phase 1 |
 | `budget.py` | Reservation, settlement, billing recovery, adjustments and snapshots | Phase 1 |
 | `generation.py` | Only runtime SDK call site; embedding/generation gateway, payload counting and output validation | Phase 1 |
-| `service.py` | Authenticated public functions, resource ownership, request orchestration | Phase 1 |
-| `ui.py` | Shared login, consultant/verifier render functions and budget widget | Phase 1 |
+| `service.py` | Role-declaring public functions, resource ownership, request orchestration | Phase 1 |
+| `ui.py` | Visitor name, consultant/verifier/admin render functions and budget widget | Phase 1 |
 | `cli.py` | Explicit local maintenance commands using the same contracts and gateway | Phase 1 |
 | `dense.py` | Hash-keyed embedding cache, matrix construction/scoring, optional local reranking | Phase 2 |
 | `evaluation.py` | Dataset validation, frozen runs, source-span scoring and reports | Phase 1 pilot; Phase 4 expansion |
@@ -38,7 +38,7 @@ Resolve defaults from the installed package/repository location, never the proce
 | `OPENAI_API_KEY` | Server environment or private Streamlit secrets; never print or export it |
 | `allowance_usd`, `operational_cap_usd` | `20`, `16`; prior spending counts against the cap |
 | `project_start`, `project_end` | Required before paid mode; actual dates, not an automatic 28-day forecast |
-| `paid_enabled` | False until prior-use reconciliation, rate checks and member setup are recorded |
+| `paid_enabled` | False until prior-use reconciliation and rate checks are recorded |
 | `generation_model`, `embedding_model` | `gpt-4o-mini`, `text-embedding-3-small`; explicit allowlist |
 | `evidence_target_tokens`, `evidence_max_tokens` | `3000`, `5000`, counted after expansion |
 | `generation_max_output_tokens` | `800`; no UI override above the authorized configuration |
@@ -177,15 +177,13 @@ Reconciliation records a nonoverlapping closed interval and matching provider pr
 
 When final usage arrives for an explicitly covered `reconciled` attempt, atomically transition it to `settled`, store its raw usage and measured cost, and append a compensating negative adjustment of that cost: the provider reconciliation already counted it. Use a unique correction identity such as `late-settlement:<attempt_id>` so duplicate completion cannot apply compensation twice. Preserve the original aggregate adjustment and token evidence. Re-importing a reconciliation is harmless; a changed finalized provider total requires a separate owner correction rather than overwriting history.
 
-## Authentication and local maintenance
+## Access and local maintenance
 
-Default to six owner-provisioned, high-entropy access tokens, with SHA256 token digests and server-owned roles in private configuration. These are random secrets, not human passwords. Generate at least 32 random bytes per token, show them only during owner provisioning, and compare digests with `hmac.compare_digest`. Never store tokens in traces. Implement bounded login attempts, logout, revocation and a finite session expiry. On a shared network require encrypted access; localhost development stays on `127.0.0.1`. If an existing identity provider is available, native Streamlit login can replace this small login boundary while retaining role checks. [Streamlit login](https://docs.streamlit.io/develop/api-reference/user/st.login) requires configured provider secrets; it is not assumed available here.
+There is no login (owner decision 2026-09-30, reaffirmed 2026-10-01). No accounts, tokens, sessions or login screen exist. The UI builds a `Principal` from the name typed in the sidebar (default `owner`) with every capability; the name attributes requests, attempts, reviews, corrections and audit events and is not authentication. Network reach is the only access control: localhost by default, and any wider exposure is an explicit owner deployment decision that lets everyone who can reach the server spend the allowance and use the admin page.
 
-`Principal` comes from a validated server session, with `consultant`, `verifier`, `budget_admin` and `sealed_evaluator` capabilities. Check it in every service entry point, including cached reads and file access. Labels and cost estimates are not client-controlled authority. Development fake users exist only in a fake-provider configuration that refuses real paid dispatch.
+`Principal` still carries `consultant`, `verifier`, `budget_admin` and `sealed_evaluator` capabilities, and every service entry point checks one, including cached reads and file access. Those checks declare each function's role; in-process callers (CLI jobs, tests) may pass narrower principals, and a later login could reuse them. Protections that do not depend on identity stay mandatory: managed `(doc_id, source_hash)` downloads, sealed rows never served to the verifier page, a reason and an audit event for every owner action, and no bulk release of unknown billing. Labels and cost estimates are not client-controlled authority.
 
-Default private member records contain `member_id`, token digest, capabilities and `enabled`; session records contain a random server session ID, member/config revision and expiry. Start with an eight-hour absolute session expiry and owner-configurable revocation. Rate-limit repeated failed login per known account and globally for unknown accounts, with generic failure text. Revalidate role/enabled state before paid dispatch and privileged reads. Provision account/secret configuration separately from the nonsecret operational config; changing a token/config revision invalidates old sessions.
-
-Maintenance CLI commands run on the owner-controlled host. Paid CLI work is exclusive maintenance mode: stop the UI, validate the owner identity/config, and reuse the same database, rates and gateway. Establish a process-owner file lock in phase 1, hold it until service cleanup, and refuse a second real gateway against that data directory. Ordinary team members use verifier actions; no raw-key notebooks or second billing store. CLI fake checks use a temporary data directory and never write production state.
+Maintenance CLI commands run on the owner-controlled host. Paid CLI work is exclusive maintenance mode: stop the UI, validate the configuration, and reuse the same database, rates and gateway. Establish a process-owner file lock in phase 1, hold it until service cleanup, and refuse a second real gateway against that data directory. Ordinary team members use verifier actions; no raw-key notebooks or second billing store. CLI fake checks use a temporary data directory and never write production state.
 
 ## Handoff format
 

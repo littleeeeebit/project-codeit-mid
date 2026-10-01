@@ -14,7 +14,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import auth, budget, service, store
+from . import budget, service, store
 from .contracts import AnswerRequest, Principal
 from .generation import FakeTransport, ProviderError
 from .settings import REPO_ROOT, Settings
@@ -177,7 +177,6 @@ def write_phase3_report(settings: Settings) -> Path:
         envelopes = json.loads(conn.execute("SELECT envelopes_json FROM budget_settings WHERE id = 1").fetchone()[0])
         used = {p: budget._purpose_used(conn, p) for p in envelopes}
     snap = budget.snapshot(settings.db_path)
-    members = auth.list_members(settings)
     load_result, browser, smoke = load("load-check.json"), load("browser-results.json"), load("paid-smoke.json")
     usd = lambda m: f"${m / 1_000_000:,.6f}"  # noqa: E731
     lines = ["# Phase 3 report", "",
@@ -186,10 +185,9 @@ def write_phase3_report(settings: Settings) -> Path:
              "## Configuration", "",
              f"- Serving: {json.loads(active_run)['mode'] + ' run ' + str(json.loads(active_run)['run_id']) if active_run else 'keyword default (kiwi_bm25)'}; "
              f"active keyword index `{active_index}`.",
-             f"- Access mode: {auth.mode(settings)}; provisioned members {len(members)} "
-             f"({', '.join(sorted({c for m in members for c in m['capabilities']})) or 'none'}).",
+             "- Access: no login (owner decision); the sidebar name only attributes requests and actions.",
              f"- Executor: {settings.request_workers} workers, {settings.request_admission} admitted unfinished "
-             f"requests; session expiry {settings.session_hours} h.", "",
+             "requests.", "",
              "## Budget", "",
              f"- Spent {usd(snap.spent_micro_usd)} of {usd(snap.allowance_micro_usd)} ({snap.spent_percent:.2f}%); "
              f"pending {usd(snap.pending_micro_usd)} (unknown {usd(snap.unknown_micro_usd)}); cap "
@@ -221,7 +219,7 @@ def write_phase3_report(settings: Settings) -> Path:
     lines.append(f"- {smoke}" if smoke else "- Not run: a real consultant smoke through the gateway needs an explicit "
                                              "owner estimate and approval.")
     lines += ["", "## Open items", "",
-              "- Real hosting, encrypted team access and private token distribution are owner tasks (runbook).",
+              "- The team host and who may reach it are owner decisions (runbook); without login, network reach is the only access control.",
               "- Measured warm/cold latency on the team host and six real browsers remain to be recorded there.", ""]
     path = out / "report.md"
     store.write_text_atomic(path, "\n".join(lines))

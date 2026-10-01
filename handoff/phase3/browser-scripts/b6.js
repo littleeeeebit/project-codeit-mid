@@ -1,7 +1,6 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const SP = process.argv[2];
-const tokens = JSON.parse(fs.readFileSync(SP + '/env/tokens.json'));
 const log = (...a) => console.log(...a);
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
@@ -10,10 +9,11 @@ const log = (...a) => console.log(...a);
     const p = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
     p.on('pageerror', e => log('PAGEERROR', i, e.message));
     await p.goto('http://127.0.0.1:8601/');
-    await p.getByLabel('이름(계정)').fill('m' + i);
-    await p.getByLabel('접속 토큰').fill(tokens['m' + i]);
-    await p.getByRole('button', { name: '로그인' }).click();
-    await p.getByText('로그인됨').first().waitFor({ timeout: 30000 });
+    const box = p.getByLabel('이름 (사용·검토 기록용)');
+    await box.waitFor({ timeout: 30000 });
+    await box.fill('m' + i);
+    await box.press('Enter');
+    await p.waitForTimeout(1200);
     await p.getByText('선택', { exact: true }).nth(i % 2 ? 0 : 2).click();
     await p.getByRole('textbox', { name: '질문' }).waitFor();
     await p.waitForTimeout(400);

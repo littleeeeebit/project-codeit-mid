@@ -1,4 +1,4 @@
-"""Login, consultant, verifier, question-review and budget-administration screens and the live budget widget.
+"""Consultant, verifier, question-review and budget-administration screens, the visitor name and the live budget widget.
 
 Paid work runs on the service's background executor; these screens own only their current request and poll
 read-only status. Layout and state ownership are described in DESIGN.md.
@@ -28,7 +28,6 @@ STATUS_TEXT = {
     "technical_error": "기술 오류",
     "in_progress": "처리 중",
     "cancelled": "취소됨",
-    "auth_required": "다시 로그인 필요",
     "interrupted": "중단됨",
 }
 REVIEW_TEXT = {"unreviewed": "원문 대조 전", "auto_verified": "자동 대조 통과", "auto_flagged": "자동 대조: 확인 필요",
@@ -97,7 +96,6 @@ def may_attach(owned: dict | None, current_target: str, view) -> bool:
 
 # ---------------------------------------------------------------- shell
 
-LOOPBACK = ("127.0.0.1", "localhost", "::1")
 REQUEST_TEXT = {"queued": "대기 중", "running": "처리 중", "completed": "완료", "failed": "실패", "cancelled": "취소됨",
                 "interrupted": "중단됨"}
 BILLING_TEXT = {"none": "유료 호출 없음", "pending": "예약 중(최대 비용 보류)", "settled": "정산됨",
@@ -137,81 +135,19 @@ def main() -> None:
         return service.get_resources(settings)
 
     res = resources()
-    principal = current_principal(st, res)
-    if principal is None:
-        return
-    pages = []
-    if principal.can("consultant"):
-        pages.append(st.Page(lambda: consultant_page(st, res, principal), title="컨설턴트", url_path="consultant",
-                             default=True))
-    if principal.can("verifier"):
-        pages += [st.Page(lambda: verifier_page(st, res, principal), title="검증", url_path="verify",
-                          default=not pages),
-                  st.Page(lambda: gold_review_page(st, res, principal), title="질문 검토", url_path="review")]
-    if principal.can("budget_admin"):
-        pages.append(st.Page(lambda: admin_page(st, res, principal), title="사용량 관리", url_path="admin",
-                             default=not pages))
+    # No login (owner decision): every visitor gets every screen. The name only attributes paid requests,
+    # review decisions and owner actions; it is not authentication.
+    with st.sidebar:
+        name = st.text_input("이름 (사용·검토 기록용)", value="owner", max_chars=40, key="member_name")
+        st.caption("로그인 없이 사용합니다. 이름은 요청·검토·관리 작업의 기록용입니다.")
+    principal = auth.visitor(name)
+    pages = [st.Page(lambda: consultant_page(st, res, principal), title="컨설턴트", url_path="consultant", default=True),
+             st.Page(lambda: verifier_page(st, res, principal), title="검증", url_path="verify"),
+             st.Page(lambda: gold_review_page(st, res, principal), title="질문 검토", url_path="review"),
+             st.Page(lambda: admin_page(st, res, principal), title="사용량 관리", url_path="admin")]
     with st.sidebar:
         budget_widget(st, res, principal)
     st.navigation(pages).run()
-
-
-def current_principal(st, res):
-    """Token mode: the server session decides who this is. Open mode (no accounts file): the phase-1 localhost
-    owner decision, refused on any non-loopback address."""
-    settings = res.settings
-    if auth.mode(settings) == "open":
-        address = st.get_option("server.address") or ""
-        if address not in LOOPBACK:
-            st.error("계정 파일이 없는 열린 모드는 127.0.0.1에서만 실행할 수 있습니다. "
-                     "`python -m rfp_assistant.cli accounts provision`으로 계정을 만든 뒤 다시 시작하세요.")
-            return None
-        with st.sidebar:
-            name = st.text_input("이름 (사용·검토 기록용)", value="owner", max_chars=40, key="member_name")
-            st.caption("로그인 없는 로컬 모드입니다. 이름은 기록용이며 인증이 아닙니다. 관리 기능은 계정 모드에서만 열립니다.")
-        return auth.open_principal(name)
-    sid = st.session_state.get("session_id")
-    if sid:
-        try:
-            principal = auth.validate_session(settings, sid)
-        except auth.AuthError as exc:
-            _drop_session(st, res, None)
-            st.warning(str(exc))
-        else:
-            with st.sidebar:
-                st.caption(f"{plain(principal.member_id)} 로그인됨")
-                if st.button("로그아웃", key="logout"):
-                    _drop_session(st, res, principal)
-                    st.rerun()
-            return principal
-    st.title("입찰메이트 RFP 도우미")
-    with st.form("login"):
-        member = st.text_input("이름(계정)", max_chars=40)
-        token = st.text_input("접속 토큰", type="password")
-        if st.form_submit_button("로그인", type="primary"):
-            try:
-                principal = auth.login(settings, member, token)
-            except auth.AuthError as exc:
-                st.error(str(exc))
-            else:
-                st.session_state.clear()
-                st.session_state["session_id"] = principal.session_id
-                st.rerun()
-    st.caption("접속 토큰은 관리자가 개인별로 전달합니다. 토큰을 다른 사람과 공유하지 마세요.")
-    return None
-
-
-def _drop_session(st, res, principal) -> None:
-    """Logout: queued work is cancelled; a running call still settles on the server."""
-    owned = st.session_state.get("owned")
-    if principal is not None and owned:
-        try:
-            _abandon(res, principal, owned)
-        except (service.ServiceError, auth.AuthError):
-            pass
-    if principal is not None and principal.session_id:
-        auth.logout(res.settings, principal.session_id)
-    st.session_state.clear()
 
 
 def budget_widget(st, res, principal) -> None:
@@ -483,7 +419,7 @@ def render_result(st, res, principal, v) -> None:
 
 def render_answer(st, res, principal, r, v=None) -> None:
     label = STATUS_TEXT.get(r.status, r.status)
-    if r.status in ("technical_error", "auth_required"):
+    if r.status == "technical_error":
         st.error(f"{label}: {r.summary}")
         if r.error:
             st.caption(f"사유 코드: {plain(r.error[:160])}")
@@ -627,7 +563,7 @@ def _history(st, res, principal) -> None:
 
 
 def verifier_page(st, res, principal) -> None:
-    principal = auth.require(auth.refresh(res.settings, principal), "verifier")  # the service checks again
+    principal = auth.require(principal, "verifier")  # the service checks again
     st.title("검증: 검색 경로와 근거 추적")
     tabs = st.tabs(["검색 추적", "실행 비교", "수정 기록", "원문 대조 (HWP)", "수집 상태 (100건)"])
     with tabs[0]:
@@ -827,10 +763,11 @@ def _corrections_tab(st, res, principal) -> None:
 
 
 def admin_page(st, res, principal) -> None:
-    principal = auth.require(auth.refresh(res.settings, principal), "budget_admin")
+    principal = auth.require(principal, "budget_admin")
     st.title("사용량 관리")
-    st.caption("모든 작업은 사유와 함께 감사 기록에 남습니다. '한 시간 지난 보류 일괄 해제' 같은 작업은 제공하지 않습니다.")
-    tabs = st.tabs(["미확정 비용", "제공자 대조", "외부 사용 조정", "유료 호출 상태", "계정", "감사 기록"])
+    st.caption("소유자 작업 화면입니다. 모든 작업은 입력한 이름·사유와 함께 감사 기록에 남습니다. "
+               "'한 시간 지난 보류 일괄 해제' 같은 작업은 제공하지 않습니다.")
+    tabs = st.tabs(["미확정 비용", "제공자 대조", "외부 사용 조정", "유료 호출 상태", "감사 기록"])
     with tabs[0]:
         rows = service.unresolved_attempts(res, principal)
         if not rows:
@@ -906,18 +843,6 @@ def admin_page(st, res, principal) -> None:
                 except (service.ServiceError, budget.BudgetError, auth.AuthError) as exc:
                     st.error(str(exc))
     with tabs[4]:
-        info = service.members_overview(res, principal)
-        st.caption("계정 발급·토큰 교체는 소유자 호스트의 CLI(`accounts provision`)에서만 합니다.")
-        st.dataframe(info["members"], hide_index=True, width="stretch")
-        with st.form("revoke"):
-            member = st.selectbox("구성원", [m["member_id"] for m in info["members"]] or [""])
-            reason = st.text_input("사유")
-            if st.form_submit_button("이 구성원의 세션 모두 종료"):
-                try:
-                    st.success(f"{service.revoke_member_sessions(res, principal, member, reason)}개 세션 종료")
-                except (service.ServiceError, auth.AuthError) as exc:
-                    st.error(str(exc))
-    with tabs[5]:
         st.dataframe([{"시각": e["created_at"][:19], "작업자": e["actor"], "작업": e["action"], "대상": e["target"],
                        "사유": e["reason"]} for e in service.audit_events(res, principal)],
                      hide_index=True, width="stretch")

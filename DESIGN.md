@@ -9,7 +9,7 @@ Written before the phase 3 layout changes, as the [phase 3 plan](docs/plan/end-t
 | 컨설턴트 | A consultant looking for a past RFP fact | A relevant project, an answer whose claims open the original evidence, and the original file |
 | 검증 | A team verifier explaining a failure or comparing configurations | A frozen run ID with the stage trace, a comparison of two runs, a correction with quoted evidence |
 | 질문 검토 | A verifier who did not draft the dataset questions | Each candidate approved or rejected against the original |
-| 사용량 관리 | The owner (`budget_admin`) | Unknown billing resolved with evidence, provider intervals reconciled, every action audited |
+| 사용량 관리 | The owner (open to every visitor: there is no login) | Unknown billing resolved with evidence, provider intervals reconciled, every action audited under the typed name with a reason |
 
 Each page has one primary task. Provenance, token details and per-member spend sit in expanders. Retrieval scores, chunk IDs and model names stay on the verifier page.
 
@@ -31,9 +31,9 @@ Streamlit columns stack on narrow screens, so the same order holds there.
 
 ## Request ownership
 
-Session state holds the server session ID, the selected scope, mode, as-of date and the owned request. The owned request is recorded as `{request_id, generation_id, target}`, where `target` hashes the scope, question, mode and date. Submitting creates one generation/idempotency ID; reruns reuse it and never resubmit. While the owned request is unfinished, the submit button is disabled.
+There is no login. Session state holds the typed visitor name, the selected scope, mode, as-of date and the owned request. The owned request is recorded as `{request_id, generation_id, target}`, where `target` hashes the scope, question, mode and date. Submitting creates one generation/idempotency ID; reruns reuse it and never resubmit. While the owned request is unfinished, the submit button is disabled.
 
-The answer panel renders a request only when `ui.may_attach` holds: the same request, generation and target, and not cancelled. Changing the selection, mode or date changes the target. The old request then becomes history, and it is cancelled only if it is still queued. Its server-side billing continues regardless. Logging out cancels queued work. "내 최근 요청" reopens a past request with its frozen scope labelled as history, never as the current answer.
+The answer panel renders a request only when `ui.may_attach` holds: the same request, generation and target, and not cancelled. Changing the selection, mode or date changes the target. The old request then becomes history, and it is cancelled only if it is still queued. Its server-side billing continues regardless. "내 최근 요청" reopens a past request with its frozen scope labelled as history, never as the current answer.
 
 ## Polling
 

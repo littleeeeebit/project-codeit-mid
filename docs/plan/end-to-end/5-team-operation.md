@@ -6,18 +6,18 @@ Enter with the actual [phase-4 release](4-evaluation-and-release.md), runbook, a
 
 ## Ownership and durable deployment
 
-Assign one operational owner and a backup owner from the team; record their roles in the runbook, not public tokens. All six users connect to one authorized application deployment. Keep the SQLite ledger and immutable artifacts on the owner's persistent local disk. Ephemeral hosting that can lose or reset the ledger is outside this baseline.
+Assign one operational owner and a backup owner from the team; record their roles in the runbook. There is no login: all six users connect to one application deployment whose network reach the owner decides. Keep the SQLite ledger and immutable artifacts on the owner's persistent local disk. Ephemeral hosting that can lose or reset the ledger is outside this baseline.
 
 Hold a process-owner lock while the real paid service is active. Refuse a second UI/gateway owner against the same data directory. Maintenance CLI jobs acquire the same lock after the UI has stopped; fake checks use a separate temporary directory. Use the host's standard-library file locking and explicit handle cleanup rather than a new coordination service. Confirm lock recovery after process death; do not delete a live lock to bypass it.
 
-Document the real interpreter, absolute application/data/source paths, encrypted team access method, port, account provisioning/revocation and controlled shutdown. The developer's localhost command alone does not prove shared deployment. Verify the first owner/backup-owner restart before declaring the runbook complete.
+Document the real interpreter, absolute application/data/source paths, who can reach the host and how, port and controlled shutdown. The developer's localhost command alone does not prove shared deployment. Verify the first owner/backup-owner restart before declaring the runbook complete.
 
 ## Operating cadence
 
 | When | Action | Paid behavior |
 | --- | --- | --- |
 | Startup | Verify database/schema, owner lock, rate/config fingerprint, active index hashes and pending-attempt recovery | None until paid configuration and recovery checks pass |
-| Every request | Authenticate, snapshot scope/config, reserve/dispatch/settle, record trace and display freshness | One bounded generation plus uncached embedding only when its route needs it |
+| Every request | Record the visitor name, snapshot scope/config, reserve/dispatch/settle, record trace and display freshness | One bounded generation plus uncached embedding only when its route needs it |
 | Daily owner check | Inspect settled/pending totals, pacing, unusual retries, failed source states and ledger backup | Read-only; no evaluation rerun |
 | Provider data becomes available | Reconcile one closed matching interval; audit external usage and unknown attempts | Read-only billing import; no raw-key experiment |
 | A source/config changes | Review change, build an immutable candidate, retrieval-first regression, estimate any needed embeddings | Only uncached approved payloads; no full-corpus re-embedding by default |
@@ -32,7 +32,7 @@ This is a manual operating cadence. Do not create scheduled automations, contact
 
 1. Run the release manifest/check commands on the actual shared host with paid mode initially disabled. Verify persistent data survives an application restart and machine/session restart as applicable.
 2. Confirm second-owner refusal and offline maintenance lock behavior. No member runs a separate academy-key application with its own ledger. If outside use is unavoidable, record that real-time scope is incomplete and reconcile dated owner evidence.
-3. Provision/revoke identities through owner configuration without exposing credentials in Git/screenshots/exports. Test consultant, verifier, budget-admin and sealed-evaluator boundaries independently.
+3. There is no login: confirm the deployment's network exposure matches the owner's decision, that members type consistent names for attribution, and that the API key never appears in Git, screenshots or exports. Confirm sealed rows stay off the verifier page and every admin action leaves an audit event.
 4. Record startup/shutdown procedure and recovery status. Re-enabling paid mode after recovery requires known-safe configuration and conservative handling of unresolved billing, not a clean-looking empty dashboard.
 
 ### 2. Back up and restore consistent state
@@ -41,7 +41,7 @@ Use `sqlite3.Connection.backup()` for a consistent database snapshot rather than
 
 Define `backup --destination <absolute-directory>` and `restore-check --backup <absolute-manifest>` in the maintenance CLI. Backup refuses unsafe or overlapping active destinations. Restore checks operate only in a fresh staging directory and keep fake transport/paid-disabled regardless of copied settings.
 
-Verify restored prior spending, pending/unknown attempts, settled costs, active index row mappings, source evidence and authorized role configuration. A restore cannot reset the allowance or resume uncertain paid calls. Before real recovery, stop the old owner; stage and inspect the backup, reconcile spending after its watermark, then activate it with an auditable reason. Never let old and restored owners dispatch concurrently.
+Verify restored prior spending, pending/unknown attempts, settled costs, active index row mappings and source evidence. A restore cannot reset the allowance or resume uncertain paid calls. Before real recovery, stop the old owner; stage and inspect the backup, reconcile spending after its watermark, then activate it with an auditable reason. Never let old and restored owners dispatch concurrently.
 
 Keep the last known-good release/index and recent consistent backups. Retention of old artifacts requires checking references from gold/traces/citations. Do not delete referenced source/extraction versions merely because a newer index exists.
 

@@ -236,7 +236,6 @@ def cmd_check(args, settings) -> int:
     with tempfile.TemporaryDirectory() as tmp:
         os.environ["RFP_DATA_DIR"] = tmp  # isolated state; never production data
         os.environ.pop("OPENAI_API_KEY", None)
-        os.environ.pop("RFP_ACCOUNTS_FILE", None)
         if args.phase == 3:  # focused service, budget and request-state checks
             suite = unittest.defaultTestLoader.loadTestsFromNames(PHASE3_MODULES)
         else:
@@ -259,24 +258,6 @@ def cmd_load_check(args, settings) -> int:
         ops.save_json(path, {**result, "recorded_at": store.utcnow()})
         print(path)
     return 0 if result["passed"] else 1
-
-
-def cmd_accounts(args, settings) -> int:
-    """Owner host only. Tokens are printed once, at provisioning, and never stored in clear text."""
-    if args.action == "provision":
-        if not args.member_id or not args.capabilities:
-            raise auth.AuthError("provision needs --member-id and --capabilities")
-        token = auth.provision(settings, args.member_id, [c.strip() for c in args.capabilities.split(",")])
-        print(f"member {args.member_id}: token (shown once; deliver privately)\n{token}")
-        print(f"accounts file: {settings.accounts_path}", file=sys.stderr)
-    elif args.action in ("disable", "enable"):
-        auth.set_enabled(settings, args.member_id, args.action == "enable")
-        _print({"member_id": args.member_id, "enabled": args.action == "enable"})
-    elif args.action == "revoke-sessions":
-        _print({"revoked": auth.revoke_sessions(settings, args.member_id, args.reason or "owner revocation")})
-    else:
-        _print({"mode": auth.mode(settings), "members": auth.list_members(settings)})
-    return 0
 
 
 def cmd_reconcile(args, settings) -> int:
@@ -447,11 +428,6 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--fail-every", type=int, default=0, help="every Nth call times out after dispatch (unknown)")
     s.add_argument("--affordable", type=int, default=4, help="maximum reservations the temporary cap admits at once")
     s.add_argument("--save", action="store_true", help="record the result for report --phase 3")
-    s = sub.add_parser("accounts", help="owner-only member tokens, roles and sessions")
-    s.add_argument("action", choices=["list", "provision", "disable", "enable", "revoke-sessions"])
-    s.add_argument("--member-id")
-    s.add_argument("--capabilities", help="comma-separated: consultant,verifier,budget_admin,sealed_evaluator")
-    s.add_argument("--reason")
     s = sub.add_parser("reconcile", help="owner import of a dated provider interval (JSON record)")
     s.add_argument("--file", required=True)
     sub.add_parser("unresolved", help="attempts whose billing is not settled or released")
@@ -478,7 +454,7 @@ COMMANDS = {"init": cmd_init, "manifest": cmd_manifest, "ingest": cmd_ingest, "r
             "compare-runs": cmd_compare_runs, "draft-activation": cmd_draft_activation,
             "fidelity": cmd_fidelity, "ocr": cmd_ocr, "build-keyword": cmd_build_keyword, "check": cmd_check, "validate-gold": cmd_validate_gold,
             "configure-budget": cmd_configure_budget, "budget-status": cmd_budget_status,
-            "gold": cmd_gold, "load-check": cmd_load_check, "accounts": cmd_accounts, "reconcile": cmd_reconcile,
+            "gold": cmd_gold, "load-check": cmd_load_check, "reconcile": cmd_reconcile,
             "unresolved": cmd_unresolved}
 
 
