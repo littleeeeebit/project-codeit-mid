@@ -22,6 +22,7 @@ This file is the shareable summary. The authoritative report is generated on the
 | Phase-4 CLI walkthrough (`tools/verification/phase4_walkthrough.py`) | Cloud, fixture corpus, fake provider | 31/31 steps passed |
 | Browser check of the 평가 tab and gold-2 review | Cloud, headless Chromium, synthetic runtime | rendered; approval refused without the inspection attestation; no horizontal scroll at 390 px |
 | `check --phase all --provider fake --save` → `release-report --latest` | Local reviewer, Windows, synthetic fixture runtime, on `bb726d5` (current code) | 248 passed, 2 POSIX skips of 250 (browser flow ran); the host-local check counted as `pass`; fixture decision `limited` (not an owner check) |
+| Schema 3→6 migration, backup/restore, one HWP and one PDF parse, verifier runs, consultant browser flow | Local reviewer, Windows, isolated snapshot of the owner runtime with the real corpus, fake provider, head `62015a9` | all passed (migration on a snapshot only; parse success is not a fidelity verdict; automated browser sessions) |
 | Paid calls | — | none; $0 spent |
 
 Evidence: [handoff/phase4](../../handoff/phase4/README.md).

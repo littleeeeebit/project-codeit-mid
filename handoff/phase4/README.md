@@ -29,6 +29,21 @@ The authoritative release evidence must be produced on the owner host with the r
 | Local reviewer, Windows, Python 3.12.14 (conda `rfp-assistant`), on `bb726d5` (review round 13; current code `796c4e1`), source `f62521d7…`, recorded 2026-10-01T17:06:00Z: `check --phase all --provider fake --save`, then `release-report --latest`, in an isolated synthetic fixture runtime | 250 run: 248 passed, 2 skipped (POSIX atexit signal test, POSIX signal-stop script test), 0 failures/errors; the Playwright browser flow ran and passed. git_dirty false, 0 paid calls. The report counted that host-local check as `pass` (saved source equals the Windows source, `stale_evidence: []`); fixture decision `limited`. The walkthrough passed 31/31 and both diff checks were clean there. Earlier runs on `503223d` (round 7) and `5e281a0` (round 10) are history. Fixture data and fake provider only: this is not an owner-host check. |
 | Browser (headless Chromium, Streamlit on the synthetic runtime) | 평가 tab, estimate, gold-2 review, refused approval without the attestation and a 390 px layout without horizontal scroll. See `screenshots/20–24`. Keyboard, contrast and screen-reader checks were not repeated for these additions. |
 
+## Local reviewer checks on the real corpus (isolated, fake provider)
+
+Run by the local reviewer on Windows (Python 3.12.14) at head `62015a9`, source `f62521d7…`, on 2026-10-01, in an isolated runtime snapshot copied from the owner runtime. The original corpus (inventory: 94 HWP and 4 PDF unique sources, all recorded as parsed; this is not a fidelity verdict) was read; the live owner database was not migrated or written (its hash was unchanged and its WAL stayed empty). The provider was fake throughout: 0 paid calls. Raw logs, document identities and receipts stay on that host. These receipts are not the app's `wiki-agent/local-verification` status and not an approved managed configuration.
+
+| Check | Outcome | Scope |
+| --- | --- | --- |
+| `init --paid-disabled` | Schema 3 → 6; legacy ledger values preserved exactly (10 requests, 105 attempts, 1 adjustment, the budget row) | Snapshot of the owner database; the live owner database is still schema 3 |
+| Native HWP parse | Passed: 449 elements, 79 tables, 44,457 characters, no warning codes | One original HWP |
+| Native PDF parse | Passed: 1,433 elements, 410 tables, 194,279 characters; `page_blank_or_image` warning recorded | One original PDF; does not establish image-page completeness or fidelity |
+| `backup` + `restore-check` | 18/18 checks passed, 13 mutable files copied, paid generation off in staging, legacy ledger values preserved | The migrated snapshot, not the live ledger |
+| `tools/verify.py verifier-runs` | 16 unit tests plus 3 real-corpus cases passed (HWP single, HWP/PDF pair, pair on whitespace BM25 with 2 evidence units) | Original corpus, isolated runtime, fake provider |
+| `tools/verify.py consultant-answer` | 4/4 assertions passed: no login, answer rendered, evidence opened on the first click, original downloaded byte-identically | Chromium/Playwright, served build `62015a9`; automated sessions, not six real members |
+
+Still open: approved managed review settings and server receipts, independently reviewed real gold-2 development and sealed sets, real retrieval/answer/sealed runs with pool review, an identified permitted API account and budget scope with paid cost/usage/latency measurements, live-ledger migration and recovery, and real member and operational evidence.
+
 ## Decisions made during implementation (for owner review)
 
 1. Two nDCG formulas, by schema. Gold-2 rows use the plan's graded formula; `dev-pilot` keeps the phase-2 increment formula so frozen `retrieval-eval-4` runs stay comparable. Reports name the dataset, and runs over different populations are never compared.
@@ -58,7 +73,7 @@ The authoritative release evidence must be produced on the owner host with the r
 
 ## Open items
 
-- No real-corpus gold, answer run, sealed evaluation or latency sample exists yet; every quality number above is synthetic and must not be reported as a result.
+- No real-corpus gold, answer run, sealed evaluation or latency sample exists yet (the real corpus has only been parsed, migrated in a snapshot and browsed with the fake provider, see above); every quality number above is synthetic and must not be reported as a result.
 - The phase-3 host decisions (network exposure, six real browsers, warm/cold latency) remain open.
 - The package-source fingerprint hashes raw file bytes. A Windows checkout with `core.autocrlf` (`git ls-files --eol`: `i/lf w/crlf`) therefore has a different fingerprint than this Linux run (observed in review round 5: Linux `0709d966…`, Windows `5dc4b079…`), so the Linux `checks/check-all.json` is stale on that host by design. `release-report` credits only a full check saved on the host itself: run `check --phase all --provider fake --save` there before the report. Round 7 confirmed this on Windows: a check saved there binds and passes.
 - The plan's judged candidate pool is only partly implemented. The pool is the predeclared source-span labels; a returned passage outside every label grades 0 and is counted (`unlabelled@5` per row, `ndcg_pool` in the aggregate), but no blind review of those passages exists, and selection stays provisional until the review is recorded (decision 12). Before finalizing a development comparison, review the counted passages; a passage holding the fact at an unlabelled place should become a new alternative (a new gold revision), after which the runs are rescored.
