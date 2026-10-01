@@ -252,6 +252,11 @@ def _overlaps(a: dict, b: dict) -> bool:
             if sa["element_id"] != sb["element_id"]:
                 continue
             if "rows" in sa and "rows" in sb:
+                fa, fb = sa.get("fragment"), sb.get("fragment")
+                if fa and fb and fa["row"] == fb["row"]:  # two pieces of one oversized row
+                    if fa["start"] < fb["end"] and fb["start"] < fa["end"]:
+                        return True
+                    continue
                 if set(sa["rows"]) & set(sb["rows"]) - {sa["rows"][0]}:  # shared header row alone is not overlap
                     return True
             elif "start" in sa and "start" in sb:
@@ -305,7 +310,8 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
     if mode in DENSE_MODES:
         problem = ("dense_index_unavailable" if dense is None else
                    "dense_index_mismatch" if dense.base_index_version != index.version else
-                   "query_vector_unavailable" if query_vector is None else None)
+                   "query_vector_unavailable" if query_vector is None else
+                   "query_vector_dimension_mismatch" if len(query_vector) != dense.dims else None)
         if problem:
             fallback, mode = f"{mode}->kiwi_bm25:{problem}", "kiwi_bm25"
     if mode == "hybrid_rerank" and reranker is None:

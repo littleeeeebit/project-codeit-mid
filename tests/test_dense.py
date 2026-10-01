@@ -132,6 +132,20 @@ class DenseBuildTest(unittest.TestCase):
         shutil.rmtree(s.data_dir / "indexes" / version)
         self.assertEqual(build_keyword_index(s, fixtures.analyzer())["index_version"], version)
 
+    def test_missing_usage_stops_further_dispatch(self):
+        s = self.env.settings.with_(embedding_batch_inputs=1)
+        no_usage = generation.FakeTransport(embedder=lambda inputs, dims: generation.EmbeddingResponse(
+            generation.fake_embeddings(inputs, dims).vectors, None))
+        version = _index_version(s)
+        estimate = dense.plan_embeddings(s, version)
+        self.assertGreater(estimate["batches"], 1)
+        out = dense.build_dense(s, no_usage, version, estimate["estimate_id"])
+        self.assertEqual((out["status"], out["published"]), ("unknown", False))
+        self.assertEqual(len(no_usage.embed_calls), 1)
+        self.assertEqual(dense.plan_embeddings(s, version)["payloads_to_embed"], estimate["payloads_to_embed"] - 1)
+        with self.assertRaises(dense.DenseError):  # reconcile first
+            dense.build_dense(s, self.transport, version, estimate["estimate_id"])
+
     def test_paid_disabled_or_stale_estimate_sends_nothing(self):
         s = self.env.settings
         version = _index_version(s)
@@ -220,6 +234,14 @@ class EvaluationRunTest(unittest.TestCase):
         self.assertEqual(evaluation.grade({"spans": [{"element_id": "t", "rows": [0, 2]}]},
                                           {"element_id": "t", "quote": "사업기간 | 계약일로부터 6개월"}, table), 2)
 
+    def test_missing_query_usage_stops_paid_evaluation_queries(self):
+        no_usage = generation.FakeTransport(embedder=lambda inputs, dims: generation.EmbeddingResponse(
+            generation.fake_embeddings(inputs, dims).vectors, None))
+        out = evaluation.evaluate_retrieval(self.env.settings, fixtures.analyzer(), no_usage, "dev-pilot", ["D"],
+                                            allow_paid_queries=True)
+        self.assertEqual(out[0]["status"], "blocked")
+        self.assertEqual(len(no_usage.embed_calls), 1)  # the second question is not paid for
+
     def test_runs_are_retrieval_only_frozen_and_reused(self):
         s = self.env.settings
         blocked = evaluation.evaluate_retrieval(s, fixtures.analyzer(), self.transport, "dev-pilot", ["D"])
@@ -300,6 +322,45 @@ class ServingTest(unittest.TestCase):
     def tearDown(self):
         self.res.close()
         self.tmp.cleanup()
+
+    def test_serving_uses_the_activated_runs_embedding_and_limits(self):
+        s = self.env.settings.with_(embedding_dimensions=256, channel_top_k=3, evidence_max_units=1)
+        res = service.Resources(s, transport=self.transport)
+        before = len(self.transport.embed_calls)
+        try:
+            run = res.serving()
+            self.assertEqual((run["embedding"]["dims"], run["limits"]["evidence_max_units"]), (1536, 6))
+            result = service.answer(res, self.env.consultant, AnswerRequest(
+                idempotency_key=str(uuid.uuid4()), generation_id="g", question="새로운 질문: 하자보수 기간 조건",
+                scope=[self.env.refs["기관A"]]))
+        finally:
+            res.close()
+        self.assertNotEqual(result.status, "technical_error", result.error)
+        self.assertEqual([c["dimensions"] for c in self.transport.embed_calls[before:]], [1536])
+        with store.open_db(s.db_path) as conn:
+            status = conn.execute("SELECT status FROM requests WHERE request_id = ?",
+                                  (result.request_id,)).fetchone()[0]
+        self.assertEqual(status, "completed")
+
+    def test_a_query_vector_of_another_size_falls_back_without_scoring(self):
+        from rfp_assistant.retrieval import retrieve
+
+        idx = self.res.index()
+        r = retrieve(self.res.run_settings(), idx, fixtures.analyzer(), "하자보수 기간",
+                     [(self.env.refs["기관A"], self.res.index().chunks[0]["extraction_id"])], mode="hybrid",
+                     dense=self.res.dense(), query_vector=[0.0] * 256)
+        self.assertEqual(r.mode, "kiwi_bm25")
+        self.assertIn("query_vector_dimension_mismatch", r.fallback)
+
+    def test_resolved_metadata_is_what_search_shows_and_finds(self):
+        c = self.env.refs["기관C"]
+        ingestion.resolve_metadata(self.env.settings, c.doc_id, "institution", "Canonical Agency",
+                                   "공고문 1쪽 기관명", "notice p1", "owner")
+        (hit,) = service.search_projects(self.res, self.env.consultant, {}, "Canonical Agency")
+        self.assertEqual((hit["doc_id"], hit["institution"]), (c.doc_id, "Canonical Agency"))
+        self.assertEqual(hit["csv_metadata"], {"institution": "기관C"})
+        (hit,) = service.search_projects(self.res, self.env.consultant, {"institution": "Canonical"}, "")
+        self.assertEqual(hit["institution"], "Canonical Agency")
 
     def test_free_retrieval_never_pays_for_a_query_vector(self):
         ref = self.env.refs["기관A"]

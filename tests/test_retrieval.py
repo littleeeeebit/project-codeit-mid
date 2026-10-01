@@ -210,7 +210,7 @@ class RerankerScopeTest(unittest.TestCase):
         a = ingestion.finalize_elements(_prose("하자보수 기간은 12개월이다.", "하자보수 절차는 별첨과 같다."), "xa")
         b = ingestion.finalize_elements(_prose("하자보수 기간은 24개월이다."), "xb")
         index = _index({"xa": a, "xb": b})
-        dense = mock.Mock(base_index_version="t", version="d1")
+        dense = mock.Mock(base_index_version="t", version="d1", dims=1)
         dense.search = lambda q, allowed, k: [(i, 1.0) for i in allowed][:k]
 
         class Hostile:
@@ -227,6 +227,30 @@ class RerankerScopeTest(unittest.TestCase):
             r = retrieve(s, index, fixtures.analyzer(), "하자보수 기간", [(DocRef("A", "ha"), "xa")],
                          mode="hybrid_rerank", dense=dense, query_vector=[1.0], reranker=None)
             self.assertEqual((r.mode, r.fallback), ("hybrid", "hybrid_rerank->hybrid:reranker_unavailable"))
+
+
+class SplitRowGradingTest(unittest.TestCase):
+    def test_each_piece_of_an_oversized_row_is_graded_on_the_text_it_carries(self):
+        from rfp_assistant import evaluation
+
+        long = " ".join(f"항목{i} 세부 사양을 충족하여야 한다." for i in range(150)) + " 단, 부가가치세 별도이며 설치비는 제외한다."
+        cells = (f'<TableRow><TableCell row="0" col="0"><Paragraph><LineSeg><Text>구분</Text></LineSeg></Paragraph></TableCell>'
+                 f'<TableCell row="0" col="1"><Paragraph><LineSeg><Text>내용</Text></LineSeg></Paragraph></TableCell></TableRow>'
+                 f'<TableRow><TableCell row="1" col="0"><Paragraph><LineSeg><Text>납품 조건</Text></LineSeg></Paragraph></TableCell>'
+                 f'<TableCell row="1" col="1"><Paragraph><LineSeg><Text>{long}</Text></LineSeg></Paragraph></TableCell></TableRow>')
+        table = (f'<Paragraph><LineSeg><TableControl><TableBody rows="2" cols="2">{cells}</TableBody></TableControl>'
+                 f'</LineSeg></Paragraph>')
+        els = ingestion.finalize_elements(_doc(table), "xa")
+        el = [e for e in els if e["kind"] == "table"][0]
+        pieces = [c for c in chunking.build_chunks(els, "xa")[0] if any("fragment" in s for s in c["spans"])]
+        self.assertGreaterEqual(len(pieces), 2)
+        unit = {"element_id": el["element_id"], "quote": "단, 부가가치세 별도이며 설치비는 제외한다."}
+        grades = [evaluation.grade(c, unit, el) for c in pieces]
+        self.assertEqual(grades[0], 0 if "부가가치세" not in pieces[0]["body"] else 2)
+        self.assertEqual(grades[-1], 2)
+        self.assertTrue(all(("부가가치세 별도" in c["body"]) == (g == 2) for c, g in zip(pieces, grades)))
+        header = {"element_id": el["element_id"], "quote": "내용"}
+        self.assertEqual({evaluation.grade(c, header, el) for c in pieces}, {2})
 
 
 if __name__ == "__main__":

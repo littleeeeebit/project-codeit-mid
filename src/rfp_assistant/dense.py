@@ -398,6 +398,13 @@ def build_dense(settings: Settings, transport: Transport | None, index_version: 
         for p, vec in zip(batch, result["vectors"]):
             cache_put(settings, p["payload_hash"], vec, {"kind": "chunk", "attempt_id": result["attempt_id"]})
         done_batches += 1
+        if result.get("billing") == "unknown":
+            # Vectors arrived but the provider reported no usage: keep them, spend nothing more until reconciled.
+            out = {"status": "unknown", "reason": "provider returned no usage", "embedded_batches": done_batches,
+                   "attempt_id": result["attempt_id"], "settled_micro_usd": spent, "published": False,
+                   "note": "vectors are cached; reconcile the unknown attempt before embedding again"}
+            finish_job_request(settings, request_id, "failed", out)
+            return out
     out = publish_dense(settings, row, payloads)
     out.update(embedded_batches=done_batches, settled_micro_usd=spent)
     finish_job_request(settings, request_id, "completed", out)

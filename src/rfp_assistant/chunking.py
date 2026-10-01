@@ -9,7 +9,7 @@ from functools import lru_cache
 
 from .ingestion import CODE_RE
 
-CHUNKER_VERSION = "structural-4"  # 4: tokenizer-offset windows, links between pieces of one split element
+CHUNKER_VERSION = "structural-5"  # 4: tokenizer-offset windows, sibling links; 5: row-fragment offsets
 LABEL_LINES = 2  # title lines carried into the table below them
 LABEL_CHARS = 60
 TARGET_TOKENS = 700
@@ -92,7 +92,7 @@ def _is_label(el: dict) -> bool:
     return 0 < len(text) <= LABEL_CHARS and not re.search(r"(다|음|함|임)\s*[.。]?$", text)
 
 
-def _table_rows(el: dict) -> list[tuple[int, str]]:
+def table_rows(el: dict) -> list[tuple[int, str]]:
     """(row index, rendered row). Merged cells carry their text into every row they span."""
     rows: dict[int, dict[int, str]] = {}
     for c in el["table"]["cells"]:
@@ -120,7 +120,7 @@ def classify_table(el: dict) -> tuple[str, list[str]]:
 
 
 def _requirement_name(el: dict) -> str | None:
-    for _, line in _table_rows(el):
+    for _, line in table_rows(el):
         parts = line.split(" | ")
         if len(parts) >= 2 and ("명칭" in parts[0] or parts[0].strip() in ("요구사항명", "요구사항 명")):
             return parts[-1][:120]
@@ -261,7 +261,7 @@ def build_chunks(elements: list[dict], extraction_id: str) -> tuple[list[dict], 
             buf_tokens -= count_tokens(labels[0]["raw_text"].strip())
         flush()
         ctype, codes = classify_table(el)
-        rows = _table_rows(el)
+        rows = table_rows(el)
         if not rows:
             buf, buf_tokens = labels, sum(count_tokens(e["raw_text"].strip()) for e in labels)
             continue
@@ -283,15 +283,18 @@ def build_chunks(elements: list[dict], extraction_id: str) -> tuple[list[dict], 
         group: list[tuple[int, str]] = []
         group_tokens = 0
 
-        def emit(group: list[tuple[int, str]], split_group: str | None = None) -> None:
+        def emit(group: list[tuple[int, str]], split_group: str | None = None,
+                 fragment: tuple[int, int] | None = None) -> None:
             if not group:
                 return
             body = "\n".join(x for x in (fixed, *[line for _, line in group]) if x)
             row_ids = ([header_r] if header_r is not None else []) + [r for r, _ in group]
             keys = list(dict.fromkeys(CODE_RE.findall("\n".join(line for _, line in group))))
             key = codes[0] if ctype == "requirement_detail" else (keys[0] if len(keys) == 1 else None)
-            b.add(heading, body, label_spans + [{"element_id": el["element_id"], "rows": row_ids}], ctype, key, path,
-                  split_group)
+            span = {"element_id": el["element_id"], "rows": row_ids}
+            if fragment is not None:  # a piece of one oversized row: which characters of the rendered row it carries
+                span["fragment"] = {"row": group[0][0], "start": fragment[0], "end": fragment[1]}
+            b.add(heading, body, label_spans + [span], ctype, key, path, split_group)
 
         for r, line in body_rows:
             t = count_tokens(line) + 1
@@ -301,7 +304,7 @@ def build_chunks(elements: list[dict], extraction_id: str) -> tuple[list[dict], 
             if t + fixed_tokens > HARD_TOKENS:  # one oversized row: split its text
                 for start, end in _split_prose(line, HARD_TOKENS - fixed_tokens - 8):
                     group = [(r, line[start:end])]
-                    emit(group, f"{el['element_id']}/r{r}")
+                    emit(group, f"{el['element_id']}/r{r}", (start, end))
                 group, group_tokens = [], 0
                 continue
             group.append((r, line))

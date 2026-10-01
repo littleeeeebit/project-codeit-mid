@@ -746,14 +746,11 @@ def ingest_source(settings: Settings, source_hash: str, force: bool = False) -> 
             )
             _record_input(conn, source_hash, key, "", "", {"seconds": seconds, "reason": reason})
         return {"source_hash": source_hash, "status": "quarantined", "reason": reason, "seconds": seconds}
-    extraction_id = hashlib.sha256(f"{source_hash}:{fp}".encode()).hexdigest()[:24]
-    elements = finalize_elements(raw, extraction_id)
+    extraction_id, elements, artifact = assign_revision(settings, source_hash, fp, raw)
     if any(e["replacement_chars"] for e in elements):
         warnings.append({"code": "replacement_characters",
                          "count": sum(e["replacement_chars"] for e in elements)})
     diagnostics = diagnose(elements, warnings)
-    artifact = settings.data_dir / "extracted" / source_hash / fp / "elements.jsonl"
-    write_jsonl_atomic(artifact, elements)
     stats = {"seconds": seconds, "diagnostics": diagnostics, "cues": original_cues(elements),
              "warnings": [w["code"] for w in warnings]}
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
@@ -770,7 +767,7 @@ def ingest_source(settings: Settings, source_hash: str, force: bool = False) -> 
             [(extraction_id, e["element_id"], e["source_order"], e["kind"], e["parent_id"], e["raw_text"],
               e["search_text"], dumps(e["location"]), dumps(e["table"]) if e["table"] else None) for e in elements],
         )
-        # A new parser revision resets review: parsed does not mean faithful.
+        # A new revision (parser or output) resets review: parsed does not mean faithful.
         review = src["review_status"] if src["active_extraction_id"] == extraction_id else "unreviewed"
         conn.execute(
             "UPDATE sources SET parse_status = 'parsed', active_extraction_id = ?, reason_code = NULL, "
@@ -781,6 +778,35 @@ def ingest_source(settings: Settings, source_hash: str, force: bool = False) -> 
             "elements": len(elements), "tables": sum(e["kind"] == "table" for e in elements),
             "warnings": [w["code"] for w in warnings], "seconds": seconds,
             "diagnostic_flags": diagnostics["flags"]}
+
+
+def assign_revision(settings: Settings, source_hash: str, fp: str, raw: list[dict]) -> tuple[str, list[dict], Path]:
+    """Extraction revision bound to the actual output, not only to the parser fingerprint: a different converter
+    or input can produce different text under the same fingerprint. Identical output keeps its revision (and its
+    review); different output gets a revision of its own beside the old one, whose artifact and element rows stay
+    for the traces, gold rows and citations pinned to them. Returns (extraction_id, elements, artifact path)."""
+    base = hashlib.sha256(f"{source_hash}:{fp}".encode()).hexdigest()[:24]
+    root = settings.data_dir / "extracted" / source_hash / fp
+    candidates = [(base, root / "elements.jsonl")]
+    elements = finalize_elements(raw, base)
+    with open_db(settings.db_path) as conn:
+        row = conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?", (base,)).fetchone()
+    if row is not None:
+        stored = Path(row["artifact_path"])
+        if not (stored.exists() and read_jsonl(stored) == json.loads(json.dumps(elements, ensure_ascii=False))):
+            digest = hashlib.sha256(dumps(elements).encode()).hexdigest()
+            content_id = hashlib.sha256(f"{source_hash}:{fp}:{digest}".encode()).hexdigest()[:24]
+            candidates = [(content_id, root / content_id / "elements.jsonl")]
+            elements = finalize_elements(raw, content_id)
+    extraction_id, artifact = candidates[0]
+    with open_db(settings.db_path) as conn:
+        known = conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?",
+                             (extraction_id,)).fetchone()
+    if known is not None:
+        artifact = Path(known["artifact_path"])
+    if not artifact.exists() or read_jsonl(artifact) != json.loads(json.dumps(elements, ensure_ascii=False)):
+        write_jsonl_atomic(artifact, elements)
+    return extraction_id, elements, artifact
 
 
 def _record_input(conn, source_hash: str, key: str, extraction_id: str, artifact_sha: str, stats: dict) -> None:
@@ -1071,10 +1097,7 @@ def recover_source(settings: Settings, doc_id: str, converted_file: Path, review
     for e in raw:
         e["location"]["format"] = "hwp_recovered_pdf"  # pages of the converted PDF, not of the original HWP
     fp = f"{parser_fingerprint('pdf')}-recovered-{converted_hash[:12]}"
-    extraction_id = hashlib.sha256(f"{source_hash}:{fp}".encode()).hexdigest()[:24]
-    elements = finalize_elements(raw, extraction_id)
-    artifact = settings.data_dir / "extracted" / source_hash / fp / "elements.jsonl"
-    write_jsonl_atomic(artifact, elements)
+    extraction_id, elements, artifact = assign_revision(settings, source_hash, fp, raw)
     warnings = previous["warnings"] + warnings + [{"code": "recovered_from_artifact", "detail": previous["reason_code"],
                                                    "converted_sha256": converted_hash}]
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):

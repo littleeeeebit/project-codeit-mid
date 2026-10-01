@@ -360,5 +360,41 @@ class FamilyTest(unittest.TestCase):
             self.assertEqual(len(fam["related_sources"]), 1)
 
 
+class RevisionIdentityTest(unittest.TestCase):
+    def test_different_output_under_one_parser_fingerprint_is_a_new_revision(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = fixtures.make_env(Path(tmp), paid=False, index=False)
+            s = env.settings
+            h = env.refs["기관D"].source_hash
+            with store.open_db(s.db_path) as conn:
+                old = conn.execute("SELECT active_extraction_id, review_status FROM sources WHERE source_hash = ?",
+                                   (h,)).fetchone()
+                old_artifact = Path(conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?",
+                                                 (old[0],)).fetchone()[0])
+            self.assertEqual(old[1], "sample_checked")
+            ingestion.ingest(s, [env.refs["기관D"].doc_id], force=True)  # identical output: same revision, review kept
+            with store.open_db(s.db_path) as conn:
+                same = conn.execute("SELECT active_extraction_id, review_status FROM sources WHERE source_hash = ?",
+                                    (h,)).fetchone()
+            self.assertEqual(tuple(same), tuple(old))
+            real = ingestion.parse_pdf
+
+            def changed(path):
+                els, warnings, reason = real(path)
+                els[-1]["raw_text"] += " (변경된 변환 결과)"
+                return els, warnings, reason
+
+            with mock.patch.object(ingestion, "parse_pdf", side_effect=changed):
+                ingestion.ingest(s, [env.refs["기관D"].doc_id], force=True)
+            with store.open_db(s.db_path) as conn:
+                new = conn.execute("SELECT active_extraction_id, review_status FROM sources WHERE source_hash = ?",
+                                   (h,)).fetchone()
+                old_rows = conn.execute("SELECT COUNT(*) FROM elements WHERE extraction_id = ?", (old[0],)).fetchone()[0]
+            self.assertNotEqual(new[0], old[0])
+            self.assertEqual(new[1], "unreviewed")  # a reviewed text does not vouch for different text
+            self.assertGreater(old_rows, 0)  # the old revision stays for pinned gold rows and citations
+            self.assertNotIn("변경된", old_artifact.read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()

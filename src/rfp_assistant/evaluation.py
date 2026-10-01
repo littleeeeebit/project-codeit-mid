@@ -9,6 +9,7 @@ import re
 import time
 from pathlib import Path
 
+from .chunking import table_rows
 from .ingestion import CODE_RE, nfc
 from .settings import Settings
 from .store import dumps, open_db, read_jsonl, utcnow, write_text_atomic
@@ -279,7 +280,22 @@ def grade(chunk: dict, unit: dict, element: dict | None) -> int:
     for span in chunk["spans"]:
         if span["element_id"] != unit["element_id"]:
             continue
-        if "rows" in span:
+        if "rows" in span and span.get("fragment"):
+            # One piece of an oversized row: only the characters this piece carries count.
+            frag = span["fragment"]
+            line = dict(table_rows(element)).get(frag["row"], "") if element.get("table") else ""
+            rng = _quote_range(line, unit["quote"])
+            if rng:
+                if frag["start"] <= rng[0] and rng[1] <= frag["end"]:
+                    return 2
+                if frag["start"] < rng[1] and rng[0] < frag["end"]:
+                    best = max(best, 1)
+                continue
+            rows = _quote_rows(element, unit["quote"])  # e.g. the header row repeated with every piece
+            if rows and rows <= set(span["rows"]) - {frag["row"]}:
+                return 2
+            best = max(best, 1)
+        elif "rows" in span:
             rows = _quote_rows(element, unit["quote"])
             if rows and rows <= set(span["rows"]):
                 return 2
@@ -573,6 +589,11 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
             if info.get("attempt_id"):
                 query_info["attempts"].append(info["attempt_id"])
                 query_info["settled_micro_usd"] += info.get("settled_micro_usd") or 0
+            if info.get("billing") == "unknown":
+                query_info.setdefault("reasons", []).append("unknown_billing_reconcile_first")
+                break  # the vector is kept; nothing more is paid until the attempt is reconciled
+        wanted = [r["id"] for r in rows if is_passage_row(r) and index.rows_by_extraction.get(r["extraction_id"])]
+        query_info["unavailable"] = sum(i not in vectors for i in wanted)
         if query_info["unavailable"]:
             dense_error = (f"{query_info['unavailable']} query vectors unavailable "
                            f"({sorted(set(r for r in query_info.get('reasons', []) if r))}); "
@@ -770,6 +791,7 @@ def activate_run(settings: Settings, run_id: str, decision_path: Path, actor: st
     active = {"run_id": run_id, "label": config["label"], "mode": config["mode"],
               "index_version": config["index_version"], "dense_version": config.get("dense_version"),
               "reranker": {**config["reranker"], "depth": config["rerank_depth"]} if config.get("reranker") else None,
+              "embedding": config.get("embedding"), "limits": config.get("limits"),
               "fallback_mode": "kiwi_bm25", "finalist_run_id": decision.get("finalist_run_id"),
               "activated_at": utcnow()}
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):

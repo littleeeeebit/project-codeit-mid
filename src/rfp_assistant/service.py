@@ -21,7 +21,7 @@ from .auth import require, require_any
 from .contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, EvidenceUnit, EvidenceView,
                         ManagedDownload, Principal, RetrievalResult)
 from .ingestion import CODE_RE, QUARANTINE_TEXT, nfc, printed_pdf_path, record_review, resolutions_by_doc
-from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, RetrievalError, best_chunk_per_extraction, scope_rows
+from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extraction, scope_rows
 from .retrieval import retrieve as _retrieve
 from .settings import Settings, read_api_key
 from .store import LockHeld, ProcessLock, dumps, init_schema, open_db, tx, utcnow
@@ -82,6 +82,19 @@ class Resources:
         return {"run_id": None, "mode": self.settings.retrieval_mode, "index_version": active,
                 "dense_version": None, "reranker": None, "fallback_mode": "kiwi_bm25"}
 
+    def run_settings(self, cfg: dict | None = None) -> Settings:
+        """Settings the activated run was evaluated with: embedding model/dimensions, depths, RRF constant and
+        evidence limits override the process configuration, so serving reproduces what was measured."""
+        cfg = cfg or self.serving()
+        changes = dict(cfg.get("limits") or {})
+        if cfg.get("embedding"):
+            changes.update(embedding_model=cfg["embedding"]["model"], embedding_dimensions=cfg["embedding"]["dims"])
+        rr = cfg.get("reranker") or {}
+        if rr.get("max_length"):
+            changes["reranker_max_length"] = rr["max_length"]
+        known = set(Settings.__dataclass_fields__)
+        return self.settings.with_(**{k: v for k, v in changes.items() if k in known})
+
     def index(self) -> KeywordIndex | None:
         with self._index_lock:
             active = self.serving()["index_version"]
@@ -121,8 +134,8 @@ class Resources:
         with self._index_lock:
             if self._reranker_key != key:
                 self._reranker_key = key
-                s = self.settings.with_(reranker_model=cfg.get("model") or self.settings.reranker_model,
-                                        reranker_revision=cfg.get("revision") or "")
+                s = self.run_settings().with_(reranker_model=cfg.get("model") or self.settings.reranker_model,
+                                              reranker_revision=cfg.get("revision") or "")
                 self._reranker, info = dense_mod.load_reranker(s)
                 if self._reranker is None:
                     self.stage_errors["reranker"] = info.get("error", "unavailable")
@@ -169,6 +182,9 @@ def _doc_rows(res: Resources, doc_ids: list[str] | None = None) -> list[dict]:
         d["meta"] = json.loads(d.pop("normalized_metadata_json"))
         d["quality"] = json.loads(d.pop("quality_json"))
         d["resolutions"] = resolutions.get(d["doc_id"], {})
+        # Effective view: a written owner/reviewer resolution replaces the CSV value for filtering, ranking and
+        # display; d["meta"] keeps the CSV values and d["resolutions"] the provenance.
+        d["effective"] = {**d["meta"], **{f: r["value"] for f, r in d["resolutions"].items()}}
         d.pop("raw_metadata_json")
         out.append(d)
     return out
@@ -202,8 +218,7 @@ def search_projects(res: Resources, principal: Principal, filters: dict, query: 
     parsed_only = filters.get("parsed_only", False)
     items = []
     for d in docs:
-        # A written owner/reviewer resolution supplies the filter value; the competing values stay visible.
-        m = {**d["meta"], **{f: r["value"] for f, r in d["resolutions"].items()}}
+        m = d["effective"]  # the competing CSV values stay visible in the result
         conflicts = {c["field"] for c in d["quality"].get("provenance_conflicts", [])} - set(d["resolutions"])
         if inst and inst not in (m["institution"] or ""):
             continue
@@ -231,16 +246,18 @@ def search_projects(res: Resources, principal: Principal, filters: dict, query: 
     ranked = []
     for d in items:
         words = [w for w in re.split(r"\s+", q) if w]
-        meta_hit = sum(w in d["meta"]["title"] or w in (d["meta"]["institution"] or "") for w in words)
+        m = d["effective"]
+        meta_hit = sum(w in (m["title"] or "") or w in (m["institution"] or "") for w in words)
         snip = snippets.get(d["active_extraction_id"] or "")
         if q and not meta_hit and not snip:
             continue
         ranked.append((meta_hit, snip[0] if snip else 0.0, d, snip[1] if snip else None))
     ranked.sort(key=lambda x: (-x[0], -x[1]))
     return [{
-        "doc_id": d["doc_id"], "source_hash": d["active_source_hash"], "title": d["meta"]["title"],
-        "institution": d["meta"]["institution"], "amount_krw": d["meta"]["amount_krw"],
-        "published_at": d["meta"]["published_at"], "bid_close": d["meta"]["bid_close"],
+        "doc_id": d["doc_id"], "source_hash": d["active_source_hash"], "title": d["effective"]["title"],
+        "institution": d["effective"]["institution"], "amount_krw": d["effective"]["amount_krw"],
+        "published_at": d["effective"]["published_at"], "bid_close": d["effective"]["bid_close"],
+        "csv_metadata": {f: d["meta"].get(f) for f in d["resolutions"]},
         "format": d["format"], "parse_status": d["parse_status"], "review_status": d["review_status"],
         "indexed": _indexed(res, d["active_extraction_id"]),
         "unavailable_reason": QUARANTINE_TEXT.get(d["reason_code"] or ""),
@@ -259,15 +276,21 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
     if idx is None:
         raise ServiceError("검색 색인이 아직 없습니다.")
     cfg = res.serving()
+    s = res.run_settings(cfg)
     pairs = [(DocRef(d["doc_id"], d["active_source_hash"]), d["active_extraction_id"]) for d in docs]
     dense = qvec = qinfo = None
     if cfg["mode"] in DENSE_MODES:
         dense = res.dense()
+        if dense is not None and (dense.model, dense.dims) != (s.embedding_model, s.embedding_dimensions):
+            # Never pay for a query vector the matrix cannot score; serve the recorded keyword fallback.
+            res.stage_errors["dense"] = (f"matrix {dense.model}/{dense.dims} does not match the run's embedding "
+                                         f"{s.embedding_model}/{s.embedding_dimensions}")
+            dense = None
         if dense is not None and scope_rows(idx, pairs):
-            qvec, qinfo = dense_mod.query_vector(res.settings, res.transport, question, request_id=request_id,
+            qvec, qinfo = dense_mod.query_vector(s, res.transport, question, request_id=request_id,
                                                  member_id=principal.member_id, purpose="interactive",
                                                  allow_paid=allow_paid)
-    result = _retrieve(res.settings, idx, res.analyzer, question, pairs, mode=cfg["mode"], dense=dense,
+    result = _retrieve(s, idx, res.analyzer, question, pairs, mode=cfg["mode"], dense=dense,
                        query_vector=qvec, reranker=res.reranker() if cfg["mode"] == "hybrid_rerank" else None,
                        rerank_depth=(cfg.get("reranker") or {}).get("depth"))
     result.query_embedding = qinfo
@@ -330,7 +353,8 @@ def prepare_answer(res: Resources, principal: Principal, question: str, scope: l
 
 
 def _doc_brief(d: dict) -> dict:
-    return {"doc_id": d["doc_id"], "title": d["meta"]["title"], "csv_institution": d["meta"]["institution"],
+    return {"doc_id": d["doc_id"], "title": d["effective"]["title"], "csv_institution": d["meta"]["institution"],
+            "resolved_metadata": {f: r["value"] for f, r in d["resolutions"].items()},
             "source_format": d["format"], "review_status": d["review_status"],
             "metadata_conflicts": [c["field"] for c in d["quality"].get("provenance_conflicts", [])]}
 
@@ -383,8 +407,9 @@ def answer(res: Resources, principal: Principal, request: AnswerRequest) -> Answ
     try:
         prep = prepare_answer(res, principal, question, request.scope, request.as_of, request_id=request_id,
                               allow_paid=True)
-    except (RetrievalError, budget.BudgetError) as exc:
-        return done("technical_error", "검색 또는 비용 추정에 실패했습니다.", request_status="failed", error=str(exc))
+    except Exception as exc:  # noqa: BLE001 - any failure here ends the request instead of leaving it running
+        return done("technical_error", "검색 또는 비용 추정에 실패했습니다.", request_status="failed",
+                    error=f"{type(exc).__name__}: {exc}"[:300])
     retrieval: RetrievalResult = prep["retrieval"]
     embed_attempts = [retrieval.query_embedding["attempt_id"]] if (retrieval.query_embedding or {}).get(
         "attempt_id") else []
@@ -489,7 +514,7 @@ def open_evidence(res: Resources, principal: Principal, request_id: str, evidenc
             context = [{"element_id": e["element_id"], "text": e["raw_text"], "cited": e["element_id"] in
                         ev["element_ids"], "location": e["location"]}
                        for e in ordered[max(0, lo - 1):hi + 2]]
-    return EvidenceView(evidence_id, ev["doc_id"], doc["meta"]["title"], ev["quote"], context, ev["location"],
+    return EvidenceView(evidence_id, ev["doc_id"], doc["effective"]["title"], ev["quote"], context, ev["location"],
                         doc["format"], True)
 
 
