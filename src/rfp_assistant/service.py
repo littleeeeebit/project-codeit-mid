@@ -399,6 +399,22 @@ LIMIT_KEYS = ("evidence_max_units", "evidence_target_tokens", "evidence_max_toke
               "fused_top_k")
 
 
+def _narrow_limits(s: Settings, limits: dict | None) -> dict:
+    """The limit values a narrowing override actually executes with: never above the serving value, at least 1,
+    and the evidence target never above the evidence maximum."""
+    if not limits:
+        return {}
+    unknown = set(limits) - set(LIMIT_KEYS)
+    if unknown:
+        raise ServiceError(f"unknown retrieval limits {sorted(unknown)}")
+    narrowed = {k: max(1, min(int(v), getattr(s, k))) for k, v in limits.items()}
+    target = min(narrowed.get("evidence_target_tokens", s.evidence_target_tokens),
+                 narrowed.get("evidence_max_tokens", s.evidence_max_tokens))
+    if target != s.evidence_target_tokens or "evidence_target_tokens" in narrowed:
+        narrowed["evidence_target_tokens"] = target
+    return narrowed
+
+
 def retrieve(res: Resources, principal: Principal, question: str, scope: list[DocRef], *,
              request_id: str | None = None, allow_paid: bool = False, limits: dict | None = None,
              mode: str | None = None) -> RetrievalResult:
@@ -417,13 +433,7 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
         cfg = {**cfg, "mode": mode}
     s = res.run_settings(cfg)
     if limits:
-        unknown = set(limits) - set(LIMIT_KEYS)
-        if unknown:
-            raise ServiceError(f"unknown retrieval limits {sorted(unknown)}")
-        narrowed = {k: max(1, min(int(v), getattr(s, k))) for k, v in limits.items()}
-        narrowed["evidence_target_tokens"] = min(narrowed.get("evidence_target_tokens", s.evidence_target_tokens),
-                                                 narrowed.get("evidence_max_tokens", s.evidence_max_tokens))
-        s = s.with_(**narrowed)
+        s = s.with_(**_narrow_limits(s, limits))
     pairs = [(DocRef(d["doc_id"], d["active_source_hash"]), d["active_extraction_id"]) for d in docs]
     dense = qvec = qinfo = None
     if cfg["mode"] in DENSE_MODES:
@@ -436,7 +446,7 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
         if dense is not None and scope_rows(idx, pairs):
             qvec, qinfo = dense_mod.query_vector(s, res.transport, question, request_id=request_id,
                                                  member_id=principal.member_id, purpose="interactive",
-                                                 allow_paid=allow_paid)
+                                                 allow_paid=allow_paid, guard=_dispatch_guard(res, request_id))
     result = _retrieve(s, idx, res.analyzer, question, pairs, mode=cfg["mode"], dense=dense,
                        query_vector=qvec, reranker=res.reranker() if cfg["mode"] == "hybrid_rerank" else None,
                        rerank_depth=(cfg.get("reranker") or {}).get("depth"))
@@ -459,7 +469,10 @@ def _config_snapshot(res: Resources, request: AnswerRequest) -> dict:
     idx = res.index()
     with open_db(res.settings.db_path) as conn:
         rate_version = conn.execute("SELECT rate_version FROM budget_settings WHERE id = 1").fetchone()[0]
-    return {"config_id": request.config_id, "index_version": idx.version if idx else None,
+    vcfg = _stored_verifier_config(res, request.config_id) if request.config_id != "default" else None
+    return {"config_id": request.config_id,
+            "retrieval": {"mode": vcfg["mode"], "limits": vcfg["limits"]} if vcfg else None,
+            "index_version": idx.version if idx else None,
             "serving": {k: v for k, v in res.serving().items() if k in ("run_id", "mode", "dense_version")},
             "prompt_version": generation.PROMPT_VERSION, "model": res.settings.generation_model,
             "reasoning_effort": res.settings.generation_reasoning_effort,
@@ -521,12 +534,15 @@ def _evidence_map(evidence: list[EvidenceUnit]) -> dict[str, dict]:
 
 
 def prepare_answer(res: Resources, principal: Principal, question: str, scope: list[DocRef], as_of: str, *,
-                   request_id: str | None = None, allow_paid: bool = False) -> dict:
+                   request_id: str | None = None, allow_paid: bool = False, mode: str | None = None,
+                   limits: dict | None = None) -> dict:
     """Retrieval plus exact prompt counting and the maximum reservation estimate. Free unless `allow_paid`
-    lets a dense mode pay for an uncached query embedding."""
+    lets a dense mode pay for an uncached query embedding. `mode`/`limits` come from a frozen verifier
+    configuration."""
     principal = _authorize(res, principal, "consultant", "verifier")
     docs = _resolve_scope(res, scope)
-    retrieval = retrieve(res, principal, question, scope, request_id=request_id, allow_paid=allow_paid)
+    retrieval = retrieve(res, principal, question, scope, request_id=request_id, allow_paid=allow_paid, mode=mode,
+                         limits=limits)
     return _priced(res, question, as_of, docs, retrieval, "single")
 
 
@@ -574,6 +590,9 @@ def _validate_request(res: Resources, request: AnswerRequest) -> str:
         raise ServiceError("기본 정보 조회는 문서를 한두 개 선택해야 합니다.")
     if not request.idempotency_key or len(request.idempotency_key) > 100 or len(request.generation_id) > 100:
         raise ServiceError("요청 식별자가 올바르지 않습니다.")
+    if request.config_id != "default" and request.mode not in PAID_MODES:
+        raise ServiceError("검증 설정은 답변 생성 요청에만 적용됩니다.")
+    resolve_verifier_config(res, request.config_id)  # unknown or outdated: refused before anything is queued
     return question
 
 
@@ -678,14 +697,37 @@ def run_queued(res: Resources, request_id: str) -> None:
     _execute(res, principal, request_id, request, snap["question"])
 
 
+STOPS = {"cancelled": "요청이 취소되어 다음 유료 단계를 시작하지 않았습니다.",
+         "interrupted": "서비스 종료로 요청이 중단되어 다음 유료 단계를 시작하지 않았습니다. (유료 호출 없음)"}
+
+
+def _stop_reason(res: Resources, conn, request_id: str) -> str | None:
+    """Why this request may not start a new paid stage: cancelled, or interrupted (marked by a controlled
+    shutdown, no longer running, or the owning resources are closing). None when it may."""
+    row = conn.execute("SELECT status, cancel_requested FROM requests WHERE request_id = ?",
+                       (request_id,)).fetchone()
+    if row is None:
+        return None  # not a persisted request (e.g. a standalone retrieval): nothing to stop
+    if row["cancel_requested"] or row["status"] == "cancelled":
+        return "cancelled"
+    if res._closed or row["status"] != "running":
+        return "interrupted"
+    return None
+
+
+def _dispatch_guard(res: Resources, request_id: str | None):
+    """The check `budget.mark_dispatching` runs in the dispatch transaction itself."""
+    return None if request_id is None else (lambda conn: _stop_reason(res, conn, request_id))
+
+
 def _checkpoint(res: Resources, request_id: str, principal: Principal) -> Principal:
-    """Before every newly dispatched paid stage: a cancelled request stops here. Already dispatched work still
-    settles; this only prevents the next dispatch."""
+    """Before every new paid stage: a cancelled or interrupted request (or a closing service) stops here.
+    Already dispatched work still settles; this only prevents the next dispatch. The dispatch itself repeats
+    the check atomically (`_dispatch_guard`)."""
     with open_db(res.settings.db_path) as conn:
-        cancelled = conn.execute("SELECT cancel_requested FROM requests WHERE request_id = ?",
-                                 (request_id,)).fetchone()[0]
-    if cancelled:
-        raise _Stop("cancelled", "cancelled", "요청이 취소되어 다음 유료 단계를 시작하지 않았습니다.")
+        reason = _stop_reason(res, conn, request_id)
+    if reason:
+        raise _Stop(reason, reason, STOPS[reason])
     return principal
 
 
@@ -726,13 +768,17 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
                                      "이 문서는 아직 검색 색인에 포함되지 않았습니다.")
         return done("ingestion_unavailable", f"원문 전체를 확인할 수 없어 답변하지 않습니다. {reason}",
                     missing_fields=missing_unavailable)
+    # A frozen verifier run's configuration is applied, not just recorded: the same mode and limits the run's
+    # estimate was computed with (refused, unpaid, when serving changed since it was frozen).
+    vcfg = resolve_verifier_config(res, request.config_id) or {"mode": None, "limits": None}
     principal = _checkpoint(res, request_id, principal)  # the query embedding may be the first paid stage
     try:
         if request.mode == "compare":
-            prep = _prepare_compare(res, principal, question, docs, request.as_of, request_id)
+            prep = _prepare_compare(res, principal, question, docs, request.as_of, request_id, mode=vcfg["mode"],
+                                    limits=vcfg["limits"])
         else:
             prep = prepare_answer(res, principal, question, request.scope, request.as_of, request_id=request_id,
-                                  allow_paid=True)
+                                  allow_paid=True, mode=vcfg["mode"], limits=vcfg["limits"] or None)
     except _Stop:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -760,16 +806,15 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
                     "검색과 원문 열람은 계속 사용할 수 있습니다.", evidence=evidence_map, error=admission["reason"],
                     **common)
     attempt_id = admission["attempt_id"]
-    try:
-        _checkpoint(res, request_id, principal)
-    except _Stop:
-        budget.release(s.db_path, attempt_id, "stopped_before_dispatch")
-        raise
     if res.transport is None:
         budget.release(s.db_path, attempt_id, "provider_unavailable")
         return done("technical_error", "유료 모델 연결이 설정되지 않았습니다.", request_status="failed",
                     evidence=evidence_map, error=res.provider_note, **common)
-    budget.mark_dispatching(s.db_path, attempt_id)
+    try:  # the stop check and the dispatching marker are one transaction: no shutdown can slip between them
+        budget.mark_dispatching(s.db_path, attempt_id, _dispatch_guard(res, request_id))
+    except budget.DispatchRefused as refused:
+        reason = str(refused)
+        raise _Stop(reason, reason, STOPS[reason]) from None
     try:
         response = res.transport.chat(model=s.generation_model, messages=prep["messages"],
                                       response_format=prep["response_format"],
@@ -820,22 +865,28 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
 
 
 def _prepare_compare(res: Resources, principal: Principal, question: str, docs: list[dict], as_of: str,
-                     request_id: str | None, allow_paid: bool = True) -> dict:
+                     request_id: str | None, allow_paid: bool = True, mode: str | None = None,
+                     limits: dict | None = None) -> dict:
     """One scoped subquery per selected document (the same question; no paid rewriting). Each starts with up to
     three evidence units and half the evidence target; unused room is redistributed only after both had a
-    coverage attempt, and the global ceiling still holds. Each side reports evidence or its limitation."""
+    coverage attempt, and the global ceiling still holds. Each side reports evidence or its limitation.
+    `mode` and narrowing `limits` (a verifier configuration) apply to both sides and to the global ceiling."""
     s = res.run_settings()
-    half_units = max(1, s.evidence_max_units // 2)
+    s = s.with_(**_narrow_limits(s, limits))
+    if s.evidence_max_units < 2:
+        raise ServiceError("두 문서 비교는 근거 단위 한도가 2개 이상이어야 합니다(문서마다 1개 이상).")
+    half_units = s.evidence_max_units // 2
     target, ceiling = s.evidence_target_tokens, s.evidence_max_tokens
-    first = {"evidence_max_units": half_units, "evidence_target_tokens": target // 2,
-             "evidence_max_tokens": ceiling // 2}
+    depth = {"channel_top_k": s.channel_top_k, "fused_top_k": s.fused_top_k}
+    first = {**depth, "evidence_max_units": half_units, "evidence_target_tokens": max(1, target // 2),
+             "evidence_max_tokens": max(1, ceiling // 2)}
     sides: dict[str, RetrievalResult | None] = {}
     for d in docs:
         if d["parse_status"] != "parsed" or not _indexed(res, d["active_extraction_id"]):
             sides[d["doc_id"]] = None
             continue
         sides[d["doc_id"]] = retrieve(res, principal, question, [DocRef(d["doc_id"], d["active_source_hash"])],
-                                      request_id=request_id, allow_paid=allow_paid, limits=first)
+                                      request_id=request_id, allow_paid=allow_paid, limits=first, mode=mode)
     used = lambda: sum(r.evidence_tokens for r in sides.values() if r)  # noqa: E731
     units = lambda: sum(len(r.evidence) for r in sides.values() if r)  # noqa: E731
     for d in docs:  # second pass: a side that was cut by its half budget may use what the other left
@@ -846,12 +897,12 @@ def _prepare_compare(res: Resources, principal: Principal, question: str, docs: 
         if spare_tokens <= 0 and spare_units <= 0:
             continue
         others = used() - r.evidence_tokens
-        wider = {"evidence_max_units": len(r.evidence) + max(0, spare_units),
+        wider = {**depth, "evidence_max_units": len(r.evidence) + max(0, spare_units),
                  "evidence_target_tokens": max(1, r.evidence_tokens + max(0, spare_tokens)),
                  "evidence_max_tokens": max(1, ceiling - others)}
         wider["evidence_target_tokens"] = min(wider["evidence_target_tokens"], wider["evidence_max_tokens"])
         again = retrieve(res, principal, question, [DocRef(d["doc_id"], d["active_source_hash"])],
-                         request_id=request_id, allow_paid=allow_paid, limits=wider)
+                         request_id=request_id, allow_paid=allow_paid, limits=wider, mode=mode)
         if len(again.evidence) >= len(r.evidence) and used() - r.evidence_tokens + again.evidence_tokens <= ceiling:
             sides[d["doc_id"]] = again
     evidence: list[EvidenceUnit] = []
@@ -875,11 +926,11 @@ def _prepare_compare(res: Resources, principal: Principal, question: str, docs: 
             timings[k] = round(timings.get(k, 0) + v, 1)
         query_embedding = query_embedding or r.query_embedding
     total = sum(e.token_count for e in evidence)
-    if total > ceiling:  # defensive: never exceed the global hard ceiling after expansion
+    if total > ceiling or len(evidence) > s.evidence_max_units:  # defensive: the global limits hold after expansion
         raise ServiceError("비교 근거가 전체 한도를 넘었습니다. 질문을 좁혀 주세요.")
     first_r = next((r for r in sides.values() if r), None)
     merged = RetrievalResult(
-        mode=first_r.mode if first_r else res.serving()["mode"], scope=[DocRef(d["doc_id"], d["active_source_hash"])
+        mode=first_r.mode if first_r else (mode or res.serving()["mode"]), scope=[DocRef(d["doc_id"], d["active_source_hash"])
                                                                         for d in docs],
         exact_matches=[c for c in candidates if c["channel"] == "exact"], candidates=candidates, evidence=evidence,
         excluded=excluded, limitations=["compare:balanced_per_document"] + limitations, evidence_tokens=total,
@@ -1168,16 +1219,41 @@ VERIFIER_MODES = ("whitespace_bm25", "kiwi_bm25", "dense", "hybrid", "hybrid_rer
 
 def verifier_config(res: Resources, mode: str | None = None, limits: dict | None = None) -> dict:
     """A versioned, immutable verifier configuration: the serving snapshot plus explicit overrides. Editing a
-    control produces another config ID; an old run keeps its own snapshot."""
+    control produces another config ID; an old run keeps its own snapshot. `limits` records the values the run
+    executes with (an override is clamped to the serving limits), `effective_limits` every limit in force."""
     idx = res.index()
     serving = res.serving()
+    s = res.run_settings(serving)
+    narrowed = _narrow_limits(s, limits)
     cfg = {"serving_run": serving.get("run_id"), "serving_mode": serving["mode"], "mode": mode or serving["mode"],
            "dense_version": serving.get("dense_version"), "index_version": idx.version if idx else None,
-           "limits": {k: int(v) for k, v in sorted((limits or {}).items())},
+           "limits": {k: narrowed[k] for k in sorted(narrowed)},
+           "effective_limits": {k: narrowed.get(k, getattr(s, k)) for k in LIMIT_KEYS},
            "prompt_version": generation.PROMPT_VERSION, "model": res.settings.generation_model}
     if cfg["mode"] not in VERIFIER_MODES:
         raise ServiceError("알 수 없는 검색 방식입니다.")
     cfg["config_id"] = "vc-" + hashlib.sha256(dumps(cfg).encode()).hexdigest()[:12]
+    return cfg
+
+
+def _stored_verifier_config(res: Resources, config_id: str) -> dict | None:
+    with open_db(res.settings.db_path) as conn:
+        row = conn.execute("SELECT config_json FROM verifier_runs WHERE config_id = ? LIMIT 1", (config_id,)).fetchone()
+    return json.loads(row["config_json"]) if row else None
+
+
+def resolve_verifier_config(res: Resources, config_id: str) -> dict | None:
+    """The frozen verifier configuration a paid request runs with (None for the serving default). It must still
+    describe the current serving state: recomputing it now must give the same ID, otherwise the index, serving
+    run, prompt or model changed since the run was frozen and its estimate no longer applies."""
+    if not config_id or config_id == "default":
+        return None
+    cfg = _stored_verifier_config(res, config_id)
+    if cfg is None:
+        raise ServiceError("알 수 없는 검증 설정입니다. (유료 호출 없음)")
+    if verifier_config(res, cfg["mode"], cfg["limits"])["config_id"] != config_id:
+        raise ServiceError("검증 실행 이후 서비스 구성(색인·검색 실행·프롬프트·모델)이 바뀌었습니다. 새 검증 실행을 "
+                           "만든 뒤 그 추정 비용으로 생성하세요. (유료 호출 없음)")
     return cfg
 
 
@@ -1201,16 +1277,17 @@ def verifier_trace(res: Resources, principal: Principal, question: str, scope: l
     cfg = verifier_config(res, mode, limits)
     docs = _resolve_scope(res, scope)
     if len(scope) == 2:
-        prep = _prepare_compare(res, principal, question, docs, as_of, None, allow_paid=False)
+        prep = _prepare_compare(res, principal, question, docs, as_of, None, allow_paid=False, mode=cfg["mode"],
+                                limits=cfg["limits"])
     elif len(scope) == 1:
-        r = retrieve(res, principal, question, scope, limits=limits or None, mode=mode)
+        r = retrieve(res, principal, question, scope, limits=cfg["limits"] or None, mode=cfg["mode"])
         prep = _priced(res, question, as_of, docs, r, "single")
     else:
         raise ServiceError("문서를 한두 개 선택하세요.")
     r: RetrievalResult = prep["retrieval"]
     idx = res.index()
     qe = r.query_embedding or {}
-    trace = {"retrieval": asdict(r), "query_tokens": res.analyzer.tokens(question),
+    trace = {"retrieval": asdict(r), "as_of": as_of, "query_tokens": res.analyzer.tokens(question),
              "codes": list(dict.fromkeys(CODE_RE.findall(nfc(question)))), "input_tokens": prep["input_tokens"],
              "estimate_micro_usd": prep["estimate_micro_usd"],
              "query_embedding_estimate_micro_usd": _embedding_estimate(res, question) if qe.get("cache") == "miss"

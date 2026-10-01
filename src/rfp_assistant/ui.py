@@ -417,7 +417,9 @@ def render_result(st, res, principal, v) -> None:
         _evidence_panel(st, res, principal, r)
 
 
-def render_answer(st, res, principal, r, v=None) -> None:
+def render_answer(st, res, principal, r, v=None, ns: str = "cur") -> None:
+    """`ns` namespaces the widget keys: the same request may be shown at once as the current answer, in the
+    history and on the verifier page."""
     label = STATUS_TEXT.get(r.status, r.status)
     if r.status == "technical_error":
         st.error(f"{label}: {r.summary}")
@@ -432,14 +434,14 @@ def render_answer(st, res, principal, r, v=None) -> None:
     if r.facts:
         _render_facts(st, r.facts)
     if r.inventory:
-        _render_inventory(st, r)
+        _render_inventory(st, r, ns)
     for i, claim in enumerate(r.claims, 1):
         kind = "추론" if claim["kind"] == "inference" else "원문 사실"
         doc = _doc_label(r, claim["doc_id"])
         st.markdown(f"**{i}. [{kind}]** {plain(claim['text'])}" + (f"  \n{plain(doc)}" if doc else ""))
         buttons = st.columns(max(1, len(claim["evidence_ids"])))
         for col, eid in zip(buttons, claim["evidence_ids"]):
-            if eid in r.evidence and col.button(f"근거 {eid}", key=f"ev-{r.request_id}-{i}-{eid}"):
+            if eid in r.evidence and col.button(f"근거 {eid}", key=f"ev-{ns}-{r.request_id}-{i}-{eid}"):
                 st.session_state["evidence_open"] = (r.request_id, eid)
     if r.missing_fields:
         st.markdown("**확인되지 않은 정보**")
@@ -482,14 +484,14 @@ def _render_facts(st, facts: list[dict]) -> None:
     st.caption("CSV 기록은 원문과 다를 수 있습니다. 충돌·값 없음은 추정하지 않고 그대로 표시합니다.")
 
 
-def _render_inventory(st, r) -> None:
+def _render_inventory(st, r, ns: str = "cur") -> None:
     inv = r.inventory
     st.caption(plain(inv["completeness_text"]))
     rows = [{"근거": i["evidence_id"], "코드": i["source_form"], "구분": "상세" if i["kind"] == "detail" else "요약",
              "이름": i["name"] or "", "위치": location_text(i["location"]) if i["location"] else ""}
             for i in inv["items"]]
     event = st.dataframe(rows, hide_index=True, width="stretch", on_select="rerun", selection_mode="single-row",
-                         key=f"inv-{r.request_id}")
+                         key=f"inv-{ns}-{r.request_id}")
     picked = event.selection.rows if event and event.selection else []
     if picked:
         st.session_state["evidence_open"] = (r.request_id, rows[picked[0]]["근거"])
@@ -552,7 +554,7 @@ def _history(st, res, principal) -> None:
                     + ", ".join(f"{s['doc_id'][:8]}@{s['source_hash'][:8]}" for s in v.scope)
                     + f" · 기준일 {v.as_of} · 방식 {v.mode}")
             if v.result is not None:
-                render_answer(st, res, principal, v.result, v)
+                render_answer(st, res, principal, v.result, v, ns="hist")
                 st.download_button("요청 기록 내보내기(JSON)", json.dumps(
                     service.export_request(res, principal, v.request_id), ensure_ascii=False, indent=1),
                     file_name=f"request-{v.request_id[:8]}.json", mime="application/json",
@@ -662,17 +664,27 @@ def _render_run(st, res, principal, t: dict) -> None:
     st.divider()
     est = t["estimate_micro_usd"]
     st.markdown("**5. 답변 생성 (별도 유료 작업)**")
+    gen_key = f"vgen-{t['run_id']}"
     if est is None:
         st.warning("현재 요금표에 없는 모델이라 비용을 추정할 수 없어 유료 생성을 막습니다.")
         return
+    if gen_key not in st.session_state:
+        try:  # generation runs with this run's frozen mode and limits; an outdated configuration is not offered
+            service.resolve_verifier_config(res, t["config"]["config_id"])
+        except service.ServiceError as exc:
+            st.warning(str(exc))
+            return
+    st.caption(f"생성은 이 실행의 설정 {t['config']['config_id']}(검색 {t['config']['mode']}, 한도 "
+               f"{plain(json.dumps(t['config']['limits'], ensure_ascii=False))})과 기준일 {t.get('as_of') or '-'}로 "
+               "다시 검색해 실행합니다.")
     agree = st.checkbox(f"이 범위로 유료 답변 생성을 1회 실행합니다 (최대 예상 {usd(est)})", key=f"vagree-{t['run_id']}")
-    gen_key = f"vgen-{t['run_id']}"
     if st.button("유료 답변 생성", disabled=not agree, key=f"vbtn-{t['run_id']}") and gen_key not in st.session_state:
         scope = [DocRef(s["doc_id"], s["source_hash"]) for s in t["scope"]]
         try:
             st.session_state[gen_key] = service.submit_answer(res, principal, AnswerRequest(
                 idempotency_key=gen_key, generation_id=gen_key, question=t["question"], scope=scope,
-                mode="compare" if len(scope) == 2 else "single", as_of=date.today().isoformat()))
+                mode="compare" if len(scope) == 2 else "single", as_of=t.get("as_of") or date.today().isoformat(),
+                config_id=t["config"]["config_id"]))
         except (service.ServiceError, auth.AuthError) as exc:
             st.error(str(exc))
     if gen_key in st.session_state:
@@ -691,7 +703,7 @@ def _verifier_request(st, res, principal, request_id: str) -> None:
         if view.status in ("queued", "running") and st.session_state.get("vfinished") != request_id:
             st.session_state["vfinished"] = request_id
             st.rerun(scope="app")
-        render_answer(st, res, principal, v.result, v)
+        render_answer(st, res, principal, v.result, v, ns="ver")
         with st.expander("결과 원본(JSON)"):
             st.code(json.dumps(service.export_request(res, principal, request_id), ensure_ascii=False, indent=1),
                     language="json")

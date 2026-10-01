@@ -247,6 +247,30 @@ class CancellationTest(Base):
 
 
 class ScopeOwnershipTest(Base):
+    def test_the_current_answer_can_also_be_opened_from_the_history(self):
+        """Review finding: the same request rendered in the current panel and the history collided on widget
+        keys (StreamlitDuplicateElementKey)."""
+        from streamlit.testing.v1 import AppTest
+
+        self.transport.gate.set()
+        rid = service.submit_answer(self.res, self.env.consultant, req(self.a, gen="gen-a"))
+        self.assertEqual(self.wait_done(rid).result.status, "answered")
+        scope = [(self.a.doc_id, self.a.source_hash)]
+        app = AppTest.from_string("import streamlit as st\nfrom rfp_assistant import ui\n"
+                                  "ui._answer_area(st, st.session_state.res, st.session_state.principal)\n"
+                                  "ui._history(st, st.session_state.res, st.session_state.principal)\n")
+        app.session_state["res"], app.session_state["principal"] = self.res, self.env.consultant
+        app.session_state["current"] = {"scope": scope, "question": Q, "mode": "single", "as_of": "2026-09-30"}
+        app.session_state["owned"] = {"request_id": rid, "generation_id": "gen-a",
+                                      "target": ui.target_key(scope, Q, "single", "2026-09-30")}
+        app.run(timeout=30)
+        self.assertFalse(app.exception, [e.message for e in app.exception])
+        app.selectbox[0].select(app.selectbox[0].options[0]).run(timeout=30)
+        self.assertFalse(app.exception, [e.message for e in app.exception])
+        keys = [b.key for b in app.button if b.key and b.key.startswith("ev-")]
+        self.assertTrue(any(k.startswith("ev-cur-") for k in keys) and any(k.startswith("ev-hist-") for k in keys),
+                        keys)
+
     def test_a_late_answer_cannot_attach_to_a_changed_scope_but_still_settles(self):
         target_a = ui.target_key([(self.a.doc_id, self.a.source_hash)], Q, "single", "2026-09-30")
         rid = service.submit_answer(self.res, self.env.consultant, req(self.a, gen="gen-a"))
@@ -299,6 +323,54 @@ class ShutdownRestartTest(Base):
             self.assertEqual(spent, first["settled_micro_usd"])
         finally:
             res2.close()
+
+    def test_a_worker_paused_before_generation_never_dispatches_once_shutdown_interrupted_it(self):
+        """Review finding: shutdown marked the request interrupted while its worker was between retrieval and
+        generation; the worker then reserved, dispatched and settled a paid call."""
+        prepared, resume = threading.Event(), threading.Event()
+        real = service.prepare_answer
+
+        def paused(*a, **kw):
+            out = real(*a, **kw)
+            prepared.set()
+            self.assertTrue(resume.wait(15))
+            return out
+
+        self.transport.gate.set()
+        self.res.settings = self.settings.with_(shutdown_wait_seconds=0.01)
+        with mock.patch.object(service, "prepare_answer", side_effect=paused):
+            rid = service.submit_answer(self.res, self.env.consultant, req(self.a))
+            self.assertTrue(prepared.wait(15))
+            self.res.close()  # the bounded wait expires: the running request is marked interrupted
+            self.assertEqual(self.request_row(rid)["status"], "interrupted")
+            resume.set()
+            view = self.wait_done(rid)
+            self.res._runner._executor.shutdown(wait=True)
+        view = service.request_status(self.res, self.env.consultant, rid)
+        self.assertEqual((view.status, view.result.status, view.billing_state),
+                         ("interrupted", "interrupted", "none"))
+        self.assertEqual((self.transport.calls, self.attempts()), ([], []))
+
+    def test_the_dispatch_marker_rechecks_the_request_in_its_own_transaction(self):
+        """A stop that lands after the last checkpoint but before dispatch still releases the reservation."""
+        rid = service.submit_answer(self.res, self.env.consultant, req(self.a))
+        self.assertTrue(self.transport.entered.acquire(timeout=10))
+        self.transport.gate.set()
+        self.wait_done(rid)
+        admission = budget.reserve(self.settings.db_path, request_id=rid, member_id="c1", stage="generation",
+                                   purpose="interactive", model=self.settings.generation_model, input_tokens=10,
+                                   max_output_tokens=10, count_method="test")
+        with self.assertRaises(budget.DispatchRefused):  # the request is completed: no new paid stage
+            budget.mark_dispatching(self.settings.db_path, admission["attempt_id"],
+                                    service._dispatch_guard(self.res, rid))
+        state = {a["attempt_id"]: a["state"] for a in self.attempts()}[admission["attempt_id"]]
+        self.assertEqual(state, "released")
+        from rfp_assistant import dense
+
+        transport = FakeTransport()
+        out = dense.metered_embed(self.settings, transport, ["질의"], 20, request_id=rid, member_id="c1",
+                                  purpose="interactive", guard=service._dispatch_guard(self.res, rid))
+        self.assertEqual((out["status"], out["billing"], transport.calls), ("blocked", "released", []))
 
     def test_a_second_owner_of_the_same_data_directory_is_refused(self):
         res2 = service.Resources(self.settings, transport=FakeTransport(), recover=True)
@@ -677,6 +749,67 @@ class VerifierTest(Base):
         self.assertEqual((self.transport.calls, self.attempts()), ([], []))
         export = service.export_verifier_run(self.res, v, a["run_id"])
         self.assertEqual(export["run_id"], a["run_id"])
+
+    def test_two_document_runs_execute_the_recorded_mode_and_limits(self):
+        """Review finding: a two-document run recorded whitespace_bm25 / 1 unit but executed the serving mode
+        with the default limits."""
+        v = self.env.verifier
+        pair = service.verifier_trace(self.res, v, "시스템 구축", [self.a, self.d], "2026-09-30",
+                                      mode="whitespace_bm25", limits={"evidence_max_units": 2})
+        self.assertEqual((pair["config"]["mode"], pair["retrieval"]["mode"]), ("whitespace_bm25", "whitespace_bm25"))
+        self.assertLessEqual(len(pair["retrieval"]["evidence"]), 2)
+        self.assertEqual(pair["config"]["effective_limits"]["evidence_max_units"], 2)
+        self.assertEqual([c["doc_id"] for c in pair["coverage"]], [self.a.doc_id, self.d.doc_id])
+        with self.assertRaises(service.ServiceError):  # one unit cannot cover two documents: refused, not stored
+            service.verifier_trace(self.res, v, "시스템 구축", [self.a, self.d], "2026-09-30",
+                                   limits={"evidence_max_units": 1})
+        self.assertEqual(len(service.verifier_runs(self.res, v)), 1)
+        wide = service.verifier_trace(self.res, v, Q, [self.a], "2026-09-30", limits={"evidence_max_units": 99})
+        self.assertEqual(wide["config"]["limits"], {"evidence_max_units": self.settings.evidence_max_units})
+
+    def _frozen_run(self):
+        run = service.verifier_trace(self.res, self.env.verifier, Q, [self.a], "2026-09-30",
+                                     mode="whitespace_bm25", limits={"evidence_max_units": 1})
+        return service.verifier_run(self.res, self.env.verifier, run["run_id"])
+
+    def test_paid_generation_from_a_frozen_run_executes_its_configuration(self):
+        """Review finding: the paid button of a whitespace_bm25 / 1-unit run generated with the serving mode."""
+        from streamlit.testing.v1 import AppTest
+
+        self.transport.gate.set()
+        frozen = self._frozen_run()
+        app = AppTest.from_string("import streamlit as st\nfrom rfp_assistant import ui\n"
+                                  "ui._render_run(st, st.session_state.res, st.session_state.principal, "
+                                  "st.session_state.run)\n")
+        app.session_state["res"], app.session_state["principal"] = self.res, self.env.verifier
+        app.session_state["run"] = frozen
+        app.run(timeout=30)
+        self.assertFalse(app.exception, [e.message for e in app.exception])
+        app.checkbox[0].check().run(timeout=30)
+        app.button[0].click().run(timeout=30)
+        self.assertFalse(app.exception, [e.message for e in app.exception])
+        rid = app.session_state[f"vgen-{frozen['run_id']}"]
+        view = self.wait_done(rid, self.env.verifier)
+        self.assertEqual(view.result.status, "answered")
+        trace = json.loads(service.get_request(self.res, self.env.verifier, rid)["trace_json"])
+        self.assertEqual(trace["retrieval"]["mode"], frozen["retrieval"]["mode"])
+        self.assertEqual(trace["config"]["retrieval"], {"mode": "whitespace_bm25", "limits": {"evidence_max_units": 1}})
+        key = lambda e: (e["extraction_id"], tuple(e["element_ids"]))  # noqa: E731
+        self.assertEqual([key(e) for e in trace["retrieval"]["evidence"]],
+                         [key(e) for e in frozen["retrieval"]["evidence"]])
+        self.assertEqual(trace["input_tokens_estimate"], frozen["input_tokens"])  # the estimate shown applies
+
+    def test_an_outdated_frozen_configuration_is_refused_before_anything_is_queued(self):
+        frozen = self._frozen_run()
+        serving = {**self.res.serving(), "run_id": "a-later-activation"}
+        request = AnswerRequest("k", "g", Q, [self.a], as_of="2026-09-30", config_id=frozen["config"]["config_id"])
+        with mock.patch.object(self.res, "serving", return_value=serving):
+            with self.assertRaises(service.ServiceError):
+                service.submit_answer(self.res, self.env.verifier, request)
+        with self.assertRaises(service.ServiceError):  # an unknown configuration is refused too
+            service.submit_answer(self.res, self.env.verifier, AnswerRequest("k2", "g", Q, [self.a],
+                                                                             config_id="vc-000000000000"))
+        self.assertEqual((self.attempts(), self.transport.calls), ([], []))
 
     def test_corrections_append_with_quoted_original_and_never_touch_sealed_labels(self):
         v = self.env.verifier

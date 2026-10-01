@@ -207,10 +207,29 @@ def _transition(db: Path, attempt_id: str, from_states: tuple, to_state: str, **
         return cur.rowcount == 1
 
 
-def mark_dispatching(db: Path, attempt_id: str) -> None:
-    """Durable marker before the network call."""
-    if not _transition(db, attempt_id, ("reserved",), "dispatching", dispatched_at=utcnow()):
+class DispatchRefused(BudgetError):
+    """The owning request may no longer start a paid call (cancelled, interrupted, service closing). The
+    reservation was released in the same transaction that refused it; nothing was sent."""
+
+
+def mark_dispatching(db: Path, attempt_id: str, guard=None) -> None:
+    """Durable marker before the network call. `guard(conn)` runs in the same transaction and returns a refusal
+    reason (or None), so a request marked interrupted or cancelled can never be dispatched after the check."""
+    with open_db(db) as conn, tx(conn, immediate=True):
+        reason = guard(conn) if guard is not None else None
+        if reason:
+            cur = conn.execute("UPDATE attempts SET state = 'released', finished_at = ?, error_json = ? "
+                               "WHERE attempt_id = ? AND state = 'reserved'",
+                               (utcnow(), dumps({"reason": f"stopped_before_dispatch:{reason}"}), attempt_id))
+        else:
+            cur = conn.execute("UPDATE attempts SET state = 'dispatching', dispatched_at = ? "
+                               "WHERE attempt_id = ? AND state = 'reserved'", (utcnow(), attempt_id))
+        if cur.rowcount:
+            _bump(conn)
+    if cur.rowcount != 1:
         raise BudgetError("attempt is not in reserved state")
+    if reason:
+        raise DispatchRefused(reason)
 
 
 def release(db: Path, attempt_id: str, reason: str, confirmed_pre_execution: bool = False) -> bool:

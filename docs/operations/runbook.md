@@ -46,6 +46,8 @@ Paid generation stays disabled until `configure-budget` records the dates, prior
   3. marks queued and unfinished requests `interrupted`;
   4. closes the SDK client and releases the lock.
 - A worker still inside a provider call keeps its attempt `dispatching`. That attempt becomes `unknown` at the next start.
+- A worker that has not yet dispatched never starts a new paid stage once stop begins. That covers query embedding and generation, even after its retrieval finishes. The stop check and the `dispatching` marker share one ledger transaction. Such a request ends `interrupted`, and its reservation, if any, is released.
+- **Verifier generation:** the 검증 page's paid button runs with its frozen run's configuration (`vc-…`): the same retrieval mode, the same limits and the same 기준일, so the shown estimate applies. If the index, serving run, prompt or model changed since the run was frozen, the button is withheld and the service refuses the configuration. Make a new run instead. A two-document run needs an evidence-unit limit of at least 2, one per document.
 - **Restart:** the next owner recovers conservatively and never replays anything:
   - queued and running requests become `interrupted`;
   - `dispatching` attempts become `unknown`, keeping their reserve as pending cost;
