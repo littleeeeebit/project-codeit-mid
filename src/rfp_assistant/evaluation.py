@@ -211,8 +211,9 @@ def validate_gold(settings: Settings, name: str) -> dict:
 # 4: runs require an index matching the current analyzer/query policy and its frozen metadata snapshot.
 EVAL_VERSION = "retrieval-eval-4"
 # Gold-2 runs record their ranking policy, so a run scored under another deduplication rule is never reused.
-# 1: repeats keyed by alternative and grade; 2: repeats keyed by the source coverage a chunk carries.
-GOLD_RANKING_POLICY = "gold2-dedup-coverage-2"
+# 1: repeats keyed by alternative and grade; 2: repeats keyed by the source coverage a chunk carries;
+# 3: nDCG@5 counted in judged group units, the unit of its ideal.
+GOLD_RANKING_POLICY = "gold2-group-units-3"
 RANK_DEPTH = 20
 CRITICAL_CODE_TYPES = {"repeated_code", "requirement_detail", "exact_identifier"}
 CRITICAL_EVIDENCE_TYPES = {"numeric_qualifier"}  # an amount/date/VAT condition must reach the packed context
@@ -476,26 +477,41 @@ def grade(chunk: dict, unit: dict, element: dict | None) -> int:
 
 def ndcg_from_grades(grades: list[int], ideal: list[int], k: int = NDCG_AT) -> float | None:
     """`DCG = sum((2**grade - 1) / log2(rank + 1))` over the first k deduplicated units, divided by the DCG of the
-    ideal (judged-pool) grades in descending order. None when the ideal pool has no relevant unit."""
+    ideal (judged-pool) grades in descending order. None when the ideal pool has no relevant unit. The textbook
+    form, for grades already in the ideal's units; the gold-2 scorer uses `ndcg_from_units` over group units."""
     gain = lambda gs: sum((2 ** g - 1) / math.log2(r + 1) for r, g in enumerate(gs[:k], start=1))  # noqa: E731
     best = gain(sorted(ideal, reverse=True))
     return round(gain(grades) / best, 4) if best else None
 
 
-def graded_units(ranking: list[dict], groups: list[dict], elements: dict, k: int = NDCG_AT) -> list[int]:
-    """Grade of each of the first k ranked units after deduplication: a unit counts only for support it adds (a
-    chunk repeating an already credited span grades 0), so overlapping chunks are one contribution."""
+def graded_units(ranking: list[dict], groups: list[dict], elements: dict, k: int = NDCG_AT) -> list[dict]:
+    """The first k judged units of a (deduplicated) gold-2 ranking. The judged unit is the required evidence group,
+    the same unit the ideal counts, so a passage is mapped to the groups it newly supports: a passage completing two
+    groups occupies two consecutive unit positions (as two passages would), a passage adding nothing occupies one
+    zero position (an irrelevant or unlabelled passage keeps costing its rank), and a group raised from partial to
+    complete gains only the difference `2**2 - 2**1`, so no group earns more than its ideal gain. Each unit is
+    `{"group", "grade", "gain", "passage"}`; `passage` is the 1-based rank of the returned passage."""
     credited = [0] * len(groups)
-    out = []
-    for chunk in ranking[:k]:
-        best = 0
-        for j, g in enumerate(groups):
-            grade_now = group_grade(chunk, g, elements)
-            if grade_now > credited[j]:
-                best = max(best, grade_now)
-                credited[j] = grade_now
-        out.append(best)
-    return out
+    out: list[dict] = []
+    for rank, chunk in enumerate(ranking, start=1):
+        if len(out) >= k:
+            break
+        grades = [group_grade(chunk, g, elements) for g in groups]
+        new = [{"group": groups[j]["group_id"], "grade": g, "gain": 2 ** g - 2 ** credited[j], "passage": rank}
+               for j, g in enumerate(grades) if g > credited[j]]
+        for j, g in enumerate(grades):
+            credited[j] = max(credited[j], g)
+        new.sort(key=lambda u: -u["gain"])  # deterministic, and the order a perfect ranking would take
+        out.extend(new or [{"group": None, "grade": 0, "gain": 0, "passage": rank, "unlabelled": not any(grades)}])
+    return out[:k]
+
+
+def ndcg_from_units(units: list[dict], groups: int, k: int = NDCG_AT) -> float | None:
+    """nDCG@k over judged group units: `sum(gain / log2(position + 1))` divided by the ideal of one complete unit
+    (gain `2**2 - 1`) per required group at the first positions. None without a required group."""
+    best = sum(3 / math.log2(r + 1) for r in range(1, min(groups, k) + 1))
+    dcg = sum(u["gain"] / math.log2(r + 1) for r, u in enumerate(units[:k], start=1))
+    return round(dcg / best, 4) if best else None
 
 
 def group_grade(chunk: dict, group: dict, elements: dict) -> int:
@@ -619,11 +635,16 @@ def score_row(row: dict, ranking: list[dict], packed: list[dict], elements: dict
 
 
 def _gold_ndcg(ranking: list[dict], groups: list[dict], elements: dict) -> dict:
-    """Gold-2 rows use the phase-4 graded formula; the ideal pool is one complete span per required group (grade 2
-    each). Pilot rows keep the phase-2 increment formula so frozen `retrieval-eval-4` runs stay comparable."""
-    grades = graded_units(ranking, groups, elements)
-    return {"ndcg@5": ndcg_from_grades(grades, [2] * len(groups)), "ndcg_formula": "(2^g-1)/log2(r+1), ideal 2/group",
-            "graded@5": grades}
+    """Gold-2 rows use the phase-4 graded formula over judged group units (`graded_units`), whose ideal is one
+    complete unit per required group: numerator, ideal and cutoff count the same units, however the evidence is
+    chunked. The judged pool is the predeclared source-span labels; a returned passage outside them grades 0 and
+    is counted in `unlabelled@5` (a blind review of those passages is not implemented). Pilot rows keep the
+    phase-2 increment formula so frozen `retrieval-eval-4` runs stay comparable."""
+    units = graded_units(ranking, groups, elements)
+    return {"ndcg@5": ndcg_from_units(units, len(groups)),
+            "ndcg_formula": "sum((2^g - 2^g_before)/log2(p+1)) over group units, ideal one complete unit per group",
+            "graded@5": [u["grade"] for u in units],
+            "unlabelled@5": len({u["passage"] for u in units if u.get("unlabelled")})}
 
 
 def combine_sides(parts: list[dict]) -> dict:
@@ -690,6 +711,10 @@ def aggregate(results: list[dict], skipped: list[dict]) -> dict:
     codes = [r["code_check"] for r in results if r.get("code_check")]
     from .dense import percentile
 
+    gold = [r for r in passage if "unlabelled@5" in r["metrics"]]
+    pool = {"ndcg_pool": {"judged_units": "required evidence groups (predeclared source spans)",
+                          "unlabelled_top5_passages": sum(r["metrics"]["unlabelled@5"] for r in gold),
+                          "blind_review_of_unlabelled": "not implemented"}} if gold else {}
     return {
         "passage_rows": len(passage), "single_evidence": {"hit@20": rate(single, "hit@20"),
                                                           "hit@5": rate(single, "hit@5")},
@@ -709,7 +734,7 @@ def aggregate(results: list[dict], skipped: list[dict]) -> dict:
         "not_scored": {"non_passage_rows": sum(1 for r in results if not r.get("metrics")),
                        "types": sorted({r["type"] for r in results if not r.get("metrics")}),
                        "skipped": skipped},
-    }
+    } | pool
 
 
 def profile_stats(index) -> dict:

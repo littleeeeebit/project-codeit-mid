@@ -196,6 +196,36 @@ class MetricFixtureTest(unittest.TestCase):
         whole = piece(0, len(line))
         self.assertEqual(evaluation.dedup_ranking([whole, first], groups, els), ([whole], 1))
 
+    def test_ndcg_counts_the_same_group_units_as_its_ideal(self):
+        """Review round 9 (F8): one passage completing two groups scores as two passages would; numerator, ideal
+        and cutoff all count required evidence groups."""
+        row = gold_row([AMOUNT_G, VAT_G])
+        amount, vat = chunk("amount", 0, 30), chunk("vat", 0, 30)
+        joined = {"extraction_id": "x", "spans": amount["spans"] + vat["spans"]}
+        compound = evaluation.score_row(row, [joined], [joined], ELS)
+        split = evaluation.score_row(row, [amount, vat], [amount, vat], ELS)
+        self.assertEqual((compound["ndcg@5"], compound["graded@5"], compound["complete@20"], compound["mrr"]),
+                         (1.0, [2, 2], 1, 1.0))
+        self.assertEqual((split["ndcg@5"], split["graded@5"]), (1.0, [2, 2]))
+        summary = lambda run_id, label, m: {  # noqa: E731
+            "run_id": run_id, "label": label, "mode": label, "blocking": [], "population_sha256": "p",
+            "critical_failures": [], "ndcg@5": m["ndcg@5"]}
+        rec = evaluation.recommend([summary("K1-joined", "K1", compound), summary("H-split", "H", split)])
+        self.assertEqual(rec["selected"]["run_id"] if isinstance(rec["selected"], dict) else rec["selected"],
+                         "K1-joined")  # fragmenting complete evidence is no measured benefit
+        # one group missing is worse however it is chunked, and an unrelated passage still costs its rank
+        lone = evaluation.score_row(row, [amount], [], ELS)
+        noisy = evaluation.score_row(row, [chunk("alt", 0, 5, x="y"), joined], [], ELS)
+        self.assertLess(lone["ndcg@5"], compound["ndcg@5"])
+        self.assertEqual((noisy["graded@5"], noisy["unlabelled@5"]), ([0, 2, 2], 1))
+        self.assertLess(noisy["ndcg@5"], compound["ndcg@5"])
+        # partial then complete support of one group earns at most that group's ideal gain
+        raised = evaluation.score_row(gold_row([VAT_G]), [chunk("vat", 6, 10), chunk("vat", 0, 30)], [], ELS)
+        self.assertEqual(raised["graded@5"], [1, 2])
+        self.assertLess(raised["ndcg@5"], 1.0)
+        agg = evaluation.aggregate([{"id": "q", "type": "t", "metrics": noisy, "families": ["f"]}], [])
+        self.assertEqual(agg["ndcg_pool"]["unlabelled_top5_passages"], 1)
+
     def test_ndcg_matches_the_hand_calculation_and_mrr(self):
         import math
 
