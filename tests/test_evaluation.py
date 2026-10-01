@@ -261,6 +261,12 @@ class MetricFixtureTest(unittest.TestCase):
         real = summaries(judged, [chunk("vat", 6, 10), amount, vat], [amount, vat])
         rec = evaluation.recommend(real)
         self.assertEqual((rec["status"], rec["selected"], rec["finalist"]), ("final", "H-run", "K1-run"))
+        # the prerequisite holds on both sides: an unreviewed baseline or an unreviewed candidate keeps it pending
+        for k1_pending, h_pending in ((1, 0), (0, 1)):
+            one_sided = [{**real[0], "ndcg_pool": {"unlabelled_top5_passages": k1_pending}},
+                         {**real[1], "ndcg_pool": {"unlabelled_top5_passages": h_pending}}]
+            rec = evaluation.recommend(one_sided)
+            self.assertEqual((rec["status"], rec["selected"], rec["finalist"]), ("pending_pool_review", "K1-run", None))
         # pilot summaries have no pool and keep the phase-2 policy
         pilot = [{**r, "ndcg_pool": None} for r in before]
         self.assertEqual((evaluation.recommend(pilot)["status"], evaluation.recommend(pilot)["selected"]),
@@ -529,6 +535,17 @@ class GoldRetrievalTest(Phase4Case):
         self.assertFalse(any("pool review" in e for e in evaluation.decision_errors(self.s, k1["run_id"], decision)))
         del decision["finalist_run_id"], decision["pool_review"]  # K1 alone is the provisional default
         self.assertFalse(any("pool review" in e for e in evaluation.decision_errors(self.s, k1["run_id"], decision)))
+        # promoting another run also needs the K1 baseline's review, not only the promoted run's
+        (k0,) = evaluation.evaluate_retrieval(self.s, fixtures.analyzer(), None, "dev", ["K0"])
+        k0_config, k0_scores = evaluation.load_run(self.s, k0["run_id"])
+        k0_pending = evaluation.pool_pending({"ndcg_pool": k0_scores["aggregate"]["ndcg_pool"]})
+        promote = {"run_id": k0["run_id"], "mode": k0_config["mode"], "decided_by": "owner", "rationale": "r",
+                   "pool_review": {"reviewed_by": "reviewer", "runs": {k0["run_id"]: k0_pending}}}
+        errors = [e for e in evaluation.decision_errors(self.s, k0["run_id"], promote) if "pool review" in e]
+        self.assertEqual(len(errors), 1)
+        self.assertIn(k1["run_id"], errors[0])
+        promote["pool_review"]["runs"][k1["run_id"]] = pending
+        self.assertFalse(any("pool review" in e for e in evaluation.decision_errors(self.s, k0["run_id"], promote)))
         with self.assertRaisesRegex(evaluation.EvaluationError, "sealed"):
             evaluation.evaluate_retrieval(self.s, fixtures.analyzer(), None, "test", ["K1"])
 

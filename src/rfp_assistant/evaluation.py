@@ -1278,13 +1278,30 @@ def decision_errors(settings: Settings, run_id: str, decision: dict) -> list[str
                     or f_config.get("population_sha256") != config.get("population_sha256")):
                 errors.append("the finalist must be a complete current-policy run on the same evaluated population")
     if config.get("label") != "K1" or finalist:
-        errors += pool_review_errors(settings, [run_id] + ([finalist] if finalist else []), decision)
+        # the claim compares against the K1 baseline, so its pool needs the review as much as the named runs
+        named = [run_id] + ([finalist] if finalist else [])
+        errors += pool_review_errors(settings, list(dict.fromkeys(named + _k1_baselines(settings, config))), decision)
     return errors + run_errors(settings, run_id)
 
 
+def _k1_baselines(settings: Settings, config: dict) -> list[str]:
+    """The newest complete current-policy K1 run on the same evaluated population (the comparison baseline)."""
+    base = settings.data_dir / "runs"
+    found = []
+    for d in base.glob("K1-*") if base.exists() else []:
+        try:
+            c, sc = load_run(settings, d.name)
+        except (EvaluationError, json.JSONDecodeError):
+            continue
+        if (c.get("eval_version") == EVAL_VERSION and sc.get("status") == "complete"
+                and c.get("population_sha256") == config.get("population_sha256")):
+            found.append((sc.get("created_at", ""), d.name))
+    return [max(found)[1]] if found else []
+
+
 def pool_review_errors(settings: Settings, run_ids: list[str], decision: dict) -> list[str]:
-    """Promoting a run, or naming a finalist, claims a measured benefit: every named run's unlabelled top-5
-    passages must have a recorded review (`pool_review`: reviewer and, per run, the count reviewed, which must
+    """Promoting a run, or naming a finalist, claims a measured benefit over K1: the unlabelled top-5 passages of
+    every named run and of the K1 baseline must have a recorded review (`pool_review`: reviewer and, per run, the count reviewed, which must
     match the run). K1 alone, the provisional default, needs none. The review is attested, not blind."""
     review = decision.get("pool_review") or {}
     errors = []
