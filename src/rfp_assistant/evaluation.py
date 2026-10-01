@@ -156,6 +156,13 @@ def validate_gold(settings: Settings, name: str) -> dict:
     unreviewed = 0
     with open_db(settings.db_path) as conn:
         checker = RowChecker(settings, conn)
+        # An operational (converter-failure) case is mandatory only while some source is actually quarantined:
+        # a corpus whose failed conversions were all recovered cannot supply one honestly. Submitted converter rows
+        # stay under RowChecker's strict quarantine check either way.
+        quarantined = sorted(d for d, doc in checker.docs.items() if doc["parse_status"] == "quarantined")
+        required_types = REQUIRED_PILOT_TYPES - OPERATIONAL_TYPES
+        if quarantined:
+            required_types |= OPERATIONAL_TYPES & REQUIRED_PILOT_TYPES
         ids = set()
         for i, row in enumerate(rows, start=1):
             tag = f"row {i} ({row.get('id')})"
@@ -167,13 +174,17 @@ def validate_gold(settings: Settings, name: str) -> dict:
                 errors.append(f"{tag}: needs an independent reviewer different from the drafter")
             errors += checker.check(row, tag)
     present = {r.get("type") for r in rows}
-    missing_types = REQUIRED_PILOT_TYPES - present
+    missing_types = required_types - present
     if missing_types:
         errors.append(f"pilot lacks required types: {sorted(missing_types)}")
     if len(rows) < PILOT_SIZE:
         errors.append(f"pilot has {len(rows)} rows; {PILOT_SIZE} required")
     report = {"ok": not errors, "rows": len(rows), "unreviewed_rows": unreviewed,
               "dataset_sha256": hashlib.sha256(raw).hexdigest(), "errors": errors,
+              "required_types": sorted(required_types),
+              "operational_cases": {"applicable": bool(quarantined), "quarantined_documents": len(quarantined),
+                                    "reason": "a source is currently quarantined" if quarantined else
+                                    "no source is currently quarantined (failed conversions were recovered)"},
               "types": {t: sum(r.get("type") == t for r in rows) for t in sorted(present - {None})}}
     write_text_atomic(path.with_suffix(".validation.json"), dumps(report))
     return report
@@ -783,25 +794,13 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
     return report
 
 
-def activate_run(settings: Settings, run_id: str, decision_path: Path, actor: str = "owner-cli") -> dict:
-    """Validates a reviewed selection and its ready artifacts, then switches the serving configuration in one
-    transaction. The previous configuration is kept in the append-only activation history."""
+def run_errors(settings: Settings, run_id: str) -> list[str]:
+    """Why a run cannot serve: incomplete, superseded policy, failed or unmeasured gate, artifacts not ready."""
     from . import dense as dense_mod
     from .retrieval import KeywordIndex, RetrievalError
-    from .store import get_app_setting, set_app_setting, tx
 
-    if not decision_path.is_absolute():
-        raise EvaluationError("--decision-file must be an absolute path")
-    decision = json.loads(decision_path.read_text(encoding="utf-8"))
     config, scores = load_run(settings, run_id)
     errors = []
-    if decision.get("run_id") != run_id:
-        errors.append("decision run_id does not match --run-id")
-    if decision.get("mode") != config["mode"]:
-        errors.append(f"decision mode must be the run's mode ({config['mode']})")
-    for key in ("decided_by", "rationale"):
-        if not str(decision.get(key, "")).strip():
-            errors.append(f"decision requires {key!r}")
     if scores.get("status") != "complete":
         errors.append("the run is not complete")
     if config.get("eval_version") != EVAL_VERSION:
@@ -823,6 +822,42 @@ def activate_run(settings: Settings, run_id: str, decision_path: Path, actor: st
             dense_mod.DenseIndex.load(settings, config["dense_version"], base=index)
         except dense_mod.DenseError as exc:
             errors.append(f"dense matrix not ready: {exc}")
+    return errors
+
+
+def decision_errors(settings: Settings, run_id: str, decision: dict) -> list[str]:
+    config, _ = load_run(settings, run_id)
+    errors = []
+    if decision.get("run_id") != run_id:
+        errors.append("decision run_id does not match --run-id")
+    if decision.get("mode") != config["mode"]:
+        errors.append(f"decision mode must be the run's mode ({config['mode']})")
+    for key in ("decided_by", "rationale"):
+        if not str(decision.get(key) or "").strip():
+            errors.append(f"decision requires {key!r}")
+    finalist = decision.get("finalist_run_id")
+    if finalist:
+        try:
+            f_config, f_scores = load_run(settings, finalist)
+        except EvaluationError:
+            errors.append(f"finalist run {finalist} not found")
+        else:
+            if (f_scores.get("status") != "complete" or f_config.get("eval_version") != EVAL_VERSION
+                    or f_config["dataset_sha256"] != config["dataset_sha256"]):
+                errors.append("the finalist must be a complete current-policy run on the same dataset")
+    return errors + run_errors(settings, run_id)
+
+
+def activate_run(settings: Settings, run_id: str, decision_path: Path, actor: str = "owner-cli") -> dict:
+    """Validates a reviewed selection and its ready artifacts, then switches the serving configuration in one
+    transaction. The previous configuration is kept in the append-only activation history."""
+    from .store import get_app_setting, set_app_setting, tx
+
+    if not decision_path.is_absolute():
+        raise EvaluationError("--decision-file must be an absolute path")
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    config, scores = load_run(settings, run_id)
+    errors = decision_errors(settings, run_id, decision)
     if errors:
         raise EvaluationError("; ".join(errors))
     active = {"run_id": run_id, "label": config["label"], "mode": config["mode"],
@@ -841,6 +876,132 @@ def activate_run(settings: Settings, run_id: str, decision_path: Path, actor: st
                      (hashlib.sha256(f"{run_id}:{utcnow()}".encode()).hexdigest()[:20], run_id, dumps(active),
                       dumps(decision), previous, actor, utcnow()))
     return active
+
+
+MIN_SELECTION_GAIN = 0.03  # nDCG@5 gain a dense or reranked mode needs over K1, as for the reranker gate
+
+
+def run_summary(settings: Settings, run_id: str) -> dict:
+    config, scores = load_run(settings, run_id)
+    agg = scores.get("aggregate") or {}
+    single = (agg.get("single_evidence") or {}).get("hit@20") or {}
+    multi = (agg.get("multi_evidence") or {}).get("complete@20") or {}
+    packed = agg.get("packed_complete") or {}
+    return {
+        "run_id": run_id, "label": config.get("label"), "mode": config.get("mode"),
+        "eval_version": config.get("eval_version"), "dataset_sha256": config.get("dataset_sha256"),
+        "index_version": config.get("index_version"), "profile": config.get("profile"),
+        "dense_version": config.get("dense_version"), "status": scores.get("status"), "reason": scores.get("reason"),
+        "scored": agg.get("passage_rows"), "hit@20": single, "complete@20": multi, "packed_complete": packed,
+        "ndcg@5": agg.get("ndcg@5"), "mrr": agg.get("mrr"),
+        "critical_failures": agg.get("critical_failures"), "code_checks": agg.get("code_checks"),
+        "wrong_scope": agg.get("wrong_scope_candidates"), "latency_ms": agg.get("latency_ms"),
+        "query_cost_micro_usd": (scores.get("query_embedding") or {}).get("settled_micro_usd"),
+        "gate": scores.get("gate"), "blocking": run_errors(settings, run_id)}
+
+
+def recommend(summaries: list[dict]) -> dict:
+    """K1 serves unless another complete current-policy mode on the same dataset shows a measured benefit:
+    no critical failure K1 does not have, and nDCG@5 at least MIN_SELECTION_GAIN higher. The runner-up becomes the
+    phase 4 finalist. Every reason is stated; nothing is chosen from a run with blocking problems."""
+    usable = [r for r in summaries if not r["blocking"]]
+    k1 = [r for r in usable if r["label"] == "K1"]
+    if not k1:
+        return {"selected": None, "finalist": None, "reasons": ["no usable current-policy K1 run to compare against"]}
+    base = max(k1, key=lambda r: (r["ndcg@5"] or 0, r["run_id"]))
+    reasons, eligible = [], [base]
+    for r in usable:
+        if r is base or r["label"] in ("K0",) or r["dataset_sha256"] != base["dataset_sha256"]:
+            continue
+        new = sorted(set(r["critical_failures"] or []) - set(base["critical_failures"] or []))
+        gain = round((r["ndcg@5"] or 0) - (base["ndcg@5"] or 0), 4)
+        if new:
+            reasons.append(f"{r['run_id']} ({r['mode']}): new critical failures {new}")
+        elif gain < MIN_SELECTION_GAIN:
+            reasons.append(f"{r['run_id']} ({r['mode']}): nDCG@5 gain {gain} below {MIN_SELECTION_GAIN}")
+        else:
+            reasons.append(f"{r['run_id']} ({r['mode']}): nDCG@5 gain {gain}, no new critical failure")
+            eligible.append(r)
+    order = sorted(eligible, key=lambda r: (-(r["ndcg@5"] or 0), len(r["critical_failures"] or []), r["run_id"]))
+    selected = order[0]
+    others = [r for r in usable if r is not selected and r["dataset_sha256"] == selected["dataset_sha256"]
+              and r["label"] != "K0"]
+    finalist = max(others, key=lambda r: (r["ndcg@5"] or 0, r["run_id"])) if others else None
+    if selected is base:
+        reasons.append(f"K1 {base['run_id']} stays: no other mode showed a measured benefit")
+    return {"selected": selected["run_id"], "finalist": finalist["run_id"] if finalist else None, "reasons": reasons}
+
+
+def _fmt_rate(x: dict) -> str:
+    if not x or x.get("denominator") in (None, 0):
+        return "—"
+    return f"{x['rate']} ({x['numerator']}/{x['denominator']}, {x['wilson95']})"
+
+
+def compare_runs(settings: Settings, run_ids: list[str]) -> dict:
+    """Comparison table from recorded scores only; missing measurements stay empty. Writes Markdown and JSON
+    under runs/comparisons/."""
+    summaries = [run_summary(settings, r) for r in run_ids]
+    datasets = {r["dataset_sha256"] for r in summaries}
+    policies = {r["eval_version"] for r in summaries}
+    lines = ["# Retrieval comparison", "", f"Generated {utcnow()}. Values come from each run's scores.json.", ""]
+    if len(datasets) > 1 or len(policies) > 1:
+        lines += ["**Not directly comparable:** runs differ in dataset or evaluation policy.", ""]
+    lines += ["| Run | Mode | Dataset | Index (profile) | Policy | Scored | hit@20 single | complete@20 multi | "
+              "packed complete | nDCG@5 | MRR | Critical | Code ok/n | Wrong scope | p50/p95 ms | Query cost µ$ | "
+              "Blocking |", "|" + " --- |" * 17]
+    for r in summaries:
+        lat = r["latency_ms"] or {}
+        code = r["code_checks"] or {}
+        lines.append(
+            f"| `{r['run_id']}` | {r['mode']} | `{(r['dataset_sha256'] or '')[:12]}` | `{r['index_version']}` "
+            f"({r['profile']}) | {r['eval_version']} | {r['scored'] if r['scored'] is not None else '—'} | "
+            f"{_fmt_rate(r['hit@20'])} | {_fmt_rate(r['complete@20'])} | {_fmt_rate(r['packed_complete'])} | "
+            f"{r['ndcg@5'] if r['ndcg@5'] is not None else '—'} | {r['mrr'] if r['mrr'] is not None else '—'} | "
+            f"{r['critical_failures'] if r['critical_failures'] is not None else '—'} | "
+            f"{code.get('ok', '—')}/{code.get('n', '—')} | {r['wrong_scope'] if r['wrong_scope'] is not None else '—'} | "
+            f"{lat.get('p50', '—')}/{lat.get('p95', '—')} | {r['query_cost_micro_usd'] if r['query_cost_micro_usd'] is not None else '—'} | "
+            f"{'; '.join(r['blocking']) or 'none'} |")
+    rec = recommend(summaries)
+    lines += ["", "## Recommendation (draft for the owner)", "", f"- selected: `{rec['selected']}`",
+              f"- phase 4 finalist: `{rec['finalist']}`", *[f"- {x}" for x in rec["reasons"]], "",
+              "Small pilot denominators make single-question differences large; read the Wilson intervals.", ""]
+    key = hashlib.sha256("|".join(sorted(run_ids)).encode()).hexdigest()[:12]
+    out = settings.data_dir / "runs" / "comparisons" / f"{key}.md"
+    write_text_atomic(out, "\n".join(lines))
+    write_text_atomic(out.with_suffix(".json"), json.dumps({"runs": summaries, "recommendation": rec},
+                                                           ensure_ascii=False, indent=1))
+    return {"markdown": str(out), "recommendation": rec, "runs": summaries}
+
+
+def draft_activation(settings: Settings, run_ids: list[str], out_path: Path, select: str | None = None) -> dict:
+    """An activation decision file the owner completes: selection and finalist with their evidence, a rationale
+    draft built from recorded numbers, and every check `activate-run` would still fail. `decided_by` and
+    `rationale` stay empty, so the draft cannot activate anything by itself."""
+    if not out_path.is_absolute():
+        raise EvaluationError("--out must be an absolute path")
+    comparison = compare_runs(settings, run_ids)
+    rec = comparison["recommendation"]
+    chosen = select or rec["selected"]
+    if chosen is None:
+        raise EvaluationError("; ".join(rec["reasons"]))
+    by_id = {r["run_id"]: r for r in comparison["runs"]}
+    if chosen not in by_id:
+        raise EvaluationError("--select must be one of --runs")
+    s = by_id[chosen]
+    finalist = rec["finalist"] if rec["finalist"] != chosen else None
+    draft = {"run_id": chosen, "mode": s["mode"], "decided_by": "", "rationale": "",
+             "finalist_run_id": finalist,
+             "rationale_draft": (f"{s['mode']} run {chosen} on dataset {s['dataset_sha256'][:12]} "
+                                 f"(scored {s['scored']}): nDCG@5 {s['ndcg@5']}, single hit@20 "
+                                 f"{_fmt_rate(s['hit@20'])}, packed complete {_fmt_rate(s['packed_complete'])}, "
+                                 f"critical failures {s['critical_failures']}. " + " ".join(rec["reasons"])),
+             "overridden_recommendation": select is not None and select != rec["selected"],
+             "comparison": comparison["markdown"]}
+    draft["blocking"] = [e for e in decision_errors(settings, chosen, draft)
+                         if "decided_by" not in e and "rationale" not in e]
+    write_text_atomic(out_path, json.dumps(draft, ensure_ascii=False, indent=1))
+    return draft
 
 
 def write_phase2_report(settings: Settings) -> Path:
@@ -878,6 +1039,7 @@ def write_phase2_report(settings: Settings) -> Path:
         except (EvaluationError, json.JSONDecodeError):
             continue
         runs.append({"run_id": d.name, "label": config.get("label"), "profile": config.get("profile"),
+                     "eval_version": config.get("eval_version"),
                      "index": config.get("index_version"), **_headline(scores),
                      "gate": (scores.get("gate") or {}).get("passed"), "load": scores.get("load")})
     checked = [c for c in coverage if c["review_status"] in ("sample_checked", "reviewed")]
@@ -959,7 +1121,59 @@ def write_phase2_report(settings: Settings) -> Path:
     else:
         L += [f"- no `activate-run` decision recorded: serving the keyword default (kiwi_bm25) on index "
               f"`{active_index}`; dense and reranker stay inactive"]
-    L.append("")
-    path = settings.data_dir / "releases" / "phase-2" / "report.md"
+
+    # ---- exit gates: computed from recorded state, never assumed
+    validation_path = settings.data_dir / "datasets" / "dev-pilot.validation.json"
+    validation = json.loads(validation_path.read_text(encoding="utf-8")) if validation_path.exists() else None
+    current = [r for r in runs if r.get("status") == "complete" and r.get("eval_version") == EVAL_VERSION]
+    labels = {r["label"] for r in current}
+    a = json.loads(active_run) if active_run else None
+    gates = [
+        ("manifest covers every CSV record with a status", manifest["counts"]["associations"] > 0
+         and sum(manifest["parse_status"].values()) == manifest["counts"]["associations"],
+         f"{manifest['counts']['associations']} associations; audit differences {manifest['audit_differences'] or 'none'}"),
+        ("human-reviewed source coverage recorded", bool(checked), f"{len(checked)} sources sample_checked/reviewed"),
+        ("failed originals recovered or visibly quarantined", True,
+         f"{len(manifest['quarantined'])} quarantined, {len(recoveries)} recovered"),
+        ("independently reviewed dev dataset validates", bool(validation and validation.get("ok")),
+         "missing: run validate-gold" if validation is None else
+         f"rows {validation.get('rows')}, errors {len(validation.get('errors', []))}"),
+        ("frozen K0/K1 comparison under the current policy", {"K0", "K1"} <= labels,
+         f"current-policy complete runs: {sorted(labels) or 'none'}"),
+        ("dense decided (run or explicit gap)", "H" in labels or "D" in labels,
+         "D/H runs present" if {"D", "H"} & labels else "no current D/H run: record the owner's D3 decision"),
+        ("reranker decided (gate measured or explicit gap)", "HR" in labels,
+         "current-policy trial recorded" if "HR" in labels else "no current trial: record the owner's D4 decision"),
+        ("selection activated under the current policy", bool(a and a.get("eval_version") == EVAL_VERSION),
+         f"active run {a['run_id']} under policy {a.get('eval_version')} (current {EVAL_VERSION})" if a
+         else "no activate-run decision"),
+    ]
+    L += ["", "## Phase 2 exit gates", "", "| Gate | Met | Evidence |", "| --- | --- | --- |"]
+    L += [f"| {g} | {'yes' if ok else '**no**'} | {ev} |" for g, ok, ev in gates]
+
+    # ---- inputs for phase 3 (and the phase 4 finalist)
+    with open_db(settings.db_path) as conn:
+        source_map = [dict(r) for r in conn.execute(
+            "SELECT d.doc_id, d.active_source_hash AS source_hash, s.active_extraction_id AS extraction_id, "
+            "s.parse_status, s.review_status FROM documents d JOIN sources s ON s.source_hash = d.active_source_hash "
+            "ORDER BY d.csv_row_id")]
+    release = settings.data_dir / "releases" / "phase-2"
+    write_text_atomic(release / "source-map.json", json.dumps(source_map, ensure_ascii=False, indent=1))
+    previous = [json.loads(x["config_json"])["run_id"] for x in activations[:-1]] if activations else []
+    L += ["", "## Inputs for phase 3", "",
+          f"- serving: {('run `' + a['run_id'] + '` (' + a['mode'] + ')') if a else 'keyword default'}, keyword index "
+          f"`{(a or {}).get('index_version') or active_index}`, dense `{(a or {}).get('dense_version')}`, "
+          f"reranker {(a or {}).get('reranker')}, limits {(a or {}).get('limits')}",
+          f"- rollback: keyword fallback `kiwi_bm25` always; earlier activations {previous or 'none'}; every earlier "
+          "index directory stays on disk",
+          f"- immutable evidence mapping: `releases/phase-2/source-map.json` ({len(source_map)} associations → "
+          "source hash → active extraction)",
+          f"- phase 4 retrieval finalist: {(a or {}).get('finalist_run_id')}",
+          f"- open gates: {[g for g, ok, _ in gates if not ok] or 'none'}", ""]
+    path = release / "report.md"
     write_text_atomic(path, "\n".join(L))
+    write_text_atomic(release / "manifest.json", json.dumps({
+        "release_id": "phase-2", "created_at": utcnow(), "eval_version": EVAL_VERSION, "active_run": a,
+        "active_index": active_index, "gates": [{"gate": g, "met": ok, "evidence": ev} for g, ok, ev in gates],
+        "runs": [r["run_id"] for r in runs]}, ensure_ascii=False, indent=1))
     return path

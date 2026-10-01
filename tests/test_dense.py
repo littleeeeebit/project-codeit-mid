@@ -359,6 +359,50 @@ class EvaluationRunTest(unittest.TestCase):
             res.close()
         self.assertEqual([(x.reranker_max_concurrency, x.reranker_max_length) for x in seen], [(1, 512)])
 
+    def test_comparison_recommends_k1_without_measured_benefit_and_drafts_an_inert_decision(self):
+        s = self.env.settings
+        runs = {o["label"]: o["run_id"] for o in evaluation.evaluate_retrieval(
+            s, fixtures.analyzer(), self.transport, "dev-pilot", ["K0", "K1", "D", "H"], allow_paid_queries=True)}
+        out = evaluation.compare_runs(s, list(runs.values()))
+        self.assertEqual(out["recommendation"]["selected"], runs["K1"])  # D/H gain < 0.03 on this fixture
+        self.assertIn(out["recommendation"]["finalist"], (runs["D"], runs["H"]))
+        table = Path(out["markdown"]).read_text(encoding="utf-8")
+        self.assertIn("Wilson", table)
+        self.assertIn(runs["H"], table)
+        draft_path = Path(self.tmp.name) / "decision-draft.json"
+        draft = evaluation.draft_activation(s, list(runs.values()), draft_path)
+        self.assertEqual((draft["run_id"], draft["mode"], draft["decided_by"], draft["blocking"]),
+                         (runs["K1"], "kiwi_bm25", "", []))
+        self.assertIn("nDCG@5", draft["rationale_draft"])
+        with self.assertRaises(evaluation.EvaluationError):  # the draft alone activates nothing
+            evaluation.activate_run(s, runs["K1"], draft_path)
+        decision = json.loads(draft_path.read_text(encoding="utf-8"))
+        decision.update(decided_by="owner", rationale=decision["rationale_draft"])
+        draft_path.write_text(json.dumps(decision, ensure_ascii=False), encoding="utf-8")
+        report = evaluation.write_phase2_report(s).read_text(encoding="utf-8")
+        self.assertIn("| selection activated under the current policy | **no** |", report)
+        active = evaluation.activate_run(s, runs["K1"], draft_path)
+        self.assertEqual(active["finalist_run_id"], decision["finalist_run_id"])
+        report = evaluation.write_phase2_report(s).read_text(encoding="utf-8")
+        self.assertIn("| selection activated under the current policy | yes |", report)
+        self.assertIn("| frozen K0/K1 comparison under the current policy | yes |", report)
+        self.assertIn("## Inputs for phase 3", report)
+        source_map = json.loads((s.data_dir / "releases" / "phase-2" / "source-map.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(source_map), 4)
+        # a run scored under another policy is shown as blocked and never recommended
+        legacy_dir = s.data_dir / "runs" / runs["H"]
+        config = json.loads((legacy_dir / "config.json").read_text(encoding="utf-8"))
+        config["eval_version"] = "retrieval-eval-1"
+        (legacy_dir / "config.json").write_text(json.dumps(config), encoding="utf-8")
+        summary = {r["run_id"]: r for r in evaluation.compare_runs(s, list(runs.values()))["runs"]}
+        self.assertTrue(any("evaluation policy" in e for e in summary[runs["H"]]["blocking"]))
+        with self.assertRaises(evaluation.EvaluationError):  # an owner override cannot pick a blocked run either
+            draft = evaluation.draft_activation(s, list(runs.values()), Path(self.tmp.name) / "d2.json",
+                                                select=runs["H"])
+            decision = {**draft, "decided_by": "owner", "rationale": "x"}
+            (Path(self.tmp.name) / "d2.json").write_text(json.dumps(decision), encoding="utf-8")
+            evaluation.activate_run(s, runs["H"], Path(self.tmp.name) / "d2.json")
+
     def test_missing_query_usage_stops_paid_evaluation_queries(self):
         no_usage = generation.FakeTransport(embedder=lambda inputs, dims: generation.EmbeddingResponse(
             generation.fake_embeddings(inputs, dims).vectors, None))

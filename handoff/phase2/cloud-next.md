@@ -41,3 +41,13 @@ Read [.wiki/gold-drafting.md](../../.wiki/gold-drafting.md) and the actual rejec
 Use `templates/gold-draft.example.json` as the row shape. Fill IDs from the current inventory and `datasets/families.json`; never choose a family split yourself. Keep `reviewed_by` and `reviewed_at` null in drafts. Ensure the new batch restores at least 24 accepted rows and includes numeric qualifiers, late table evidence and repeated codes. Source quotes belong in local candidate inputs, not the shared baseline inventory.
 
 After that, follow `README.md` for frozen K0/K1 comparisons and use actual failures/results for further changes and selection drafts. Dense, HR measurements and activation remain separately decided local operations.
+
+## Status from Cloud (PR #4)
+
+Done offline, with fake-provider tests (`check --phase 2 --provider fake`, 119 passed on Linux):
+
+- `validate-gold` derives the mandatory operational type from current source states. The report now carries `required_types` and `operational_cases`. All five acceptance cases above are tests in `tests/test_gold.py::ValidationApplicabilityTest`; the "all parsed" case uses a real `recover-source` on the fixture rather than a faked state. Frozen run eligibility is unaffected: retrieval runs read reviewed rows directly and never consulted this rule, so `EVAL_VERSION` stays `retrieval-eval-2`.
+- `gold excerpts --out <absolute new dir>` produces the narrowly scoped drafting input this file asks for: candidate elements per dev-family document (numeric/qualifier, late table, repeated code, deadline) with exact IDs, plus `drafting-context.json` with the rejection reasons/inferences and existing question keys. It holds source text, so it belongs in `local-inputs/`; share it only if the owner authorizes Cloud to draft the next batch from it.
+- `compare-runs` and `draft-activation` turn real runs into the comparison table and an inert decision draft (owner fields empty, blocking checks listed). `report --phase 2` now writes an exit-gate checklist, `manifest.json` and `source-map.json`.
+
+Next local steps after merge, in order: `ingest --profile all`, `fidelity run`, human reviews and `import-reviews`, gold decisions on the 23 pending rows, `gold excerpts` for the next batch (shared with Cloud if authorized), independent approval to at least 24 rows, `validate-gold`, the two `--no-activate` builds, `evaluate-retrieval` K0,K1 on both indexes, `compare-runs`, `draft-activation`, `report --phase 2`. Collect with `tools/phase2_handoff.py --run-id ...` and push the package. D3/D4 remain owner decisions.

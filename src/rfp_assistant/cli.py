@@ -199,6 +199,19 @@ def cmd_activate_run(args, settings) -> int:
     return 0
 
 
+def cmd_compare_runs(args, settings) -> int:
+    out = evaluation.compare_runs(settings, args.run_id)
+    _print({"markdown": out["markdown"], "recommendation": out["recommendation"]})
+    return 0
+
+
+def cmd_draft_activation(args, settings) -> int:
+    draft = evaluation.draft_activation(settings, [r.strip() for r in args.runs.split(",") if r.strip()],
+                                        Path(args.out), select=args.select)
+    _print(draft)
+    return 0
+
+
 def cmd_report(args, settings) -> int:
     if args.phase != 2:
         print("only --phase 2 is implemented", file=sys.stderr)
@@ -260,6 +273,11 @@ def cmd_gold(args, settings) -> int:
         return 1 if errors else 0
     elif args.action == "sync":
         _print({"written": gold.sync(settings)})
+    elif args.action == "excerpts":
+        if not args.out:
+            raise gold.GoldError("excerpts needs --out <absolute new directory>")
+        evaluation.assign_families(settings)
+        _print(gold.write_excerpts(settings, Path(args.out), per_category=args.per_category))
     elif args.action == "repin":
         _print(gold.repin(settings, args.batch or ""))
     else:
@@ -333,6 +351,12 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("activate-run", help="validate a reviewed selection and switch the serving configuration")
     s.add_argument("--run-id", required=True)
     s.add_argument("--decision-file", required=True)
+    s = sub.add_parser("compare-runs", help="comparison table and K1-default recommendation from recorded runs")
+    s.add_argument("--run-id", action="append", required=True)
+    s = sub.add_parser("draft-activation", help="decision file for the owner to complete; activates nothing")
+    s.add_argument("--runs", required=True, help="comma-separated run IDs to compare")
+    s.add_argument("--out", required=True, help="absolute path of the draft decision JSON")
+    s.add_argument("--select", help="choose this run instead of the recommendation (recorded as an override)")
     s = sub.add_parser("report", help="write the phase handoff report from recorded state")
     s.add_argument("--phase", type=int, required=True)
     s = sub.add_parser("check", help="automated phase gate in temporary state")
@@ -351,7 +375,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--enable-paid", action="store_true")
     sub.add_parser("budget-status")
     s = sub.add_parser("gold", help="dataset candidate queue and rejection wiki")
-    s.add_argument("action", choices=["status", "submit", "infer", "check", "sync", "repin"])
+    s.add_argument("action", choices=["status", "submit", "infer", "check", "sync", "repin", "excerpts"])
+    s.add_argument("--out", help="excerpts: absolute new directory for excerpts.jsonl and drafting-context.json "
+                                 "(contains source text; keep it in local inputs unless the owner shares it)")
+    s.add_argument("--per-category", type=int, default=2, help="excerpts: elements per document and category")
     s.add_argument("--file", help="submit: candidate JSONL; infer: JSON with cause, lesson, drafting_rule")
     s.add_argument("--batch", help="submit: new batch id; repin: batch id for pending rows moved to the active "
                                    "extraction after a parser revision")
@@ -367,6 +394,7 @@ COMMANDS = {"init": cmd_init, "manifest": cmd_manifest, "ingest": cmd_ingest, "r
             "resolve-metadata": cmd_resolve_metadata, "plan-embeddings": cmd_plan_embeddings,
             "build-dense": cmd_build_dense, "evaluate-retrieval": cmd_evaluate_retrieval,
             "trial-reranker": cmd_trial_reranker, "activate-run": cmd_activate_run, "report": cmd_report,
+            "compare-runs": cmd_compare_runs, "draft-activation": cmd_draft_activation,
             "fidelity": cmd_fidelity, "ocr": cmd_ocr, "build-keyword": cmd_build_keyword, "check": cmd_check, "validate-gold": cmd_validate_gold,
             "configure-budget": cmd_configure_budget, "budget-status": cmd_budget_status,
             "gold": cmd_gold}

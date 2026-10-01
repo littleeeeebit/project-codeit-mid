@@ -18,7 +18,7 @@ import sqlite3
 from pathlib import Path
 
 from .evaluation import METADATA_TYPES, OPERATIONAL_TYPES, RowChecker, dataset_path
-from .ingestion import QUARANTINE_TEXT, nfc
+from .ingestion import CODE_RE, QUARANTINE_TEXT, nfc
 from .settings import Settings
 from .store import dumps, open_db, tx, utcnow, write_jsonl_atomic, write_text_atomic
 
@@ -455,3 +455,99 @@ def recent(settings: Settings, limit: int = 20) -> list[dict]:
     return [{"candidate_id": r["candidate_id"], "status": r["status"], "decided_by": r["decided_by"],
              "decided_at": r["decided_at"],
              "categories": json.loads(r["reject_json"])["categories"] if r["reject_json"] else []} for r in rows]
+
+
+# ---------------------------------------------------------------- drafting inputs
+
+EXCERPT_CATEGORIES = ("numeric_qualifier", "late_table", "repeated_code", "deadline")
+QUALIFIER_RE = re.compile(r"(\d[\d,]{3,}\s*원|부가(가치)?세|VAT|\d+\s*(%|개월|일\s*이내|년\s*이내)|이상|이하|이내|초과|미만)")
+DEADLINE_RE = re.compile(r"(20\d\d\s*[.\-년]\s*\d{1,2}\s*[.\-월]\s*\d{1,2}|마감|제출\s*기한|까지)")
+LATE_FROM = 0.7
+
+
+def excerpts(settings: Settings, per_category: int = 2, max_chars: int = 800) -> dict:
+    """Narrowly scoped drafting inputs: a few candidate elements per dev-family document and category, plus the
+    queue context a drafter must respect (rejections with their reasons, existing question keys). Contains source
+    text, so it belongs in the local inputs; the owner decides whether to share it."""
+    fam_path = settings.data_dir / "datasets" / "families.json"
+    if not fam_path.exists():
+        raise GoldError("families.json is missing; run validate-gold or assign families first")
+    families = json.loads(fam_path.read_text(encoding="utf-8"))["families"]
+    dev = {d: k for k, f in families.items() if f["split"] == "dev" for d in f["doc_ids"]}
+    with open_db(settings.db_path) as conn:
+        docs = [dict(r) for r in conn.execute(
+            "SELECT d.doc_id, d.active_source_hash, s.active_extraction_id FROM documents d "
+            "JOIN sources s ON s.source_hash = d.active_source_hash WHERE s.parse_status = 'parsed' "
+            "ORDER BY d.csv_row_id")]
+        docs = [d for d in docs if d["doc_id"] in dev]
+        seen_sources: set[str] = set()
+        elements: dict[str, list[dict]] = {}
+        for d in docs:
+            if d["active_source_hash"] in seen_sources:
+                continue  # byte-identical copies share one extraction: draft against one association
+            seen_sources.add(d["active_source_hash"])
+            elements[d["doc_id"]] = [dict(r) for r in conn.execute(
+                "SELECT element_id, source_order, kind, raw_text, location_json FROM elements "
+                "WHERE extraction_id = ? AND kind != 'toc' ORDER BY source_order", (d["active_extraction_id"],))]
+        code_docs: dict[str, set[str]] = {}
+        for doc_id, els in elements.items():
+            for e in els:
+                for code in CODE_RE.findall(e["raw_text"]):
+                    code_docs.setdefault(code, set()).add(doc_id)
+        rejected = [{"candidate_id": r["candidate_id"], "doc_id": json.loads(r["row_json"]).get("doc_id"),
+                     "type": json.loads(r["row_json"]).get("type"),
+                     "categories": json.loads(r["reject_json"])["categories"],
+                     "note": json.loads(r["reject_json"]).get("note"),
+                     "inference": json.loads(r["inference_json"]) if r["inference_json"] else None}
+                    for r in conn.execute("SELECT * FROM gold_candidates WHERE status = 'rejected'")]
+        keys = sorted(r[0] for r in conn.execute("SELECT question_key FROM gold_candidates"))
+    out = []
+    for d in docs:
+        els = elements.get(d["doc_id"])
+        if not els:
+            continue
+        n = len(els)
+        picked: dict[str, int] = {}
+        for e in els:
+            text = e["raw_text"].strip()
+            if len(text) < 20:
+                continue
+            position = e["source_order"] / max(1, els[-1]["source_order"])
+            cats = []
+            if QUALIFIER_RE.search(text):
+                cats.append("numeric_qualifier")
+            if e["kind"] == "table" and position >= LATE_FROM:
+                cats.append("late_table")
+            if any(len(code_docs.get(c, ())) > 1 for c in CODE_RE.findall(text)):
+                cats.append("repeated_code")
+            if DEADLINE_RE.search(text):
+                cats.append("deadline")
+            for cat in cats:
+                if picked.get(cat, 0) >= per_category:
+                    continue
+                picked[cat] = picked.get(cat, 0) + 1
+                loc = json.loads(e["location_json"])
+                out.append({"category": cat, "doc_id": d["doc_id"], "source_hash": d["active_source_hash"],
+                            "extraction_id": d["active_extraction_id"], "family": dev[d["doc_id"]],
+                            "element_id": e["element_id"], "kind": e["kind"], "position": round(position, 3),
+                            "elements_in_extraction": n,
+                            "location": {k: loc.get(k) for k in ("page", "page_label", "section_path", "path")},
+                            "text": text[:max_chars], "truncated": len(text) > max_chars})
+                break  # one category per element keeps the pack varied
+    context = {"created_at": utcnow(), "dev_documents": len(docs), "excerpts": len(out),
+               "by_category": {c: sum(x["category"] == c for x in out) for c in EXCERPT_CATEGORIES},
+               "queue": status(settings)["counts"], "rejections": rejected, "existing_question_keys": keys,
+               "rules": "Read .wiki/gold-drafting.md. Quote exactly from `text`; keep reviewed_by null; never pick "
+                        "a family or split yourself; a different person approves against the original."}
+    return {"excerpts": out, "context": context}
+
+
+def write_excerpts(settings: Settings, out_dir: Path, **kw) -> dict:
+    if not out_dir.is_absolute():
+        raise GoldError("--out must be an absolute directory")
+    if out_dir.exists() and any(out_dir.iterdir()):
+        raise GoldError("--out already has files; choose a new directory so earlier packs survive")
+    pack = excerpts(settings, **kw)
+    write_jsonl_atomic(out_dir / "excerpts.jsonl", pack["excerpts"])
+    write_text_atomic(out_dir / "drafting-context.json", json.dumps(pack["context"], ensure_ascii=False, indent=1))
+    return {"out": str(out_dir), **{k: pack["context"][k] for k in ("dev_documents", "excerpts", "by_category")}}
