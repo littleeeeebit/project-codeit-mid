@@ -1,6 +1,6 @@
 {
- "release_id": "F-7688a698b1",
- "generated_at": "2026-10-01T16:22:05.731174+00:00",
+ "release_id": "F-c4b9f101a3",
+ "generated_at": "2026-10-01T16:45:32.300489+00:00",
  "status": "limited",
  "reasons": [
   "hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)",
@@ -11,25 +11,25 @@
  ],
  "evidence_label": "sealed pilot",
  "code": {
-  "source_sha256": "35af9eb31d6df5527a0cf3b90276e48554e6c80ed4a0faccf394701a52430edd",
-  "git_revision": "245b395b105a7f184fbe89d8229801bf32a18fa9",
+  "source_sha256": "8950db532de5723e3080b4910d693517e724b75c03e80b4b9620a880829e48cb",
+  "git_revision": "91cb989af046ee67db60f5d2514fc66c76c8d767",
   "git_dirty": false
  },
- "metric_code_sha256": "2d1ae3c2d0202897103bb5eee15292fd252405d0a170308820efa8839846b954",
- "settings_fingerprint": "c93791872febbdc7",
+ "metric_code_sha256": "79293685b3bfe6026613445298372942ca2265ef9b732fb9ece7ecb3ea4b9bc4",
+ "settings_fingerprint": "44802c19e6f0165a",
  "model": "gpt-6-luna",
  "reasoning_effort": "low",
  "max_output_tokens": 2000,
  "prompt_version": "grounded-answer-3",
  "rate_version": "openai-standard-gpt-6-luna-2026-09-30",
  "active_run": {
-  "activated_at": "2026-10-01T16:21:30.910395+00:00",
+  "activated_at": "2026-10-01T16:44:56.797348+00:00",
   "dense_version": null,
   "embedding": null,
   "eval_version": "retrieval-eval-4",
   "fallback_mode": "kiwi_bm25",
   "finalist_run_id": null,
-  "index_version": "12b56f789787423d",
+  "index_version": "6147acd7406a53f8",
   "label": "K1",
   "limits": {
    "channel_top_k": 20,
@@ -41,22 +41,22 @@
   },
   "mode": "kiwi_bm25",
   "reranker": null,
-  "run_id": "K1-9b49573f5f"
+  "run_id": "K1-3a436a8e2a"
  },
- "active_index": "12b56f789787423d",
+ "active_index": "6147acd7406a53f8",
  "datasets": {
   "dev": {
-   "dataset_sha256": "8496dd81dc9ecb920d115ff1e2e73546be19d110ff1110ea7b7bf362709c473d",
+   "dataset_sha256": "bd818db806c308bc86142e9c36adebb90219cbef0aef55b632791551e6fbe83f",
    "rows": 4,
    "label": "pilot",
-   "review_log_sha256": "14b8d0e62cf53991e3b2992298a1d98863e490e90a87cd5fac44299ff89deaa1",
+   "review_log_sha256": "e75610e957bb74e1b389c627fe7417ca435a15a7f3d656019ca2d627d38ea69d",
    "current": true
   },
   "test": {
-   "dataset_sha256": "6a983402b8fd5d0e8d57d214c309d113580877ba5ca00bb255082ac55cd99f37",
+   "dataset_sha256": "7ad07172df8896637596ddf820f00cbf0df7171a5ed9693b3638fd9cc06b1d84",
    "rows": 1,
    "label": "pilot",
-   "review_log_sha256": "83aecda0254a381fd7a54a51cce65312e7c22db04f310cd15062083ebafc9a80",
+   "review_log_sha256": "53b8d4a5e36fcc554344d41f4158a72281332f19a86e8f769d7ccb05ad613835",
    "current": true
   }
  },
@@ -69,9 +69,9 @@
  },
  "stale_evidence": [],
  "freeze": {
-  "freeze_id": "F-7688a698b1",
-  "frozen_at": "2026-10-01T16:21:43.358120+00:00",
-  "selected_run_id": "K1-9b49573f5f",
+  "freeze_id": "F-c4b9f101a3",
+  "frozen_at": "2026-10-01T16:45:09.067252+00:00",
+  "selected_run_id": "K1-3a436a8e2a",
   "decided_by": "owner",
   "post_test": false
  }

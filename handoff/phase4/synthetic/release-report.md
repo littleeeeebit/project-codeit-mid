@@ -1,6 +1,6 @@
-# Release report F-7688a698b1
+# Release report F-c4b9f101a3
 
-Generated 2026-10-01T16:22:05.731174+00:00 from `data/` state. Every figure is read from recorded evidence; anything not run is listed as missing. This command never generates an answer.
+Generated 2026-10-01T16:45:32.300489+00:00 from `data/` state. Every figure is read from recorded evidence; anything not run is listed as missing. This command never generates an answer.
 
 ## Decision: **limited**
 
@@ -12,11 +12,11 @@ Generated 2026-10-01T16:22:05.731174+00:00 from `data/` state. Every figure is r
 
 ## Release manifest
 
-- code: Git `245b395b105a7f184fbe89d8229801bf32a18fa9` (uncommitted changes: False), package source `35af9eb31d6df552`; metric code `2d1ae3c2d0202897`
-- model gpt-6-luna, reasoning low, output cap 2000, prompt grounded-answer-3, rates openai-standard-gpt-6-luna-2026-09-30, settings `c93791872febbdc7`
-- serving: run `K1-9b49573f5f` (kiwi_bm25), keyword index `12b56f789787423d`, dense `None`, reranker None; fallback kiwi_bm25
+- code: Git `91cb989af046ee67db60f5d2514fc66c76c8d767` (uncommitted changes: False), package source `8950db532de5723e`; metric code `79293685b3bfe602`
+- model gpt-6-luna, reasoning low, output cap 2000, prompt grounded-answer-3, rates openai-standard-gpt-6-luna-2026-09-30, settings `44802c19e6f0165a`
+- serving: run `K1-3a436a8e2a` (kiwi_bm25), keyword index `6147acd7406a53f8`, dense `None`, reranker None; fallback kiwi_bm25
 - dependencies: requirements-lock.txt `060fd9cdbdc949a3`; hardware {'platform': 'Linux-6.18.44-fc-v50-x86_64-with-glibc2.39', 'machine': 'x86_64', 'python': '3.12.3', 'cpu_count': 4}
-- freeze: {'freeze_id': 'F-7688a698b1', 'frozen_at': '2026-10-01T16:21:43.358120+00:00', 'selected_run_id': 'K1-9b49573f5f', 'decided_by': 'owner', 'post_test': False}
+- freeze: {'freeze_id': 'F-c4b9f101a3', 'frozen_at': '2026-10-01T16:45:09.067252+00:00', 'selected_run_id': 'K1-3a436a8e2a', 'decided_by': 'owner', 'post_test': False}
 
 ## Coverage
 
@@ -27,26 +27,26 @@ Generated 2026-10-01T16:22:05.731174+00:00 from `data/` state. Every figure is r
 
 ## Datasets
 
-- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}; frozen `8496dd81dc9e` (current True)
-- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}; frozen `6a983402b8fd` (current True)
+- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}; frozen `bd818db806c3` (current True)
+- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}; frozen `7ad07172df88` (current True)
 
 ## Retrieval runs (development, retrieval only)
 
 | Run | Mode | Scored | hit@20 single | complete@20 multi | nDCG@5 | MRR | Critical | Wrong scope | p95 ms |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `K0-463e92eaad` | whitespace_bm25 | 3 | 0.5 (1/2) | 0.0 | 0.5377 | 0.6667 | ['dev-amount', 'dev-deadline'] | 0 | 0.37 |
-| `K1-9b49573f5f` | kiwi_bm25 | 3 | 1.0 (2/2) | 1.0 | 1.0 | 1.0 | [] | 0 | 1619.26 |
+| `K0-2517cf0dc5` | whitespace_bm25 | 3 | 0.5 (1/2) | 0.0 | 0.5377 | 0.6667 | ['dev-amount', 'dev-deadline'] | 0 | 0.46 |
+| `K1-3a436a8e2a` | kiwi_bm25 | 3 | 1.0 (2/2) | 1.0 | 1.0 | 1.0 | [] | 0 | 1715.13 |
 
 ## Answer evaluation
 
-- development run `A-853cb4a5d78f` (complete): see `runs/A-853cb4a5d78f/report.md`
-  - `K1-9b49573f5f` (kiwi_bm25) 4/4: claims 0.6667 (n=3), critical wrong 0, citation precision lower bound 1.0, negatives 0.0 (n=1), cost $0.000385
-  - `K0-463e92eaad` (whitespace_bm25) 4/4: claims 0.3333 (n=3), critical wrong 0, citation precision lower bound 1.0, negatives 1.0 (n=1), cost $0.000187
-- sealed run `S-1cf484a4459d` (sealed test, complete) under freeze `F-7688a698b1`
+- development run `A-c7203ff76482` (complete): see `runs/A-c7203ff76482/report.md`
+  - `K1-3a436a8e2a` (kiwi_bm25) 4/4: claims 0.6667 (n=3), critical wrong 0, citation precision lower bound 1.0, negatives 0.0 (n=1), cost $0.000385
+  - `K0-2517cf0dc5` (whitespace_bm25) 4/4: claims 0.3333 (n=3), critical wrong 0, citation precision lower bound 1.0, negatives 1.0 (n=1), cost $0.000187
+- sealed run `S-7364aebbcadd` (sealed test, complete) under freeze `F-c4b9f101a3`
 
 ## Latency
 
-- fake sample `L-361f018bd3b8`: n=12, failures 0, warm p50/p95 96.1/126.05 ms (n=6), cold first wave 140.6 ms, 6 users × 2 waves
+- fake sample `L-e0c2fc57ed80`: n=12, failures 0, warm p50/p95 77.85/104.0 ms (n=6), cold first wave 124.6 ms, 6 users × 2 waves
 
 ## Checks
 
@@ -60,7 +60,7 @@ Generated 2026-10-01T16:22:05.731174+00:00 from `data/` state. Every figure is r
 | no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases | pass | 0 observed wrong, 0 contested or awaiting blind review |
 | no selected-scope leakage | pass | claims/evidence outside scope 0, wrong-scope candidates 0 |
 | managed evidence links resolve | pass | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
-| admission cap enforced and ledger not frozen | pass | committed $0.001805 of cap $5.000000; frozen None |
+| admission cap enforced and ledger not frozen | pass | committed $0.001806 of cap $5.000000; frozen None |
 | no unresolved billing | pass | 0 open or unknown attempts |
 | single-evidence hit@20 >= 0.90 | met | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
 | multi-evidence complete coverage@20 >= 0.80 | not measured | {'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None} |
@@ -71,15 +71,15 @@ Generated 2026-10-01T16:22:05.731174+00:00 from `data/` state. Every figure is r
 
 ## Budget
 
-- spent $0.001805 of the $5.000000 allowance (0.04%); pending $0.000000 (unknown $0.000000); cap $5.000000; paid enabled True; last reconciliation never; dates 2026-09-30..2026-10-28
-- envelopes (used incl. open / envelope): embedding $0.000000/$0.312500, gold_eval $0.001805/$0.937500, interactive $0.000000/$3.750000
+- spent $0.001806 of the $5.000000 allowance (0.04%); pending $0.000000 (unknown $0.000000); cap $5.000000; paid enabled True; last reconciliation never; dates 2026-09-30..2026-10-28
+- envelopes (used incl. open / envelope): embedding $0.000000/$0.312500, gold_eval $0.001806/$0.937500, interactive $0.000000/$3.750000
 - adjustments: [('prior-use-baseline', 0)]
 - tracked scope: calls through this application's gateway plus recorded adjustments; not provider credit
 
 ## Mentor walkthrough
 
-- not recorded for this candidate: follow docs/operations/runbook.md §10.6 and save `releases/F-7688a698b1/walkthrough-results.json`
+- not recorded for this candidate: follow docs/operations/runbook.md §10.6 and save `releases/F-c4b9f101a3/walkthrough-results.json`
 
 ## Restore drills
 
-- 2026-10-01T16:22:05.402872+00:00: passed — backup `backup-1`, spent $0.001805, pending $0.000000, unknown $0.000000, prior use $0.000000
+- 2026-10-01T16:45:31.994318+00:00: passed — backup `backup-1`, spent $0.001806, pending $0.000000, unknown $0.000000, prior use $0.000000
