@@ -56,4 +56,5 @@ The authoritative release evidence must be produced on the owner host with the r
 
 - No real-corpus gold, answer run, sealed evaluation or latency sample exists yet; every quality number above is synthetic and must not be reported as a result.
 - The phase-3 host decisions (network exposure, six real browsers, warm/cold latency) remain open.
+- The package-source fingerprint hashes raw file bytes. A Windows checkout with `core.autocrlf` (`git ls-files --eol`: `i/lf w/crlf`) therefore has a different fingerprint than this Linux run (observed in review round 5: Linux `0709d966…`, Windows `5dc4b079…`), so the Linux `checks/check-all.json` is stale on that host by design. `release-report` credits only a full check saved on the host itself: run `check --phase all --provider fake --save` there before the report.
 - The answer scorer's number/date extraction covers the formats in the fixture and common Korean RFP spellings (`130,000,000원`, `1억 3천만 원`, `130백만원`, `2024. 6. 11.(화) 17:00`, `오후 5시`); other phrasings fall to `missing`/`needs_review` and should be checked during blind review.
