@@ -69,6 +69,63 @@ class MetricFixtureTest(unittest.TestCase):
         answer["claims"][0]["text"] = "예산은 문서에 나옵니다."
         self.assertEqual(answers.claim_verdict(claim, answer, "d"), "missing")
 
+    def test_claims_keep_their_document_unit_and_time(self):
+        """Review round 1: a value stated for the other document, in another unit, or at another cutoff time is
+        never credited, and a correct value next to a contradicting one is contested, not correct."""
+        months = p4.claim("c1", ["g1"], {"type": "number", "value": 12, "unit": "개월"})
+        both = {"summary": "두 사업 비교", "claims": [{"doc_id": "A", "text": "하자보수는 6개월"},
+                                                 {"doc_id": "B", "text": "하자보수는 12개월"}]}
+        self.assertEqual(answers.claim_verdict(months, both, "A", single_document=False), "wrong_value")
+        self.assertEqual(answers.claim_verdict(months, both, "B", single_document=False), "correct")
+        self.assertEqual(answers.claim_verdict(months, {"claims": [{"doc_id": "A", "text": "하자보수는 12일"}]}, "A"),
+                         "missing")
+        self.assertEqual(answers.claim_verdict(months, {"claims": [{"doc_id": "A", "text": "12개월 또는 6개월"}]},
+                                               "A"), "contested")
+        # the unattributed summary never credits one side of a comparison
+        self.assertEqual(answers.claim_verdict(months, {"summary": "12개월", "claims": [
+            {"doc_id": "B", "text": "12개월"}]}, "A", single_document=False), "missing")
+        deadline = p4.claim("c1", ["g1"], {"type": "date", "value": "2024-06-11", "time": "17:00"}, "deadline")
+        answer = lambda text: {"claims": [{"doc_id": "A", "text": text}]}  # noqa: E731
+        self.assertEqual(answers.claim_verdict(deadline, answer("제출 마감은 2024. 6. 11. 18:00까지"), "A"), "wrong_value")
+        self.assertEqual(answers.claim_verdict(deadline, answer("2024. 6. 11.(화) 17:00까지"), "A"), "correct")
+        self.assertEqual(answers.claim_verdict(deadline, answer("2024. 6. 11. 17:00, 정정 2024. 6. 11. 18:00"), "A"),
+                         "contested")
+        self.assertEqual(answers.claim_verdict(deadline, answer("2024. 6. 11.까지"), "A"), "incomplete_qualifier")
+        scored = [{"question_id": "q", "type": "direct_fact", "answerability": "answerable", "outcome": "answered",
+                   "status_ok": True, "scope_leaks": 0, "settled_micro_usd": 0, "latency_ms": 1, "attempt_no": 1,
+                   "links": [], "answer_claims": [],
+                   "claims": [{"claim_id": "c1", "verdict": v, "critical_kind": "deadline"}]}
+                  for v in ("wrong_value", "contested")]
+        agg = answers.aggregate_answers(scored)
+        self.assertEqual(len(agg["critical_wrong"]), 1)
+        self.assertEqual([c["verdict"] for c in agg["critical_unresolved"]], ["contested"])
+        self.assertEqual(agg["required_claim_correctness"]["numerator"], 0)
+
+    def test_a_hallucinated_claim_sharing_a_correct_citation_is_not_supported(self):
+        """Review round 1: a cited chunk holding a complete gold span is retrieval relevance; the generated claim
+        itself must state that span's value, or it goes to blind review."""
+        from types import SimpleNamespace
+
+        claim = p4.claim("c1", ["g1"], {"type": "number", "value": 130000000, "unit": "KRW"}, "amount")
+        row = {**gold_row([AMOUNT_G]), "question_type": "direct_fact", "answerability": "answerable",
+               "expected_status": "answered", "mode": "single", "scope": [{"doc_id": "d"}],
+               "required_claims": [claim]}
+        index = SimpleNamespace(chunks=[{"chunk_id": "k1", **chunk("amount", 0, 30)}], elements=ELS)
+        record = {"finalist": "F", "outcome": "answered", "link_validity": {"E1": True},
+                  "evidence": {"E1": {"doc_id": "d", "chunk_id": "k1"}},
+                  "answer": {"summary": "", "claims": [
+                      {"doc_id": "d", "text": "사업 예산은 130,000,000원이다.", "evidence_ids": ["E1"]},
+                      {"doc_id": "d", "text": "누구나 무조건 낙찰받는다.", "evidence_ids": ["E1"]},
+                      {"doc_id": "d", "text": "사업 예산은 130,000,000원이며 누구나 낙찰받는다. 계약은 수의계약이다.",
+                       "evidence_ids": ["E1"]}]}}
+        out = answers.score_record(row, record, index, {})
+        self.assertEqual([link["support"] for link in out["links"]], ["supporting", "unjudged", "unjudged"])
+        self.assertEqual([a["supported"] for a in out["answer_claims"]], [True, None, None])
+        self.assertEqual(out["claims"][0]["verdict"], "correct")
+        agg = answers.aggregate_answers([out])
+        self.assertEqual(agg["citation_precision_lower_bound"]["numerator"], 1)
+        self.assertEqual(agg["answer_claims_unjudged"], 2)  # both go to the blind review sheet
+
     def test_overlapping_duplicates_count_once_and_rechunking_keeps_the_truth(self):
         row = gold_row([AMOUNT_G])
         a = evaluation.score_row(row, [chunk("amount", 0, 30), chunk("amount", 5, 30)], [], ELS)

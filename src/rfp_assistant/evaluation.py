@@ -1615,21 +1615,86 @@ def extract_dates(text: str) -> set[str]:
     return out
 
 
+def _unit_marker(unit) -> str:
+    return "원" if str(unit or "").strip().upper() in ("KRW", "원") else str(unit or "").strip()
+
+
+def stated_numbers(text: str, unit) -> set[Decimal]:
+    """Numbers written with the given unit right after them (`12개월`, `1억 3천만 원`); a bare or differently
+    united number is not a statement of this quantity."""
+    marker, t = _unit_marker(unit), nfc(text or "")
+    if not marker:
+        return set()
+    return {_plain(v) for v, _, end in number_spans(t) if t[end:end + len(marker) + 1].lstrip().startswith(marker)}
+
+
+def _expected(claim: dict) -> list:
+    match = claim.get("match") or {}
+    return [v for v in [match.get("value")] + list(claim.get("alternatives") or []) if v not in (None, "")]
+
+
 def claim_value_found(claim: dict, text: str) -> bool:
-    """The claim's typed value (or a permitted alternative) is stated in `text`."""
+    """The claim's typed value (or a permitted alternative) is stated in `text`: a number with its unit, a date
+    with its required time, or a text pattern."""
     match = claim.get("match") or {}
     kind = match.get("type")
-    values = [match.get("value")] + list(claim.get("alternatives") or [])
     if kind == "number":
-        found = extract_numbers(text)
-        return any(v is not None and Decimal(str(v)) in found for v in values)
+        return bool({_plain(Decimal(str(v))) for v in _expected(claim)} & stated_numbers(text, match.get("unit")))
     if kind == "date":
         found = extract_dates(text)
-        stamp = lambda v: f"{v}T{match['time']}" if match.get("time") and v == match.get("value") else v  # noqa: E731
-        return any(v is not None and stamp(v) in found for v in values)
-    patterns = list(match.get("patterns") or []) + [v for v in values[1:] if isinstance(v, str)]
+        return any(_date_key(match, v) in found for v in _expected(claim))
+    patterns = list(match.get("patterns") or []) + [v for v in _expected(claim)[1:] if isinstance(v, str)]
     hay = norm_text(text)
     return any(norm_text(p) and norm_text(p) in hay for p in patterns)
+
+
+def _date_key(match: dict, value: str) -> str:
+    """The form a date value must be stated in: with the claim's time when the claim has one."""
+    return f"{value}T{match['time']}" if match.get("time") and "T" not in str(value) else str(value)
+
+
+def typed_verdict(claim: dict, text: str) -> str:
+    """One claim against the text an answer states about the claim's own document.
+
+    correct: the value is stated (with its unit/time) and nothing contradicting it is; contested: the value and a
+    different value of the same kind are both stated, so the answer is not credited until a reviewer decides;
+    wrong_value: only other values of the same kind are stated; incomplete_qualifier: the value is stated without a
+    required qualifier (or a deadline without its time); missing: nothing of this kind is stated; needs_review: a
+    text claim whose patterns do not appear (a paraphrase may still be right)."""
+    match = claim.get("match") or {}
+    kind = match.get("type")
+    if kind == "text":
+        if claim_value_found(claim, text):
+            return "incomplete_qualifier" if qualifiers_found(claim, text) else "correct"
+        return "needs_review" if (text or "").strip() else "missing"
+    if kind == "number":
+        expected = {_plain(Decimal(str(v))) for v in _expected(claim)}
+        stated = stated_numbers(text, match.get("unit"))
+        if stated & expected:
+            if stated - expected:
+                return "contested"
+            return "incomplete_qualifier" if qualifiers_found(claim, text) else "correct"
+        return "wrong_value" if stated else "missing"
+    found = extract_dates(text)
+    stated_dt = {d for d in found if "T" in d}
+    stated_d = {d for d in found if "T" not in d}
+    want_d = {str(v).split("T")[0] for v in _expected(claim)}
+    if match.get("time"):
+        want_dt = {_date_key(match, v) for v in _expected(claim)}
+        if stated_dt & want_dt:
+            if (stated_dt - want_dt) or (stated_d - want_d):
+                return "contested"
+            return "incomplete_qualifier" if qualifiers_found(claim, text) else "correct"
+        if stated_dt:  # a stated cutoff on another day or at another time
+            return "wrong_value"
+        if stated_d & want_d:
+            return "contested" if stated_d - want_d else "incomplete_qualifier"  # the required time is missing
+        return "wrong_value" if stated_d else "missing"
+    if stated_d & want_d:
+        if stated_d - want_d:
+            return "contested"
+        return "incomplete_qualifier" if qualifiers_found(claim, text) else "correct"
+    return "wrong_value" if stated_d else "missing"
 
 
 def qualifiers_found(claim: dict, text: str) -> list[list[str]]:

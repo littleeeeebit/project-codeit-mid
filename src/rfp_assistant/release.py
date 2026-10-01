@@ -359,8 +359,9 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
          f"{(all_check or {}).get('tests_run')} tests, recorded {(all_check or {}).get('recorded_at')}"
          if all_check else "no saved run: check --phase all --provider fake --save"),
         ("no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases",
-         None if ans is None else not ans["critical_wrong"],
-         "no answer evaluation" if ans is None else f"{len(ans['critical_wrong'])} observed"),
+         None if ans is None else False if ans["critical_wrong"] else None if ans.get("critical_unresolved") else True,
+         "no answer evaluation" if ans is None else f"{len(ans['critical_wrong'])} observed wrong, "
+         f"{len(ans.get('critical_unresolved') or [])} contested or awaiting blind review"),
         ("no selected-scope leakage", None if ans is None else ans["scope_leaks"] == 0 and not (
             served.get("wrong_scope_candidates") or 0), "no answer evaluation" if ans is None else
          f"claims/evidence outside scope {ans['scope_leaks']}, wrong-scope candidates "

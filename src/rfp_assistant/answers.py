@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 from pathlib import Path
 
 from . import budget, evaluation, generation, service
@@ -31,7 +31,7 @@ ESTIMATE_TTL_HOURS = 24
 ACTIONS = ("answer-finalists", "sealed", "latency")
 TECHNICAL = ("technical_error", "budget_blocked", "ingestion_unavailable", "cancelled", "interrupted")
 REFUSALS = ("insufficient_evidence", "clarification_required")
-CLAIM_VERDICTS = ("correct", "wrong_value", "incomplete_qualifier", "missing", "needs_review")
+CLAIM_VERDICTS = ("correct", "wrong_value", "contested", "incomplete_qualifier", "missing", "needs_review")
 REVIEW_VERDICTS = {"claim": ("correct", "wrong_value", "incomplete_qualifier", "missing"),
                    "link": ("supporting", "unsupported"), "answer_claim": ("supported", "unsupported")}
 
@@ -484,42 +484,31 @@ def _link_validity(pinned: PinnedResources, request_id: str, result: dict, row: 
 # ---------------------------------------------------------------- scoring
 
 
-def _answer_texts(answer: dict, doc_id: str | None) -> tuple[str, str]:
-    """(all stated text, text of claims about `doc_id`) of a generated answer."""
-    claims = answer.get("claims") or []
-    conflicts = " ".join(a.get("value", "") for c in answer.get("conflicts") or [] for a in c.get("alternatives") or [])
-    every = " ".join([answer.get("summary") or ""] + [c.get("text", "") for c in claims] + [conflicts])
-    mine = " ".join(c.get("text", "") for c in claims if doc_id is None or c.get("doc_id") == doc_id)
-    return every, mine
+def doc_text(answer: dict, doc_id: str | None, single_document: bool) -> str:
+    """What the answer states about one document: its claims and conflict alternatives attributed to that
+    document. The unattributed summary counts only when a single document is in scope, so a comparison can never
+    credit one side with the other side's value."""
+    parts = [c.get("text", "") for c in answer.get("claims") or [] if c.get("doc_id") == doc_id]
+    parts += [a.get("value", "") for c in answer.get("conflicts") or [] for a in c.get("alternatives") or []
+              if a.get("doc_id") == doc_id]
+    if single_document:
+        parts.insert(0, answer.get("summary") or "")
+    return " ".join(p for p in parts if p)
 
 
-def _stated(claim: dict, text: str) -> set:
-    """Values of the claim's own kind stated in `text` (numbers carrying the claim's unit; dates)."""
-    match = claim.get("match") or {}
-    if match.get("type") == "date":
-        return {d for d in evaluation.extract_dates(text) if "T" not in d}
-    if match.get("type") != "number":
-        return set()
-    unit = "원" if str(match.get("unit")).upper() in ("KRW", "원") else str(match.get("unit") or "")
-    if not unit:
-        return set()
-    text = evaluation.nfc(text)
-    return {evaluation._plain(v) for v, _, end in evaluation.number_spans(text)
-            if text[end:end + len(unit) + 1].lstrip().startswith(unit)}
+def claim_verdict(claim: dict, answer: dict, doc_id: str | None, single_document: bool = True) -> str:
+    return evaluation.typed_verdict(claim, doc_text(answer, doc_id, single_document))
 
 
-def claim_verdict(claim: dict, answer: dict, doc_id: str | None) -> str:
-    every, mine = _answer_texts(answer, doc_id)
-    match = claim.get("match") or {}
-    if evaluation.claim_value_found(claim, every):
-        return "incomplete_qualifier" if evaluation.qualifiers_found(claim, every) else "correct"
-    if match.get("type") == "text":
-        return "needs_review" if (answer.get("claims") or []) else "missing"
-    expected = {Decimal(str(v)) for v in [match.get("value")] + list(claim.get("alternatives") or [])
-                if v is not None} if match.get("type") == "number" else \
-        {v for v in [match.get("value")] + list(claim.get("alternatives") or []) if v}
-    stated = _stated(claim, mine)
-    return "wrong_value" if stated and not stated & expected else "missing"
+_SENTENCE = re.compile(r"(?<=[다요음함됨])\.\s*|\n+|[!?。]\s*")
+
+
+def claim_states_support(text: str, required: list[dict]) -> bool:
+    """Every sentence of a generated claim states the typed value of one of `required` (claims whose cited span is
+    complete). Anything else, a heading line or an extra assertion included, is left to a blind reviewer."""
+    sentences = [x for x in _SENTENCE.split(text or "") if len(evaluation.norm_text(x)) >= 2]
+    return bool(sentences) and bool(required) and all(
+        any(evaluation.claim_value_found(r, x) for r in required) for x in sentences)
 
 
 def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> dict:
@@ -543,9 +532,10 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
         out["metadata_correct"] = bool(states) and all(states.get((doc, f)) == s for f, s in wanted.items())
         return out
     answered = outcome == "answered"
+    single = len(scope_docs) == 1
     for c in row.get("required_claims") or []:
         doc_id = doc_of_group.get((c.get("support_groups") or [None])[0])
-        verdict = claim_verdict(c, answer, doc_id) if answered else ("missing" if not out["technical"] else "missing")
+        verdict = claim_verdict(c, answer, doc_id, single) if answered else "missing"
         item = f"{prefix}|claim|{c['claim_id']}"
         reviewed = reviews.get(item)
         out["claims"].append({"claim_id": c["claim_id"], "item": item, "verdict": (reviewed or {}).get("verdict", verdict),
@@ -558,9 +548,15 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
         for eid in ac.get("evidence_ids") or []:
             ev = (record.get("evidence") or {}).get(eid) or {}
             chunk = chunks.get(ev.get("chunk_id"))
-            best = max((evaluation.group_grade(chunk, g, index.elements) for g in groups
-                        if chunk is not None and g["doc_id"] == ev.get("doc_id")), default=0)
-            support = "supporting" if best == 2 else "unjudged"  # partial or unlabelled: a person decides
+            complete = {g["group_id"] for g in groups if chunk is not None and g["doc_id"] == ev.get("doc_id")
+                        and evaluation.group_grade(chunk, g, index.elements) == 2}
+            best = 2 if complete else max((evaluation.group_grade(chunk, g, index.elements) for g in groups
+                                           if chunk is not None and g["doc_id"] == ev.get("doc_id")), default=0)
+            backed = [r for r in row.get("required_claims") or [] if set(r.get("support_groups") or []) & complete]
+            # A complete gold span in the cited chunk is retrieval relevance, not support: the claim itself must
+            # state the value that span establishes, and say nothing else; otherwise a person decides.
+            support = "supporting" if ac.get("doc_id") == ev.get("doc_id") and claim_states_support(
+                ac.get("text", ""), backed) else "unjudged"
             item = f"{prefix}|link|{i}|{eid}"
             reviewed = reviews.get(item)
             support = (reviewed or {}).get("verdict", support)
@@ -627,6 +623,10 @@ def aggregate_answers(scored: list[dict]) -> dict:
     metadata = [s for s in scored if "metadata_correct" in s]
     critical = [{"question_id": s["question_id"], "claim_id": c["claim_id"], "kind": c["critical_kind"]}
                 for s in answerable for c in s["claims"] if c["critical_kind"] and c["verdict"] == "wrong_value"]
+    critical_open = [{"question_id": s["question_id"], "claim_id": c["claim_id"], "kind": c["critical_kind"],
+                      "verdict": c["verdict"]}
+                     for s in answerable for c in s["claims"]
+                     if c["critical_kind"] and c["verdict"] in ("contested", "needs_review")]
     from .dense import percentile
 
     latencies = [s["latency_ms"] for s in scored if s.get("latency_ms") is not None]
@@ -641,6 +641,7 @@ def aggregate_answers(scored: list[dict]) -> dict:
         "claims_needing_review": sum(c["verdict"] == "needs_review" for c in claims),
         "claim_verdicts": {v: sum(c["verdict"] == v for c in claims) for v in CLAIM_VERDICTS},
         "critical_wrong": critical,
+        "critical_unresolved": critical_open,
         "citation_precision_judged": _wilson_rate(supporting, supporting + unsupported),
         "citation_precision_lower_bound": _wilson_rate(supporting, len(links)),
         "links_unjudged": sum(link["support"] not in ("supporting", "unsupported") for link in links),
@@ -750,6 +751,7 @@ def answer_report_md(config: dict, scores: dict) -> str:
                   f"| question-level completeness | {_fmt(v['question_completeness'])} |",
                   f"| claims needing review | {v['claims_needing_review']} |",
                   f"| critical wrong values | {v['critical_wrong'] or 'none observed'} |",
+                  f"| critical claims contested or awaiting review | {v['critical_unresolved'] or 'none'} |",
                   f"| citation precision (judged links) | {_fmt(v['citation_precision_judged'])} |",
                   f"| citation precision (lower bound, unjudged = unsupported) | "
                   f"{_fmt(v['citation_precision_lower_bound'])} |",
@@ -798,7 +800,7 @@ def export_review_sheet(settings: Settings, run_id: str, out: Path | None = None
                 "answer_claims": [c.get("text") for c in answer.get("claims") or []],
                 "gold_quotes": [a["quote"] for g in row.get("evidence_groups") or [] for a in g["alternatives"]]}
         for c in s["claims"]:
-            if c["verdict"] in ("needs_review", "wrong_value") or c["critical_kind"]:
+            if c["verdict"] in ("needs_review", "wrong_value", "contested") or c["critical_kind"]:
                 spec = next(x for x in row["required_claims"] if x["claim_id"] == c["claim_id"])
                 items.append(("claim", c["item"], {**base, "expected": spec["match"], "qualifiers": spec["qualifiers"],
                                                    "deterministic": c["deterministic"]}))
