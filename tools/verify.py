@@ -217,7 +217,7 @@ def unittest_summary(out: str, code: int) -> str:
             if ran else f"no unittest summary (exit {code})")
 
 
-def load_check_summary(out: str, code: int) -> tuple[bool, str]:
+def load_check_summary(code: int, out: str) -> tuple[bool, str]:  # takes Context.cli's result
     try:
         data = json.loads(out[out.index("{"):out.rindex("}") + 1])
     except ValueError:

@@ -112,7 +112,8 @@ class EvidenceTest(unittest.TestCase):
         self.assertRegex(obs["actual"], r"^\d+ tests in .*OK")
 
     def test_unobserved_assertions_and_another_head_never_pass(self):
-        ev = verify.evidence(self.spec, "abc", {"a": (True, "seen")}, None, "RuntimeError: boom")
+        with mock.patch.dict(os.environ, {"WIKI_VERIFICATION_HEAD": "abc"}):  # the service's head, if it runs us
+            ev = verify.evidence(self.spec, "abc", {"a": (True, "seen")}, None, "RuntimeError: boom")
         self.assertEqual([(o["id"], o["pass"]) for o in ev["observations"]], [("a", True), ("b", False)])
         self.assertIn("boom", ev["observations"][1]["actual"])
         self.assertEqual(set(ev) - {"head", "flow", "environment_id", "test_scope", "observations"},
