@@ -42,7 +42,14 @@ Run by the local reviewer on Windows (Python 3.12.14) at head `62015a9`, source 
 | `tools/verify.py verifier-runs` | 16 unit tests plus 3 real-corpus cases passed (HWP single, HWP/PDF pair, pair on whitespace BM25 with 2 evidence units) | Original corpus, isolated runtime, fake provider |
 | `tools/verify.py consultant-answer` | 4/4 assertions passed: no login, answer rendered, evidence opened on the first click, original downloaded byte-identically | Chromium/Playwright, served build `62015a9`; automated sessions, not six real members |
 
-Still open: approved managed review settings and server receipts, independently reviewed real gold-2 development and sealed sets, real retrieval/answer/sealed runs with pool review, an identified permitted API account and budget scope with paid cost/usage/latency measurements, live-ledger migration and recovery, and real member and operational evidence.
+Owner preparation recorded in review round 17 (2026-10-01), still with 0 paid calls:
+
+- A verification settings proposal (15 flows, the isolated real-corpus runtime, fake provider, a separate browser origin) is prepared but not saved through the app, so no server-approved verification record exists.
+- A pilot of 4 development and 4 sealed-test gold-2 questions was drafted from original evidence (families assigned first, evidence pinned to source/extraction/raw coordinates). Every row is pending independent original review; none is approved. This is an 8-row pilot, not the 60 + 60 target.
+- The owner selected the project OpenAI account and at most $0.10 of additional spending; a read-only model-access check passed. The isolated ledger holds $0.160623 of historical spend under a $0.260623 cap, with purpose envelopes and unknown-billing stops still applying. The planned real configuration is gpt-6-luna on OpenAI with a 1,000-token output cap; the review UI is still on the fake provider.
+- On the reviewer's host, a generic redaction mask missed an unlisted `Authorization`/`Bearer` credential. Receipts holding such a value must be checked before they are published; none were published here.
+
+Still open: the owner's settings save and exact-head server records, independent original review and freeze of the pilot rows, independently reviewed real gold-2 development and sealed sets, real retrieval/answer/sealed runs with pool review, an identified permitted API account and budget scope with paid cost/usage/latency measurements, live-ledger migration and recovery, and real member and operational evidence.
 
 ## Decisions made during implementation (for owner review)
 
