@@ -1,0 +1,15 @@
+{
+ "phase": "4",
+ "provider": "fake",
+ "ok": true,
+ "tests_run": 48,
+ "failures": 0,
+ "errors": 0,
+ "skipped": 0,
+ "code": {
+  "source_sha256": "09b207b41edc36e4bce32d26287f18d630b07453d90d918407e12092f84806b0",
+  "git_revision": "b9f2ef750afbaab19fcd28aaa00f1051dac4c9d6",
+  "git_dirty": true
+ },
+ "recorded_at": "2026-10-01T12:58:12.949186+00:00"
+}

@@ -1,12 +1,17 @@
-"""Development-pilot dataset validation and source-family assignment."""
+"""Dataset validation (development pilot and the phase-4 gold schema), source-family assignment, frozen
+retrieval runs and source-span scoring."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import math
+import random
 import re
 import time
+import uuid
+from datetime import date
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from .chunking import table_rows
@@ -30,9 +35,14 @@ def _ws(text: str) -> str:
     return re.sub(r"\s+", " ", nfc(text)).strip()
 
 
+SEALED_SPLITS = ("test",)  # questions and labels live under sealed/, never under datasets/
+
+
 def dataset_path(settings: Settings, name: str) -> Path:
     if not re.fullmatch(r"[a-z0-9-]+", name):
         raise ValueError("dataset names use lowercase letters, digits and hyphens")
+    if name in SEALED_SPLITS:
+        return settings.data_dir / "sealed" / f"{name}.jsonl"
     return settings.data_dir / "datasets" / f"{name}.jsonl"
 
 
@@ -145,6 +155,8 @@ class RowChecker:
 
 
 def validate_gold(settings: Settings, name: str) -> dict:
+    if name in GOLD_DATASETS:  # the phase-4 schema (dev, sealed test); dev-pilot keeps the pilot rules
+        return validate_gold_v2(settings, name)
     path = dataset_path(settings, name)
     if not path.exists():
         return {"ok": False, "errors": [f"dataset file missing: {path.name}"], "rows": 0}
@@ -199,7 +211,7 @@ def validate_gold(settings: Settings, name: str) -> dict:
 # 4: runs require an index matching the current analyzer/query policy and its frozen metadata snapshot.
 EVAL_VERSION = "retrieval-eval-4"
 RANK_DEPTH = 20
-CRITICAL_CODE_TYPES = {"repeated_code", "requirement_detail"}
+CRITICAL_CODE_TYPES = {"repeated_code", "requirement_detail", "exact_identifier"}
 CRITICAL_EVIDENCE_TYPES = {"numeric_qualifier"}  # an amount/date/VAT condition must reach the packed context
 NDCG_AT = 5
 GATE_NDCG_GAIN = 0.03
@@ -222,9 +234,39 @@ def wilson(successes: int, n: int, z: float = 1.96) -> list[float] | None:
     return [round(max(0.0, centre - half), 4), round(min(1.0, centre + half), 4)]
 
 
-def load_eval_rows(settings: Settings, name: str) -> tuple[list[dict], list[dict], str]:
+BOOTSTRAP_SEED = 20261001
+BOOTSTRAP_RESAMPLES = 1000
+
+
+def family_bootstrap(results: list[dict], key: str, seed: int = BOOTSTRAP_SEED,
+                     resamples: int = BOOTSTRAP_RESAMPLES) -> dict | None:
+    """95% percentile interval of a mean ranked metric, resampling whole source families (a row's family set is
+    its unit), so related questions move together. None when fewer than two families are scored."""
+    by_family: dict[str, list[float]] = {}
+    for r in results:
+        value = (r.get("metrics") or {}).get(key)
+        if value is not None:
+            by_family.setdefault("+".join(r.get("families") or [str(r.get("id"))]), []).append(value)
+    if len(by_family) < 2:
+        return None
+    units = sorted(by_family)
+    rng = random.Random(seed)
+    means = []
+    for _ in range(resamples):
+        picked = [v for u in (rng.choice(units) for _ in units) for v in by_family[u]]
+        means.append(sum(picked) / len(picked))
+    means.sort()
+    return {"low": round(means[int(0.025 * resamples)], 4), "high": round(means[int(0.975 * resamples) - 1], 4),
+            "families": len(units), "seed": seed, "resamples": resamples, "unit": "source family"}
+
+
+def load_eval_rows(settings: Settings, name: str, sealed: bool = False) -> tuple[list[dict], list[dict], str]:
     """(scored rows, skipped rows with reasons, dataset sha256). Only independently reviewed dev rows whose
-    evidence is pinned to the document's active extraction are scored; the rest are listed, not dropped."""
+    evidence is pinned to the document's active extraction are scored; the rest are listed, not dropped. The
+    sealed test split is read only by the sealed run (`sealed=True`)."""
+    if name in SEALED_SPLITS and not sealed:
+        raise EvaluationError("the test split is sealed: it is evaluated once, by sealed-run under a release "
+                              "freeze, never by evaluate-retrieval or plan-run")
     path = dataset_path(settings, name)
     if not path.exists():
         raise EvaluationError(f"dataset file missing: {path.name}")
@@ -234,6 +276,8 @@ def load_eval_rows(settings: Settings, name: str) -> tuple[list[dict], list[dict
         active = {r["doc_id"]: (r["active_source_hash"], r["active_extraction_id"]) for r in conn.execute(
             "SELECT d.doc_id, d.active_source_hash, s.active_extraction_id FROM documents d "
             "JOIN sources s ON s.source_hash = d.active_source_hash")}
+    if name in GOLD_DATASETS:
+        return _gold_eval_rows(rows, name, active) + (hashlib.sha256(raw).hexdigest(),)
     scored, skipped = [], []
     for row in rows:
         reason = None
@@ -249,10 +293,83 @@ def load_eval_rows(settings: Settings, name: str) -> tuple[list[dict], list[dict
     return scored, skipped, hashlib.sha256(raw).hexdigest()
 
 
+def _gold_eval_rows(rows: list[dict], name: str, active: dict) -> tuple[list[dict], list[dict]]:
+    scored, skipped = [], []
+    for row in rows:
+        review = row.get("review") or {}
+        reason = None
+        if (review.get("status") != "approved" or not review.get("reviewed_by")
+                or review.get("reviewed_by") == review.get("drafted_by") or review.get("original_inspected") is not True):
+            reason = "not_independently_reviewed"
+        elif review.get("disputed") and not (review.get("second_review") or {}).get("agreed"):
+            reason = "dispute_unresolved"
+        elif row.get("split") != name:
+            reason = f"not_{name}"
+        elif any(s.get("doc_id") not in active for s in row.get("scope") or []):
+            reason = "unknown_doc"
+        elif row.get("mode") != "metadata" and any(active[s["doc_id"]][1] != s.get("extraction_id")
+                                                   for s in row.get("scope") or []):
+            reason = "evidence_revision_not_active"
+        (skipped if reason else scored).append(row if not reason else {"id": row.get("question_id"),
+                                                                       "reason": reason})
+    return scored, skipped
+
+
+def is_gold_row(row: dict) -> bool:
+    return row.get("dataset_version") == GOLD_SCHEMA
+
+
+def row_id(row: dict):
+    return row.get("question_id") if is_gold_row(row) else row.get("id")
+
+
+def row_type(row: dict):
+    return row.get("question_type") if is_gold_row(row) else row.get("type")
+
+
+def row_critical(row: dict) -> bool:
+    if is_gold_row(row):
+        return any(c.get("criticality") == "critical" for c in row.get("required_claims") or [])
+    return bool(row.get("critical"))
+
+
+def row_scope(row: dict) -> list[tuple]:
+    """[(DocRef, extraction_id)] the row's retrieval is restricted to (one per compared document)."""
+    from .contracts import DocRef
+
+    if is_gold_row(row):
+        return [(DocRef(s["doc_id"], s["source_hash"]), s.get("extraction_id")) for s in row.get("scope") or []]
+    return [(DocRef(row["doc_id"], row["source_hash"]), row["extraction_id"])]
+
+
+def row_groups(row: dict) -> list[dict]:
+    """Required evidence groups; each group is one fact, satisfied by any of its alternative source spans. A pilot
+    row's evidence units are groups of one alternative each."""
+    if is_gold_row(row):
+        return [{"group_id": g["group_id"], "doc_id": g.get("doc_id"),
+                 "alternatives": [{"element_id": a["element_id"], "quote": a["quote"],
+                                   "extraction_id": a["extraction_id"]} for a in g.get("alternatives") or []]}
+                for g in row.get("evidence_groups") or []]
+    return [{"group_id": u.get("element_id"), "doc_id": row.get("doc_id"),
+             "alternatives": [{**u, "extraction_id": row.get("extraction_id")}]} for u in row.get("evidence") or []]
+
+
+def row_families(row: dict) -> list[str]:
+    return sorted(row.get("family_ids") or []) if is_gold_row(row) else [row.get("family") or str(row.get("id"))]
+
+
 def population_identity(rows: list[dict], skipped: list[dict]) -> str:
     """Identity of what a run actually scores: each eligible row's question, type, scope and pinned evidence, plus
     which rows were skipped and why. The dataset file can stay byte-identical while a source revision or review
     change makes a different set of questions eligible; runs over different populations are not comparable."""
+    if rows and is_gold_row(rows[0]):
+        scored = sorted(({"id": r.get("question_id"), "revision": r.get("revision"), "type": r.get("question_type"),
+                          "question": r.get("question"), "mode": r.get("mode"), "scope": r.get("scope"),
+                          "answerability": r.get("answerability"), "critical": row_critical(r),
+                          "groups": [[g["group_id"], [[a["element_id"], a["quote"]] for a in g["alternatives"]]]
+                                     for g in row_groups(r)]} for r in rows), key=lambda x: str(x["id"]))
+        return hashlib.sha256(dumps({"schema": GOLD_SCHEMA, "scored": scored,
+                                     "skipped": sorted(skipped, key=lambda x: str(x.get("id")))}).encode()).hexdigest()
     scored = sorted(({"id": r.get("id"), "type": r.get("type"), "question": r.get("question"),
                       "doc_id": r.get("doc_id"), "source_hash": r.get("source_hash"),
                       "extraction_id": r.get("extraction_id"), "answerable": r.get("answerable"),
@@ -269,8 +386,17 @@ def current_population(settings: Settings, dataset: str) -> tuple[str, int]:
 
 
 def is_passage_row(row: dict) -> bool:
+    """Scored on ranked passages: answerable (or conflicting) evidence-backed rows; metadata, operational and
+    unanswerable rows are reported in their own strata."""
+    if is_gold_row(row):
+        return (row.get("mode") != "metadata" and bool(row.get("evidence_groups"))
+                and row.get("answerability") in ("answerable", "conflicting"))
     return bool(row.get("answerable")) and bool(row.get("evidence")) and row.get("type") not in (
         METADATA_TYPES | OPERATIONAL_TYPES)
+
+
+def scope_indexed(index, row: dict) -> bool:
+    return any(index.rows_by_extraction.get(x) for _, x in row_scope(row))
 
 
 def _quote_range(text: str, quote: str) -> tuple[int, int] | None:
@@ -345,19 +471,48 @@ def grade(chunk: dict, unit: dict, element: dict | None) -> int:
     return best
 
 
-def score_row(row: dict, ranking: list[dict], packed: list[dict], elements: dict) -> dict:
-    """Ranked metrics for one passage row. Each gold unit is credited once, at the first rank where it reaches
-    its grade: overlapping chunks repeating one fact earn nothing more. Ideal DCG places one complete unit per
-    rank (capped at 1 when a single chunk carries several units)."""
-    units = row["evidence"]
-    x = row["extraction_id"]
-    els = [elements.get((x, u["element_id"])) for u in units]
+def ndcg_from_grades(grades: list[int], ideal: list[int], k: int = NDCG_AT) -> float | None:
+    """`DCG = sum((2**grade - 1) / log2(rank + 1))` over the first k deduplicated units, divided by the DCG of the
+    ideal (judged-pool) grades in descending order. None when the ideal pool has no relevant unit."""
+    gain = lambda gs: sum((2 ** g - 1) / math.log2(r + 1) for r, g in enumerate(gs[:k], start=1))  # noqa: E731
+    best = gain(sorted(ideal, reverse=True))
+    return round(gain(grades) / best, 4) if best else None
+
+
+def graded_units(ranking: list[dict], groups: list[dict], elements: dict, k: int = NDCG_AT) -> list[int]:
+    """Grade of each of the first k ranked units after deduplication: a unit counts only for support it adds (a
+    chunk repeating an already credited span grades 0), so overlapping chunks are one contribution."""
+    credited = [0] * len(groups)
+    out = []
+    for chunk in ranking[:k]:
+        best = 0
+        for j, g in enumerate(groups):
+            grade_now = group_grade(chunk, g, elements)
+            if grade_now > credited[j]:
+                best = max(best, grade_now)
+                credited[j] = grade_now
+        out.append(best)
+    return out
+
+
+def group_grade(chunk: dict, group: dict, elements: dict) -> int:
+    """A group's grade is its best alternative's: two alternatives of one fact never add up to two facts."""
+    return max((grade(chunk, a, elements.get((a["extraction_id"], a["element_id"]))) for a in group["alternatives"]),
+               default=0)
+
+
+def score_row(row: dict, ranking: list[dict], packed: list[dict], elements: dict,
+              groups: list[dict] | None = None) -> dict:
+    """Ranked metrics for one passage row. Each required evidence group is credited once, at the first rank where
+    it reaches its grade: overlapping chunks repeating one fact earn nothing more. Ideal DCG places one complete
+    group per rank (capped at 1 when a single chunk carries several groups)."""
+    units = groups if groups is not None else row_groups(row)
     credited = [0] * len(units)
     dcg, first_full = 0.0, None
     for rank, chunk in enumerate(ranking[:RANK_DEPTH], start=1):
         gain = 0
         for j, u in enumerate(units):
-            g = grade(chunk, u, els[j])
+            g = group_grade(chunk, u, elements)
             if g > credited[j]:
                 if rank <= NDCG_AT:
                     gain += g - credited[j]
@@ -365,10 +520,10 @@ def score_row(row: dict, ranking: list[dict], packed: list[dict], elements: dict
             if g == 2 and first_full is None:
                 first_full = rank
         dcg += gain / math.log2(rank + 1)
-    at = lambda k: [max((grade(c, u, els[j]) for c in ranking[:k]), default=0)  # noqa: E731
-                    for j, u in enumerate(units)]
+    at = lambda k: [max((group_grade(c, u, elements) for c in ranking[:k]), default=0)  # noqa: E731
+                    for u in units]
     top5, top20 = at(5), at(RANK_DEPTH)
-    packed_grades = [max((grade(c, u, els[j]) for c in packed), default=0) for j, u in enumerate(units)]
+    packed_grades = [max((group_grade(c, u, elements) for c in packed), default=0) for u in units]
     n = len(units)
     return {
         "units": n, "hit@1": int(any(g == 2 for g in at(1))), "hit@5": int(any(g == 2 for g in top5)),
@@ -379,14 +534,38 @@ def score_row(row: dict, ranking: list[dict], packed: list[dict], elements: dict
         "packed_complete": int(all(g == 2 for g in packed_grades)),
         "qualifier_loss": sum(g == 1 for g in packed_grades), "packed_missing": sum(g == 0 for g in packed_grades),
         "unit_grades@20": top20,
-        "missing_units": [u["element_id"] for u, g in zip(units, top20) if g < 2],
-    }
+        "missing_units": [u["group_id"] for u, g in zip(units, top20) if g < 2],
+        "packed_grades": packed_grades,
+    } | (_gold_ndcg(ranking, units, elements) if is_gold_row(row) else {})
+
+
+def _gold_ndcg(ranking: list[dict], groups: list[dict], elements: dict) -> dict:
+    """Gold-2 rows use the phase-4 graded formula; the ideal pool is one complete span per required group (grade 2
+    each). Pilot rows keep the phase-2 increment formula so frozen `retrieval-eval-4` runs stay comparable."""
+    grades = graded_units(ranking, groups, elements)
+    return {"ndcg@5": ndcg_from_grades(grades, [2] * len(groups)), "ndcg_formula": "(2^g-1)/log2(r+1), ideal 2/group",
+            "graded@5": grades}
+
+
+def combine_sides(parts: list[dict]) -> dict:
+    """Metrics of a two-document row from each document's own ranking: groups count once overall; recall and
+    complete coverage are defined, while single-ranking measures (hit, nDCG, MRR) are not applicable."""
+    units = sum(p["units"] for p in parts)
+    top20 = [g for p in parts for g in p["unit_grades@20"]]
+    packed = [g for p in parts for g in p["packed_grades"]]
+    return {"units": units, "hit@1": None, "hit@5": None, "hit@20": None,
+            "recall@20": round(sum(g == 2 for g in top20) / units, 4), "complete@20": int(all(g == 2 for g in top20)),
+            "ndcg@5": None, "mrr": None, "packed_recall": round(sum(g == 2 for g in packed) / units, 4),
+            "packed_complete": int(all(g == 2 for g in packed)), "qualifier_loss": sum(g == 1 for g in packed),
+            "packed_missing": sum(g == 0 for g in packed), "unit_grades@20": top20,
+            "missing_units": [m for p in parts for m in p["missing_units"]], "packed_grades": packed,
+            "per_document": True}
 
 
 def code_check(row: dict, packed: list[dict]) -> dict | None:
     """Critical check: an explicit requirement code must bring its own block first."""
     codes = list(dict.fromkeys(CODE_RE.findall(nfc(row.get("question", "")))))
-    if not codes or row.get("type") not in CRITICAL_CODE_TYPES:
+    if not codes or row_type(row) not in CRITICAL_CODE_TYPES:
         return None
     first = packed[0] if packed else None
     ok = bool(first and first.get("requirement_key") in codes)
@@ -400,7 +579,8 @@ def critical_failures(results: list[dict], rows: dict | None = None) -> list[str
     out = []
     for r in results:
         row = (rows or {}).get(r.get("id"), r)
-        critical_row = row.get("type") in CRITICAL_EVIDENCE_TYPES or bool(row.get("critical"))
+        critical_row = (row_type(row) in CRITICAL_EVIDENCE_TYPES or bool(row.get("critical"))
+                        or (is_gold_row(row) and row_critical(row)))
         if ((r.get("code_check") and not r["code_check"]["ok"]) or r.get("wrong_scope")
                 or (critical_row and r.get("metrics") and not r["metrics"]["packed_complete"])):
             out.append(r["id"])
@@ -413,11 +593,13 @@ def aggregate(results: list[dict], skipped: list[dict]) -> dict:
     multi = [r for r in passage if r["metrics"]["units"] > 1]
 
     def rate(rows: list[dict], key: str) -> dict:
+        rows = [r for r in rows if r["metrics"].get(key) is not None]
         k = sum(r["metrics"][key] for r in rows)
         return {"numerator": k, "denominator": len(rows), "rate": round(k / len(rows), 4) if rows else None,
                 "wilson95": wilson(k, len(rows))}
 
     def mean(rows: list[dict], key: str) -> float | None:
+        rows = [r for r in rows if r["metrics"].get(key) is not None]  # not applicable is not zero
         return round(sum(r["metrics"][key] for r in rows) / len(rows), 4) if rows else None
 
     by_type: dict[str, dict] = {}
@@ -443,6 +625,8 @@ def aggregate(results: list[dict], skipped: list[dict]) -> dict:
         "latency_ms": {"p50": percentile(latencies, 0.5), "p95": percentile(latencies, 0.95), "n": len(latencies)},
         "fallbacks": sorted({r["fallback"] for r in results if r.get("fallback")}),
         "by_type": by_type,
+        "ndcg_eligible_rows": sum(1 for r in passage if r["metrics"].get("ndcg@5") is not None),
+        "bootstrap95": {k: family_bootstrap(passage, k) for k in ("ndcg@5", "mrr", "recall@20")},
         "not_scored": {"non_passage_rows": sum(1 for r in results if not r.get("metrics")),
                        "types": sorted({r["type"] for r in results if not r.get("metrics")}),
                        "skipped": skipped},
@@ -509,27 +693,42 @@ def _frozen_config(settings: Settings, label: str, dataset: str, dataset_sha: st
 
 def _execute(settings: Settings, index, analyzer, rows: list[dict], mode: str, dense=None, vectors=None,
              reranker=None, rerank_depth=None) -> list[dict]:
-    from .contracts import DocRef
     from .retrieval import retrieve
 
     results = []
     for row in rows:
-        out = {"id": row.get("id"), "type": row.get("type"), "critical": bool(row.get("critical")),
-               "question": row.get("question")}
+        out = {"id": row_id(row), "type": row_type(row), "critical": row_critical(row),
+               "question": row.get("question"), "families": row_families(row)}
         if not is_passage_row(row):
             results.append(out)  # metadata, operational and unanswerable rows: reported, not ranked
             continue
-        scope = [(DocRef(row["doc_id"], row["source_hash"]), row["extraction_id"])]
-        r = retrieve(settings, index, analyzer, row["question"], scope, mode=mode, dense=dense,
-                     query_vector=(vectors or {}).get(row.get("id")), reranker=reranker, rerank_depth=rerank_depth)
-        ranking = [index.chunks[index.row_of[c]] for c in r.ranking]
-        packed = [index.chunks[index.row_of[e.chunk_id]] for e in r.evidence]
+        scope, groups = row_scope(row), row_groups(row)
+        allowed = {x for _, x in scope}
+        sides = []  # one scoped retrieval per selected document, as the balanced comparison serves it
+        for ref, x in ([(None, None)] if len(scope) == 1 else scope):
+            r = retrieve(settings, index, analyzer, row["question"], scope if ref is None else [(ref, x)], mode=mode,
+                         dense=dense, query_vector=(vectors or {}).get(row_id(row)), reranker=reranker,
+                         rerank_depth=rerank_depth)
+            ranking = [index.chunks[index.row_of[c]] for c in r.ranking]
+            packed = [index.chunks[index.row_of[e.chunk_id]] for e in r.evidence]
+            mine = groups if ref is None else [g for g in groups if g["doc_id"] == ref.doc_id]
+            sides.append((r, ranking, packed, score_row(row, ranking, packed, index.elements, mine)))
+        r, ranking, packed, metrics = sides[0]
+        if len(sides) > 1:
+            metrics = combine_sides([m for *_, m in sides])
+        timings: dict = {}
+        for side in sides:
+            for k, v in side[0].timings_ms.items():
+                timings[k] = round(timings.get(k, 0) + v, 1) if isinstance(v, (int, float)) else v
         out.update(
-            metrics=score_row(row, ranking, packed, index.elements), code_check=code_check(row, packed),
-            wrong_scope=sum(c["extraction_id"] != row["extraction_id"] for c in ranking),
-            ranking=r.ranking[:RANK_DEPTH], packed=[e.chunk_id for e in r.evidence], fallback=r.fallback,
-            candidates=r.candidates, limitations=r.limitations, timings_ms=r.timings_ms,
-            evidence_tokens=r.evidence_tokens)
+            metrics=metrics, code_check=code_check(row, packed) if len(sides) == 1 else None,
+            wrong_scope=sum(c["extraction_id"] not in allowed for _, rk, _, _ in sides for c in rk),
+            ranking=[c for s in sides for c in s[0].ranking[:RANK_DEPTH]],
+            packed=[e.chunk_id for s in sides for e in s[0].evidence],
+            fallback=next((s[0].fallback for s in sides if s[0].fallback), None),
+            candidates=[c for s in sides for c in s[0].candidates],
+            limitations=[x for s in sides for x in s[0].limitations], timings_ms=timings,
+            evidence_tokens=sum(s[0].evidence_tokens for s in sides))
         results.append(out)
     return results
 
@@ -631,7 +830,7 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
                 settings, member_id, f"evaluate:{dataset_sha[:16]}:{index.version}:{dense.version}",
                 {"job": "evaluate-retrieval", "dataset": dataset, "index": index.version})
         for row in rows:
-            if not is_passage_row(row) or not index.rows_by_extraction.get(row["extraction_id"]):
+            if not is_passage_row(row) or not scope_indexed(index, row):
                 continue  # an empty scope never pays for a query vector
             vec, info = dense_mod.query_vector(settings, transport, row["question"], request_id=request_id,
                                                member_id=member_id, purpose="gold_eval",
@@ -642,7 +841,7 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
                 if info.get("status") == "unknown":
                     break  # no automatic resend; stop spending
                 continue
-            vectors[row["id"]] = vec
+            vectors[row_id(row)] = vec
             query_info["hits" if info["cache"] == "hit" else "paid"] += 1
             if info.get("attempt_id"):
                 query_info["attempts"].append(info["attempt_id"])
@@ -650,7 +849,7 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
             if info.get("billing") == "unknown":
                 query_info.setdefault("reasons", []).append("unknown_billing_reconcile_first")
                 break  # the vector is kept; nothing more is paid until the attempt is reconciled
-        wanted = [r["id"] for r in rows if is_passage_row(r) and index.rows_by_extraction.get(r["extraction_id"])]
+        wanted = [row_id(r) for r in rows if is_passage_row(r) and scope_indexed(index, r)]
         query_info["unavailable"] = sum(i not in vectors for i in wanted)
         if query_info["unavailable"]:
             dense_error = (f"{query_info['unavailable']} query vectors unavailable "
@@ -675,10 +874,51 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
             continue
         results = _execute(settings, index, analyzer, rows, RUN_MODES[label], dense=dense, vectors=vectors)
         scores = {"status": "complete", "aggregate": aggregate(results, skipped), "profile_stats": stats,
-                  "query_embedding": query_info if label in ("D", "H") else None, "created_at": utcnow()}
+                  "query_embedding": query_info if label in ("D", "H") else None, "created_at": utcnow(),
+                  "provenance": {"code": code_fingerprint(), "hardware": hardware(),
+                                 "metric_code_sha256": metric_code_sha256()}}
         _write_run(settings, run_id, config, results, scores)
         summaries.append({"run_id": run_id, "label": label, "reused": False, **_headline(scores)})
     return summaries
+
+
+def code_fingerprint() -> dict:
+    """What code produced a result: the Git revision when Git can tell, whether tracked files differ from it, and a
+    hash of the package source either way. A missing or unreadable repository is stated, never replaced by a clean
+    revision."""
+    import subprocess
+
+    from .settings import REPO_ROOT
+
+    digest = hashlib.sha256()
+    for path in sorted((REPO_ROOT / "src" / "rfp_assistant").glob("*.py")):
+        digest.update(path.name.encode() + b"\0" + path.read_bytes())
+    out = {"source_sha256": digest.hexdigest(), "git_revision": None, "git_dirty": None}
+    try:
+        rev = subprocess.run(["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"], capture_output=True, text=True,
+                             timeout=10)
+        status = subprocess.run(["git", "-C", str(REPO_ROOT), "status", "--porcelain", "--untracked-files=no"],
+                                capture_output=True, text=True, timeout=10)
+        if rev.returncode == 0 and status.returncode == 0:
+            out.update(git_revision=rev.stdout.strip(), git_dirty=bool(status.stdout.strip()))
+        else:
+            out["git_note"] = "not a Git checkout or Git refused; no revision recorded"
+    except (OSError, subprocess.SubprocessError):
+        out["git_note"] = "Git is not available; no revision recorded"
+    return out
+
+
+def hardware() -> dict:
+    import os
+    import platform
+
+    return {"platform": platform.platform(), "machine": platform.machine(), "python": platform.python_version(),
+            "cpu_count": os.cpu_count()}
+
+
+def metric_code_sha256() -> str:
+    """Hash of the scoring code (this module): part of every phase-4 freeze."""
+    return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
 
 def _headline(scores: dict) -> dict:
@@ -761,7 +1001,7 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
                                             purpose="gold_eval", allow_paid=False)
             if vec is None:
                 raise EvaluationError("a frozen H query vector is missing from the cache; rerun H")
-            vectors[row["id"]] = vec
+            vectors[row_id(row)] = vec
     if reranker is None:
         reranker, load_info = dense_mod.load_reranker(settings)
     load_info = load_info or getattr(reranker, "info", {})
@@ -798,7 +1038,7 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
         if inference_failure(warm):
             return failed_trial(inference_failure(warm))
     base_ndcg = h_scores["aggregate"]["ndcg@5"] or 0.0
-    by_id = {r.get("id"): r for r in rows}
+    by_id = {row_id(r): r for r in rows}
     base_critical = set(critical_failures(list(h_traces.values()), by_id))  # same rule for both sides
     best = None
     for depth in depths:
@@ -932,6 +1172,16 @@ def decision_errors(settings: Settings, run_id: str, decision: dict) -> list[str
     return errors + run_errors(settings, run_id)
 
 
+def serving_config(run_id: str, config: dict) -> dict:
+    """The serving configuration a recorded retrieval run describes (what `activate-run` stores and what the
+    phase-4 answer evaluation pins)."""
+    return {"run_id": run_id, "label": config["label"], "mode": config["mode"],
+            "index_version": config["index_version"], "dense_version": config.get("dense_version"),
+            "reranker": {**config["reranker"], "depth": config["rerank_depth"]} if config.get("reranker") else None,
+            "embedding": config.get("embedding"), "limits": config.get("limits"),
+            "eval_version": config["eval_version"], "fallback_mode": "kiwi_bm25"}
+
+
 def activate_run(settings: Settings, run_id: str, decision_path: Path, actor: str = "owner-cli") -> dict:
     """Validates a reviewed selection and its ready artifacts, then switches the serving configuration in one
     transaction. The previous configuration is kept in the append-only activation history."""
@@ -944,12 +1194,7 @@ def activate_run(settings: Settings, run_id: str, decision_path: Path, actor: st
     errors = decision_errors(settings, run_id, decision)
     if errors:
         raise EvaluationError("; ".join(errors))
-    active = {"run_id": run_id, "label": config["label"], "mode": config["mode"],
-              "index_version": config["index_version"], "dense_version": config.get("dense_version"),
-              "reranker": {**config["reranker"], "depth": config["rerank_depth"]} if config.get("reranker") else None,
-              "embedding": config.get("embedding"), "limits": config.get("limits"),
-              "eval_version": config["eval_version"],
-              "fallback_mode": "kiwi_bm25", "finalist_run_id": decision.get("finalist_run_id"),
+    active = {**serving_config(run_id, config), "finalist_run_id": decision.get("finalist_run_id"),
               "activated_at": utcnow()}
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
         previous = get_app_setting(conn, "active_run")
@@ -1284,3 +1529,532 @@ def write_phase2_report(settings: Settings) -> Path:
         "active_index": active_index, "gates": [{"gate": g, "met": ok, "evidence": ev} for g, ok, ev in gates],
         "runs": [r["run_id"] for r in runs]}, ensure_ascii=False, indent=1))
     return path
+
+
+# ================================================================ phase 4: reviewed gold (schema gold-2)
+# Rows of `dev` (datasets/dev.jsonl) and the sealed `test` (sealed/test.jsonl). Labels point at stable source
+# evidence (source hash, extraction revision, element, raw offsets/cells, exact quote), never at chunk IDs, so a
+# rechunked index is scored against the same ground truth.
+
+GOLD_SCHEMA = "gold-2"
+GOLD_DATASETS = ("dev", "test")
+GOLD_TYPE_TARGETS = {  # per split; the combined target is twice this (120 rows)
+    "direct_fact": 12, "semantic_paraphrase": 9, "exact_identifier": 6, "table_numeric": 9, "multi_passage": 6,
+    "cross_document": 6, "missing_false_premise": 6, "revision_conflict": 6,
+}
+METADATA_STRATUM = "metadata_direct"  # answered from typed CSV metadata; never in passage denominators
+GOLD_TYPES = set(GOLD_TYPE_TARGETS) | {METADATA_STRATUM}
+EXPECTED_STATUS = {"answerable": ("answered",), "unanswerable": ("insufficient_evidence", "clarification_required"),
+                   "ambiguous": ("clarification_required",), "conflicting": ("conflicting_evidence",)}
+CLAIM_MATCH_TYPES = ("number", "date", "text")
+CRITICAL_KINDS = ("deadline", "amount", "mandatory_condition", "institution")
+METADATA_FIELDS = ("title", "institution", "notice", "revision", "amount_krw", "published_at", "bid_start",
+                   "bid_close")
+METADATA_STATES = ("known", "unknown", "conflict", "zero_review", "resolved")
+QID_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
+LEAK_SIMILARITY = 0.85  # character-bigram Jaccard at or above which two questions count as one paraphrase
+EARLY_BEFORE, LATE_FROM_POSITION = 0.3, 0.7
+
+
+def norm_text(text) -> str:
+    """NFC without any whitespace: the comparison form for quotes, patterns and qualifiers."""
+    return re.sub(r"\s+", "", nfc(str(text or "")))
+
+
+_UNITS = {"조": 10 ** 12, "억": 10 ** 8, "천만": 10 ** 7, "백만": 10 ** 6, "십만": 10 ** 5, "만": 10 ** 4, "천": 10 ** 3}
+_NUMBER_PART = re.compile(r"(?<![\d.,])(\d[\d,]*(?:\.\d+)?)\s*(조|억|천만|백만|십만|만|천)?")
+_DATE_RE = re.compile(
+    r"(20\d{2})\s*(?:[.\-/]|년)\s*(\d{1,2})\s*(?:[.\-/]|월)\s*(\d{1,2})\s*일?\.?(?:\s*\([^)]{0,4}\))?"
+    r"(?:\s*(오전|오후)?\s*(\d{1,2})\s*(?::|시)\s*(\d{2})?\s*분?)?")
+
+
+def number_spans(text: str) -> list[tuple[Decimal, int, int]]:
+    """(value, start, end) of every amount or count as written in Korean RFPs: `130,000,000원`, `1억 3천만 원`,
+    `130백만원`, `1.3억`, `12개월`. A unit-bearing part followed by a smaller part (`1억 3천만`) is one amount."""
+    out: list[tuple[Decimal, int, int]] = []
+    prev: tuple[int, int] | None = None  # unit magnitude and end of the previous part
+    t = nfc(text or "")
+    for m in _NUMBER_PART.finditer(t):
+        try:
+            base = Decimal(m.group(1).rstrip(",").replace(",", ""))
+        except InvalidOperation:
+            prev = None
+            continue
+        mag = _UNITS.get(m.group(2) or "", 1)
+        value = base * mag
+        if prev and out and prev[0] > 1 and mag < prev[0] and not t[prev[1]:m.start()].strip():
+            out[-1] = (out[-1][0] + value, out[-1][1], m.end())
+        else:
+            out.append((value, m.start(), m.end()))
+        prev = (mag, m.end())
+    return out
+
+
+def _plain(v: Decimal) -> Decimal:
+    return Decimal(int(v)) if v == v.to_integral_value() else v.normalize()
+
+
+def extract_numbers(text: str) -> set[Decimal]:
+    return {_plain(v) for v, _, _ in number_spans(text)}
+
+
+def extract_dates(text: str) -> set[str]:
+    """`2024. 6. 11.(화) 17:00`, `2024-06-11`, `2024년 6월 11일 오후 5시` -> {'2024-06-11', '2024-06-11T17:00'}."""
+    out: set[str] = set()
+    for m in _DATE_RE.finditer(nfc(text or "")):
+        try:
+            day = date(int(m.group(1)), int(m.group(2)), int(m.group(3))).isoformat()
+        except ValueError:
+            continue
+        out.add(day)
+        if m.group(5):
+            hour = int(m.group(5)) + (12 if m.group(4) == "오후" and int(m.group(5)) < 12 else 0)
+            minute = int(m.group(6) or 0)
+            if hour < 24 and minute < 60:
+                out.add(f"{day}T{hour:02d}:{minute:02d}")
+    return out
+
+
+def claim_value_found(claim: dict, text: str) -> bool:
+    """The claim's typed value (or a permitted alternative) is stated in `text`."""
+    match = claim.get("match") or {}
+    kind = match.get("type")
+    values = [match.get("value")] + list(claim.get("alternatives") or [])
+    if kind == "number":
+        found = extract_numbers(text)
+        return any(v is not None and Decimal(str(v)) in found for v in values)
+    if kind == "date":
+        found = extract_dates(text)
+        stamp = lambda v: f"{v}T{match['time']}" if match.get("time") and v == match.get("value") else v  # noqa: E731
+        return any(v is not None and stamp(v) in found for v in values)
+    patterns = list(match.get("patterns") or []) + [v for v in values[1:] if isinstance(v, str)]
+    hay = norm_text(text)
+    return any(norm_text(p) and norm_text(p) in hay for p in patterns)
+
+
+def qualifiers_found(claim: dict, text: str) -> list[list[str]]:
+    """Qualifier groups (each a list of permitted spellings) that `text` does not state."""
+    hay = norm_text(text)
+    return [q for q in claim.get("qualifiers") or [] if not any(norm_text(x) in hay for x in q)]
+
+
+def _bigrams(text: str) -> set[str]:
+    t = norm_text(text)
+    return {t[i:i + 2] for i in range(len(t) - 1)} or {t}
+
+
+def question_similarity(a: str, b: str) -> float:
+    x, y = _bigrams(a), _bigrams(b)
+    return len(x & y) / len(x | y) if x | y else 1.0
+
+
+def load_families(settings: Settings) -> dict:
+    path = settings.data_dir / "datasets" / "families.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"families": {}}
+
+
+class GoldChecker:
+    """Checks one gold-2 row against the managed originals and the family map. Shared by `gold submit` (no review
+    yet) and `validate-gold` (independent review required). Messages name IDs, never question text or quotes, so
+    a sealed validation report can be shown without revealing the test set."""
+
+    def __init__(self, settings: Settings, conn) -> None:
+        self.families = load_families(settings)["families"]
+        self.fam_of_doc = {d: (k, f) for k, f in self.families.items() for d in f["doc_ids"]}
+        self.conn = conn
+        self.docs = {r["doc_id"]: dict(r) for r in conn.execute(
+            "SELECT d.doc_id, d.active_source_hash, s.active_extraction_id, s.parse_status "
+            "FROM documents d JOIN sources s ON s.source_hash = d.active_source_hash")}
+        self._last_order: dict[str, int] = {}
+
+    def element(self, extraction_id: str | None, element_id: str | None):
+        return self.conn.execute("SELECT raw_text, table_json, source_order FROM elements WHERE extraction_id = ? "
+                                 "AND element_id = ?", (extraction_id, element_id)).fetchone()
+
+    def position(self, extraction_id: str, source_order: int) -> float:
+        if extraction_id not in self._last_order:
+            self._last_order[extraction_id] = self.conn.execute(
+                "SELECT COALESCE(MAX(source_order), 0) FROM elements WHERE extraction_id = ?",
+                (extraction_id,)).fetchone()[0]
+        return source_order / max(1, self._last_order[extraction_id])
+
+    def row_position(self, row: dict) -> str | None:
+        """early / middle / late by the first evidence alternative's place in its extraction."""
+        for g in row.get("evidence_groups") or []:
+            for alt in g.get("alternatives") or []:
+                el = self.element(alt.get("extraction_id"), alt.get("element_id"))
+                if el is not None:
+                    p = self.position(alt["extraction_id"], el["source_order"])
+                    return "early" if p < EARLY_BEFORE else "late" if p >= LATE_FROM_POSITION else "middle"
+        return None
+
+    def family_leaks(self) -> list[str]:
+        """Source hashes that sit in both dev and test families: byte-identical or related originals split apart."""
+        splits: dict[str, set[str]] = {}
+        for f in self.families.values():
+            hashes = {f.get("source_hash"), *f.get("related_sources", [])}
+            hashes |= {self.docs[d]["active_source_hash"] for d in f["doc_ids"] if d in self.docs}
+            for h in hashes - {None}:
+                splits.setdefault(h, set()).add(f["split"])
+        return sorted(h for h, s in splits.items() if len(s) > 1)
+
+    def _check_alternative(self, alt: dict, scoped: dict, tag: str) -> list[str]:
+        if "chunk_id" in alt or not alt.get("element_id"):
+            return [f"{tag}: evidence must name a source element; chunk-only labels change with every rechunk"]
+        e = []
+        if alt.get("source_hash") != scoped.get("source_hash"):
+            e.append(f"{tag}: evidence source hash is not the scoped original's")
+        if alt.get("extraction_id") != scoped.get("extraction_id"):
+            e.append(f"{tag}: evidence extraction revision is not the scoped one")
+        el = self.element(alt.get("extraction_id"), alt.get("element_id"))
+        if el is None:
+            return e + [f"{tag}: evidence element not in extraction"]
+        quote = str(alt.get("quote") or "")
+        cells = json.loads(el["table_json"] or '{"cells": []}')["cells"]
+        haystacks = [el["raw_text"]] + [c["text"] for c in cells]
+        if not quote.strip() or not any(_ws(quote) in _ws(h) for h in haystacks):
+            e.append(f"{tag}: quote not found in the original extraction element")
+        offsets = alt.get("offsets")
+        if offsets is not None:
+            ok = (isinstance(offsets, list) and len(offsets) == 2 and all(isinstance(x, int) for x in offsets)
+                  and 0 <= offsets[0] < offsets[1] <= len(el["raw_text"]))
+            if not ok or _ws(quote) not in _ws(el["raw_text"][offsets[0]:offsets[1]]):
+                e.append(f"{tag}: raw offsets do not hold the quote")
+        wanted = alt.get("cells")
+        if wanted is not None:
+            by_pos = {(c["row"], c["col"]): c["text"] for c in cells}
+            texts = [by_pos.get(tuple(rc)) if isinstance(rc, list) and len(rc) == 2 else None for rc in wanted]
+            if not wanted or None in texts:
+                e.append(f"{tag}: cell coordinates are not in the table")
+            elif _ws(quote) not in _ws(" ".join(texts)) and not all(_ws(t) in _ws(quote) for t in texts):
+                e.append(f"{tag}: the named cells do not hold the quote")
+        return e
+
+    def _check_claim(self, c: dict, groups: dict, tag: str, seen: set) -> list[str]:
+        cid = c.get("claim_id")
+        tag = f"{tag} claim {cid}"
+        e = []
+        if not cid or cid in seen:
+            e.append(f"{tag}: claim_id missing or repeated")
+        seen.add(cid)
+        match = c.get("match") or {}
+        kind = match.get("type")
+        if kind not in CLAIM_MATCH_TYPES:
+            return e + [f"{tag}: match.type must be one of {CLAIM_MATCH_TYPES}"]
+        if kind == "number" and (not isinstance(match.get("value"), int) or isinstance(match.get("value"), bool)
+                                 or not str(match.get("unit") or "").strip()):
+            e.append(f"{tag}: a number claim needs an integer value and its unit")
+        if kind == "date":
+            try:
+                date.fromisoformat(str(match.get("value")))
+            except ValueError:
+                e.append(f"{tag}: a date claim needs an ISO date value")
+            if match.get("time") is not None and not re.fullmatch(r"\d{2}:\d{2}", str(match["time"])):
+                e.append(f"{tag}: time must be HH:MM")
+        if kind == "text" and not [p for p in match.get("patterns") or [] if str(p).strip()]:
+            e.append(f"{tag}: a text claim needs matching patterns")
+        if c.get("criticality") not in ("critical", "normal"):
+            e.append(f"{tag}: criticality must be critical or normal")
+        elif (c["criticality"] == "critical") != (c.get("critical_kind") in CRITICAL_KINDS):
+            e.append(f"{tag}: a critical claim names its kind {CRITICAL_KINDS}; a normal claim names none")
+        quals = c.get("qualifiers") or []
+        if not isinstance(quals, list) or not all(isinstance(q, list) and q and all(str(x).strip() for x in q)
+                                                  for q in quals):
+            e.append(f"{tag}: qualifiers are lists of permitted spellings")
+            quals = []
+        support = c.get("support_groups") or []
+        if not support or any(g not in groups for g in support):
+            return e + [f"{tag}: support_groups must name this row's evidence groups"]
+        quotes = " ".join(a.get("quote", "") for g in support for a in groups[g].get("alternatives") or [])
+        if kind in ("number", "date") and not claim_value_found({"match": match}, quotes):
+            e.append(f"{tag}: the {kind} value is not stated in its support quotes")
+        if kind == "text" and not claim_value_found({"match": match}, quotes):
+            e.append(f"{tag}: no pattern appears in its support quotes")
+        if qualifiers_found({"qualifiers": quals}, quotes):
+            e.append(f"{tag}: a qualifier is not stated in its support quotes (add its evidence group)")
+        return e
+
+    def check(self, row: dict, tag: str, *, split: str | None = None, require_review: bool = True) -> list[str]:
+        e: list[str] = []
+        if row.get("dataset_version") != GOLD_SCHEMA:
+            e.append(f"{tag}: dataset_version must be {GOLD_SCHEMA!r}")
+        if not QID_RE.fullmatch(str(row.get("question_id") or "")):
+            e.append(f"{tag}: question_id uses lowercase letters, digits and hyphens")
+        rev = row.get("revision")
+        if not isinstance(rev, int) or isinstance(rev, bool) or rev < 1:
+            e.append(f"{tag}: revision must be an integer >= 1")
+        if row.get("split") not in GOLD_DATASETS:
+            e.append(f"{tag}: split must be dev or test")
+        elif split and row["split"] != split:
+            e.append(f"{tag}: a {row['split']} row cannot enter dataset {split}")
+        if row.get("operational_case") or row.get("question_type") in OPERATIONAL_TYPES:
+            return e + [f"{tag}: converter failures, interrupted calls and ownership races belong to the operational "
+                        "suite, not to gold"]
+        qtype, mode, answerability = row.get("question_type"), row.get("mode"), row.get("answerability")
+        if qtype not in GOLD_TYPES:
+            e.append(f"{tag}: unknown question_type {qtype!r}")
+        for key in ("question", "difficulty_reason"):
+            if not str(row.get(key) or "").strip():
+                e.append(f"{tag}: {key} is empty")
+        if mode not in ("single", "compare", "metadata"):
+            e.append(f"{tag}: mode must be single, compare or metadata")
+        try:
+            date.fromisoformat(str(row.get("as_of_date")))
+        except ValueError:
+            e.append(f"{tag}: as_of_date must be an ISO date")
+        if answerability not in EXPECTED_STATUS:
+            e.append(f"{tag}: answerability must be one of {sorted(EXPECTED_STATUS)}")
+        elif row.get("expected_status") not in EXPECTED_STATUS[answerability]:
+            e.append(f"{tag}: expected_status for {answerability} must be one of {EXPECTED_STATUS[answerability]}")
+        scope = row.get("scope")
+        if not isinstance(scope, list) or not 1 <= len(scope) <= 2 or not all(isinstance(s, dict) for s in scope):
+            return e + [f"{tag}: scope names one or two documents"]
+        if len({s.get("doc_id") for s in scope}) != len(scope):
+            e.append(f"{tag}: the same document is scoped twice")
+        if (mode == "compare") != (len(scope) == 2):
+            e.append(f"{tag}: compare mode scopes exactly two documents; other modes one")
+        if (qtype == "cross_document") != (mode == "compare"):
+            e.append(f"{tag}: cross_document questions and compare mode go together")
+        if (qtype == METADATA_STRATUM) != (mode == "metadata"):
+            e.append(f"{tag}: metadata_direct questions and metadata mode go together")
+        scoped: dict[str, dict] = {}
+        for s in scope:
+            doc = self.docs.get(s.get("doc_id"))
+            if doc is None:
+                e.append(f"{tag}: unknown doc_id")
+                continue
+            short = s["doc_id"][:8]
+            if s.get("source_hash") != doc["active_source_hash"]:
+                e.append(f"{tag}: {short}: source revision does not match the managed original")
+            if mode != "metadata":
+                if doc["parse_status"] != "parsed":
+                    e.append(f"{tag}: {short} is {doc['parse_status']}: " + (
+                        "a source failure is not source absence; move this case to the operational suite"
+                        if answerability != "answerable" else "its original text is unavailable"))
+                elif s.get("extraction_id") != doc["active_extraction_id"]:
+                    e.append(f"{tag}: {short}: extraction revision is not the active one")
+            scoped[s["doc_id"]] = s
+        fams = set()
+        for d in scoped:
+            fam = self.fam_of_doc.get(d)
+            if fam is None:
+                e.append(f"{tag}: {d[:8]} has no assigned family")
+                continue
+            fams.add(fam[0])
+            if fam[1]["split"] != row.get("split"):
+                e.append(f"{tag}: {d[:8]} belongs to a {fam[1]['split']} family")
+        if sorted(set(row.get("family_ids") or [])) != sorted(fams):
+            e.append(f"{tag}: family_ids must be exactly the scoped documents' assigned families")
+        groups = row.get("evidence_groups") or []
+        by_id: dict[str, dict] = {}
+        for g in groups:
+            gid = g.get("group_id")
+            if not gid or gid in by_id:
+                e.append(f"{tag}: evidence group id missing or repeated")
+                continue
+            by_id[gid] = g
+            if g.get("doc_id") not in scoped:
+                e.append(f"{tag} {gid}: evidence group outside the scope")
+                continue
+            alts = g.get("alternatives") or []
+            if not alts:
+                e.append(f"{tag} {gid}: an evidence group needs at least one source span")
+            for i, alt in enumerate(alts, 1):
+                e += self._check_alternative(alt, scoped[g["doc_id"]], f"{tag} {gid}#{i}")
+        claims = row.get("required_claims") or []
+        if mode != "metadata":
+            if answerability == "answerable" and not groups:
+                e.append(f"{tag}: an answerable passage question needs evidence groups")
+            if answerability == "answerable" and not claims:
+                e.append(f"{tag}: an answerable passage question needs required claims")
+            if mode == "compare" and answerability == "answerable" and set(scoped) - {g.get("doc_id") for g in groups}:
+                e.append(f"{tag}: every compared document needs at least one evidence group")
+            if answerability == "conflicting" and len(by_id) < 2:
+                e.append(f"{tag}: a conflict needs one evidence group per competing value")
+        seen: set = set()
+        for c in claims:
+            e += self._check_claim(c, by_id, tag, seen)
+        if mode == "metadata":
+            fields = row.get("metadata_fields") or []
+            states = row.get("expected_states") or {}
+            if not fields or set(fields) - set(METADATA_FIELDS):
+                e.append(f"{tag}: metadata_fields must name CSV fields {METADATA_FIELDS}")
+            if set(states) != set(fields) or set(states.values()) - set(METADATA_STATES):
+                e.append(f"{tag}: expected_states gives one of {METADATA_STATES} for every metadata field")
+        if answerability in ("unanswerable", "ambiguous") and mode != "metadata":
+            nv = row.get("negative_validation") or {}
+            if not nv:
+                e.append(f"{tag}: a negative or ambiguous case needs negative_validation")
+            else:
+                if set(scoped) - set(nv.get("scope_searched") or []):
+                    e.append(f"{tag}: negative_validation must search every scoped document")
+                if not nv.get("methods"):
+                    e.append(f"{tag}: negative_validation must record how absence was checked")
+                if nv.get("original_complete") is not True:
+                    e.append(f"{tag}: absence needs an original complete enough to establish it")
+                if not str(nv.get("rationale") or "").strip():
+                    e.append(f"{tag}: negative_validation needs a rationale")
+                if answerability == "unanswerable" and not nv.get("locations"):
+                    e.append(f"{tag}: verified absence lists the original locations inspected")
+        review = row.get("review") or {}
+        prov = row.get("generation_provenance") or {}
+        drafter = str(review.get("drafted_by") or "").strip()
+        if not drafter:
+            e.append(f"{tag}: review.drafted_by is required")
+        if prov.get("method") not in ("human", "llm"):
+            e.append(f"{tag}: generation_provenance.method must be human or llm")
+        elif prov["method"] == "llm" and not all(prov.get(k) for k in ("model", "prompt_version", "source_set_hash")):
+            e.append(f"{tag}: an LLM draft records its model, prompt version and source-set hash")
+        if not require_review:
+            if review.get("reviewed_by") or review.get("approved_at"):
+                e.append(f"{tag}: drafts cannot carry a review")
+            return e
+        reviewer = str(review.get("reviewed_by") or "").strip()
+        if review.get("status") != "approved" or not reviewer or not review.get("approved_at"):
+            e.append(f"{tag}: pending or unreviewed rows are not gold")
+        elif reviewer == drafter or (prov.get("method") == "llm" and reviewer == prov.get("model")):
+            e.append(f"{tag}: needs an independent reviewer; a drafter (or drafting model) cannot approve itself")
+        elif review.get("original_inspected") is not True:
+            e.append(f"{tag}: the reviewer must have inspected the original")
+        if review.get("disputed"):
+            second = review.get("second_review") or {}
+            if not second or second.get("reviewer") in (None, "", drafter, reviewer):
+                e.append(f"{tag}: a disputed row needs an independent second review")
+            elif second.get("agreed") is not True:
+                e.append(f"{tag}: the second reviewer disagreed; correct the row as a new revision")
+        return e
+
+
+def _gold_split_rows(settings: Settings, name: str) -> list[dict]:
+    path = dataset_path(settings, name)
+    return read_jsonl(path) if path.exists() else []
+
+
+def validate_gold_v2(settings: Settings, name: str) -> dict:
+    """Accepted gold only: independently reviewed against the original, quotes present in the pinned extraction,
+    families inside one split, no question repeated or paraphrased across splits. The report counts types against
+    the phase-4 targets and source positions; a smaller valid set is labeled `pilot`, never `gold`."""
+    if name not in GOLD_DATASETS:
+        raise EvaluationError(f"{name} is not a gold-2 dataset")
+    path = dataset_path(settings, name)
+    if not path.exists():
+        return {"ok": False, "dataset": name, "errors": [f"dataset file missing: {path.name}"], "rows": 0}
+    raw = path.read_bytes()
+    if raw.startswith(b"\xef\xbb\xbf"):
+        return {"ok": False, "dataset": name, "errors": ["dataset must be UTF-8 without BOM"], "rows": 0}
+    rows = read_jsonl(path)
+    other_name = "test" if name == "dev" else "dev"
+    other = _gold_split_rows(settings, other_name)
+    errors: list[str] = []
+    rejected: dict[str, list[str]] = {}
+    positions = {"early": 0, "middle": 0, "late": 0, "none": 0}
+    with open_db(settings.db_path) as conn:
+        checker = GoldChecker(settings, conn)
+        leaks = checker.family_leaks()
+        errors += [f"source {h[:12]} sits in both dev and test families: split leakage" for h in leaks]
+        affected = {notice_fam for r in load_families(settings).get("related_across_splits", [])
+                    for notice_fam in r["families"]}
+        seen_ids, seen_q = set(), {}
+        for i, row in enumerate(rows, start=1):
+            qid = str(row.get("question_id") or f"row-{i}")
+            tag = qid
+            errs = checker.check(row, tag, split=name)
+            if qid in seen_ids:
+                errs.append(f"{tag}: question_id repeated (keep only the latest revision)")
+            seen_ids.add(qid)
+            key = norm_text(row.get("question"))
+            if key in seen_q:
+                errs.append(f"{tag}: same question as {seen_q[key]}")
+            seen_q.setdefault(key, qid)
+            if set(row.get("family_ids") or []) & affected:
+                errs.append(f"{tag}: its family has related revisions in the other split; fix the family map")
+            for o in other:
+                if question_similarity(row.get("question", ""), o.get("question", "")) >= LEAK_SIMILARITY:
+                    which = "a sealed row (ID withheld)" if other_name in SEALED_SPLITS else \
+                        f"row {o.get('question_id')}"
+                    errs.append(f"{tag}: repeats or paraphrases {other_name} {which}: leakage")
+                    break
+            if errs:
+                rejected[qid] = errs
+                errors += errs
+            if row.get("mode") != "metadata":
+                positions[checker.row_position(row) or "none"] += 1
+    types = {t: sum(r.get("question_type") == t for r in rows) for t in sorted(GOLD_TYPES)}
+    targets = {t: {"rows": types[t], "target": n, "met": types[t] >= n} for t, n in GOLD_TYPE_TARGETS.items()}
+    ok = not errors
+    report = {"ok": ok, "dataset": name, "schema": GOLD_SCHEMA, "rows": len(rows),
+              "dataset_sha256": hashlib.sha256(raw).hexdigest(),
+              "label": "gold" if ok and all(t["met"] for t in targets.values()) else "pilot",
+              "targets": targets, "metadata_stratum": types[METADATA_STRATUM],
+              "answerability": {a: sum(r.get("answerability") == a for r in rows) for a in EXPECTED_STATUS},
+              "source_positions": positions, "rejected_rows": [{"question_id": k, "errors": v}
+                                                               for k, v in rejected.items()],
+              "errors": errors, "validated_at": utcnow()}
+    write_text_atomic(path.with_suffix(".validation.json"), json.dumps(report, ensure_ascii=False, indent=1))
+    return report
+
+
+def gold_manifest_path(settings: Settings, name: str) -> Path:
+    return dataset_path(settings, name).with_name(f"{name}-manifest.json")
+
+
+def review_log_path(settings: Settings, name: str) -> Path:
+    return dataset_path(settings, name).with_name("review-log.jsonl" if name == "dev" else f"{name}-review-log.jsonl")
+
+
+def export_review_log(settings: Settings, name: str) -> tuple[Path, str]:
+    """The append-only review decisions behind a dataset (first decisions and second reviews), oldest first."""
+    from .store import write_jsonl_atomic
+
+    with open_db(settings.db_path) as conn:
+        rows = [dict(r) for r in conn.execute(
+            "SELECT r.review_id, r.candidate_id, r.reviewer, r.kind, r.decision, r.original_inspected, r.note, "
+            "r.created_at FROM gold_reviews r JOIN gold_candidates c ON c.candidate_id = r.candidate_id "
+            "WHERE c.dataset = ? ORDER BY r.created_at, r.review_id", (name,))]
+    path = review_log_path(settings, name)
+    write_jsonl_atomic(path, rows)
+    return path, hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def freeze_dataset(settings: Settings, name: str, actor: str, reason: str) -> dict:
+    """Freezes a validated gold split: dataset, review log and family map hashes in its manifest, with an audit
+    event. The test manifest stays under sealed/."""
+    if not (reason or "").strip():
+        raise EvaluationError("freezing a dataset needs a reason")
+    report = validate_gold_v2(settings, name)
+    if not report["ok"]:
+        raise EvaluationError(f"{name} does not validate ({len(report['errors'])} errors); freeze refused")
+    log_path, log_sha = export_review_log(settings, name)
+    fam_path = settings.data_dir / "datasets" / "families.json"
+    manifest = {"dataset": name, "schema": GOLD_SCHEMA, "dataset_sha256": report["dataset_sha256"],
+                "rows": report["rows"], "label": report["label"], "targets": report["targets"],
+                "metadata_stratum": report["metadata_stratum"], "answerability": report["answerability"],
+                "source_positions": report["source_positions"], "review_log_sha256": log_sha,
+                "families_sha256": hashlib.sha256(fam_path.read_bytes()).hexdigest() if fam_path.exists() else None,
+                "frozen_by": actor, "reason": reason.strip(), "frozen_at": utcnow()}
+    write_text_atomic(gold_manifest_path(settings, name), json.dumps(manifest, ensure_ascii=False, indent=1))
+    record_audit(settings, actor, "freeze_dataset", name, reason, {k: manifest[k] for k in (
+        "dataset_sha256", "rows", "label", "review_log_sha256")})
+    return manifest
+
+
+def frozen_dataset(settings: Settings, name: str) -> dict | None:
+    """The frozen manifest, with `current` telling whether today's dataset bytes are still the frozen ones."""
+    path = gold_manifest_path(settings, name)
+    if not path.exists():
+        return None
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    data = dataset_path(settings, name)
+    manifest["current"] = data.exists() and hashlib.sha256(data.read_bytes()).hexdigest() == manifest["dataset_sha256"]
+    return manifest
+
+
+def record_audit(settings: Settings, actor: str, action: str, target: str, reason: str, details: dict) -> str:
+    from .store import tx
+
+    event_id = str(uuid.uuid4())
+    with open_db(settings.db_path) as conn, tx(conn, immediate=True):
+        conn.execute("INSERT INTO audit_events(event_id, actor, action, target, reason, details_json, created_at) "
+                     "VALUES (?, ?, ?, ?, ?, ?, ?)", (event_id, actor, action, target, reason, dumps(details),
+                                                       utcnow()))
+    return event_id

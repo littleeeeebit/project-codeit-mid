@@ -63,6 +63,7 @@ class Resources:
         gateway always does) and resolves what a previous process left: unfinished requests become interrupted,
         dispatching attempts unknown, never-dispatched reservations released. Nothing is replayed."""
         self.settings = settings
+        self.paid_purpose = "interactive"  # ledger envelope of every paid stage this owner dispatches
         init_schema(settings.db_path)
         budget.ensure_budget_row(settings.db_path)
         self._lock: ProcessLock | None = None
@@ -457,7 +458,7 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
             dense = None
         if dense is not None and scope_rows(idx, pairs):
             qvec, qinfo = dense_mod.query_vector(s, res.transport, question, request_id=request_id,
-                                                 member_id=principal.member_id, purpose="interactive",
+                                                 member_id=principal.member_id, purpose=res.paid_purpose,
                                                  allow_paid=allow_paid, guard=_dispatch_guard(res, request_id))
     result = _retrieve(s, idx, res.analyzer, question, pairs, mode=cfg["mode"], dense=dense,
                        query_vector=qvec, reranker=res.reranker() if cfg["mode"] == "hybrid_rerank" else None,
@@ -815,7 +816,7 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
                     missing_fields=server_missing, **common)
     principal = _checkpoint(res, request_id, principal)
     admission = budget.reserve(s.db_path, request_id=request_id, member_id=principal.member_id, stage="generation",
-                               purpose="interactive", model=s.generation_model, input_tokens=prep["input_tokens"],
+                               purpose=res.paid_purpose, model=s.generation_model, input_tokens=prep["input_tokens"],
                                max_output_tokens=s.generation_max_output_tokens, count_method=generation.COUNT_METHOD,
                                ceiling_micro_usd=frozen["estimate_micro_usd"] if frozen is not None else None)
     trace["admission"] = admission
@@ -1620,17 +1621,138 @@ def gold_queue(res: Resources, principal: Principal) -> dict:
 
 def gold_candidate(res: Resources, principal: Principal, candidate_id: str) -> dict:
     principal = _authorize(res, principal, "verifier")
-    return gold.candidate(res.settings, candidate_id)
+    try:
+        return gold.candidate(res.settings, candidate_id)
+    except gold.GoldError as exc:
+        raise ServiceError(str(exc)) from None
 
 
 def gold_decide(res: Resources, principal: Principal, candidate_id: str, decision: str, expected_sha: str,
-                categories: list[str] | None = None, note: str = "") -> dict:
-    """The visitor's chosen name is recorded as the reviewer."""
+                categories: list[str] | None = None, note: str = "", *, original_inspected: bool = False,
+                disputed: bool = False) -> dict:
+    """The visitor's chosen name is recorded as the reviewer. Sealed test candidates are refused here: only the
+    owner's CLI reviews them."""
     principal = _authorize(res, principal, "verifier")
     try:
-        return gold.decide(res.settings, candidate_id, decision, principal.member_id, expected_sha, categories, note)
+        return gold.decide(res.settings, candidate_id, decision, principal.member_id, expected_sha, categories, note,
+                           original_inspected=original_inspected, disputed=disputed)
     except gold.GoldError as exc:
         raise ServiceError(str(exc)) from None
+
+
+def gold_second_review(res: Resources, principal: Principal, candidate_id: str, agreed: bool, note: str) -> dict:
+    principal = _authorize(res, principal, "verifier")
+    try:
+        return gold.second_review(res.settings, candidate_id, principal.member_id, agreed, note)
+    except gold.GoldError as exc:
+        raise ServiceError(str(exc)) from None
+
+
+def gold_awaiting_second_review(res: Resources, principal: Principal) -> list[dict]:
+    """Approved development gold rows marked disputed that still lack an independent second review."""
+    principal = _authorize(res, principal, "verifier")
+    from .store import read_jsonl
+
+    path = res.settings.data_dir / "datasets" / "dev.jsonl"
+    rows = read_jsonl(path) if path.exists() else []
+    return [r for r in rows if (r.get("review") or {}).get("disputed") and not (r["review"].get("second_review"))]
+
+
+# ---------------------------------------------------------------- phase 4: development answer evaluation
+
+_EVAL_JOBS: dict[str, threading.Thread] = {}
+_EVAL_LOCK = threading.Lock()
+
+
+def evaluation_overview(res: Resources, principal: Principal) -> dict:
+    """What the verifier may see of phase 4: development validation and freeze state, the sealed set's size and
+    freeze state only, development answer runs and their scores, and the latest release decision."""
+    principal = _authorize(res, principal, "verifier")
+    from . import evaluation
+
+    s = res.settings
+    dev = evaluation.dataset_path(s, "dev")
+    validation = json.loads(dev.with_suffix(".validation.json").read_text(encoding="utf-8")) \
+        if dev.with_suffix(".validation.json").exists() else None
+    runs = []
+    base = s.data_dir / "runs"
+    for d in sorted(base.glob("A-*")) if base.exists() else []:
+        try:
+            config = json.loads((d / "config.json").read_text(encoding="utf-8"))
+            rows_file = d / "rows.jsonl"
+            done = sum(1 for line in rows_file.read_text(encoding="utf-8").splitlines()
+                       if line.strip() and json.loads(line).get("status") == "done") if rows_file.exists() else 0
+            runs.append({"run_id": d.name, "config": config,
+                         "progress": {"done": done, "total": (config.get("rows") or 0) * len(config["finalists"])},
+                         "scores": json.loads((d / "scores.json").read_text(encoding="utf-8"))
+                         if (d / "scores.json").exists() else None,
+                         "running": d.name in _EVAL_JOBS and _EVAL_JOBS[d.name].is_alive()})
+        except (OSError, json.JSONDecodeError):
+            continue
+    test = evaluation.frozen_dataset(s, "test")
+    releases = []
+    for path in (s.data_dir / "releases").glob("*/manifest.json") if (s.data_dir / "releases").exists() else []:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if "status" in data:  # release-report manifests; phase-2 handoff manifests have no decision
+            releases.append((path.stat().st_mtime, data))
+    return {"dev_validation": validation, "dev_frozen": evaluation.frozen_dataset(s, "dev"),
+            "test": {"rows": sealed_rows_count(s), "frozen": bool(test), "current": bool(test and test["current"])},
+            "answer_runs": runs,
+            "release": max(releases, key=lambda x: x[0])[1] if releases else None}
+
+
+def sealed_rows_count(settings: Settings) -> int:
+    test = settings.data_dir / "sealed" / "test.jsonl"
+    return sum(1 for line in test.read_text(encoding="utf-8").splitlines() if line.strip()) if test.exists() else 0
+
+
+def plan_answer_evaluation(res: Resources, principal: Principal, run_ids: list[str] | None = None) -> dict:
+    """Free: prices every development answer the finalists would still generate. Nothing is sent."""
+    principal = _authorize(res, principal, "verifier")
+    from . import answers
+
+    try:
+        return answers.plan_run(res.settings, "answer-finalists", "dev", run_ids or None)
+    except answers.AnswerEvalError as exc:
+        raise ServiceError(str(exc)) from None
+
+
+def start_answer_evaluation(res: Resources, principal: Principal, estimate_id: str) -> str:
+    """Runs a planned development answer evaluation on this process's gateway in one background thread, with the
+    estimate the verifier consented to. One evaluation at a time; the service's stop interrupts it between rows and
+    before any new paid stage; rerunning resumes."""
+    principal = _authorize(res, principal, "verifier")
+    from . import answers
+
+    try:
+        est = answers.load_estimate(res.settings, estimate_id)
+        if est["action"] != "answer-finalists":
+            raise ServiceError("검증 화면에서는 개발 질문 평가만 실행할 수 있습니다. 봉인 평가는 소유자 CLI로 실행합니다.")
+        answers.recheck(res.settings, est)
+    except answers.AnswerEvalError as exc:
+        raise ServiceError(str(exc)) from None
+    if res.transport is None or res._closed:
+        raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
+    with _EVAL_LOCK:
+        if any(t.is_alive() for t in _EVAL_JOBS.values()):
+            raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
+
+        def job() -> None:
+            try:
+                answers.run_answers(res.settings, res, estimate_id, principal.member_id)
+            except Exception as exc:  # noqa: BLE001 - recorded for the overview; rows already finished stay
+                from .store import write_text_atomic
+
+                write_text_atomic(answers.run_dir(res.settings, est["run_id"]) / "last-error.txt",
+                                  f"{type(exc).__name__}: {exc}"[:500])
+
+        thread = threading.Thread(target=job, name=f"rfp-eval-{est['run_id']}", daemon=True)
+        _EVAL_JOBS[est["run_id"]] = thread
+        thread.start()
+    return est["run_id"]
 
 
 def fidelity_overview(res: Resources, principal: Principal) -> list[dict]:

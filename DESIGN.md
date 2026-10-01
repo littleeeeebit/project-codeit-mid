@@ -1,4 +1,4 @@
-# Interface design (phase 3)
+# Interface design (phases 3–4)
 
 Written before the phase 3 layout changes, as the [phase 3 plan](docs/plan/end-to-end/3-workflows-and-operations.md) requires. It records purpose, reading order and state ownership. It does not record measured widths, spacing or colors. Real-browser observations live in `.runtime/releases/phase-3/report.md`, and only for what was actually checked.
 
@@ -42,3 +42,9 @@ Two fragments only read: the allowance strip every 2 s and the owned request eve
 ## Accessibility and text
 
 All labels and answers are in Korean, with labelled inputs. The theme's primary color (`.streamlit/config.toml`, `#B3261E`) keeps white button text above 4.5:1; Streamlit's default red does not. Tables meant to be read, such as metadata facts and the audit log, use static cells rather than the canvas grid. States are spelled out in text next to any color: 대기 중, 처리 중, 근거 부족, 확인 필요, 근거 충돌, 사용 한도로 차단, 기술 오류, 취소됨, 중단됨. Source and model text is escaped before rendering, and no unsafe HTML is used. There are no uncalibrated confidence percentages.
+
+## Phase 4 additions
+
+- **검증 › 평가 (4단계).** For a verifier preparing the release: the development gold status (rows, validity, `pilot`/`gold` label, the per-type targets table, freeze state), the sealed test set as a row count and freeze state only, each development answer run with its finalists' scores and their denominators, and the latest release decision with its reasons. The paid action is two steps: "비용 추정 (무료, 호출 없음)" shows the estimate ID, finalists, remaining answers, the maximum and the remaining `gold_eval` envelope; the run button stays disabled until the consent checkbox naming that maximum is ticked. The run uses the application's own gateway in one background thread, one evaluation at a time; a 2 s read-only fragment shows the finished count. A controlled stop interrupts it between rows; rerunning resumes. Sealed runs, freezes and backups are not on this page; they are owner CLI actions.
+- **질문 검토 for gold-2 rows.** The candidate shows its type, answerability, expected status and as-of date, every scoped document with its review state and original download, the typed required claims (value, unit, qualifier spellings, criticality, support groups) as a static table, every evidence alternative with its location and full element text, and any negative-validation record. Approval is a form: it requires "원문 파일에서 … 직접 확인했습니다" and offers "쟁점 있음" for a second review. "2차 검토 대기" lists disputed approved rows; a third person records agreement or disagreement with a note. Sealed candidates never appear here.
+- **Scores.** Rates show as `0.67 (2/3)`; an empty denominator shows "해당 없음", never 100 %. Citation precision is labelled as a lower bound when unjudged links count against it.

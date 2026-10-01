@@ -2,13 +2,16 @@
  "version": 1,
  "contracts": [
   "docs/plan/end-to-end/3-workflows-and-operations.md",
-  "docs/plan/end-to-end/implementation-contracts.md"
+  "docs/plan/end-to-end/implementation-contracts.md",
+  "docs/plan/end-to-end/4-evaluation-and-release.md"
  ],
  "prose_paths": [
   "README.md",
   "DESIGN.md",
   "docs/operations/runbook.md",
-  "handoff/phase3/README.md"
+  "handoff/phase3/README.md",
+  "handoff/phase4/README.md",
+  "docs/operations/release-report.md"
  ],
  "flows": [
   {
@@ -302,8 +305,55 @@
      "expected": "check --phase 3 --provider fake passes"
     },
     {
+     "id": "phase4-gate",
+     "expected": "check --phase 4 --provider fake passes"
+    },
+    {
      "id": "full-suite",
      "expected": "The full unittest discovery passes"
+    }
+   ]
+  },
+  {
+   "id": "evaluation-release",
+   "title": "Phase 4 gold, answer evaluation, sealed run and release evidence",
+   "kind": "command",
+   "command": "python -B tools/verify.py evaluation-release",
+   "paths": [
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/answers.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/cli.py",
+    "src/rfp_assistant/evaluation.py",
+    "src/rfp_assistant/gold.py",
+    "src/rfp_assistant/release.py",
+    "src/rfp_assistant/sealed.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tests/phase4_fixtures.py",
+    "tests/test_evaluation.py",
+    "tests/test_release.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "gold-and-answers",
+     "expected": "Gold-2 validation, grouped-evidence metrics, answer runs and sealed-run tests pass"
+    },
+    {
+     "id": "backup-and-report",
+     "expected": "Backup, staged restore, reconciliation fixture and release-report tests pass"
+    },
+    {
+     "id": "cli-walkthrough",
+     "expected": "On the fixture corpus the CLI validates, freezes, evaluates, freezes the release, runs the sealed set once, backs up, restores and reports with the fake provider"
     }
    ]
   },

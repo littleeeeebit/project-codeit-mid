@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
-SCHEMA_VERSION = 5  # 5: background requests, audit events, corrections, verifier runs
+SCHEMA_VERSION = 6  # 5: background requests, audit events, corrections, verifier runs; 6: gold review log, eval estimates
 BUSY_TIMEOUT_MS = 5000
 
 SOURCES_DDL = """
@@ -267,6 +267,25 @@ CREATE TABLE IF NOT EXISTS verifier_runs (
     scope_json TEXT NOT NULL,
     trace_json TEXT NOT NULL,
     created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS gold_reviews (
+    review_id TEXT PRIMARY KEY,
+    candidate_id TEXT NOT NULL REFERENCES gold_candidates(candidate_id),
+    reviewer TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('decision', 'second')),
+    decision TEXT NOT NULL,
+    original_inspected INTEGER NOT NULL DEFAULT 0,
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS gold_reviews_candidate ON gold_reviews(candidate_id, created_at);
+CREATE TABLE IF NOT EXISTS eval_estimates (
+    estimate_id TEXT PRIMARY KEY,
+    action TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    estimate_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS activations (
     activation_id TEXT PRIMARY KEY,

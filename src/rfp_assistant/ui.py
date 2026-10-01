@@ -611,7 +611,7 @@ def _history(st, res, principal) -> None:
 def verifier_page(st, res, principal) -> None:
     principal = auth.require(principal, "verifier")  # the service checks again
     st.title("검증: 검색 경로와 근거 추적")
-    tabs = st.tabs(["검색 추적", "실행 비교", "수정 기록", "원문 대조 (HWP)", "수집 상태 (100건)"])
+    tabs = st.tabs(["검색 추적", "실행 비교", "수정 기록", "원문 대조 (HWP)", "수집 상태 (100건)", "평가 (4단계)"])
     with tabs[0]:
         _trace_tab(st, res, principal)
     with tabs[1]:
@@ -624,6 +624,99 @@ def verifier_page(st, res, principal) -> None:
         rows = service.ingestion_overview(res, principal)
         st.dataframe([{k: r[k] for k in ("filename", "format", "parse_status", "review_status", "reason_code")}
                       | {"warnings": ", ".join(r["warnings"])} for r in rows], hide_index=True, width="stretch")
+    with tabs[5]:
+        _evaluation_tab(st, res, principal)
+
+
+def _rate_text(r: dict | None) -> str:
+    if not r or not r.get("denominator"):
+        return "해당 없음"
+    return f"{r['rate']:.2f} ({r['numerator']}/{r['denominator']})"
+
+
+def _evaluation_tab(st, res, principal) -> None:
+    """Phase 4 for verifiers: development gold status, development answer runs and the release decision. The sealed
+    test set appears only as a row count and its freeze state; its questions and labels are never served here."""
+    ov = service.evaluation_overview(res, principal)
+    st.caption("개발(dev) 질문만 이 화면에서 다룹니다. 봉인된 시험(test) 질문과 라벨은 표시하지 않으며, 봉인 평가는 소유자 CLI로만 "
+               "실행합니다. 점수는 표본 수와 함께 읽으세요.")
+    v, frozen, test = ov["dev_validation"], ov["dev_frozen"], ov["test"]
+    if v:
+        st.markdown(f"**개발 데이터셋** {v['rows']}문항 · " + ("유효" if v["ok"] else f"오류 {len(v['errors'])}건")
+                    + f" · 표시 **{'gold' if v['label'] == 'gold' else '파일럿(목표 미달)'}** · 검증 {v['validated_at'][:16]}"
+                    + (f" · 고정됨({'현재와 같음' if frozen['current'] else '고정 이후 바뀜'})" if frozen else " · 고정 전"))
+        st.dataframe([{"유형": GOLD_TYPE_TEXT.get(t, t), "문항": x["rows"], "목표": x["target"],
+                       "충족": "예" if x["met"] else "아니요"} for t, x in v["targets"].items()],
+                     hide_index=True, width="stretch")
+        if v["errors"]:
+            with st.expander(f"검증 오류 {len(v['errors'])}건"):
+                st.markdown("  \n".join(plain(e) for e in v["errors"][:50]))
+    else:
+        st.info("개발 데이터셋 검증 기록이 없습니다: `python -m rfp_assistant.cli validate-gold --dataset dev`")
+    st.caption(f"봉인 시험 세트: {test['rows']}문항 · " + ("고정됨" if test["frozen"] else "고정 전")
+               + ("" if not test["frozen"] or test["current"] else " (고정 이후 바뀜)"))
+    st.markdown("**개발 답변 평가 실행**")
+    for run in reversed(ov["answer_runs"]):
+        scores = run["scores"] or {}
+        head = f"{run['run_id']} · {run['config']['label']} · " + (
+            "실행 중" if run["running"] else STATUS_EVAL.get(scores.get("status"), "점수 없음"))
+        with st.expander(head, expanded=run["running"]):
+            if run["running"]:
+                _evaluation_progress(st, res, principal, run["run_id"])
+            if scores.get("stop_reason"):
+                st.warning(f"중단 사유: {plain(scores['stop_reason'])}")
+            rows = []
+            for fid, f in (scores.get("finalists") or {}).items():
+                rows.append({"후보": fid, "방식": MODE_TEXT.get(f["mode"], f["mode"]), "완료": f"{f['completed']}/{f['of']}",
+                             "필수 주장 정확도": _rate_text(f["required_claim_correctness"]),
+                             "치명 오류": len(f["critical_wrong"]),
+                             "인용 정밀도(하한)": _rate_text(f["citation_precision_lower_bound"]),
+                             "미판정 인용": f["links_unjudged"], "부정 질문 처리": _rate_text(f["negative_handling"]),
+                             "비용": usd(f["cost"]["settled_micro_usd"]), "p95(ms)": f["latency_ms"]["p95"]})
+            if rows:
+                st.dataframe(rows, hide_index=True, width="stretch")
+                st.caption("인용 정밀도 하한은 사람이 아직 판정하지 않은 인용을 지지하지 않는 것으로 셉니다. "
+                           "블라인드 검토표: `export-review --run-id ...` → `import-review`.")
+    est = st.session_state.get("eval_estimate")
+    if st.button("비용 추정 (무료, 호출 없음)", key="eval-plan"):
+        try:
+            est = service.plan_answer_evaluation(res, principal)
+            st.session_state["eval_estimate"] = est
+        except (service.ServiceError, auth.AuthError) as exc:
+            st.error(str(exc))
+            est = None
+    if est:
+        st.markdown(f"추정 `{est['estimate_id']}` · 후보 {', '.join(est['finalists'])} · 남은 답변 {est['rows_remaining']}개 · "
+                    f"최대 {usd(est['max_micro_usd'])} (gold_eval 예산 남음 {usd(est['envelope_remaining_micro_usd'])}) · "
+                    f"유효 기한 {est['expires_at'][:16]}")
+        if not est["fits"]:
+            st.error("최대 비용이 평가 예산 또는 운영 한도를 넘어 실행할 수 없습니다.")
+        else:
+            agree = st.checkbox(f"이 추정으로 개발 답변 평가를 실행합니다 (최대 {usd(est['max_micro_usd'])}, 공유 예산에서 차감)",
+                                key=f"eval-agree-{est['estimate_id']}")
+            if st.button("평가 실행 (유료)", disabled=not agree, key=f"eval-run-{est['estimate_id']}"):
+                try:
+                    service.start_answer_evaluation(res, principal, est["estimate_id"])
+                    st.session_state.pop("eval_estimate", None)
+                    st.rerun()
+                except (service.ServiceError, auth.AuthError) as exc:
+                    st.error(str(exc))
+    release = ov["release"]
+    if release:
+        st.markdown(f"**최근 릴리스 판정** `{release['release_id']}`: **{RELEASE_TEXT.get(release['status'], release['status'])}**")
+        for r in release.get("reasons") or []:
+            st.caption(plain(r))
+
+
+def _evaluation_progress(st, res, principal, run_id: str) -> None:
+    @st.fragment(run_every=2)
+    def _poll():
+        run = next((r for r in service.evaluation_overview(res, principal)["answer_runs"] if r["run_id"] == run_id), None)
+        if run is None or not run["running"]:
+            st.rerun(scope="app")
+        st.info(f"평가 실행 중 · 완료 {run['progress']['done']}/{run['progress']['total']}개 답변")
+
+    _poll()
 
 
 def _trace_tab(st, res, principal) -> None:
@@ -915,6 +1008,16 @@ def admin_page(st, res, principal) -> None:
 # Who comes here: a verifier who did not draft the questions. What for: check each drafted question against
 # the original, then approve it into the dataset or reject it with a reason for the drafting agent.
 
+GOLD_TYPE_TEXT = {"direct_fact": "직접 사실", "semantic_paraphrase": "다른 표현", "exact_identifier": "요구사항 코드",
+                  "table_numeric": "표·숫자", "multi_passage": "한 문서 여러 근거", "cross_document": "두 문서 비교",
+                  "missing_false_premise": "없음·잘못된 전제", "revision_conflict": "차수·중복 충돌",
+                  "metadata_direct": "기본 정보"}
+STATUS_EVAL = {"complete": "완료", "partial": "일부 완료"}
+MATCH_TEXT = {"number": "숫자", "date": "날짜", "text": "문구"}
+CRITICAL_TEXT = {"deadline": "중요: 마감", "amount": "중요: 금액", "mandatory_condition": "중요: 필수 조건",
+                 "institution": "중요: 기관"}
+RELEASE_TEXT = {"ready": "출시 가능", "limited": "제한적 출시", "blocked": "차단"}
+ANSWERABILITY_TEXT = {"answerable": "답변 가능", "unanswerable": "원문에 없음", "ambiguous": "모호함", "conflicting": "충돌"}
 TYPE_TEXT = {"late_content": "뒷부분 내용", "table_fact": "표 속 사실", "numeric_qualifier": "숫자·조건",
              "repeated_code": "반복 요구사항 코드", "requirement_detail": "요구사항 상세", "condition": "조건",
              "missing_metadata": "메타데이터 누락", "provenance_conflict": "출처 충돌",
@@ -935,10 +1038,28 @@ def gold_review_page(st, res, principal) -> None:
     if not pending:
         st.info("검토할 질문이 없습니다.")
     else:
-        labels = {f"{p['candidate_id']} · {TYPE_TEXT.get(p['type'], p['type'])} · {p['question'][:50]}":
+        labels = {f"{p['candidate_id']} · {TYPE_TEXT.get(p['type']) or GOLD_TYPE_TEXT.get(p['type'], p['type'])} · "
+                  f"{p['question'][:50]}":
                   p["candidate_id"] for p in pending}
         cid = labels[st.selectbox("검토할 질문", list(labels))]
         _gold_candidate(st, res, principal, service.gold_candidate(res, principal, cid), REJECT_CATEGORIES)
+    waiting = service.gold_awaiting_second_review(res, principal)
+    if waiting:
+        with st.expander(f"2차 검토 대기 {len(waiting)}건 (쟁점 표시된 승인 질문)"):
+            labels = {f"{r['candidate_id']} · {r['question'][:50]}": r for r in waiting}
+            r = labels[st.selectbox("질문", list(labels), key="second-pick")]
+            st.markdown(f"> {plain(r['question'])}")
+            st.json({"required_claims": r.get("required_claims"), "evidence_groups": r.get("evidence_groups")})
+            with st.form(f"second-{r['candidate_id']}", clear_on_submit=True):
+                verdict = st.radio("원문과 대조한 결과", ["동의", "동의하지 않음"], horizontal=True)
+                note = st.text_area("확인 내용 (원문 위치 포함)")
+                if st.form_submit_button("2차 검토 기록"):
+                    try:
+                        service.gold_second_review(res, principal, r["candidate_id"], verdict == "동의", note)
+                        st.session_state["gold_flash"] = f"{r['candidate_id']}: 2차 검토를 기록했습니다."
+                        st.rerun()
+                    except (service.ServiceError, auth.AuthError) as exc:
+                        st.error(str(exc))
     if q["recent"]:
         with st.expander("최근 처리"):
             st.dataframe([{"질문": r["candidate_id"], "결과": "승인" if r["status"] == "approved" else "거절",
@@ -993,7 +1114,77 @@ def _fidelity_tab(st, res, principal) -> None:
                 st.rerun()
 
 
+def _gold2_candidate(st, res, principal, c: dict, categories: dict) -> None:
+    """A gold-2 row: every scoped document, the typed required claims and every evidence alternative."""
+    row, ctx = c["row"], c["context"]
+    st.markdown(f"**유형** {GOLD_TYPE_TEXT.get(row.get('question_type'), row.get('question_type'))} · **데이터셋** "
+                f"{plain(c['dataset'])} · **초안** {plain(c['drafted_by'])} · **답변 가능성** "
+                f"{ANSWERABILITY_TEXT.get(row.get('answerability'), row.get('answerability'))} · **기대 상태** "
+                f"{STATUS_TEXT.get(row.get('expected_status'), row.get('expected_status'))} · **기준일** "
+                f"{plain(row.get('as_of_date'))}")
+    st.markdown("**질문**")
+    st.info(plain(row.get("question", "")))
+    st.caption("난이도 이유: " + plain(row.get("difficulty_reason")))
+    for err in c.get("current_errors") or []:
+        st.error(f"현재 원문 상태와 맞지 않습니다: {plain(err)}")
+    for i, (doc, sc) in enumerate(zip(ctx.get("documents") or [], row.get("scope") or [])):
+        if doc is None:
+            st.error("문서를 찾을 수 없습니다.")
+            continue
+        st.markdown(f"**문서 {i + 1}** {plain(doc.get('title'))} · {plain(doc.get('filename'))} · "
+                    f"{(doc.get('format') or '').upper()} · {REVIEW_TEXT.get(doc.get('review_status'), '')}")
+        if doc.get("review_status") in REVIEW_WARNING:
+            st.warning(REVIEW_WARNING[doc["review_status"]])
+        if doc.get("unavailable_reason"):
+            st.error(doc["unavailable_reason"])
+        try:
+            dl = service.original_download(res, principal, doc["doc_id"], sc["source_hash"])
+            st.download_button("원문 파일 받기", dl.data, file_name=dl.filename, mime=dl.mime,
+                               key=f"dl-{c['candidate_id']}-{i}")
+        except service.ServiceError as exc:
+            st.caption(str(exc))
+    claims = row.get("required_claims") or []
+    if claims:
+        st.markdown("**필수 주장** (답변이 반드시 맞혀야 하는 값과 단서)")
+        st.dataframe([{"주장": x.get("claim_id"),
+                       "형식": MATCH_TEXT.get((x.get("match") or {}).get("type"), (x.get("match") or {}).get("type")),
+                       "값": json.dumps({k: v for k, v in (x.get("match") or {}).items() if k != "type"},
+                                       ensure_ascii=False),
+                       "단서(하나 이상 표기)": " / ".join("|".join(q) for q in x.get("qualifiers") or []),
+                       "중요도": CRITICAL_TEXT.get(x.get("critical_kind"), "보통"),
+                       "근거 그룹": ", ".join(x.get("support_groups") or [])}
+                      for x in claims], hide_index=True, width="stretch")
+    for ev in ctx.get("evidence", []):
+        loc = location_text(ev["location"]) if ev["location"] else "위치 없음"
+        st.markdown(f"**근거 {plain(ev.get('group_id'))}** · {loc}")
+        st.markdown(f"> {plain(ev['quote'])}")
+        with st.expander("추출된 원문 요소 전체"):
+            st.markdown(plain(ev["text"]) if ev["text"] else "요소를 찾을 수 없습니다.")
+    if row.get("negative_validation"):
+        st.markdown("**부재 검증 기록**")
+        st.json(row["negative_validation"])
+    if "metadata" in ctx:
+        st.markdown("**CSV 메타데이터**")
+        st.json({"fields": ctx["metadata"], "expected_states": row.get("expected_states"),
+                 "conflicts": ctx["metadata_conflicts"]})
+    st.divider()
+    left, right = st.columns(2)
+    with left.form(f"approve-{c['candidate_id']}"):
+        inspected = st.checkbox("원문 파일에서 질문·값·단위·조건·근거를 직접 확인했습니다")
+        disputed = st.checkbox("쟁점 있음: 마감·금액·기관·필수 조건을 다른 사람이 한 번 더 확인해야 합니다")
+        if st.form_submit_button("승인 → 데이터셋", type="primary"):
+            _gold_decide(st, res, principal, c, "approve", original_inspected=inspected, disputed=disputed)
+    with right.form(f"reject-{c['candidate_id']}", clear_on_submit=True):
+        picked = st.multiselect("거절 사유", list(categories), format_func=categories.get)
+        note = st.text_area("메모 (무엇이 틀렸는지 구체적으로)")
+        if st.form_submit_button("거절 → 거절 위키"):
+            _gold_decide(st, res, principal, c, "reject", picked, note)
+
+
 def _gold_candidate(st, res, principal, c: dict, categories: dict) -> None:
+    if c.get("gold"):
+        _gold2_candidate(st, res, principal, c, categories)
+        return
     row, ctx = c["row"], c["context"]
     doc = ctx.get("document") or {}
     st.markdown(f"**유형** {TYPE_TEXT.get(row.get('type'), row.get('type'))} · **데이터셋** {plain(c['dataset'])} · "
@@ -1033,9 +1224,11 @@ def _gold_candidate(st, res, principal, c: dict, categories: dict) -> None:
             _gold_decide(st, res, principal, c, "reject", picked, note)
 
 
-def _gold_decide(st, res, principal, c: dict, decision: str, categories=None, note: str = "") -> None:
+def _gold_decide(st, res, principal, c: dict, decision: str, categories=None, note: str = "", *,
+                 original_inspected: bool = False, disputed: bool = False) -> None:
     try:
-        service.gold_decide(res, principal, c["candidate_id"], decision, c["row_sha256"], categories, note)
+        service.gold_decide(res, principal, c["candidate_id"], decision, c["row_sha256"], categories, note,
+                            original_inspected=original_inspected, disputed=disputed)
     except (service.ServiceError, auth.AuthError) as exc:
         st.error(str(exc))
         return
