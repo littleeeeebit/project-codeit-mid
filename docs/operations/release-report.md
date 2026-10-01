@@ -60,7 +60,7 @@ Allowance and cap on the owner host: $5 / $5 (phase-3 configuration, `README.md`
 
 ## Known limitations
 
-- Answer scoring is deterministic only for typed numbers (with their unit) and dates (with their cutoff time), matched per document; a correct value stated next to a contradicting one is contested. Text claims, and any citation whose claim does not itself state the labelled value, need blind human review before they count. Contested or unreviewed critical claims leave the critical-value hard check unverified.
+- Answer scoring is deterministic only for typed numbers (with their unit) and dates (with their cutoff time), matched per document; a correct value stated next to a contradicting one is contested. Text claims, and any citation whose claim is not a verbatim quote of its cited evidence, need blind human review before they count; a negated qualifier never counts as stated. Contested or unreviewed critical claims leave the critical-value hard check unverified.
 - There is no paid LLM judge.
 - A two-document question has no single ranking, so it is excluded from hit@k, nDCG@5 and MRR.
 - The sealed set can be evaluated once per freeze; a further run is labeled post-test regression and cannot support a new reliability claim.

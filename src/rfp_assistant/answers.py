@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import time
 import uuid
 from dataclasses import asdict
@@ -500,15 +499,12 @@ def claim_verdict(claim: dict, answer: dict, doc_id: str | None, single_document
     return evaluation.typed_verdict(claim, doc_text(answer, doc_id, single_document))
 
 
-_SENTENCE = re.compile(r"(?<=[다요음함됨])\.\s*|\n+|[!?。]\s*")
-
-
-def claim_states_support(text: str, required: list[dict]) -> bool:
-    """Every sentence of a generated claim states the typed value of one of `required` (claims whose cited span is
-    complete). Anything else, a heading line or an extra assertion included, is left to a blind reviewer."""
-    sentences = [x for x in _SENTENCE.split(text or "") if len(evaluation.norm_text(x)) >= 2]
-    return bool(sentences) and bool(required) and all(
-        any(evaluation.claim_value_found(r, x) for r in required) for x in sentences)
+def verbatim_support(claim_text: str, cited_text: str) -> bool:
+    """The whole generated assertion appears word for word (ignoring whitespace) in the cited evidence text. Only
+    then is support demonstrable without judgement; a paraphrase, an added assertion, a negation or a qualifier the
+    source does not state all go to the blind reviewer."""
+    claim, cited = evaluation.norm_text(claim_text), evaluation.norm_text(cited_text)
+    return len(claim) >= 4 and claim in cited
 
 
 def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> dict:
@@ -548,15 +544,12 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
         for eid in ac.get("evidence_ids") or []:
             ev = (record.get("evidence") or {}).get(eid) or {}
             chunk = chunks.get(ev.get("chunk_id"))
-            complete = {g["group_id"] for g in groups if chunk is not None and g["doc_id"] == ev.get("doc_id")
-                        and evaluation.group_grade(chunk, g, index.elements) == 2}
-            best = 2 if complete else max((evaluation.group_grade(chunk, g, index.elements) for g in groups
-                                           if chunk is not None and g["doc_id"] == ev.get("doc_id")), default=0)
-            backed = [r for r in row.get("required_claims") or [] if set(r.get("support_groups") or []) & complete]
-            # A complete gold span in the cited chunk is retrieval relevance, not support: the claim itself must
-            # state the value that span establishes, and say nothing else; otherwise a person decides.
-            support = "supporting" if ac.get("doc_id") == ev.get("doc_id") and claim_states_support(
-                ac.get("text", ""), backed) else "unjudged"
+            best = max((evaluation.group_grade(chunk, g, index.elements) for g in groups
+                        if chunk is not None and g["doc_id"] == ev.get("doc_id")), default=0)
+            # A gold span in the cited chunk is retrieval relevance, not support for whatever the claim says
+            # (review rounds 1-2): only a claim quoted verbatim from its citation is supported without a person.
+            support = "supporting" if ac.get("doc_id") == ev.get("doc_id") and verbatim_support(
+                ac.get("text", ""), ev.get("quote") or "") else "unjudged"
             item = f"{prefix}|link|{i}|{eid}"
             reviewed = reviews.get(item)
             support = (reviewed or {}).get("verdict", support)

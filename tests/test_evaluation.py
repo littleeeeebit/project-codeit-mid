@@ -101,30 +101,47 @@ class MetricFixtureTest(unittest.TestCase):
         self.assertEqual([c["verdict"] for c in agg["critical_unresolved"]], ["contested"])
         self.assertEqual(agg["required_claim_correctness"]["numerator"], 0)
 
-    def test_a_hallucinated_claim_sharing_a_correct_citation_is_not_supported(self):
-        """Review round 1: a cited chunk holding a complete gold span is retrieval relevance; the generated claim
-        itself must state that span's value, or it goes to blind review."""
+    def citation_case(self, *texts: str, groups=None, claims=None):
         from types import SimpleNamespace
 
-        claim = p4.claim("c1", ["g1"], {"type": "number", "value": 130000000, "unit": "KRW"}, "amount")
-        row = {**gold_row([AMOUNT_G]), "question_type": "direct_fact", "answerability": "answerable",
-               "expected_status": "answered", "mode": "single", "scope": [{"doc_id": "d"}],
-               "required_claims": [claim]}
+        claims = claims or [p4.claim("c1", ["g1"], {"type": "number", "value": 130000000, "unit": "KRW"}, "amount")]
+        row = {**gold_row(groups or [AMOUNT_G]), "question_type": "direct_fact", "answerability": "answerable",
+               "expected_status": "answered", "mode": "single", "scope": [{"doc_id": "d"}], "required_claims": claims}
         index = SimpleNamespace(chunks=[{"chunk_id": "k1", **chunk("amount", 0, 30)}], elements=ELS)
         record = {"finalist": "F", "outcome": "answered", "link_validity": {"E1": True},
-                  "evidence": {"E1": {"doc_id": "d", "chunk_id": "k1"}},
-                  "answer": {"summary": "", "claims": [
-                      {"doc_id": "d", "text": "사업 예산은 130,000,000원이다.", "evidence_ids": ["E1"]},
-                      {"doc_id": "d", "text": "누구나 무조건 낙찰받는다.", "evidence_ids": ["E1"]},
-                      {"doc_id": "d", "text": "사업 예산은 130,000,000원이며 누구나 낙찰받는다. 계약은 수의계약이다.",
-                       "evidence_ids": ["E1"]}]}}
+                  "evidence": {"E1": {"doc_id": "d", "chunk_id": "k1", "quote": ELS[("x", "amount")]["raw_text"]}},
+                  "answer": {"summary": "", "claims": [{"doc_id": "d", "text": t, "evidence_ids": ["E1"]}
+                                                       for t in texts]}}
         out = answers.score_record(row, record, index, {})
+        return out, answers.aggregate_answers([out])
+
+    def test_a_hallucinated_claim_sharing_a_correct_citation_is_not_supported(self):
+        """Review rounds 1-2: a cited chunk holding a complete gold span is retrieval relevance. Only a claim quoted
+        verbatim from its citation is supported automatically; anything else reaches blind review."""
+        out, agg = self.citation_case("사업 예산은 금 130,000,000원으로 한다.", "누구나 무조건 낙찰받는다.",
+                                      "사업 예산은 130,000,000원이며 누구나 무조건 낙찰받는다.")
         self.assertEqual([link["support"] for link in out["links"]], ["supporting", "unjudged", "unjudged"])
         self.assertEqual([a["supported"] for a in out["answer_claims"]], [True, None, None])
-        self.assertEqual(out["claims"][0]["verdict"], "correct")
-        agg = answers.aggregate_answers([out])
         self.assertEqual(agg["citation_precision_lower_bound"]["numerator"], 1)
-        self.assertEqual(agg["answer_claims_unjudged"], 2)  # both go to the blind review sheet
+        self.assertEqual(agg["answer_claims_unjudged"], 2)
+
+    def test_a_single_sentence_with_a_correct_value_and_a_hallucination_goes_to_review(self):
+        out, agg = self.citation_case("사업 예산은 130,000,000원이며 누구나 무조건 낙찰받는다.")
+        self.assertEqual(out["claims"][0]["verdict"], "correct")  # the typed value is stated
+        self.assertEqual((out["links"][0]["support"], out["answer_claims"][0]["supported"]), ("unjudged", None))
+        self.assertEqual((agg["citation_precision_lower_bound"]["numerator"], agg["answer_claims_unjudged"]), (0, 1))
+
+    def test_a_negated_qualifier_and_a_citation_of_one_of_two_groups(self):
+        claims = [p4.claim("c1", ["g1", "g2"], {"type": "number", "value": 130000000, "unit": "KRW"}, "amount",
+                           qualifiers=[["부가가치세를 포함", "부가가치세 포함", "부가세 포함"]])]
+        out, _ = self.citation_case("사업 예산은 130,000,000원이며 부가가치세를 포함하지 않은 금액이다.",
+                                    groups=[AMOUNT_G, VAT_G], claims=claims)
+        self.assertEqual(out["claims"][0]["verdict"], "incomplete_qualifier")
+        self.assertEqual(out["links"][0]["support"], "unjudged")
+        # verbatim from the amount span: the link supports what it states, but the VAT group is not established
+        out, _ = self.citation_case("사업 예산은 금 130,000,000원으로 한다.", groups=[AMOUNT_G, VAT_G], claims=claims)
+        self.assertEqual((out["links"][0]["support"], out["claims"][0]["verdict"]),
+                         ("supporting", "incomplete_qualifier"))
 
     def test_overlapping_duplicates_count_once_and_rechunking_keeps_the_truth(self):
         row = gold_row([AMOUNT_G])

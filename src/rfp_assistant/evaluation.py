@@ -1697,10 +1697,29 @@ def typed_verdict(claim: dict, text: str) -> str:
     return "wrong_value" if stated_d else "missing"
 
 
+_NEGATION_AFTER = ("않", "안됨", "아니", "제외", "불포함", "미포함", "별도", "없")
+_NEGATION_BEFORE = ("미", "불", "비")
+
+
+def _affirmed(spelling: str, hay: str) -> bool:
+    """`spelling` occurs in `hay` at least once without a negation right after it (`부가가치세를 포함하지 않은`,
+    `부가세 별도`) or a negating prefix before it (`미포함`)."""
+    s = norm_text(spelling)
+    start = hay.find(s) if s else -1
+    while start >= 0:
+        after = hay[start + len(s):start + len(s) + 6]
+        negated = any(n in after for n in _NEGATION_AFTER) or hay[max(0, start - 1):start] in _NEGATION_BEFORE
+        if not negated:
+            return True
+        start = hay.find(s, start + 1)
+    return False
+
+
 def qualifiers_found(claim: dict, text: str) -> list[list[str]]:
-    """Qualifier groups (each a list of permitted spellings) that `text` does not state."""
+    """Qualifier groups (each a list of permitted spellings) that `text` does not affirm; a negated mention does not
+    state the qualifier."""
     hay = norm_text(text)
-    return [q for q in claim.get("qualifiers") or [] if not any(norm_text(x) in hay for x in q)]
+    return [q for q in claim.get("qualifiers") or [] if not any(_affirmed(x, hay) for x in q)]
 
 
 def _bigrams(text: str) -> set[str]:
