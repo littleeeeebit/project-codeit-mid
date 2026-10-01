@@ -260,7 +260,7 @@ def db_rows(data_dir: str, sql: str, args=()) -> list[sqlite3.Row]:
 def owner_config(repo: Path | None = None) -> tuple[dict, dict]:
     """Supported keys from the copied env_file (`.env`), then the process environment. Returns (values, source)."""
     values, source = {}, {}
-    env_file = (repo or REPO) / ".env"
+    env_file = Path(os.environ.get("RFP_VERIFY_ENV_FILE") or (repo or REPO) / ".env")  # override: tests, manual runs
     if env_file.is_file():
         for line in env_file.read_text(encoding="utf-8-sig").splitlines():
             line = line.strip()

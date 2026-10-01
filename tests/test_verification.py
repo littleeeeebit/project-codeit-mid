@@ -228,7 +228,10 @@ class BrowserFlowTest(unittest.TestCase):
         env = {**os.environ, "RFP_VERIFY_BROWSER_EXECUTABLE": os.environ.get(
             "RFP_VERIFY_BROWSER_EXECUTABLE", "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"),
             "RFP_VERIFY_ORIGIN": "http://127.0.0.1:8779"}
-        env = {k: v for k, v in env.items() if k not in ("RFP_SOURCE_DIR", "RFP_DATA_DIR")}
+        # Hermetic: the fixture corpus, whatever the checkout's .env or the calling service configured.
+        env = {k: v for k, v in env.items() if not k.startswith("WIKI_VERIFICATION_")
+               and k not in ("RFP_SOURCE_DIR", "RFP_DATA_DIR")}
+        env["RFP_VERIFY_ENV_FILE"] = str(REPO / ".runtime" / "no-such-env-file")
         proc = subprocess.run([sys.executable, "-B", "tools/verify.py", "consultant-answer"], cwd=REPO, env=env,
                               capture_output=True, text=True, timeout=900)
         [block] = fenced("\n".join(proc.stdout.splitlines()[-80:]), "local-evidence")  # the service's tail
