@@ -644,7 +644,9 @@ def _gold_ndcg(ranking: list[dict], groups: list[dict], elements: dict) -> dict:
     return {"ndcg@5": ndcg_from_units(units, len(groups)),
             "ndcg_formula": "sum((2^g - 2^g_before)/log2(p+1)) over group units, ideal one complete unit per group",
             "graded@5": [u["grade"] for u in units],
-            "unlabelled@5": len({u["passage"] for u in units if u.get("unlabelled")})}
+            "unlabelled@5": len({u["passage"] for u in units if u.get("unlabelled")}),
+            "unlabelled_chunks@5": sorted({str(ranking[u["passage"] - 1].get("chunk_id") or f"rank {u['passage']}")
+                                           for u in units if u.get("unlabelled")})}
 
 
 def combine_sides(parts: list[dict]) -> dict:
@@ -1275,7 +1277,29 @@ def decision_errors(settings: Settings, run_id: str, decision: dict) -> list[str
             if (f_scores.get("status") != "complete" or f_config.get("eval_version") != EVAL_VERSION
                     or f_config.get("population_sha256") != config.get("population_sha256")):
                 errors.append("the finalist must be a complete current-policy run on the same evaluated population")
+    if config.get("label") != "K1" or finalist:
+        errors += pool_review_errors(settings, [run_id] + ([finalist] if finalist else []), decision)
     return errors + run_errors(settings, run_id)
+
+
+def pool_review_errors(settings: Settings, run_ids: list[str], decision: dict) -> list[str]:
+    """Promoting a run, or naming a finalist, claims a measured benefit: every named run's unlabelled top-5
+    passages must have a recorded review (`pool_review`: reviewer and, per run, the count reviewed, which must
+    match the run). K1 alone, the provisional default, needs none. The review is attested, not blind."""
+    review = decision.get("pool_review") or {}
+    errors = []
+    for rid in run_ids:
+        try:
+            n = pool_pending({"ndcg_pool": (load_run(settings, rid)[1].get("aggregate") or {}).get("ndcg_pool")})
+        except EvaluationError:
+            continue
+        if not n:
+            continue
+        if not str(review.get("reviewed_by") or "").strip() or (review.get("runs") or {}).get(rid) != n:
+            errors.append(f"run {rid}: {n} returned top-5 passages lie outside the gold labels and have no recorded "
+                          "pool review; review them, then add missing support as new alternatives and rescore, or "
+                          "record pool_review {reviewed_by, runs: {run_id: count}} in the decision")
+    return errors
 
 
 def serving_config(run_id: str, config: dict) -> dict:
@@ -1334,7 +1358,13 @@ def run_summary(settings: Settings, run_id: str) -> dict:
         "critical_failures": agg.get("critical_failures"), "code_checks": agg.get("code_checks"),
         "wrong_scope": agg.get("wrong_scope_candidates"), "latency_ms": agg.get("latency_ms"),
         "query_cost_micro_usd": (scores.get("query_embedding") or {}).get("settled_micro_usd"),
-        "gate": scores.get("gate"), "blocking": run_errors(settings, run_id)}
+        "gate": scores.get("gate"), "ndcg_pool": agg.get("ndcg_pool"), "blocking": run_errors(settings, run_id)}
+
+
+def pool_pending(summary: dict) -> int:
+    """Returned top-5 passages outside every gold label that no review has judged: while any remain, an nDCG
+    difference may only reflect missing labels (pilot runs have no pool and report 0)."""
+    return int(((summary.get("ndcg_pool") or {}).get("unlabelled_top5_passages")) or 0)
 
 
 def recommend(summaries: list[dict]) -> dict:
@@ -1344,8 +1374,11 @@ def recommend(summaries: list[dict]) -> dict:
     usable = [r for r in summaries if not r["blocking"]]
     k1 = [r for r in usable if r["label"] == "K1"]
     if not k1:
-        return {"selected": None, "finalist": None, "reasons": ["no usable current-policy K1 run to compare against"]}
+        return {"selected": None, "finalist": None, "status": "none",
+                "reasons": ["no usable current-policy K1 run to compare against"]}
     base = max(k1, key=lambda r: (r["ndcg@5"] or 0, r["run_id"]))
+    compared = [r for r in usable if r["label"] != "K0" and r["population_sha256"] == base["population_sha256"]]
+    pending = {r["run_id"]: pool_pending(r) for r in compared if pool_pending(r)}
     reasons, eligible = [], [base]
     for r in usable:
         if r is base or r["label"] in ("K0",):
@@ -1362,6 +1395,16 @@ def recommend(summaries: list[dict]) -> dict:
         else:
             reasons.append(f"{r['run_id']} ({r['mode']}): nDCG@5 gain {gain}, no new critical failure")
             eligible.append(r)
+    if pending:
+        # Plan §3: unjudged passages are reviewed before a development comparison is final. Until then K1 stays as
+        # the provisional default, and no gain counts as a measured benefit or names a finalist.
+        reasons.append(f"comparison pending pool review: unreviewed top-5 passages outside the gold labels {pending}; "
+                       "gains above are provisional. Review them (`unlabelled_chunks@5` in each run's traces): add a "
+                       "passage holding a required fact as a new alternative and rescore, or record the review in "
+                       "the decision's `pool_review`")
+        reasons.append(f"K1 {base['run_id']} stays provisionally; no finalist while the review is pending")
+        return {"selected": base["run_id"], "finalist": None, "status": "pending_pool_review", "provisional": True,
+                "pool_pending": pending, "reasons": reasons}
     order = sorted(eligible, key=lambda r: (-(r["ndcg@5"] or 0), len(r["critical_failures"] or []), r["run_id"]))
     selected = order[0]
     others = [r for r in usable if r is not selected and r["population_sha256"] == selected["population_sha256"]
@@ -1369,7 +1412,8 @@ def recommend(summaries: list[dict]) -> dict:
     finalist = max(others, key=lambda r: (r["ndcg@5"] or 0, r["run_id"])) if others else None
     if selected is base:
         reasons.append(f"K1 {base['run_id']} stays: no other mode showed a measured benefit")
-    return {"selected": selected["run_id"], "finalist": finalist["run_id"] if finalist else None, "reasons": reasons}
+    return {"selected": selected["run_id"], "finalist": finalist["run_id"] if finalist else None, "status": "final",
+            "reasons": reasons}
 
 
 def _fmt_rate(x: dict) -> str:
@@ -1403,7 +1447,9 @@ def compare_runs(settings: Settings, run_ids: list[str]) -> dict:
             f"{lat.get('p50', '—')}/{lat.get('p95', '—')} | {r['query_cost_micro_usd'] if r['query_cost_micro_usd'] is not None else '—'} | "
             f"{'; '.join(r['blocking']) or 'none'} |")
     rec = recommend(summaries)
-    lines += ["", "## Recommendation (draft for the owner)", "", f"- selected: `{rec['selected']}`",
+    lines += ["", "## Recommendation (draft for the owner)", "",
+              f"- status: {rec.get('status')}" + (" (provisional)" if rec.get("provisional") else ""),
+              f"- selected: `{rec['selected']}`",
               f"- phase 4 finalist: `{rec['finalist']}`", *[f"- {x}" for x in rec["reasons"]], "",
               "Small pilot denominators make single-question differences large; read the Wilson intervals.", ""]
     key = hashlib.sha256("|".join(sorted(run_ids)).encode()).hexdigest()[:12]
@@ -1437,6 +1483,7 @@ def draft_activation(settings: Settings, run_ids: list[str], out_path: Path, sel
                                  f"{_fmt_rate(s['hit@20'])}, packed complete {_fmt_rate(s['packed_complete'])}, "
                                  f"critical failures {s['critical_failures']}. " + " ".join(rec["reasons"])),
              "overridden_recommendation": select is not None and select != rec["selected"],
+             "recommendation_status": rec.get("status"), "pool_pending": rec.get("pool_pending") or {},
              "comparison": comparison["markdown"]}
     draft["blocking"] = [e for e in decision_errors(settings, chosen, draft)
                          if "decided_by" not in e and "rationale" not in e]

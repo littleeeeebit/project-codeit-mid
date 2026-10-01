@@ -226,6 +226,46 @@ class MetricFixtureTest(unittest.TestCase):
         agg = evaluation.aggregate([{"id": "q", "type": "t", "metrics": noisy, "families": ["f"]}], [])
         self.assertEqual(agg["ndcg_pool"]["unlabelled_top5_passages"], 1)
 
+    def test_an_unreviewed_pool_never_promotes_a_run(self):
+        """Review round 10 (F9): a gain that may come only from passages outside the gold labels is provisional;
+        once the pool is judged, the same rankings decide normally."""
+        els = {**ELS, ("x", "both"): {"raw_text": ELS[("x", "amount")]["raw_text"] + " " + ELS[("x", "vat")]["raw_text"],
+                                      "table": None}}
+        amount, vat, both = chunk("amount", 0, 30), chunk("vat", 0, 30), chunk("both", 0, 60)
+
+        def summaries(groups, k1_ranking, h_ranking):
+            out = []
+            for label, ranking in (("K1", k1_ranking), ("H", h_ranking)):
+                m = evaluation.score_row(gold_row(groups), ranking, [], els)
+                agg = evaluation.aggregate([{"id": "q", "type": "t", "metrics": m, "families": ["f"]}], [])
+                out.append({"run_id": f"{label}-run", "label": label, "mode": label, "blocking": [],
+                            "population_sha256": "p", "critical_failures": [], "ndcg@5": agg["ndcg@5"],
+                            "ndcg_pool": agg.get("ndcg_pool")})
+            return out
+
+        labelled = [AMOUNT_G, VAT_G]
+        before = summaries(labelled, [both, amount, vat], [amount, vat, both])
+        self.assertEqual([(r["ndcg@5"], evaluation.pool_pending(r)) for r in before], [(0.6934, 1), (1.0, 1)])
+        rec = evaluation.recommend(before)
+        self.assertEqual((rec["status"], rec["selected"], rec["finalist"], rec["provisional"]),
+                         ("pending_pool_review", "K1-run", None, True))
+        self.assertEqual(rec["pool_pending"], {"K1-run": 1, "H-run": 1})
+        # the review finds the compound passage holds both facts: new alternatives, rescored, no benefit remains
+        judged = [grp("g1", ("amount", "130,000,000원"), ("both", "130,000,000원")),
+                  grp("g2", ("vat", "부가가치세를 포함한"), ("both", "부가가치세를 포함한"))]
+        after = summaries(judged, [both, amount, vat], [amount, vat, both])
+        self.assertEqual([(r["ndcg@5"], evaluation.pool_pending(r)) for r in after], [(1.0, 0), (1.0, 0)])
+        rec = evaluation.recommend(after)
+        self.assertEqual((rec["status"], rec["selected"]), ("final", "K1-run"))
+        # a fully judged comparison with a real gain still promotes
+        real = summaries(judged, [chunk("vat", 6, 10), amount, vat], [amount, vat])
+        rec = evaluation.recommend(real)
+        self.assertEqual((rec["status"], rec["selected"], rec["finalist"]), ("final", "H-run", "K1-run"))
+        # pilot summaries have no pool and keep the phase-2 policy
+        pilot = [{**r, "ndcg_pool": None} for r in before]
+        self.assertEqual((evaluation.recommend(pilot)["status"], evaluation.recommend(pilot)["selected"]),
+                         ("final", "H-run"))
+
     def test_ndcg_matches_the_hand_calculation_and_mrr(self):
         import math
 
@@ -477,6 +517,18 @@ class GoldRetrievalTest(Phase4Case):
         self.assertTrue(traces["dev-compare"]["metrics"]["per_document"])
         self.assertEqual(traces["dev-compare"]["wrong_scope"], 0)
         self.assertIn("git_revision", scores["provenance"]["code"])
+        # F9: one returned passage lies outside the labels; naming a finalist needs its recorded review
+        pending = evaluation.pool_pending({"ndcg_pool": scores["aggregate"]["ndcg_pool"]})
+        self.assertGreater(pending, 0)
+        decision = {"run_id": k1["run_id"], "mode": config["mode"], "decided_by": "owner", "rationale": "r",
+                    "finalist_run_id": k1["run_id"]}
+        self.assertTrue(any("pool review" in e for e in evaluation.decision_errors(self.s, k1["run_id"], decision)))
+        decision["pool_review"] = {"reviewed_by": "reviewer", "runs": {k1["run_id"]: pending - 1 or 99}}
+        self.assertTrue(any("pool review" in e for e in evaluation.decision_errors(self.s, k1["run_id"], decision)))
+        decision["pool_review"]["runs"] = {k1["run_id"]: pending}
+        self.assertFalse(any("pool review" in e for e in evaluation.decision_errors(self.s, k1["run_id"], decision)))
+        del decision["finalist_run_id"], decision["pool_review"]  # K1 alone is the provisional default
+        self.assertFalse(any("pool review" in e for e in evaluation.decision_errors(self.s, k1["run_id"], decision)))
         with self.assertRaisesRegex(evaluation.EvaluationError, "sealed"):
             evaluation.evaluate_retrieval(self.s, fixtures.analyzer(), None, "test", ["K1"])
 
