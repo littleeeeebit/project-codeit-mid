@@ -17,8 +17,8 @@ This file is the shareable summary. The authoritative report is generated on the
 
 | Check | Where | Outcome |
 | --- | --- | --- |
-| `check --phase 4 --provider fake` | Cloud, temporary state | 58 tests passed |
-| `check --phase all --provider fake` | Cloud, temporary state | 246 tests passed |
+| `check --phase 4 --provider fake` | Cloud, temporary state | 59 tests passed |
+| `check --phase all --provider fake` | Cloud, temporary state | 247 tests passed |
 | Phase-4 CLI walkthrough (`tools/verification/phase4_walkthrough.py`) | Cloud, fixture corpus, fake provider | 31/31 steps passed |
 | Browser check of the 평가 tab and gold-2 review | Cloud, headless Chromium, synthetic runtime | rendered; approval refused without the inspection attestation; no horizontal scroll at 390 px |
 | `check --phase all --provider fake --save` → `release-report --latest` | Local reviewer, Windows, fixture runtime, before the F8 change | 242 passed, 3 POSIX/optional skips of 245; the host-local check counted as `pass`; fixture decision `limited` (not an owner check) |
@@ -63,6 +63,6 @@ Allowance and cap on the owner host: $5 / $5 (phase-3 configuration, `README.md`
 
 - Answer scoring is deterministic only for typed numbers (with their unit) and dates (with their cutoff time), matched per document; a correct value stated next to a contradicting one is contested. Text claims, and any citation whose claim is not a verbatim quote of its cited evidence, need blind human review before they count; a negated qualifier never counts as stated. Contested or unreviewed critical claims leave the critical-value hard check unverified.
 - There is no paid LLM judge.
-- nDCG@5 uses the predeclared source-span labels as its judged pool; passages outside every label are counted but not yet blind-reviewed.
+- nDCG@5 uses the predeclared source-span labels as its judged pool; passages outside every label are counted but not yet blind-reviewed; until a review is recorded, retrieval selection stays provisional (K1, no finalist).
 - A two-document question has no single ranking, so it is excluded from hit@k, nDCG@5 and MRR.
 - The sealed set can be evaluated once per freeze; a further run is labeled post-test regression and cannot support a new reliability claim.

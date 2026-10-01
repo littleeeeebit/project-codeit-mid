@@ -157,7 +157,9 @@ python -m rfp_assistant.cli draft-activation --runs <run>,<run> --out C:\abs\dec
 python -m rfp_assistant.cli activate-run --run-id <run> --decision-file C:\abs\decision.json
 ```
 
-Each run records the Git revision (or says none was available), whether tracked files differed from it, the package-source and metric-code hashes, and the hardware. Two-document rows are scored per document (recall and complete coverage only); gold-2 nDCG@5 uses `(2^grade−1)/log2(rank+1)` against one complete span per required group, with family-grouped bootstrap intervals (seed 20261001, 1000 resamples).
+Each run records the Git revision (or says none was available), whether tracked files differed from it, the package-source and metric-code hashes, and the hardware. Two-document rows are scored per document (recall and complete coverage only); gold-2 nDCG@5 uses `(2^grade−1)/log2(rank+1)` counted in required evidence groups, the unit of its ideal (one complete unit per group), with family-grouped bootstrap intervals (seed 20261001, 1000 resamples).
+
+Returned top-5 passages outside every gold label are counted (`ndcg_pool`) and listed per row (`unlabelled_chunks@5` in the run's `traces.jsonl`). While any remain unreviewed, the recommendation is `pending_pool_review`: K1 stays provisionally and no finalist is named. Open each listed passage in its original. If it holds a required fact, add it as a new alternative (a new gold revision), validate, freeze and rerun. Otherwise record the review in the decision file before promoting a run or naming a finalist: `"pool_review": {"reviewed_by": "<name>", "runs": {"<run id>": <reviewed count>}}`. K1 alone needs no review.
 
 ### 10.3 Answer finalists (paid)
 
