@@ -213,7 +213,8 @@ EVAL_VERSION = "retrieval-eval-4"
 # Gold-2 runs record their ranking policy, so a run scored under another deduplication rule is never reused.
 # 1: repeats keyed by alternative and grade; 2: repeats keyed by the source coverage a chunk carries;
 # 3: nDCG@5 counted in judged group units, the unit of its ideal; 4: grading targets the reviewer's offsets/cells.
-GOLD_RANKING_POLICY = "gold2-pinned-coordinates-4"
+# 5: row fragments target the approved column or offset occurrence within the row.
+GOLD_RANKING_POLICY = "gold2-pinned-coordinates-5"
 RANK_DEPTH = 20
 CRITICAL_CODE_TYPES = {"repeated_code", "requirement_detail", "exact_identifier"}
 CRITICAL_EVIDENCE_TYPES = {"numeric_qualifier"}  # an amount/date/VAT condition must reach the packed context
@@ -489,20 +490,72 @@ def row_target(unit: dict, element: dict) -> set[int]:
     return _quote_rows(element, unit["quote"])
 
 
+def _line_segments(element: dict, row: int) -> dict[tuple[int, int], tuple[int, int]]:
+    """Where each cell (by its own row and column) sits in `table_rows`' line for `row`, the line row fragments'
+    offsets refer to: cells spanning into the row are carried, and an adjacent repeat shares the kept segment."""
+    cells = [c for c in element["table"]["cells"] if c["row"] <= row < c["row"] + max(1, c.get("rowspan", 1))]
+    out: dict[tuple[int, int], tuple[int, int]] = {}
+    pos, last, last_seg = 0, None, None
+    for c in sorted(cells, key=lambda c: c["col"]):
+        t = c["text"].strip()
+        if not t:
+            continue
+        if last is not None and t == last:
+            out[(c["row"], c["col"])] = last_seg
+            continue
+        if last is not None:
+            pos += 3  # " | "
+        last, last_seg = t, (pos, pos + len(t))
+        out[(c["row"], c["col"])] = last_seg
+        pos += len(t)
+    return out
+
+
+def _raw_cells(element: dict) -> list[tuple[tuple[int, int], int, int]]:
+    """Each nonempty cell's (row, col) and its character range in the element `raw_text` (`render_table`)."""
+    text, spans = _rendered_rows(element["table"]["cells"])
+    out = []
+    for r, a, _ in spans:
+        pos = a
+        for c in sorted((c for c in element["table"]["cells"] if c["row"] == r), key=lambda c: c["col"]):
+            t = c["text"].strip()
+            if t:
+                out.append(((c["row"], c["col"]), pos, pos + len(t)))
+                pos += len(t) + 3
+    return out
+
+
 def fragment_target(unit: dict, element: dict, row: int) -> tuple[int, int] | None:
-    """The approved quote inside one row's rendered line (what a row fragment's offsets refer to): None when the
-    row is not an approved row; inside the named cell's segment when `cells` name one in this row."""
+    """The approved quote inside one row's `table_rows` line (what a row fragment's offsets refer to). With
+    `cells`, the quote inside the named cells' segment of this row; with `offsets`, the approved characters of the
+    raw table text translated into this row's segments; without coordinates, the first occurrence in the line.
+    None when this row does not hold the approved quote."""
     if row not in row_target(unit, element):
         return None
     line = dict(table_rows(element)).get(row, "")
-    for rc in unit.get("cells") or []:
-        if isinstance(rc, list) and len(rc) == 2 and rc[0] == row:
-            text = next((c["text"].strip() for c in element["table"]["cells"]
-                         if (c["row"], c["col"]) == (rc[0], rc[1])), "")
-            at = line.find(text) if text else -1
-            rng = _quote_range(line[at:at + len(text)], unit["quote"]) if at >= 0 else None
-            if rng:
-                return (at + rng[0], at + rng[1])
+    segments = _line_segments(element, row)
+    named = [segments[tuple(rc)] for rc in unit.get("cells") or []
+             if isinstance(rc, list) and len(rc) == 2 and tuple(rc) in segments]
+    if unit.get("cells"):
+        if not named:
+            return None
+        lo, hi = min(a for a, _ in named), max(b for _, b in named)
+        rng = _quote_range(line[lo:hi], unit["quote"])
+        return (lo + rng[0], lo + rng[1]) if rng else None
+    o = _offsets(unit)
+    text, _ = _rendered_rows(element["table"]["cells"])
+    if o is not None and text == element.get("raw_text"):
+        rng = _quote_range(text[o[0]:o[1]], unit["quote"])
+        if not rng:
+            return None
+        qa, qb = o[0] + rng[0], o[0] + rng[1]
+        raw = _raw_cells(element)
+        first = next((x for x in raw if x[1] <= qa < x[2]), None)  # cells holding the first and last character
+        last = next((x for x in raw if x[1] < qb <= x[2]), None)
+        s1, s2 = (segments.get(first[0]) if first else None), (segments.get(last[0]) if last else None)
+        if s1 is None or s2 is None:
+            return None
+        return (s1[0] + qa - first[1], s2[0] + qb - last[1])
     return _quote_range(line, unit["quote"])
 
 

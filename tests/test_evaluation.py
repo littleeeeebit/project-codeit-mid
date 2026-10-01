@@ -318,6 +318,51 @@ class MetricFixtureTest(unittest.TestCase):
         self.assertEqual(evaluation.grade(piece(0, 0, len(line)), unit, el), 1)  # same table, not the approved row
         self.assertEqual(evaluation.coverage(piece(1, a, a + 2), unit, el), frozenset(("f", 1, i) for i in range(a, a + 2)))
 
+    def test_a_repeated_value_in_one_row_is_found_at_the_approved_column(self):
+        """Review round 12 (F10): fragments of one row pick the named column or the offset occurrence, not the
+        first equal value in the row."""
+        cells = [{"row": 0, "col": i, "text": t} for i, t in enumerate(["이전 계약", "12개월", "현재 계약", "12개월"])]
+        cells += [{"row": 1, "col": 0, "text": "비고"}, {"row": 1, "col": 1, "text": "12개월 이내 하자보수"}]
+        from rfp_assistant.ingestion import render_table
+
+        el = {"raw_text": render_table(cells), "table": {"cells": cells}}
+        line = dict(evaluation.table_rows(el))[0]
+        approved, earlier = line.rindex("12개월"), line.index("12개월")
+        self.assertEqual(line, "이전 계약 | 12개월 | 현재 계약 | 12개월")
+        piece = lambda r, a, b: {"extraction_id": "x", "spans": [  # noqa: E731
+            {"element_id": "t", "rows": [r], "fragment": {"row": r, "start": a, "end": b}}]}
+        base = {"element_id": "t", "quote": "12개월", "extraction_id": "x"}
+        raw_at = el["raw_text"].index("12개월", el["raw_text"].index("현재"))
+        for unit in ({**base, "cells": [[0, 3]]}, {**base, "offsets": [raw_at, raw_at + 4]}):
+            self.assertEqual(evaluation.fragment_target(unit, el, 0), (approved, approved + 4))
+            self.assertEqual(evaluation.grade(piece(0, approved, approved + 4), unit, el), 2)
+            self.assertEqual(evaluation.grade(piece(0, earlier, earlier + 4), unit, el), 0)
+            self.assertEqual(evaluation.grade(piece(0, approved, approved + 2), unit, el), 1)
+            self.assertEqual(evaluation.coverage(piece(0, approved, approved + 2), unit, el),
+                             frozenset(("f", 0, i) for i in range(approved, approved + 2)))
+            group = {"group_id": "g1", "doc_id": "d", "alternatives": [unit]}
+            row = {**gold_row([group]), "evidence_groups": [group]}
+            m = evaluation.score_row(row, [piece(0, approved, len(line))], [piece(0, approved, len(line))],
+                                     {("x", "t"): el})
+            self.assertEqual((m["recall@20"], m["ndcg@5"], m["packed_complete"]), (1.0, 1.0, 1))
+            self.assertEqual(evaluation.score_row(row, [piece(0, 0, approved - 1)], [], {("x", "t"): el})["recall@20"],
+                             0.0)
+        # offsets in a later row translate from the raw table text into that row's line
+        later = el["raw_text"].index("12개월 이내")
+        unit = {**base, "offsets": [later, later + 4]}
+        self.assertEqual(evaluation.fragment_target(unit, el, 1), (dict(evaluation.table_rows(el))[1].index("12개월"),
+                                                                   dict(evaluation.table_rows(el))[1].index("12개월") + 4))
+        self.assertIsNone(evaluation.fragment_target(unit, el, 0))
+        # without coordinates the first equal value stays the documented fallback
+        self.assertEqual(evaluation.fragment_target(base, el, 0), (earlier, earlier + 4))
+        # segments follow the fragment line: a spanned cell is carried and an adjacent repeat shares its segment
+        spanned = {"table": {"cells": [{"row": 0, "col": 0, "text": "구분", "rowspan": 2},
+                                       {"row": 0, "col": 1, "text": "6개월"}, {"row": 0, "col": 2, "text": "6개월"},
+                                       {"row": 1, "col": 1, "text": "12개월"}]}}
+        self.assertEqual(dict(evaluation.table_rows(spanned))[1], "구분 | 12개월")
+        self.assertEqual(evaluation._line_segments(spanned, 1), {(0, 0): (0, 2), (1, 1): (5, 9)})
+        self.assertEqual(evaluation._line_segments(spanned, 0)[(0, 2)], evaluation._line_segments(spanned, 0)[(0, 1)])
+
     def test_ndcg_matches_the_hand_calculation_and_mrr(self):
         import math
 
