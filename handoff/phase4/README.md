@@ -30,13 +30,13 @@ The authoritative release evidence must be produced on the owner host with the r
 
 ## Decisions made during implementation (for owner review)
 
-1. **Two nDCG formulas, by schema.** Gold-2 rows use the plan's graded formula; `dev-pilot` keeps the phase-2 increment formula so frozen `retrieval-eval-4` runs stay comparable. Reports name the dataset, and runs over different populations are never compared.
-2. **Two-document questions have no single ranking.** They count toward evidence recall and complete coverage, scored per selected document, and are excluded from hit@k, nDCG@5 and MRR denominators.
-3. **Citation support is deterministic only for complete span support.** A link to a chunk carrying the whole labelled span supports; anything else stays unjudged until a blind reviewer decides. The release gate uses the lower bound (unjudged counted as unsupported).
-4. **No paid judge.** The plan allows a calibrated, sampled LLM judge; none is implemented or planned, so judge cost is always 0. Blind human review covers text claims and unjudged citations.
-5. **Sealed rows never reach a screen.** Their review, freeze and run are owner CLI actions; the 평가 tab shows only the sealed row count and freeze state, and the dev validation report withholds sealed IDs.
-6. **Evaluation identity.** Answer-run requests use the member `evaluation-job` (so a resume under another typed name finds the same idempotency keys) and the `gold_eval` envelope.
-7. **A repaired release needs a new freeze.** A post-test regression run requires `--post-test-regression` and `--reason`; a new reliability claim needs a newly drafted, independently sealed test set.
+1. Two nDCG formulas, by schema. Gold-2 rows use the plan's graded formula; `dev-pilot` keeps the phase-2 increment formula so frozen `retrieval-eval-4` runs stay comparable. Reports name the dataset, and runs over different populations are never compared.
+2. Two-document questions have no single ranking. They count toward evidence recall and complete coverage, scored per selected document, and are excluded from hit@k, nDCG@5 and MRR denominators.
+3. Citation support is deterministic only for complete span support. A link to a chunk carrying the whole labelled span supports; anything else stays unjudged until a blind reviewer decides. The release gate uses the lower bound (unjudged counted as unsupported).
+4. No paid judge. The plan allows a calibrated, sampled LLM judge; none is implemented or planned, so judge cost is always 0. Blind human review covers text claims and unjudged citations.
+5. Sealed rows never reach a screen. Their review, freeze and run are owner CLI actions; the 평가 tab shows only the sealed row count and freeze state, and the dev validation report withholds sealed IDs.
+6. Evaluation identity. Answer-run requests use the member `evaluation-job` (so a resume under another typed name finds the same idempotency keys) and the `gold_eval` envelope.
+7. A repaired release needs a new freeze. A post-test regression run requires `--post-test-regression` and `--reason`; a new reliability claim needs a newly drafted, independently sealed test set.
 
 ## Owner steps on the local host
 
