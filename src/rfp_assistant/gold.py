@@ -465,6 +465,71 @@ DEADLINE_RE = re.compile(r"(20\d\d\s*[.\-년]\s*\d{1,2}\s*[.\-월]\s*\d{1,2}|마
 LATE_FROM = 0.7
 
 
+_BOUNDARY = re.compile(r"(?<=[.。!?])\s+|\n")
+
+
+def _trigger(category: str, raw: str, code_docs: dict[str, set[str]]) -> tuple[int, int] | None:
+    """Character span in raw_text of the fact that puts an element in a category."""
+    if category == "numeric_qualifier":
+        m = QUALIFIER_RE.search(raw)
+    elif category == "deadline":
+        m = DEADLINE_RE.search(raw)
+    elif category == "repeated_code":
+        m = next((m for m in CODE_RE.finditer(raw) if len(code_docs.get(m.group(1), ())) > 1), None)
+    else:  # late_table: the header row is what makes the table readable
+        first = raw.split("\n", 1)[0]
+        return (0, len(first)) if first.strip() else None
+    return (m.start(), m.end()) if m else None
+
+
+def _window(raw: str, kind: str, trigger: tuple[int, int], max_chars: int) -> dict | None:
+    """A bounded excerpt that always contains the trigger: for a table, its header row plus the row(s) holding the
+    trigger; for prose, the sentence(s) holding it, widened by whole neighbouring sentences. `offsets` are raw_text
+    spans, so every excerpt traces back to the active element. None when even the trigger does not fit."""
+    start, end = trigger
+    if end - start > max_chars:
+        return None
+    if kind == "table":
+        lines, pos = [], 0
+        for line in raw.split("\n"):
+            lines.append((pos, pos + len(line)))
+            pos += len(line) + 1
+        hit = [i for i, (a, b) in enumerate(lines) if a < end and start < b] or [0]
+        chosen = sorted({0, *hit})
+        size = lambda ids: sum(lines[i][1] - lines[i][0] + 1 for i in ids)  # noqa: E731
+        if size(chosen) <= max_chars:
+            nxt = hit[-1] + 1
+            while nxt < len(lines) and size(chosen + [nxt]) <= max_chars:  # the next rows often hold conditions
+                chosen.append(nxt)
+                nxt += 1
+            spans = [lines[i] for i in chosen]
+            return {"text": "\n".join(raw[a:b] for a, b in spans), "offsets": [list(x) for x in spans],
+                    "row_lines": chosen, "context_clipped": False}
+        # one row longer than the bound: fall through to a character window inside it
+    bounds = sorted({0, len(raw), *(m.end() for m in _BOUNDARY.finditer(raw))})
+    sentences = list(zip(bounds, bounds[1:]))
+    first = next(i for i, (a, b) in enumerate(sentences) if b > start)
+    last = next(i for i, (a, b) in enumerate(sentences) if b >= end)
+    lo, hi = first, last
+    if sentences[hi][1] - sentences[lo][0] <= max_chars:
+        while True:
+            grew = False
+            for cand in (hi + 1, lo - 1):
+                if 0 <= cand < len(sentences):
+                    a, b = min(sentences[lo][0], sentences[cand][0]), max(sentences[hi][1], sentences[cand][1])
+                    if b - a <= max_chars:
+                        lo, hi, grew = min(lo, cand), max(hi, cand), True
+            if not grew:
+                break
+        a, b = sentences[lo][0], sentences[hi][1]
+        return {"text": raw[a:b].strip(), "offsets": [[a, b]], "context_clipped": False}
+    pad = (max_chars - (end - start)) // 2
+    a = max(0, start - pad)
+    b = min(len(raw), a + max_chars)
+    a = max(0, b - max_chars)
+    return {"text": raw[a:b], "offsets": [[a, b]], "context_clipped": True}
+
+
 def excerpts(settings: Settings, per_category: int = 2, max_chars: int = 800) -> dict:
     """Narrowly scoped drafting inputs: a few candidate elements per dev-family document and category, plus the
     queue context a drafter must respect (rejections with their reasons, existing question keys). Contains source
@@ -501,7 +566,7 @@ def excerpts(settings: Settings, per_category: int = 2, max_chars: int = 800) ->
                      "inference": json.loads(r["inference_json"]) if r["inference_json"] else None}
                     for r in conn.execute("SELECT * FROM gold_candidates WHERE status = 'rejected'")]
         keys = sorted(r[0] for r in conn.execute("SELECT question_key FROM gold_candidates"))
-    out = []
+    out, omitted = [], []
     for d in docs:
         els = elements.get(d["doc_id"])
         if not els:
@@ -509,21 +574,22 @@ def excerpts(settings: Settings, per_category: int = 2, max_chars: int = 800) ->
         n = len(els)
         picked: dict[str, int] = {}
         for e in els:
-            text = e["raw_text"].strip()
-            if len(text) < 20:
+            raw = e["raw_text"]
+            if len(raw.strip()) < 20:
                 continue
             position = e["source_order"] / max(1, els[-1]["source_order"])
-            cats = []
-            if QUALIFIER_RE.search(text):
-                cats.append("numeric_qualifier")
-            if e["kind"] == "table" and position >= LATE_FROM:
-                cats.append("late_table")
-            if any(len(code_docs.get(c, ())) > 1 for c in CODE_RE.findall(text)):
-                cats.append("repeated_code")
-            if DEADLINE_RE.search(text):
-                cats.append("deadline")
-            for cat in cats:
+            for cat in EXCERPT_CATEGORIES:
                 if picked.get(cat, 0) >= per_category:
+                    continue
+                if cat == "late_table" and not (e["kind"] == "table" and position >= LATE_FROM):
+                    continue
+                trigger = _trigger(cat, raw, code_docs)
+                if trigger is None:
+                    continue
+                window = _window(raw, e["kind"], trigger, max_chars)
+                if window is None:
+                    omitted.append({"category": cat, "element_id": e["element_id"],
+                                    "reason": "the triggering fact does not fit the excerpt bound"})
                     continue
                 picked[cat] = picked.get(cat, 0) + 1
                 loc = json.loads(e["location_json"])
@@ -532,10 +598,11 @@ def excerpts(settings: Settings, per_category: int = 2, max_chars: int = 800) ->
                             "element_id": e["element_id"], "kind": e["kind"], "position": round(position, 3),
                             "elements_in_extraction": n,
                             "location": {k: loc.get(k) for k in ("page", "page_label", "section_path", "path")},
-                            "text": text[:max_chars], "truncated": len(text) > max_chars})
+                            "trigger": raw[trigger[0]:trigger[1]], "trigger_offset": list(trigger), **window})
                 break  # one category per element keeps the pack varied
     context = {"created_at": utcnow(), "dev_documents": len(docs), "excerpts": len(out),
                "by_category": {c: sum(x["category"] == c for x in out) for c in EXCERPT_CATEGORIES},
+               "omitted": omitted,
                "queue": status(settings)["counts"], "rejections": rejected, "existing_question_keys": keys,
                "rules": "Read .wiki/gold-drafting.md. Quote exactly from `text`; keep reviewed_by null; never pick "
                         "a family or split yourself; a different person approves against the original."}

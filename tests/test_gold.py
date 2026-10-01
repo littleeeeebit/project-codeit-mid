@@ -254,6 +254,30 @@ class ExcerptPackTest(unittest.TestCase):
             self.assertIn("rejections", context)
             with self.assertRaises(gold.GoldError):  # earlier packs survive
                 gold.write_excerpts(s, out)
+            for r in rows:  # every excerpt carries its trigger and maps back to raw spans
+                self.assertIn(r["trigger"], r["text"])
+
+    def test_a_late_trigger_is_inside_its_bounded_excerpt(self):
+        prefix = " ".join(f"일반 사항 {i}번을 설명한다." for i in range(80))  # well over 800 characters
+        raw = f"{prefix} 제안서는 2024. 6. 11. 17시까지 제출하여야 하며, 지연 제출은 접수하지 않는다. 기타 사항."
+        self.assertGreater(raw.index("2024"), 800)
+        start, end = gold._trigger("deadline", raw, {})
+        window = gold._window(raw, "paragraph", (start, end), 300)
+        self.assertIn("2024. 6. 11", window["text"])
+        self.assertIn("지연 제출은 접수하지 않는다", window["text"])  # the condition in the same sentence
+        self.assertLessEqual(len(window["text"]), 300)
+        (a, b), = window["offsets"]
+        self.assertEqual(raw[a:b].strip(), window["text"])
+        self.assertFalse(window["context_clipped"])
+        table = "구분 | 내용\n" + "\n".join(f"항목{i} | 일반 설명" for i in range(120)) + \
+                "\n사업 금액 | 130,000,000원 (부가가치세 포함)\n비고 | 분할 지급 불가"
+        start, end = gold._trigger("numeric_qualifier", table, {})
+        window = gold._window(table, "table", (start, end), 200)
+        self.assertTrue(window["text"].startswith("구분 | 내용"))  # header row kept with the fact
+        self.assertIn("130,000,000원 (부가가치세 포함)", window["text"])
+        self.assertIn("분할 지급 불가", window["text"])  # the following condition row fits the bound
+        self.assertEqual(["\n".join(table[a:b] for a, b in window["offsets"])], [window["text"]])
+        self.assertIsNone(gold._window("x" * 50, "paragraph", (0, 50), 20))  # cannot fit: no fake candidate
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import json
+import shutil
 import tempfile
 import unittest
 import unittest.mock
@@ -385,7 +386,7 @@ class EvaluationRunTest(unittest.TestCase):
         self.assertEqual(active["finalist_run_id"], decision["finalist_run_id"])
         report = evaluation.write_phase2_report(s).read_text(encoding="utf-8")
         self.assertIn("| selection activated under the current policy | yes |", report)
-        self.assertIn("| frozen K0/K1 comparison under the current policy | yes |", report)
+        self.assertIn("but the dataset does not validate", report)  # the 4-row fixture is not a valid pilot
         self.assertIn("## Inputs for phase 3", report)
         source_map = json.loads((s.data_dir / "releases" / "phase-2" / "source-map.json").read_text(encoding="utf-8"))
         self.assertEqual(len(source_map), 4)
@@ -470,6 +471,150 @@ class EvaluationRunTest(unittest.TestCase):
         text = report_path.read_text(encoding="utf-8")
         self.assertIn(runs["H"], text)
         self.assertIn("## Selection", text)
+
+
+
+class PopulationAndGateTest(unittest.TestCase):
+    """Runs bind the population they scored; report gates are recomputed from today's dataset and sources."""
+
+    QUOTE = "하자보수 기간은 검수 완료일로부터 12개월로 한다."
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.env = fixtures.make_env(self.root)
+        self.transport = generation.FakeTransport()
+        _plan_and_build(self.env, self.transport)
+        s = self.env.settings
+        evaluation.assign_families(s)
+        path = s.data_dir / "datasets" / "families.json"
+        fams = json.loads(path.read_text(encoding="utf-8"))
+        for f in fams["families"].values():
+            f["split"] = "dev"
+        path.write_text(json.dumps(fams, ensure_ascii=False), encoding="utf-8")
+        self.fam_of = {d: k for k, f in fams["families"].items() for d in f["doc_ids"]}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def element(self, key: str, like: str) -> tuple[str, str]:
+        ref = self.env.refs[key]
+        with store.open_db(self.env.settings.db_path) as conn:
+            x = conn.execute("SELECT active_extraction_id FROM sources WHERE source_hash = ?",
+                             (ref.source_hash,)).fetchone()[0]
+            return x, conn.execute("SELECT element_id FROM elements WHERE extraction_id = ? AND raw_text LIKE ?",
+                                   (x, like)).fetchone()[0]
+
+    def row(self, rid: str, key: str, like: str, quote: str, question: str, kind: str = "condition") -> dict:
+        ref = self.env.refs[key]
+        x, el = self.element(key, like)
+        return {"id": rid, "type": kind, "question": question, "doc_id": ref.doc_id, "source_hash": ref.source_hash,
+                "extraction_id": x, "family": self.fam_of[ref.doc_id], "split": "dev", "answerable": True,
+                "evidence": [{"element_id": el, "quote": quote}], "drafted_by": "agent", "reviewed_by": "person"}
+
+    def write(self, rows: list[dict], name: str = "dev-pilot") -> None:
+        store.write_jsonl_atomic(evaluation.dataset_path(self.env.settings, name), rows)
+
+    def evaluate(self, labels, name="dev-pilot", force=False):
+        return {o["label"]: o for o in evaluation.evaluate_retrieval(
+            self.env.settings, fixtures.analyzer(), self.transport, name, labels, allow_paid_queries=True,
+            force=force)}
+
+    def revise(self, filename: str, lines: list[str]) -> None:
+        s = self.env.settings
+        (s.files_dir / filename).write_bytes(fixtures.make_pdf([lines]))
+        ingestion.import_manifest(s)
+        ingestion.ingest(s)
+
+    def test_dropping_a_hard_question_is_not_an_improvement(self):
+        s = self.env.settings
+        q1 = self.row("q1", "기관D", "%좌석%", "도서관 좌석 예약 시스템을 구축한다.", "열람 공간 사용 신청 방식")  # lexical miss
+        q2 = self.row("q2", "기관A", "%하자보수%", self.QUOTE, "검수 후 하자 보수 기간은 얼마인가?")
+        self.write([q1, q2])
+        k1 = self.evaluate(["K1"])["K1"]
+        self.revise("기관D_도서관 좌석 예약.pdf", ["제안요청서", "Ⅰ. 사업 안내", "열람실 좌석 배정 시스템을 구축한다."])
+        d = self.evaluate(["D"])["D"]
+        k1_config, _ = evaluation.load_run(s, k1["run_id"])
+        d_config, _ = evaluation.load_run(s, d["run_id"])
+        self.assertEqual(k1_config["dataset_sha256"], d_config["dataset_sha256"])  # same bytes...
+        self.assertNotEqual(k1_config["population_sha256"], d_config["population_sha256"])  # ...other questions
+        self.assertEqual((k1_config["population_size"], d_config["population_size"]), (2, 1))
+        out = evaluation.compare_runs(s, [k1["run_id"], d["run_id"]])
+        self.assertNotEqual(out["recommendation"]["selected"], d["run_id"])
+        k1_summary = {r["run_id"]: r for r in out["runs"]}[k1["run_id"]]
+        self.assertTrue(any("evaluated population changed" in e for e in k1_summary["blocking"]))
+        self.assertIn("Not directly comparable", Path(out["markdown"]).read_text(encoding="utf-8"))
+        # rerunning K1 after the change scores the new population under a new identity, not the old frozen run
+        again = self.evaluate(["K1"])["K1"]
+        self.assertNotEqual(again["run_id"], k1["run_id"])
+        self.assertFalse(again["reused"])
+        rec = evaluation.compare_runs(s, [again["run_id"], d["run_id"]])["recommendation"]
+        self.assertEqual(rec["selected"], again["run_id"])  # matching population: compared normally
+        self.assertEqual(rec["finalist"], d["run_id"])
+
+    def test_equal_sized_but_different_question_sets_differ(self):
+        q2 = self.row("q2", "기관A", "%하자보수%", self.QUOTE, "검수 후 하자 보수 기간은 얼마인가?")
+        rows, skipped = [q2], []
+        other = dict(q2, question="하자보수는 언제부터 계산하나?")
+        self.assertNotEqual(evaluation.population_identity(rows, skipped),
+                            evaluation.population_identity([other], skipped))
+        self.write([q2])
+        first = self.evaluate(["K1"])["K1"]
+        self.write([other])
+        second = self.evaluate(["K1"])["K1"]
+        self.assertNotEqual(first["run_id"], second["run_id"])
+        self.assertFalse(second["reused"])
+
+    def _valid_pilot(self) -> list[dict]:
+        converted = self.root / "converted.pdf"
+        converted.write_bytes(fixtures.make_pdf([["재난 관리 시스템", "Ⅰ. 사업 안내", "상황 전파 기능을 제공한다."]]))
+        review = self.root / "recovery.json"
+        review.write_text(json.dumps({"reviewer": "owner", "method": "hancom_pdf_export",
+                                      "compared_locations": [{"page": 1}], "fidelity_passed": True,
+                                      "mapping_limitations": "converted PDF pages"}), encoding="utf-8")
+        ingestion.recover_source(self.env.settings, self.env.refs["기관E"].doc_id, converted, review)
+        kinds = ("late_content", "table_fact", "repeated_code", "condition", "numeric_qualifier")
+        rows = [self.row(f"p{i}", "기관A", "%하자보수%", self.QUOTE, f"하자보수 조건 질문 {i}", kinds[i % 5])
+                for i in range(20)]
+        c = self.env.refs["기관C"]
+        rows += [{"id": f"m{i}", "type": ("missing_metadata", "provenance_conflict")[i % 2], "question": f"메타 {i}",
+                  "doc_id": c.doc_id, "source_hash": c.source_hash, "family": self.fam_of[c.doc_id], "split": "dev",
+                  "answerable": True, "metadata_fields": ["institution"], "drafted_by": "agent",
+                  "reviewed_by": "person"} for i in range(4)]
+        return rows
+
+    def gates(self) -> dict:
+        evaluation.write_phase2_report(self.env.settings)
+        manifest = json.loads((self.env.settings.data_dir / "releases" / "phase-2" / "manifest.json").read_text(
+            encoding="utf-8"))
+        return {g["gate"]: g["met"] for g in manifest["gates"]}
+
+    def test_report_gates_follow_the_current_dataset_and_a_compatible_pair(self):
+        rows = self._valid_pilot()
+        self.write(rows)
+        self.assertTrue(evaluation.validate_gold(self.env.settings, "dev-pilot")["ok"])
+        runs = self.evaluate(["K0", "K1"])
+        g = self.gates()
+        self.assertTrue(g["independently reviewed dev dataset validates"])
+        self.assertTrue(g["frozen K0/K1 comparison under the current policy"])
+        # a passing validation file does not survive a changed dataset
+        self.write([])
+        g = self.gates()
+        self.assertFalse(g["independently reviewed dev dataset validates"])
+        self.assertFalse(g["frozen K0/K1 comparison under the current policy"])
+        # K0 on another dataset and K1 on this one are not a pair
+        self.write(rows)
+        self.write(rows[:23] + [dict(rows[23], question="다른 질문")], name="other-set")
+        shutil.rmtree(self.env.settings.data_dir / "runs" / runs["K0"]["run_id"])
+        self.evaluate(["K0"], name="other-set")
+        self.assertFalse(self.gates()["frozen K0/K1 comparison under the current policy"])
+        self.evaluate(["K0"])
+        self.assertTrue(self.gates()["frozen K0/K1 comparison under the current policy"])
+        # same dataset bytes, but a source revision makes the pinned evidence stale
+        self.revise("기관A_통합 정보시스템.pdf", ["제안요청서", "Ⅲ. 계약 조건", "하자보수 기간은 24개월로 한다."])
+        g = self.gates()
+        self.assertFalse(g["independently reviewed dev dataset validates"])
+        self.assertFalse(g["frozen K0/K1 comparison under the current policy"])
 
 
 class ServingTest(unittest.TestCase):

@@ -195,7 +195,8 @@ def validate_gold(settings: Settings, name: str) -> dict:
 # Scoring and promotion policy. Bump whenever grading, critical checks or the HR gate change: runs and gates
 # recorded under another version are history, not evidence, and are neither compared against nor activated.
 # 2: row-fragment grading, numeric/qualifier critical failures, trial frozen to H, recorded reranker concurrency.
-EVAL_VERSION = "retrieval-eval-2"
+# 3: runs bind the evaluated population (scored rows and their pinned evidence), not only the dataset bytes.
+EVAL_VERSION = "retrieval-eval-3"
 RANK_DEPTH = 20
 CRITICAL_CODE_TYPES = {"repeated_code", "requirement_detail"}
 CRITICAL_EVIDENCE_TYPES = {"numeric_qualifier"}  # an amount/date/VAT condition must reach the packed context
@@ -245,6 +246,25 @@ def load_eval_rows(settings: Settings, name: str) -> tuple[list[dict], list[dict
             reason = "evidence_revision_not_active"
         (skipped if reason else scored).append(row if not reason else {"id": row.get("id"), "reason": reason})
     return scored, skipped, hashlib.sha256(raw).hexdigest()
+
+
+def population_identity(rows: list[dict], skipped: list[dict]) -> str:
+    """Identity of what a run actually scores: each eligible row's question, type, scope and pinned evidence, plus
+    which rows were skipped and why. The dataset file can stay byte-identical while a source revision or review
+    change makes a different set of questions eligible; runs over different populations are not comparable."""
+    scored = sorted(({"id": r.get("id"), "type": r.get("type"), "question": r.get("question"),
+                      "doc_id": r.get("doc_id"), "source_hash": r.get("source_hash"),
+                      "extraction_id": r.get("extraction_id"), "answerable": r.get("answerable"),
+                      "critical": bool(r.get("critical")),
+                      "evidence": [[e.get("element_id"), e.get("quote")] for e in r.get("evidence") or []]}
+                     for r in rows), key=lambda x: str(x["id"]))
+    return hashlib.sha256(dumps({"scored": scored, "skipped": sorted(skipped, key=lambda x: str(x.get("id")))}
+                                ).encode()).hexdigest()
+
+
+def current_population(settings: Settings, dataset: str) -> tuple[str, int]:
+    rows, skipped, _ = load_eval_rows(settings, dataset)
+    return population_identity(rows, skipped), len(rows)
 
 
 def is_passage_row(row: dict) -> bool:
@@ -469,11 +489,12 @@ def _ready_dense_for(settings: Settings, index_version: str) -> str | None:
 
 
 def _frozen_config(settings: Settings, label: str, dataset: str, dataset_sha: str, index, dense, analyzer,
-                   extra: dict | None = None) -> dict:
+                   extra: dict | None = None, population: tuple[str, int] | None = None) -> dict:
     from .retrieval import RUN_MODES, WhitespaceAnalyzer, analyzer_fingerprint
 
     return {"eval_version": EVAL_VERSION, "label": label, "mode": RUN_MODES[label], "dataset": dataset,
-            "dataset_sha256": dataset_sha, "index_version": index.version, "index_manifest_hash": index.manifest_hash,
+            "dataset_sha256": dataset_sha, "population_sha256": population[0] if population else None,
+            "population_size": population[1] if population else None, "index_version": index.version, "index_manifest_hash": index.manifest_hash,
             "profile": index.profile, "analyzer": WhitespaceAnalyzer.version if label == "K0"
             else analyzer_fingerprint(analyzer),
             "dense_version": dense.version if dense is not None and label in ("D", "H", "HR") else None,
@@ -633,7 +654,8 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
     stats = profile_stats(index)
     summaries = []
     for label in labels:
-        config = _frozen_config(settings, label, dataset, dataset_sha, index, dense, analyzer)
+        config = _frozen_config(settings, label, dataset, dataset_sha, index, dense, analyzer,
+                                population=(population_identity(rows, skipped), len(rows)))
         run_id = f"{label}-{hashlib.sha256(dumps(config).encode()).hexdigest()[:10]}"
         d = _run_dir(settings, run_id)
         if (d / "scores.json").exists() and not force:
@@ -706,6 +728,8 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
     if h_run is None:
         raise EvaluationError("no complete frozen H run for this dataset and index; run evaluate-retrieval with H")
     h_config, h_scores = load_run(settings, h_run)
+    if h_config.get("population_sha256") != population_identity(rows, skipped):
+        raise EvaluationError("the evaluated population changed since the frozen H run; rerun H before the trial")
     from .retrieval import analyzer_fingerprint
 
     if h_config["analyzer"] != analyzer_fingerprint(analyzer):
@@ -806,6 +830,13 @@ def run_errors(settings: Settings, run_id: str) -> list[str]:
     if config.get("eval_version") != EVAL_VERSION:
         errors.append(f"the run was scored under evaluation policy {config.get('eval_version')!r}, not "
                       f"{EVAL_VERSION!r}; rerun the comparison (and the reranker trial) — cached vectors are reused")
+    if config.get("eval_version") == EVAL_VERSION:
+        try:
+            if current_population(settings, config["dataset"])[0] != config.get("population_sha256"):
+                errors.append("the evaluated population changed since the run (source revision, review or dataset "
+                              "edit); repin or rerun on the current dataset")
+        except EvaluationError as exc:
+            errors.append(f"cannot recheck the evaluated population: {exc}")
     if config["mode"] == "hybrid_rerank" and not (scores.get("gate") or {}).get("passed"):
         errors.append("the reranker did not pass its promotion gate; keep the bypass")
     if config["mode"] == "hybrid_rerank" and not (config.get("reranker") or {}).get("max_concurrency"):
@@ -843,8 +874,8 @@ def decision_errors(settings: Settings, run_id: str, decision: dict) -> list[str
             errors.append(f"finalist run {finalist} not found")
         else:
             if (f_scores.get("status") != "complete" or f_config.get("eval_version") != EVAL_VERSION
-                    or f_config["dataset_sha256"] != config["dataset_sha256"]):
-                errors.append("the finalist must be a complete current-policy run on the same dataset")
+                    or f_config.get("population_sha256") != config.get("population_sha256")):
+                errors.append("the finalist must be a complete current-policy run on the same evaluated population")
     return errors + run_errors(settings, run_id)
 
 
@@ -890,6 +921,8 @@ def run_summary(settings: Settings, run_id: str) -> dict:
     return {
         "run_id": run_id, "label": config.get("label"), "mode": config.get("mode"),
         "eval_version": config.get("eval_version"), "dataset_sha256": config.get("dataset_sha256"),
+        "population_sha256": config.get("population_sha256"), "population_size": config.get("population_size"),
+        "limits": config.get("limits"),
         "index_version": config.get("index_version"), "profile": config.get("profile"),
         "dense_version": config.get("dense_version"), "status": scores.get("status"), "reason": scores.get("reason"),
         "scored": agg.get("passage_rows"), "hit@20": single, "complete@20": multi, "packed_complete": packed,
@@ -911,7 +944,10 @@ def recommend(summaries: list[dict]) -> dict:
     base = max(k1, key=lambda r: (r["ndcg@5"] or 0, r["run_id"]))
     reasons, eligible = [], [base]
     for r in usable:
-        if r is base or r["label"] in ("K0",) or r["dataset_sha256"] != base["dataset_sha256"]:
+        if r is base or r["label"] in ("K0",):
+            continue
+        if r["population_sha256"] != base["population_sha256"]:
+            reasons.append(f"{r['run_id']} ({r['mode']}): scored a different population than K1; not compared")
             continue
         new = sorted(set(r["critical_failures"] or []) - set(base["critical_failures"] or []))
         gain = round((r["ndcg@5"] or 0) - (base["ndcg@5"] or 0), 4)
@@ -924,7 +960,7 @@ def recommend(summaries: list[dict]) -> dict:
             eligible.append(r)
     order = sorted(eligible, key=lambda r: (-(r["ndcg@5"] or 0), len(r["critical_failures"] or []), r["run_id"]))
     selected = order[0]
-    others = [r for r in usable if r is not selected and r["dataset_sha256"] == selected["dataset_sha256"]
+    others = [r for r in usable if r is not selected and r["population_sha256"] == selected["population_sha256"]
               and r["label"] != "K0"]
     finalist = max(others, key=lambda r: (r["ndcg@5"] or 0, r["run_id"])) if others else None
     if selected is base:
@@ -942,19 +978,19 @@ def compare_runs(settings: Settings, run_ids: list[str]) -> dict:
     """Comparison table from recorded scores only; missing measurements stay empty. Writes Markdown and JSON
     under runs/comparisons/."""
     summaries = [run_summary(settings, r) for r in run_ids]
-    datasets = {r["dataset_sha256"] for r in summaries}
+    datasets = {r["population_sha256"] for r in summaries}
     policies = {r["eval_version"] for r in summaries}
     lines = ["# Retrieval comparison", "", f"Generated {utcnow()}. Values come from each run's scores.json.", ""]
     if len(datasets) > 1 or len(policies) > 1:
-        lines += ["**Not directly comparable:** runs differ in dataset or evaluation policy.", ""]
-    lines += ["| Run | Mode | Dataset | Index (profile) | Policy | Scored | hit@20 single | complete@20 multi | "
+        lines += ["**Not directly comparable:** runs differ in evaluated population or evaluation policy.", ""]
+    lines += ["| Run | Mode | Dataset/population | Index (profile) | Policy | Scored | hit@20 single | complete@20 multi | "
               "packed complete | nDCG@5 | MRR | Critical | Code ok/n | Wrong scope | p50/p95 ms | Query cost µ$ | "
               "Blocking |", "|" + " --- |" * 17]
     for r in summaries:
         lat = r["latency_ms"] or {}
         code = r["code_checks"] or {}
         lines.append(
-            f"| `{r['run_id']}` | {r['mode']} | `{(r['dataset_sha256'] or '')[:12]}` | `{r['index_version']}` "
+            f"| `{r['run_id']}` | {r['mode']} | `{(r['dataset_sha256'] or '')[:12]}`/`{(r['population_sha256'] or '')[:8]}` | `{r['index_version']}` "
             f"({r['profile']}) | {r['eval_version']} | {r['scored'] if r['scored'] is not None else '—'} | "
             f"{_fmt_rate(r['hit@20'])} | {_fmt_rate(r['complete@20'])} | {_fmt_rate(r['packed_complete'])} | "
             f"{r['ndcg@5'] if r['ndcg@5'] is not None else '—'} | {r['mrr'] if r['mrr'] is not None else '—'} | "
@@ -1039,7 +1075,8 @@ def write_phase2_report(settings: Settings) -> Path:
         except (EvaluationError, json.JSONDecodeError):
             continue
         runs.append({"run_id": d.name, "label": config.get("label"), "profile": config.get("profile"),
-                     "eval_version": config.get("eval_version"),
+                     "eval_version": config.get("eval_version"), "population": config.get("population_sha256"),
+                     "dataset_name": config.get("dataset"), "limits": config.get("limits"),
                      "index": config.get("index_version"), **_headline(scores),
                      "gate": (scores.get("gate") or {}).get("passed"), "load": scores.get("load")})
     checked = [c for c in coverage if c["review_status"] in ("sample_checked", "reviewed")]
@@ -1123,11 +1160,25 @@ def write_phase2_report(settings: Settings) -> Path:
               f"`{active_index}`; dense and reranker stay inactive"]
 
     # ---- exit gates: computed from recorded state, never assumed
-    validation_path = settings.data_dir / "datasets" / "dev-pilot.validation.json"
-    validation = json.loads(validation_path.read_text(encoding="utf-8")) if validation_path.exists() else None
-    current = [r for r in runs if r.get("status") == "complete" and r.get("eval_version") == EVAL_VERSION]
+    # Revalidated now (free, no provider): a stored passing report says nothing about today's dataset or sources.
+    validation = validate_gold(settings, "dev-pilot") if dataset_path(settings, "dev-pilot").exists() else None
+    try:
+        population = current_population(settings, "dev-pilot")[0]
+    except EvaluationError:
+        population = None
+    current = [r for r in runs if r.get("status") == "complete" and r.get("eval_version") == EVAL_VERSION
+               and r.get("dataset_name") == "dev-pilot" and population and r.get("population") == population]
     labels = {r["label"] for r in current}
+    lexical_pair = next(((k0, k1) for k0 in current if k0["label"] == "K0" for k1 in current if k1["label"] == "K1"
+                         and k1["index"] == k0["index"] and k1["limits"] == k0["limits"]), None)
     a = json.loads(active_run) if active_run else None
+    active_errors = []
+    if a and a.get("run_id"):
+        try:
+            active_errors = run_errors(settings, a["run_id"])
+        except EvaluationError as exc:
+            active_errors = [str(exc)]
+    active_ok = bool(a and a.get("eval_version") == EVAL_VERSION and not active_errors)
     gates = [
         ("manifest covers every CSV record with a status", manifest["counts"]["associations"] > 0
          and sum(manifest["parse_status"].values()) == manifest["counts"]["associations"],
@@ -1136,17 +1187,20 @@ def write_phase2_report(settings: Settings) -> Path:
         ("failed originals recovered or visibly quarantined", True,
          f"{len(manifest['quarantined'])} quarantined, {len(recoveries)} recovered"),
         ("independently reviewed dev dataset validates", bool(validation and validation.get("ok")),
-         "missing: run validate-gold" if validation is None else
-         f"rows {validation.get('rows')}, errors {len(validation.get('errors', []))}"),
-        ("frozen K0/K1 comparison under the current policy", {"K0", "K1"} <= labels,
-         f"current-policy complete runs: {sorted(labels) or 'none'}"),
+         "dataset file missing" if validation is None else
+         f"revalidated now: rows {validation.get('rows')}, errors {len(validation.get('errors', []))}"),
+        ("frozen K0/K1 comparison under the current policy", bool(lexical_pair and validation and validation.get("ok")),
+         f"pair {lexical_pair[0]['run_id']} / {lexical_pair[1]['run_id']} on index {lexical_pair[0]['index']}"
+         + ("" if validation and validation.get("ok") else ", but the dataset does not validate")
+         if lexical_pair else f"no K0/K1 pair on the current population, same index and limits "
+                              f"(compatible runs: {sorted(r['run_id'] for r in current) or 'none'})"),
         ("dense decided (run or explicit gap)", "H" in labels or "D" in labels,
          "D/H runs present" if {"D", "H"} & labels else "no current D/H run: record the owner's D3 decision"),
         ("reranker decided (gate measured or explicit gap)", "HR" in labels,
          "current-policy trial recorded" if "HR" in labels else "no current trial: record the owner's D4 decision"),
-        ("selection activated under the current policy", bool(a and a.get("eval_version") == EVAL_VERSION),
-         f"active run {a['run_id']} under policy {a.get('eval_version')} (current {EVAL_VERSION})" if a
-         else "no activate-run decision"),
+        ("selection activated under the current policy", active_ok,
+         (f"active run {a['run_id']} under policy {a.get('eval_version')} (current {EVAL_VERSION})"
+          + (f"; {'; '.join(active_errors)}" if active_errors else "")) if a else "no activate-run decision"),
     ]
     L += ["", "## Phase 2 exit gates", "", "| Gate | Met | Evidence |", "| --- | --- | --- |"]
     L += [f"| {g} | {'yes' if ok else '**no**'} | {ev} |" for g, ok, ev in gates]
