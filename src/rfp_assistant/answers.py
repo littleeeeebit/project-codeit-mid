@@ -666,6 +666,33 @@ def load_reviews(settings: Settings, run_id: str) -> dict[str, dict]:
     return latest
 
 
+def ledger_cost(settings: Settings, run_id: str, finalist: str) -> dict:
+    """Every paid attempt this finalist's rows made in this run, read from the shared ledger through all of their
+    request keys (`<run>:<finalist>:<question>:<attempt>`), retries and unfinished rows included. Settled cost
+    counts once; open and unknown reservations are pending; reconciled attempts are paid through the provider
+    reconciliation adjustment, not here. Nothing is charged or settled by reading."""
+    prefix = f"{run_id}:{finalist}:"
+    with open_db(settings.db_path) as conn:
+        rows = conn.execute(
+            "SELECT r.idempotency_key, a.state, a.reserved_micro_usd, a.settled_micro_usd FROM attempts a "
+            "JOIN requests r ON r.request_id = a.request_id WHERE r.member_id = ? AND substr(r.idempotency_key, 1, ?) "
+            "= ?", (EVAL_MEMBER, len(prefix), prefix)).fetchall()
+    final_keys = {}
+    for r in rows:  # the highest attempt number per question is that row's current request
+        qid, _, n = r["idempotency_key"][len(prefix):].rpartition(":")
+        final_keys[qid] = max(final_keys.get(qid, 0), int(n) if n.isdigit() else 0)
+    retry = [r for r in rows if r["idempotency_key"][len(prefix):].rpartition(":")[2] !=
+             str(final_keys[r["idempotency_key"][len(prefix):].rpartition(":")[0]])]
+    settled = lambda xs: sum(r["settled_micro_usd"] or 0 for r in xs if r["state"] == "settled")  # noqa: E731
+    return {"settled_micro_usd": settled(rows), "settled_in_earlier_attempts_micro_usd": settled(retry),
+            "pending_micro_usd": sum(r["reserved_micro_usd"] for r in rows
+                                     if r["state"] in ("reserved", "dispatching")),
+            "unknown_micro_usd": sum(r["reserved_micro_usd"] for r in rows if r["state"] == "unknown"),
+            "reconciled_attempts": sum(r["state"] == "reconciled" for r in rows),
+            "attempts": len(rows), "retried_rows": sum(1 for n in final_keys.values() if n > 1),
+            "source": "shared ledger, all request keys of the run"}
+
+
 def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) -> dict:
     """Scores the recorded rows (free; no generation) and writes scores.json and report.md."""
     from .retrieval import KeywordIndex
@@ -694,6 +721,9 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
         per_finalist[f["run_id"]] = {"mode": f["mode"], "completed": len(scored), "of": len(by_id),
                                      "not_finished": sorted(pending + missing), **aggregate_answers(scored),
                                      "served_retrieval": evaluation.aggregate(served, []) if served else None}
+        cost = ledger_cost(settings, run_id, f["run_id"])
+        cost["per_question_micro_usd"] = round(cost["settled_micro_usd"] / len(scored), 1) if scored else None
+        per_finalist[f["run_id"]]["cost"] = cost
     complete = all(v["completed"] == v["of"] for v in per_finalist.values())
     scores = {"status": "complete" if complete else "partial", "stop_reason": stop_reason, "run_id": run_id,
               "label": config["label"], "finalists": per_finalist, "reviews": len(reviews),
@@ -758,7 +788,11 @@ def answer_report_md(config: dict, scores: dict) -> str:
                   f"| metadata stratum | {_fmt(v['metadata_correct'])} |",
                   f"| technical outcomes | {v['technical_outcomes'] or 'none'} |",
                   f"| scope leaks | {v['scope_leaks']} |",
-                  f"| settled cost | {usd(v['cost']['settled_micro_usd'])} (retried rows {v['cost']['retried_rows']}) |",
+                  f"| settled cost (ledger, every attempt) | {usd(v['cost']['settled_micro_usd'])}; earlier attempts "
+                  f"{usd(v['cost'].get('settled_in_earlier_attempts_micro_usd', 0))}, pending "
+                  f"{usd(v['cost'].get('pending_micro_usd', 0))}, unknown {usd(v['cost'].get('unknown_micro_usd', 0))}, "
+                  f"reconciled attempts {v['cost'].get('reconciled_attempts', 0)}, retried rows "
+                  f"{v['cost']['retried_rows']} |",
                   f"| latency p50/p95 ms | {v['latency_ms']['p50']}/{v['latency_ms']['p95']} (n={v['latency_ms']['n']}, "
                   f"{v['latency_ms']['condition']}) |", ""]
         if v["not_finished"]:

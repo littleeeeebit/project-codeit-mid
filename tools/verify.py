@@ -398,7 +398,11 @@ def pick_documents(ctx: Context, corpus: dict) -> tuple[str, str]:
 
     def first(ext):
         return next((r["doc_id"] for r in rows if r["filename"].lower().endswith(ext)), None)
-    return hwp or first(".hwp") or rows[0]["doc_id"], pdf or first(".pdf") or rows[-1]["doc_id"]
+    hwp, pdf = hwp or first(".hwp"), pdf or first(".pdf")
+    if not hwp or not pdf or hwp == pdf:  # never stand a PDF in for the HWP case: that is not HWP evidence
+        raise RuntimeError("the configured corpus needs one parsed HWP and one parsed PDF in the active index "
+                           f"(found hwp={hwp}, pdf={pdf}); set RFP_VERIFY_HWP_DOC_ID and RFP_VERIFY_PDF_DOC_ID")
+    return hwp, pdf
 
 
 @flow("verifier-runs")

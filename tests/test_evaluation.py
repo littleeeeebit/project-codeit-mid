@@ -441,6 +441,19 @@ class AnswerRunTest(GoldRetrievalTest):
         self.assertEqual(len(transport.calls), calls)
         self.assertEqual(again["status"], "complete")
 
+    def assert_cost_matches_ledger(self, run_id: str, expect_partial: bool = False) -> None:
+        summary = answers.finalize(self.s, run_id)
+        self.assertEqual(summary["status"], "partial" if expect_partial else "complete")
+        scores = json.loads((answers.run_dir(self.s, run_id) / "scores.json").read_text(encoding="utf-8"))
+        reported = sum(v["cost"]["settled_micro_usd"] for v in scores["finalists"].values())
+        earlier = sum(v["cost"]["settled_in_earlier_attempts_micro_usd"] for v in scores["finalists"].values())
+        with store.open_db(self.s.db_path) as conn:
+            actual = conn.execute("SELECT COALESCE(SUM(a.settled_micro_usd), 0) FROM attempts a JOIN requests r "
+                                  "ON r.request_id = a.request_id WHERE a.state = 'settled' AND "
+                                  "substr(r.idempotency_key, 1, ?) = ?", (len(run_id) + 1, run_id + ":")).fetchone()[0]
+        self.assertEqual(reported, actual)
+        self.assertGreater(earlier if not expect_partial else reported, 0)
+
     def test_an_interrupted_run_keeps_its_rows_and_never_replays_unknown_billing(self):
         n = {"calls": 0}
 
@@ -477,8 +490,11 @@ class AnswerRunTest(GoldRetrievalTest):
                                          {"prompt_tokens": 100, "completion_tokens": 10}, None, "export", "reconciled")
         finally:
             res.close()
+        # review round 3 (F5): before the retry the row is unfinished, yet its settled earlier attempt is reported
+        self.assert_cost_matches_ledger(out["run_id"], expect_partial=True)
         _, final = self.answer_run(transport)
         self.assertEqual(final["status"], "complete")
+        self.assert_cost_matches_ledger(out["run_id"])
         row = answers.load_progress(self.s, out["run_id"])[(unknown[0]["finalist"], unknown[0]["question_id"])]
         self.assertEqual((row["status"], row["attempt_no"]), ("done", 2))
         self.assertEqual(row["history"][0]["attempt_states"], ["settled"])
