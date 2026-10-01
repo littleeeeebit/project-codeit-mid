@@ -166,8 +166,9 @@ def unresolved_attempts(settings: Settings, purpose: str) -> list[str]:
 
 
 def metered_embed(settings: Settings, transport: Transport | None, texts: list[str], input_tokens: int, *,
-                  request_id: str, member_id: str, purpose: str) -> dict:
-    """One bounded embedding call through the ledger. Returns {'status': ok|blocked|failed|unknown, ...}."""
+                  request_id: str, member_id: str, purpose: str, guard=None) -> dict:
+    """One bounded embedding call through the ledger. Returns {'status': ok|blocked|failed|unknown, ...}.
+    `guard` is the owning request's dispatch check (see budget.mark_dispatching)."""
     if transport is None:
         return {"status": "blocked", "reason": "provider_unavailable", "vectors": None, "attempt_id": None}
     db = settings.db_path
@@ -178,7 +179,11 @@ def metered_embed(settings: Settings, transport: Transport | None, texts: list[s
         return {"status": "blocked", "reason": admission["reason"], "vectors": None, "attempt_id": None,
                 "reserved_micro_usd": admission.get("reserved_micro_usd")}
     attempt_id = admission["attempt_id"]
-    budget.mark_dispatching(db, attempt_id)
+    try:
+        budget.mark_dispatching(db, attempt_id, guard)
+    except budget.DispatchRefused as exc:
+        return {"status": "blocked", "reason": f"stopped_before_dispatch:{exc}", "vectors": None,
+                "attempt_id": attempt_id, "billing": "released"}
     try:
         response = transport.embed(model=settings.embedding_model, inputs=texts,
                                    dimensions=settings.embedding_dimensions)
@@ -209,7 +214,7 @@ def metered_embed(settings: Settings, transport: Transport | None, texts: list[s
 
 
 def query_vector(settings: Settings, transport: Transport | None, question: str, *, request_id: str | None,
-                 member_id: str, purpose: str, allow_paid: bool) -> tuple[np.ndarray | None, dict]:
+                 member_id: str, purpose: str, allow_paid: bool, guard=None) -> tuple[np.ndarray | None, dict]:
     """Cached by normalized query, model and dimensions. A miss is paid only when `allow_paid`."""
     text = normalize_payload(question)
     h = payload_hash(text, settings.embedding_model, settings.embedding_dimensions)
@@ -220,7 +225,7 @@ def query_vector(settings: Settings, transport: Transport | None, question: str,
         return None, {"cache": "miss", "payload_hash": h, "reason": "paid_query_embedding_not_allowed"}
     tokens = count_embedding_tokens(text, settings.embedding_model) + QUERY_MARGIN_TOKENS
     result = metered_embed(settings, transport, [text], tokens, request_id=request_id, member_id=member_id,
-                           purpose=purpose)
+                           purpose=purpose, guard=guard)
     info = {"cache": "miss", "payload_hash": h, **{k: v for k, v in result.items() if k != "vectors"}}
     if result["status"] != "ok":
         return None, info

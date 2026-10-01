@@ -68,6 +68,11 @@ class Settings:
     request_timeout_seconds: float = 60.0
     converter_timeout_seconds: float = 300.0
     framing_margin_tokens: int = 200
+    # Phase 3 operation: the bounded background executor and a fake-provider delay that makes races observable.
+    request_workers: int = 6
+    request_admission: int = 12  # admitted unfinished (queued + running) requests across the process
+    shutdown_wait_seconds: float = 20.0
+    fake_delay_seconds: float = 0.0
     extra: dict = field(default_factory=dict)
 
     @property
@@ -160,6 +165,12 @@ def validate(s: Settings) -> None:
         raise SettingsError("reranker_precision must be 'fp32' or 'fp16'")
     if s.rrf_k < 1 or s.channel_top_k < 1 or s.fused_top_k < 1 or s.reranker_max_concurrency < 1:
         raise SettingsError("rrf_k, top-k depths and reranker concurrency must be positive")
+    if not 1 <= s.request_workers <= 6 or not s.request_workers <= s.request_admission <= 48:
+        raise SettingsError("request_workers must be 1..6 and request_admission within workers..48")
+    if s.fake_delay_seconds and s.provider != "fake":
+        raise SettingsError("fake_delay_seconds applies only to provider 'fake'")
+    if not 0 <= s.fake_delay_seconds <= 120 or not 0 <= s.shutdown_wait_seconds <= 300:
+        raise SettingsError("fake_delay_seconds must be within 0..120 and shutdown_wait_seconds within 0..300")
     s.data_dir.mkdir(parents=True, exist_ok=True)
     if not os.access(s.data_dir, os.W_OK):
         raise SettingsError("runtime directory is not writable")

@@ -158,8 +158,10 @@ def estimate(db: Path, model: str, input_tokens: int, max_output_tokens: int) ->
 
 
 def reserve(db: Path, *, request_id: str, member_id: str, stage: str, purpose: str, model: str, input_tokens: int,
-            max_output_tokens: int, count_method: str) -> dict:
-    """Atomic admission. Returns {'admitted': bool, 'attempt_id', 'reserved_micro_usd', 'reason'}."""
+            max_output_tokens: int, count_method: str, ceiling_micro_usd: int | None = None) -> dict:
+    """Atomic admission. Returns {'admitted': bool, 'attempt_id', 'reserved_micro_usd', 'reason'}.
+    `ceiling_micro_usd` is a maximum the user consented to: a reservation above it (e.g. rates reconfigured since
+    the estimate) is refused in the same transaction that would have admitted it."""
     attempt_id = str(uuid.uuid4())
     try:
         with open_db(db) as conn, tx(conn, immediate=True):
@@ -175,6 +177,9 @@ def reserve(db: Path, *, request_id: str, member_id: str, stage: str, purpose: s
             if purpose not in envelopes:
                 return {"admitted": False, "reason": "unknown_purpose", "attempt_id": None}
             amount = max_cost(rates, input_tokens, max_output_tokens)
+            if ceiling_micro_usd is not None and amount > ceiling_micro_usd:
+                return {"admitted": False, "reason": "above_consented_maximum", "attempt_id": None,
+                        "reserved_micro_usd": amount, "ceiling_micro_usd": ceiling_micro_usd}
             totals = _totals(conn)
             available = row["cap_micro_usd"] - totals["spent"] - totals["pending"]
             if available < amount:
@@ -207,10 +212,29 @@ def _transition(db: Path, attempt_id: str, from_states: tuple, to_state: str, **
         return cur.rowcount == 1
 
 
-def mark_dispatching(db: Path, attempt_id: str) -> None:
-    """Durable marker before the network call."""
-    if not _transition(db, attempt_id, ("reserved",), "dispatching", dispatched_at=utcnow()):
+class DispatchRefused(BudgetError):
+    """The owning request may no longer start a paid call (cancelled, interrupted, service closing). The
+    reservation was released in the same transaction that refused it; nothing was sent."""
+
+
+def mark_dispatching(db: Path, attempt_id: str, guard=None) -> None:
+    """Durable marker before the network call. `guard(conn)` runs in the same transaction and returns a refusal
+    reason (or None), so a request marked interrupted or cancelled can never be dispatched after the check."""
+    with open_db(db) as conn, tx(conn, immediate=True):
+        reason = guard(conn) if guard is not None else None
+        if reason:
+            cur = conn.execute("UPDATE attempts SET state = 'released', finished_at = ?, error_json = ? "
+                               "WHERE attempt_id = ? AND state = 'reserved'",
+                               (utcnow(), dumps({"reason": f"stopped_before_dispatch:{reason}"}), attempt_id))
+        else:
+            cur = conn.execute("UPDATE attempts SET state = 'dispatching', dispatched_at = ? "
+                               "WHERE attempt_id = ? AND state = 'reserved'", (utcnow(), attempt_id))
+        if cur.rowcount:
+            _bump(conn)
+    if cur.rowcount != 1:
         raise BudgetError("attempt is not in reserved state")
+    if reason:
+        raise DispatchRefused(reason)
 
 
 def release(db: Path, attempt_id: str, reason: str, confirmed_pre_execution: bool = False) -> bool:
@@ -284,7 +308,24 @@ def reconcile(db: Path, actor: str, reconciliation_id: str, interval_start: str,
     with open_db(db) as conn, tx(conn, immediate=True):
         prior = conn.execute("SELECT * FROM adjustments WHERE correction_key = ?", (key,)).fetchone()
         if prior is not None:
+            same = (prior["interval_start"], prior["interval_end"], prior["scope"],
+                    json.loads(prior["covered_attempts_json"])) == (interval_start, interval_end, scope,
+                                                                     covered_attempt_ids)
+            if not same or prior["evidence"] != evidence or _provider_total(conn, prior) != provider_total_micro:
+                raise BudgetError("this reconciliation ID was already imported with different values; a changed "
+                                  "provider total needs a separate owner correction")
             return False
+        if not interval_start or not interval_end or interval_start > interval_end:
+            raise BudgetError("reconciliation needs a closed interval with start <= end")
+        if not evidence.strip() or not scope.strip():
+            raise BudgetError("reconciliation needs the provider scope and dated evidence")
+        for attempt_id in covered_attempt_ids:  # only explicitly covered unknown attempts inside the interval
+            a = conn.execute("SELECT state, dispatched_at FROM attempts WHERE attempt_id = ?",
+                             (attempt_id,)).fetchone()
+            if a is None or a["state"] != "unknown":
+                raise BudgetError(f"covered attempt {attempt_id} is not an unknown attempt")
+            if not a["dispatched_at"] or not interval_start <= a["dispatched_at"] <= interval_end:
+                raise BudgetError(f"covered attempt {attempt_id} was not dispatched inside the interval")
         overlap = conn.execute(
             "SELECT 1 FROM adjustments WHERE correction_key LIKE 'reconcile:%' AND scope = ? "
             "AND NOT (interval_end < ? OR interval_start > ?)", (scope, interval_start, interval_end)).fetchone()
@@ -297,12 +338,22 @@ def reconcile(db: Path, actor: str, reconciliation_id: str, interval_start: str,
             "INSERT INTO adjustments(adjustment_id, correction_key, amount_micro_usd, interval_start, interval_end, "
             "scope, evidence, reason, actor, covered_attempts_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (str(uuid.uuid4()), key, provider_total_micro - local, interval_start, interval_end, scope, evidence,
-             "provider reconciliation", actor, dumps(covered_attempt_ids), utcnow()))
+             f"provider reconciliation; provider_total_micro_usd={provider_total_micro}; "
+             f"local_settled_micro_usd={local}", actor, dumps(covered_attempt_ids), utcnow()))
         for attempt_id in covered_attempt_ids:
             conn.execute("UPDATE attempts SET state = 'reconciled' WHERE attempt_id = ? AND state = 'unknown'",
                          (attempt_id,))
         _bump(conn)
     return True
+
+
+def _provider_total(conn: sqlite3.Connection, adjustment: sqlite3.Row) -> int | None:
+    """The provider total an imported reconciliation recorded (reason text written by `reconcile`)."""
+    for part in adjustment["reason"].split(";"):
+        name, _, value = part.strip().partition("=")
+        if name == "provider_total_micro_usd":
+            return int(value)
+    return None
 
 
 def recover(db: Path) -> dict:
@@ -319,7 +370,27 @@ def recover(db: Path) -> dict:
     return {"unknown": unknown, "released": released}
 
 
-def snapshot(db: Path) -> BudgetSnapshot:
+CAP_WARNINGS = (50, 75, 90)
+
+
+def pacing(cap_micro: int, committed_micro: int, start: str | None, end: str | None, today: date) -> dict | None:
+    """Linear pacing over the configured project dates: how much of the cap the elapsed share would allow."""
+    if not start or not end:
+        return None
+    s, e = date.fromisoformat(start), date.fromisoformat(end)
+    total = (e - s).days or 1
+    elapsed = min(1.0, max(0.0, ((today - s).days + 1) / total))
+    expected = int(cap_micro * elapsed)
+    return {"elapsed_fraction": round(elapsed, 4), "expected_micro_usd": expected,
+            "committed_micro_usd": committed_micro, "ahead": committed_micro > expected,
+            "days_left": max(0, (e - today).days)}
+
+
+def snapshot(db: Path, today: date | None = None) -> BudgetSnapshot:
+    from zoneinfo import ZoneInfo
+    from datetime import datetime
+
+    today = today or datetime.now(ZoneInfo("Asia/Seoul")).date()
     with open_db(db) as conn:
         row = _settings_row(conn)
         totals = _totals(conn)
@@ -336,7 +407,19 @@ def snapshot(db: Path) -> BudgetSnapshot:
         last = conn.execute("SELECT MAX(created_at) FROM adjustments WHERE correction_key LIKE 'reconcile:%'"
                             ).fetchone()[0]
         revision = get_app_setting(conn, "ledger_revision") or "0"
+        unknown = conn.execute("SELECT COALESCE(SUM(reserved_micro_usd), 0) FROM attempts WHERE state = 'unknown'"
+                               ).fetchone()[0]
     allowance = row["allowance_micro_usd"]
+    committed = totals["spent"] + totals["pending"]
+    cap_percent = 100 * committed / row["cap_micro_usd"] if row["cap_micro_usd"] else 100.0
+    warnings = [f"cap_{level}" for level in CAP_WARNINGS if cap_percent >= level]
+    pace = pacing(row["cap_micro_usd"], committed, row["project_start"], row["project_end"], today)
+    if pace and pace["ahead"]:
+        warnings.append("ahead_of_pace")
+    if row["cap_micro_usd"] - committed <= 0:
+        warnings.append("cap_exhausted")
+    if unknown:
+        warnings.append("unknown_billing")
     return BudgetSnapshot(
         allowance_micro_usd=allowance, cap_micro_usd=row["cap_micro_usd"], spent_micro_usd=totals["spent"],
         pending_micro_usd=totals["pending"],
@@ -345,4 +428,5 @@ def snapshot(db: Path) -> BudgetSnapshot:
         committed_percent=100 * (totals["spent"] + totals["pending"]) / allowance,
         paid_enabled=bool(row["paid_enabled"]), frozen_reason=row["frozen_reason"], tokens=tokens,
         per_member=per_member, open_attempts=open_attempts, ledger_revision=revision, tracking_scope=TRACKING_SCOPE,
-        last_reconciliation=last)
+        last_reconciliation=last, project_start=row["project_start"], project_end=row["project_end"],
+        cap_percent=cap_percent, warnings=warnings, pacing=pace, read_at=utcnow(), unknown_micro_usd=unknown)

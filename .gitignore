@@ -18,6 +18,7 @@ __pycache__/
 *.egg-info/
 
 # Local secrets and wiki synchronization state
+.wiki/verification*
 .env.*
 .streamlit/secrets.toml
 .wiki/.sync

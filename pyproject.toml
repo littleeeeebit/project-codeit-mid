@@ -24,6 +24,8 @@ dependencies = [
 [project.optional-dependencies]
 # Local reranker trial (phase 2); the base installation serves without it.
 reranker = ["sentence-transformers", "torch"]
+# Browser flows of tools/verify.py (local verification service).
+verify = ["playwright"]
 
 [project.scripts]
 rfp-assistant = "rfp_assistant.cli:main"

@@ -1,0 +1,132 @@
+{
+ "kind": "browser_walkthrough",
+ "synthetic": true,
+ "recorded_at": "2026-10-01",
+ "summary": "Headless Chromium (Playwright 1.56.1) against `streamlit run app.py --server.address 127.0.0.1` with provider 'fake' (4 s delay) on the four-document test fixture corpus. No login (owner decision): visitors typed names in the sidebar. Not the team host, not the real corpus, no paid call.",
+ "environment": {
+  "streamlit": "1.64.0",
+  "python": "3.12.3",
+  "os": "Linux (cloud container)",
+  "browser": "Chromium 1194 headless"
+ },
+ "steps": [
+  {
+   "step": "Open the app: no login form; the sidebar name (default owner) and all four pages (컨설턴트, 검증, 질문 검토, 사용량 관리) are visible",
+   "role": "visitor",
+   "viewport": "1400x1000",
+   "outcome": "passed (01, 02)"
+  },
+  {
+   "step": "Select the PDF project, ask; the submit button is disabled while the request runs",
+   "role": "visitor kim",
+   "viewport": "1400x1000",
+   "outcome": "passed (03)"
+  },
+  {
+   "step": "A second session (lee) sees the reservation in its sidebar while kim's call runs (warm server)",
+   "role": "visitor lee",
+   "viewport": "1400x1000",
+   "outcome": "passed: nonzero pending seen 6 ms after submit"
+  },
+  {
+   "step": "Change the selection while the 4 s fake call is in flight: the late answer does not attach; it remains in history",
+   "role": "visitor kim",
+   "viewport": "1400x1000",
+   "outcome": "passed (04)"
+  },
+  {
+   "step": "Ask on another PDF, open evidence E1: quote, neighbouring elements, page, review state, original download",
+   "role": "visitor kim",
+   "viewport": "1400x1000",
+   "outcome": "passed (06)"
+  },
+  {
+   "step": "Narrow layout keeps reading order (strip, search, cards, selection, answer)",
+   "role": "visitor kim",
+   "viewport": "420x900",
+   "outcome": "passed (07)"
+  },
+  {
+   "step": "Two-document comparison: both documents contribute claims",
+   "role": "visitor kim",
+   "viewport": "1400x1000",
+   "outcome": "passed (08)"
+  },
+  {
+   "step": "Basic information comparison: conflict and unknown states shown, no paid call",
+   "role": "visitor kim",
+   "viewport": "1400x1000",
+   "outcome": "passed (09)"
+  },
+  {
+   "step": "Quarantined HWP: unavailable reason shown; requirement list reports 원문 미수집",
+   "role": "visitor kim",
+   "viewport": "1400x1000",
+   "outcome": "passed (10)"
+  },
+  {
+   "step": "Deep links /verify, /admin, /review open without login (by design); a reload resets the sidebar name to owner",
+   "role": "visitor",
+   "viewport": "1400x1000",
+   "outcome": "passed"
+  },
+  {
+   "step": "Verifier: free trace frozen under a run ID; second run with 1 evidence unit; comparison shows the limits change",
+   "role": "visitor lee",
+   "viewport": "1400x1000",
+   "outcome": "passed (11, 12)"
+  },
+  {
+   "step": "Admin page: a $16 external adjustment recorded with evidence and reason (audited under the typed name)",
+   "role": "visitor owner",
+   "viewport": "1400x1000",
+   "outcome": "passed (13)"
+  },
+  {
+   "step": "At the cap: exhaustion warning; paid answer blocked; original download still works (bytes equal the managed original)",
+   "role": "visitor kim",
+   "viewport": "1400x1000",
+   "outcome": "passed (14, 15)"
+  },
+  {
+   "step": "Six names in six browser contexts submit at once against a cold server (fake delay 4 s)",
+   "role": "visitors m1-m6",
+   "viewport": "1280x900",
+   "outcome": "passed: all six answered in 10.4 s; each saw only its own answer; every sidebar showed the shared $0.0071 reservation 5.4-5.6 s after submit (cold index load); the ledger attributes one attempt to each of m1..m6"
+  },
+  {
+   "step": "Reload all six pages and keep polling 8 s",
+   "role": "visitors m1-m6",
+   "viewport": "1280x900",
+   "outcome": "passed: attempts stayed 6 settled"
+  },
+  {
+   "step": "Keyboard: Tab from the page start reaches a labelled input",
+   "role": "visitor",
+   "viewport": "1400x1000",
+   "outcome": "partial: focus reached an input; full keyboard walkthrough and contrast measurement not done"
+  }
+ ],
+ "screenshots": [
+  "01-landing.png",
+  "02-consultant.png",
+  "03-running.png",
+  "04-scope-changed.png",
+  "06-answer-evidence.png",
+  "07-narrow.png",
+  "08-compare.png",
+  "09-metadata.png",
+  "10-quarantined.png",
+  "11-verifier-trace.png",
+  "12-verifier-compare.png",
+  "13-admin.png",
+  "14-cap-blocked.png",
+  "15-warnings-collapsed.png",
+  "16-six-sessions-m1.png"
+ ],
+ "observations": [
+  "Without login, a browser reload resets the sidebar name to 'owner'; requests made under another name are listed under that name.",
+  "Headless Chromium reports the download's suggested name as 'download'; the bytes equal the managed original. Check the Korean filename in a real desktop browser.",
+  "Fixture-only retrieval note (phase 2 policy, unchanged): '좌석 예약 시스템은 무엇인가요?' on the one-chunk 도서관 fixture returns insufficient evidence because the restated title terms are dropped and '시스템' has non-positive IDF in the four-document corpus; no paid call is made."
+ ]
+}

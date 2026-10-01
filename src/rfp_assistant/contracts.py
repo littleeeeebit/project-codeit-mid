@@ -67,6 +67,7 @@ class AnswerRequest:
     mode: Literal["single", "compare", "metadata", "inventory"] = "single"
     as_of: str = ""
     config_id: str = "default"
+    verifier_run_id: str = ""  # generate from this frozen verifier run's evidence (its config_id is then implied)
 
 
 @dataclass
@@ -83,6 +84,38 @@ class AnswerResult:
     billing_state: str = "none"
     error: str | None = None
     generation_id: str = ""
+    mode: str = "single"
+    facts: list[dict] = field(default_factory=list)  # metadata mode: typed values with provenance and state
+    inventory: dict | None = None  # inventory mode: structured requirements and the completeness declaration
+    coverage: list[dict] = field(default_factory=list)  # per selected document: evidence count or limitation
+    limitations: list[str] = field(default_factory=list)
+
+
+REQUEST_STATUSES = ("queued", "running", "completed", "failed", "cancelled", "interrupted")
+TERMINAL_STATUSES = ("completed", "failed", "cancelled", "interrupted")
+
+
+@dataclass
+class RequestView:
+    """One persisted request as its owner (or a verifier) may see it. `status` is the execution state;
+    the domain outcome and billing state live in `result` / `billing_state`."""
+    request_id: str
+    member_id: str
+    status: str
+    mode: str
+    generation_id: str
+    question: str
+    as_of: str
+    scope: list[dict]
+    input_hash: str
+    created_at: str
+    updated_at: str
+    cancel_requested: bool
+    billing_state: str
+    reserved_micro_usd: int  # open reservations still held by this request
+    settled_micro_usd: int
+    attempts: list[dict]
+    result: AnswerResult | None
 
 
 @dataclass
@@ -102,6 +135,13 @@ class BudgetSnapshot:
     ledger_revision: str
     tracking_scope: str
     last_reconciliation: str | None
+    project_start: str | None = None
+    project_end: str | None = None
+    cap_percent: float = 0.0  # (spent + pending) / operational cap: warnings use this, not the $20 percentage
+    warnings: list[str] = field(default_factory=list)
+    pacing: dict | None = None
+    read_at: str = ""
+    unknown_micro_usd: int = 0
 
 
 @dataclass
@@ -114,6 +154,9 @@ class EvidenceView:
     location: dict
     source_format: str
     download_available: bool
+    source_hash: str = ""
+    review_status: str = ""
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass

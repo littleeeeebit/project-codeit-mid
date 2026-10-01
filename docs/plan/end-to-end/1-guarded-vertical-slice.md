@@ -40,7 +40,7 @@ Every CLI flag above is a planned contract to implement, not an existing command
 1. Inventory tracked/untracked code and preserve unrelated changes. Create the editable `rfp_assistant` package, one settings loader and the common records. Validate absolute source/data paths and configuration once. Acquire the process-owner lock before real gateway startup and reject a second owner; fake checks use isolated paths.
 2. Start paid-disabled. Initialize schema without modifying an existing allowance. Create a fake-provider mode that refuses to instantiate a real SDK client, even if the host has a key.
 3. Pin compatible installed versions after a smoke import. Keep the converter environment separate; the audit used Python 3.13.9, pyhwp 0.1b15 and PyMuPDF 1.28.0, which are observations rather than a guarantee for every dependency combination. Use the research primary sources when a pin needs verification. Declare PyMuPDF, Kiwi, `rank_bm25`, OpenAI SDK, token counting, NumPy and Streamlit as the core dependencies; add `tzdata` on Windows when required by `ZoneInfo("Asia/Seoul")`. Local reranker libraries remain optional until phase 2.
-4. Add private owner provisioning for six random member tokens and server roles as specified in the contract. Store digests only. Provide logout and service-level role validation immediately; the initial verifier page must not be accessible by merely guessing a page address.
+4. No login (owner decision 2026-09-30): the sidebar name attributes work and the visitor gets every screen. Keep service-level role checks as declarations so narrower in-process principals are still refused.
 5. Add missing ignore entries for runtime, environments, models and private settings. Do not overwrite the existing `.gitignore` or `.env`. README documents secret names and setup steps without values.
 
 ### 2. Import the complete manifest and typed metadata
@@ -103,9 +103,9 @@ For a finite first slice, use a nonstreaming Chat Completions call. This reduces
 
 ### 7. Connect both minimal interfaces and the reviewed pilot
 
-Consultant entry: login → historical project list/search → explicit selected title/source → question form → domain status and claim citations → excerpt plus original download. Show source-review limitations and a compact spent/pending indicator. Do not expose raw chunk IDs or reranker settings on the work screen.
+Consultant entry: visitor name → historical project list/search → explicit selected title/source → question form → domain status and claim citations → excerpt plus original download. Show source-review limitations and a compact spent/pending indicator. Do not expose raw chunk IDs or reranker settings on the work screen.
 
-Verifier entry: authorize role before loading data → choose a pilot row or enter a scoped question → run retrieval-only by default → inspect elements, chunks, filters, BM25 ranks, evidence locations and final token budget. Paid generation is a separate deliberate action with its estimate. Both pages call the shared service, not duplicate retrieval code.
+Verifier entry: choose a pilot row or enter a scoped question → run retrieval-only by default → inspect elements, chunks, filters, BM25 ranks, evidence locations and final token budget. Paid generation is a separate deliberate action with its estimate. Both pages call the shared service, not duplicate retrieval code.
 
 Prepare 24 independent-reviewed development examples from source families assigned to development before question drafting. Include late content, table qualifiers, repeated codes, missing metadata, provenance conflict and converter unavailability. Keep recovery/unavailability operational cases separate from source-absence gold. Quote validation uses the original/extraction revision, not the chosen retriever's returned snippets. Save review identity and dataset hash.
 
@@ -124,7 +124,7 @@ Implement `check --phase 1 --provider fake` to run these invariants using tempor
 | Six simultaneous reservations with only one request's remainder | At most the affordable number dispatches; admission/attempt records agree |
 | Same idempotency key and duplicate settlement | One paid dispatch and one settled charge; changed input with reused key is rejected |
 | Timeout, restart and malformed generated JSON | Unknown cost is retained; settled invalid output remains charged; no automatic second call |
-| Forbidden verifier action, fabricated evidence ID and escaped source markup | Service denies unauthorized work and invalid citations; content cannot execute HTML |
+| Narrower in-process principal calling a verifier function, fabricated evidence ID and escaped source markup | Service denies the undeclared role and invalid citations; content cannot execute HTML |
 
 Use a fake cost example with exactly 100 microdollars available and six concurrent 60-microdollar reservations: exactly one is admitted. Also test a known unused reservation release and a successful cheaper settlement. Do not replace concurrency with six sequential calls.
 

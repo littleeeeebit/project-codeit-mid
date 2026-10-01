@@ -16,7 +16,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from . import auth, budget, chunking, evaluation, fidelity, gold, ingestion, service, store
+from . import auth, budget, chunking, evaluation, fidelity, gold, ingestion, ops, service, store
 from .settings import DEFAULT_RATES, RATE_VERSION, REPO_ROOT, load_settings
 
 
@@ -213,24 +213,70 @@ def cmd_draft_activation(args, settings) -> int:
 
 
 def cmd_report(args, settings) -> int:
-    if args.phase != 2:
-        print("only --phase 2 is implemented", file=sys.stderr)
-        return 2
-    print(evaluation.write_phase2_report(settings))
-    return 0
+    if args.phase == 2:
+        print(evaluation.write_phase2_report(settings))
+        return 0
+    if args.phase == 3:
+        print(ops.write_phase3_report(settings))
+        return 0
+    print("only --phase 2|3 is implemented", file=sys.stderr)
+    return 2
+
+
+PHASE3_MODULES = ("tests.test_service", "tests.test_budget", "tests.test_generation")
 
 
 def cmd_check(args, settings) -> int:
-    if args.phase not in (1, 2) or args.provider != "fake":
-        print("only --phase 1|2 --provider fake is implemented", file=sys.stderr)
+    if args.phase not in (1, 2, 3) or args.provider != "fake":
+        print("only --phase 1|2|3 --provider fake is implemented", file=sys.stderr)
         return 2
     tests_dir = REPO_ROOT / "tests"
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
     with tempfile.TemporaryDirectory() as tmp:
         os.environ["RFP_DATA_DIR"] = tmp  # isolated state; never production data
         os.environ.pop("OPENAI_API_KEY", None)
-        suite = unittest.defaultTestLoader.discover(str(tests_dir), top_level_dir=str(REPO_ROOT))
+        if args.phase == 3:  # focused service, budget and request-state checks
+            suite = unittest.defaultTestLoader.loadTestsFromNames(PHASE3_MODULES)
+        else:
+            suite = unittest.defaultTestLoader.discover(str(tests_dir), top_level_dir=str(REPO_ROOT))
         result = unittest.TextTestRunner(verbosity=2).run(suite)
     return 0 if result.wasSuccessful() else 1
+
+
+def cmd_load_check(args, settings) -> int:
+    if args.provider != "fake":
+        print("load-check runs only against the fake provider; a real load test would spend the team allowance",
+              file=sys.stderr)
+        return 2
+    os.environ.pop("OPENAI_API_KEY", None)
+    result = ops.load_check(users=args.users, requests_per_user=args.requests, delay_seconds=args.delay,
+                            fail_every=args.fail_every, affordable=args.affordable)
+    _print(result)
+    if args.save:
+        path = ops.phase3_dir(settings) / "load-check.json"
+        ops.save_json(path, {**result, "recorded_at": store.utcnow()})
+        print(path)
+    return 0 if result["passed"] else 1
+
+
+def cmd_reconcile(args, settings) -> int:
+    record = json.loads(Path(args.file).read_text(encoding="utf-8"))
+    res = service.Resources(settings)
+    try:
+        _print(asdict(service.reconcile(res, auth.OWNER_CLI, record)))
+    finally:
+        res.close()
+    return 0
+
+
+def cmd_unresolved(args, settings) -> int:
+    res = service.Resources(settings)
+    try:
+        _print(service.unresolved_attempts(res, auth.OWNER_CLI))
+    finally:
+        res.close()
+    return 0
 
 
 def cmd_validate_gold(args, settings) -> int:
@@ -374,6 +420,17 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--confirm-rates", action="store_true")
     s.add_argument("--enable-paid", action="store_true")
     sub.add_parser("budget-status")
+    s = sub.add_parser("load-check", help="concurrent members against a temporary ledger with a fake provider")
+    s.add_argument("--users", type=int, default=6)
+    s.add_argument("--provider", required=True)
+    s.add_argument("--requests", type=int, default=2, help="requests per member")
+    s.add_argument("--delay", type=float, default=0.5, help="fake provider delay in seconds")
+    s.add_argument("--fail-every", type=int, default=0, help="every Nth call times out after dispatch (unknown)")
+    s.add_argument("--affordable", type=int, default=4, help="maximum reservations the temporary cap admits at once")
+    s.add_argument("--save", action="store_true", help="record the result for report --phase 3")
+    s = sub.add_parser("reconcile", help="owner import of a dated provider interval (JSON record)")
+    s.add_argument("--file", required=True)
+    sub.add_parser("unresolved", help="attempts whose billing is not settled or released")
     s = sub.add_parser("gold", help="dataset candidate queue and rejection wiki")
     s.add_argument("action", choices=["status", "submit", "infer", "check", "sync", "repin", "excerpts"])
     s.add_argument("--out", help="excerpts: absolute new directory for excerpts.jsonl and drafting-context.json "
@@ -397,7 +454,8 @@ COMMANDS = {"init": cmd_init, "manifest": cmd_manifest, "ingest": cmd_ingest, "r
             "compare-runs": cmd_compare_runs, "draft-activation": cmd_draft_activation,
             "fidelity": cmd_fidelity, "ocr": cmd_ocr, "build-keyword": cmd_build_keyword, "check": cmd_check, "validate-gold": cmd_validate_gold,
             "configure-budget": cmd_configure_budget, "budget-status": cmd_budget_status,
-            "gold": cmd_gold}
+            "gold": cmd_gold, "load-check": cmd_load_check, "reconcile": cmd_reconcile,
+            "unresolved": cmd_unresolved}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -406,7 +464,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         settings = load_settings()
-        if args.command not in ("init", "check"):
+        if args.command not in ("init", "check", "load-check"):
             store.init_schema(settings.db_path)
         return COMMANDS[args.command](args, settings)
     except (ingestion.IngestionError, budget.BudgetError, service.ServiceError, auth.AuthError, gold.GoldError,

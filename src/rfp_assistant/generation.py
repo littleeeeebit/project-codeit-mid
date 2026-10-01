@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
+import uuid
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
@@ -11,7 +14,7 @@ from pydantic import ValidationError
 from .chunking import count_tokens
 from .contracts import AnswerPayload, EvidenceUnit
 
-PROMPT_VERSION = "grounded-answer-2"
+PROMPT_VERSION = "grounded-answer-3"  # 3: explicit comparison mode
 COUNT_METHOD = "tiktoken:o200k_base+per_message_4+schema+margin"
 PER_MESSAGE_TOKENS = 4
 
@@ -33,6 +36,8 @@ If the document scope is ambiguous, request clarification.
 If sources conflict, show the competing values and their evidence IDs.
 Separate source facts from your inference; do not guarantee bid eligibility.
 Do not claim an exhaustive list from a limited retrieval context.
+In comparison mode, cover every selected document that has evidence: give its claims,
+or list what is missing for it. Never answer for only one side; keep each claim's doc_id.
 Use only the evidence IDs listed in the request; use the given doc_id values exactly.
 
 Return a short conclusion, supported claims, missing information,
@@ -137,15 +142,21 @@ class FakeTransport:
     """Test seam: never touches the network or a key. `responder(messages) -> ProviderResponse | Exception`."""
 
     def __init__(self, responder: Callable[[list[dict]], ProviderResponse | Exception] | None = None,
-                 embedder: Callable[[list[str], int], EmbeddingResponse | Exception] | None = None) -> None:
+                 embedder: Callable[[list[str], int], EmbeddingResponse | Exception] | None = None,
+                 delay_seconds: float = 0.0) -> None:
         self.responder = responder or _echo_first_evidence
         self.embedder = embedder or fake_embeddings
+        self.delay_seconds = delay_seconds  # makes races observable in browser and load checks
         self.calls: list[dict] = []
         self.embed_calls: list[dict] = []
         self.closed = False
+        self._calls_lock = threading.Lock()
 
     def chat(self, *, model, messages, response_format, max_completion_tokens, reasoning_effort) -> ProviderResponse:
-        self.calls.append({"model": model, "messages": messages, "reasoning_effort": reasoning_effort})
+        with self._calls_lock:
+            self.calls.append({"model": model, "messages": messages, "reasoning_effort": reasoning_effort})
+        if self.delay_seconds:
+            time.sleep(self.delay_seconds)
         result = self.responder(messages)
         if isinstance(result, Exception):
             raise result
@@ -183,28 +194,32 @@ def fake_embeddings(inputs: list[str], dimensions: int) -> EmbeddingResponse:
 
 
 def _echo_first_evidence(messages: list[dict]) -> ProviderResponse:
+    """One claim from the first evidence unit of every document that has evidence."""
     request = json.loads(messages[-1]["content"])
-    ev = request["evidence"][0] if request["evidence"] else None
+    firsts: dict[str, dict] = {}
+    for e in request["evidence"]:
+        firsts.setdefault(e["doc_id"], e)
     payload = {
-        "status": "answered" if ev else "insufficient_evidence",
+        "status": "answered" if firsts else "insufficient_evidence",
         "summary": "가짜 제공자 응답입니다.",
         "claims": [{"text": ev["text"][:80], "kind": "source_fact", "doc_id": ev["doc_id"],
-                    "evidence_ids": [ev["evidence_id"]]}] if ev else [],
+                    "evidence_ids": [ev["evidence_id"]]} for ev in firsts.values()],
         "missing_fields": [], "conflicts": [], "next_action": None,
     }
     prompt_tokens = sum(count_tokens(m["content"]) for m in messages)
     return ProviderResponse(json.dumps(payload, ensure_ascii=False), None, "stop",
                             {"prompt_tokens": prompt_tokens, "completion_tokens": 60, "cached_tokens": 0},
-                            f"fake-{abs(hash(messages[-1]['content']))}")
+                            f"fake-{uuid.uuid4().hex}")  # providers never repeat a response ID
 
 
 # ---------------------------------------------------------------- prompt and counting
 
 
 def build_messages(question: str, as_of: str, docs: list[dict], evidence: list[EvidenceUnit],
-                   limitations: list[str]) -> list[dict]:
+                   limitations: list[str], mode: str = "single") -> list[dict]:
     """Trusted instructions stay in the system message; question, metadata and evidence are JSON data."""
     request = {
+        "mode": mode,
         "question": question,
         "as_of_date": as_of,
         "selected_documents": docs,
@@ -230,7 +245,8 @@ def count_request_tokens(messages: list[dict], response_format: dict, margin: in
 
 
 def validate_answer(response: ProviderResponse, evidence: list[EvidenceUnit], allowed_doc_ids: set[str],
-                    stored_quotes: dict[str, str]) -> AnswerPayload:
+                    stored_quotes: dict[str, str], required_doc_ids: set[str] | None = None) -> AnswerPayload:
+    """`required_doc_ids`: in a comparison, each of these documents must appear in a claim or a missing field."""
     if response.refusal:
         raise TechnicalError(f"model_refusal: {response.refusal[:200]}")
     if response.finish_reason == "length":
@@ -271,4 +287,9 @@ def validate_answer(response: ProviderResponse, evidence: list[EvidenceUnit], al
             raise TechnicalError("source_absence_claimed_from_retrieval")  # top-k misses cannot establish absence
     if payload.status == "answered" and not payload.claims:
         raise TechnicalError("answered_without_claims")
+    if required_doc_ids:
+        covered = {c.doc_id for c in payload.claims} | {m.doc_id for m in payload.missing_fields}
+        absent = sorted(required_doc_ids - covered)
+        if absent:
+            raise TechnicalError(f"comparison_side_missing: {','.join(d[:8] for d in absent)}")
     return payload

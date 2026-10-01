@@ -1,6 +1,6 @@
 # RFP assistant (입찰메이트)
 
-Internal assistant for historical Korean RFPs: search projects, select one document, ask a scoped question, receive one metered grounded answer, and open the original evidence. The plan lives in [docs/plan/end-to-end](docs/plan/end-to-end/0-overview.md); this README covers setup and launch for what is implemented (phases 1 and 2).
+Internal assistant for historical Korean RFPs: search projects, select one document, ask a scoped question, receive one metered grounded answer, and open the original evidence. The plan lives in [docs/plan/end-to-end](docs/plan/end-to-end/0-overview.md); this README covers setup and launch for what is implemented (phases 1–3). Operations (access, stop/restart, billing recovery, reconciliation) are in the [runbook](docs/operations/runbook.md); screen layout and request ownership in [DESIGN.md](DESIGN.md).
 
 ## Environment
 
@@ -41,6 +41,8 @@ python -m rfp_assistant.cli manifest                      # all 100 CSV associat
 python -m rfp_assistant.cli ingest                        # every original; failures are quarantined with a reason
 python -m rfp_assistant.cli build-keyword --include-unreviewed   # operating index over every parsed source
 python -m rfp_assistant.cli check --phase 1 --provider fake   # automated invariants in temporary state, no key
+python -m rfp_assistant.cli check --phase 3 --provider fake   # service, budget and request-state gate
+python -m rfp_assistant.cli load-check --users 6 --provider fake   # six concurrent members, temporary ledger
 python -m streamlit run app.py --server.address 127.0.0.1
 ```
 
@@ -129,7 +131,11 @@ python -m rfp_assistant.cli check --phase 2 --provider fake  # every automated i
 
 ## Access and paid use
 
-There is no login: every visitor gets the consultant, verification and question-review screens. The name in the sidebar (default `owner`) is recorded on paid requests and review decisions; it attributes work but does not authenticate anyone. Anyone who can reach the server can spend the budget, so keep `--server.address 127.0.0.1` unless everyone on that network may do so.
+There is no login (owner decision, reaffirmed for phase 3): every visitor gets the consultant, verification, question-review and 사용량 관리 (budget administration) screens. The name in the sidebar (default `owner`) is recorded on paid requests, review decisions, corrections and audited owner actions; it attributes work but does not authenticate anyone. Anyone who can reach the server can spend the budget and use the admin page, so keep `--server.address 127.0.0.1` unless everyone on that network may do so (see the [runbook](docs/operations/runbook.md)).
+
+Local verification: `verification.json` lists the major flows for the local verification service. Each flow runs as `python -B tools/verify.py <flow-id>` with the fake provider and ends with one `local-evidence` block. Browser flows need `pip install -e .[verify]`. See runbook §8.
+
+Paid answers run in the background on a bounded executor (6 workers, 12 admitted requests); the page polls read-only status every second and shows the reserved maximum, the settled cost or the unknown pending cost of its own request. A request is persisted under its idempotency key before it runs, so reruns and double clicks never start a second call. An answer renders only while the screen still asks exactly what it asked (same documents, question, mode and date); otherwise it stays in "내 최근 요청" as history and its billing still settles. Two selected documents allow a balanced comparison (each side retrieved within half the evidence budget, an answer that drops a side is rejected); basic information (typed CSV values with unknown/zero/conflict states) and the structured requirement list are free.
 
 Paid generation stays disabled until the owner records the project dates, the prior use, the allowance and the cap, after rechecking current model prices. The current configuration is a dedicated $5 allowance with a $5 hard cap:
 
@@ -153,4 +159,4 @@ Recorded before any distribution decision:
 
 ## Layout
 
-`src/rfp_assistant/` holds one package: `settings`, `contracts`, `store`, `auth`, `ingestion`, `chunking`, `retrieval`, `dense` (embedding cache, matrix, reranker), `budget`, `generation` (the only SDK call site), `service`, `ui`, `cli`, `evaluation`. `app.py` launches the consultant and verifier pages. Tests are standard `unittest` under `tests/`.
+`src/rfp_assistant/` holds one package: `settings`, `contracts`, `store`, `auth`, `ingestion`, `chunking`, `retrieval`, `dense` (embedding cache, matrix, reranker), `budget`, `generation` (the only SDK call site), `service` (also the bounded request executor), `ui`, `cli`, `evaluation`, `ops` (fake-provider load check and the phase-3 report). `app.py` launches the consultant, verifier, question-review and budget-administration pages. Tests are standard `unittest` under `tests/`.

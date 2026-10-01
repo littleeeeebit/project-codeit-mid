@@ -1,0 +1,561 @@
+{
+ "version": 1,
+ "contracts": [
+  "docs/plan/end-to-end/3-workflows-and-operations.md",
+  "docs/plan/end-to-end/implementation-contracts.md"
+ ],
+ "prose_paths": [
+  "README.md",
+  "DESIGN.md",
+  "docs/operations/runbook.md",
+  "handoff/phase3/README.md"
+ ],
+ "flows": [
+  {
+   "id": "access",
+   "title": "Open access with attribution; role declarations hold at the service",
+   "kind": "command",
+   "command": "python -B tools/verify.py access",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tests/test_generation.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "role-declarations",
+     "expected": "Visitor, authorization and verifier-role tests pass: narrower principals are refused and sealed rows are never served"
+    }
+   ]
+  },
+  {
+   "id": "question-modes",
+   "title": "Single, comparison, metadata and inventory answers with safe sources",
+   "kind": "command",
+   "command": "python -B tools/verify.py question-modes",
+   "paths": [
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/ingestion.py",
+    "src/rfp_assistant/retrieval.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "tests/fixtures.py",
+    "tests/test_generation.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "answer-modes",
+     "expected": "Mode, comparison, search-filter and answer-flow tests pass"
+    },
+    {
+     "id": "sources-and-exports",
+     "expected": "Managed-download, evidence-warning, redaction and provider-safety tests pass"
+    }
+   ]
+  },
+  {
+   "id": "request-lifecycle",
+   "title": "Background requests: idempotent submission, cancellation, ownership and history",
+   "kind": "command",
+   "command": "python -B tools/verify.py request-lifecycle",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/cli.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/ops.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "submission-and-cancellation",
+     "expected": "Submission, queue and cancellation tests pass"
+    },
+    {
+     "id": "ownership-and-history",
+     "expected": "Scope-ownership and history tests pass"
+    },
+    {
+     "id": "six-user-load",
+     "expected": "load-check --users 6 with the fake provider passes"
+    }
+   ]
+  },
+  {
+   "id": "controlled-stop",
+   "title": "Controlled stop and conservative restart",
+   "kind": "command",
+   "command": "python -B tools/verify.py controlled-stop",
+   "paths": [
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/dense.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "tests/fixtures.py",
+    "tests/test_service.py",
+    "tools/verification/signal_stop.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "stop-and-recovery",
+     "expected": "Shutdown, restart-recovery, dispatch-guard and signal tests pass"
+    },
+    {
+     "id": "native-ctrl-c",
+     "expected": "A request running at a native Ctrl+C ends interrupted with zero paid attempts and the process exits 0"
+    }
+   ]
+  },
+  {
+   "id": "shared-budget",
+   "title": "Six users share one cap; the ledger fails closed",
+   "kind": "command",
+   "command": "python -B tools/verify.py shared-budget",
+   "paths": [
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/cli.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/ops.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "tests/fixtures.py",
+    "tests/test_budget.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "budget-ledger",
+     "expected": "Six-user budget, pacing, cap-warning and ledger tests pass"
+    },
+    {
+     "id": "six-user-load",
+     "expected": "load-check --users 6 with the fake provider passes"
+    },
+    {
+     "id": "injected-timeouts",
+     "expected": "load-check --users 6 --fail-every 3 passes: timed-out attempts stay unknown and are never retried"
+    }
+   ]
+  },
+  {
+   "id": "budget-recovery",
+   "title": "Reconciliation and owner settlement of unknown attempts",
+   "kind": "command",
+   "command": "python -B tools/verify.py budget-recovery",
+   "paths": [
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/cli.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "tests/fixtures.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "reconciliation",
+     "expected": "Reconciliation and owner-settlement tests pass"
+    }
+   ]
+  },
+  {
+   "id": "verifier-runs",
+   "title": "Frozen verifier runs and generation from frozen evidence",
+   "kind": "command",
+   "command": "python -B tools/verify.py verifier-runs",
+   "paths": [
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/dense.py",
+    "src/rfp_assistant/evaluation.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/retrieval.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "tests/fixtures.py",
+    "tests/test_dense.py",
+    "tests/test_service.py",
+    "tools/verification/real_corpus_frozen.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "verifier-unit",
+     "expected": "Verifier and serving tests pass"
+    },
+    {
+     "id": "frozen-generation-on-corpus",
+     "expected": "On an isolated copy of the configured corpus, single, pair and two-unit whitespace frozen runs generate with the same mode, evidence, quotes and token estimate, one generation attempt each and a reservation equal to the displayed maximum"
+    }
+   ]
+  },
+  {
+   "id": "repository-gates",
+   "title": "Repository gates",
+   "kind": "command",
+   "command": "python -B tools/verify.py repository-gates",
+   "paths": [
+    "DESIGN.md",
+    "README.md",
+    "app.py",
+    "docs/*",
+    "handoff/*",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/*",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "tests/*",
+    "tests/fixtures.py",
+    "tools/*",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "whitespace",
+     "expected": "git diff --check reports nothing"
+    },
+    {
+     "id": "phase3-gate",
+     "expected": "check --phase 3 --provider fake passes"
+    },
+    {
+     "id": "full-suite",
+     "expected": "The full unittest discovery passes"
+    }
+   ]
+  },
+  {
+   "id": "consultant-answer",
+   "title": "Consultant asks one question and opens the original evidence in a browser",
+   "kind": "browser",
+   "command": "python -B tools/verify.py consultant-answer",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/ingestion.py",
+    "src/rfp_assistant/retrieval.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "no-login",
+     "expected": "The served app opens on the consultant page without a login form"
+    },
+    {
+     "id": "grounded-answer",
+     "expected": "Selecting a document and asking returns a grounded fake-provider answer whose single generation attempt settles"
+    },
+    {
+     "id": "evidence-first-click",
+     "expected": "One click on the first evidence button opens its quote in the evidence panel"
+    },
+    {
+     "id": "managed-download",
+     "expected": "The evidence panel's original download is byte-identical to a managed source file"
+    }
+   ]
+  },
+  {
+   "id": "request-history",
+   "title": "Two requests with the same question stay separately reviewable from the history",
+   "kind": "browser",
+   "command": "python -B tools/verify.py request-history",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "separate-requests",
+     "expected": "Two submissions of the same question appear as two separate history choices"
+    },
+    {
+     "id": "history-evidence-first-click",
+     "expected": "Selecting the older request in the history and clicking its evidence once opens that evidence"
+    }
+   ]
+  },
+  {
+   "id": "verifier-generation",
+   "title": "Verifier freezes a run and generates from it in a browser",
+   "kind": "browser",
+   "command": "python -B tools/verify.py verifier-generation",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/retrieval.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "frozen-run",
+     "expected": "A free search-only verifier run is frozen and shown with its evidence and maximum estimate"
+    },
+    {
+     "id": "generation-within-consent",
+     "expected": "Generating from the frozen run completes with one generation attempt whose reservation does not exceed the displayed maximum"
+    }
+   ]
+  },
+  {
+   "id": "six-sessions",
+   "title": "Six concurrent browser sessions share one budget",
+   "kind": "browser",
+   "command": "python -B tools/verify.py six-sessions",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tests/test_generation.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "six-attributed",
+     "expected": "Six sessions with different typed names each submit once; every request finishes attributed to its own name with at most one generation attempt and no open reservation"
+    },
+    {
+     "id": "shared-reservation-visible",
+     "expected": "While the first session's request is running, another session's sidebar shows the shared reservation within the polling interval"
+    }
+   ]
+  },
+  {
+   "id": "cap-exhaustion",
+   "title": "Exhausted cap: audited owner action, blocked paid answers, working free routes",
+   "kind": "browser",
+   "command": "python -B tools/verify.py cap-exhaustion",
+   "paths": [
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tests/test_generation.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "reasonless-refused",
+     "expected": "An owner adjustment without a reason is refused and records nothing"
+    },
+    {
+     "id": "adjustment-audited",
+     "expected": "An owner adjustment with a reason is recorded and appears in the audit log tab"
+    },
+    {
+     "id": "paid-blocked-at-cap",
+     "expected": "At the exhausted cap a consultant's paid question is blocked before any attempt and the cap warning is shown"
+    },
+    {
+     "id": "free-routes-and-polling",
+     "expected": "At the cap an original still downloads, and polling and a reload create no attempt"
+    }
+   ]
+  },
+  {
+   "id": "accessibility",
+   "title": "Keyboard use, focus, contrast and narrow layout",
+   "kind": "browser",
+   "command": "python -B tools/verify.py accessibility",
+   "paths": [
+    "DESIGN.md",
+    "app.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "src/rfp_assistant/auth.py",
+    "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/contracts.py",
+    "src/rfp_assistant/generation.py",
+    "src/rfp_assistant/service.py",
+    "src/rfp_assistant/settings.py",
+    "src/rfp_assistant/store.py",
+    "src/rfp_assistant/ui.py",
+    "tests/fixtures.py",
+    "tests/test_generation.py",
+    "tests/test_service.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "keyboard-only",
+     "expected": "With the keyboard only, a document is selected, a question typed and submitted, and the answer's first evidence opened"
+    },
+    {
+     "id": "focus-visible",
+     "expected": "Every control reached by Tab shows a visible focus indicator"
+    },
+    {
+     "id": "contrast",
+     "expected": "Every visible text has a contrast ratio of at least 4.5:1 against its background"
+    },
+    {
+     "id": "narrow-layout",
+     "expected": "At a 390 px wide viewport the page does not scroll horizontally and the answer status is shown as text"
+    }
+   ]
+  }
+ ]
+}
