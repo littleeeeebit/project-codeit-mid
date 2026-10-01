@@ -27,7 +27,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.27,
+   "seconds": 0.3,
    "tail": "}"
   },
   {
@@ -108,7 +108,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.29,
+   "seconds": 0.28,
    "tail": "}"
   },
   {
@@ -128,7 +128,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.29,
+   "seconds": 0.28,
    "tail": "}"
   },
   {
@@ -148,7 +148,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.33,
+   "seconds": 0.26,
    "tail": "}"
   },
   {
@@ -168,7 +168,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.3,
+   "seconds": 0.26,
    "tail": "}"
   },
   {
@@ -188,7 +188,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.28,
+   "seconds": 0.26,
    "tail": "}"
   },
   {
@@ -202,7 +202,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.26,
+   "seconds": 0.25,
    "tail": "}"
   },
   {
@@ -216,7 +216,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.29,
+   "seconds": 0.27,
    "tail": "}"
   },
   {
@@ -234,7 +234,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.29,
+   "seconds": 0.26,
    "tail": "}"
   },
   {
@@ -252,7 +252,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.29,
+   "seconds": 0.26,
    "tail": "}"
   },
   {
@@ -268,7 +268,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 3.71,
+   "seconds": 3.51,
    "tail": "]"
   },
   {
@@ -293,14 +293,14 @@
     "cli",
     "draft-activation",
     "--runs",
-    "K0-abc1cbfed6,K1-7c8e7f5156",
+    "K0-cef258864f,K1-b7f86f6c33",
     "--out",
     "<work>/phase4/decision.json"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.3,
+   "seconds": 0.32,
    "tail": "}"
   },
   {
@@ -309,14 +309,14 @@
     "cli",
     "activate-run",
     "--run-id",
-    "K1-7c8e7f5156",
+    "K1-b7f86f6c33",
     "--decision-file",
     "<work>/phase4/decision.json"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.27,
+   "seconds": 0.28,
    "tail": "}"
   },
   {
@@ -329,12 +329,12 @@
     "--dataset",
     "dev",
     "--runs",
-    "K1-7c8e7f5156,K0-abc1cbfed6"
+    "K1-b7f86f6c33,K0-cef258864f"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 4.65,
+   "seconds": 4.06,
    "tail": "}"
   },
   {
@@ -343,14 +343,14 @@
     "cli",
     "run-answers",
     "--estimate-id",
-    "bf6dca7c051b",
+    "1fc7e427c32e",
     "--actor",
     "owner"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 4.31,
+   "seconds": 3.57,
    "tail": "}"
   },
   {
@@ -363,12 +363,12 @@
     "--dataset",
     "dev",
     "--runs",
-    "K1-7c8e7f5156,K0-abc1cbfed6"
+    "K1-b7f86f6c33,K0-cef258864f"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 3.52,
+   "seconds": 3.38,
    "tail": "}"
   },
   {
@@ -377,12 +377,12 @@
     "cli",
     "export-review",
     "--run-id",
-    "A-4d3b0b7c65b9"
+    "A-d1c7d4b327ab"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.26,
+   "seconds": 0.27,
    "tail": "}"
   },
   {
@@ -391,9 +391,9 @@
     "cli",
     "freeze-release",
     "--run-id",
-    "K1-7c8e7f5156",
+    "K1-b7f86f6c33",
     "--answer-run",
-    "A-4d3b0b7c65b9",
+    "A-d1c7d4b327ab",
     "--decided-by",
     "owner",
     "--rationale",
@@ -413,12 +413,12 @@
     "--action",
     "sealed",
     "--freeze-id",
-    "F-d6d250b0d3"
+    "F-5b9cb02b63"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 3.99,
+   "seconds": 3.98,
    "tail": "}"
   },
   {
@@ -427,14 +427,14 @@
     "cli",
     "run-answers",
     "--estimate-id",
-    "8c94d2280990",
+    "1dccb03cde9a",
     "--actor",
     "owner"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 3.66,
+   "seconds": 3.56,
    "tail": "}"
   },
   {
@@ -445,12 +445,12 @@
     "--action",
     "sealed",
     "--freeze-id",
-    "F-d6d250b0d3"
+    "F-5b9cb02b63"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 3.29,
+   "seconds": 3.83,
    "tail": "}"
   },
   {
@@ -459,15 +459,15 @@
     "cli",
     "run-answers",
     "--estimate-id",
-    "c7b2560f9f11",
+    "7ec339a0a119",
     "--actor",
     "owner"
    ],
    "exit": 1,
    "expected_exit": 1,
    "ok": true,
-   "seconds": 3.74,
-   "tail": "error: sealed run S-064c9e7d21d7 is already complete; its result stands. A further run on this test set is a post-test regression: plan it with --post-test-regression and run it with --reason"
+   "seconds": 3.47,
+   "tail": "error: sealed run S-516013e77c18 is already complete; its result stands. A further run on this test set is a post-test regression: plan it with --post-test-regression and run it with --reason"
   },
   {
    "step": "plan latency sample",
@@ -484,7 +484,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 3.5,
+   "seconds": 3.59,
    "tail": "}"
   },
   {
@@ -493,14 +493,14 @@
     "cli",
     "latency-run",
     "--estimate-id",
-    "8f3bf106504f",
+    "3fb81a94c8fc",
     "--actor",
     "owner"
    ],
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 3.95,
+   "seconds": 3.8,
    "tail": "}"
   },
   {
@@ -532,7 +532,7 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.29,
+   "seconds": 0.3,
    "tail": "}"
   },
   {
@@ -545,8 +545,8 @@
    "exit": 0,
    "expected_exit": 0,
    "ok": true,
-   "seconds": 0.31,
-   "tail": "<work>/phase4/data/releases/F-d6d250b0d3/report.md"
+   "seconds": 0.3,
+   "tail": "<work>/phase4/data/releases/F-5b9cb02b63/report.md"
   }
  ],
  "passed": true,
@@ -554,9 +554,10 @@
  "release_reasons": [
   "hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)",
   "quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
+  "quality target missed: citation precision >= 0.95 (unjudged links count as unsupported) ({'numerator': 0, 'denominator': 1, 'rate': 0.0, 'wilson95': [0.0, 0.7935]})",
   "quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
   "quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)",
   "evidence is sealed pilot, not a sealed evaluation of reviewed gold"
  ],
- "release_report": "<work>/phase4/data/releases/F-d6d250b0d3/report.md"
+ "release_report": "<work>/phase4/data/releases/F-5b9cb02b63/report.md"
 }

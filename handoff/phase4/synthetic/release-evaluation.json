@@ -127,7 +127,7 @@
   "dev": {
    "dataset": "dev",
    "schema": "gold-2",
-   "dataset_sha256": "65b6e71cf9fae71e8e0f828485fa8768c0c480175dee63a9605e6d2d71900e99",
+   "dataset_sha256": "12face89bb1b102cc620ea3674dfb4c670e34909d581cb0d59d5a7e7cb3de0c7",
    "rows": 4,
    "label": "pilot",
    "targets": {
@@ -185,17 +185,17 @@
     "late": 2,
     "none": 1
    },
-   "review_log_sha256": "282d9bf7ec70afd738993e8598f3a1e0e8d65a61b880a9fb4cd2bf25c490ba09",
-   "families_sha256": "bec948a9ead7577b8c8048a35dec4e903be57efdba6733927ec9ccb8a9053969",
+   "review_log_sha256": "6473f43b900985d309e3ed353a53dd0b4e76453d3cff525da79d8aaf02d93684",
+   "families_sha256": "18e8e9a6dafd5694a53d2bead7b7e3fa98936602dc7cced47f6ea18799855130",
    "frozen_by": "owner",
    "reason": "walkthrough",
-   "frozen_at": "2026-10-01T12:59:52.597384+00:00",
+   "frozen_at": "2026-10-01T13:30:04.658192+00:00",
    "current": true
   },
   "test": {
    "dataset": "test",
    "schema": "gold-2",
-   "dataset_sha256": "9bee2f7f407834dd1292c2af70af25968799cebfee900bad8c84cea4d03f9606",
+   "dataset_sha256": "bb2f41859323fa1054e48554e451ad20fcd42d47e82612f3a4acec7021f5efd6",
    "rows": 1,
    "label": "pilot",
    "targets": {
@@ -253,20 +253,20 @@
     "late": 1,
     "none": 0
    },
-   "review_log_sha256": "7cba5d9448a6b3d501e9533b19ab9a5d7938c80911ab43ec81e33322cbce66dd",
-   "families_sha256": "bec948a9ead7577b8c8048a35dec4e903be57efdba6733927ec9ccb8a9053969",
+   "review_log_sha256": "682df3a4dc53d8fcba7171561cdd716b191dc6f147c02cf73648f818f7bc355e",
+   "families_sha256": "18e8e9a6dafd5694a53d2bead7b7e3fa98936602dc7cced47f6ea18799855130",
    "frozen_by": "owner",
    "reason": "walkthrough",
-   "frozen_at": "2026-10-01T12:59:52.889651+00:00",
+   "frozen_at": "2026-10-01T13:30:04.917457+00:00",
    "current": true
   }
  },
  "retrieval_runs": [
   {
-   "run_id": "K0-abc1cbfed6",
+   "run_id": "K0-cef258864f",
    "label": "K0",
    "mode": "whitespace_bm25",
-   "dataset_sha256": "65b6e71cf9fae71e8e0f828485fa8768c0c480175dee63a9605e6d2d71900e99",
+   "dataset_sha256": "12face89bb1b102cc620ea3674dfb4c670e34909d581cb0d59d5a7e7cb3de0c7",
    "population_size": 4,
    "scored": 3,
    "hit@20": {
@@ -312,10 +312,10 @@
    "blocking": []
   },
   {
-   "run_id": "K1-7c8e7f5156",
+   "run_id": "K1-b7f86f6c33",
    "label": "K1",
    "mode": "kiwi_bm25",
-   "dataset_sha256": "65b6e71cf9fae71e8e0f828485fa8768c0c480175dee63a9605e6d2d71900e99",
+   "dataset_sha256": "12face89bb1b102cc620ea3674dfb4c670e34909d581cb0d59d5a7e7cb3de0c7",
    "population_size": 4,
    "scored": 3,
    "hit@20": {
@@ -350,8 +350,8 @@
    "critical_failures": [],
    "wrong_scope": 0,
    "latency_ms": {
-    "p50": 1.0,
-    "p95": 1646.2,
+    "p50": 0.9,
+    "p95": 1564.47,
     "n": 3
    },
    "query_cost_micro_usd": null,
@@ -360,12 +360,12 @@
  ],
  "answer_runs": [
   {
-   "run_id": "A-4d3b0b7c65b9",
+   "run_id": "A-d1c7d4b327ab",
    "label": "development finalists",
    "status": "complete",
    "stop_reason": null,
    "finalists": {
-    "K1-7c8e7f5156": {
+    "K1-b7f86f6c33": {
      "mode": "kiwi_bm25",
      "completed": 4,
      "of": 4,
@@ -394,37 +394,36 @@
      "claim_verdicts": {
       "correct": 2,
       "wrong_value": 0,
+      "contested": 0,
       "incomplete_qualifier": 0,
       "missing": 1,
       "needs_review": 0
      },
      "critical_wrong": [],
+     "critical_unresolved": [],
      "citation_precision_judged": {
-      "numerator": 3,
-      "denominator": 3,
-      "rate": 1.0,
-      "wilson95": [
-       0.4385,
-       1.0
-      ]
+      "numerator": 0,
+      "denominator": 0,
+      "rate": null,
+      "wilson95": null
      },
      "citation_precision_lower_bound": {
-      "numerator": 3,
+      "numerator": 0,
       "denominator": 4,
-      "rate": 0.75,
+      "rate": 0.0,
       "wilson95": [
-       0.3006,
-       0.9544
+       0.0,
+       0.4899
       ]
      },
-     "links_unjudged": 1,
+     "links_unjudged": 4,
      "citation_coverage": {
-      "numerator": 3,
+      "numerator": 0,
       "denominator": 4,
-      "rate": 0.75,
+      "rate": 0.0,
       "wilson95": [
-       0.3006,
-       0.9544
+       0.0,
+       0.4899
       ]
      },
      "unsupported_claim_rate": {
@@ -436,7 +435,7 @@
        0.4899
       ]
      },
-     "answer_claims_unjudged": 1,
+     "answer_claims_unjudged": 4,
      "link_validity": {
       "numerator": 4,
       "denominator": 4,
@@ -505,13 +504,13 @@
       }
      },
      "cost": {
-      "settled_micro_usd": 384,
-      "per_question_micro_usd": 96.0,
+      "settled_micro_usd": 385,
+      "per_question_micro_usd": 96.2,
       "retried_rows": 0
      },
      "latency_ms": {
-      "p50": 22.0,
-      "p95": 25.97,
+      "p50": 18.9,
+      "p95": 22.98,
       "n": 4,
       "condition": "sequential, single process, one call at a time"
      },
@@ -569,8 +568,8 @@
       "critical_failures": [],
       "missing_in_packed": 0,
       "latency_ms": {
-       "p50": 1.5,
-       "p95": 1.59,
+       "p50": 1.1,
+       "p95": 1.28,
        "n": 3
       },
       "fallbacks": [],
@@ -628,7 +627,7 @@
       }
      }
     },
-    "K0-abc1cbfed6": {
+    "K0-cef258864f": {
      "mode": "whitespace_bm25",
      "completed": 4,
      "of": 4,
@@ -657,37 +656,36 @@
      "claim_verdicts": {
       "correct": 1,
       "wrong_value": 0,
+      "contested": 0,
       "incomplete_qualifier": 1,
       "missing": 1,
       "needs_review": 0
      },
      "critical_wrong": [],
+     "critical_unresolved": [],
      "citation_precision_judged": {
-      "numerator": 2,
-      "denominator": 2,
-      "rate": 1.0,
-      "wilson95": [
-       0.3424,
-       1.0
-      ]
+      "numerator": 0,
+      "denominator": 0,
+      "rate": null,
+      "wilson95": null
      },
      "citation_precision_lower_bound": {
-      "numerator": 2,
+      "numerator": 0,
       "denominator": 2,
-      "rate": 1.0,
+      "rate": 0.0,
       "wilson95": [
-       0.3424,
-       1.0
+       0.0,
+       0.6576
       ]
      },
-     "links_unjudged": 0,
+     "links_unjudged": 2,
      "citation_coverage": {
-      "numerator": 2,
+      "numerator": 0,
       "denominator": 2,
-      "rate": 1.0,
+      "rate": 0.0,
       "wilson95": [
-       0.3424,
-       1.0
+       0.0,
+       0.6576
       ]
      },
      "unsupported_claim_rate": {
@@ -699,7 +697,7 @@
        0.6576
       ]
      },
-     "answer_claims_unjudged": 0,
+     "answer_claims_unjudged": 2,
      "link_validity": {
       "numerator": 2,
       "denominator": 2,
@@ -771,8 +769,8 @@
       "retried_rows": 0
      },
      "latency_ms": {
-      "p50": 17.35,
-      "p95": 23.64,
+      "p50": 14.95,
+      "p95": 20.3,
       "n": 4,
       "condition": "sequential, single process, one call at a time"
      },
@@ -894,17 +892,17 @@
     }
    },
    "selection": {
-    "baseline": "K1-7c8e7f5156",
-    "candidate": "K0-abc1cbfed6",
+    "baseline": "K1-b7f86f6c33",
+    "candidate": "K0-cef258864f",
     "claim_correctness_gain": -0.3334,
     "negative_handling_gain": 1.0,
     "new_critical_wrong": [],
     "p95_ms": [
-     25.97,
-     23.64
+     22.98,
+     20.3
     ],
     "settled_micro_usd": [
-     384,
+     385,
      187
     ],
     "note": "development evidence for the owner's selection; small denominators: read the intervals"
@@ -913,13 +911,13 @@
  ],
  "sealed_runs": [
   {
-   "run_id": "S-064c9e7d21d7",
+   "run_id": "S-516013e77c18",
    "label": "sealed test",
-   "freeze_id": "F-d6d250b0d3",
+   "freeze_id": "F-5b9cb02b63",
    "status": "complete",
    "stop_reason": null,
    "finalists": {
-    "K1-7c8e7f5156": {
+    "K1-b7f86f6c33": {
      "mode": "kiwi_bm25",
      "completed": 1,
      "of": 1,
@@ -948,37 +946,36 @@
      "claim_verdicts": {
       "correct": 1,
       "wrong_value": 0,
+      "contested": 0,
       "incomplete_qualifier": 0,
       "missing": 0,
       "needs_review": 0
      },
      "critical_wrong": [],
+     "critical_unresolved": [],
      "citation_precision_judged": {
-      "numerator": 1,
-      "denominator": 1,
-      "rate": 1.0,
-      "wilson95": [
-       0.2065,
-       1.0
-      ]
+      "numerator": 0,
+      "denominator": 0,
+      "rate": null,
+      "wilson95": null
      },
      "citation_precision_lower_bound": {
-      "numerator": 1,
+      "numerator": 0,
       "denominator": 1,
-      "rate": 1.0,
+      "rate": 0.0,
       "wilson95": [
-       0.2065,
-       1.0
+       0.0,
+       0.7935
       ]
      },
-     "links_unjudged": 0,
+     "links_unjudged": 1,
      "citation_coverage": {
-      "numerator": 1,
+      "numerator": 0,
       "denominator": 1,
-      "rate": 1.0,
+      "rate": 0.0,
       "wilson95": [
-       0.2065,
-       1.0
+       0.0,
+       0.7935
       ]
      },
      "unsupported_claim_rate": {
@@ -990,7 +987,7 @@
        0.7935
       ]
      },
-     "answer_claims_unjudged": 0,
+     "answer_claims_unjudged": 1,
      "link_validity": {
       "numerator": 1,
       "denominator": 1,
@@ -1041,8 +1038,8 @@
       "retried_rows": 0
      },
      "latency_ms": {
-      "p50": 24.6,
-      "p95": 24.6,
+      "p50": 24.5,
+      "p95": 24.5,
       "n": 1,
       "condition": "sequential, single process, one call at a time"
      },
@@ -1124,13 +1121,13 @@
      }
     }
    },
-   "scored_at": "2026-10-01T13:00:18.804285+00:00"
+   "scored_at": "2026-10-01T13:30:29.109741+00:00"
   }
  ],
  "latency": [
   {
-   "run_id": "L-a7e8dc6fa96b",
-   "estimate_id": "8f3bf106504f",
+   "run_id": "L-4c23fb947040",
+   "estimate_id": "3fb81a94c8fc",
    "actor": "owner",
    "provider": "fake",
    "users": 6,
@@ -1139,85 +1136,31 @@
    "n": 12,
    "failures": 0,
    "all_ms": {
-    "p50": 109.4,
-    "p95": 134.4,
+    "p50": 105.75,
+    "p95": 141.79,
     "n": 12
    },
    "warm_ms": {
-    "p50": 103.0,
-    "p95": 126.7,
+    "p50": 87.45,
+    "p95": 101.42,
     "n": 6,
     "note": "waves after the first"
    },
-   "cold_wave_ms": 139.1,
+   "cold_wave_ms": 160.6,
    "waves": [
     {
      "wave": 1,
-     "wall_ms": 139.1,
-     "requests": [
-      {
-       "question_id": "dev-deadline",
-       "ms": 102.1,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-deadline",
-       "ms": 106.1,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-amount",
-       "ms": 114.0,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-amount",
-       "ms": 114.1,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-warranty",
-       "ms": 116.5,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-warranty",
-       "ms": 137.7,
-       "status": "answered",
-       "billing": "settled"
-      }
-     ]
-    },
-    {
-     "wave": 2,
-     "wall_ms": 133.3,
+     "wall_ms": 160.6,
      "requests": [
       {
        "question_id": "dev-warranty",
-       "ms": 86.0,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-amount",
-       "ms": 95.0,
+       "ms": 107.3,
        "status": "answered",
        "billing": "settled"
       },
       {
        "question_id": "dev-deadline",
-       "ms": 98.9,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-warranty",
-       "ms": 107.1,
+       "ms": 109.1,
        "status": "answered",
        "billing": "settled"
       },
@@ -1228,8 +1171,62 @@
        "billing": "settled"
       },
       {
+       "question_id": "dev-warranty",
+       "ms": 115.5,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-amount",
+       "ms": 127.8,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
        "question_id": "dev-deadline",
-       "ms": 131.7,
+       "ms": 158.9,
+       "status": "answered",
+       "billing": "settled"
+      }
+     ]
+    },
+    {
+     "wave": 2,
+     "wall_ms": 105.2,
+     "requests": [
+      {
+       "question_id": "dev-amount",
+       "ms": 72.9,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-deadline",
+       "ms": 76.0,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-deadline",
+       "ms": 83.8,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-amount",
+       "ms": 91.1,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-warranty",
+       "ms": 93.1,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-warranty",
+       "ms": 104.2,
        "status": "answered",
        "billing": "settled"
       }
@@ -1237,9 +1234,9 @@
     }
    ],
    "serving": {
-    "run_id": "K1-7c8e7f5156",
+    "run_id": "K1-b7f86f6c33",
     "mode": "kiwi_bm25",
-    "index_version": "33c9c91370a80eaa"
+    "index_version": "e399b2b9650cef12"
    },
    "hardware": {
     "platform": "Linux-6.18.44-fc-v50-x86_64-with-glibc2.39",
@@ -1247,7 +1244,7 @@
     "python": "3.12.3",
     "cpu_count": 4
    },
-   "recorded_at": "2026-10-01T13:00:33.267930+00:00",
+   "recorded_at": "2026-10-01T13:30:43.808644+00:00",
    "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
   }
  ],

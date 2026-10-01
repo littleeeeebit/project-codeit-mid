@@ -17,8 +17,8 @@ This file is the shareable summary. The authoritative report is generated on the
 
 | Check | Where | Outcome |
 | --- | --- | --- |
-| `check --phase 4 --provider fake` | Cloud, temporary state | 48 tests passed |
-| `check --phase all --provider fake` | Cloud, temporary state | 236 tests passed |
+| `check --phase 4 --provider fake` | Cloud, temporary state | 50 tests passed |
+| `check --phase all --provider fake` | Cloud, temporary state | 238 tests passed |
 | Phase-4 CLI walkthrough (`tools/verification/phase4_walkthrough.py`) | Cloud, fixture corpus, fake provider | 31/31 steps passed |
 | Browser check of the 평가 tab and gold-2 review | Cloud, headless Chromium, synthetic runtime | rendered; approval refused without the inspection attestation; no horizontal scroll at 390 px |
 | Paid calls | — | none; $0 spent |
@@ -60,7 +60,7 @@ Allowance and cap on the owner host: $5 / $5 (phase-3 configuration, `README.md`
 
 ## Known limitations
 
-- Answer scoring is deterministic only for typed numbers and dates; text claims and partially supporting citations need blind human review before they count.
+- Answer scoring is deterministic only for typed numbers (with their unit) and dates (with their cutoff time), matched per document; a correct value stated next to a contradicting one is contested. Text claims, and any citation whose claim does not itself state the labelled value, need blind human review before they count. Contested or unreviewed critical claims leave the critical-value hard check unverified.
 - There is no paid LLM judge.
 - A two-document question has no single ranking, so it is excluded from hit@k, nDCG@5 and MRR.
 - The sealed set can be evaluated once per freeze; a further run is labeled post-test regression and cannot support a new reliability claim.
