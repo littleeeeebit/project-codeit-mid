@@ -37,6 +37,7 @@ The authoritative release evidence must be produced on the owner host with the r
 5. Sealed rows never reach a screen. Their review, freeze and run are owner CLI actions; the 평가 tab shows only the sealed row count and freeze state, and the dev validation report withholds sealed IDs.
 6. Evaluation identity. Answer-run requests use the member `evaluation-job` (so a resume under another typed name finds the same idempotency keys) and the `gold_eval` envelope.
 7. Exposure is per test set (review round 1). Any sealed run that started, finished or not, exposes the set: only that run may resume, unchanged, under its own freeze, and every later freeze or run on the set is a labeled post-test regression. Every digest a freeze records (dataset, family map, review-log file and the database review history) is checked at plan, start and resume. A repaired release needs a new freeze. A post-test regression run requires `--post-test-regression` and `--reason`; a new reliability claim needs a newly drafted, independently sealed test set.
+8. Answer-run cost comes from the ledger (review round 3). Each finalist's cost sums every attempt of the run through all of its request keys, retries and unfinished rows included, and separates settled, pending, unknown and reconciled parts.
 
 ## Owner steps on the local host
 

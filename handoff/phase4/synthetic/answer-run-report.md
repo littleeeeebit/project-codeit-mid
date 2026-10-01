@@ -1,10 +1,10 @@
-# Answer run A-341ef1e7218a (development finalists)
+# Answer run A-792075127e33 (development finalists)
 
-- dataset `dev` (`b9480db7ce00`), population `1a50006d6d90`, status **complete**
-- model gpt-6-luna (reasoning low), prompt grounded-answer-3, output cap 2000; code `1e2e5f1caff8` dirty=False
+- dataset `dev` (`13a87ef84114`), population `d2c5ab4a7275`, status **complete**
+- model gpt-6-luna (reasoning low), prompt grounded-answer-3, output cap 2000; code `fa3bbfd8c620` dirty=False
 - blind reviews applied: 0
 
-## Finalist `K1-ef4c8775fe` (kiwi_bm25): 4/4 rows
+## Finalist `K1-f959a84946` (kiwi_bm25): 4/4 rows
 
 | Metric | Value |
 | --- | --- |
@@ -25,10 +25,10 @@
 | metadata stratum | n/a (0 eligible) |
 | technical outcomes | none |
 | scope leaks | 0 |
-| settled cost | $0.000385 (retried rows 0) |
-| latency p50/p95 ms | 24.7/25.25 (n=4, sequential, single process, one call at a time) |
+| settled cost (ledger, every attempt) | $0.000385; earlier attempts $0.000000, pending $0.000000, unknown $0.000000, reconciled attempts 0, retried rows 0 |
+| latency p50/p95 ms | 26.7/30.58 (n=4, sequential, single process, one call at a time) |
 
-## Finalist `K0-84c52d1b32` (whitespace_bm25): 4/4 rows
+## Finalist `K0-56970cbc48` (whitespace_bm25): 4/4 rows
 
 | Metric | Value |
 | --- | --- |
@@ -49,21 +49,21 @@
 | metadata stratum | n/a (0 eligible) |
 | technical outcomes | none |
 | scope leaks | 0 |
-| settled cost | $0.000187 (retried rows 0) |
-| latency p50/p95 ms | 16.1/27.24 (n=4, sequential, single process, one call at a time) |
+| settled cost (ledger, every attempt) | $0.000187; earlier attempts $0.000000, pending $0.000000, unknown $0.000000, reconciled attempts 0, retried rows 0 |
+| latency p50/p95 ms | 21.8/27.41 (n=4, sequential, single process, one call at a time) |
 
 ## Finalist comparison
 
 ```json
 {
- "baseline": "K1-ef4c8775fe",
- "candidate": "K0-84c52d1b32",
+ "baseline": "K1-f959a84946",
+ "candidate": "K0-56970cbc48",
  "claim_correctness_gain": -0.3334,
  "negative_handling_gain": 1.0,
  "new_critical_wrong": [],
  "p95_ms": [
-  25.25,
-  27.24
+  30.58,
+  27.41
  ],
  "settled_micro_usd": [
   385,
