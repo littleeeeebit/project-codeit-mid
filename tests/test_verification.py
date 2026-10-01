@@ -135,7 +135,8 @@ class DatasetCopyTest(unittest.TestCase):
             data = env.settings.data_dir
             (data / "indexes").mkdir(exist_ok=True)
             with mock.patch.dict(os.environ, {"RFP_SOURCE_DIR": str(env.settings.source_dir),
-                                              "RFP_DATA_DIR": str(data)}):
+                                              "RFP_DATA_DIR": str(data),  # not a checkout .env that may exist
+                                              "RFP_VERIFY_ENV_FILE": str(Path(tmp) / "no-env-file")}):
                 ctx = verify.Context("t")
                 corpus = ctx.dataset()
             try:
