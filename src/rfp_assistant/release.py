@@ -335,10 +335,33 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
     lock = REPO_ROOT / "requirements-lock.txt"
     usd = lambda m: f"${(m or 0) / 1_000_000:,.6f}"  # noqa: E731
 
-    # ---- evidence used for the decision: the untouched sealed run if there is one, else development
+    # ---- evidence used for the decision, bound to the current candidate (review round 3, F6). Older results stay
+    # on disk and in the evaluation JSON, but evidence recorded for other code, configuration or data is listed as
+    # stale and never counts as a pass.
+    current_code = evaluation.code_fingerprint()["source_sha256"]
+    stale: list[str] = []
     first_sealed = next((s for s in sealed_runs if s["label"] == "sealed test" and s["status"] == "complete"), None)
-    dev_answer = next((a for a in reversed(answer_runs) if active and active["run_id"] in a["scores"]["finalists"]),
-                      None)
+    if first_sealed:
+        try:
+            problems = sealed.freeze_problems(settings, sealed.load_freeze(settings, first_sealed["freeze_id"]))
+        except evaluation.EvaluationError as exc:
+            problems = [str(exc)]
+        if problems:
+            stale.append(f"sealed run {first_sealed['run_id']}: {'; '.join(problems)}")
+            first_sealed = None
+    dev_answer = None
+    for a in reversed(answer_runs):
+        if not active or active["run_id"] not in a["scores"]["finalists"]:
+            continue
+        problems, _ = sealed._selection_problems(settings, active, a["run_id"], frozen["dev"] or {
+            "dataset_sha256": (validation["dev"] or {}).get("dataset_sha256")})
+        if a["config"].get("provenance", {}).get("code", {}).get("source_sha256") != current_code:
+            problems.append("recorded for other package source")
+        if problems:
+            stale.append(f"development answer run {a['run_id']}: {'; '.join(problems)}")
+            continue
+        dev_answer = a
+        break
     if first_sealed:
         label = "sealed gold" if (frozen["test"] or {}).get("label") == "gold" else "sealed pilot"
         ans = first_sealed["finalists"][next(iter(first_sealed["finalists"]))]
@@ -346,17 +369,32 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
         label = "development pilot" if (frozen["dev"] or {}).get("label") != "gold" else "development gold"
         ans = dev_answer["scores"]["finalists"][active["run_id"]]
     else:
-        label, ans = "no answer evaluation", None
+        label, ans = ("no answer evaluation for the current candidate" if stale else "no answer evaluation"), None
     served = (ans or {}).get("served_retrieval") or {}
     if not served and active:
-        served = next(((r.get("hit@20"), r) for r in retrieval_runs if r["run_id"] == active["run_id"]), (None, {}))[1]
-        served = {"single_evidence": {"hit@20": served.get("hit@20")}, "multi_evidence": {
-            "complete@20": served.get("complete@20")}} if served else {}
-    lat = next((x for x in reversed(latency) if x and x.get("provider") == "real"), None)
+        run = next((r for r in retrieval_runs if r["run_id"] == active["run_id"] and not r.get("blocking")), None)
+        served = {"single_evidence": {"hit@20": run.get("hit@20")}, "multi_evidence": {
+            "complete@20": run.get("complete@20")}} if run else {}
+    lat = None
+    for x in reversed(latency):
+        if not x or x.get("provider") != "real":
+            continue
+        if (x.get("serving") or {}).get("run_id") != (active or {}).get("run_id") or \
+                (x.get("code") or {}).get("source_sha256") != current_code:
+            stale.append(f"latency sample {x.get('run_id')}: recorded for another serving run or package source")
+            continue
+        lat = x
+        break
     all_check = checks.get("check-all")
+    check_stale = bool(all_check) and (all_check.get("code") or {}).get("source_sha256") != current_code
+    if check_stale:
+        stale.append(f"saved check-all: recorded for package source "
+                     f"{(all_check.get('code') or {}).get('source_sha256', '')[:12]}, current {current_code[:12]}")
     hard = [
-        ("automated invariants (check --phase all --provider fake)", (all_check or {}).get("ok"),
-         f"{(all_check or {}).get('tests_run')} tests, recorded {(all_check or {}).get('recorded_at')}"
+        ("automated invariants (check --phase all --provider fake)",
+         None if check_stale else (all_check or {}).get("ok"),
+         ("stale: recorded for other package source; rerun check --phase all --provider fake --save" if check_stale
+          else f"{(all_check or {}).get('tests_run')} tests, recorded {(all_check or {}).get('recorded_at')}")
          if all_check else "no saved run: check --phase all --provider fake --save"),
         ("no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases",
          None if ans is None else False if ans["critical_wrong"] else None if ans.get("critical_unresolved") else True,
@@ -397,6 +435,7 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
          "no real latency sample" if lat is None else f"warm p95 {lat['warm_ms']['p95']} ms, n={lat['warm_ms']['n']}"),
     ]
     status, reasons = decide_status(hard, quality, label)
+    reasons += [f"stale evidence not counted: {x}" for x in stale]
 
     release_manifest = {
         "release_id": rid, "generated_at": utcnow(), "status": status, "reasons": reasons, "evidence_label": label,
@@ -408,7 +447,7 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
         "active_index": active_index, "datasets": {n: {k: (frozen[n] or {}).get(k) for k in (
             "dataset_sha256", "rows", "label", "review_log_sha256", "current")} for n in ("dev", "test")},
         "requirements_lock_sha256": _sha_file(lock) if lock.exists() else None, "hardware": evaluation.hardware(),
-        "freeze": {k: (freeze or {}).get(k) for k in ("freeze_id", "frozen_at", "selected_run_id", "decided_by",
+        "stale_evidence": stale, "freeze": {k: (freeze or {}).get(k) for k in ("freeze_id", "frozen_at", "selected_run_id", "decided_by",
                                                        "post_test")} if freeze else None}
     coverage_rep = {"counts": manifest_rep["counts"], "parse_status": manifest_rep["parse_status"],
                     "review_status": manifest_rep["review_status"], "audit_differences": manifest_rep["audit_differences"],

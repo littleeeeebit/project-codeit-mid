@@ -982,7 +982,7 @@ def latency_run(settings: Settings, owner: service.Resources, estimate_id: str, 
                           "note": "waves after the first"},
               "cold_wave_ms": waves[0]["wall_ms"] if waves else None, "waves": waves,
               "serving": {k: est["serving"].get(k) for k in ("run_id", "mode", "index_version")},
-              "hardware": evaluation.hardware(), "recorded_at": utcnow(),
+              "hardware": evaluation.hardware(), "code": evaluation.code_fingerprint(), "recorded_at": utcnow(),
               "note": "preliminary latency sample of full answers under concurrent members; not an SLA"}
     write_text_atomic(path, json.dumps(result, ensure_ascii=False, indent=1))
     return {**result, "path": str(path)}

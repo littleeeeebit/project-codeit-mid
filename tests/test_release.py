@@ -5,8 +5,9 @@ import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
+from unittest import mock
 
-from rfp_assistant import answers, auth, budget, cli, dense, evaluation, release, sealed, service, store
+from rfp_assistant import answers, auth, budget, cli, dense, evaluation, generation, release, sealed, service, store
 from rfp_assistant.contracts import AnswerRequest
 from rfp_assistant.generation import FakeTransport
 from rfp_assistant.settings import DEFAULT_RATES
@@ -181,6 +182,30 @@ class ReleaseReportTest(unittest.TestCase):
             evaluation_json = json.loads((path.parent / "evaluation.json").read_text(encoding="utf-8"))
             self.assertEqual(len(evaluation_json["sealed_runs"]), 1)
             self.assertNotIn("도서관에서 무엇을", text)  # no sealed question text in the report
+            # review round 3 (F6): saved checks and answer evidence count only for the current candidate
+            checks = s.data_dir / "releases" / "checks"
+            checks.mkdir(parents=True, exist_ok=True)
+            current = evaluation.code_fingerprint()
+            saved = {"phase": "all", "ok": True, "tests_run": 243, "recorded_at": "2026-10-01T00:00:00+00:00"}
+            (checks / "check-all.json").write_text(json.dumps({**saved, "code": {"source_sha256": "f" * 64}}),
+                                                    encoding="utf-8")
+            manifest = lambda: json.loads((release.write_release_report(s, "latest").parent / "manifest.json")  # noqa: E731
+                                          .read_text(encoding="utf-8"))
+            m = manifest()
+            self.assertTrue(any("saved check-all" in x for x in m["stale_evidence"]))
+            self.assertIn("hard check not verified: automated invariants", " ".join(m["reasons"]))
+            (checks / "check-all.json").write_text(json.dumps({**saved, "code": current}), encoding="utf-8")
+            m = manifest()
+            self.assertNotIn("automated invariants", " ".join(m["reasons"]))
+            self.assertEqual(m["evidence_label"], "sealed pilot")
+            with mock.patch.object(generation, "PROMPT_VERSION", "grounded-answer-changed"):
+                m = manifest()
+            self.assertEqual(m["evidence_label"], "no answer evaluation for the current candidate")
+            self.assertTrue(any(x.startswith("sealed run S-") for x in m["stale_evidence"]))
+            self.assertTrue(any(x.startswith("development answer run A-") for x in m["stale_evidence"]))
+            self.assertNotEqual(m["status"], "ready")
+            self.assertEqual(len(json.loads((path.parent / "evaluation.json").read_text(encoding="utf-8"))
+                                 ["sealed_runs"]), 1)  # the old result stays on record
 
 
 class CheckCommandTest(unittest.TestCase):
