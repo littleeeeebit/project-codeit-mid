@@ -21,7 +21,7 @@ This file is the shareable summary. The authoritative report is generated on the
 | `check --phase all --provider fake` | Cloud, temporary state | 250 tests passed |
 | Phase-4 CLI walkthrough (`tools/verification/phase4_walkthrough.py`) | Cloud, fixture corpus, fake provider | 31/31 steps passed |
 | Browser check of the 평가 tab and gold-2 review | Cloud, headless Chromium, synthetic runtime | rendered; approval refused without the inspection attestation; no horizontal scroll at 390 px |
-| `check --phase all --provider fake --save` → `release-report --latest` | Local reviewer, Windows, fixture runtime, on `5e281a0` (before the F9 change) | 244 passed, 2 POSIX skips of 246 (browser flow ran); the host-local check counted as `pass`; fixture decision `limited` (not an owner check) |
+| `check --phase all --provider fake --save` → `release-report --latest` | Local reviewer, Windows, synthetic fixture runtime, on `bb726d5` (current code) | 248 passed, 2 POSIX skips of 250 (browser flow ran); the host-local check counted as `pass`; fixture decision `limited` (not an owner check) |
 | Paid calls | — | none; $0 spent |
 
 Evidence: [handoff/phase4](../../handoff/phase4/README.md).
