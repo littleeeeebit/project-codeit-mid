@@ -6,7 +6,6 @@ import hashlib
 import json
 import re
 import shutil
-import sqlite3
 import threading
 import time
 import uuid
@@ -139,10 +138,18 @@ def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreview
             f"AND review_status IN ({','.join('?' * len(allowed))}) ORDER BY source_hash", allowed)]
     if not sources:
         raise RetrievalError("no parsed sources match the review policy; record reviews or pass --include-unreviewed")
+    with open_db(settings.db_path) as conn:
+        hashes = {s["source_hash"] for s in sources}
+        doc_ids = [r["doc_id"] for r in conn.execute("SELECT doc_id, active_source_hash FROM documents "
+                                                     "ORDER BY doc_id") if r["active_source_hash"] in hashes]
+    # The query policy reads each document's title/institution terms; freezing them here makes the index (and every
+    # run bound to its manifest) reproduce retrieval exactly. A later metadata correction needs a rebuild.
+    scope_terms = metadata_term_snapshot(settings, analyzer, doc_ids)
     config = {"chunker": chunking.chunker_fingerprint(profile), "profile": profile,
               "analyzer": analyzer_fingerprint(analyzer), "idf": IDF_POLICY,
               "review_scope": "reviewed_only" if not include_unreviewed else "includes_unreviewed",
-              "extractions": [s["active_extraction_id"] for s in sources]}
+              "extractions": [s["active_extraction_id"] for s in sources],
+              "metadata_terms": hashlib.sha256(dumps(scope_terms).encode()).hexdigest()}
     source_set_hash = hashlib.sha256("".join(s["source_hash"] for s in sources).encode()).hexdigest()
     version = hashlib.sha256(dumps(config).encode()).hexdigest()[:16]
     final_dir = settings.data_dir / "indexes" / version
@@ -167,8 +174,9 @@ def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreview
         write_jsonl_atomic(tmp / "chunks.jsonl", chunks)
         write_jsonl_atomic(tmp / "tokens.jsonl", tokens)
         write_jsonl_atomic(tmp / "requirements.jsonl", inventory)
+        write_text_atomic(tmp / "scope-terms.json", json.dumps(scope_terms, ensure_ascii=False, sort_keys=True))
         files = {n: hashlib.sha256((tmp / n).read_bytes()).hexdigest()
-                 for n in ("chunks.jsonl", "tokens.jsonl", "requirements.jsonl")}
+                 for n in ("chunks.jsonl", "tokens.jsonl", "requirements.jsonl", "scope-terms.json")}
         manifest = {"index_version": version, "created_at": utcnow(), "source_set_hash": source_set_hash,
                     "sources": sources, "config": config, "chunk_count": len(chunks), "files": files,
                     "row_order": "chunks.jsonl line order"}
@@ -222,6 +230,7 @@ class KeywordIndex:
     elements: dict[tuple[str, str], dict]
     profile: str = "structural"
     manifest_hash: str = ""
+    scope_terms: dict = field(default_factory=dict)  # doc_id -> title/institution terms frozen at build
     _extra_bm25: dict = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
@@ -261,9 +270,12 @@ class KeywordIndex:
         for extraction_id in rows:
             for e in load_elements(settings, extraction_id):
                 elements[(extraction_id, e["element_id"])] = e
+        terms_path = manifest_path.parent / "scope-terms.json"
+        scope_terms = json.loads(terms_path.read_text(encoding="utf-8")) if "scope-terms.json" in manifest["files"] \
+            else {}
         return cls(version, manifest["config"]["review_scope"], chunks,
                    BM25Okapi([t["tokens"] or ["∅"] for t in tokens]), rows, elements,
-                   manifest["config"].get("profile", "structural"), row["manifest_hash"])
+                   manifest["config"].get("profile", "structural"), row["manifest_hash"], scope_terms)
 
 
 # ---------------------------------------------------------------- retrieval
@@ -321,26 +333,26 @@ def _protected(token: str) -> bool:
     return token.startswith("code:") or any(ch.isdigit() for ch in token) or token in NEGATIONS
 
 
-def scope_metadata_terms(settings: Settings, analyzer, doc_ids: list[str]) -> set[str]:
-    """Analyzer tokens of the selected documents' own title and institution (CSV values and recorded resolutions)."""
+def metadata_term_snapshot(settings: Settings, analyzer, doc_ids: list[str]) -> dict[str, list[str]]:
+    """doc_id -> analyzer tokens of that document's own title and institution (CSV values and recorded
+    resolutions). Built once into the index; retrieval never reads mutable metadata at query time."""
     if not doc_ids:
-        return set()
-    try:
-        with open_db(settings.db_path) as conn:
-            rows = conn.execute(
-                f"SELECT doc_id, normalized_metadata_json FROM documents WHERE doc_id IN "
-                f"({','.join('?' * len(doc_ids))})", doc_ids).fetchall()
-            resolved = conn.execute(
-                f"SELECT value_json FROM metadata_resolutions WHERE field IN ('title', 'institution') AND doc_id IN "
-                f"({','.join('?' * len(doc_ids))})", doc_ids).fetchall()
-    except sqlite3.Error:  # an index used without a manifest database (unit fixtures)
-        return set()
-    texts = []
+        return {}
+    marks = ",".join("?" * len(doc_ids))
+    with open_db(settings.db_path) as conn:
+        rows = conn.execute(f"SELECT doc_id, normalized_metadata_json FROM documents WHERE doc_id IN ({marks})",
+                            doc_ids).fetchall()
+        resolved = conn.execute(
+            f"SELECT doc_id, value_json FROM metadata_resolutions WHERE field IN ('title', 'institution') "
+            f"AND doc_id IN ({marks}) ORDER BY created_at", doc_ids).fetchall()
+    texts: dict[str, list[str]] = {}
     for r in rows:
         meta = json.loads(r["normalized_metadata_json"])
-        texts += [meta.get("title") or "", meta.get("institution") or ""]
-    texts += [str(json.loads(r["value_json"])) for r in resolved]
-    return {t for text in texts for t in analyzer.tokens(text) if not _protected(t)}
+        texts.setdefault(r["doc_id"], []).extend([meta.get("title") or "", meta.get("institution") or ""])
+    for r in resolved:
+        texts.setdefault(r["doc_id"], []).append(str(json.loads(r["value_json"])))
+    return {d: sorted({t for text in ts for t in analyzer.tokens(text) if not _protected(t)})
+            for d, ts in sorted(texts.items())}
 
 
 def scope_redundant_terms(index: KeywordIndex, qtokens: list[str], allowed: list[int],
@@ -348,7 +360,8 @@ def scope_redundant_terms(index: KeywordIndex, qtokens: list[str], allowed: list
     """Query terms that cannot discriminate inside the selected scope and only drown the asked fact:
     - terms present in more than half of the scope's chunks (their scope-local BM25 IDF is not positive);
     - the selected project's own title/institution terms, when the question restates that name (two or more).
-    Codes, digits and negations are never dropped, and nothing is dropped if no other term would remain."""
+    Codes, digits and negations are never dropped, and nothing is dropped unless a kept term still matches a chunk
+    of the scope."""
     terms = {t for t in qtokens if not _protected(t)}
     drop: set[str] = set()
     if len(allowed) >= SCOPE_MIN_ROWS:
@@ -359,7 +372,13 @@ def scope_redundant_terms(index: KeywordIndex, qtokens: list[str], allowed: list
     restated = terms & metadata_terms
     if len(restated) >= METADATA_RESTATEMENT_MIN:
         drop |= restated
-    return drop if any(t not in drop for t in qtokens) else set()
+    kept = [t for t in qtokens if t not in drop]
+    freqs = index.bm25.doc_freqs
+    # Only drop when what is left still finds something in the scope; otherwise a common fact term ("하자보수" in a
+    # warranty-only scope) would leave an unmatched interrogative and report false evidence absence.
+    if drop and any(t in freqs[i] for i in allowed for t in kept):
+        return drop
+    return set()
 
 
 def rank_lexical(index: KeywordIndex, analyzer, question: str, allowed: list[int], k: int,
@@ -439,8 +458,8 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
         lex_analyzer = WhitespaceAnalyzer() if mode == "whitespace_bm25" else analyzer
         drop: set[str] = set()
         if mode != "whitespace_bm25":  # K0 stays the plain documented baseline
-            drop = scope_redundant_terms(index, analyzer.tokens(question), allowed, scope_metadata_terms(
-                settings, analyzer, list(dict.fromkeys(ref.doc_id for ref, _ in scope))))
+            metadata_terms = {t for ref, _ in scope for t in index.scope_terms.get(ref.doc_id, [])}
+            drop = scope_redundant_terms(index, analyzer.tokens(question), allowed, metadata_terms)
             if drop:
                 limitations.append("scope_redundant_terms:" + ",".join(sorted(drop)))
         lexical = rank_lexical(index, lex_analyzer, question, allowed, k, whitespace=mode == "whitespace_bm25",
@@ -470,12 +489,17 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
     if mode == "hybrid_rerank":
         depth = min(rerank_depth or settings.fused_top_k, len(ordered))
         pool = ordered[:depth]
-        scored, rerank_info = reranker.rerank(question, [index.chunks[i] for i in pool])
-        admitted = set(pool)
-        reranked = [pool[p] for p, _ in scored if 0 <= p < len(pool) and pool[p] in admitted]
-        candidates += [{"chunk_id": cid(pool[p]), "channel": "rerank", "rank": r + 1, "score": round(s, 6)}
-                       for r, (p, s) in enumerate(scored) if 0 <= p < len(pool)]
-        ordered = list(dict.fromkeys(reranked + ordered[depth:]))
+        try:
+            scored, rerank_info = reranker.rerank(question, [index.chunks[i] for i in pool])
+        except Exception as exc:  # noqa: BLE001 - an inference failure serves the H order, visibly
+            scored, rerank_info = None, None
+            fallback, mode = f"hybrid_rerank->hybrid:reranker_error:{type(exc).__name__}: {exc}"[:300], "hybrid"
+        if scored is not None:
+            admitted = set(pool)
+            reranked = [pool[p] for p, _ in scored if 0 <= p < len(pool) and pool[p] in admitted]
+            candidates += [{"chunk_id": cid(pool[p]), "channel": "rerank", "rank": r + 1, "score": round(s, 6)}
+                           for r, (p, s) in enumerate(scored) if 0 <= p < len(pool)]
+            ordered = list(dict.fromkeys(reranked + ordered[depth:]))
     t5 = time.perf_counter()
     ranking = list(dict.fromkeys(exact + ordered))  # exact identifier matches stay ahead of every ranker
 

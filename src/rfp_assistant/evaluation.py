@@ -765,15 +765,37 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
                    [], {"status": "blocked", "reason": report["gate"]["reason"], "trial": report})
         return {"run_id": run_id, **report}
     passage = [r for r in rows if is_passage_row(r)]
+
+    def inference_failure(results: list[dict]) -> str | None:
+        return next((r["fallback"] for r in results if (r.get("fallback") or "").startswith("hybrid_rerank->")), None)
+
+    def failed_trial(reason: str, depth=None) -> dict:
+        """An inference error is recorded as a blocked trial with the bypass decision, never as a measurement."""
+        report["gate"] = {"passed": False, "decision": "bypass", "reason": f"reranker inference failed: {reason}",
+                          "depth": depth}
+        run_id = f"HR-failed-{hashlib.sha256(dumps([h_run, depth, reason, utcnow()]).encode()).hexdigest()[:10]}"
+        _write_run(settings, run_id, {**h_config, "label": "HR", "mode": "hybrid_rerank", "h_run": h_run,
+                                      "eval_version": EVAL_VERSION, "rerank_depth": depth,
+                                      "reranker": {k: load_info.get(k) for k in ("model", "revision", "device",
+                                                                                "max_length", "max_concurrency",
+                                                                                "precision")}},
+                   [], {"status": "blocked", "reason": report["gate"]["reason"], "trial": report, "load": load_info})
+        return {"run_id": run_id, **report}
+
     # Warm once, then measure the reranking stage alone and under concurrent load.
     if passage:
-        _execute(trial_settings, index, analyzer, passage[:1], "hybrid_rerank", dense, vectors, reranker, max(depths))
+        warm = _execute(trial_settings, index, analyzer, passage[:1], "hybrid_rerank", dense, vectors, reranker,
+                        max(depths))
+        if inference_failure(warm):
+            return failed_trial(inference_failure(warm))
     base_ndcg = h_scores["aggregate"]["ndcg@5"] or 0.0
     by_id = {r.get("id"): r for r in rows}
     base_critical = set(critical_failures(list(h_traces.values()), by_id))  # same rule for both sides
     best = None
     for depth in depths:
         results = _execute(trial_settings, index, analyzer, rows, "hybrid_rerank", dense, vectors, reranker, depth)
+        if inference_failure(results):
+            return failed_trial(inference_failure(results), depth)
         for r in results:  # the pool must be exactly the frozen H candidates
             if r.get("metrics"):
                 frozen = [c["chunk_id"] for c in h_traces[r["id"]]["candidates"] if c["channel"] == "rrf"][:depth]
@@ -786,7 +808,8 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
             t0 = time.perf_counter()
             (r,) = _execute(trial_settings, index, analyzer, [row], "hybrid_rerank", dense, vectors, reranker, depth)
             timings = r.get("timings_ms") or {}
-            return ((time.perf_counter() - t0) * 1000, timings.get("rerank_queue"), timings.get("rerank_infer"))
+            return ((time.perf_counter() - t0) * 1000, timings.get("rerank_queue"), timings.get("rerank_infer"),
+                    inference_failure([r]))
 
         def base(row):
             t0 = time.perf_counter()
@@ -799,6 +822,9 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
             queue = [m[1] for m in measured if m[1] is not None]
             infer = [m[2] for m in measured if m[2] is not None]
             unranked = list(pool.map(base, passage * max(1, users // max(1, len(passage)))))
+        under_load = next((m[3] for m in measured if m[3]), None)
+        if under_load:
+            return failed_trial(f"under {users}-user load: {under_load}", depth)
         agg = aggregate(results, skipped)
         new_critical = sorted(set(agg["critical_failures"]) - base_critical)
         added_p95 = round((percentile(loaded, 0.95) or 0) - (percentile(unranked, 0.95) or 0), 1)

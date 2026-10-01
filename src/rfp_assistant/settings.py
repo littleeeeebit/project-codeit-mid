@@ -154,6 +154,8 @@ def validate(s: Settings) -> None:
         raise SettingsError(f"embedding_batch_inputs must be within 1..{EMBEDDING_MAX_INPUTS_PER_REQUEST}")
     if not 1 <= s.embedding_batch_tokens <= EMBEDDING_MAX_TOKENS_PER_REQUEST:
         raise SettingsError(f"embedding_batch_tokens must be within 1..{EMBEDDING_MAX_TOKENS_PER_REQUEST}")
+    if s.reranker_max_concurrency != 1:
+        raise SettingsError("reranker_max_concurrency must be 1 until per-worker tokenizer isolation exists")
     if s.reranker_precision not in ("fp32", "fp16"):
         raise SettingsError("reranker_precision must be 'fp32' or 'fp16'")
     if s.rrf_k < 1 or s.channel_top_k < 1 or s.fused_top_k < 1 or s.reranker_max_concurrency < 1:

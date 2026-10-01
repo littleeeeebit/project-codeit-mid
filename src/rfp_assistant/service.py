@@ -100,8 +100,9 @@ class Resources:
             changes["reranker_max_length"] = rr["max_length"]
         if rr.get("max_concurrency"):  # the bound the six-user latency gate was measured with
             changes["reranker_max_concurrency"] = rr["max_concurrency"]
-        if rr.get("precision"):
-            changes["reranker_precision"] = rr["precision"]
+        if rr:
+            # A trial that recorded no precision was measured at the then-only fp32; never inherit the process value.
+            changes["reranker_precision"] = rr.get("precision") or "fp32"
         known = set(Settings.__dataclass_fields__)
         return self.settings.with_(**{k: v for k, v in changes.items() if k in known})
 

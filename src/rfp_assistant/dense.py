@@ -552,6 +552,9 @@ class LocalReranker:
     def __init__(self, settings: Settings, device: str | None = None) -> None:
         if not settings.reranker_revision:
             raise DenseError("reranker_revision is not pinned; set the model card's commit hash in the config file")
+        if settings.reranker_max_concurrency != 1:
+            raise DenseError("reranker_max_concurrency must be 1: the shared tokenizer is not safe for parallel "
+                             "preprocessing (a concurrency-2 run crashed in CrossEncoder.predict)")
         import importlib.metadata as md
 
         from sentence_transformers import CrossEncoder
@@ -590,11 +593,13 @@ class LocalReranker:
 
     def rerank(self, question: str, chunks: list[dict]) -> tuple[list[tuple[int, float]], dict]:
         pairs = [(question, c["payload"]) for c in chunks]
-        tok = self.model.tokenizer
-        truncated = sum(len(tok(q, p)["input_ids"]) > self.max_length for q, p in pairs)
         t0 = time.perf_counter()
+        # Every use of the shared tokenizer (truncation counting and the prediction's own preprocessing) happens
+        # under the one model lock: the tokenizer keeps mutable padding/truncation state.
         with self._sem:
             t1 = time.perf_counter()
+            tok = self.model.tokenizer
+            truncated = sum(len(tok(q, p)["input_ids"]) > self.max_length for q, p in pairs)
             scores = [float(s) for s in self.model.predict(pairs, show_progress_bar=False)] if pairs else []
             t2 = time.perf_counter()
         order = sorted(range(len(scores)), key=lambda i: (-scores[i], chunks[i]["chunk_id"]))

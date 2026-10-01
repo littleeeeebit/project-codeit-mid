@@ -324,12 +324,34 @@ class ObservedNumericMissTest(unittest.TestCase):
         self.assertEqual(retrieval.scope_redundant_terms(index, ["공통", "문구"], index.rows_by_extraction["xa"],
                                                          set()), set())
 
-    def test_restated_metadata_terms_come_from_the_selected_documents(self):
-        env = fixtures.make_env(Path(self.tmp.name) / "env", paid=False, index=False)
-        terms = retrieval.scope_metadata_terms(env.settings, fixtures.analyzer(), [env.refs["기관A"].doc_id])
-        self.assertTrue({"통합", "구축", "기관"} <= terms)  # CSV title and institution of 기관A
-        self.assertEqual(retrieval.scope_metadata_terms(self.settings, fixtures.analyzer(), ["x"]), set())
+    def test_metadata_terms_are_frozen_into_the_index(self):
+        from rfp_assistant import service
 
+        env = fixtures.make_env(Path(self.tmp.name) / "env", paid=False)
+        s = env.settings
+        a, c = env.refs["기관A"], env.refs["기관C"]
+        index = KeywordIndex.load(s)
+        self.assertTrue({"통합", "구축", "기관"} <= set(index.scope_terms[a.doc_id]))  # CSV title and institution
+        before = dict(index.scope_terms)
+        ingestion.resolve_metadata(s, c.doc_id, "institution", "새한국정보원", "공고문 1쪽", "notice p1", "owner")
+        res = service.Resources(s)
+        try:
+            self.assertEqual(res.index().scope_terms, before)  # serving reads the snapshot, not live metadata
+        finally:
+            res.close()
+        rebuilt = retrieval.build_keyword_index(s, fixtures.analyzer(), activate=False)
+        self.assertNotEqual(rebuilt["index_version"], index.version)  # a correction takes effect via a new index
+        self.assertIn("새한국정보원", KeywordIndex.load(s, rebuilt["index_version"]).scope_terms[c.doc_id])
+
+    def test_a_common_fact_term_is_not_dropped_into_false_absence(self):
+        els = ingestion.finalize_elements(_sections(
+            [(f"{i + 1}. 하자보수 {i}", [f"하자보수 기간은 품목 {i}에 대하여 {i + 1}년으로 한다."]) for i in range(10)]),
+            "xa")
+        index = _index({"xa": els})
+        r, quote = self.first(index, "하자보수 기간은 얼마인가?")
+        self.assertTrue(r.evidence)
+        self.assertIn("하자보수 기간", quote)
+        self.assertFalse(any(x.startswith("scope_redundant_terms:") for x in r.limitations))
 
 if __name__ == "__main__":
     unittest.main()

@@ -215,6 +215,11 @@ class TimedReranker(IdentityReranker):
         return order, {"truncated": 1, "queue_ms": 7.5, "infer_ms": 2.5}
 
 
+class ExplodingReranker(IdentityReranker):
+    def rerank(self, question, chunks):
+        raise ValueError("expected sequence of length 446 at dim 1 (got 378)")
+
+
 class DemotingReranker(FakeReranker):
     """Pushes the chunks that mention 하자보수 to the end."""
 
@@ -431,6 +436,60 @@ class EvaluationRunTest(unittest.TestCase):
         with self.assertRaises(Exception):
             from rfp_assistant.settings import validate
             validate(s.with_(reranker_precision="int4"))
+
+    def test_an_inference_error_becomes_a_bypass_artifact_not_a_crash_or_a_score(self):
+        s = self.env.settings
+        evaluation.evaluate_retrieval(s, fixtures.analyzer(), self.transport, "dev-pilot", ["H"],
+                                      allow_paid_queries=True)
+        report = evaluation.trial_reranker(s, fixtures.analyzer(), "dev-pilot", [10, 20], reranker=ExplodingReranker(),
+                                           load_info=ExplodingReranker.info, users=2)
+        self.assertEqual((report["gate"]["passed"], report["gate"]["decision"]), (False, "bypass"))
+        self.assertIn("reranker inference failed", report["gate"]["reason"])
+        _, scores = evaluation.load_run(s, report["run_id"])
+        self.assertEqual(scores["status"], "blocked")
+
+    def test_shared_tokenizer_is_never_used_by_two_workers_at_once(self):
+        import threading
+        import time as _time
+
+        class Tokenizer:
+            def __init__(self):
+                self.busy = threading.Lock()
+                self.overlaps = 0
+
+            def use(self):
+                if not self.busy.acquire(blocking=False):
+                    self.overlaps += 1
+                    return
+                _time.sleep(0.002)
+                self.busy.release()
+
+            def __call__(self, q, p):
+                self.use()
+                return {"input_ids": list(range(len(p)))}
+
+        class Model:
+            def __init__(self):
+                self.tokenizer = Tokenizer()
+
+            def predict(self, pairs, show_progress_bar=False):
+                self.tokenizer.use()  # prediction preprocesses with the same tokenizer
+                return [float(len(p)) for _, p in pairs]
+
+        r = dense.LocalReranker.__new__(dense.LocalReranker)
+        r.model, r.max_length, r._sem = Model(), 512, threading.BoundedSemaphore(1)
+        chunks = [{"chunk_id": f"c{i}", "payload": "x" * (i + 1)} for i in range(5)]
+        threads = [threading.Thread(target=lambda: [r.rerank("q", chunks) for _ in range(5)]) for _ in range(6)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(r.model.tokenizer.overlaps, 0)
+        from rfp_assistant.settings import SettingsError, validate
+        with self.assertRaises(SettingsError):
+            validate(self.env.settings.with_(reranker_max_concurrency=2))
+        with self.assertRaises(dense.DenseError):
+            dense.LocalReranker(self.env.settings.with_(reranker_revision="abc", reranker_max_concurrency=2))
 
     def test_missing_query_usage_stops_paid_evaluation_queries(self):
         no_usage = generation.FakeTransport(embedder=lambda inputs, dims: generation.EmbeddingResponse(
@@ -760,6 +819,17 @@ class ServingTest(unittest.TestCase):
             self.assertIsNot(self.res.reranker(), first)  # a precision change reloads the model
             self.assertEqual(self.res.run_settings().reranker_precision, "fp16")
         self.assertEqual(loads, [512, 1024, 1024])
+
+    def test_a_legacy_hr_without_recorded_precision_serves_fp32(self):
+        with store.open_db(self.env.settings.db_path) as conn, store.tx(conn, immediate=True):
+            run = json.loads(get_app_setting(conn, "active_run"))
+            run["reranker"] = {"model": "m", "revision": "r", "max_length": 512, "max_concurrency": 1, "depth": 20}
+            store.set_app_setting(conn, "active_run", json.dumps(run))
+        res = service.Resources(self.env.settings.with_(reranker_precision="fp16"), transport=self.transport)
+        try:
+            self.assertEqual(res.run_settings().reranker_precision, "fp32")
+        finally:
+            res.close()
 
     def test_answer_billing_reports_every_paid_stage(self):
         no_usage = generation.FakeTransport(embedder=lambda inputs, dims: generation.EmbeddingResponse(
