@@ -15,7 +15,7 @@ from pathlib import Path
 from unittest import mock
 
 from rfp_assistant import auth, budget, service, store, ui
-from rfp_assistant.contracts import AnswerRequest, DocRef, Principal
+from rfp_assistant.contracts import AnswerRequest, Principal
 from rfp_assistant.generation import FakeTransport, ProviderResponse
 from rfp_assistant.settings import DEFAULT_RATES
 from tests import fixtures
@@ -59,6 +59,8 @@ class Base(unittest.TestCase):
     def tearDown(self):
         self.transport.gate.set()
         self.res.close()
+        if self.res._runner is not None:  # a deliberately orphaned worker must finish before the files go
+            self.res._runner._executor.shutdown(wait=True)
         self.tmp.cleanup()
 
     def wait_done(self, request_id, principal=None, timeout=10):
@@ -687,6 +689,23 @@ class ModesTest(Base):
 
 
 # ---------------------------------------------------------------- sources, exports and verifier work
+
+
+class SearchFilterTest(Base):
+    def test_unknown_or_conflicting_values_are_excluded_or_flagged_never_satisfied(self):
+        c = self.env.consultant
+        f = {"amount_min": 1, "closing_from": "2024-01-01"}
+        strict = {i["doc_id"] for i in service.search_projects(self.res, c, f, "")}
+        self.assertNotIn(self.d.doc_id, strict)  # unknown amount and closing date
+        self.assertNotIn(self.a.doc_id, strict)  # bid_close conflicts with its byte-identical copy
+        shown = {i["doc_id"]: i for i in service.search_projects(self.res, c, {**f, "include_unknown": True}, "")}
+        self.assertEqual(sorted(shown[self.d.doc_id]["filter_undecided"]), ["amount_krw:unknown", "bid_close:unknown"])
+        self.assertIn("bid_close:conflict", shown[self.a.doc_id]["filter_undecided"])
+        self.assertNotIn(self.e.doc_id, shown)  # a known 0원 amount fails amount_min; it is not "unknown"
+
+    def test_only_the_highest_cap_warning_is_shown(self):
+        self.assertEqual(ui.visible_warnings(["cap_50", "cap_75", "ahead_of_pace"]), ["cap_75", "ahead_of_pace"])
+        self.assertEqual(ui.visible_warnings(["cap_50", "cap_75", "cap_90", "cap_exhausted"]), ["cap_exhausted"])
 
 
 class SourceAndExportTest(Base):

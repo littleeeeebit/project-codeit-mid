@@ -1,0 +1,44 @@
+{
+ "kind": "fake_provider_load_check",
+ "synthetic": true,
+ "users": 6,
+ "requests_per_user": 2,
+ "fake_delay_seconds": 0.5,
+ "fail_every": 3,
+ "cap_micro_usd": 5328,
+ "max_reservation_micro_usd": 1184,
+ "affordable_at_once": 4,
+ "outcomes": {
+  "failed/technical_error": 1,
+  "completed/answered": 3,
+  "completed/budget_blocked": 8
+ },
+ "attempt_states": {
+  "settled": 3,
+  "unknown": 1
+ },
+ "provider_calls": 4,
+ "spent_micro_usd": 267,
+ "pending_unknown_micro_usd": 1184,
+ "submit_ms": {
+  "p50": 62.4,
+  "p95": 97.6
+ },
+ "poll_ms": {
+  "samples": 15,
+  "p50": 2.0,
+  "p95": 10.2,
+  "max": 11.5
+ },
+ "wall_seconds": 0.77,
+ "violations": [],
+ "checks": {
+  "cap_never_exceeded": true,
+  "one_generation_attempt_per_request": true,
+  "no_open_reservation_left": true,
+  "all_requests_finished": true,
+  "duplicate_submit_reused_request": true
+ },
+ "passed": true,
+ "recorded_at": "2026-10-01T06:03:26.749830+00:00"
+}

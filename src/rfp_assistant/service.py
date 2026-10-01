@@ -339,27 +339,33 @@ def search_projects(res: Resources, principal: Principal, filters: dict, query: 
     amount_min, amount_max = filters.get("amount_min"), filters.get("amount_max")
     close_from, close_to = filters.get("closing_from"), filters.get("closing_to")
     parsed_only = filters.get("parsed_only", False)
+    include_unknown = filters.get("include_unknown", False)
     items = []
+    notes: dict[str, list[str]] = {}
     for d in docs:
         m = d["effective"]  # the competing CSV values stay visible in the result
         conflicts = {c["field"] for c in d["quality"].get("provenance_conflicts", [])} - set(d["resolutions"])
         if inst and inst not in (m["institution"] or ""):
             continue
-        if amount_min is not None or amount_max is not None:  # unknown amounts never satisfy a range
+        undecided = []  # a range filter never treats an unknown or conflicting value as satisfied
+        if amount_min is not None or amount_max is not None:
             if m["amount_krw"] is None or "amount_krw" in conflicts:
-                continue
-            if amount_min is not None and m["amount_krw"] < amount_min:
-                continue
-            if amount_max is not None and m["amount_krw"] > amount_max:
+                undecided.append("amount_krw:" + ("conflict" if "amount_krw" in conflicts else "unknown"))
+            elif (amount_min is not None and m["amount_krw"] < amount_min) or \
+                    (amount_max is not None and m["amount_krw"] > amount_max):
                 continue
         if close_from or close_to:
             if m["bid_close"] is None or "bid_close" in conflicts:
-                continue
-            day = m["bid_close"]["value"][:10]
-            if (close_from and day < close_from) or (close_to and day > close_to):
-                continue
+                undecided.append("bid_close:" + ("conflict" if "bid_close" in conflicts else "unknown"))
+            else:
+                day = m["bid_close"]["value"][:10]
+                if (close_from and day < close_from) or (close_to and day > close_to):
+                    continue
+        if undecided and not include_unknown:
+            continue
         if parsed_only and d["parse_status"] != "parsed":
             continue
+        notes[d["doc_id"]] = undecided
         items.append(d)
     q = nfc(query or "").strip()
     snippets: dict[str, tuple[float, str]] = {}
@@ -385,7 +391,8 @@ def search_projects(res: Resources, principal: Principal, filters: dict, query: 
         "indexed": _indexed(res, d["active_extraction_id"]),
         "unavailable_reason": QUARANTINE_TEXT.get(d["reason_code"] or ""),
         "flags": d["quality"]["flags"], "conflicts": d["quality"].get("provenance_conflicts", []),
-        "resolutions": d["resolutions"], "snippet": snip,
+        "resolutions": d["resolutions"], "snippet": snip, "filter_undecided": notes.get(d["doc_id"], []),
+        "notice": d["effective"].get("notice"),
     } for _, _, d, snip in ranked[:limit]]
 
 
@@ -555,7 +562,7 @@ def _validate_request(res: Resources, request: AnswerRequest) -> str:
     question = (request.question or "").strip()
     if request.mode not in PAID_MODES + FREE_MODES:
         raise ServiceError("지원하지 않는 질문 방식입니다.")
-    if request.mode != "inventory" and (not question or len(question) > s.question_max_characters):
+    if request.mode in PAID_MODES and (not question or len(question) > s.question_max_characters):
         raise ServiceError(f"질문은 1~{s.question_max_characters}자여야 합니다.")
     if len(question) > s.question_max_characters:
         raise ServiceError(f"질문은 {s.question_max_characters}자를 넘을 수 없습니다.")

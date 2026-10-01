@@ -1,0 +1,132 @@
+{
+ "kind": "browser_walkthrough",
+ "synthetic": true,
+ "recorded_at": "2026-10-01",
+ "summary": "Headless Chromium (Playwright 1.56.1) against `streamlit run app.py --server.address 127.0.0.1` with provider 'fake' (4 s delay) on the four-document test fixture corpus, token mode with throwaway fake accounts. Not the team host, not the real corpus, no paid call.",
+ "environment": {
+  "streamlit": "1.64.0",
+  "python": "3.12.3",
+  "os": "Linux (cloud container)",
+  "browser": "Chromium 1194 headless"
+ },
+ "steps": [
+  {
+   "step": "Login with a wrong token shows the generic failure; a consultant (kim) sees only the consultant page",
+   "role": "consultant",
+   "viewport": "1400x1000",
+   "outcome": "passed (01, 02)"
+  },
+  {
+   "step": "Select the PDF project, ask; the submit button is disabled while the request runs",
+   "role": "consultant",
+   "viewport": "1400x1000",
+   "outcome": "passed (03)"
+  },
+  {
+   "step": "A second session (lee) sees the reservation in its sidebar while kim's call runs (warm server)",
+   "role": "consultant+verifier",
+   "viewport": "1400x1000",
+   "outcome": "passed: nonzero pending seen 260 ms after submit"
+  },
+  {
+   "step": "Change the selection while the 4 s fake call is in flight: the late answer does not attach; it remains in history",
+   "role": "consultant",
+   "viewport": "1400x1000",
+   "outcome": "passed (04)"
+  },
+  {
+   "step": "Ask on another PDF, open evidence E1: quote, neighbouring elements, page, review state, original download",
+   "role": "consultant",
+   "viewport": "1400x1000",
+   "outcome": "passed (06)"
+  },
+  {
+   "step": "Narrow layout keeps reading order (strip, search, cards, selection, answer)",
+   "role": "consultant",
+   "viewport": "420x900",
+   "outcome": "passed (07)"
+  },
+  {
+   "step": "Two-document comparison: both documents contribute claims",
+   "role": "consultant",
+   "viewport": "1400x1000",
+   "outcome": "passed (08)"
+  },
+  {
+   "step": "Basic information comparison: conflict and unknown states shown, no paid call",
+   "role": "consultant",
+   "viewport": "1400x1000",
+   "outcome": "passed (09)"
+  },
+  {
+   "step": "Quarantined HWP: unavailable reason shown; requirement list reports 원문 미수집",
+   "role": "consultant",
+   "viewport": "1400x1000",
+   "outcome": "passed (10)"
+  },
+  {
+   "step": "Consultant deep links /verify, /admin, /review: reload asks for login; after login no privileged content",
+   "role": "consultant",
+   "viewport": "1400x1000",
+   "outcome": "passed"
+  },
+  {
+   "step": "Verifier: free trace frozen under a run ID; second run with 1 evidence unit; comparison shows the limits change",
+   "role": "verifier",
+   "viewport": "1400x1000",
+   "outcome": "passed (11, 12)"
+  },
+  {
+   "step": "Owner records a $16 external adjustment on the admin page (audited)",
+   "role": "budget_admin",
+   "viewport": "1400x1000",
+   "outcome": "passed (13)"
+  },
+  {
+   "step": "At the cap: consultant sees the exhaustion warning; paid answer blocked; original download still works (bytes equal the managed original)",
+   "role": "consultant",
+   "viewport": "1400x1000",
+   "outcome": "passed (14, 15)"
+  },
+  {
+   "step": "Six members in six browser contexts submit at once against a cold server (fake delay 4 s)",
+   "role": "6 consultants",
+   "viewport": "1280x900",
+   "outcome": "passed: all six answered in 9.6 s; each saw only its own answer; every sidebar showed the shared $0.0071 reservation 5.4-5.6 s after submit (cold index load)"
+  },
+  {
+   "step": "Reload all six pages and keep polling 8 s",
+   "role": "6 consultants",
+   "viewport": "1280x900",
+   "outcome": "passed: attempts stayed 6 settled, requests stayed 6"
+  },
+  {
+   "step": "Keyboard: Tab from the page start reaches a labelled input",
+   "role": "consultant",
+   "viewport": "1400x1000",
+   "outcome": "partial: focus reached an input; full keyboard walkthrough and contrast measurement not done"
+  }
+ ],
+ "screenshots": [
+  "01-login.png",
+  "02-consultant.png",
+  "03-running.png",
+  "04-scope-changed.png",
+  "06-answer-evidence.png",
+  "07-narrow.png",
+  "08-compare.png",
+  "09-metadata.png",
+  "10-quarantined.png",
+  "11-verifier-trace.png",
+  "12-verifier-compare.png",
+  "13-admin.png",
+  "14-cap-blocked.png",
+  "15-warnings-collapsed.png",
+  "16-six-sessions-m1.png"
+ ],
+ "observations": [
+  "A browser reload starts a new Streamlit session and asks for login again (the session ID is deliberately not put in the URL).",
+  "Headless Chromium reports the download's suggested name as 'download'; the bytes equal the managed original. Check the Korean filename in a real desktop browser.",
+  "Fixture-only retrieval note (phase 2 policy, unchanged): '좌석 예약 시스템은 무엇인가요?' on the one-chunk 도서관 fixture returns insufficient evidence because the restated title terms are dropped and '시스템' has non-positive IDF in the four-document corpus; no paid call is made."
+ ]
+}
