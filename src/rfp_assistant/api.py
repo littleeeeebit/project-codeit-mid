@@ -10,14 +10,18 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import date
+from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import quote, unquote
 
 from fastapi import Depends, FastAPI, Header, Request
 from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import service
+
+WEB = Path(__file__).resolve().parents[2] / "web" / "out"
 
 
 def create_app(resources=None) -> FastAPI:
@@ -45,6 +49,8 @@ def create_app(resources=None) -> FastAPI:
     _routes(app)
     _verify_routes(app)
     _dataset_routes(app)  # after /api/gold/recent and friends, which /api/gold/{candidate_id} would shadow
+    if WEB.is_dir():  # the built screens (`cd web && npm run build`); mounted last, so /api/* stays the API's
+        app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
     return app
 
 
