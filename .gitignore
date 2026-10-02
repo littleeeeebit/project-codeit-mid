@@ -5,6 +5,8 @@
 .wiki/installed-agents.json
 .wiki/trajectory.jsonl
 .wiki/review/
+# Raw conversation transcripts stay local; their summaries (.wiki/memory/*.md) are kept
+.wiki/memory/*.raw.md
 
 # Original dataset and local application artifacts
 /원본 데이터/

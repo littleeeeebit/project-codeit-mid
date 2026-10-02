@@ -1,6 +1,6 @@
 # Phase 4 handoff: evaluation and release
 
-This folder records what the Cloud implementation of the [phase 4 plan](../../docs/plan/end-to-end/4-evaluation-and-release.md) built and checked. All evidence here is **synthetic**: the fake provider, the phase-4 fixture corpus (five CSV associations: four generated PDFs, one unconvertible HWP) and typed reviewer names. No original document, no local runtime and no API key were used, no paid call was made, and **$0 was spent**. No reviewed gold exists in this repository, so no real quality number is claimed anywhere below.
+This folder records what the Cloud implementation of the [phase 4 plan](../../docs/plan/end-to-end/4-evaluation-and-release.md) built and checked. All evidence here is **synthetic**: the fake provider, the phase-4 fixture corpus (five CSV associations: four generated PDFs, one unconvertible HWP) and typed reviewer names. No original document, no local runtime and no API key were used, no paid call was made, and $0 was spent. No reviewed gold exists in this repository, so no real quality number is claimed anywhere below.
 
 The authoritative release evidence must be produced on the owner host with the real corpus, following [runbook §9–12](../../docs/operations/runbook.md#9-setup-and-the-api-key). The shareable outcome is [docs/operations/release-report.md](../../docs/operations/release-report.md).
 

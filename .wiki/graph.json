@@ -45,16 +45,6 @@
   },
   {
    "a": "docs/operations/release-report.md",
-   "b": "docs/plan/end-to-end/4-evaluation-and-release.md",
-   "kind": "link"
-  },
-  {
-   "a": "docs/operations/release-report.md",
-   "b": "README.md",
-   "kind": "link"
-  },
-  {
-   "a": "docs/operations/release-report.md",
    "b": "docs/operations/runbook.md",
    "kind": "link"
   },
@@ -477,6 +467,12 @@
    "a": "docs/rag/sources.md",
    "b": "docs/rag/project-and-data.md",
    "kind": "link"
+  },
+  {
+   "a": ".wiki/gold-drafting",
+   "b": "docs/rag/golden-dataset.md",
+   "kind": "reads",
+   "cross": true
   },
   {
    "a": ".wiki/gold-drafting",
