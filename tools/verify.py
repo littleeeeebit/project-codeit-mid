@@ -398,7 +398,11 @@ def pick_documents(ctx: Context, corpus: dict) -> tuple[str, str]:
 
     def first(ext):
         return next((r["doc_id"] for r in rows if r["filename"].lower().endswith(ext)), None)
-    return hwp or first(".hwp") or rows[0]["doc_id"], pdf or first(".pdf") or rows[-1]["doc_id"]
+    hwp, pdf = hwp or first(".hwp"), pdf or first(".pdf")
+    if not hwp or not pdf or hwp == pdf:  # never stand a PDF in for the HWP case: that is not HWP evidence
+        raise RuntimeError("the configured corpus needs one parsed HWP and one parsed PDF in the active index "
+                           f"(found hwp={hwp}, pdf={pdf}); set RFP_VERIFY_HWP_DOC_ID and RFP_VERIFY_PDF_DOC_ID")
+    return hwp, pdf
 
 
 @flow("verifier-runs")
@@ -432,8 +436,28 @@ def repository_gates(ctx: Context) -> dict:
                   else out.strip()[:300] or f"exit {code}")
     code, out = ctx.cli("phase3-gate", ["check", "--phase", "3", "--provider", "fake"])
     gate = (code == 0, unittest_summary(out, code))
+    code, out = ctx.cli("phase4-gate", ["check", "--phase", "4", "--provider", "fake"])
+    gate4 = (code == 0, unittest_summary(out, code))
     code, out = ctx.run("full-suite", [ctx.python, "-B", "-m", "unittest", "discover", "-s", "tests", "-t", "."])
-    return {"whitespace": whitespace, "phase3-gate": gate, "full-suite": (code == 0, unittest_summary(out, code))}
+    return {"whitespace": whitespace, "phase3-gate": gate, "phase4-gate": gate4,
+            "full-suite": (code == 0, unittest_summary(out, code))}
+
+
+@flow("evaluation-release")
+def evaluation_release(ctx: Context) -> dict:
+    """Unit gates plus the operator's CLI path on a temporary fixture corpus (fake provider, never RFP_DATA_DIR)."""
+    gold_answers = ctx.unit("evaluation-tests", ["tests.test_evaluation"])
+    release_tests = ctx.unit("release-tests", ["tests.test_release"])
+    code, out = ctx.run("cli-walkthrough", [ctx.python, "-B", "tools/verification/phase4_walkthrough.py",
+                                            str(ctx.work)], 900)
+    try:
+        report = json.loads((ctx.work / "phase4-walkthrough.json").read_text(encoding="utf-8"))
+        failed = [s["step"] for s in report["steps"] if not s["ok"]]
+        walk = (code == 0 and report["passed"], f"{len(report['steps'])} CLI steps, failed {failed or 'none'}; "
+                                                f"release status {report.get('release_status')}")
+    except (OSError, ValueError, KeyError):
+        walk = (False, f"no walkthrough result (exit {code}): {out[-300:]}")
+    return {"gold-and-answers": gold_answers, "backup-and-report": release_tests, "cli-walkthrough": walk}
 
 
 # ---------------------------------------------------------------- browser flows

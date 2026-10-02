@@ -1,0 +1,78 @@
+{
+ "release_id": "F-5e8fce120d",
+ "generated_at": "2026-10-02T08:46:54.145781+00:00",
+ "status": "limited",
+ "reasons": [
+  "hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)",
+  "quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
+  "quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
+  "quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)",
+  "evidence is sealed pilot, not a sealed evaluation of reviewed gold"
+ ],
+ "evidence_label": "sealed pilot",
+ "code": {
+  "source_sha256": "2580eb9f48f36039180430dac25509bb67f3f2a24b5b61a968d846749fcbe7d6",
+  "git_revision": "87da697473f8cf6038608c73fe19ede3ba0fb0ab",
+  "git_dirty": false
+ },
+ "metric_code_sha256": "be4ea056096a5270bacd46be59c31a93deb4e3fcd42c47b2e2c6ef21353e77b1",
+ "settings_fingerprint": "84c534444d0f9d62",
+ "model": "gpt-6-luna",
+ "reasoning_effort": "low",
+ "max_output_tokens": 2000,
+ "prompt_version": "grounded-answer-4",
+ "rate_version": "openai-standard-gpt-6-luna-2026-09-30",
+ "active_run": {
+  "activated_at": "2026-10-02T08:46:18.991659+00:00",
+  "dense_version": null,
+  "embedding": null,
+  "eval_version": "retrieval-eval-4",
+  "fallback_mode": "kiwi_bm25",
+  "finalist_run_id": null,
+  "index_version": "d70a07d522a75ea2",
+  "label": "K1",
+  "limits": {
+   "channel_top_k": 20,
+   "evidence_max_tokens": 5000,
+   "evidence_max_units": 6,
+   "evidence_target_tokens": 3000,
+   "fused_top_k": 20,
+   "rrf_k": 60
+  },
+  "mode": "kiwi_bm25",
+  "reranker": null,
+  "run_id": "K1-ec84b5c615"
+ },
+ "active_index": "d70a07d522a75ea2",
+ "datasets": {
+  "dev": {
+   "dataset_sha256": "fae2eb474a5a8e21282e9c37e84a12f81f6754be8be9fe78e95c4fff949f7714",
+   "rows": 4,
+   "label": "pilot",
+   "review_log_sha256": "cfd36a894941afc52abea9d1e0382ac04d4de96699dba055b88c3fdf99046edf",
+   "current": true
+  },
+  "test": {
+   "dataset_sha256": "81e944ec5582c10deab82864f8385a22fbf3560b97f90e85af81ad3bf776daa8",
+   "rows": 1,
+   "label": "pilot",
+   "review_log_sha256": "d1e259893baa29ccfd09cdb8cb466ef211c769ddf242a8ea58398a567d18ed28",
+   "current": true
+  }
+ },
+ "requirements_lock_sha256": "060fd9cdbdc949a34f12667a45bdd8714bbd78db6a7ff06c482a894028626780",
+ "hardware": {
+  "platform": "Linux-6.18.44-fc-v51-x86_64-with-glibc2.39",
+  "machine": "x86_64",
+  "python": "3.12.3",
+  "cpu_count": 4
+ },
+ "stale_evidence": [],
+ "freeze": {
+  "freeze_id": "F-5e8fce120d",
+  "frozen_at": "2026-10-02T08:46:31.062374+00:00",
+  "selected_run_id": "K1-ec84b5c615",
+  "decided_by": "owner",
+  "post_test": false
+ }
+}

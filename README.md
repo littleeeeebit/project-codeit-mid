@@ -1,6 +1,6 @@
 # RFP assistant (입찰메이트)
 
-Internal assistant for historical Korean RFPs: search projects, select one document, ask a scoped question, receive one metered grounded answer, and open the original evidence. The plan lives in [docs/plan/end-to-end](docs/plan/end-to-end/0-overview.md); this README covers setup and launch for what is implemented (phases 1–3). Operations (access, stop/restart, billing recovery, reconciliation) are in the [runbook](docs/operations/runbook.md); screen layout and request ownership in [DESIGN.md](DESIGN.md).
+Internal assistant for historical Korean RFPs: search projects, select one document, ask a scoped question, receive one metered grounded answer, and open the original evidence. The plan lives in [docs/plan/end-to-end](docs/plan/end-to-end/0-overview.md); this README covers setup and launch for what is implemented (phases 1–4). Operations (access, stop/restart, billing recovery, reconciliation, evaluation, sealed run, backup/restore, index rollback) are in the [runbook](docs/operations/runbook.md); screen layout and request ownership in [DESIGN.md](DESIGN.md). Phase outcomes: [phase 2](handoff/phase2/README.md), [phase 3](handoff/phase3/README.md), [phase 4](handoff/phase4/README.md) and the [release report](docs/operations/release-report.md).
 
 ## Environment
 
@@ -43,6 +43,8 @@ python -m rfp_assistant.cli build-keyword --include-unreviewed   # operating ind
 python -m rfp_assistant.cli check --phase 1 --provider fake   # automated invariants in temporary state, no key
 python -m rfp_assistant.cli check --phase 3 --provider fake   # service, budget and request-state gate
 python -m rfp_assistant.cli load-check --users 6 --provider fake   # six concurrent members, temporary ledger
+python -m rfp_assistant.cli check --phase 4 --provider fake   # gold, evaluation, sealed run, backup and report gate
+python -m rfp_assistant.cli check --phase all --provider fake --save   # every test; recorded for release-report
 python -m streamlit run app.py --server.address 127.0.0.1
 ```
 
@@ -129,6 +131,32 @@ python -m rfp_assistant.cli check --phase 2 --provider fake  # every automated i
 - Gold drafting inputs. `gold excerpts --out <abs new dir>` writes `excerpts.jsonl` (a few numeric/qualifier, late-table, repeated-code and deadline elements per dev-family document; each excerpt is a bounded window around its triggering fact, with the table header or neighbouring sentences, the trigger, raw-text `offsets` and `context_clipped`) and `drafting-context.json` (queue counts, rejections with reasons and inferences, existing question keys). It contains source text: keep it in local inputs unless the owner shares it. `gold status` lists `pending_invalid` candidates that no longer pass the shared checks (for example a converter case whose document has since been recovered); the review screen shows the same errors. `validate-gold` requires the `converter_unavailable` case only while a source is actually quarantined, and reports `required_types` and `operational_cases`.
 - Activation. The decision JSON names `run_id`, `mode` (the run's mode), `decided_by`, `rationale` and optionally `finalist_run_id` (the other retrieval finalist for phase 4). `activate-run` verifies the index and matrix and requires a passed gate for HR. It switches serving in one transaction and keeps the history in `activations`. Runs and gates carry the evaluation policy version (`EVAL_VERSION`). Only runs scored under the current policy can be activated. An HR selection from an older policy keeps hybrid retrieval without the reranker until a current trial passes. Cached corpus and query vectors make that rerun free. Serving reuses the run's evaluated embedding model/dimensions, depths, RRF constant, evidence limits and reranker input length, whatever the process configuration says. Until then the keyword default serves. If the matrix fails verification or a query vector is unavailable, serving falls back to K1 and the trace records why.
 
+## Phase 4: evaluation and release
+
+Plan: [4-evaluation-and-release.md](docs/plan/end-to-end/4-evaluation-and-release.md). Procedure: [runbook §10–12](docs/operations/runbook.md#10-phase-4-evaluation-sealed-run-and-release). Outcome on this branch: [release report](docs/operations/release-report.md) and [phase-4 handoff](handoff/phase4/README.md).
+
+```powershell
+python -m rfp_assistant.cli validate-gold --dataset dev                       # gold-2 rows; `test` prints IDs/counts only
+python -m rfp_assistant.cli freeze-dataset --dataset dev --actor <owner> --reason "<why>"
+python -m rfp_assistant.cli evaluate-retrieval --dataset dev --runs K0,K1,D,H  # free; the sealed split is refused
+python -m rfp_assistant.cli plan-run --dataset dev --action answer-finalists   # every remaining attempt priced, nothing sent
+python -m rfp_assistant.cli run-answers --estimate-id <id> --actor <owner>     # paid, resumable, UI stopped
+python -m rfp_assistant.cli export-review --run-id <A-run>                     # blind sheet; import-review applies it
+python -m rfp_assistant.cli freeze-release --run-id <run> --answer-run <A-run> --decided-by <owner> --rationale "..."
+python -m rfp_assistant.cli plan-run --action sealed --freeze-id <F-id>        # then run-answers: once per test set
+python -m rfp_assistant.cli plan-run --action latency --waves 5 --users 6      # then latency-run
+python -m rfp_assistant.cli backup --destination D:\abs\new-dir --actor <owner>
+python -m rfp_assistant.cli restore-check --backup D:\abs\new-dir\manifest.json   # fresh staging, paid off
+python -m rfp_assistant.cli check --phase all --provider fake --save
+python -m rfp_assistant.cli release-report --latest                            # read-only; ready / limited / blocked
+```
+
+- Gold-2 datasets. `dev` (`.runtime/datasets/dev.jsonl`) and the sealed `test` (`.runtime/sealed/test.jsonl`) share the review queue with the pilot. Labels are evidence groups of alternative source spans (hash, extraction, element, offsets/cells, exact quote), never chunk IDs; required claims are typed (number + unit, date + time, text patterns) with qualifiers and criticality. The validator rejects unreviewed or self-approved rows, missing quotes, cross-split families and paraphrases, unverified negatives and source failures labeled as absence, and labels any set below the 60 + 60 targets `pilot`. Sealed rows are reviewed only through the owner's CLI (`gold show/decide/second-review`).
+- Answer evaluation. At most two development finalists (by default the activated run and its recorded finalist). Each answer goes through the service's own answer path with the finalist's retrieval configuration pinned, charged to the `gold_eval` envelope. Resuming never re-sends a finished row or a row whose billing is unknown. Scores keep denominators and Wilson intervals; text claims and unlabelled citations wait for blind human review, and there is no paid judge.
+- Sealed run. `freeze-release` records the release candidate (activated run, code/metric/prompt/model/rate/settings hashes, frozen dev/test manifests, the development selection). The sealed set then runs once; any later run is a labeled post-test regression.
+- Release report. `release-report` decides `ready` only when every hard check passes and every quality target is met on sealed gold; otherwise `limited` (unverified, unmeasured, missed or pilot-only) or `blocked` (a failed hard check).
+- Active retrieval mode. Serving uses whatever `activate-run` last recorded in the owner's `.runtime`; until then it is the keyword default `kiwi_bm25` with no dense or reranker stage. This repository records no activation of its own; `release-report` and `report --phase 2` print the active run.
+
 ## Access and paid use
 
 There is no login (owner decision, reaffirmed for phase 3): every visitor gets the consultant, verification, question-review and 사용량 관리 (budget administration) screens. The name in the sidebar (default `owner`) is recorded on paid requests, review decisions, corrections and audited owner actions; it attributes work but does not authenticate anyone. Anyone who can reach the server can spend the budget and use the admin page, so keep `--server.address 127.0.0.1` unless everyone on that network may do so (see the [runbook](docs/operations/runbook.md)).
@@ -159,4 +187,4 @@ Recorded before any distribution decision:
 
 ## Layout
 
-`src/rfp_assistant/` holds one package: `settings`, `contracts`, `store`, `auth`, `ingestion`, `chunking`, `retrieval`, `dense` (embedding cache, matrix, reranker), `budget`, `generation` (the only SDK call site), `service` (also the bounded request executor), `ui`, `cli`, `evaluation`, `ops` (fake-provider load check and the phase-3 report). `app.py` launches the consultant, verifier, question-review and budget-administration pages. Tests are standard `unittest` under `tests/`.
+`src/rfp_assistant/` holds one package: `settings`, `contracts`, `store`, `auth`, `ingestion`, `chunking`, `retrieval`, `dense` (embedding cache, matrix, reranker), `budget`, `generation` (the only SDK call site), `service` (also the bounded request executor), `ui`, `cli`, `evaluation` (pilot and gold-2 validation, frozen retrieval runs, source-span metrics), `gold` (the review queue), `answers` (phase-4 answer runs, scoring, blind review, latency sample), `sealed` (release freeze and the single sealed run), `release` (backup, staged restore, release report), `ops` (fake-provider load check and the phase-3 report). `app.py` launches the consultant, verifier, question-review and budget-administration pages. Tests are standard `unittest` under `tests/`.

@@ -16,7 +16,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from . import auth, budget, chunking, evaluation, fidelity, gold, ingestion, ops, service, store
+from . import answers, auth, budget, chunking, drafting, evaluation, fidelity, gold, ingestion, ops, release, sealed, service, store
 from .settings import DEFAULT_RATES, RATE_VERSION, REPO_ROOT, load_settings
 
 
@@ -219,28 +219,43 @@ def cmd_report(args, settings) -> int:
     if args.phase == 3:
         print(ops.write_phase3_report(settings))
         return 0
-    print("only --phase 2|3 is implemented", file=sys.stderr)
+    if args.phase == 4:
+        print(release.write_release_report(settings, "latest"))
+        return 0
+    print("only --phase 2|3|4 is implemented", file=sys.stderr)
     return 2
 
 
 PHASE3_MODULES = ("tests.test_service", "tests.test_budget", "tests.test_generation")
+PHASE4_MODULES = ("tests.test_evaluation", "tests.test_gold", "tests.test_release")
+PHASE5_MODULES = ("tests.test_release",)
 
 
 def cmd_check(args, settings) -> int:
-    if args.phase not in (1, 2, 3) or args.provider != "fake":
-        print("only --phase 1|2|3 --provider fake is implemented", file=sys.stderr)
+    phase = args.phase
+    if phase not in ("1", "2", "3", "4", "5", "all") or args.provider != "fake":
+        print("only --phase 1|2|3|4|5|all --provider fake is implemented", file=sys.stderr)
         return 2
     tests_dir = REPO_ROOT / "tests"
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
+    real_data_dir = settings.data_dir
     with tempfile.TemporaryDirectory() as tmp:
         os.environ["RFP_DATA_DIR"] = tmp  # isolated state; never production data
         os.environ.pop("OPENAI_API_KEY", None)
-        if args.phase == 3:  # focused service, budget and request-state checks
-            suite = unittest.defaultTestLoader.loadTestsFromNames(PHASE3_MODULES)
+        names = {"3": PHASE3_MODULES, "4": PHASE4_MODULES, "5": PHASE5_MODULES}.get(phase)
+        if names:  # focused checks
+            suite = unittest.defaultTestLoader.loadTestsFromNames(names)
         else:
             suite = unittest.defaultTestLoader.discover(str(tests_dir), top_level_dir=str(REPO_ROOT))
         result = unittest.TextTestRunner(verbosity=2).run(suite)
+    if args.save:  # what the release report cites: exactly this run, its counts and the code it ran on
+        path = real_data_dir / "releases" / "checks" / f"check-{phase}.json"
+        ops.save_json(path, {"phase": phase, "provider": "fake", "ok": result.wasSuccessful(),
+                             "tests_run": result.testsRun, "failures": len(result.failures),
+                             "errors": len(result.errors), "skipped": len(result.skipped),
+                             "code": evaluation.code_fingerprint(), "recorded_at": store.utcnow()})
+        print(path)
     return 0 if result.wasSuccessful() else 1
 
 
@@ -286,6 +301,88 @@ def cmd_validate_gold(args, settings) -> int:
     return 0 if report["ok"] else 1
 
 
+def cmd_freeze_dataset(args, settings) -> int:
+    _print(evaluation.freeze_dataset(settings, args.dataset, args.actor, args.reason))
+    return 0
+
+
+def _ids(text: str | None) -> list[str] | None:
+    return [x.strip() for x in text.split(",") if x.strip()] if text else None
+
+
+def cmd_plan_run(args, settings) -> int:
+    if args.action == "latency":
+        est = answers.plan_latency(settings, waves=args.waves, users=args.users)
+    else:
+        est = answers.plan_run(settings, args.action, args.dataset, _ids(args.runs), args.freeze_id,
+                               post_test=args.post_test_regression)
+    _print({k: v for k, v in est.items() if k != "per_row" or args.verbose})
+    return 0 if est["fits"] else 1
+
+
+def cmd_run_answers(args, settings) -> int:
+    res = _paid_resources(settings)  # exclusive maintenance mode: the same gateway, ledger and owner lock
+    try:
+        if res.transport is None:
+            raise answers.AnswerEvalError(res.provider_note or "no provider transport")
+        result = answers.run_answers(settings, res, args.estimate_id, args.actor, args.reason)
+    finally:
+        res.close()
+    _print(result)
+    _print(asdict(budget.snapshot(settings.db_path)))
+    return 0 if result["status"] == "complete" else 1
+
+
+def cmd_latency_run(args, settings) -> int:
+    res = _paid_resources(settings)
+    try:
+        if res.transport is None:
+            raise answers.AnswerEvalError(res.provider_note or "no provider transport")
+        result = answers.latency_run(settings, res, args.estimate_id, args.actor)
+    finally:
+        res.close()
+    _print({k: v for k, v in result.items() if k != "waves"})
+    return 0 if not result["failures"] else 1
+
+
+def cmd_score_answers(args, settings) -> int:
+    _print(answers.finalize(settings, args.run_id))
+    return 0
+
+
+def cmd_export_review(args, settings) -> int:
+    _print(answers.export_review_sheet(settings, args.run_id, Path(args.out) if args.out else None))
+    return 0
+
+
+def cmd_import_review(args, settings) -> int:
+    _print(answers.import_reviews(settings, args.run_id, Path(args.file), args.reviewer))
+    return 0
+
+
+def cmd_freeze_release(args, settings) -> int:
+    freeze = sealed.freeze_release(settings, auth.OWNER_CLI, args.run_id, args.answer_run, args.decided_by,
+                                   args.rationale)
+    _print({k: freeze[k] for k in ("freeze_id", "selected_run_id", "post_test", "test_manifest", "code")})
+    return 0
+
+
+def cmd_backup(args, settings) -> int:
+    _print(release.backup(settings, Path(args.destination), args.actor))
+    return 0
+
+
+def cmd_restore_check(args, settings) -> int:
+    report = release.restore_check(settings, Path(args.backup), Path(args.staging) if args.staging else None)
+    _print({k: report[k] for k in ("passed", "staging", "checks")})
+    return 0 if report["passed"] else 1
+
+
+def cmd_release_report(args, settings) -> int:
+    print(release.write_release_report(settings, "latest" if args.latest or not args.release_id else args.release_id))
+    return 0
+
+
 def cmd_configure_budget(args, settings) -> int:
     if not args.confirm_rates:
         print("recheck current model prices, then pass --confirm-rates", file=sys.stderr)
@@ -307,7 +404,17 @@ def cmd_budget_status(args, settings) -> int:
 
 
 def cmd_gold(args, settings) -> int:
-    if args.action == "submit":
+    if args.action == "generate":
+        if not args.file or not args.out or not args.max_cost_usd:
+            raise gold.GoldError("generate needs --file <plan.json> --out <new private directory> --max-cost-usd")
+        plan = json.loads(Path(args.file).read_text(encoding="utf-8"))
+        try:
+            ceiling = int((Decimal(args.max_cost_usd) * budget.MICRO).to_integral_value(rounding="ROUND_FLOOR"))
+        except (ArithmeticError, ValueError):
+            raise gold.GoldError("generate needs a finite positive --max-cost-usd") from None
+        _print(drafting.generate(settings, plan, Path(args.out), ceiling,
+                                split="test" if args.dataset == "test" else "dev", principal=auth.OWNER_CLI))
+    elif args.action == "submit":
         evaluation.assign_families(settings)
         _print(gold.submit(settings, Path(args.file), args.batch, args.dataset, args.drafted_by))
     elif args.action == "infer":
@@ -326,6 +433,20 @@ def cmd_gold(args, settings) -> int:
         _print(gold.write_excerpts(settings, Path(args.out), per_category=args.per_category))
     elif args.action == "repin":
         _print(gold.repin(settings, args.batch or ""))
+    elif args.action == "show":  # the owner's terminal: the only place a sealed candidate is shown for review
+        c = gold.candidate(settings, args.candidate_id or "", include_sealed=True)
+        _print({k: c[k] for k in ("candidate_id", "status", "dataset", "drafted_by", "row_sha256", "row", "context",
+                                  "reviews", "current_errors")})
+    elif args.action == "decide":
+        c = gold.candidate(settings, args.candidate_id or "", include_sealed=True)
+        _print(gold.decide(settings, c["candidate_id"], args.decision or "", args.reviewer, args.expected_sha
+                           or c["row_sha256"], args.category, args.note, original_inspected=args.original_inspected,
+                           disputed=args.disputed, include_sealed=True))
+    elif args.action == "second-review":
+        if args.agree == args.disagree:
+            raise gold.GoldError("pass exactly one of --agree or --disagree")
+        _print(gold.second_review(settings, args.candidate_id or "", args.reviewer, args.agree, args.note,
+                                  include_sealed=True))
     else:
         _print(gold.status(settings))
     return 0
@@ -406,10 +527,55 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("report", help="write the phase handoff report from recorded state")
     s.add_argument("--phase", type=int, required=True)
     s = sub.add_parser("check", help="automated phase gate in temporary state")
-    s.add_argument("--phase", type=int, required=True)
+    s.add_argument("--phase", required=True, help="1, 2, 3, 4, 5 or all")
     s.add_argument("--provider", required=True)
-    s = sub.add_parser("validate-gold")
+    s.add_argument("--save", action="store_true", help="record the outcome for release-report")
+    s = sub.add_parser("validate-gold", help="dev-pilot (phase 2 rules) or the gold-2 splits dev / test")
     s.add_argument("--dataset", required=True)
+    s = sub.add_parser("freeze-dataset", help="validate and freeze a gold split: dataset, review log, family map")
+    s.add_argument("--dataset", required=True, choices=["dev", "test"])
+    s.add_argument("--actor", required=True)
+    s.add_argument("--reason", required=True)
+    s = sub.add_parser("plan-run", help="estimate an answer evaluation before anything is sent (no provider call)")
+    s.add_argument("--action", required=True, choices=list(answers.ACTIONS))
+    s.add_argument("--dataset", default="dev", help="answer-finalists: the reviewed development split")
+    s.add_argument("--runs", help="answer-finalists: one or two retrieval run IDs (default: active + its finalist)")
+    s.add_argument("--freeze-id", help="sealed: the release freeze")
+    s.add_argument("--post-test-regression", action="store_true",
+                   help="sealed: a further run after the untouched sealed result (needs --reason at run time)")
+    s.add_argument("--waves", type=int, default=5, help="latency: waves")
+    s.add_argument("--users", type=int, default=6, help="latency: concurrent members per wave")
+    s.add_argument("--verbose", action="store_true", help="print every row's price")
+    s = sub.add_parser("run-answers", help="paid: execute a planned answer run (stop the UI first); resumable")
+    s.add_argument("--estimate-id", required=True)
+    s.add_argument("--actor", required=True)
+    s.add_argument("--reason", help="sealed post-test regression: why the sealed set is run again")
+    s = sub.add_parser("latency-run", help="paid: the planned bounded latency sample (stop the UI first)")
+    s.add_argument("--estimate-id", required=True)
+    s.add_argument("--actor", required=True)
+    s = sub.add_parser("score-answers", help="rescore a recorded answer run (free)")
+    s.add_argument("--run-id", required=True)
+    s = sub.add_parser("export-review", help="blind review sheet of the items a person must judge")
+    s.add_argument("--run-id", required=True)
+    s.add_argument("--out", help="absolute path (default: the run directory)")
+    s = sub.add_parser("import-review", help="append completed blind verdicts and rescore")
+    s.add_argument("--run-id", required=True)
+    s.add_argument("--file", required=True)
+    s.add_argument("--reviewer", required=True)
+    s = sub.add_parser("freeze-release", help="owner: freeze the release candidate before the sealed run")
+    s.add_argument("--run-id", required=True, help="the activated retrieval run selected for release")
+    s.add_argument("--answer-run", required=True, help="the complete development answer run behind the selection")
+    s.add_argument("--decided-by", required=True)
+    s.add_argument("--rationale", required=True)
+    s = sub.add_parser("backup", help="owner: consistent SQLite snapshot and artifact manifest")
+    s.add_argument("--destination", required=True, help="absolute new directory outside the runtime")
+    s.add_argument("--actor", default="owner-cli")
+    s = sub.add_parser("restore-check", help="restore into fresh staging with paid generation off and verify")
+    s.add_argument("--backup", required=True, help="absolute path of the backup's manifest.json")
+    s.add_argument("--staging", help="absolute empty directory (default: a new temporary directory)")
+    s = sub.add_parser("release-report", help="read-only release report from recorded evidence")
+    s.add_argument("--latest", action="store_true", help="the newest freeze (or a dated draft)")
+    s.add_argument("--release-id")
     s = sub.add_parser("configure-budget", help="owner-only dates, prior use, rates and paid state")
     s.add_argument("--start", required=True)
     s.add_argument("--end", required=True)
@@ -432,17 +598,28 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--file", required=True)
     sub.add_parser("unresolved", help="attempts whose billing is not settled or released")
     s = sub.add_parser("gold", help="dataset candidate queue and rejection wiki")
-    s.add_argument("action", choices=["status", "submit", "infer", "check", "sync", "repin", "excerpts"])
-    s.add_argument("--out", help="excerpts: absolute new directory for excerpts.jsonl and drafting-context.json "
+    s.add_argument("action", choices=["status", "submit", "infer", "check", "sync", "repin", "excerpts", "generate", "show",
+                                      "decide", "second-review"])
+    s.add_argument("--out", help="generate/excerpts: absolute new private output directory; excerpts writes excerpts.jsonl and drafting-context.json "
                                  "(contains source text; keep it in local inputs unless the owner shares it)")
     s.add_argument("--per-category", type=int, default=2, help="excerpts: elements per document and category")
-    s.add_argument("--file", help="submit: candidate JSONL; infer: JSON with cause, lesson, drafting_rule")
+    s.add_argument("--max-cost-usd", help="generate: total cost ceiling; the shared purpose envelope also applies")
+    s.add_argument("--file", help="generate: plan JSON; submit: candidate JSONL; infer: JSON with cause, lesson, drafting_rule")
     s.add_argument("--batch", help="submit: new batch id; repin: batch id for pending rows moved to the active "
                                    "extraction after a parser revision")
-    s.add_argument("--dataset", default="dev-pilot", help="submit: target dataset")
+    s.add_argument("--dataset", default="dev-pilot", help="submit: target dataset; generate: test for owner-only sealed drafting")
     s.add_argument("--drafted-by", default="", help="submit: drafting agent identity")
     s.add_argument("--candidate-id", help="infer: rejected candidate id")
     s.add_argument("--by", default="", help="infer: inferring agent identity")
+    s.add_argument("--decision", choices=["approve", "reject"], help="decide")
+    s.add_argument("--reviewer", default="", help="decide / second-review: reviewer name")
+    s.add_argument("--expected-sha", help="decide: row version shown by `gold show` (default: current)")
+    s.add_argument("--original-inspected", action="store_true", help="decide: the original was inspected")
+    s.add_argument("--disputed", action="store_true", help="decide: needs an independent second review")
+    s.add_argument("--category", action="append", help="decide (reject): rejection category, repeatable")
+    s.add_argument("--note", default="", help="decide / second-review: note")
+    s.add_argument("--agree", action="store_true", help="second-review")
+    s.add_argument("--disagree", action="store_true", help="second-review")
     return p
 
 
@@ -455,7 +632,11 @@ COMMANDS = {"init": cmd_init, "manifest": cmd_manifest, "ingest": cmd_ingest, "r
             "fidelity": cmd_fidelity, "ocr": cmd_ocr, "build-keyword": cmd_build_keyword, "check": cmd_check, "validate-gold": cmd_validate_gold,
             "configure-budget": cmd_configure_budget, "budget-status": cmd_budget_status,
             "gold": cmd_gold, "load-check": cmd_load_check, "reconcile": cmd_reconcile,
-            "unresolved": cmd_unresolved}
+            "unresolved": cmd_unresolved, "freeze-dataset": cmd_freeze_dataset, "plan-run": cmd_plan_run,
+            "run-answers": cmd_run_answers, "latency-run": cmd_latency_run, "score-answers": cmd_score_answers,
+            "export-review": cmd_export_review, "import-review": cmd_import_review,
+            "freeze-release": cmd_freeze_release, "backup": cmd_backup, "restore-check": cmd_restore_check,
+            "release-report": cmd_release_report}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -468,7 +649,7 @@ def main(argv: list[str] | None = None) -> int:
             store.init_schema(settings.db_path)
         return COMMANDS[args.command](args, settings)
     except (ingestion.IngestionError, budget.BudgetError, service.ServiceError, auth.AuthError, gold.GoldError,
-            evaluation.EvaluationError, ValueError, RuntimeError) as exc:
+            evaluation.EvaluationError, release.ReleaseError, ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 

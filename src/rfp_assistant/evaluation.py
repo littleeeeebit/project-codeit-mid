@@ -1,12 +1,17 @@
-"""Development-pilot dataset validation and source-family assignment."""
+"""Dataset validation (development pilot and the phase-4 gold schema), source-family assignment, frozen
+retrieval runs and source-span scoring."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import math
+import random
 import re
 import time
+import uuid
+from datetime import date
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from .chunking import table_rows
@@ -30,9 +35,14 @@ def _ws(text: str) -> str:
     return re.sub(r"\s+", " ", nfc(text)).strip()
 
 
+SEALED_SPLITS = ("test",)  # questions and labels live under sealed/, never under datasets/
+
+
 def dataset_path(settings: Settings, name: str) -> Path:
     if not re.fullmatch(r"[a-z0-9-]+", name):
         raise ValueError("dataset names use lowercase letters, digits and hyphens")
+    if name in SEALED_SPLITS:
+        return settings.data_dir / "sealed" / f"{name}.jsonl"
     return settings.data_dir / "datasets" / f"{name}.jsonl"
 
 
@@ -145,6 +155,8 @@ class RowChecker:
 
 
 def validate_gold(settings: Settings, name: str) -> dict:
+    if name in GOLD_DATASETS:  # the phase-4 schema (dev, sealed test); dev-pilot keeps the pilot rules
+        return validate_gold_v2(settings, name)
     path = dataset_path(settings, name)
     if not path.exists():
         return {"ok": False, "errors": [f"dataset file missing: {path.name}"], "rows": 0}
@@ -198,8 +210,13 @@ def validate_gold(settings: Settings, name: str) -> dict:
 # 3: runs bind the evaluated population (scored rows and their pinned evidence), not only the dataset bytes.
 # 4: runs require an index matching the current analyzer/query policy and its frozen metadata snapshot.
 EVAL_VERSION = "retrieval-eval-4"
+# Gold-2 runs record their ranking policy, so a run scored under another deduplication rule is never reused.
+# 1: repeats keyed by alternative and grade; 2: repeats keyed by the source coverage a chunk carries;
+# 3: nDCG@5 counted in judged group units, the unit of its ideal; 4: grading targets the reviewer's offsets/cells.
+# 5: row fragments target the approved column or offset occurrence within the row.
+GOLD_RANKING_POLICY = "gold2-pinned-coordinates-5"
 RANK_DEPTH = 20
-CRITICAL_CODE_TYPES = {"repeated_code", "requirement_detail"}
+CRITICAL_CODE_TYPES = {"repeated_code", "requirement_detail", "exact_identifier"}
 CRITICAL_EVIDENCE_TYPES = {"numeric_qualifier"}  # an amount/date/VAT condition must reach the packed context
 NDCG_AT = 5
 GATE_NDCG_GAIN = 0.03
@@ -222,9 +239,39 @@ def wilson(successes: int, n: int, z: float = 1.96) -> list[float] | None:
     return [round(max(0.0, centre - half), 4), round(min(1.0, centre + half), 4)]
 
 
-def load_eval_rows(settings: Settings, name: str) -> tuple[list[dict], list[dict], str]:
+BOOTSTRAP_SEED = 20261001
+BOOTSTRAP_RESAMPLES = 1000
+
+
+def family_bootstrap(results: list[dict], key: str, seed: int = BOOTSTRAP_SEED,
+                     resamples: int = BOOTSTRAP_RESAMPLES) -> dict | None:
+    """95% percentile interval of a mean ranked metric, resampling whole source families (a row's family set is
+    its unit), so related questions move together. None when fewer than two families are scored."""
+    by_family: dict[str, list[float]] = {}
+    for r in results:
+        value = (r.get("metrics") or {}).get(key)
+        if value is not None:
+            by_family.setdefault("+".join(r.get("families") or [str(r.get("id"))]), []).append(value)
+    if len(by_family) < 2:
+        return None
+    units = sorted(by_family)
+    rng = random.Random(seed)
+    means = []
+    for _ in range(resamples):
+        picked = [v for u in (rng.choice(units) for _ in units) for v in by_family[u]]
+        means.append(sum(picked) / len(picked))
+    means.sort()
+    return {"low": round(means[int(0.025 * resamples)], 4), "high": round(means[int(0.975 * resamples) - 1], 4),
+            "families": len(units), "seed": seed, "resamples": resamples, "unit": "source family"}
+
+
+def load_eval_rows(settings: Settings, name: str, sealed: bool = False) -> tuple[list[dict], list[dict], str]:
     """(scored rows, skipped rows with reasons, dataset sha256). Only independently reviewed dev rows whose
-    evidence is pinned to the document's active extraction are scored; the rest are listed, not dropped."""
+    evidence is pinned to the document's active extraction are scored; the rest are listed, not dropped. The
+    sealed test split is read only by the sealed run (`sealed=True`)."""
+    if name in SEALED_SPLITS and not sealed:
+        raise EvaluationError("the test split is sealed: it is evaluated once, by sealed-run under a release "
+                              "freeze, never by evaluate-retrieval or plan-run")
     path = dataset_path(settings, name)
     if not path.exists():
         raise EvaluationError(f"dataset file missing: {path.name}")
@@ -234,6 +281,8 @@ def load_eval_rows(settings: Settings, name: str) -> tuple[list[dict], list[dict
         active = {r["doc_id"]: (r["active_source_hash"], r["active_extraction_id"]) for r in conn.execute(
             "SELECT d.doc_id, d.active_source_hash, s.active_extraction_id FROM documents d "
             "JOIN sources s ON s.source_hash = d.active_source_hash")}
+    if name in GOLD_DATASETS:
+        return _gold_eval_rows(rows, name, active) + (hashlib.sha256(raw).hexdigest(),)
     scored, skipped = [], []
     for row in rows:
         reason = None
@@ -249,10 +298,93 @@ def load_eval_rows(settings: Settings, name: str) -> tuple[list[dict], list[dict
     return scored, skipped, hashlib.sha256(raw).hexdigest()
 
 
+def _gold_eval_rows(rows: list[dict], name: str, active: dict) -> tuple[list[dict], list[dict]]:
+    scored, skipped = [], []
+    for row in rows:
+        review = row.get("review") or {}
+        prov = row.get("generation_provenance") or {}
+        second = review.get("second_review") or {}
+        reason = None
+        if (review.get("status") != "approved" or not review.get("reviewed_by")
+                or review.get("reviewed_by") == review.get("drafted_by") or review.get("original_inspected") is not True
+                or (prov.get("method") == "llm" and review.get("reviewed_by") == prov.get("model"))):
+            reason = "not_independently_reviewed"
+        elif (review.get("disputed") or second) and (second.get("agreed") is not True
+                or second.get("reviewer") in (None, "", review.get("drafted_by"), review.get("reviewed_by"))
+                or (prov.get("method") == "llm" and second.get("reviewer") == prov.get("model"))):
+            reason = "dispute_unresolved"
+        elif row.get("split") != name:
+            reason = f"not_{name}"
+        elif any(s.get("doc_id") not in active for s in row.get("scope") or []):
+            reason = "unknown_doc"
+        elif row.get("mode") != "metadata" and any(active[s["doc_id"]][1] != s.get("extraction_id")
+                                                   for s in row.get("scope") or []):
+            reason = "evidence_revision_not_active"
+        (skipped if reason else scored).append(row if not reason else {"id": row.get("question_id"),
+                                                                       "reason": reason})
+    return scored, skipped
+
+
+def is_gold_row(row: dict) -> bool:
+    return row.get("dataset_version") == GOLD_SCHEMA
+
+
+def row_id(row: dict):
+    return row.get("question_id") if is_gold_row(row) else row.get("id")
+
+
+def row_type(row: dict):
+    return row.get("question_type") if is_gold_row(row) else row.get("type")
+
+
+def row_critical(row: dict) -> bool:
+    if is_gold_row(row):
+        return any(c.get("criticality") == "critical" for c in row.get("required_claims") or [])
+    return bool(row.get("critical"))
+
+
+def row_scope(row: dict) -> list[tuple]:
+    """[(DocRef, extraction_id)] the row's retrieval is restricted to (one per compared document)."""
+    from .contracts import DocRef
+
+    if is_gold_row(row):
+        return [(DocRef(s["doc_id"], s["source_hash"]), s.get("extraction_id")) for s in row.get("scope") or []]
+    return [(DocRef(row["doc_id"], row["source_hash"]), row["extraction_id"])]
+
+
+def row_groups(row: dict) -> list[dict]:
+    """Required evidence groups; each group is one fact, satisfied by any of its alternative source spans. A pilot
+    row's evidence units are groups of one alternative each. Gold-2 alternatives carry the reviewer's `offsets`
+    and `cells`, which pick the approved occurrence when a quote repeats."""
+    if is_gold_row(row):
+        return [{"group_id": g["group_id"], "doc_id": g.get("doc_id"),
+                 "alternatives": [{"element_id": a["element_id"], "quote": a["quote"],
+                                   "extraction_id": a["extraction_id"],
+                                   **{k: a[k] for k in ("offsets", "cells") if a.get(k) is not None}}
+                                  for a in g.get("alternatives") or []]}
+                for g in row.get("evidence_groups") or []]
+    # pilot units keep the phase-2 quote matching (retrieval-eval-4): reviewer coordinates are a gold-2 policy
+    return [{"group_id": u.get("element_id"), "doc_id": row.get("doc_id"),
+             "alternatives": [{**{k: v for k, v in u.items() if k not in ("offsets", "cells")},
+                               "extraction_id": row.get("extraction_id")}]} for u in row.get("evidence") or []]
+
+
+def row_families(row: dict) -> list[str]:
+    return sorted(row.get("family_ids") or []) if is_gold_row(row) else [row.get("family") or str(row.get("id"))]
+
+
 def population_identity(rows: list[dict], skipped: list[dict]) -> str:
     """Identity of what a run actually scores: each eligible row's question, type, scope and pinned evidence, plus
     which rows were skipped and why. The dataset file can stay byte-identical while a source revision or review
     change makes a different set of questions eligible; runs over different populations are not comparable."""
+    if rows and is_gold_row(rows[0]):
+        scored = sorted(({"id": r.get("question_id"), "revision": r.get("revision"), "type": r.get("question_type"),
+                          "question": r.get("question"), "mode": r.get("mode"), "scope": r.get("scope"),
+                          "answerability": r.get("answerability"), "critical": row_critical(r),
+                          "groups": [[g["group_id"], [[a["element_id"], a["quote"]] for a in g["alternatives"]]]
+                                     for g in row_groups(r)]} for r in rows), key=lambda x: str(x["id"]))
+        return hashlib.sha256(dumps({"schema": GOLD_SCHEMA, "scored": scored,
+                                     "skipped": sorted(skipped, key=lambda x: str(x.get("id")))}).encode()).hexdigest()
     scored = sorted(({"id": r.get("id"), "type": r.get("type"), "question": r.get("question"),
                       "doc_id": r.get("doc_id"), "source_hash": r.get("source_hash"),
                       "extraction_id": r.get("extraction_id"), "answerable": r.get("answerable"),
@@ -269,8 +401,17 @@ def current_population(settings: Settings, dataset: str) -> tuple[str, int]:
 
 
 def is_passage_row(row: dict) -> bool:
+    """Scored on ranked passages: answerable (or conflicting) evidence-backed rows; metadata, operational and
+    unanswerable rows are reported in their own strata."""
+    if is_gold_row(row):
+        return (row.get("mode") != "metadata" and bool(row.get("evidence_groups"))
+                and row.get("answerability") in ("answerable", "conflicting"))
     return bool(row.get("answerable")) and bool(row.get("evidence")) and row.get("type") not in (
         METADATA_TYPES | OPERATIONAL_TYPES)
+
+
+def scope_indexed(index, row: dict) -> bool:
+    return any(index.rows_by_extraction.get(x) for _, x in row_scope(row))
 
 
 def _quote_range(text: str, quote: str) -> tuple[int, int] | None:
@@ -279,6 +420,22 @@ def _quote_range(text: str, quote: str) -> tuple[int, int] | None:
         return None
     m = re.search(r"\s*".join(re.escape(w) for w in words), nfc(text))
     return (m.start(), m.end()) if m else None
+
+
+def _rendered_rows(cells: list[dict]) -> tuple[str, list[tuple[int, int, int]]]:
+    """The table text the gold validator accepts (one line per nonempty row, cells joined by ` | `) and each row's
+    (row, start, end) in it."""
+    by_row: dict[int, list[dict]] = {}
+    for c in cells:
+        by_row.setdefault(c["row"], []).append(c)
+    spans, text = [], ""
+    for r in sorted(by_row):
+        line = " | ".join(t for t in (c["text"].strip() for c in sorted(by_row[r], key=lambda c: c["col"])) if t)
+        if line:
+            text += ("\n" if text else "")
+            spans.append((r, len(text), len(text) + len(line)))
+            text += line
+    return text, spans
 
 
 def _quote_rows(element: dict, quote: str) -> set[int]:
@@ -291,25 +448,126 @@ def _quote_rows(element: dict, quote: str) -> set[int]:
             rows.update(range(c["row"], c["row"] + max(1, c.get("rowspan", 1))))
     if rows:
         return rows
-    by_row: dict[int, list[dict]] = {}
-    for c in cells:
-        by_row.setdefault(c["row"], []).append(c)
-    spans, text = [], ""
-    for r in sorted(by_row):
-        line = " | ".join(t for t in (c["text"].strip() for c in sorted(by_row[r], key=lambda c: c["col"])) if t)
-        if line:
-            text += ("\n" if text else "")
-            spans.append((r, len(text), len(text) + len(line)))
-            text += line
+    text, spans = _rendered_rows(cells)
     rng = _quote_range(text, quote)
     if rng:
         rows = {r for r, a, b in spans if a < rng[1] and rng[0] < b}
     return rows
 
 
+def _offsets(unit: dict) -> tuple[int, int] | None:
+    o = unit.get("offsets")
+    return (o[0], o[1]) if isinstance(o, list) and len(o) == 2 and all(isinstance(x, int) for x in o) else None
+
+
+def text_target(unit: dict, element: dict) -> tuple[int, int] | None:
+    """The approved occurrence of the quote in the element text: searched only inside the reviewer's `offsets`
+    when the alternative has them (the range may include context), otherwise the first occurrence (older,
+    coordinate-free alternatives)."""
+    o = _offsets(unit)
+    if o is None:
+        return _quote_range(element["raw_text"], unit["quote"])
+    rng = _quote_range(element["raw_text"][o[0]:o[1]], unit["quote"])
+    return (o[0] + rng[0], o[0] + rng[1]) if rng else None
+
+
+def row_target(unit: dict, element: dict) -> set[int]:
+    """The approved table rows: the rows of the reviewer's `cells` (with their row spans) when given, else the
+    rows the reviewer's `offsets` cover in the rendered table text, else every row holding the quote."""
+    cells = (element.get("table") or {}).get("cells", [])
+    wanted = unit.get("cells")
+    if wanted:
+        by_pos = {(c["row"], c["col"]): c for c in cells}
+        rows: set[int] = set()
+        for rc in wanted:
+            c = by_pos.get(tuple(rc)) if isinstance(rc, list) and len(rc) == 2 else None
+            if c:
+                rows.update(range(c["row"], c["row"] + max(1, c.get("rowspan", 1))))
+        return rows
+    o = _offsets(unit)
+    if o is not None:
+        text, spans = _rendered_rows(cells)
+        if text == element.get("raw_text"):
+            rng = _quote_range(text[o[0]:o[1]], unit["quote"])
+            if rng:
+                a, b = o[0] + rng[0], o[0] + rng[1]
+                return {r for r, x, y in spans if x < b and a < y}
+    return _quote_rows(element, unit["quote"])
+
+
+def _line_segments(element: dict, row: int) -> dict[tuple[int, int], tuple[int, int]]:
+    """Where each cell (by its own row and column) sits in `table_rows`' line for `row`, the line row fragments'
+    offsets refer to: cells spanning into the row are carried, and an adjacent repeat shares the kept segment."""
+    cells = [c for c in element["table"]["cells"] if c["row"] <= row < c["row"] + max(1, c.get("rowspan", 1))]
+    out: dict[tuple[int, int], tuple[int, int]] = {}
+    pos, last, last_seg = 0, None, None
+    for c in sorted(cells, key=lambda c: c["col"]):
+        t = c["text"].strip()
+        if not t:
+            continue
+        if last is not None and t == last:
+            out[(c["row"], c["col"])] = last_seg
+            continue
+        if last is not None:
+            pos += 3  # " | "
+        last, last_seg = t, (pos, pos + len(t))
+        out[(c["row"], c["col"])] = last_seg
+        pos += len(t)
+    return out
+
+
+def _raw_cells(element: dict) -> list[tuple[tuple[int, int], int, int]]:
+    """Each nonempty cell's (row, col) and its character range in the element `raw_text` (`render_table`)."""
+    text, spans = _rendered_rows(element["table"]["cells"])
+    out = []
+    for r, a, _ in spans:
+        pos = a
+        for c in sorted((c for c in element["table"]["cells"] if c["row"] == r), key=lambda c: c["col"]):
+            t = c["text"].strip()
+            if t:
+                out.append(((c["row"], c["col"]), pos, pos + len(t)))
+                pos += len(t) + 3
+    return out
+
+
+def fragment_target(unit: dict, element: dict, row: int) -> tuple[int, int] | None:
+    """The approved quote inside one row's `table_rows` line (what a row fragment's offsets refer to). With
+    `cells`, the quote inside the named cells' segment of this row; with `offsets`, the approved characters of the
+    raw table text translated into this row's segments; without coordinates, the first occurrence in the line.
+    None when this row does not hold the approved quote."""
+    if row not in row_target(unit, element):
+        return None
+    line = dict(table_rows(element)).get(row, "")
+    segments = _line_segments(element, row)
+    named = [segments[tuple(rc)] for rc in unit.get("cells") or []
+             if isinstance(rc, list) and len(rc) == 2 and tuple(rc) in segments]
+    if unit.get("cells"):
+        if not named:
+            return None
+        lo, hi = min(a for a, _ in named), max(b for _, b in named)
+        rng = _quote_range(line[lo:hi], unit["quote"])
+        return (lo + rng[0], lo + rng[1]) if rng else None
+    o = _offsets(unit)
+    text, _ = _rendered_rows(element["table"]["cells"])
+    if o is not None and text == element.get("raw_text"):
+        rng = _quote_range(text[o[0]:o[1]], unit["quote"])
+        if not rng:
+            return None
+        qa, qb = o[0] + rng[0], o[0] + rng[1]
+        raw = _raw_cells(element)
+        first = next((x for x in raw if x[1] <= qa < x[2]), None)  # cells holding the first and last character
+        last = next((x for x in raw if x[1] < qb <= x[2]), None)
+        s1, s2 = (segments.get(first[0]) if first else None), (segments.get(last[0]) if last else None)
+        if s1 is None or s2 is None:
+            return None
+        return (s1[0] + qa - first[1], s2[0] + qb - last[1])
+    return _quote_range(line, unit["quote"])
+
+
 def grade(chunk: dict, unit: dict, element: dict | None) -> int:
-    """2: the chunk carries the whole quoted evidence; 1: it carries part of the same element around it;
-    0: unrelated. Judged on source spans, so any chunking is scored against the same target."""
+    """2: the chunk carries the whole approved evidence; 1: it carries part of the same element around it;
+    0: unrelated. Judged on source spans against the reviewer's coordinates (`text_target`, `row_target`,
+    `fragment_target`), so any chunking is scored against the same approved occurrence."""
     if element is None:
         return 0
     best = 0
@@ -319,25 +577,24 @@ def grade(chunk: dict, unit: dict, element: dict | None) -> int:
         if "rows" in span and span.get("fragment"):
             # One piece of an oversized row: only the characters this piece carries count.
             frag = span["fragment"]
-            line = dict(table_rows(element)).get(frag["row"], "") if element.get("table") else ""
-            rng = _quote_range(line, unit["quote"])
+            rng = fragment_target(unit, element, frag["row"]) if element.get("table") else None
             if rng:
                 if frag["start"] <= rng[0] and rng[1] <= frag["end"]:
                     return 2
                 if frag["start"] < rng[1] and rng[0] < frag["end"]:
                     best = max(best, 1)
                 continue
-            rows = _quote_rows(element, unit["quote"])  # e.g. the header row repeated with every piece
+            rows = row_target(unit, element)  # e.g. the header row repeated with every piece
             if rows and rows <= set(span["rows"]) - {frag["row"]}:
                 return 2
             best = max(best, 1)
         elif "rows" in span:
-            rows = _quote_rows(element, unit["quote"])
+            rows = row_target(unit, element)
             if rows and rows <= set(span["rows"]):
                 return 2
             best = max(best, 1)
         else:
-            rng = _quote_range(element["raw_text"], unit["quote"])
+            rng = text_target(unit, element)
             if rng and span["start"] <= rng[0] and rng[1] <= span["end"]:
                 return 2
             if rng is None or (span["start"] < rng[1] and rng[0] < span["end"]):
@@ -345,19 +602,138 @@ def grade(chunk: dict, unit: dict, element: dict | None) -> int:
     return best
 
 
-def score_row(row: dict, ranking: list[dict], packed: list[dict], elements: dict) -> dict:
-    """Ranked metrics for one passage row. Each gold unit is credited once, at the first rank where it reaches
-    its grade: overlapping chunks repeating one fact earn nothing more. Ideal DCG places one complete unit per
-    rank (capped at 1 when a single chunk carries several units)."""
-    units = row["evidence"]
-    x = row["extraction_id"]
-    els = [elements.get((x, u["element_id"])) for u in units]
+def ndcg_from_grades(grades: list[int], ideal: list[int], k: int = NDCG_AT) -> float | None:
+    """`DCG = sum((2**grade - 1) / log2(rank + 1))` over the first k deduplicated units, divided by the DCG of the
+    ideal (judged-pool) grades in descending order. None when the ideal pool has no relevant unit. The textbook
+    form, for grades already in the ideal's units; the gold-2 scorer uses `ndcg_from_units` over group units."""
+    gain = lambda gs: sum((2 ** g - 1) / math.log2(r + 1) for r, g in enumerate(gs[:k], start=1))  # noqa: E731
+    best = gain(sorted(ideal, reverse=True))
+    return round(gain(grades) / best, 4) if best else None
+
+
+def graded_units(ranking: list[dict], groups: list[dict], elements: dict, k: int = NDCG_AT) -> list[dict]:
+    """The first k judged units of a (deduplicated) gold-2 ranking. The judged unit is the required evidence group,
+    the same unit the ideal counts, so a passage is mapped to the groups it newly supports: a passage completing two
+    groups occupies two consecutive unit positions (as two passages would), a passage adding nothing occupies one
+    zero position (an irrelevant or unlabelled passage keeps costing its rank), and a group raised from partial to
+    complete gains only the difference `2**2 - 2**1`, so no group earns more than its ideal gain. Each unit is
+    `{"group", "grade", "gain", "passage"}`; `passage` is the 1-based rank of the returned passage."""
+    credited = [0] * len(groups)
+    out: list[dict] = []
+    for rank, chunk in enumerate(ranking, start=1):
+        if len(out) >= k:
+            break
+        grades = [group_grade(chunk, g, elements) for g in groups]
+        new = [{"group": groups[j]["group_id"], "grade": g, "gain": 2 ** g - 2 ** credited[j], "passage": rank}
+               for j, g in enumerate(grades) if g > credited[j]]
+        for j, g in enumerate(grades):
+            credited[j] = max(credited[j], g)
+        new.sort(key=lambda u: -u["gain"])  # deterministic, and the order a perfect ranking would take
+        out.extend(new or [{"group": None, "grade": 0, "gain": 0, "passage": rank, "unlabelled": not any(grades)}])
+    return out[:k]
+
+
+def ndcg_from_units(units: list[dict], groups: int, k: int = NDCG_AT) -> float | None:
+    """nDCG@k over judged group units: `sum(gain / log2(position + 1))` divided by the ideal of one complete unit
+    (gain `2**2 - 1`) per required group at the first positions. None without a required group."""
+    best = sum(3 / math.log2(r + 1) for r in range(1, min(groups, k) + 1))
+    dcg = sum(u["gain"] / math.log2(r + 1) for r, u in enumerate(units[:k], start=1))
+    return round(dcg / best, 4) if best else None
+
+
+def group_grade(chunk: dict, group: dict, elements: dict) -> int:
+    """A group's grade is its best alternative's: two alternatives of one fact never add up to two facts."""
+    return max((grade(chunk, a, elements.get((a["extraction_id"], a["element_id"]))) for a in group["alternatives"]),
+               default=0)
+
+
+def coverage(chunk: dict, unit: dict, element: dict | None) -> frozenset | None:
+    """The part of the approved evidence a chunk carries (the same targets `grade` uses), as comparable atoms:
+    character offsets of the quote in the element text, quoted table rows, or character offsets of the quote inside one row fragment. None when it
+    cannot be located (the chunk then never counts as a repeat)."""
+    if element is None:
+        return None
+    atoms: set = set()
+    for span in chunk["spans"]:
+        if span["element_id"] != unit["element_id"]:
+            continue
+        if "rows" in span and span.get("fragment"):
+            frag = span["fragment"]
+            rng = fragment_target(unit, element, frag["row"]) if element.get("table") else None
+            if rng:
+                atoms.update(("f", frag["row"], i) for i in range(max(rng[0], frag["start"]), min(rng[1], frag["end"])))
+                continue
+            rows = row_target(unit, element)
+            if not rows:
+                return None
+            atoms.update(("r", r) for r in rows & (set(span["rows"]) - {frag["row"]}))
+        elif "rows" in span:
+            rows = row_target(unit, element)
+            if not rows:
+                return None
+            atoms.update(("r", r) for r in rows & set(span["rows"]))
+        else:
+            rng = text_target(unit, element)
+            if rng is None:
+                return None
+            atoms.update(("c", i) for i in range(max(rng[0], span["start"]), min(rng[1], span["end"])))
+    return frozenset(atoms)
+
+
+def dedup_ranking(ranking: list[dict], groups: list[dict], elements: dict) -> tuple[list[dict], int]:
+    """Canonical ranking for gold-2 ranked metrics: a chunk that only repeats source coverage already credited
+    higher up is removed before rank positions and cutoffs apply. A supporting alternative is a repeat when that
+    alternative's complete span was already credited, or when the characters/rows of it this chunk carries were
+    all carried by earlier chunks; two different pieces of one quote are distinct support and both stay. A chunk
+    supporting nothing stays as a rank-consuming zero; a chunk adding group support stays; another alternative of
+    a credited fact is a different passage and stays (grading 0). Returns the ranking and the number removed."""
+    full: set[tuple[int, int]] = set()
+    seen: dict[tuple[int, int], set] = {}
+    credited = [0] * len(groups)
+    out, removed = [], 0
+    for chunk in ranking:
+        hits, cover = {}, {}
+        for j, g in enumerate(groups):
+            for i, a in enumerate(g["alternatives"]):
+                el = elements.get((a["extraction_id"], a["element_id"]))
+                v = grade(chunk, a, el)
+                if v:
+                    hits[(j, i)] = v
+                    cover[(j, i)] = coverage(chunk, a, el) if v == 1 else None
+        best = [max((v for (j, _), v in hits.items() if j == n), default=0) for n in range(len(groups))]
+        repeat = bool(hits) and not any(b > c for b, c in zip(best, credited)) and all(
+            k in full or (v == 1 and cover[k] is not None and cover[k] <= seen.get(k, set()))
+            for k, v in hits.items())
+        if repeat:
+            removed += 1
+            continue
+        for k, v in hits.items():
+            if v == 2:
+                full.add(k)
+            elif cover[k] is not None:
+                seen.setdefault(k, set()).update(cover[k])
+        credited = [max(b, c) for b, c in zip(best, credited)]
+        out.append(chunk)
+    return out, removed
+
+
+def score_row(row: dict, ranking: list[dict], packed: list[dict], elements: dict,
+              groups: list[dict] | None = None) -> dict:
+    """Ranked metrics for one passage row. Each required evidence group is credited once, at the first rank where
+    it reaches its grade: overlapping chunks repeating one fact earn nothing more. Ideal DCG places one complete
+    group per rank (capped at 1 when a single chunk carries several groups). Gold-2 rows are ranked after
+    `dedup_ranking`, so repeats do not consume positions; pilot rows keep the phase-2 raw ranking so frozen
+    `retrieval-eval-4` runs stay comparable. Packed-context figures always use what was actually packed."""
+    units = groups if groups is not None else row_groups(row)
+    removed = None
+    if is_gold_row(row):
+        ranking, removed = dedup_ranking(ranking, units, elements)
     credited = [0] * len(units)
     dcg, first_full = 0.0, None
     for rank, chunk in enumerate(ranking[:RANK_DEPTH], start=1):
         gain = 0
         for j, u in enumerate(units):
-            g = grade(chunk, u, els[j])
+            g = group_grade(chunk, u, elements)
             if g > credited[j]:
                 if rank <= NDCG_AT:
                     gain += g - credited[j]
@@ -365,10 +741,10 @@ def score_row(row: dict, ranking: list[dict], packed: list[dict], elements: dict
             if g == 2 and first_full is None:
                 first_full = rank
         dcg += gain / math.log2(rank + 1)
-    at = lambda k: [max((grade(c, u, els[j]) for c in ranking[:k]), default=0)  # noqa: E731
-                    for j, u in enumerate(units)]
+    at = lambda k: [max((group_grade(c, u, elements) for c in ranking[:k]), default=0)  # noqa: E731
+                    for u in units]
     top5, top20 = at(5), at(RANK_DEPTH)
-    packed_grades = [max((grade(c, u, els[j]) for c in packed), default=0) for j, u in enumerate(units)]
+    packed_grades = [max((group_grade(c, u, elements) for c in packed), default=0) for u in units]
     n = len(units)
     return {
         "units": n, "hit@1": int(any(g == 2 for g in at(1))), "hit@5": int(any(g == 2 for g in top5)),
@@ -379,14 +755,45 @@ def score_row(row: dict, ranking: list[dict], packed: list[dict], elements: dict
         "packed_complete": int(all(g == 2 for g in packed_grades)),
         "qualifier_loss": sum(g == 1 for g in packed_grades), "packed_missing": sum(g == 0 for g in packed_grades),
         "unit_grades@20": top20,
-        "missing_units": [u["element_id"] for u, g in zip(units, top20) if g < 2],
-    }
+        "missing_units": [u["group_id"] for u, g in zip(units, top20) if g < 2],
+        "packed_grades": packed_grades,
+    } | ({"duplicates_removed": removed} if removed is not None else {}) | (_gold_ndcg(ranking, units, elements) if is_gold_row(row) else {})
+
+
+def _gold_ndcg(ranking: list[dict], groups: list[dict], elements: dict) -> dict:
+    """Gold-2 rows use the phase-4 graded formula over judged group units (`graded_units`), whose ideal is one
+    complete unit per required group: numerator, ideal and cutoff count the same units, however the evidence is
+    chunked. The judged pool is the predeclared source-span labels; a returned passage outside them grades 0 and
+    is counted in `unlabelled@5` (a blind review of those passages is not implemented). Pilot rows keep the
+    phase-2 increment formula so frozen `retrieval-eval-4` runs stay comparable."""
+    units = graded_units(ranking, groups, elements)
+    return {"ndcg@5": ndcg_from_units(units, len(groups)),
+            "ndcg_formula": "sum((2^g - 2^g_before)/log2(p+1)) over group units, ideal one complete unit per group",
+            "graded@5": [u["grade"] for u in units],
+            "unlabelled@5": len({u["passage"] for u in units if u.get("unlabelled")}),
+            "unlabelled_chunks@5": sorted({str(ranking[u["passage"] - 1].get("chunk_id") or f"rank {u['passage']}")
+                                           for u in units if u.get("unlabelled")})}
+
+
+def combine_sides(parts: list[dict]) -> dict:
+    """Metrics of a two-document row from each document's own ranking: groups count once overall; recall and
+    complete coverage are defined, while single-ranking measures (hit, nDCG, MRR) are not applicable."""
+    units = sum(p["units"] for p in parts)
+    top20 = [g for p in parts for g in p["unit_grades@20"]]
+    packed = [g for p in parts for g in p["packed_grades"]]
+    return {"units": units, "hit@1": None, "hit@5": None, "hit@20": None,
+            "recall@20": round(sum(g == 2 for g in top20) / units, 4), "complete@20": int(all(g == 2 for g in top20)),
+            "ndcg@5": None, "mrr": None, "packed_recall": round(sum(g == 2 for g in packed) / units, 4),
+            "packed_complete": int(all(g == 2 for g in packed)), "qualifier_loss": sum(g == 1 for g in packed),
+            "packed_missing": sum(g == 0 for g in packed), "unit_grades@20": top20,
+            "missing_units": [m for p in parts for m in p["missing_units"]], "packed_grades": packed,
+            "per_document": True}
 
 
 def code_check(row: dict, packed: list[dict]) -> dict | None:
     """Critical check: an explicit requirement code must bring its own block first."""
     codes = list(dict.fromkeys(CODE_RE.findall(nfc(row.get("question", "")))))
-    if not codes or row.get("type") not in CRITICAL_CODE_TYPES:
+    if not codes or row_type(row) not in CRITICAL_CODE_TYPES:
         return None
     first = packed[0] if packed else None
     ok = bool(first and first.get("requirement_key") in codes)
@@ -400,7 +807,8 @@ def critical_failures(results: list[dict], rows: dict | None = None) -> list[str
     out = []
     for r in results:
         row = (rows or {}).get(r.get("id"), r)
-        critical_row = row.get("type") in CRITICAL_EVIDENCE_TYPES or bool(row.get("critical"))
+        critical_row = (row_type(row) in CRITICAL_EVIDENCE_TYPES or bool(row.get("critical"))
+                        or (is_gold_row(row) and row_critical(row)))
         if ((r.get("code_check") and not r["code_check"]["ok"]) or r.get("wrong_scope")
                 or (critical_row and r.get("metrics") and not r["metrics"]["packed_complete"])):
             out.append(r["id"])
@@ -413,11 +821,13 @@ def aggregate(results: list[dict], skipped: list[dict]) -> dict:
     multi = [r for r in passage if r["metrics"]["units"] > 1]
 
     def rate(rows: list[dict], key: str) -> dict:
+        rows = [r for r in rows if r["metrics"].get(key) is not None]
         k = sum(r["metrics"][key] for r in rows)
         return {"numerator": k, "denominator": len(rows), "rate": round(k / len(rows), 4) if rows else None,
                 "wilson95": wilson(k, len(rows))}
 
     def mean(rows: list[dict], key: str) -> float | None:
+        rows = [r for r in rows if r["metrics"].get(key) is not None]  # not applicable is not zero
         return round(sum(r["metrics"][key] for r in rows) / len(rows), 4) if rows else None
 
     by_type: dict[str, dict] = {}
@@ -429,6 +839,10 @@ def aggregate(results: list[dict], skipped: list[dict]) -> dict:
     codes = [r["code_check"] for r in results if r.get("code_check")]
     from .dense import percentile
 
+    gold = [r for r in passage if "unlabelled@5" in r["metrics"]]
+    pool = {"ndcg_pool": {"judged_units": "required evidence groups (predeclared source spans)",
+                          "unlabelled_top5_passages": sum(r["metrics"]["unlabelled@5"] for r in gold),
+                          "blind_review_of_unlabelled": "not implemented"}} if gold else {}
     return {
         "passage_rows": len(passage), "single_evidence": {"hit@20": rate(single, "hit@20"),
                                                           "hit@5": rate(single, "hit@5")},
@@ -443,10 +857,12 @@ def aggregate(results: list[dict], skipped: list[dict]) -> dict:
         "latency_ms": {"p50": percentile(latencies, 0.5), "p95": percentile(latencies, 0.95), "n": len(latencies)},
         "fallbacks": sorted({r["fallback"] for r in results if r.get("fallback")}),
         "by_type": by_type,
+        "ndcg_eligible_rows": sum(1 for r in passage if r["metrics"].get("ndcg@5") is not None),
+        "bootstrap95": {k: family_bootstrap(passage, k) for k in ("ndcg@5", "mrr", "recall@20")},
         "not_scored": {"non_passage_rows": sum(1 for r in results if not r.get("metrics")),
                        "types": sorted({r["type"] for r in results if not r.get("metrics")}),
                        "skipped": skipped},
-    }
+    } | pool
 
 
 def profile_stats(index) -> dict:
@@ -509,27 +925,42 @@ def _frozen_config(settings: Settings, label: str, dataset: str, dataset_sha: st
 
 def _execute(settings: Settings, index, analyzer, rows: list[dict], mode: str, dense=None, vectors=None,
              reranker=None, rerank_depth=None) -> list[dict]:
-    from .contracts import DocRef
     from .retrieval import retrieve
 
     results = []
     for row in rows:
-        out = {"id": row.get("id"), "type": row.get("type"), "critical": bool(row.get("critical")),
-               "question": row.get("question")}
+        out = {"id": row_id(row), "type": row_type(row), "critical": row_critical(row),
+               "question": row.get("question"), "families": row_families(row)}
         if not is_passage_row(row):
             results.append(out)  # metadata, operational and unanswerable rows: reported, not ranked
             continue
-        scope = [(DocRef(row["doc_id"], row["source_hash"]), row["extraction_id"])]
-        r = retrieve(settings, index, analyzer, row["question"], scope, mode=mode, dense=dense,
-                     query_vector=(vectors or {}).get(row.get("id")), reranker=reranker, rerank_depth=rerank_depth)
-        ranking = [index.chunks[index.row_of[c]] for c in r.ranking]
-        packed = [index.chunks[index.row_of[e.chunk_id]] for e in r.evidence]
+        scope, groups = row_scope(row), row_groups(row)
+        allowed = {x for _, x in scope}
+        sides = []  # one scoped retrieval per selected document, as the balanced comparison serves it
+        for ref, x in ([(None, None)] if len(scope) == 1 else scope):
+            r = retrieve(settings, index, analyzer, row["question"], scope if ref is None else [(ref, x)], mode=mode,
+                         dense=dense, query_vector=(vectors or {}).get(row_id(row)), reranker=reranker,
+                         rerank_depth=rerank_depth)
+            ranking = [index.chunks[index.row_of[c]] for c in r.ranking]
+            packed = [index.chunks[index.row_of[e.chunk_id]] for e in r.evidence]
+            mine = groups if ref is None else [g for g in groups if g["doc_id"] == ref.doc_id]
+            sides.append((r, ranking, packed, score_row(row, ranking, packed, index.elements, mine)))
+        r, ranking, packed, metrics = sides[0]
+        if len(sides) > 1:
+            metrics = combine_sides([m for *_, m in sides])
+        timings: dict = {}
+        for side in sides:
+            for k, v in side[0].timings_ms.items():
+                timings[k] = round(timings.get(k, 0) + v, 1) if isinstance(v, (int, float)) else v
         out.update(
-            metrics=score_row(row, ranking, packed, index.elements), code_check=code_check(row, packed),
-            wrong_scope=sum(c["extraction_id"] != row["extraction_id"] for c in ranking),
-            ranking=r.ranking[:RANK_DEPTH], packed=[e.chunk_id for e in r.evidence], fallback=r.fallback,
-            candidates=r.candidates, limitations=r.limitations, timings_ms=r.timings_ms,
-            evidence_tokens=r.evidence_tokens)
+            metrics=metrics, code_check=code_check(row, packed) if len(sides) == 1 else None,
+            wrong_scope=sum(c["extraction_id"] not in allowed for _, rk, _, _ in sides for c in rk),
+            ranking=[c for s in sides for c in s[0].ranking[:RANK_DEPTH]],
+            packed=[e.chunk_id for s in sides for e in s[0].evidence],
+            fallback=next((s[0].fallback for s in sides if s[0].fallback), None),
+            candidates=[c for s in sides for c in s[0].candidates],
+            limitations=[x for s in sides for x in s[0].limitations], timings_ms=timings,
+            evidence_tokens=sum(s[0].evidence_tokens for s in sides))
         results.append(out)
     return results
 
@@ -631,7 +1062,7 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
                 settings, member_id, f"evaluate:{dataset_sha[:16]}:{index.version}:{dense.version}",
                 {"job": "evaluate-retrieval", "dataset": dataset, "index": index.version})
         for row in rows:
-            if not is_passage_row(row) or not index.rows_by_extraction.get(row["extraction_id"]):
+            if not is_passage_row(row) or not scope_indexed(index, row):
                 continue  # an empty scope never pays for a query vector
             vec, info = dense_mod.query_vector(settings, transport, row["question"], request_id=request_id,
                                                member_id=member_id, purpose="gold_eval",
@@ -642,7 +1073,7 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
                 if info.get("status") == "unknown":
                     break  # no automatic resend; stop spending
                 continue
-            vectors[row["id"]] = vec
+            vectors[row_id(row)] = vec
             query_info["hits" if info["cache"] == "hit" else "paid"] += 1
             if info.get("attempt_id"):
                 query_info["attempts"].append(info["attempt_id"])
@@ -650,7 +1081,7 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
             if info.get("billing") == "unknown":
                 query_info.setdefault("reasons", []).append("unknown_billing_reconcile_first")
                 break  # the vector is kept; nothing more is paid until the attempt is reconciled
-        wanted = [r["id"] for r in rows if is_passage_row(r) and index.rows_by_extraction.get(r["extraction_id"])]
+        wanted = [row_id(r) for r in rows if is_passage_row(r) and scope_indexed(index, r)]
         query_info["unavailable"] = sum(i not in vectors for i in wanted)
         if query_info["unavailable"]:
             dense_error = (f"{query_info['unavailable']} query vectors unavailable "
@@ -660,7 +1091,9 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
     summaries = []
     for label in labels:
         config = _frozen_config(settings, label, dataset, dataset_sha, index, dense, analyzer,
-                                population=(population_identity(rows, skipped), len(rows)))
+                                population=(population_identity(rows, skipped), len(rows)),
+                                extra={"ranking_policy": GOLD_RANKING_POLICY}
+                                if any(is_gold_row(r) for r in rows) else None)
         run_id = f"{label}-{hashlib.sha256(dumps(config).encode()).hexdigest()[:10]}"
         d = _run_dir(settings, run_id)
         if (d / "scores.json").exists() and not force:
@@ -675,10 +1108,51 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
             continue
         results = _execute(settings, index, analyzer, rows, RUN_MODES[label], dense=dense, vectors=vectors)
         scores = {"status": "complete", "aggregate": aggregate(results, skipped), "profile_stats": stats,
-                  "query_embedding": query_info if label in ("D", "H") else None, "created_at": utcnow()}
+                  "query_embedding": query_info if label in ("D", "H") else None, "created_at": utcnow(),
+                  "provenance": {"code": code_fingerprint(), "hardware": hardware(),
+                                 "metric_code_sha256": metric_code_sha256()}}
         _write_run(settings, run_id, config, results, scores)
         summaries.append({"run_id": run_id, "label": label, "reused": False, **_headline(scores)})
     return summaries
+
+
+def code_fingerprint() -> dict:
+    """What code produced a result: the Git revision when Git can tell, whether tracked files differ from it, and a
+    hash of the package source either way. A missing or unreadable repository is stated, never replaced by a clean
+    revision."""
+    import subprocess
+
+    from .settings import REPO_ROOT
+
+    digest = hashlib.sha256()
+    for path in sorted((REPO_ROOT / "src" / "rfp_assistant").glob("*.py")):
+        digest.update(path.name.encode() + b"\0" + path.read_bytes())
+    out = {"source_sha256": digest.hexdigest(), "git_revision": None, "git_dirty": None}
+    try:
+        rev = subprocess.run(["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"], capture_output=True, text=True,
+                             timeout=10)
+        status = subprocess.run(["git", "-C", str(REPO_ROOT), "status", "--porcelain", "--untracked-files=no"],
+                                capture_output=True, text=True, timeout=10)
+        if rev.returncode == 0 and status.returncode == 0:
+            out.update(git_revision=rev.stdout.strip(), git_dirty=bool(status.stdout.strip()))
+        else:
+            out["git_note"] = "not a Git checkout or Git refused; no revision recorded"
+    except (OSError, subprocess.SubprocessError):
+        out["git_note"] = "Git is not available; no revision recorded"
+    return out
+
+
+def hardware() -> dict:
+    import os
+    import platform
+
+    return {"platform": platform.platform(), "machine": platform.machine(), "python": platform.python_version(),
+            "cpu_count": os.cpu_count()}
+
+
+def metric_code_sha256() -> str:
+    """Hash of the scoring code (this module): part of every phase-4 freeze."""
+    return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
 
 def _headline(scores: dict) -> dict:
@@ -761,7 +1235,7 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
                                             purpose="gold_eval", allow_paid=False)
             if vec is None:
                 raise EvaluationError("a frozen H query vector is missing from the cache; rerun H")
-            vectors[row["id"]] = vec
+            vectors[row_id(row)] = vec
     if reranker is None:
         reranker, load_info = dense_mod.load_reranker(settings)
     load_info = load_info or getattr(reranker, "info", {})
@@ -798,7 +1272,7 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
         if inference_failure(warm):
             return failed_trial(inference_failure(warm))
     base_ndcg = h_scores["aggregate"]["ndcg@5"] or 0.0
-    by_id = {r.get("id"): r for r in rows}
+    by_id = {row_id(r): r for r in rows}
     base_critical = set(critical_failures(list(h_traces.values()), by_id))  # same rule for both sides
     best = None
     for depth in depths:
@@ -929,7 +1403,56 @@ def decision_errors(settings: Settings, run_id: str, decision: dict) -> list[str
             if (f_scores.get("status") != "complete" or f_config.get("eval_version") != EVAL_VERSION
                     or f_config.get("population_sha256") != config.get("population_sha256")):
                 errors.append("the finalist must be a complete current-policy run on the same evaluated population")
+    if config.get("label") != "K1" or finalist:
+        # the claim compares against the K1 baseline, so its pool needs the review as much as the named runs
+        named = [run_id] + ([finalist] if finalist else [])
+        errors += pool_review_errors(settings, list(dict.fromkeys(named + _k1_baselines(settings, config))), decision)
     return errors + run_errors(settings, run_id)
+
+
+def _k1_baselines(settings: Settings, config: dict) -> list[str]:
+    """The newest complete current-policy K1 run on the same evaluated population (the comparison baseline)."""
+    base = settings.data_dir / "runs"
+    found = []
+    for d in base.glob("K1-*") if base.exists() else []:
+        try:
+            c, sc = load_run(settings, d.name)
+        except (EvaluationError, json.JSONDecodeError):
+            continue
+        if (c.get("eval_version") == EVAL_VERSION and sc.get("status") == "complete"
+                and c.get("population_sha256") == config.get("population_sha256")):
+            found.append((sc.get("created_at", ""), d.name))
+    return [max(found)[1]] if found else []
+
+
+def pool_review_errors(settings: Settings, run_ids: list[str], decision: dict) -> list[str]:
+    """Promoting a run, or naming a finalist, claims a measured benefit over K1: the unlabelled top-5 passages of
+    every named run and of the K1 baseline must have a recorded review (`pool_review`: reviewer and, per run, the count reviewed, which must
+    match the run). K1 alone, the provisional default, needs none. The review is attested, not blind."""
+    review = decision.get("pool_review") or {}
+    errors = []
+    for rid in run_ids:
+        try:
+            n = pool_pending({"ndcg_pool": (load_run(settings, rid)[1].get("aggregate") or {}).get("ndcg_pool")})
+        except EvaluationError:
+            continue
+        if not n:
+            continue
+        if not str(review.get("reviewed_by") or "").strip() or (review.get("runs") or {}).get(rid) != n:
+            errors.append(f"run {rid}: {n} returned top-5 passages lie outside the gold labels and have no recorded "
+                          "pool review; review them, then add missing support as new alternatives and rescore, or "
+                          "record pool_review {reviewed_by, runs: {run_id: count}} in the decision")
+    return errors
+
+
+def serving_config(run_id: str, config: dict) -> dict:
+    """The serving configuration a recorded retrieval run describes (what `activate-run` stores and what the
+    phase-4 answer evaluation pins)."""
+    return {"run_id": run_id, "label": config["label"], "mode": config["mode"],
+            "index_version": config["index_version"], "dense_version": config.get("dense_version"),
+            "reranker": {**config["reranker"], "depth": config["rerank_depth"]} if config.get("reranker") else None,
+            "embedding": config.get("embedding"), "limits": config.get("limits"),
+            "eval_version": config["eval_version"], "fallback_mode": "kiwi_bm25"}
 
 
 def activate_run(settings: Settings, run_id: str, decision_path: Path, actor: str = "owner-cli") -> dict:
@@ -944,12 +1467,7 @@ def activate_run(settings: Settings, run_id: str, decision_path: Path, actor: st
     errors = decision_errors(settings, run_id, decision)
     if errors:
         raise EvaluationError("; ".join(errors))
-    active = {"run_id": run_id, "label": config["label"], "mode": config["mode"],
-              "index_version": config["index_version"], "dense_version": config.get("dense_version"),
-              "reranker": {**config["reranker"], "depth": config["rerank_depth"]} if config.get("reranker") else None,
-              "embedding": config.get("embedding"), "limits": config.get("limits"),
-              "eval_version": config["eval_version"],
-              "fallback_mode": "kiwi_bm25", "finalist_run_id": decision.get("finalist_run_id"),
+    active = {**serving_config(run_id, config), "finalist_run_id": decision.get("finalist_run_id"),
               "activated_at": utcnow()}
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
         previous = get_app_setting(conn, "active_run")
@@ -983,7 +1501,13 @@ def run_summary(settings: Settings, run_id: str) -> dict:
         "critical_failures": agg.get("critical_failures"), "code_checks": agg.get("code_checks"),
         "wrong_scope": agg.get("wrong_scope_candidates"), "latency_ms": agg.get("latency_ms"),
         "query_cost_micro_usd": (scores.get("query_embedding") or {}).get("settled_micro_usd"),
-        "gate": scores.get("gate"), "blocking": run_errors(settings, run_id)}
+        "gate": scores.get("gate"), "ndcg_pool": agg.get("ndcg_pool"), "blocking": run_errors(settings, run_id)}
+
+
+def pool_pending(summary: dict) -> int:
+    """Returned top-5 passages outside every gold label that no review has judged: while any remain, an nDCG
+    difference may only reflect missing labels (pilot runs have no pool and report 0)."""
+    return int(((summary.get("ndcg_pool") or {}).get("unlabelled_top5_passages")) or 0)
 
 
 def recommend(summaries: list[dict]) -> dict:
@@ -993,8 +1517,11 @@ def recommend(summaries: list[dict]) -> dict:
     usable = [r for r in summaries if not r["blocking"]]
     k1 = [r for r in usable if r["label"] == "K1"]
     if not k1:
-        return {"selected": None, "finalist": None, "reasons": ["no usable current-policy K1 run to compare against"]}
+        return {"selected": None, "finalist": None, "status": "none",
+                "reasons": ["no usable current-policy K1 run to compare against"]}
     base = max(k1, key=lambda r: (r["ndcg@5"] or 0, r["run_id"]))
+    compared = [r for r in usable if r["label"] != "K0" and r["population_sha256"] == base["population_sha256"]]
+    pending = {r["run_id"]: pool_pending(r) for r in compared if pool_pending(r)}
     reasons, eligible = [], [base]
     for r in usable:
         if r is base or r["label"] in ("K0",):
@@ -1011,6 +1538,16 @@ def recommend(summaries: list[dict]) -> dict:
         else:
             reasons.append(f"{r['run_id']} ({r['mode']}): nDCG@5 gain {gain}, no new critical failure")
             eligible.append(r)
+    if pending:
+        # Plan §3: unjudged passages are reviewed before a development comparison is final. Until then K1 stays as
+        # the provisional default, and no gain counts as a measured benefit or names a finalist.
+        reasons.append(f"comparison pending pool review: unreviewed top-5 passages outside the gold labels {pending}; "
+                       "gains above are provisional. Review them (`unlabelled_chunks@5` in each run's traces): add a "
+                       "passage holding a required fact as a new alternative and rescore, or record the review in "
+                       "the decision's `pool_review`")
+        reasons.append(f"K1 {base['run_id']} stays provisionally; no finalist while the review is pending")
+        return {"selected": base["run_id"], "finalist": None, "status": "pending_pool_review", "provisional": True,
+                "pool_pending": pending, "reasons": reasons}
     order = sorted(eligible, key=lambda r: (-(r["ndcg@5"] or 0), len(r["critical_failures"] or []), r["run_id"]))
     selected = order[0]
     others = [r for r in usable if r is not selected and r["population_sha256"] == selected["population_sha256"]
@@ -1018,7 +1555,8 @@ def recommend(summaries: list[dict]) -> dict:
     finalist = max(others, key=lambda r: (r["ndcg@5"] or 0, r["run_id"])) if others else None
     if selected is base:
         reasons.append(f"K1 {base['run_id']} stays: no other mode showed a measured benefit")
-    return {"selected": selected["run_id"], "finalist": finalist["run_id"] if finalist else None, "reasons": reasons}
+    return {"selected": selected["run_id"], "finalist": finalist["run_id"] if finalist else None, "status": "final",
+            "reasons": reasons}
 
 
 def _fmt_rate(x: dict) -> str:
@@ -1052,7 +1590,9 @@ def compare_runs(settings: Settings, run_ids: list[str]) -> dict:
             f"{lat.get('p50', '—')}/{lat.get('p95', '—')} | {r['query_cost_micro_usd'] if r['query_cost_micro_usd'] is not None else '—'} | "
             f"{'; '.join(r['blocking']) or 'none'} |")
     rec = recommend(summaries)
-    lines += ["", "## Recommendation (draft for the owner)", "", f"- selected: `{rec['selected']}`",
+    lines += ["", "## Recommendation (draft for the owner)", "",
+              f"- status: {rec.get('status')}" + (" (provisional)" if rec.get("provisional") else ""),
+              f"- selected: `{rec['selected']}`",
               f"- phase 4 finalist: `{rec['finalist']}`", *[f"- {x}" for x in rec["reasons"]], "",
               "Small pilot denominators make single-question differences large; read the Wilson intervals.", ""]
     key = hashlib.sha256("|".join(sorted(run_ids)).encode()).hexdigest()[:12]
@@ -1086,6 +1626,7 @@ def draft_activation(settings: Settings, run_ids: list[str], out_path: Path, sel
                                  f"{_fmt_rate(s['hit@20'])}, packed complete {_fmt_rate(s['packed_complete'])}, "
                                  f"critical failures {s['critical_failures']}. " + " ".join(rec["reasons"])),
              "overridden_recommendation": select is not None and select != rec["selected"],
+             "recommendation_status": rec.get("status"), "pool_pending": rec.get("pool_pending") or {},
              "comparison": comparison["markdown"]}
     draft["blocking"] = [e for e in decision_errors(settings, chosen, draft)
                          if "decided_by" not in e and "rationale" not in e]
@@ -1284,3 +1825,637 @@ def write_phase2_report(settings: Settings) -> Path:
         "active_index": active_index, "gates": [{"gate": g, "met": ok, "evidence": ev} for g, ok, ev in gates],
         "runs": [r["run_id"] for r in runs]}, ensure_ascii=False, indent=1))
     return path
+
+
+# ================================================================ phase 4: reviewed gold (schema gold-2)
+# Rows of `dev` (datasets/dev.jsonl) and the sealed `test` (sealed/test.jsonl). Labels point at stable source
+# evidence (source hash, extraction revision, element, raw offsets/cells, exact quote), never at chunk IDs, so a
+# rechunked index is scored against the same ground truth.
+
+GOLD_SCHEMA = "gold-2"
+GOLD_DATASETS = ("dev", "test")
+GOLD_TYPE_TARGETS = {  # per split; the combined target is twice this (120 rows)
+    "direct_fact": 12, "semantic_paraphrase": 9, "exact_identifier": 6, "table_numeric": 9, "multi_passage": 6,
+    "cross_document": 6, "missing_false_premise": 6, "revision_conflict": 6,
+}
+METADATA_STRATUM = "metadata_direct"  # answered from typed CSV metadata; never in passage denominators
+GOLD_TYPES = set(GOLD_TYPE_TARGETS) | {METADATA_STRATUM}
+EXPECTED_STATUS = {"answerable": ("answered",), "unanswerable": ("insufficient_evidence", "clarification_required"),
+                   "ambiguous": ("clarification_required",), "conflicting": ("conflicting_evidence",)}
+CLAIM_MATCH_TYPES = ("number", "date", "text")
+CRITICAL_KINDS = ("deadline", "amount", "mandatory_condition", "institution")
+METADATA_FIELDS = ("title", "institution", "notice", "revision", "amount_krw", "published_at", "bid_start",
+                   "bid_close")
+METADATA_STATES = ("known", "unknown", "conflict", "zero_review", "resolved")
+QID_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
+LEAK_SIMILARITY = 0.85  # character-bigram Jaccard at or above which two questions count as one paraphrase
+EARLY_BEFORE, LATE_FROM_POSITION = 0.3, 0.7
+
+
+def norm_text(text) -> str:
+    """NFC without any whitespace: the comparison form for quotes, patterns and qualifiers."""
+    return re.sub(r"\s+", "", nfc(str(text or "")))
+
+
+_UNITS = {"조": 10 ** 12, "억": 10 ** 8, "천만": 10 ** 7, "백만": 10 ** 6, "십만": 10 ** 5, "만": 10 ** 4, "천": 10 ** 3}
+_NUMBER_PART = re.compile(r"(?<![\d.,])(\d[\d,]*(?:\.\d+)?)\s*(조|억|천만|백만|십만|만|천)?")
+_DATE_RE = re.compile(
+    r"(20\d{2})\s*(?:[.\-/]|년)\s*(\d{1,2})\s*(?:[.\-/]|월)\s*(\d{1,2})\s*일?\.?(?:\s*\([^)]{0,4}\))?"
+    r"(?:\s*(오전|오후)?\s*(\d{1,2})\s*(?::|시)\s*(\d{2})?\s*분?)?")
+
+
+def number_spans(text: str) -> list[tuple[Decimal, int, int]]:
+    """(value, start, end) of every amount or count as written in Korean RFPs: `130,000,000원`, `1억 3천만 원`,
+    `130백만원`, `1.3억`, `12개월`. A unit-bearing part followed by a smaller part (`1억 3천만`) is one amount."""
+    out: list[tuple[Decimal, int, int]] = []
+    prev: tuple[int, int] | None = None  # unit magnitude and end of the previous part
+    t = nfc(text or "")
+    for m in _NUMBER_PART.finditer(t):
+        try:
+            base = Decimal(m.group(1).rstrip(",").replace(",", ""))
+        except InvalidOperation:
+            prev = None
+            continue
+        mag = _UNITS.get(m.group(2) or "", 1)
+        value = base * mag
+        if prev and out and prev[0] > 1 and mag < prev[0] and not t[prev[1]:m.start()].strip():
+            out[-1] = (out[-1][0] + value, out[-1][1], m.end())
+        else:
+            out.append((value, m.start(), m.end()))
+        prev = (mag, m.end())
+    return out
+
+
+def _plain(v: Decimal) -> Decimal:
+    return Decimal(int(v)) if v == v.to_integral_value() else v.normalize()
+
+
+def extract_numbers(text: str) -> set[Decimal]:
+    return {_plain(v) for v, _, _ in number_spans(text)}
+
+
+def extract_dates(text: str) -> set[str]:
+    """`2024. 6. 11.(화) 17:00`, `2024-06-11`, `2024년 6월 11일 오후 5시` -> {'2024-06-11', '2024-06-11T17:00'}."""
+    out: set[str] = set()
+    for m in _DATE_RE.finditer(nfc(text or "")):
+        try:
+            day = date(int(m.group(1)), int(m.group(2)), int(m.group(3))).isoformat()
+        except ValueError:
+            continue
+        out.add(day)
+        if m.group(5):
+            hour = int(m.group(5)) + (12 if m.group(4) == "오후" and int(m.group(5)) < 12 else 0)
+            minute = int(m.group(6) or 0)
+            if hour < 24 and minute < 60:
+                out.add(f"{day}T{hour:02d}:{minute:02d}")
+    return out
+
+
+def _unit_marker(unit) -> str:
+    return "원" if str(unit or "").strip().upper() in ("KRW", "원") else str(unit or "").strip()
+
+
+def stated_numbers(text: str, unit) -> set[Decimal]:
+    """Numbers written with the given unit right after them (`12개월`, `1억 3천만 원`); a bare or differently
+    united number is not a statement of this quantity."""
+    marker, t = _unit_marker(unit), nfc(text or "")
+    if not marker:
+        return set()
+    return {_plain(v) for v, _, end in number_spans(t) if t[end:end + len(marker) + 1].lstrip().startswith(marker)}
+
+
+def _expected(claim: dict) -> list:
+    match = claim.get("match") or {}
+    return [v for v in [match.get("value")] + list(claim.get("alternatives") or []) if v not in (None, "")]
+
+
+def claim_value_found(claim: dict, text: str) -> bool:
+    """The claim's typed value (or a permitted alternative) is stated in `text`: a number with its unit, a date
+    with its required time, or a text pattern."""
+    match = claim.get("match") or {}
+    kind = match.get("type")
+    if kind == "number":
+        return bool({_plain(Decimal(str(v))) for v in _expected(claim)} & stated_numbers(text, match.get("unit")))
+    if kind == "date":
+        found = extract_dates(text)
+        return any(_date_key(match, v) in found for v in _expected(claim))
+    patterns = list(match.get("patterns") or []) + [v for v in _expected(claim)[1:] if isinstance(v, str)]
+    hay = norm_text(text)
+    return any(norm_text(p) and norm_text(p) in hay for p in patterns)
+
+
+def _date_key(match: dict, value: str) -> str:
+    """The form a date value must be stated in: with the claim's time when the claim has one."""
+    return f"{value}T{match['time']}" if match.get("time") and "T" not in str(value) else str(value)
+
+
+def typed_verdict(claim: dict, text: str) -> str:
+    """One claim against the text an answer states about the claim's own document.
+
+    correct: the value is stated (with its unit/time) and nothing contradicting it is; contested: the value and a
+    different value of the same kind are both stated, so the answer is not credited until a reviewer decides;
+    wrong_value: only other values of the same kind are stated; incomplete_qualifier: the value is stated without a
+    required qualifier (or a deadline without its time); missing: nothing of this kind is stated; needs_review: a
+    text claim whose patterns do not appear (a paraphrase may still be right)."""
+    match = claim.get("match") or {}
+    kind = match.get("type")
+    if kind == "text":
+        if claim_value_found(claim, text):
+            return "incomplete_qualifier" if qualifiers_found(claim, text) else "correct"
+        return "needs_review" if (text or "").strip() else "missing"
+    if kind == "number":
+        expected = {_plain(Decimal(str(v))) for v in _expected(claim)}
+        stated = stated_numbers(text, match.get("unit"))
+        if stated & expected:
+            if stated - expected:
+                return "contested"
+            return "incomplete_qualifier" if qualifiers_found(claim, text) else "correct"
+        return "wrong_value" if stated else "missing"
+    found = extract_dates(text)
+    stated_dt = {d for d in found if "T" in d}
+    stated_d = {d for d in found if "T" not in d}
+    want_d = {str(v).split("T")[0] for v in _expected(claim)}
+    if match.get("time"):
+        want_dt = {_date_key(match, v) for v in _expected(claim)}
+        if stated_dt & want_dt:
+            if (stated_dt - want_dt) or (stated_d - want_d):
+                return "contested"
+            return "incomplete_qualifier" if qualifiers_found(claim, text) else "correct"
+        if stated_dt:  # a stated cutoff on another day or at another time
+            return "wrong_value"
+        if stated_d & want_d:
+            return "contested" if stated_d - want_d else "incomplete_qualifier"  # the required time is missing
+        return "wrong_value" if stated_d else "missing"
+    if stated_d & want_d:
+        if stated_d - want_d:
+            return "contested"
+        return "incomplete_qualifier" if qualifiers_found(claim, text) else "correct"
+    return "wrong_value" if stated_d else "missing"
+
+
+_NEGATION_AFTER = ("않", "안됨", "아니", "제외", "불포함", "미포함", "별도", "없")
+_NEGATION_BEFORE = ("미", "불", "비")
+
+
+def _affirmed(spelling: str, hay: str) -> bool:
+    """`spelling` occurs in `hay` at least once without a negation right after it (`부가가치세를 포함하지 않은`,
+    `부가세 별도`) or a negating prefix before it (`미포함`)."""
+    s = norm_text(spelling)
+    start = hay.find(s) if s else -1
+    while start >= 0:
+        after = hay[start + len(s):start + len(s) + 6]
+        negated = any(n in after for n in _NEGATION_AFTER) or hay[max(0, start - 1):start] in _NEGATION_BEFORE
+        if not negated:
+            return True
+        start = hay.find(s, start + 1)
+    return False
+
+
+def qualifiers_found(claim: dict, text: str) -> list[list[str]]:
+    """Qualifier groups (each a list of permitted spellings) that `text` does not affirm; a negated mention does not
+    state the qualifier."""
+    hay = norm_text(text)
+    return [q for q in claim.get("qualifiers") or [] if not any(_affirmed(x, hay) for x in q)]
+
+
+def _bigrams(text: str) -> set[str]:
+    t = norm_text(text)
+    return {t[i:i + 2] for i in range(len(t) - 1)} or {t}
+
+
+def question_similarity(a: str, b: str) -> float:
+    x, y = _bigrams(a), _bigrams(b)
+    return len(x & y) / len(x | y) if x | y else 1.0
+
+
+def load_families(settings: Settings) -> dict:
+    path = settings.data_dir / "datasets" / "families.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"families": {}}
+
+
+class GoldChecker:
+    """Checks one gold-2 row against the managed originals and the family map. Shared by `gold submit` (no review
+    yet) and `validate-gold` (independent review required). Messages name IDs, never question text or quotes, so
+    a sealed validation report can be shown without revealing the test set."""
+
+    def __init__(self, settings: Settings, conn) -> None:
+        self.families = load_families(settings)["families"]
+        self.fam_of_doc = {d: (k, f) for k, f in self.families.items() for d in f["doc_ids"]}
+        self.conn = conn
+        self.docs = {r["doc_id"]: dict(r) for r in conn.execute(
+            "SELECT d.doc_id, d.active_source_hash, s.active_extraction_id, s.parse_status "
+            "FROM documents d JOIN sources s ON s.source_hash = d.active_source_hash")}
+        self._last_order: dict[str, int] = {}
+
+    def element(self, extraction_id: str | None, element_id: str | None):
+        return self.conn.execute("SELECT raw_text, table_json, source_order FROM elements WHERE extraction_id = ? "
+                                 "AND element_id = ?", (extraction_id, element_id)).fetchone()
+
+    def position(self, extraction_id: str, source_order: int) -> float:
+        if extraction_id not in self._last_order:
+            self._last_order[extraction_id] = self.conn.execute(
+                "SELECT COALESCE(MAX(source_order), 0) FROM elements WHERE extraction_id = ?",
+                (extraction_id,)).fetchone()[0]
+        return source_order / max(1, self._last_order[extraction_id])
+
+    def row_position(self, row: dict) -> str | None:
+        """early / middle / late by the first evidence alternative's place in its extraction."""
+        for g in row.get("evidence_groups") or []:
+            for alt in g.get("alternatives") or []:
+                el = self.element(alt.get("extraction_id"), alt.get("element_id"))
+                if el is not None:
+                    p = self.position(alt["extraction_id"], el["source_order"])
+                    return "early" if p < EARLY_BEFORE else "late" if p >= LATE_FROM_POSITION else "middle"
+        return None
+
+    def family_leaks(self) -> list[str]:
+        """Source hashes that sit in both dev and test families: byte-identical or related originals split apart."""
+        splits: dict[str, set[str]] = {}
+        for f in self.families.values():
+            hashes = {f.get("source_hash"), *f.get("related_sources", [])}
+            hashes |= {self.docs[d]["active_source_hash"] for d in f["doc_ids"] if d in self.docs}
+            for h in hashes - {None}:
+                splits.setdefault(h, set()).add(f["split"])
+        return sorted(h for h, s in splits.items() if len(s) > 1)
+
+    def _check_alternative(self, alt: dict, scoped: dict, tag: str) -> list[str]:
+        if "chunk_id" in alt or not alt.get("element_id"):
+            return [f"{tag}: evidence must name a source element; chunk-only labels change with every rechunk"]
+        e = []
+        if alt.get("source_hash") != scoped.get("source_hash"):
+            e.append(f"{tag}: evidence source hash is not the scoped original's")
+        if alt.get("extraction_id") != scoped.get("extraction_id"):
+            e.append(f"{tag}: evidence extraction revision is not the scoped one")
+        el = self.element(alt.get("extraction_id"), alt.get("element_id"))
+        if el is None:
+            return e + [f"{tag}: evidence element not in extraction"]
+        quote = str(alt.get("quote") or "")
+        cells = json.loads(el["table_json"] or '{"cells": []}')["cells"]
+        haystacks = [el["raw_text"]] + [c["text"] for c in cells]
+        if not quote.strip() or not any(_ws(quote) in _ws(h) for h in haystacks):
+            e.append(f"{tag}: quote not found in the original extraction element")
+        offsets = alt.get("offsets")
+        if offsets is not None:
+            ok = (isinstance(offsets, list) and len(offsets) == 2 and all(isinstance(x, int) for x in offsets)
+                  and 0 <= offsets[0] < offsets[1] <= len(el["raw_text"]))
+            if not ok or _ws(quote) not in _ws(el["raw_text"][offsets[0]:offsets[1]]):
+                e.append(f"{tag}: raw offsets do not hold the quote")
+        wanted = alt.get("cells")
+        if wanted is not None:
+            by_pos = {(c["row"], c["col"]): c["text"] for c in cells}
+            texts = [by_pos.get(tuple(rc)) if isinstance(rc, list) and len(rc) == 2 else None for rc in wanted]
+            if not wanted or None in texts:
+                e.append(f"{tag}: cell coordinates are not in the table")
+            elif _ws(quote) not in _ws(" ".join(texts)) and not all(_ws(t) in _ws(quote) for t in texts):
+                e.append(f"{tag}: the named cells do not hold the quote")
+        return e
+
+    def _check_claim(self, c: dict, groups: dict, tag: str, seen: set) -> list[str]:
+        cid = c.get("claim_id")
+        tag = f"{tag} claim {cid}"
+        e = []
+        if not cid or cid in seen:
+            e.append(f"{tag}: claim_id missing or repeated")
+        seen.add(cid)
+        match = c.get("match") or {}
+        kind = match.get("type")
+        if kind not in CLAIM_MATCH_TYPES:
+            return e + [f"{tag}: match.type must be one of {CLAIM_MATCH_TYPES}"]
+        if kind == "number" and (not isinstance(match.get("value"), int) or isinstance(match.get("value"), bool)
+                                 or not str(match.get("unit") or "").strip()):
+            e.append(f"{tag}: a number claim needs an integer value and its unit")
+        if kind == "date":
+            try:
+                date.fromisoformat(str(match.get("value")))
+            except ValueError:
+                e.append(f"{tag}: a date claim needs an ISO date value")
+            if match.get("time") is not None and not re.fullmatch(r"\d{2}:\d{2}", str(match["time"])):
+                e.append(f"{tag}: time must be HH:MM")
+        if kind == "text" and not [p for p in match.get("patterns") or [] if str(p).strip()]:
+            e.append(f"{tag}: a text claim needs matching patterns")
+        if c.get("criticality") not in ("critical", "normal"):
+            e.append(f"{tag}: criticality must be critical or normal")
+        elif (c["criticality"] == "critical") != (c.get("critical_kind") in CRITICAL_KINDS):
+            e.append(f"{tag}: a critical claim names its kind {CRITICAL_KINDS}; a normal claim names none")
+        quals = c.get("qualifiers") or []
+        if not isinstance(quals, list) or not all(isinstance(q, list) and q and all(str(x).strip() for x in q)
+                                                  for q in quals):
+            e.append(f"{tag}: qualifiers are lists of permitted spellings")
+            quals = []
+        support = c.get("support_groups") or []
+        if not support or any(g not in groups for g in support):
+            return e + [f"{tag}: support_groups must name this row's evidence groups"]
+        quotes = " ".join(a.get("quote", "") for g in support for a in groups[g].get("alternatives") or [])
+        if kind in ("number", "date") and not claim_value_found({"match": match}, quotes):
+            e.append(f"{tag}: the {kind} value is not stated in its support quotes")
+        if kind == "text" and not claim_value_found({"match": match}, quotes):
+            e.append(f"{tag}: no pattern appears in its support quotes")
+        if qualifiers_found({"qualifiers": quals}, quotes):
+            e.append(f"{tag}: a qualifier is not stated in its support quotes (add its evidence group)")
+        return e
+
+    def check(self, row: dict, tag: str, *, split: str | None = None, require_review: bool = True) -> list[str]:
+        e: list[str] = []
+        if row.get("dataset_version") != GOLD_SCHEMA:
+            e.append(f"{tag}: dataset_version must be {GOLD_SCHEMA!r}")
+        if not QID_RE.fullmatch(str(row.get("question_id") or "")):
+            e.append(f"{tag}: question_id uses lowercase letters, digits and hyphens")
+        rev = row.get("revision")
+        if not isinstance(rev, int) or isinstance(rev, bool) or rev < 1:
+            e.append(f"{tag}: revision must be an integer >= 1")
+        if row.get("split") not in GOLD_DATASETS:
+            e.append(f"{tag}: split must be dev or test")
+        elif split and row["split"] != split:
+            e.append(f"{tag}: a {row['split']} row cannot enter dataset {split}")
+        if row.get("operational_case") or row.get("question_type") in OPERATIONAL_TYPES:
+            return e + [f"{tag}: converter failures, interrupted calls and ownership races belong to the operational "
+                        "suite, not to gold"]
+        qtype, mode, answerability = row.get("question_type"), row.get("mode"), row.get("answerability")
+        if qtype not in GOLD_TYPES:
+            e.append(f"{tag}: unknown question_type {qtype!r}")
+        for key in ("question", "difficulty_reason"):
+            if not str(row.get(key) or "").strip():
+                e.append(f"{tag}: {key} is empty")
+        if mode not in ("single", "compare", "metadata"):
+            e.append(f"{tag}: mode must be single, compare or metadata")
+        try:
+            date.fromisoformat(str(row.get("as_of_date")))
+        except ValueError:
+            e.append(f"{tag}: as_of_date must be an ISO date")
+        if answerability not in EXPECTED_STATUS:
+            e.append(f"{tag}: answerability must be one of {sorted(EXPECTED_STATUS)}")
+        elif row.get("expected_status") not in EXPECTED_STATUS[answerability]:
+            e.append(f"{tag}: expected_status for {answerability} must be one of {EXPECTED_STATUS[answerability]}")
+        scope = row.get("scope")
+        if not isinstance(scope, list) or not 1 <= len(scope) <= 2 or not all(isinstance(s, dict) for s in scope):
+            return e + [f"{tag}: scope names one or two documents"]
+        if len({s.get("doc_id") for s in scope}) != len(scope):
+            e.append(f"{tag}: the same document is scoped twice")
+        if (mode == "compare") != (len(scope) == 2):
+            e.append(f"{tag}: compare mode scopes exactly two documents; other modes one")
+        if (qtype == "cross_document") != (mode == "compare"):
+            e.append(f"{tag}: cross_document questions and compare mode go together")
+        if (qtype == METADATA_STRATUM) != (mode == "metadata"):
+            e.append(f"{tag}: metadata_direct questions and metadata mode go together")
+        scoped: dict[str, dict] = {}
+        for s in scope:
+            doc = self.docs.get(s.get("doc_id"))
+            if doc is None:
+                e.append(f"{tag}: unknown doc_id")
+                continue
+            short = s["doc_id"][:8]
+            if s.get("source_hash") != doc["active_source_hash"]:
+                e.append(f"{tag}: {short}: source revision does not match the managed original")
+            if mode != "metadata":
+                if doc["parse_status"] != "parsed":
+                    e.append(f"{tag}: {short} is {doc['parse_status']}: " + (
+                        "a source failure is not source absence; move this case to the operational suite"
+                        if answerability != "answerable" else "its original text is unavailable"))
+                elif s.get("extraction_id") != doc["active_extraction_id"]:
+                    e.append(f"{tag}: {short}: extraction revision is not the active one")
+            scoped[s["doc_id"]] = s
+        fams = set()
+        for d in scoped:
+            fam = self.fam_of_doc.get(d)
+            if fam is None:
+                e.append(f"{tag}: {d[:8]} has no assigned family")
+                continue
+            fams.add(fam[0])
+            if fam[1]["split"] != row.get("split"):
+                e.append(f"{tag}: {d[:8]} belongs to a {fam[1]['split']} family")
+        if sorted(set(row.get("family_ids") or [])) != sorted(fams):
+            e.append(f"{tag}: family_ids must be exactly the scoped documents' assigned families")
+        groups = row.get("evidence_groups") or []
+        by_id: dict[str, dict] = {}
+        for g in groups:
+            gid = g.get("group_id")
+            if not gid or gid in by_id:
+                e.append(f"{tag}: evidence group id missing or repeated")
+                continue
+            by_id[gid] = g
+            if g.get("doc_id") not in scoped:
+                e.append(f"{tag} {gid}: evidence group outside the scope")
+                continue
+            alts = g.get("alternatives") or []
+            if not alts:
+                e.append(f"{tag} {gid}: an evidence group needs at least one source span")
+            for i, alt in enumerate(alts, 1):
+                e += self._check_alternative(alt, scoped[g["doc_id"]], f"{tag} {gid}#{i}")
+        claims = row.get("required_claims") or []
+        if mode != "metadata":
+            if answerability == "answerable" and not groups:
+                e.append(f"{tag}: an answerable passage question needs evidence groups")
+            if answerability == "answerable" and not claims:
+                e.append(f"{tag}: an answerable passage question needs required claims")
+            if mode == "compare" and answerability == "answerable" and set(scoped) - {g.get("doc_id") for g in groups}:
+                e.append(f"{tag}: every compared document needs at least one evidence group")
+            if answerability == "conflicting" and len(by_id) < 2:
+                e.append(f"{tag}: a conflict needs one evidence group per competing value")
+        seen: set = set()
+        for c in claims:
+            e += self._check_claim(c, by_id, tag, seen)
+        if mode == "metadata":
+            fields = row.get("metadata_fields") or []
+            states = row.get("expected_states") or {}
+            if not fields or set(fields) - set(METADATA_FIELDS):
+                e.append(f"{tag}: metadata_fields must name CSV fields {METADATA_FIELDS}")
+            if set(states) != set(fields) or set(states.values()) - set(METADATA_STATES):
+                e.append(f"{tag}: expected_states gives one of {METADATA_STATES} for every metadata field")
+        if answerability in ("unanswerable", "ambiguous") and mode != "metadata":
+            nv = row.get("negative_validation") or {}
+            if not nv:
+                e.append(f"{tag}: a negative or ambiguous case needs negative_validation")
+            else:
+                if set(scoped) - set(nv.get("scope_searched") or []):
+                    e.append(f"{tag}: negative_validation must search every scoped document")
+                if not nv.get("methods"):
+                    e.append(f"{tag}: negative_validation must record how absence was checked")
+                if nv.get("original_complete") is not True:
+                    e.append(f"{tag}: absence needs an original complete enough to establish it")
+                if not str(nv.get("rationale") or "").strip():
+                    e.append(f"{tag}: negative_validation needs a rationale")
+                if answerability == "unanswerable" and not nv.get("locations"):
+                    e.append(f"{tag}: verified absence lists the original locations inspected")
+        review = row.get("review") or {}
+        prov = row.get("generation_provenance") or {}
+        drafter = str(review.get("drafted_by") or "").strip()
+        if not drafter:
+            e.append(f"{tag}: review.drafted_by is required")
+        if prov.get("method") not in ("human", "llm"):
+            e.append(f"{tag}: generation_provenance.method must be human or llm")
+        elif prov["method"] == "llm" and not all(prov.get(k) for k in ("model", "prompt_version", "source_set_hash")):
+            e.append(f"{tag}: an LLM draft records its model, prompt version and source-set hash")
+        if not require_review:
+            if review.get("reviewed_by") or review.get("approved_at"):
+                e.append(f"{tag}: drafts cannot carry a review")
+            return e
+        reviewer = str(review.get("reviewed_by") or "").strip()
+        if review.get("status") != "approved" or not reviewer or not review.get("approved_at"):
+            e.append(f"{tag}: pending or unreviewed rows are not gold")
+        elif reviewer == drafter or (prov.get("method") == "llm" and reviewer == prov.get("model")):
+            e.append(f"{tag}: needs an independent reviewer; a drafter (or drafting model) cannot approve itself")
+        elif review.get("original_inspected") is not True:
+            e.append(f"{tag}: the reviewer must have inspected the original")
+        if review.get("disputed") or review.get("second_review"):
+            second = review.get("second_review") or {}
+            if (not second or second.get("reviewer") in (None, "", drafter, reviewer)
+                    or (prov.get("method") == "llm" and second.get("reviewer") == prov.get("model"))):
+                e.append(f"{tag}: a disputed row needs an independent second review")
+            elif second.get("agreed") is not True:
+                e.append(f"{tag}: the second reviewer disagreed; correct the row as a new revision")
+        return e
+
+
+def _gold_split_rows(settings: Settings, name: str) -> list[dict]:
+    path = dataset_path(settings, name)
+    return read_jsonl(path) if path.exists() else []
+
+
+def validate_gold_v2(settings: Settings, name: str) -> dict:
+    """Accepted gold only: independently reviewed against the original, quotes present in the pinned extraction,
+    families inside one split, no question repeated or paraphrased across splits. The report counts types against
+    the phase-4 targets and source positions; a smaller valid set is labeled `pilot`, never `gold`."""
+    if name not in GOLD_DATASETS:
+        raise EvaluationError(f"{name} is not a gold-2 dataset")
+    path = dataset_path(settings, name)
+    if not path.exists():
+        return {"ok": False, "dataset": name, "errors": [f"dataset file missing: {path.name}"], "rows": 0}
+    raw = path.read_bytes()
+    if raw.startswith(b"\xef\xbb\xbf"):
+        return {"ok": False, "dataset": name, "errors": ["dataset must be UTF-8 without BOM"], "rows": 0}
+    rows = read_jsonl(path)
+    other_name = "test" if name == "dev" else "dev"
+    other = _gold_split_rows(settings, other_name)
+    errors: list[str] = []
+    rejected: dict[str, list[str]] = {}
+    positions = {"early": 0, "middle": 0, "late": 0, "none": 0}
+    with open_db(settings.db_path) as conn:
+        checker = GoldChecker(settings, conn)
+        leaks = checker.family_leaks()
+        errors += [f"source {h[:12]} sits in both dev and test families: split leakage" for h in leaks]
+        affected = {notice_fam for r in load_families(settings).get("related_across_splits", [])
+                    for notice_fam in r["families"]}
+        seen_ids, seen_q = set(), {}
+        for i, row in enumerate(rows, start=1):
+            qid = str(row.get("question_id") or f"row-{i}")
+            tag = qid
+            errs = checker.check(row, tag, split=name)
+            if qid in seen_ids:
+                errs.append(f"{tag}: question_id repeated (keep only the latest revision)")
+            seen_ids.add(qid)
+            key = norm_text(row.get("question"))
+            if key in seen_q:
+                errs.append(f"{tag}: same question as {seen_q[key]}")
+            seen_q.setdefault(key, qid)
+            if set(row.get("family_ids") or []) & affected:
+                errs.append(f"{tag}: its family has related revisions in the other split; fix the family map")
+            for o in other:
+                if question_similarity(row.get("question", ""), o.get("question", "")) >= LEAK_SIMILARITY:
+                    which = "a sealed row (ID withheld)" if other_name in SEALED_SPLITS else \
+                        f"row {o.get('question_id')}"
+                    errs.append(f"{tag}: repeats or paraphrases {other_name} {which}: leakage")
+                    break
+            if errs:
+                rejected[qid] = errs
+                errors += errs
+            if row.get("mode") != "metadata":
+                positions[checker.row_position(row) or "none"] += 1
+    types = {t: sum(r.get("question_type") == t for r in rows) for t in sorted(GOLD_TYPES)}
+    targets = {t: {"rows": types[t], "target": n, "met": types[t] >= n} for t, n in GOLD_TYPE_TARGETS.items()}
+    ok = not errors
+    report = {"ok": ok, "dataset": name, "schema": GOLD_SCHEMA, "rows": len(rows),
+              "dataset_sha256": hashlib.sha256(raw).hexdigest(),
+              "label": "gold" if ok and all(t["met"] for t in targets.values()) else "pilot",
+              "targets": targets, "metadata_stratum": types[METADATA_STRATUM],
+              "answerability": {a: sum(r.get("answerability") == a for r in rows) for a in EXPECTED_STATUS},
+              "source_positions": positions, "rejected_rows": [{"question_id": k, "errors": v}
+                                                               for k, v in rejected.items()],
+              "errors": errors, "validated_at": utcnow()}
+    write_text_atomic(path.with_suffix(".validation.json"), json.dumps(report, ensure_ascii=False, indent=1))
+    return report
+
+
+def gold_manifest_path(settings: Settings, name: str) -> Path:
+    return dataset_path(settings, name).with_name(f"{name}-manifest.json")
+
+
+def review_log_path(settings: Settings, name: str) -> Path:
+    return dataset_path(settings, name).with_name("review-log.jsonl" if name == "dev" else f"{name}-review-log.jsonl")
+
+
+def _review_log_text(settings: Settings, name: str) -> str:
+    with open_db(settings.db_path) as conn:
+        rows = [dict(r) for r in conn.execute(
+            "SELECT r.review_id, r.candidate_id, r.reviewer, r.kind, r.decision, r.original_inspected, r.note, "
+            "r.created_at FROM gold_reviews r JOIN gold_candidates c ON c.candidate_id = r.candidate_id "
+            "WHERE c.dataset = ? ORDER BY r.created_at, r.review_id", (name,))]
+    return "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
+
+
+def export_review_log(settings: Settings, name: str) -> tuple[Path, str]:
+    """The append-only review decisions behind a dataset (first decisions and second reviews), oldest first,
+    rendered from the database."""
+    text = _review_log_text(settings, name)
+    path = review_log_path(settings, name)
+    write_text_atomic(path, text)
+    return path, hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _families_sha(settings: Settings) -> str | None:
+    fam_path = settings.data_dir / "datasets" / "families.json"
+    return hashlib.sha256(fam_path.read_bytes()).hexdigest() if fam_path.exists() else None
+
+
+def freeze_dataset(settings: Settings, name: str, actor: str, reason: str) -> dict:
+    """Freezes a validated gold split: dataset, review log and family map hashes in its manifest, with an audit
+    event. The test manifest stays under sealed/."""
+    if not (reason or "").strip():
+        raise EvaluationError("freezing a dataset needs a reason")
+    report = validate_gold_v2(settings, name)
+    if not report["ok"]:
+        raise EvaluationError(f"{name} does not validate ({len(report['errors'])} errors); freeze refused")
+    log_path, log_sha = export_review_log(settings, name)
+    manifest = {"dataset": name, "schema": GOLD_SCHEMA, "dataset_sha256": report["dataset_sha256"],
+                "rows": report["rows"], "label": report["label"], "targets": report["targets"],
+                "metadata_stratum": report["metadata_stratum"], "answerability": report["answerability"],
+                "source_positions": report["source_positions"], "review_log_sha256": log_sha,
+                "families_sha256": _families_sha(settings),
+                "frozen_by": actor, "reason": reason.strip(), "frozen_at": utcnow()}
+    write_text_atomic(gold_manifest_path(settings, name), json.dumps(manifest, ensure_ascii=False, indent=1))
+    record_audit(settings, actor, "freeze_dataset", name, reason, {k: manifest[k] for k in (
+        "dataset_sha256", "rows", "label", "review_log_sha256")})
+    return manifest
+
+
+def frozen_dataset(settings: Settings, name: str) -> dict | None:
+    """The frozen manifest with `current`: today's dataset bytes, family map, review log file and the review history
+    in the database are all still the frozen ones. `changed` names whatever differs."""
+    path = gold_manifest_path(settings, name)
+    if not path.exists():
+        return None
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    data, log = dataset_path(settings, name), review_log_path(settings, name)
+    sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest() if p.exists() else None  # noqa: E731
+    changed = []
+    if sha(data) != manifest["dataset_sha256"]:
+        changed.append("dataset")
+    if _families_sha(settings) != manifest.get("families_sha256"):
+        changed.append("family map")
+    if sha(log) != manifest.get("review_log_sha256"):
+        changed.append("review log file")
+    if hashlib.sha256(_review_log_text(settings, name).encode("utf-8")).hexdigest() != manifest.get("review_log_sha256"):
+        changed.append("review history in the database")
+    manifest["changed"] = changed
+    manifest["current"] = not changed
+    return manifest
+
+
+def record_audit(settings: Settings, actor: str, action: str, target: str, reason: str, details: dict) -> str:
+    from .store import tx
+
+    event_id = str(uuid.uuid4())
+    with open_db(settings.db_path) as conn, tx(conn, immediate=True):
+        conn.execute("INSERT INTO audit_events(event_id, actor, action, target, reason, details_json, created_at) "
+                     "VALUES (?, ?, ?, ?, ?, ?, ?)", (event_id, actor, action, target, reason, dumps(details),
+                                                       utcnow()))
+    return event_id
