@@ -1987,7 +1987,7 @@ def candidate_spans(c: dict) -> list[dict]:
             else [(text, False)]
         spans.append({"label": ev.get("group_id") or f"근거 {i}", "doc_id": ev.get("doc_id"),
                       "location": ev.get("location"), "quote": quote, "cited_found": start >= 0,
-                      "missing": not text, "segments": [p for p in parts if p[0]]})
+                      "missing": not text, "segments": [{"text": t, "cited": c} for t, c in parts if t]})
     return spans
 
 
@@ -2002,6 +2002,40 @@ DRAFT_RUN_RE = re.compile(r"draft-\d{8}-[0-9a-f]{6}")
 
 def _drafts_dir(settings: Settings) -> Path:
     return settings.data_dir / "drafts"
+
+
+def candidate_review(res: Resources, principal: Principal, candidate_id: str) -> dict:
+    """A pending candidate as the review screen reads it: the draft and its labels, who drafted it and who asked
+    for the drafting (that person cannot approve), each scoped document with its review state and the PDF pages the
+    draft points at, the cited spans inside their original element text, and the CSV metadata it relies on."""
+    c = gold_candidate(res, principal, candidate_id)
+    row, ctx = c["row"], c["context"]
+    scope = row["scope"] if isinstance(row.get("scope"), list) else [
+        {"doc_id": row.get("doc_id"), "source_hash": row.get("source_hash")}]
+    documents = []
+    for doc, sc in zip(ctx.get("documents") or [ctx.get("document")], scope):
+        pages = [{"group_id": loc.get("group_id"), "pdf_pages": loc["pdf_pages"]}
+                 for loc in row.get("review_locations") or []
+                 if isinstance(loc, dict) and (loc.get("doc_id"), loc.get("source_hash")) == (sc.get("doc_id"),
+                                                                                              sc.get("source_hash"))
+                 and isinstance(loc.get("pdf_pages"), list) and loc["pdf_pages"]
+                 and all(type(p) is int and p > 0 for p in loc["pdf_pages"])]
+        documents.append({**(doc or {}), "found": doc is not None, "doc_id": sc.get("doc_id"),
+                          "source_hash": sc.get("source_hash"), "pdf_pages": pages})
+    meta = ctx.get("metadata") or {}
+    metadata = [{"field": k, "value": v} for k, v in meta.items()] if not c["gold"] else [
+        {"field": f"{d[:8]} {f}", "value": v} for d, fields in meta.items() for f, v in fields.items()]
+    metadata += [{"field": f"충돌: {x.get('field')}", "value": x} for x in ctx.get("metadata_conflicts") or []]
+    answer = row.get("expected_answer")
+    return {"candidate_id": candidate_id, "dataset": c["dataset"], "gold": c["gold"], "row_sha256": c["row_sha256"],
+            "drafted_by": c["drafted_by"], "requested_by": c["requested_by"],
+            "type": row.get("question_type") or row.get("type"), "question": row.get("question") or "",
+            "expected_answer": answer if isinstance(answer, str) and answer.strip() else None,
+            "difficulty_reason": row.get("difficulty_reason"), "answerability": row.get("answerability"),
+            "expected_status": row.get("expected_status"), "as_of_date": row.get("as_of_date"),
+            "required_claims": row.get("required_claims") or [],
+            "negative_validation": row.get("negative_validation") or {}, "current_errors": c["current_errors"],
+            "documents": documents, "spans": candidate_spans(c), "metadata": metadata}
 
 
 def _drafting_meta(settings: Settings, run_id: str | None) -> dict:

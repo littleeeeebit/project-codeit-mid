@@ -6,9 +6,9 @@
 // over summary tiles with tabs and a to-do inbox page (DESIGN.md, 검증).
 
 import { useState } from "react";
-import { cn } from "cn";
 import { api, errorText, type Schemas } from "@/lib/api";
 import { must, usePoll } from "@/lib/use-poll";
+import { type MenuGroup, SideMenu } from "@/components/side-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DatasetState, SecondReviewDetail, type Waiting, WaitingRow } from "./gold";
 import { EvaluationSection, ReleaseBadge } from "./evaluation";
@@ -140,8 +140,8 @@ function TracePane({ runs, onRun }: { runs: Schemas["TraceSummary"][]; onRun: ()
 
 function SidebarLayout({ d, section, onSection }: { d: Data; section: Key; onSection: (k: Key) => void }) {
   const ov = d.ov.data!;
-  const groups: { title: string; items: { k: Key; count?: React.ReactNode }[] }[] = [
-    { title: "사람이 볼 차례", items: [{ k: "todo", count: todoCount(d) }] },
+  const groups: MenuGroup<Key>[] = [
+    { title: "사람이 볼 차례", items: [{ k: "todo", count: todoCount(d), urgent: todoCount(d) > 0 }] },
     { title: "재현", items: [{ k: "trace", count: d.runs.data?.length }, { k: "compare" }] },
     { title: "현황", items: [
       { k: "evaluation", count: <ReleaseBadge release={ov.evaluation.release} /> },
@@ -151,27 +151,9 @@ function SidebarLayout({ d, section, onSection }: { d: Data; section: Key; onSec
     { title: "기록", items: [{ k: "corrections" }, { k: "exports" }] },
   ];
   return (
-    <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
-      <nav aria-label="검증 영역" className="space-y-5 lg:sticky lg:top-20 lg:self-start">
-        <h1 className="px-2 text-xl font-bold tracking-tight">검증</h1>
-        {groups.map((g) => (
-          <div key={g.title} className="space-y-0.5">
-            <p className="px-2 pb-1 text-xs font-semibold text-muted-foreground">{g.title}</p>
-            {g.items.map(({ k, count }) => (
-              <button key={k} type="button" aria-current={section === k ? "page" : undefined} onClick={() => onSection(k)}
-                      className={cn("flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                        section === k ? "bg-accent text-foreground" : "text-foreground/80 hover:bg-secondary")}>
-                {TITLES[k]}
-                {count !== undefined && <span className={cn("text-xs tabular-nums", k === "todo" && Number(count) > 0 ? "font-bold text-warn" : "text-muted-foreground")}>{count}</span>}
-              </button>
-            ))}
-          </div>
-        ))}
-      </nav>
-      <main className="min-w-0 space-y-6">
-        <PageTitle title={TITLES[section]}>{section === "todo" ? "자동 대조가 표시한 원문과 쟁점 표시된 승인 질문입니다. 표시된 곳만 보면 됩니다." : undefined}</PageTitle>
-        <Body k={section} d={d} />
-      </main>
-    </div>
+    <SideMenu title="검증" groups={groups} titles={TITLES} section={section} onSection={onSection}>
+      <PageTitle title={TITLES[section]}>{section === "todo" ? "자동 대조가 표시한 원문과 쟁점 표시된 승인 질문입니다. 표시된 곳만 보면 됩니다." : undefined}</PageTitle>
+      <Body k={section} d={d} />
+    </SideMenu>
   );
 }

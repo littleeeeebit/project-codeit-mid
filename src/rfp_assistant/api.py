@@ -44,6 +44,7 @@ def create_app(resources=None) -> FastAPI:
             app.add_exception_handler(error, _forbidden)
     _routes(app)
     _verify_routes(app)
+    _dataset_routes(app)  # after /api/gold/recent and friends, which /api/gold/{candidate_id} would shadow
     return app
 
 
@@ -745,6 +746,218 @@ def _verify_routes(app: FastAPI) -> None:
     @app.post("/api/gold/{candidate_id}/second-review")
     def second_review(candidate_id: str, body: SecondReviewIn, res: Res, member: Member) -> dict:
         return service.gold_second_review(res, member, candidate_id, body.agreed, body.note)
+
+
+# ---------------------------------------------------------------- 데이터셋 만들기: shapes
+
+
+class DraftDocument(_Read):
+    doc_id: str
+    source_hash: str
+    title: str | None
+    institution: str | None
+    filename: str | None
+
+
+class DraftElement(_Read):
+    element_id: str
+    kind: str
+    text: str | None
+    location: dict
+
+
+class SourceRef(BaseModel):
+    doc_id: str
+    element_id: str
+
+
+class SlotIn(BaseModel):
+    question_type: str
+    intent: str
+    doc_ids: list[str]
+    sources: list[SourceRef]
+
+
+class Slot(SlotIn):
+    question_id: str
+
+
+class SlotsIn(BaseModel):
+    slots: list[Slot]
+
+
+class StartIn(SlotsIn):
+    consented_max_micro_usd: int
+
+
+class DraftEstimate(_Read):
+    calls: int
+    max_micro_usd: int
+    paid_enabled: bool
+    envelope_remaining_micro_usd: int | None
+    available_micro_usd: int | None
+    fits: bool
+
+
+class Receipt(_Read):
+    rows: int
+    invalid: int
+    settled_micro_usd: int
+
+
+class DraftRow(_Read):
+    question_id: str
+    question_type: str | None = None
+    question: str = ""
+    required_claims: list = []
+
+
+class InvalidDraft(_Read):
+    question_id: str
+    reason: str
+
+
+class DraftRun(_Read):
+    run_id: str
+    requested_by: str | None
+    created_at: str | None
+    max_micro_usd: int | None
+    slots: int
+    status: Literal["running", "completed", "failed", "interrupted"]
+    receipt: Receipt | None
+    rows: list[DraftRow]
+    invalid: list[InvalidDraft]
+    error: str | None
+    submitted: bool
+
+
+class Pending(_Read):
+    candidate_id: str
+    dataset: str
+    batch_id: str
+    type: str | None
+    question: str | None
+
+
+class PdfPages(_Read):
+    group_id: str | None
+    pdf_pages: list[int]
+
+
+class CandidateDocument(_Read):
+    found: bool
+    doc_id: str | None
+    source_hash: str | None
+    title: str | None = None
+    institution: str | None = None
+    filename: str | None = None
+    format: str | None = None
+    review_status: str | None = None
+    unavailable_reason: str | None = None
+    pdf_pages: list[PdfPages]
+
+
+class Segment(_Read):
+    text: str
+    cited: bool
+
+
+class Span(_Read):
+    label: str
+    location: dict | None
+    quote: str
+    cited_found: bool
+    missing: bool
+    segments: list[Segment] = Field(description="The element text in order; `cited` marks the quoted span")
+
+
+class MetadataRow(_Read):
+    field: str
+    value: Any
+
+
+class CandidateReview(_Read):
+    candidate_id: str
+    dataset: str
+    gold: bool
+    row_sha256: str
+    drafted_by: str | None
+    requested_by: str | None = Field(description="Who started the drafting run; refused as approver")
+    type: str | None
+    question: str
+    expected_answer: str | None
+    difficulty_reason: str | None
+    answerability: str | None
+    expected_status: str | None
+    as_of_date: str | None
+    required_claims: list[GoldClaim]
+    negative_validation: dict[str, Any]
+    current_errors: list[str]
+    documents: list[CandidateDocument]
+    spans: list[Span]
+    metadata: list[MetadataRow]
+
+
+class DecideIn(BaseModel):
+    decision: Literal["approve", "reject"]
+    expected_sha: str
+    note: str
+    categories: list[str] = []
+    original_inspected: bool = False
+    disputed: bool = False
+
+
+# ---------------------------------------------------------------- 데이터셋 만들기: routes
+
+
+def _dataset_routes(app: FastAPI) -> None:
+    @app.get("/api/drafting/documents", response_model=list[DraftDocument])
+    def draft_documents(res: Res, member: Member):
+        """Development-family documents only: no sealed source reaches drafting."""
+        return service.draft_documents(res, member)
+
+    @app.get("/api/drafting/documents/{doc_id}/elements", response_model=list[DraftElement])
+    def draft_elements(doc_id: str, res: Res, member: Member, contains: str = ""):
+        return service.draft_elements(res, member, doc_id, contains)
+
+    @app.post("/api/drafting/slots", response_model=Slot)
+    def draft_slot(body: SlotIn):
+        return service.draft_slot(body.question_type, body.intent, body.doc_ids, [s.model_dump() for s in body.sources])
+
+    @app.post("/api/drafting/plan", response_model=DraftEstimate)
+    def plan_drafting(body: SlotsIn, res: Res, member: Member):
+        """Free: the maximum cost of drafting these slots. Nothing is sent."""
+        return service.plan_drafting(res, member, [s.model_dump() for s in body.slots])
+
+    @app.post("/api/drafting/start", response_model=Started)
+    def start_drafting(body: StartIn, res: Res, member: Member):
+        """Paid: gpt-6-luna drafting through the budget gateway, never above the consented maximum."""
+        return Started(run_id=service.start_drafting(res, member, [s.model_dump() for s in body.slots],
+                                                     body.consented_max_micro_usd))
+
+    @app.get("/api/drafting/runs", response_model=list[DraftRun])
+    def drafting_runs(res: Res, member: Member):
+        return service.drafting_runs(res, member)
+
+    @app.post("/api/drafting/runs/{run_id}/submit")
+    def submit_drafts(run_id: str, res: Res, member: Member) -> dict:
+        return service.submit_drafts(res, member, run_id)
+
+    @app.get("/api/gold/pending", response_model=list[Pending])
+    def gold_pending(res: Res, member: Member):
+        """Development candidates only; sealed ones are reviewed through the owner's CLI."""
+        return service.gold_queue(res, member)["pending"]
+
+    @app.get("/api/gold/{candidate_id}", response_model=CandidateReview)
+    def gold_candidate(candidate_id: str, res: Res, member: Member):
+        return service.candidate_review(res, member, candidate_id)
+
+    @app.post("/api/gold/{candidate_id}/decide", response_model=Decided)
+    def gold_decide(candidate_id: str, body: DecideIn, res: Res, member: Member):
+        """A note is required for both outcomes, and whoever started the drafting run cannot approve it."""
+        return service.gold_decide(res, member, candidate_id, body.decision, body.expected_sha,
+                                   body.categories if body.decision == "reject" else None, body.note,
+                                   original_inspected=body.original_inspected, disputed=body.disputed)
 
 
 app = create_app()

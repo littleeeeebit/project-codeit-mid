@@ -68,7 +68,7 @@ export function DatasetState({ ov }: { ov: Overview }) {
   );
 }
 
-function RecentDecisions() {
+export function RecentDecisions() {
   const recent = usePoll("gold-recent", () => must(api.GET("/api/gold/recent"), errorText), null);
   const cats = usePoll("gold-cats", () => must(api.GET("/api/gold/reject-categories"), errorText), null);
   return (

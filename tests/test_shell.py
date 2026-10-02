@@ -6,7 +6,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from rfp_assistant import auth, budget, generation, gold, service
+from fastapi.testclient import TestClient
+
+from rfp_assistant import api, auth, budget, generation, gold, service
 from tests import phase4_fixtures as fx
 
 
@@ -20,12 +22,13 @@ class CandidateSpansTest(unittest.TestCase):
     def test_the_recorded_offsets_pick_which_repeat_is_cited(self):
         (span,) = service.candidate_spans(self.candidate("가 12개월 나 12개월 다", "12개월", [9, 13]))
         self.assertTrue(span["cited_found"])
-        self.assertEqual(span["segments"], [("가 12개월 나 ", False), ("12개월", True), (" 다", False)])
+        self.assertEqual(span["segments"], [{"text": "가 12개월 나 ", "cited": False}, {"text": "12개월", "cited": True},
+                                            {"text": " 다", "cited": False}])
 
     def test_a_quote_not_in_the_element_marks_nothing(self):
         (span,) = service.candidate_spans(self.candidate("하자보수 기간", "12개월"))
         self.assertFalse(span["cited_found"])
-        self.assertEqual(span["segments"], [("하자보수 기간", False)])
+        self.assertEqual(span["segments"], [{"text": "하자보수 기간", "cited": False}])
         (gone,) = service.candidate_spans(self.candidate("", "12개월"))
         self.assertTrue(gone["missing"])
 
@@ -119,17 +122,20 @@ class ShellServiceTest(unittest.TestCase):
         self.assertTrue(service.drafting_runs(self.res, self.a)[0]["submitted"])
         with self.assertRaises(service.ServiceError):
             service.submit_drafts(self.res, self.a, run_id)
-        (pending,) = service.gold_queue(self.res, self.b)["pending"]
-        c = service.gold_candidate(self.res, self.b, pending["candidate_id"])
-        self.assertEqual(c["requested_by"], "person-a")
-        self.assertTrue(all(s["cited_found"] for s in service.candidate_spans(c)))
-        decide = lambda who, note: service.gold_decide(  # noqa: E731
-            self.res, who, c["candidate_id"], "approve", c["row_sha256"], note=note, original_inspected=True)
-        with self.assertRaisesRegex(service.ServiceError, "메모"):
-            decide(self.b, "  ")
-        with self.assertRaisesRegex(service.ServiceError, "요청한 사람"):
-            decide(self.a, "원문 확인")
-        decide(self.b, "원문 1쪽 예산과 2쪽 부가세 문구 확인")
+        with TestClient(api.create_app(self.res)) as client:  # the review screen's calls, over HTTP
+            (pending,) = client.get("/api/gold/pending").json()
+            c = client.get(f"/api/gold/{pending['candidate_id']}").json()
+            self.assertEqual((c["requested_by"], c["documents"][0]["found"]), ("person-a", True))
+            self.assertTrue(c["spans"] and all(s["cited_found"] for s in c["spans"]))
+            self.assertIn({"text": fx.AMOUNT, "cited": True}, c["spans"][0]["segments"])
+
+            def decide(who: str, note: str):
+                return client.post(f"/api/gold/{c['candidate_id']}/decide", headers={"X-Member": who}, json={
+                    "decision": "approve", "expected_sha": c["row_sha256"], "note": note, "original_inspected": True})
+
+            self.assertIn("메모", decide("person-b", "  ").json()["detail"])
+            self.assertIn("요청한 사람", decide("person-a", "원문 확인").json()["detail"])
+            self.assertEqual(decide("person-b", "원문 1쪽 예산과 2쪽 부가세 문구 확인").json()["status"], "approved")
         self.assertEqual(gold.candidate(self.s, c["candidate_id"])["status"], "approved")
 
 

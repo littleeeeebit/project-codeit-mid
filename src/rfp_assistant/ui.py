@@ -1412,8 +1412,8 @@ def _candidate_sources(st, c: dict) -> None:
             if s["missing"]:
                 st.error("원문 요소를 찾을 수 없습니다.")
                 continue
-            for text, cited in s["segments"]:
-                st.markdown(marked(text.strip("\n"), cited))
+            for seg in s["segments"]:
+                st.markdown(marked(seg["text"].strip("\n"), seg["cited"]))
             if not s["cited_found"] and s["quote"]:
                 st.markdown("초안 인용: " + plain(s["quote"]))
 

@@ -82,10 +82,27 @@ export const REVIEW_TONE: Record<string, Tone> = {
   needs_recovery: "bad",
 };
 
+/** Question types of gold rows, then of the earlier pilot rows still in the review queue. */
 export const GOLD_TYPE: Record<string, string> = {
   direct_fact: "직접 사실", semantic_paraphrase: "다른 표현", exact_identifier: "요구사항 코드", table_numeric: "표·숫자",
   multi_passage: "한 문서 여러 근거", cross_document: "두 문서 비교", missing_false_premise: "없음·잘못된 전제",
   revision_conflict: "차수·중복 충돌", metadata_direct: "기본 정보",
+  late_content: "뒷부분 내용", table_fact: "표 속 사실", numeric_qualifier: "숫자·조건", repeated_code: "반복 요구사항 코드",
+  requirement_detail: "요구사항 상세", condition: "조건", missing_metadata: "메타데이터 누락",
+  provenance_conflict: "출처 충돌", converter_unavailable: "변환 실패 문서", not_in_source: "원문에 없음",
+};
+
+/** The types a drafting slot can ask for, in the order the form offers them. */
+export const DRAFT_TYPES = ["direct_fact", "semantic_paraphrase", "exact_identifier", "table_numeric", "multi_passage",
+  "cross_document", "missing_false_premise"] as const;
+
+export const ANSWERABILITY: Record<string, string> = {
+  answerable: "답변 가능", unanswerable: "원문에 없음", ambiguous: "모호함", conflicting: "충돌",
+};
+
+export const DRAFT_STATUS: Record<string, { label: string; tone: Tone }> = {
+  running: { label: "생성 중", tone: "info" }, completed: { label: "완료", tone: "ok" }, failed: { label: "실패", tone: "bad" },
+  interrupted: { label: "중단됨", tone: "neutral" },
 };
 
 /** 0.83 (5/6); an empty denominator is 'not applicable', never 100 %. */

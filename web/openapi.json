@@ -442,6 +442,293 @@
     "title": "Candidate",
     "type": "object"
    },
+   "CandidateDocument": {
+    "properties": {
+     "doc_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Doc Id"
+     },
+     "filename": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Filename"
+     },
+     "format": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Format"
+     },
+     "found": {
+      "title": "Found",
+      "type": "boolean"
+     },
+     "institution": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Institution"
+     },
+     "pdf_pages": {
+      "items": {
+       "$ref": "#/components/schemas/PdfPages"
+      },
+      "title": "Pdf Pages",
+      "type": "array"
+     },
+     "review_status": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Review Status"
+     },
+     "source_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Hash"
+     },
+     "title": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Title"
+     },
+     "unavailable_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unavailable Reason"
+     }
+    },
+    "required": [
+     "found",
+     "doc_id",
+     "source_hash",
+     "pdf_pages"
+    ],
+    "title": "CandidateDocument",
+    "type": "object"
+   },
+   "CandidateReview": {
+    "properties": {
+     "answerability": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Answerability"
+     },
+     "as_of_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "As Of Date"
+     },
+     "candidate_id": {
+      "title": "Candidate Id",
+      "type": "string"
+     },
+     "current_errors": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Current Errors",
+      "type": "array"
+     },
+     "dataset": {
+      "title": "Dataset",
+      "type": "string"
+     },
+     "difficulty_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Difficulty Reason"
+     },
+     "documents": {
+      "items": {
+       "$ref": "#/components/schemas/CandidateDocument"
+      },
+      "title": "Documents",
+      "type": "array"
+     },
+     "drafted_by": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Drafted By"
+     },
+     "expected_answer": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expected Answer"
+     },
+     "expected_status": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expected Status"
+     },
+     "gold": {
+      "title": "Gold",
+      "type": "boolean"
+     },
+     "metadata": {
+      "items": {
+       "$ref": "#/components/schemas/MetadataRow"
+      },
+      "title": "Metadata",
+      "type": "array"
+     },
+     "negative_validation": {
+      "additionalProperties": true,
+      "title": "Negative Validation",
+      "type": "object"
+     },
+     "question": {
+      "title": "Question",
+      "type": "string"
+     },
+     "requested_by": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Who started the drafting run; refused as approver",
+      "title": "Requested By"
+     },
+     "required_claims": {
+      "items": {
+       "$ref": "#/components/schemas/GoldClaim"
+      },
+      "title": "Required Claims",
+      "type": "array"
+     },
+     "row_sha256": {
+      "title": "Row Sha256",
+      "type": "string"
+     },
+     "spans": {
+      "items": {
+       "$ref": "#/components/schemas/Span"
+      },
+      "title": "Spans",
+      "type": "array"
+     },
+     "type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Type"
+     }
+    },
+    "required": [
+     "candidate_id",
+     "dataset",
+     "gold",
+     "row_sha256",
+     "drafted_by",
+     "requested_by",
+     "type",
+     "question",
+     "expected_answer",
+     "difficulty_reason",
+     "answerability",
+     "expected_status",
+     "as_of_date",
+     "required_claims",
+     "negative_validation",
+     "current_errors",
+     "documents",
+     "spans",
+     "metadata"
+    ],
+    "title": "CandidateReview",
+    "type": "object"
+   },
    "Claim": {
     "properties": {
      "doc_id": {
@@ -805,6 +1092,51 @@
     "title": "Dated",
     "type": "object"
    },
+   "DecideIn": {
+    "properties": {
+     "categories": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Categories",
+      "type": "array"
+     },
+     "decision": {
+      "enum": [
+       "approve",
+       "reject"
+      ],
+      "title": "Decision",
+      "type": "string"
+     },
+     "disputed": {
+      "default": false,
+      "title": "Disputed",
+      "type": "boolean"
+     },
+     "expected_sha": {
+      "title": "Expected Sha",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "original_inspected": {
+      "default": false,
+      "title": "Original Inspected",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "decision",
+     "expected_sha",
+     "note"
+    ],
+    "title": "DecideIn",
+    "type": "object"
+   },
    "Decided": {
     "properties": {
      "candidate_id": {
@@ -1009,6 +1341,292 @@
      "snippet"
     ],
     "title": "Document",
+    "type": "object"
+   },
+   "DraftDocument": {
+    "properties": {
+     "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+     },
+     "filename": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Filename"
+     },
+     "institution": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Institution"
+     },
+     "source_hash": {
+      "title": "Source Hash",
+      "type": "string"
+     },
+     "title": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Title"
+     }
+    },
+    "required": [
+     "doc_id",
+     "source_hash",
+     "title",
+     "institution",
+     "filename"
+    ],
+    "title": "DraftDocument",
+    "type": "object"
+   },
+   "DraftElement": {
+    "properties": {
+     "element_id": {
+      "title": "Element Id",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "location": {
+      "additionalProperties": true,
+      "title": "Location",
+      "type": "object"
+     },
+     "text": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Text"
+     }
+    },
+    "required": [
+     "element_id",
+     "kind",
+     "text",
+     "location"
+    ],
+    "title": "DraftElement",
+    "type": "object"
+   },
+   "DraftEstimate": {
+    "properties": {
+     "available_micro_usd": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Available Micro Usd"
+     },
+     "calls": {
+      "title": "Calls",
+      "type": "integer"
+     },
+     "envelope_remaining_micro_usd": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Envelope Remaining Micro Usd"
+     },
+     "fits": {
+      "title": "Fits",
+      "type": "boolean"
+     },
+     "max_micro_usd": {
+      "title": "Max Micro Usd",
+      "type": "integer"
+     },
+     "paid_enabled": {
+      "title": "Paid Enabled",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "calls",
+     "max_micro_usd",
+     "paid_enabled",
+     "envelope_remaining_micro_usd",
+     "available_micro_usd",
+     "fits"
+    ],
+    "title": "DraftEstimate",
+    "type": "object"
+   },
+   "DraftRow": {
+    "properties": {
+     "question": {
+      "default": "",
+      "title": "Question",
+      "type": "string"
+     },
+     "question_id": {
+      "title": "Question Id",
+      "type": "string"
+     },
+     "question_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Question Type"
+     },
+     "required_claims": {
+      "default": [],
+      "items": {},
+      "title": "Required Claims",
+      "type": "array"
+     }
+    },
+    "required": [
+     "question_id"
+    ],
+    "title": "DraftRow",
+    "type": "object"
+   },
+   "DraftRun": {
+    "properties": {
+     "created_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created At"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "invalid": {
+      "items": {
+       "$ref": "#/components/schemas/InvalidDraft"
+      },
+      "title": "Invalid",
+      "type": "array"
+     },
+     "max_micro_usd": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Micro Usd"
+     },
+     "receipt": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Receipt"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "requested_by": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Requested By"
+     },
+     "rows": {
+      "items": {
+       "$ref": "#/components/schemas/DraftRow"
+      },
+      "title": "Rows",
+      "type": "array"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "slots": {
+      "title": "Slots",
+      "type": "integer"
+     },
+     "status": {
+      "enum": [
+       "running",
+       "completed",
+       "failed",
+       "interrupted"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "submitted": {
+      "title": "Submitted",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "run_id",
+     "requested_by",
+     "created_at",
+     "max_micro_usd",
+     "slots",
+     "status",
+     "receipt",
+     "rows",
+     "invalid",
+     "error",
+     "submitted"
+    ],
+    "title": "DraftRun",
     "type": "object"
    },
    "Estimate": {
@@ -1778,6 +2396,24 @@
     "title": "IngestionRow",
     "type": "object"
    },
+   "InvalidDraft": {
+    "properties": {
+     "question_id": {
+      "title": "Question Id",
+      "type": "string"
+     },
+     "reason": {
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "question_id",
+     "reason"
+    ],
+    "title": "InvalidDraft",
+    "type": "object"
+   },
    "Inventory": {
     "properties": {
      "completeness_text": {
@@ -1896,6 +2532,23 @@
     "title": "Latency",
     "type": "object"
    },
+   "MetadataRow": {
+    "properties": {
+     "field": {
+      "title": "Field",
+      "type": "string"
+     },
+     "value": {
+      "title": "Value"
+     }
+    },
+    "required": [
+     "field",
+     "value"
+    ],
+    "title": "MetadataRow",
+    "type": "object"
+   },
    "MissingField": {
     "properties": {
      "doc_id": {
@@ -1955,6 +2608,81 @@
     "title": "Owned",
     "type": "object"
    },
+   "PdfPages": {
+    "properties": {
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id"
+     },
+     "pdf_pages": {
+      "items": {
+       "type": "integer"
+      },
+      "title": "Pdf Pages",
+      "type": "array"
+     }
+    },
+    "required": [
+     "group_id",
+     "pdf_pages"
+    ],
+    "title": "PdfPages",
+    "type": "object"
+   },
+   "Pending": {
+    "properties": {
+     "batch_id": {
+      "title": "Batch Id",
+      "type": "string"
+     },
+     "candidate_id": {
+      "title": "Candidate Id",
+      "type": "string"
+     },
+     "dataset": {
+      "title": "Dataset",
+      "type": "string"
+     },
+     "question": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Question"
+     },
+     "type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Type"
+     }
+    },
+    "required": [
+     "candidate_id",
+     "dataset",
+     "batch_id",
+     "type",
+     "question"
+    ],
+    "title": "Pending",
+    "type": "object"
+   },
    "Rate": {
     "description": "A rate with its denominator; an empty denominator is 'not applicable', never 100 %.",
     "properties": {
@@ -1984,6 +2712,29 @@
      "rate"
     ],
     "title": "Rate",
+    "type": "object"
+   },
+   "Receipt": {
+    "properties": {
+     "invalid": {
+      "title": "Invalid",
+      "type": "integer"
+     },
+     "rows": {
+      "title": "Rows",
+      "type": "integer"
+     },
+     "settled_micro_usd": {
+      "title": "Settled Micro Usd",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "rows",
+     "invalid",
+     "settled_micro_usd"
+    ],
+    "title": "Receipt",
     "type": "object"
    },
    "Recorded": {
@@ -2413,6 +3164,202 @@
      "note"
     ],
     "title": "SecondReviewIn",
+    "type": "object"
+   },
+   "Segment": {
+    "properties": {
+     "cited": {
+      "title": "Cited",
+      "type": "boolean"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "text",
+     "cited"
+    ],
+    "title": "Segment",
+    "type": "object"
+   },
+   "Slot": {
+    "properties": {
+     "doc_ids": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Doc Ids",
+      "type": "array"
+     },
+     "intent": {
+      "title": "Intent",
+      "type": "string"
+     },
+     "question_id": {
+      "title": "Question Id",
+      "type": "string"
+     },
+     "question_type": {
+      "title": "Question Type",
+      "type": "string"
+     },
+     "sources": {
+      "items": {
+       "$ref": "#/components/schemas/SourceRef"
+      },
+      "title": "Sources",
+      "type": "array"
+     }
+    },
+    "required": [
+     "question_type",
+     "intent",
+     "doc_ids",
+     "sources",
+     "question_id"
+    ],
+    "title": "Slot",
+    "type": "object"
+   },
+   "SlotIn": {
+    "properties": {
+     "doc_ids": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Doc Ids",
+      "type": "array"
+     },
+     "intent": {
+      "title": "Intent",
+      "type": "string"
+     },
+     "question_type": {
+      "title": "Question Type",
+      "type": "string"
+     },
+     "sources": {
+      "items": {
+       "$ref": "#/components/schemas/SourceRef"
+      },
+      "title": "Sources",
+      "type": "array"
+     }
+    },
+    "required": [
+     "question_type",
+     "intent",
+     "doc_ids",
+     "sources"
+    ],
+    "title": "SlotIn",
+    "type": "object"
+   },
+   "SlotsIn": {
+    "properties": {
+     "slots": {
+      "items": {
+       "$ref": "#/components/schemas/Slot"
+      },
+      "title": "Slots",
+      "type": "array"
+     }
+    },
+    "required": [
+     "slots"
+    ],
+    "title": "SlotsIn",
+    "type": "object"
+   },
+   "SourceRef": {
+    "properties": {
+     "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+     },
+     "element_id": {
+      "title": "Element Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "doc_id",
+     "element_id"
+    ],
+    "title": "SourceRef",
+    "type": "object"
+   },
+   "Span": {
+    "properties": {
+     "cited_found": {
+      "title": "Cited Found",
+      "type": "boolean"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "location": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Location"
+     },
+     "missing": {
+      "title": "Missing",
+      "type": "boolean"
+     },
+     "quote": {
+      "title": "Quote",
+      "type": "string"
+     },
+     "segments": {
+      "description": "The element text in order; `cited` marks the quoted span",
+      "items": {
+       "$ref": "#/components/schemas/Segment"
+      },
+      "title": "Segments",
+      "type": "array"
+     }
+    },
+    "required": [
+     "label",
+     "location",
+     "quote",
+     "cited_found",
+     "missing",
+     "segments"
+    ],
+    "title": "Span",
+    "type": "object"
+   },
+   "StartIn": {
+    "properties": {
+     "consented_max_micro_usd": {
+      "title": "Consented Max Micro Usd",
+      "type": "integer"
+     },
+     "slots": {
+      "items": {
+       "$ref": "#/components/schemas/Slot"
+      },
+      "title": "Slots",
+      "type": "array"
+     }
+    },
+    "required": [
+     "slots",
+     "consented_max_micro_usd"
+    ],
+    "title": "StartIn",
     "type": "object"
    },
    "Started": {
@@ -3301,6 +4248,394 @@
     "summary": "Documents"
    }
   },
+  "/api/drafting/documents": {
+   "get": {
+    "description": "Development-family documents only: no sealed source reaches drafting.",
+    "operationId": "draft_documents_api_drafting_documents_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DraftDocument"
+         },
+         "title": "Response Draft Documents Api Drafting Documents Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Draft Documents"
+   }
+  },
+  "/api/drafting/documents/{doc_id}/elements": {
+   "get": {
+    "operationId": "draft_elements_api_drafting_documents__doc_id__elements_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "contains",
+      "required": false,
+      "schema": {
+       "default": "",
+       "title": "Contains",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DraftElement"
+         },
+         "title": "Response Draft Elements Api Drafting Documents  Doc Id  Elements Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Draft Elements"
+   }
+  },
+  "/api/drafting/plan": {
+   "post": {
+    "description": "Free: the maximum cost of drafting these slots. Nothing is sent.",
+    "operationId": "plan_drafting_api_drafting_plan_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SlotsIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DraftEstimate"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Plan Drafting"
+   }
+  },
+  "/api/drafting/runs": {
+   "get": {
+    "operationId": "drafting_runs_api_drafting_runs_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DraftRun"
+         },
+         "title": "Response Drafting Runs Api Drafting Runs Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Drafting Runs"
+   }
+  },
+  "/api/drafting/runs/{run_id}/submit": {
+   "post": {
+    "operationId": "submit_drafts_api_drafting_runs__run_id__submit_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "run_id",
+      "required": true,
+      "schema": {
+       "title": "Run Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Submit Drafts Api Drafting Runs  Run Id  Submit Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Submit Drafts"
+   }
+  },
+  "/api/drafting/slots": {
+   "post": {
+    "operationId": "draft_slot_api_drafting_slots_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SlotIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Slot"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Draft Slot"
+   }
+  },
+  "/api/drafting/start": {
+   "post": {
+    "description": "Paid: gpt-6-luna drafting through the budget gateway, never above the consented maximum.",
+    "operationId": "start_drafting_api_drafting_start_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/StartIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Started"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Start Drafting"
+   }
+  },
+  "/api/gold/pending": {
+   "get": {
+    "description": "Development candidates only; sealed ones are reviewed through the owner's CLI.",
+    "operationId": "gold_pending_api_gold_pending_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Pending"
+         },
+         "title": "Response Gold Pending Api Gold Pending Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Gold Pending"
+   }
+  },
   "/api/gold/recent": {
    "get": {
     "operationId": "gold_recent_api_gold_recent_get",
@@ -3365,6 +4700,115 @@
      }
     },
     "summary": "Reject Categories"
+   }
+  },
+  "/api/gold/{candidate_id}": {
+   "get": {
+    "operationId": "gold_candidate_api_gold__candidate_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "candidate_id",
+      "required": true,
+      "schema": {
+       "title": "Candidate Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CandidateReview"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Gold Candidate"
+   }
+  },
+  "/api/gold/{candidate_id}/decide": {
+   "post": {
+    "description": "A note is required for both outcomes, and whoever started the drafting run cannot approve it.",
+    "operationId": "gold_decide_api_gold__candidate_id__decide_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "candidate_id",
+      "required": true,
+      "schema": {
+       "title": "Candidate Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DecideIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Decided"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Gold Decide"
    }
   },
   "/api/gold/{candidate_id}/second-review": {
