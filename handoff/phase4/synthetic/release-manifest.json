@@ -1,6 +1,6 @@
 {
- "release_id": "F-3ba8b82de6",
- "generated_at": "2026-10-01T16:57:31.252415+00:00",
+ "release_id": "F-5e8fce120d",
+ "generated_at": "2026-10-02T08:46:54.145781+00:00",
  "status": "limited",
  "reasons": [
   "hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)",
@@ -11,25 +11,25 @@
  ],
  "evidence_label": "sealed pilot",
  "code": {
-  "source_sha256": "360d3945faf98b57f38283119a189ff05961081d8f11b1a0fb6dfed6f36b01f2",
-  "git_revision": "796c4e176b9444f09fe027d55efca030724edb88",
+  "source_sha256": "2580eb9f48f36039180430dac25509bb67f3f2a24b5b61a968d846749fcbe7d6",
+  "git_revision": "87da697473f8cf6038608c73fe19ede3ba0fb0ab",
   "git_dirty": false
  },
- "metric_code_sha256": "29060c3810a8f05f68f1f1bf96c39ebdc97ed4dfd92d37d707fce31895334f0b",
- "settings_fingerprint": "30349a2618f2f360",
+ "metric_code_sha256": "be4ea056096a5270bacd46be59c31a93deb4e3fcd42c47b2e2c6ef21353e77b1",
+ "settings_fingerprint": "84c534444d0f9d62",
  "model": "gpt-6-luna",
  "reasoning_effort": "low",
  "max_output_tokens": 2000,
- "prompt_version": "grounded-answer-3",
+ "prompt_version": "grounded-answer-4",
  "rate_version": "openai-standard-gpt-6-luna-2026-09-30",
  "active_run": {
-  "activated_at": "2026-10-01T16:56:54.497546+00:00",
+  "activated_at": "2026-10-02T08:46:18.991659+00:00",
   "dense_version": null,
   "embedding": null,
   "eval_version": "retrieval-eval-4",
   "fallback_mode": "kiwi_bm25",
   "finalist_run_id": null,
-  "index_version": "44c3054f748fc009",
+  "index_version": "d70a07d522a75ea2",
   "label": "K1",
   "limits": {
    "channel_top_k": 20,
@@ -41,37 +41,37 @@
   },
   "mode": "kiwi_bm25",
   "reranker": null,
-  "run_id": "K1-f5b26e4852"
+  "run_id": "K1-ec84b5c615"
  },
- "active_index": "44c3054f748fc009",
+ "active_index": "d70a07d522a75ea2",
  "datasets": {
   "dev": {
-   "dataset_sha256": "b5e2df5ef7c05e2191b5d4eb61769109559dee7a756ff1ea8250f6402ca2ec13",
+   "dataset_sha256": "fae2eb474a5a8e21282e9c37e84a12f81f6754be8be9fe78e95c4fff949f7714",
    "rows": 4,
    "label": "pilot",
-   "review_log_sha256": "1149b007c5262d8aca2fdcbb009379ccb74ea92298b934b123a389d81f88914f",
+   "review_log_sha256": "cfd36a894941afc52abea9d1e0382ac04d4de96699dba055b88c3fdf99046edf",
    "current": true
   },
   "test": {
-   "dataset_sha256": "9e31c4a21b8e697ac63fe4f13b19b273069c913197f0bf7700ea3e600e9d0527",
+   "dataset_sha256": "81e944ec5582c10deab82864f8385a22fbf3560b97f90e85af81ad3bf776daa8",
    "rows": 1,
    "label": "pilot",
-   "review_log_sha256": "094e54728d71cc3a9763fffc4c795076d7232b94b3cead549b020e264fe60aff",
+   "review_log_sha256": "d1e259893baa29ccfd09cdb8cb466ef211c769ddf242a8ea58398a567d18ed28",
    "current": true
   }
  },
  "requirements_lock_sha256": "060fd9cdbdc949a34f12667a45bdd8714bbd78db6a7ff06c482a894028626780",
  "hardware": {
-  "platform": "Linux-6.18.44-fc-v50-x86_64-with-glibc2.39",
+  "platform": "Linux-6.18.44-fc-v51-x86_64-with-glibc2.39",
   "machine": "x86_64",
   "python": "3.12.3",
   "cpu_count": 4
  },
  "stale_evidence": [],
  "freeze": {
-  "freeze_id": "F-3ba8b82de6",
-  "frozen_at": "2026-10-01T16:57:07.280381+00:00",
-  "selected_run_id": "K1-f5b26e4852",
+  "freeze_id": "F-5e8fce120d",
+  "frozen_at": "2026-10-02T08:46:31.062374+00:00",
+  "selected_run_id": "K1-ec84b5c615",
   "decided_by": "owner",
   "post_test": false
  }

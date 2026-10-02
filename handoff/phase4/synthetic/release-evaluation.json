@@ -127,7 +127,7 @@
   "dev": {
    "dataset": "dev",
    "schema": "gold-2",
-   "dataset_sha256": "b5e2df5ef7c05e2191b5d4eb61769109559dee7a756ff1ea8250f6402ca2ec13",
+   "dataset_sha256": "fae2eb474a5a8e21282e9c37e84a12f81f6754be8be9fe78e95c4fff949f7714",
    "rows": 4,
    "label": "pilot",
    "targets": {
@@ -185,18 +185,18 @@
     "late": 2,
     "none": 1
    },
-   "review_log_sha256": "1149b007c5262d8aca2fdcbb009379ccb74ea92298b934b123a389d81f88914f",
-   "families_sha256": "91ee5e65c1c5d6d1b159b0b7d2b1ec9fd3d9f12e0c0d3c9f6e1495814345dfc7",
+   "review_log_sha256": "cfd36a894941afc52abea9d1e0382ac04d4de96699dba055b88c3fdf99046edf",
+   "families_sha256": "34faefbdae0c16b08f19d71e0a3561e49c5ad525c76a1815f195669b05399fc2",
    "frozen_by": "owner",
    "reason": "walkthrough",
-   "frozen_at": "2026-10-01T16:56:48.613320+00:00",
+   "frozen_at": "2026-10-02T08:46:13.245147+00:00",
    "changed": [],
    "current": true
   },
   "test": {
    "dataset": "test",
    "schema": "gold-2",
-   "dataset_sha256": "9e31c4a21b8e697ac63fe4f13b19b273069c913197f0bf7700ea3e600e9d0527",
+   "dataset_sha256": "81e944ec5582c10deab82864f8385a22fbf3560b97f90e85af81ad3bf776daa8",
    "rows": 1,
    "label": "pilot",
    "targets": {
@@ -254,21 +254,21 @@
     "late": 1,
     "none": 0
    },
-   "review_log_sha256": "094e54728d71cc3a9763fffc4c795076d7232b94b3cead549b020e264fe60aff",
-   "families_sha256": "91ee5e65c1c5d6d1b159b0b7d2b1ec9fd3d9f12e0c0d3c9f6e1495814345dfc7",
+   "review_log_sha256": "d1e259893baa29ccfd09cdb8cb466ef211c769ddf242a8ea58398a567d18ed28",
+   "families_sha256": "34faefbdae0c16b08f19d71e0a3561e49c5ad525c76a1815f195669b05399fc2",
    "frozen_by": "owner",
    "reason": "walkthrough",
-   "frozen_at": "2026-10-01T16:56:48.914075+00:00",
+   "frozen_at": "2026-10-02T08:46:13.526429+00:00",
    "changed": [],
    "current": true
   }
  },
  "retrieval_runs": [
   {
-   "run_id": "K0-9abbc718ff",
+   "run_id": "K0-592d512bd6",
    "label": "K0",
    "mode": "whitespace_bm25",
-   "dataset_sha256": "b5e2df5ef7c05e2191b5d4eb61769109559dee7a756ff1ea8250f6402ca2ec13",
+   "dataset_sha256": "fae2eb474a5a8e21282e9c37e84a12f81f6754be8be9fe78e95c4fff949f7714",
    "population_size": 4,
    "scored": 3,
    "hit@20": {
@@ -306,18 +306,18 @@
    ],
    "wrong_scope": 0,
    "latency_ms": {
-    "p50": 0.2,
-    "p95": 0.47,
+    "p50": 0.1,
+    "p95": 0.37,
     "n": 3
    },
    "query_cost_micro_usd": null,
    "blocking": []
   },
   {
-   "run_id": "K1-f5b26e4852",
+   "run_id": "K1-ec84b5c615",
    "label": "K1",
    "mode": "kiwi_bm25",
-   "dataset_sha256": "b5e2df5ef7c05e2191b5d4eb61769109559dee7a756ff1ea8250f6402ca2ec13",
+   "dataset_sha256": "fae2eb474a5a8e21282e9c37e84a12f81f6754be8be9fe78e95c4fff949f7714",
    "population_size": 4,
    "scored": 3,
    "hit@20": {
@@ -352,8 +352,8 @@
    "critical_failures": [],
    "wrong_scope": 0,
    "latency_ms": {
-    "p50": 0.9,
-    "p95": 1654.56,
+    "p50": 1.0,
+    "p95": 1641.16,
     "n": 3
    },
    "query_cost_micro_usd": null,
@@ -362,12 +362,12 @@
  ],
  "answer_runs": [
   {
-   "run_id": "A-e15212d8c13e",
+   "run_id": "A-78476e0eec8f",
    "label": "development finalists",
    "status": "complete",
    "stop_reason": null,
    "finalists": {
-    "K1-f5b26e4852": {
+    "K1-ec84b5c615": {
      "mode": "kiwi_bm25",
      "completed": 4,
      "of": 4,
@@ -509,7 +509,7 @@
       }
      },
      "cost": {
-      "settled_micro_usd": 386,
+      "settled_micro_usd": 482,
       "settled_in_earlier_attempts_micro_usd": 0,
       "pending_micro_usd": 0,
       "unknown_micro_usd": 0,
@@ -517,11 +517,11 @@
       "attempts": 4,
       "retried_rows": 0,
       "source": "shared ledger, all request keys of the run",
-      "per_question_micro_usd": 96.5
+      "per_question_micro_usd": 120.5
      },
      "latency_ms": {
-      "p50": 21.15,
-      "p95": 24.46,
+      "p50": 19.5,
+      "p95": 22.56,
       "n": 4,
       "condition": "sequential, single process, one call at a time"
      },
@@ -580,7 +580,7 @@
       "missing_in_packed": 0,
       "latency_ms": {
        "p50": 1.1,
-       "p95": 1.37,
+       "p95": 1.28,
        "n": 3
       },
       "fallbacks": [],
@@ -643,7 +643,7 @@
       }
      }
     },
-    "K0-9abbc718ff": {
+    "K0-592d512bd6": {
      "mode": "whitespace_bm25",
      "completed": 4,
      "of": 4,
@@ -783,7 +783,7 @@
       }
      },
      "cost": {
-      "settled_micro_usd": 187,
+      "settled_micro_usd": 235,
       "settled_in_earlier_attempts_micro_usd": 0,
       "pending_micro_usd": 0,
       "unknown_micro_usd": 0,
@@ -791,11 +791,11 @@
       "attempts": 2,
       "retried_rows": 0,
       "source": "shared ledger, all request keys of the run",
-      "per_question_micro_usd": 46.8
+      "per_question_micro_usd": 58.8
      },
      "latency_ms": {
-      "p50": 16.4,
-      "p95": 22.02,
+      "p50": 15.1,
+      "p95": 20.29,
       "n": 4,
       "condition": "sequential, single process, one call at a time"
      },
@@ -857,7 +857,7 @@
       "missing_in_packed": 2,
       "latency_ms": {
        "p50": 0.2,
-       "p95": 0.38,
+       "p95": 0.29,
        "n": 3
       },
       "fallbacks": [],
@@ -922,18 +922,18 @@
     }
    },
    "selection": {
-    "baseline": "K1-f5b26e4852",
-    "candidate": "K0-9abbc718ff",
+    "baseline": "K1-ec84b5c615",
+    "candidate": "K0-592d512bd6",
     "claim_correctness_gain": -0.3334,
     "negative_handling_gain": 1.0,
     "new_critical_wrong": [],
     "p95_ms": [
-     24.46,
-     22.02
+     22.56,
+     20.29
     ],
     "settled_micro_usd": [
-     386,
-     187
+     482,
+     235
     ],
     "note": "development evidence for the owner's selection; small denominators: read the intervals"
    }
@@ -941,13 +941,13 @@
  ],
  "sealed_runs": [
   {
-   "run_id": "S-eee3edd95d49",
+   "run_id": "S-771073cb0f75",
    "label": "sealed test",
-   "freeze_id": "F-3ba8b82de6",
+   "freeze_id": "F-5e8fce120d",
    "status": "complete",
    "stop_reason": null,
    "finalists": {
-    "K1-f5b26e4852": {
+    "K1-ec84b5c615": {
      "mode": "kiwi_bm25",
      "completed": 1,
      "of": 1,
@@ -1066,7 +1066,7 @@
       }
      },
      "cost": {
-      "settled_micro_usd": 85,
+      "settled_micro_usd": 109,
       "settled_in_earlier_attempts_micro_usd": 0,
       "pending_micro_usd": 0,
       "unknown_micro_usd": 0,
@@ -1074,11 +1074,11 @@
       "attempts": 1,
       "retried_rows": 0,
       "source": "shared ledger, all request keys of the run",
-      "per_question_micro_usd": 85.0
+      "per_question_micro_usd": 109.0
      },
      "latency_ms": {
-      "p50": 28.6,
-      "p95": 28.6,
+      "p50": 23.2,
+      "p95": 23.2,
       "n": 1,
       "condition": "sequential, single process, one call at a time"
      },
@@ -1133,8 +1133,8 @@
       "critical_failures": [],
       "missing_in_packed": 0,
       "latency_ms": {
-       "p50": 1.6,
-       "p95": 1.6,
+       "p50": 1.3,
+       "p95": 1.3,
        "n": 1
       },
       "fallbacks": [],
@@ -1165,13 +1165,13 @@
      }
     }
    },
-   "scored_at": "2026-10-01T16:57:15.059509+00:00"
+   "scored_at": "2026-10-02T08:46:37.974738+00:00"
   }
  ],
  "latency": [
   {
-   "run_id": "L-dbe40b8a7b95",
-   "estimate_id": "f51834c2b1ae",
+   "run_id": "L-dfcc9cd3dda8",
+   "estimate_id": "79d73c660105",
    "actor": "owner",
    "provider": "fake",
    "users": 6,
@@ -1180,55 +1180,55 @@
    "n": 12,
    "failures": 0,
    "all_ms": {
-    "p50": 123.4,
-    "p95": 163.12,
+    "p50": 103.8,
+    "p95": 141.79,
     "n": 12
    },
    "warm_ms": {
-    "p50": 77.45,
-    "p95": 103.22,
+    "p50": 94.65,
+    "p95": 149.25,
     "n": 6,
     "note": "waves after the first"
    },
-   "cold_wave_ms": 171.6,
+   "cold_wave_ms": 128.8,
    "waves": [
     {
      "wave": 1,
-     "wall_ms": 171.6,
+     "wall_ms": 128.8,
      "requests": [
       {
-       "question_id": "dev-warranty",
-       "ms": 137.7,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
        "question_id": "dev-deadline",
-       "ms": 138.1,
+       "ms": 100.2,
        "status": "answered",
        "billing": "settled"
       },
       {
        "question_id": "dev-amount",
-       "ms": 141.6,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-warranty",
-       "ms": 145.6,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-amount",
-       "ms": 157.0,
+       "ms": 102.3,
        "status": "answered",
        "billing": "settled"
       },
       {
        "question_id": "dev-deadline",
-       "ms": 170.6,
+       "ms": 104.5,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-warranty",
+       "ms": 112.7,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-warranty",
+       "ms": 117.9,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-amount",
+       "ms": 128.2,
        "status": "answered",
        "billing": "settled"
       }
@@ -1236,41 +1236,41 @@
     },
     {
      "wave": 2,
-     "wall_ms": 111.1,
+     "wall_ms": 158.7,
      "requests": [
       {
-       "question_id": "dev-warranty",
-       "ms": 61.0,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-amount",
-       "ms": 65.0,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-amount",
-       "ms": 76.2,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
        "question_id": "dev-deadline",
-       "ms": 78.7,
-       "status": "answered",
-       "billing": "settled"
-      },
-      {
-       "question_id": "dev-deadline",
-       "ms": 85.6,
+       "ms": 71.9,
        "status": "answered",
        "billing": "settled"
       },
       {
        "question_id": "dev-warranty",
-       "ms": 109.1,
+       "ms": 77.7,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-warranty",
+       "ms": 86.2,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-deadline",
+       "ms": 103.1,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-amount",
+       "ms": 121.8,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "dev-amount",
+       "ms": 158.4,
        "status": "answered",
        "billing": "settled"
       }
@@ -1278,22 +1278,22 @@
     }
    ],
    "serving": {
-    "run_id": "K1-f5b26e4852",
+    "run_id": "K1-ec84b5c615",
     "mode": "kiwi_bm25",
-    "index_version": "44c3054f748fc009"
+    "index_version": "d70a07d522a75ea2"
    },
    "hardware": {
-    "platform": "Linux-6.18.44-fc-v50-x86_64-with-glibc2.39",
+    "platform": "Linux-6.18.44-fc-v51-x86_64-with-glibc2.39",
     "machine": "x86_64",
     "python": "3.12.3",
     "cpu_count": 4
    },
    "code": {
-    "source_sha256": "360d3945faf98b57f38283119a189ff05961081d8f11b1a0fb6dfed6f36b01f2",
-    "git_revision": "796c4e176b9444f09fe027d55efca030724edb88",
+    "source_sha256": "2580eb9f48f36039180430dac25509bb67f3f2a24b5b61a968d846749fcbe7d6",
+    "git_revision": "87da697473f8cf6038608c73fe19ede3ba0fb0ab",
     "git_dirty": false
    },
-   "recorded_at": "2026-10-01T16:57:29.999232+00:00",
+   "recorded_at": "2026-10-02T08:46:52.954116+00:00",
    "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
   }
  ],

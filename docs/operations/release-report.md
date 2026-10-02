@@ -17,8 +17,8 @@ This file is the shareable summary. The authoritative report is generated on the
 
 | Check | Where | Outcome |
 | --- | --- | --- |
-| `check --phase 4 --provider fake` | Cloud, temporary state | 62 tests passed |
-| `check --phase all --provider fake` | Cloud, temporary state | 250 tests passed |
+| `check --phase 4 --provider fake` | Cloud, temporary state | 68 tests passed |
+| `check --phase all --provider fake` | Cloud, temporary state | 262 tests passed |
 | Phase-4 CLI walkthrough (`tools/verification/phase4_walkthrough.py`) | Cloud, fixture corpus, fake provider | 31/31 steps passed |
 | Browser check of the 평가 tab and gold-2 review | Cloud, headless Chromium, synthetic runtime | rendered; approval refused without the inspection attestation; no horizontal scroll at 390 px |
 | `check --phase all --provider fake --save` → `release-report --latest` | Local reviewer, Windows, synthetic fixture runtime, on `bb726d5` (current code) | 248 passed, 2 POSIX skips of 250 (browser flow ran); the host-local check counted as `pass`; fixture decision `limited` (not an owner check) |
@@ -33,7 +33,7 @@ Evidence: [handoff/phase4](../../handoff/phase4/README.md).
 | --- | --- |
 | Code | Git revision of the merged phase-4 branch; `release-report` records whether the working tree differed |
 | Active retrieval | the owner's `activate-run` selection; until then the keyword default `kiwi_bm25` (no dense, no reranker) |
-| Model, prompt, output cap | `gpt-6-luna`, `grounded-answer-3`, 2,000 tokens (reasoning `low`) |
+| Model, prompt, output cap | `gpt-6-luna`, `grounded-answer-4`, 2,000 tokens (reasoning `low`) |
 | Rates | `openai-standard-gpt-6-luna-2026-09-30` (recheck before paid work) |
 | Datasets | `dev` and `test` manifests (hashes, rows, label, review log) from `freeze-dataset` |
 | Freeze | `F-…` from `freeze-release` |

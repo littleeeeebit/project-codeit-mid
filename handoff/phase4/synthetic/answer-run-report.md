@@ -1,10 +1,10 @@
-# Answer run A-e15212d8c13e (development finalists)
+# Answer run A-78476e0eec8f (development finalists)
 
-- dataset `dev` (`b5e2df5ef7c0`), population `dcb6cd446227`, status **complete**
-- model gpt-6-luna (reasoning low), prompt grounded-answer-3, output cap 2000; code `796c4e176b94` dirty=False
+- dataset `dev` (`fae2eb474a5a`), population `4954249207d2`, status **complete**
+- model gpt-6-luna (reasoning low), prompt grounded-answer-4, output cap 2000; code `87da697473f8` dirty=False
 - blind reviews applied: 0
 
-## Finalist `K1-f5b26e4852` (kiwi_bm25): 4/4 rows
+## Finalist `K1-ec84b5c615` (kiwi_bm25): 4/4 rows
 
 | Metric | Value |
 | --- | --- |
@@ -25,10 +25,10 @@
 | metadata stratum | n/a (0 eligible) |
 | technical outcomes | none |
 | scope leaks | 0 |
-| settled cost (ledger, every attempt) | $0.000386; earlier attempts $0.000000, pending $0.000000, unknown $0.000000, reconciled attempts 0, retried rows 0 |
-| latency p50/p95 ms | 21.15/24.46 (n=4, sequential, single process, one call at a time) |
+| settled cost (ledger, every attempt) | $0.000482; earlier attempts $0.000000, pending $0.000000, unknown $0.000000, reconciled attempts 0, retried rows 0 |
+| latency p50/p95 ms | 19.5/22.56 (n=4, sequential, single process, one call at a time) |
 
-## Finalist `K0-9abbc718ff` (whitespace_bm25): 4/4 rows
+## Finalist `K0-592d512bd6` (whitespace_bm25): 4/4 rows
 
 | Metric | Value |
 | --- | --- |
@@ -49,25 +49,25 @@
 | metadata stratum | n/a (0 eligible) |
 | technical outcomes | none |
 | scope leaks | 0 |
-| settled cost (ledger, every attempt) | $0.000187; earlier attempts $0.000000, pending $0.000000, unknown $0.000000, reconciled attempts 0, retried rows 0 |
-| latency p50/p95 ms | 16.4/22.02 (n=4, sequential, single process, one call at a time) |
+| settled cost (ledger, every attempt) | $0.000235; earlier attempts $0.000000, pending $0.000000, unknown $0.000000, reconciled attempts 0, retried rows 0 |
+| latency p50/p95 ms | 15.1/20.29 (n=4, sequential, single process, one call at a time) |
 
 ## Finalist comparison
 
 ```json
 {
- "baseline": "K1-f5b26e4852",
- "candidate": "K0-9abbc718ff",
+ "baseline": "K1-ec84b5c615",
+ "candidate": "K0-592d512bd6",
  "claim_correctness_gain": -0.3334,
  "negative_handling_gain": 1.0,
  "new_critical_wrong": [],
  "p95_ms": [
-  24.46,
-  22.02
+  22.56,
+  20.29
  ],
  "settled_micro_usd": [
-  386,
-  187
+  482,
+  235
  ],
  "note": "development evidence for the owner's selection; small denominators: read the intervals"
 }
