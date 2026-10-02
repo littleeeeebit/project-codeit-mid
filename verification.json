@@ -510,7 +510,7 @@
     },
     {
      "id": "shared-reservation-visible",
-     "expected": "While the first session's request is running, another session's sidebar shows the shared reservation within the polling interval"
+     "expected": "While the first session's request is running, another session's budget row shows the shared reservation within the polling interval"
     }
    ]
   },
@@ -525,6 +525,7 @@
     "requirements.txt",
     "src/rfp_assistant/auth.py",
     "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/cli.py",
     "src/rfp_assistant/contracts.py",
     "src/rfp_assistant/generation.py",
     "src/rfp_assistant/service.py",
@@ -548,7 +549,7 @@
     },
     {
      "id": "adjustment-audited",
-     "expected": "An owner adjustment with a reason is recorded and appears in the audit log tab"
+     "expected": "An owner adjustment with a reason (CLI adjust) is recorded and appears in the audit log (CLI audit)"
     },
     {
      "id": "paid-blocked-at-cap",

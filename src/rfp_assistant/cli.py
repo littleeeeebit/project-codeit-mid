@@ -16,7 +16,8 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from . import answers, auth, budget, chunking, drafting, evaluation, fidelity, gold, ingestion, ops, release, sealed, service, store
+from . import answers, auth, budget, chunking, drafting, evaluation, fidelity, generation, gold, ingestion, ops, release, sealed, service, store
+from .contracts import Principal
 from .settings import DEFAULT_RATES, RATE_VERSION, REPO_ROOT, load_settings
 
 
@@ -289,6 +290,54 @@ def cmd_unresolved(args, settings) -> int:
     res = service.Resources(settings)
     try:
         _print(service.unresolved_attempts(res, auth.OWNER_CLI))
+    finally:
+        res.close()
+    return 0
+
+
+def _ledger_owner(args, settings):
+    """Ledger-only owner actions never dispatch, so they run beside the serving app without claiming its gateway
+    lock; the typed actor is recorded in the audit log as the UI used to record the visitor's name."""
+    res = service.Resources(settings, transport=generation.FakeTransport())
+    return res, Principal(args.actor, auth.OWNER_CLI.capabilities)
+
+
+def cmd_settle(args, settings) -> int:
+    res, owner = _ledger_owner(args, settings)
+    try:
+        _print(service.settle_from_evidence(res, owner, args.attempt_id, {
+            "prompt_tokens": args.prompt_tokens, "completion_tokens": args.completion_tokens,
+            "cached_tokens": args.cached_tokens}, args.response_id, args.evidence, args.reason))
+    finally:
+        res.close()
+    return 0
+
+
+def cmd_adjust(args, settings) -> int:
+    res, owner = _ledger_owner(args, settings)
+    try:
+        amount = int((Decimal(args.amount_usd) * budget.MICRO).to_integral_value(rounding="ROUND_HALF_EVEN"))
+        applied = service.add_external_adjustment(res, owner, args.key, amount, args.evidence, args.reason)
+        _print({"applied": applied, "amount_micro_usd": amount})
+    finally:
+        res.close()
+    return 0
+
+
+def cmd_paid(args, settings) -> int:
+    res, owner = _ledger_owner(args, settings)
+    try:
+        service.set_paid_enabled(res, owner, args.state == "on", args.reason)
+        _print(asdict(budget.snapshot(settings.db_path)))
+    finally:
+        res.close()
+    return 0
+
+
+def cmd_audit(args, settings) -> int:
+    res, owner = _ledger_owner(args, settings)
+    try:
+        _print(service.audit_events(res, owner, args.limit))
     finally:
         res.close()
     return 0
@@ -597,6 +646,28 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("reconcile", help="owner import of a dated provider interval (JSON record)")
     s.add_argument("--file", required=True)
     sub.add_parser("unresolved", help="attempts whose billing is not settled or released")
+    s = sub.add_parser("settle", help="owner: settle an unknown attempt from dated provider usage evidence")
+    s.add_argument("--attempt-id", required=True)
+    s.add_argument("--prompt-tokens", type=int, required=True)
+    s.add_argument("--completion-tokens", type=int, required=True)
+    s.add_argument("--cached-tokens", type=int, default=0)
+    s.add_argument("--response-id")
+    s.add_argument("--evidence", required=True, help="where the dated provider usage export is")
+    s.add_argument("--reason", required=True)
+    s.add_argument("--actor", default="owner-cli", help="name recorded in the audit log")
+    s = sub.add_parser("adjust", help="owner: record external usage (negative amounts correct an earlier one)")
+    s.add_argument("--key", required=True, help="idempotency key; the same key is recorded once")
+    s.add_argument("--amount-usd", required=True)
+    s.add_argument("--evidence", required=True)
+    s.add_argument("--reason", required=True)
+    s.add_argument("--actor", default="owner-cli", help="name recorded in the audit log")
+    s = sub.add_parser("paid", help="owner: turn paid generation on or off")
+    s.add_argument("state", choices=("on", "off"))
+    s.add_argument("--reason", required=True)
+    s.add_argument("--actor", default="owner-cli", help="name recorded in the audit log")
+    s = sub.add_parser("audit", help="owner actions, newest first")
+    s.add_argument("--limit", type=int, default=50)
+    s.add_argument("--actor", default="owner-cli")
     s = sub.add_parser("gold", help="dataset candidate queue and rejection wiki")
     s.add_argument("action", choices=["status", "submit", "infer", "check", "sync", "repin", "excerpts", "generate", "show",
                                       "decide", "second-review"])
@@ -632,7 +703,8 @@ COMMANDS = {"init": cmd_init, "manifest": cmd_manifest, "ingest": cmd_ingest, "r
             "fidelity": cmd_fidelity, "ocr": cmd_ocr, "build-keyword": cmd_build_keyword, "check": cmd_check, "validate-gold": cmd_validate_gold,
             "configure-budget": cmd_configure_budget, "budget-status": cmd_budget_status,
             "gold": cmd_gold, "load-check": cmd_load_check, "reconcile": cmd_reconcile,
-            "unresolved": cmd_unresolved, "freeze-dataset": cmd_freeze_dataset, "plan-run": cmd_plan_run,
+            "unresolved": cmd_unresolved, "settle": cmd_settle, "adjust": cmd_adjust, "paid": cmd_paid,
+            "audit": cmd_audit, "freeze-dataset": cmd_freeze_dataset, "plan-run": cmd_plan_run,
             "run-answers": cmd_run_answers, "latency-run": cmd_latency_run, "score-answers": cmd_score_answers,
             "export-review": cmd_export_review, "import-review": cmd_import_review,
             "freeze-release": cmd_freeze_release, "backup": cmd_backup, "restore-check": cmd_restore_check,

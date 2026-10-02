@@ -82,7 +82,7 @@ python -m rfp_assistant.cli ingest                        # merge OCR text; then
 
 ### Dataset questions
 
-Drafted questions wait in a review queue. On the `질문 검토` screen, a reviewer whose sidebar name differs from the drafter either approves each one into the dataset or rejects it with a reason into the rejection wiki. The drafting procedure for agents, including exact file locations, is [.wiki/gold-drafting.md](.wiki/gold-drafting.md).
+Drafted questions wait in a review queue. On the `데이터셋 만들기` page a verifier picks development documents and source passages, has gpt-6-luna draft source-bound questions within a consented maximum (charged to `gold_eval`), and sends the valid drafts to the queue. A reviewer whose typed name differs from both the drafter and whoever started the drafting run then approves each one into the dataset or rejects it into the rejection wiki, always with a note, with the draft shown next to its original passages. The drafting procedure for agents, including exact file locations, is [.wiki/gold-drafting.md](.wiki/gold-drafting.md).
 
 ```powershell
 python -m rfp_assistant.cli gold status                   # counts, rejection wiki path, rejections awaiting an inferred reason
@@ -159,7 +159,7 @@ python -m rfp_assistant.cli release-report --latest                            #
 
 ## Access and paid use
 
-There is no login (owner decision, reaffirmed for phase 3): every visitor gets the consultant, verification, question-review and 사용량 관리 (budget administration) screens. The name in the sidebar (default `owner`) is recorded on paid requests, review decisions, corrections and audited owner actions; it attributes work but does not authenticate anyone. Anyone who can reach the server can spend the budget and use the admin page, so keep `--server.address 127.0.0.1` unless everyone on that network may do so (see the [runbook](docs/operations/runbook.md)).
+There is no login (owner decision, reaffirmed for phase 3): every visitor gets the three pages 질문하기, 검증 and 데이터셋 만들기 (layout in [DESIGN.md](DESIGN.md)). The name typed under the menu (default `owner`) is recorded on paid requests, review decisions and corrections; it attributes work but does not authenticate anyone. Budget administration (settlement, reconciliation, external adjustments, paid on/off, the audit log) is owner CLI only: `unresolved`, `settle`, `reconcile`, `adjust`, `paid`, `audit`, each with `--actor` and a reason. Anyone who can reach the server can spend the budget, so keep `--server.address 127.0.0.1` unless everyone on that network may do so (see the [runbook](docs/operations/runbook.md)).
 
 Local verification: `verification.json` lists the major flows for the local verification service. Each flow runs as `python -B tools/verify.py <flow-id>` with the fake provider and ends with one `local-evidence` block. Browser flows need `pip install -e .[verify]`. See runbook §8.
 

@@ -8,15 +8,18 @@ from __future__ import annotations
 
 import atexit
 import dataclasses
+import functools
 import hashlib
 import json
 import re
 import sqlite3
+import subprocess
 import threading
 import uuid
 import weakref
 from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import asdict
+from datetime import date
 from pathlib import Path
 
 from . import auth, budget, fidelity, generation, gold
@@ -1625,19 +1628,31 @@ def gold_queue(res: Resources, principal: Principal) -> dict:
 
 
 def gold_candidate(res: Resources, principal: Principal, candidate_id: str) -> dict:
+    """The candidate, its source context, and who asked for the drafting run it came from (if any)."""
     principal = _authorize(res, principal, "verifier")
     try:
-        return gold.candidate(res.settings, candidate_id)
+        c = gold.candidate(res.settings, candidate_id)
     except gold.GoldError as exc:
         raise ServiceError(str(exc)) from None
+    return {**c, "requested_by": _drafting_meta(res.settings, c["batch_id"]).get("requested_by")}
 
 
 def gold_decide(res: Resources, principal: Principal, candidate_id: str, decision: str, expected_sha: str,
                 categories: list[str] | None = None, note: str = "", *, original_inspected: bool = False,
                 disputed: bool = False) -> dict:
-    """The visitor's chosen name is recorded as the reviewer. Sealed test candidates are refused here: only the
-    owner's CLI reviews them."""
+    """The visitor's chosen name is recorded as the reviewer, and every decision carries a note. Whoever started a
+    drafting run cannot approve its candidates, any more than the drafting model can. Sealed test candidates are
+    refused here: only the owner's CLI reviews them."""
     principal = _authorize(res, principal, "verifier")
+    if not (note or "").strip():
+        raise ServiceError("승인·거절 모두 메모를 적어야 합니다.")
+    if decision == "approve":
+        with open_db(res.settings.db_path) as conn:
+            row = conn.execute("SELECT batch_id FROM gold_candidates WHERE candidate_id = ?",
+                               (candidate_id,)).fetchone()
+        requester = _drafting_meta(res.settings, row["batch_id"]).get("requested_by") if row else None
+        if requester and requester == principal.member_id:
+            raise ServiceError("초안 생성을 요청한 사람은 그 초안을 승인할 수 없습니다. 다른 검토자가 승인하세요.")
     try:
         return gold.decide(res.settings, candidate_id, decision, principal.member_id, expected_sha, categories, note,
                            original_inspected=original_inspected, disputed=disputed)
@@ -1808,3 +1823,345 @@ def ingestion_overview(res: Resources, principal: Principal) -> list[dict]:
             "SELECT d.doc_id, d.filename, s.format, s.parse_status, s.review_status, s.reason_code, s.warnings_json "
             "FROM documents d JOIN sources s ON s.source_hash = d.active_source_hash ORDER BY d.csv_row_id").fetchall()
     return [{**dict(r), "warnings": [w.get("code") for w in json.loads(r["warnings_json"])]} for r in rows]
+
+
+# ---------------------------------------------------------------- the Streamlit shell's entry points
+# ui.py imports nothing from this package except this module: every action and every decision that is not
+# rendering lives here, so the screens stay presentation only (tests/test_ui_boundary.py).
+
+AuthError = auth.AuthError
+REJECT_CATEGORIES = gold.REJECT_CATEGORIES
+SHELL_ERRORS = (ServiceError, auth.AuthError)  # what a screen catches and shows instead of a traceback
+
+
+def app_resources() -> Resources:
+    from .settings import load_settings
+
+    return get_resources(load_settings())
+
+
+def visitor(name: str | None) -> Principal:
+    return auth.visitor(name)
+
+
+@functools.lru_cache(maxsize=1)
+def build_head() -> str:
+    """The commit this server process loaded (read once), or `unknown` outside a checkout."""
+    from .settings import REPO_ROOT
+
+    try:
+        out = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    head = out.stdout.strip()
+    return head if out.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", head) else "unknown"
+
+
+def target_key(scope: list[tuple[str, str]], question: str, mode: str, as_of: str) -> str:
+    """Identity of what a screen currently asks: selected (doc_id, source_hash) pairs, question, mode, date."""
+    data = {"scope": [list(x) for x in scope], "q": " ".join((question or "").split()), "mode": mode, "as_of": as_of}
+    return hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+
+
+def may_attach(owned: dict | None, current_target: str, view) -> bool:
+    """A request's outcome may render as the current answer only while the screen still asks exactly what it
+    asked: same request, generation and target, and not cancelled. Otherwise it stays history."""
+    return bool(owned and view is not None and owned.get("target") == current_target
+                and owned.get("request_id") == view.request_id and owned.get("generation_id") == view.generation_id
+                and not view.cancel_requested and view.status != "cancelled")
+
+
+def visible_warnings(warnings: list[str]) -> list[str]:
+    """Only the highest cap level (exhaustion replaces them all), then the other warnings."""
+    caps = [w for w in warnings if w.startswith("cap_")]
+    top = ["cap_exhausted"] if "cap_exhausted" in caps else caps[-1:]
+    return top + [w for w in warnings if not w.startswith("cap_")]
+
+
+def abandon_request(res: Resources, principal: Principal, request_id: str) -> None:
+    """The screen no longer owns this request: cancel it only while it is still queued (never dispatched)."""
+    if request_status(res, principal, request_id).status == "queued":
+        cancel_request(res, principal, request_id)
+
+
+def find_documents(res: Resources, principal: Principal, query: str = "", institution: str = "",
+                   amount_min: int | None = None, amount_max: int | None = None, closing_from: str | None = None,
+                   closing_to: str | None = None, limit: int = 100) -> list[dict]:
+    """질문하기's document search. A document whose amount or closing date cannot be judged stays listed with its
+    `filter_undecided` notes, and askable documents come first; the relevance order holds within each group."""
+    items = search_projects(res, principal, {
+        "institution": institution, "amount_min": amount_min, "amount_max": amount_max,
+        "closing_from": closing_from, "closing_to": closing_to, "include_unknown": True}, query, limit=limit)
+    return sorted(items, key=lambda i: not i["indexed"])
+
+
+def ask(res: Resources, principal: Principal, scope: list[tuple[str, str]], question: str, mode: str,
+        as_of: str) -> dict:
+    """One question from 질문하기 under a fresh generation ID; returns the ownership record the screen keeps."""
+    generation_id = str(uuid.uuid4())
+    request_id = submit_answer(res, principal, AnswerRequest(
+        idempotency_key=generation_id, generation_id=generation_id, question=question or "",
+        scope=[DocRef(*x) for x in scope], mode=mode, as_of=as_of))
+    return {"request_id": request_id, "generation_id": generation_id,
+            "target": target_key(scope, question, mode, as_of)}
+
+
+def trace_documents(res: Resources, principal: Principal) -> list[dict]:
+    """Documents a verifier can trace: parsed and in the serving index."""
+    return [i for i in search_projects(res, principal, {"parsed_only": True}, "", limit=100) if i["indexed"]]
+
+
+def trace_questions(res: Resources, principal: Principal) -> list[dict]:
+    """Reviewed development questions (gold, then the pilot set) to reproduce on the trace tab. Never sealed."""
+    return dataset_rows(res, principal, "dev") + dataset_rows(res, principal, "dev-pilot")
+
+
+def trace_modes(res: Resources) -> list[str]:
+    """Retrieval modes a trace can run, the serving one first."""
+    return list(dict.fromkeys([res.serving()["mode"], "kiwi_bm25", "whitespace_bm25", "dense", "hybrid",
+                               "hybrid_rerank"]))
+
+
+def run_trace(res: Resources, principal: Principal, question: str, scope: list[tuple[str, str]], as_of: str,
+              mode: str) -> dict:
+    """A frozen retrieval-only run at the settings' evidence limits; the serving mode is recorded as the default."""
+    return verifier_trace(res, principal, question, [DocRef(*x) for x in scope], as_of,
+                          mode=None if mode == res.serving()["mode"] else mode)
+
+
+def generate_from_run(res: Resources, principal: Principal, run: dict) -> str:
+    """The verifier's paid answer from a frozen run: its evidence, as-of date and configuration, one idempotent
+    request per run however often the button is pressed."""
+    key = f"vgen-{run['run_id']}"
+    scope = [DocRef(s["doc_id"], s["source_hash"]) for s in run["scope"]]
+    return submit_answer(res, principal, AnswerRequest(
+        idempotency_key=key, generation_id=key, question=run["question"], scope=scope,
+        mode="compare" if len(scope) == 2 else "single", as_of=run.get("as_of") or date.today().isoformat(),
+        config_id=run["config"]["config_id"], verifier_run_id=run["run_id"]))
+
+
+def candidate_spans(c: dict) -> list[dict]:
+    """Each evidence alternative of a gold candidate as its element text cut into segments, the cited span marked,
+    so a draft can be read next to its original. The recorded offsets win; a quote found nowhere marks nothing."""
+    offsets = {(g.get("group_id"), alt.get("element_id")): alt.get("offsets")
+               for g in c["row"].get("evidence_groups") or [] for alt in g.get("alternatives") or []}
+    spans = []
+    for i, ev in enumerate(c["context"].get("evidence") or [], 1):
+        text, quote = ev.get("text") or "", ev.get("quote") or ""
+        off = offsets.get((ev.get("group_id"), ev.get("element_id")))
+        if off and isinstance(off, list) and len(off) == 2 and text[off[0]:off[1]] == quote:
+            start = off[0]
+        else:
+            start = text.find(quote) if quote else -1
+        parts = [(text[:start], False), (quote, True), (text[start + len(quote):], False)] if start >= 0 \
+            else [(text, False)]
+        spans.append({"label": ev.get("group_id") or f"근거 {i}", "doc_id": ev.get("doc_id"),
+                      "location": ev.get("location"), "quote": quote, "cited_found": start >= 0,
+                      "missing": not text, "segments": [p for p in parts if p[0]]})
+    return spans
+
+
+# ---------------------------------------------------------------- dataset generation (development split only)
+# A drafting run lives in <data>/drafts/<run_id>/: request.json (who asked, the plan, the consented maximum) and
+# output/, written by drafting's generation loop. Its valid candidates enter review as gold batch <run_id>.
+
+_DRAFT_JOBS: dict[str, threading.Thread] = {}
+_DRAFT_LOCK = threading.Lock()
+DRAFT_RUN_RE = re.compile(r"draft-\d{8}-[0-9a-f]{6}")
+
+
+def _drafts_dir(settings: Settings) -> Path:
+    return settings.data_dir / "drafts"
+
+
+def _drafting_meta(settings: Settings, run_id: str | None) -> dict:
+    if not run_id or not DRAFT_RUN_RE.fullmatch(run_id):
+        return {}
+    try:
+        return json.loads((_drafts_dir(settings) / run_id / "request.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def draft_documents(res: Resources, principal: Principal) -> list[dict]:
+    """Documents drafting may use: current, parsed and assigned to a development family. A sealed-family document
+    never appears, so no sealed source reaches development generation through this page."""
+    principal = _authorize(res, principal, "verifier")
+    from . import evaluation
+
+    out = []
+    with open_db(res.settings.db_path) as conn:
+        checker = evaluation.GoldChecker(res.settings, conn)
+        for doc_id, doc in checker.docs.items():
+            fam = checker.fam_of_doc.get(doc_id)
+            if not fam or fam[1]["split"] != "dev" or doc["parse_status"] != "parsed":
+                continue
+            ctx = gold._document_context(conn, doc_id) or {}
+            out.append({"doc_id": doc_id, "source_hash": doc["active_source_hash"],
+                        "extraction_id": doc["active_extraction_id"], "title": ctx.get("title"),
+                        "institution": ctx.get("institution"), "filename": ctx.get("filename")})
+    return sorted(out, key=lambda d: (d["title"] or "", d["doc_id"]))
+
+
+def draft_elements(res: Resources, principal: Principal, doc_id: str, contains: str = "") -> list[dict]:
+    """The source elements of one development document in reading order, optionally only those containing a
+    phrase (whitespace-insensitive), to pick drafting sources from."""
+    doc = next((d for d in draft_documents(res, principal) if d["doc_id"] == doc_id), None)
+    if doc is None:
+        raise ServiceError("개발용 문서가 아닙니다. 봉인 평가 문서와 원문 미수집 문서는 초안에 쓸 수 없습니다.")
+    with open_db(res.settings.db_path) as conn:
+        rows = conn.execute("SELECT element_id, kind, raw_text, location_json FROM elements WHERE extraction_id = ? "
+                            "ORDER BY source_order", (doc["extraction_id"],)).fetchall()
+    needle = "".join(nfc(contains or "").split())
+    return [{"element_id": r["element_id"], "kind": r["kind"], "text": r["raw_text"],
+             "location": json.loads(r["location_json"])} for r in rows
+            if not needle or needle in "".join(nfc(r["raw_text"] or "").split())]
+
+
+def draft_slot(question_type: str, intent: str, doc_ids: list[str], sources: list[dict]) -> dict:
+    """One question slot as a screen describes it, with a fresh question ID. Identities are resolved at planning."""
+    from .drafting import TYPES
+
+    if question_type not in TYPES:
+        raise ServiceError("질문 유형을 고르세요.")
+    if not (intent or "").strip():
+        raise ServiceError("무엇을 묻는 질문인지(의도)를 적으세요.")
+    if not 1 <= len(doc_ids) <= 2 or len(set(doc_ids)) != len(doc_ids):
+        raise ServiceError("서로 다른 문서를 한두 개 고르세요.")
+    if not sources or {s["doc_id"] for s in sources} != set(doc_ids):
+        raise ServiceError("고른 문서마다 원문 구절을 하나 이상 고르세요.")
+    return {"question_id": f"ui-{uuid.uuid4().hex[:10]}", "question_type": question_type, "intent": intent.strip(),
+            "doc_ids": list(doc_ids),
+            "sources": [{"doc_id": s["doc_id"], "element_id": s["element_id"]} for s in sources]}
+
+
+def _draft_plan(res: Resources, principal: Principal, slots: list[dict]) -> dict:
+    if not 1 <= len(slots) <= 50:
+        raise ServiceError("질문 자리를 1~50개 만드세요.")
+    docs = {d["doc_id"]: d for d in draft_documents(res, principal)}
+    today = date.today().isoformat()
+    plan = []
+    for s in slots:
+        scope = [docs.get(d) for d in s["doc_ids"]]
+        if None in scope:
+            raise ServiceError(f"{s['question_id']}: 개발용 문서가 아니거나 원문이 바뀌었습니다.")
+        plan.append({"question_id": s["question_id"], "revision": 1, "question_type": s["question_type"],
+                     "intent": s["intent"], "as_of_date": today, "sources": s["sources"],
+                     "scope": [{k: d[k] for k in ("doc_id", "source_hash", "extraction_id")} for d in scope]})
+    return {"slots": plan}
+
+
+def plan_drafting(res: Resources, principal: Principal, slots: list[dict]) -> dict:
+    """Free: the maximum a drafting run of these slots can cost (five slots per call, full output allowance),
+    against the remaining `gold_eval` envelope and the cap. Nothing is sent."""
+    principal = _authorize(res, principal, "verifier")
+    from . import answers, drafting
+
+    s = res.settings
+    plan = _draft_plan(res, principal, slots)
+    try:
+        learned, resolved = drafting.lessons(s), drafting.source_slots(s, plan, "dev")
+        fmt, total, calls = drafting.response_format(), 0, 0
+        for start in range(0, len(resolved), 5):
+            subset = resolved[start:start + 5]
+            tokens = generation.count_request_tokens(drafting.messages(subset, learned), fmt, s.framing_margin_tokens)
+            total += budget.estimate(s.db_path, drafting.MODEL, tokens, min(drafting.MAX_OUTPUT, 1200 * len(subset)))
+            calls += 1
+    except (gold.GoldError, budget.BudgetError) as exc:
+        raise ServiceError(str(exc)) from None
+    ledger = answers._ledger(s)
+    room = min(ledger["envelope_remaining_micro_usd"], ledger["available_micro_usd"])
+    return {"plan": plan, "calls": calls, "max_micro_usd": total, "paid_enabled": ledger["paid_enabled"],
+            "envelope_remaining_micro_usd": ledger["envelope_remaining_micro_usd"],
+            "available_micro_usd": ledger["available_micro_usd"],
+            "fits": ledger["paid_enabled"] and total <= room}
+
+
+def start_drafting(res: Resources, principal: Principal, slots: list[dict], consented_max_micro: int) -> str:
+    """Runs gpt-6-luna drafting of these slots on this process's gateway in one background thread, never above
+    the maximum the person consented to. Every call is reserved and settled in the shared ledger (`gold_eval`).
+    The run only prepares pending candidates; nothing is approved here."""
+    principal = _authorize(res, principal, "verifier")
+    from . import drafting
+    from .store import write_text_atomic
+
+    est = plan_drafting(res, principal, slots)
+    if est["max_micro_usd"] > consented_max_micro:
+        raise ServiceError("최대 비용이 동의한 금액보다 커졌습니다. 다시 추정하세요.")
+    if not est["fits"]:
+        raise ServiceError("유료 호출이 꺼져 있거나 최대 비용이 평가 예산 또는 운영 한도를 넘습니다.")
+    if res.transport is None or res._closed:
+        raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
+    with _DRAFT_LOCK:
+        if any(t.is_alive() for t in _DRAFT_JOBS.values()):
+            raise ServiceError("다른 초안 생성이 실행 중입니다. 끝난 뒤 다시 시도하세요.")
+        run_id = f"draft-{date.today():%Y%m%d}-{uuid.uuid4().hex[:6]}"
+        run_dir = _drafts_dir(res.settings) / run_id
+        run_dir.mkdir(parents=True)
+        write_text_atomic(run_dir / "request.json", dumps({
+            "run_id": run_id, "requested_by": principal.member_id, "created_at": utcnow(),
+            "max_micro_usd": consented_max_micro, "plan": est["plan"]}))
+
+        def job() -> None:
+            try:  # this process already owns the gateway lock that drafting.generate would take
+                drafting._generate(res.settings, est["plan"], run_dir / "output", consented_max_micro,
+                                   res.transport, "dev")
+            except Exception as exc:  # noqa: BLE001 - recorded for the run list; settled calls stay settled
+                write_text_atomic(run_dir / "error.txt", f"{type(exc).__name__}: {exc}"[:500])
+
+        thread = threading.Thread(target=job, name=f"rfp-{run_id}", daemon=True)
+        _DRAFT_JOBS[run_id] = thread
+        thread.start()
+    return run_id
+
+
+def drafting_runs(res: Resources, principal: Principal) -> list[dict]:
+    """Every drafting run, newest first: who asked, its state, valid and invalid drafts, and whether its valid
+    drafts were sent to review."""
+    principal = _authorize(res, principal, "verifier")
+    from .store import read_jsonl
+
+    base = _drafts_dir(res.settings)
+    with open_db(res.settings.db_path) as conn:
+        submitted = {r[0] for r in conn.execute("SELECT DISTINCT batch_id FROM gold_candidates")}
+    runs = []
+    for d in sorted(base.iterdir(), reverse=True) if base.exists() else []:
+        if not DRAFT_RUN_RE.fullmatch(d.name):
+            continue
+        meta, out = _drafting_meta(res.settings, d.name), d / "output"
+        try:
+            receipt = json.loads((out / "receipt.json").read_text(encoding="utf-8")) \
+                if (out / "receipt.json").exists() else None
+            rows = read_jsonl(out / "candidates.jsonl") if (out / "candidates.jsonl").exists() else []
+            invalid = json.loads((out / "invalid.json").read_text(encoding="utf-8")) \
+                if (out / "invalid.json").exists() else []
+            error = (d / "error.txt").read_text(encoding="utf-8") if (d / "error.txt").exists() else None
+        except (OSError, json.JSONDecodeError):
+            continue
+        running = d.name in _DRAFT_JOBS and _DRAFT_JOBS[d.name].is_alive()
+        runs.append({"run_id": d.name, "requested_by": meta.get("requested_by"), "created_at": meta.get("created_at"),
+                     "max_micro_usd": meta.get("max_micro_usd"),
+                     "slots": len((meta.get("plan") or {}).get("slots") or []),
+                     "status": "running" if running else "completed" if receipt else "failed" if error
+                     else "interrupted",
+                     "receipt": receipt, "rows": rows, "invalid": invalid, "error": error,
+                     "submitted": d.name in submitted})
+    return runs
+
+
+def submit_drafts(res: Resources, principal: Principal, run_id: str) -> dict:
+    """Sends a finished run's valid drafts to the development review queue as one batch drafted by the model."""
+    principal = _authorize(res, principal, "verifier")
+    from . import drafting, evaluation
+
+    run = next((r for r in drafting_runs(res, principal) if r["run_id"] == run_id), None)
+    if run is None or run["status"] != "completed" or not run["rows"]:
+        raise ServiceError("검토 대기열에 올릴 유효한 초안이 없습니다.")
+    if run["submitted"]:
+        raise ServiceError("이미 검토 대기열에 올린 초안입니다.")
+    evaluation.assign_families(res.settings)
+    try:
+        return gold.submit(res.settings, _drafts_dir(res.settings) / run_id / "output" / "candidates.jsonl", run_id,
+                           "dev", drafting.DRAFTER)
+    except gold.GoldError as exc:
+        raise ServiceError(str(exc)) from None

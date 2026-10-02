@@ -229,7 +229,7 @@ class CancellationTest(Base):
         view = self.wait_done(rid)
         self.assertEqual((view.status, view.billing_state), ("cancelled", "settled"))
         self.assertTrue(view.cancel_requested)
-        self.assertFalse(ui.may_attach({"request_id": rid, "generation_id": "g1", "target": "t"}, "t", view))
+        self.assertFalse(service.may_attach({"request_id": rid, "generation_id": "g1", "target": "t"}, "t", view))
 
     def test_cancellation_before_generation_releases_nothing_because_nothing_was_reserved(self):
         real = service.prepare_answer
@@ -263,7 +263,7 @@ class ScopeOwnershipTest(Base):
         app.session_state["res"], app.session_state["principal"] = self.res, self.env.consultant
         app.session_state["current"] = {"scope": scope, "question": Q, "mode": "single", "as_of": "2026-09-30"}
         app.session_state["owned"] = {"request_id": rid, "generation_id": "gen-a",
-                                      "target": ui.target_key(scope, Q, "single", "2026-09-30")}
+                                      "target": service.target_key(scope, Q, "single", "2026-09-30")}
         app.run(timeout=30)
         self.assertFalse(app.exception, [e.message for e in app.exception])
         app.selectbox[0].select(app.selectbox[0].options[0]).run(timeout=30)
@@ -300,7 +300,7 @@ class ScopeOwnershipTest(Base):
         for option in list(box.options):
             app.selectbox[0].select(option).run(timeout=30)
             self.assertFalse(app.exception, [e.message for e in app.exception])
-            shown += [b.key[len("exp-"):] for b in app.get("download_button") if b.key.startswith("exp-")]
+            shown += [rid for rid in rids if any(f"요청 {rid[:8]}" in c.value for c in app.caption)]
         self.assertEqual(sorted(shown), sorted(rids))
 
     def test_the_chosen_history_request_survives_another_request_finishing(self):
@@ -323,12 +323,12 @@ class ScopeOwnershipTest(Base):
         app.session_state["res"], app.session_state["principal"] = self.res, self.env.consultant
         app.run(timeout=30)
         app.selectbox[0].select(older).run(timeout=30)
-        exports = lambda: [b.key for b in app.get("download_button") if b.key.startswith("exp-")]  # noqa: E731
-        self.assertEqual(exports(), [f"exp-{older}"])
+        shown = lambda: [r for r in (older, newer) if any(f"요청 {r[:8]}" in c.value for c in app.caption)]  # noqa: E731
+        self.assertEqual(shown(), [older])
         status(newer, "completed")  # only the other row's label changes
         app.run(timeout=30)
         self.assertFalse(app.exception, [e.message for e in app.exception])
-        self.assertEqual((app.selectbox[0].value, exports()), (older, [f"exp-{older}"]))
+        self.assertEqual((app.selectbox[0].value, shown()), (older, [older]))
 
     def test_evidence_of_an_older_history_request_opens_in_the_history(self):
         from streamlit.testing.v1 import AppTest
@@ -348,19 +348,19 @@ class ScopeOwnershipTest(Base):
                          ["evdl-hist"])
 
     def test_a_late_answer_cannot_attach_to_a_changed_scope_but_still_settles(self):
-        target_a = ui.target_key([(self.a.doc_id, self.a.source_hash)], Q, "single", "2026-09-30")
+        target_a = service.target_key([(self.a.doc_id, self.a.source_hash)], Q, "single", "2026-09-30")
         rid = service.submit_answer(self.res, self.env.consultant, req(self.a, gen="gen-a"))
         owned = {"request_id": rid, "generation_id": "gen-a", "target": target_a}
         self.assertTrue(self.transport.entered.acquire(timeout=10))
-        target_d = ui.target_key([(self.d.doc_id, self.d.source_hash)], Q, "single", "2026-09-30")  # user moved on
+        target_d = service.target_key([(self.d.doc_id, self.d.source_hash)], Q, "single", "2026-09-30")  # user moved on
         self.transport.gate.set()
         view = self.wait_done(rid)
         self.assertEqual((view.result.status, view.billing_state), ("answered", "settled"))
-        self.assertTrue(ui.may_attach(owned, target_a, view))
-        self.assertFalse(ui.may_attach(owned, target_d, view))
-        changed_question = ui.target_key([(self.a.doc_id, self.a.source_hash)], "다른 질문", "single", "2026-09-30")
-        self.assertFalse(ui.may_attach(owned, changed_question, view))
-        self.assertFalse(ui.may_attach({**owned, "generation_id": "gen-b"}, target_a, view))
+        self.assertTrue(service.may_attach(owned, target_a, view))
+        self.assertFalse(service.may_attach(owned, target_d, view))
+        changed_question = service.target_key([(self.a.doc_id, self.a.source_hash)], "다른 질문", "single", "2026-09-30")
+        self.assertFalse(service.may_attach(owned, changed_question, view))
+        self.assertFalse(service.may_attach({**owned, "generation_id": "gen-b"}, target_a, view))
         self.assertEqual(view.scope, [{"doc_id": self.a.doc_id, "source_hash": self.a.source_hash}])
 
 
@@ -835,8 +835,8 @@ class SearchFilterTest(Base):
         self.assertNotIn(self.e.doc_id, shown)  # a known 0원 amount fails amount_min; it is not "unknown"
 
     def test_only_the_highest_cap_warning_is_shown(self):
-        self.assertEqual(ui.visible_warnings(["cap_50", "cap_75", "ahead_of_pace"]), ["cap_75", "ahead_of_pace"])
-        self.assertEqual(ui.visible_warnings(["cap_50", "cap_75", "cap_90", "cap_exhausted"]), ["cap_exhausted"])
+        self.assertEqual(service.visible_warnings(["cap_50", "cap_75", "ahead_of_pace"]), ["cap_75", "ahead_of_pace"])
+        self.assertEqual(service.visible_warnings(["cap_50", "cap_75", "cap_90", "cap_exhausted"]), ["cap_exhausted"])
 
 
 class SourceAndExportTest(Base):

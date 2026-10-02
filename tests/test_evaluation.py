@@ -601,10 +601,10 @@ class GoldQueueTest(Phase4Case):
             c = service.gold_candidate(res, v, "dev-amount-r1")
             self.assertEqual(len(c["context"]["evidence"]), 2)
             with self.assertRaises(service.ServiceError):
-                service.gold_decide(res, v, "dev-amount-r1", "approve", c["row_sha256"])
+                service.gold_decide(res, v, "dev-amount-r1", "approve", c["row_sha256"], note="원문 확인")
             for cid in ("dev-amount-r1", "dev-deadline-r1", "dev-warranty-r1", "dev-absent-r1"):
                 sha = service.gold_candidate(res, v, cid)["row_sha256"]
-                service.gold_decide(res, v, cid, "approve", sha, original_inspected=True,
+                service.gold_decide(res, v, cid, "approve", sha, note="원문 확인", original_inspected=True,
                                     disputed=cid == "dev-deadline-r1")
             self.assertEqual([r["question_id"] for r in service.gold_awaiting_second_review(res, v)], ["dev-deadline"])
             report = evaluation.validate_gold(self.s, "dev")
@@ -1128,15 +1128,20 @@ class EvaluationScreenTest(GoldRetrievalTest):
         path = self.root / "b.jsonl"
         store.write_jsonl_atomic(path, rows)
         gold.submit(self.s, path, "b1", "dev", "agent-a")
-        app = self.app("ui.gold_review_page(st, st.session_state.res, st.session_state.principal)\n")
+        app = self.app("ui.dataset_page(st, st.session_state.res, st.session_state.principal)\n")
         app.run(timeout=60)
         self.assertFalse(app.exception, [e.message for e in app.exception])
         self.assertTrue(any("필수 주장" in m.value for m in app.markdown))
         submit = lambda: next(b for b in app.button if "승인" in b.label)  # noqa: E731
+        note = lambda: next(t for t in app.text_area if t.label.startswith("메모"))  # noqa: E731
+        submit().click().run(timeout=60)
+        self.assertTrue(any("메모" in e.value for e in app.error))  # every decision carries a note
+        note().input("원문 4쪽 마감 일시 확인")
         submit().click().run(timeout=60)
         self.assertTrue(any("원문을 직접 확인" in e.value for e in app.error))
         self.assertEqual(gold.candidate(self.s, "dev-deadline-r1")["status"], "pending")
-        app.checkbox[0].check().run(timeout=60)
+        next(c for c in app.checkbox if c.label.startswith("원문 파일에서")).check()
+        note().input("원문 4쪽 마감 일시 확인")
         submit().click().run(timeout=60)
         self.assertFalse(app.exception, [e.message for e in app.exception])
         self.assertEqual(gold.candidate(self.s, "dev-deadline-r1")["status"], "approved")

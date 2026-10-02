@@ -217,12 +217,13 @@ class Context:
         return ok, actual
 
     def open_app(self, page, origin: str, name: str) -> tuple[bool, str]:
+        page.goto(origin + "/verify")  # the served build is shown at the foot of 검증
+        found = wait_text(page, r"빌드 ([0-9a-f]{40}|unknown)", 60000) and re.search(
+            r"빌드 ([0-9a-f]{40}|unknown)", page.locator('[data-testid="stMain"]').inner_text())
+        self.build_head = found.group(1) if found else "not shown"
         page.goto(origin + "/")
         box = page.get_by_label("이름 (사용·검토 기록용)")
         box.wait_for(timeout=60000)
-        sidebar = page.locator('section[data-testid="stSidebar"]').inner_text()
-        found = re.search(r"빌드 ([0-9a-f]{40}|unknown)", sidebar)
-        self.build_head = found.group(1) if found else "not shown"
         login = page.get_by_text("접속 토큰").count() + page.get_by_label("비밀번호").count()
         box.fill(name)
         box.press("Enter")
@@ -290,13 +291,28 @@ def wait_request(data_dir: str, where: str, args=(), timeout: float = 120) -> sq
 
 
 def rendered(page, row) -> bool:
-    """The request's own result is on the page: its status label and, for an answer, its summary."""
-    from rfp_assistant.ui import STATUS_TEXT
-
+    """The request's own result is on the page: its footer line carries the request ID."""
     result = json.loads(row["result_json"]) if row and row["result_json"] else None
     if not result:
         return False
-    return wait_text(page, re.escape(f"{STATUS_TEXT.get(result['status'], result['status'])}: "), 30000)
+    return wait_text(page, re.escape(f"요청 {row['request_id'][:8]} · "), 30000)
+
+
+def pick_first_document(page) -> None:
+    """질문하기's sidebar lists documents as checkboxes labelled with their titles; askable ones come first."""
+    page.locator('section[data-testid="stSidebar"] [data-testid="stCheckbox"]').first.click()
+
+
+def evidence_heading(page):
+    return page.get_by_role("heading", name="근거 E1", exact=True)
+
+
+def evidence_opened(page, timeout_ms: int) -> bool:
+    try:
+        evidence_heading(page).first.wait_for(timeout=timeout_ms)
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def wait_text(page, pattern: str, timeout_ms: int = 60000) -> bool:
@@ -485,7 +501,7 @@ def consultant_answer(ctx: Context) -> dict:
                                    lambda: ctx.open_app(page, origin, member))}
 
         def answer():
-            page.get_by_text("선택", exact=True).first.click()
+            pick_first_document(page)
             last = ask_and_wait(page, corpus["data_dir"], member, corpus["question"])
             result = json.loads(last["result_json"]) if last and last["result_json"] else {}
             shown = bool(last) and rendered(page, last)
@@ -498,7 +514,7 @@ def consultant_answer(ctx: Context) -> dict:
 
         def evidence():
             page.get_by_role("button", name="근거 E1").first.click()
-            opened = wait_text(page, r"^근거 E1 ·", 15000) or wait_text(page, "근거 E1 ·", 5000)
+            opened = evidence_opened(page, 15000)
             return opened, f"evidence panel {'opened' if opened else 'did not open'} after one click"
         out["evidence-first-click"] = ctx.act("click 근거 E1 once", "the evidence panel opens", evidence)
 
@@ -525,7 +541,7 @@ def request_history(ctx: Context) -> dict:
         ctx.act("open the app and type a name", "consultant page", lambda: ctx.open_app(page, origin, member))
 
         def twice():
-            page.get_by_text("선택", exact=True).first.click()
+            pick_first_document(page)
             for _ in range(2):
                 ask_and_wait(page, corpus["data_dir"], member, corpus["question"])
             page.get_by_text("내 최근 요청").click()
@@ -545,8 +561,8 @@ def request_history(ctx: Context) -> dict:
             page.wait_for_timeout(1500)
             expander = page.locator('[data-testid="stExpander"]').filter(has_text="내 최근 요청")
             expander.get_by_role("button", name="근거 E1").first.click()
-            opened = wait_text(page, "근거 E1 ·", 15000)
-            panels = page.get_by_text(re.compile("근거 E1 ·")).count()
+            opened = evidence_opened(page, 15000)
+            panels = evidence_heading(page).count()
             return opened, f"older request {rows[0]['request_id'][:8]} selected; evidence panels shown {panels} after one click"
         out["history-evidence-first-click"] = ctx.act("open the older request's evidence once",
                                                       "its evidence opens", older_evidence)
@@ -563,12 +579,13 @@ def verifier_generation(ctx: Context) -> dict:
 
         def freeze():
             page.get_by_role("link", name="검증").click()
-            page.get_by_text("검색 경로와 근거 추적").wait_for(timeout=30000)
+            page.get_by_role("heading", name="검색 추적").wait_for(timeout=30000)
             page.get_by_role("textbox", name="질문").fill(corpus["question"])
             page.get_by_role("textbox", name="질문").press("Enter")
             page.locator('[data-testid="stMultiSelect"]').first.click()
             page.get_by_role("option").first.click()
             page.keyboard.press("Escape")
+            page.get_by_role("heading", name="검색 추적").click()  # an open dropdown takes the next click
             page.get_by_role("button", name="검색만 실행 (무료)").click()
             shown = wait_text(page, r"실행 vr-", 60000)
             runs = db_rows(corpus["data_dir"], "SELECT run_id, trace_json FROM verifier_runs WHERE member_id = ?",
@@ -602,8 +619,9 @@ def verifier_generation(ctx: Context) -> dict:
     return with_browser(ctx, body)
 
 
-def sidebar_pending(page) -> float | None:
-    found = re.search(r"진행 중 예약 \$([0-9.,]+)", page.locator('section[data-testid="stSidebar"]').inner_text())
+def shared_pending(page) -> float | None:
+    """The reservation shown in the budget row under the menu."""
+    found = re.search(r"진행 중 예약 \$([0-9.,]+)", page.locator('[data-testid="stMain"]').inner_text())
     return float(found.group(1).replace(",", "")) if found else None
 
 
@@ -621,7 +639,7 @@ def six_sessions(ctx: Context) -> dict:
             for m in members:
                 page = ctx.page(browser, origin)
                 ctx.open_app(page, origin, m)
-                page.get_by_text("선택", exact=True).first.click()
+                pick_first_document(page)
                 page.get_by_role("textbox", name="질문").wait_for(timeout=30000)
                 page.get_by_role("textbox", name="질문").fill(corpus["question"])
                 pages.append(page)
@@ -633,13 +651,13 @@ def six_sessions(ctx: Context) -> dict:
             pages[0].get_by_role("button", name=re.compile("근거 기반 답변 받기")).click()
             seen = None
             while time.monotonic() - started < 10 and seen is None:
-                value = sidebar_pending(pages[5])
+                value = shared_pending(pages[5])
                 if value:
                     seen = (round(time.monotonic() - started, 1), value)
                 pages[5].wait_for_timeout(200)
             return seen is not None, (f"session 6 showed a shared reservation of ${seen[1]} {seen[0]} s after session 1 "
                                       "submitted" if seen else "session 6 never showed a reservation within 10 s")
-        visible = ctx.act("submit in session 1 and watch session 6's sidebar", "the shared reservation appears",
+        visible = ctx.act("submit in session 1 and watch session 6's budget row", "the shared reservation appears",
                           watch)
 
         def all_submit():
@@ -664,40 +682,35 @@ def six_sessions(ctx: Context) -> dict:
 def cap_exhaustion(ctx: Context) -> dict:
     def body(ctx, browser, origin, corpus):
         data = corpus["data_dir"]
-        owner = ctx.page(browser, origin)
-        ctx.open_app(owner, origin, f"verify-owner-{os.getpid()}")
         cap = db_rows(data, "SELECT cap_micro_usd FROM budget_settings WHERE id = 1")[0]["cap_micro_usd"]
         amount = f"{cap / 1_000_000 + 1:.6f}"
+        # Budget administration is an owner CLI path beside the running app (it never takes the gateway lock).
+        env = {**ctx.env, "RFP_SOURCE_DIR": corpus["source_dir"], "RFP_DATA_DIR": corpus["data_dir"]}
 
-        def adjust(reason: str):
-            owner.get_by_role("link", name="사용량 관리").click()
-            owner.get_by_text("미확정 비용").first.wait_for(timeout=30000)
-            owner.get_by_role("tab", name="외부 사용 조정").click()
-            panel = owner.get_by_role("tabpanel", name="외부 사용 조정")
-            panel.get_by_label("조정 키(중복 방지)").fill(f"verify-cap-{os.getpid()}")
-            panel.get_by_label("금액(USD, 음수는 정정)").fill(amount)
-            panel.get_by_label("증빙").fill("verification: synthetic cap exhaustion on an isolated runtime")
-            panel.get_by_label("사유").fill(reason)
+        def owner_cli(name: str, args: list[str]) -> tuple[int, str]:
+            return ctx.run(name, [ctx.python, "-B", "-m", "rfp_assistant.cli", *args, "--actor",
+                                  f"verify-owner-{os.getpid()}"], 300, env)
+
+        def adjust(reason: str) -> tuple[int, str, int]:
             before = db_rows(data, "SELECT COUNT(*) AS n FROM audit_events")[0]["n"]
-            panel.get_by_role("button", name="조정 기록").click()
-            owner.wait_for_timeout(2500)
+            code, out = owner_cli("adjust", ["adjust", "--key", f"verify-cap-{os.getpid()}", "--amount-usd", amount,
+                                             "--evidence", "verification: synthetic cap exhaustion on an isolated runtime",
+                                             "--reason", reason])
             after = db_rows(data, "SELECT COUNT(*) AS n FROM audit_events")[0]["n"]
-            return panel, after - before
+            return code, out, after - before
 
         def reasonless():
-            panel, added = adjust("")
-            errors = panel.locator('[data-testid="stAlertContentError"]').all_inner_texts()
-            return bool(errors) and added == 0, f"error shown {errors[:1]}; audit events added {added}"
-        refused = ctx.act("record an adjustment without a reason", "refused and nothing recorded", reasonless)
+            code, out, added = adjust("")
+            return code != 0 and added == 0, f"exit {code}; {out.strip().splitlines()[-1][:160] if out.strip() else ''}; audit events added {added}"
+        refused = ctx.act("record an adjustment without a reason (CLI adjust)", "refused and nothing recorded", reasonless)
 
         def with_reason():
-            panel, added = adjust("cap exhaustion verification")
-            ok_text = panel.get_by_text("기록했습니다.").count()
-            owner.get_by_role("tab", name="감사 기록").click()
-            owner.wait_for_timeout(1000)
-            listed = owner.get_by_role("tabpanel", name="감사 기록").inner_text().count("cap exhaustion verification")
-            return bool(ok_text and added == 1 and listed), f"confirmation {bool(ok_text)}; audit events added {added}; audit tab rows {listed}"
-        audited = ctx.act("record the adjustment with a reason", "recorded and listed in the audit log", with_reason)
+            code, out, added = adjust("cap exhaustion verification")
+            _, audit = owner_cli("audit", ["audit", "--limit", "5"])
+            listed = audit.count("cap exhaustion verification")
+            return bool(code == 0 and added == 1 and listed), f"exit {code}; audit events added {added}; audit rows {listed}"
+        audited = ctx.act("record the adjustment with a reason (CLI adjust, audit)", "recorded and listed in the audit log",
+                          with_reason)
 
         member = f"verify-cap-{os.getpid()}"
         consultant = ctx.page(browser, origin)
@@ -705,7 +718,7 @@ def cap_exhaustion(ctx: Context) -> dict:
 
         def blocked():
             warned = wait_text(consultant, "운영 한도에 도달", 15000)
-            consultant.get_by_text("선택", exact=True).first.click()
+            pick_first_document(consultant)
             row = ask_and_wait(consultant, data, member, corpus["question"])
             result = json.loads(row["result_json"])["status"] if row and row["result_json"] else None
             return bool(warned and result == "budget_blocked" and not row["attempts"]), (
@@ -782,8 +795,8 @@ def accessibility(ctx: Context) -> dict:
         def keyboard():
             # Styles are compared focused vs. unfocused; transitions would report a value mid-animation.
             page.add_style_tag(content="*, *::before, *::after { transition: none !important; }")
-            page.get_by_label("이름 (사용·검토 기록용)").focus()
-            pick = tab_to(lambda i: i["type"] == "checkbox" and i["name"] == "선택")
+            page.get_by_label("검색어").focus()  # the sidebar precedes the page in tab order
+            pick = tab_to(lambda i: i["type"] == "checkbox")
             if pick:
                 page.keyboard.press("Space")
                 page.wait_for_timeout(1500)
@@ -800,7 +813,7 @@ def accessibility(ctx: Context) -> dict:
             if new and rendered(page, row):
                 if tab_to(lambda i: i["tag"] == "BUTTON" and i["name"] == "근거 E1"):
                     page.keyboard.press("Enter")
-                    opened = wait_text(page, "근거 E1 ·", 15000)
+                    opened = evidence_opened(page, 15000)
             return bool(pick and box and submit and new and opened), (
                 f"document selected {bool(pick)}; question typed {bool(box)}; submitted {bool(submit)}; "
                 f"request {row['status'] if row else None}; evidence opened {opened}; {len(focused)} Tab stops")
@@ -824,7 +837,7 @@ def accessibility(ctx: Context) -> dict:
             page.set_viewport_size({"width": 390, "height": 844})
             page.wait_for_timeout(1500)
             width = page.evaluate("() => [document.documentElement.scrollWidth, window.innerWidth]")
-            status = page.get_by_text(re.compile(r"^(답변|근거 부족|확인 필요|기술 오류): ")).count()
+            status = page.get_by_text(re.compile(r"^(답변|근거 부족|확인 필요|근거 충돌|기술 오류.*)$")).count()
             return width[0] <= width[1] and status > 0, f"scroll width {width[0]} for a {width[1]} px viewport; status labels in text {status}"
         layout = ctx.act("narrow the viewport to 390 px", "no horizontal scroll and text status", narrow)
         return {"keyboard-only": keys, "focus-visible": ring, "contrast": readable, "narrow-layout": layout}

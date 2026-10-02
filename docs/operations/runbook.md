@@ -12,12 +12,12 @@ Run the commands with the project environment's interpreter from any directory. 
 
 ## 2. Access: no login
 
-There is no login (owner decision 2026-09-30, reaffirmed for phase 3 on 2026-10-01). Every visitor gets every page: 컨설턴트, 검증, 질문 검토 and 사용량 관리. The sidebar name (default `owner`) is recorded on requests, attempts, reviews, corrections and audit events.
+There is no login (owner decision 2026-09-30, reaffirmed for phase 3 on 2026-10-01). Every visitor gets every page: 질문하기, 검증 and 데이터셋 만들기. The name typed under the menu (default `owner`) is recorded on requests, attempts, reviews and corrections. Budget administration is owner CLI only (section 5); its `--actor` is recorded on audit events.
 
-- Attribution, not authentication. Per-member spend in the sidebar is only as accurate as the names people type. Ask each member to use one consistent name.
-- Network reach is the access control. Anyone who can open the page can spend the allowance and use the admin page. Admin actions still require a reason and leave an audit event with the typed name; there is still no bulk release of unknown billing.
-- Sealed test rows are never served to the verifier page. Only the phase-4 freeze procedure, run by the owner from the CLI, reads `sealed/`.
-- A browser reload resets the sidebar name to `owner`; retype it. Running requests still settle on the server, and the reloaded page shows them under "내 최근 요청" for that name.
+- Attribution, not authentication. Per-member spend (`budget-status`) is only as accurate as the names people type. Ask each member to use one consistent name.
+- Network reach is the access control. Anyone who can open the page can spend the allowance. Admin actions run from the owner's terminal, require a reason and leave an audit event; there is still no bulk release of unknown billing.
+- Sealed test rows are never served to the 검증 or 데이터셋 만들기 pages. Only the phase-4 freeze procedure, run by the owner from the CLI, reads `sealed/`.
+- A browser reload resets the typed name to `owner`; retype it. Running requests still settle on the server, and the reloaded page shows them under "내 최근 요청" for that name.
 
 ## 3. Launch
 
@@ -48,7 +48,7 @@ Paid generation stays disabled until `configure-budget` records the dates, prior
 - A worker still inside a provider call keeps its attempt `dispatching`. That attempt becomes `unknown` at the next start.
 - A worker that has not yet dispatched never starts a new paid stage once stop begins. That covers query embedding and generation, even after its retrieval finishes. The stop check and the `dispatching` marker share one ledger transaction. Such a request ends `interrupted`, and its reservation, if any, is released.
 - The stop starts from the interpreter's exit as soon as Streamlit's signal handler ends the server. It runs before the executor waits for its workers, so a running request stops at its next paid stage instead of finishing first.
-- Verifier generation: the 검증 page's paid button generates from the frozen run's own evidence and 기준일 (`verifier_run_id`). It never retrieves again, so a query-vector cache miss cannot switch it to hybrid and no query embedding is paid. The reservation never exceeds the displayed maximum. The maximum is passed into the atomic admission, so even a rate change between estimate and reservation refuses the request (`above_consented_maximum`) without a call. If the index, serving run, prompt or model changed since the run was frozen, the button is withheld and the service refuses the run. Make a new run instead. A two-document run needs an evidence-unit limit of at least 2, one per document, and the form enforces that minimum.
+- Verifier generation: the 검증 page's paid button generates from the frozen run's own evidence and 기준일 (`verifier_run_id`). It never retrieves again, so a query-vector cache miss cannot switch it to hybrid and no query embedding is paid. The reservation never exceeds the displayed maximum. The maximum is passed into the atomic admission, so even a rate change between estimate and reservation refuses the request (`above_consented_maximum`) without a call. If the index, serving run, prompt or model changed since the run was frozen, the button is withheld and the service refuses the run. Make a new run instead. Page traces run at the settings' evidence limits; limit experiments go through `evaluate-retrieval`.
 - Restart: the next owner recovers conservatively and never replays anything:
   - queued and running requests become `interrupted`;
   - `dispatching` attempts become `unknown`, keeping their reserve as pending cost;
@@ -56,16 +56,19 @@ Paid generation stays disabled until `configure-budget` records the dates, prior
 
 ## 5. Budget recovery
 
-The admin page (사용량 관리) and the CLI show the same state:
+Budget administration is owner CLI only. These commands run beside the serving app without taking its gateway lock:
 
 ```powershell
 python -m rfp_assistant.cli budget-status
 python -m rfp_assistant.cli unresolved
+python -m rfp_assistant.cli audit --actor <owner>
+python -m rfp_assistant.cli adjust --key <unique key> --amount-usd 0.12 --evidence "<where>" --reason "<why>" --actor <owner>
+python -m rfp_assistant.cli paid off --reason "<why>" --actor <owner>
 ```
 
 An `unknown` attempt holds its full reservation until evidence arrives. There is no bulk release, and age alone never releases anything. Resolve one attempt with exactly one of these, each with a reason and an audit event:
 
-1. Settle from usage evidence. On the admin page, use the 미확정 비용 → 정산 form with the provider's dated usage for that call: input, output and cached tokens, plus an evidence location. Settlement happens exactly once; a duplicate completion changes nothing.
+1. Settle from usage evidence: `settle --attempt-id <id> --prompt-tokens N --completion-tokens N --cached-tokens N --evidence "<dated provider export>" --reason "<why>" --actor <owner>` with the provider's dated usage for that call. Settlement happens exactly once; a duplicate completion changes nothing.
 2. Reconcile a closed provider interval. Build a JSON record and import it:
 
    ```json
@@ -144,8 +147,8 @@ python -m rfp_assistant.cli freeze-dataset --dataset test --actor <owner> --reas
 ```
 
 - Row shape, evidence groups, typed claims and negatives: `.wiki/gold-drafting.md`, section "Phase 4 gold rows".
-- Development rows are reviewed on `질문 검토`. The reviewer differs from the drafter, ticks "원문 파일에서 … 직접 확인했습니다", and marks disputed deadlines, amounts, institutions and mandatory conditions; a third person records the second review under "2차 검토 대기".
-- Sealed rows are reviewed only in the owner's terminal: `gold show --candidate-id <id>`, `gold decide ... --original-inspected`, `gold second-review ...`. They live under `.runtime/sealed/`; the 검증 and 질문 검토 pages never show them, and `evaluate-retrieval`/`plan-run --action answer-finalists` refuse the `test` split.
+- Development rows are drafted and reviewed on `데이터셋 만들기`. The reviewer differs from the drafter and from whoever started the drafting run, writes a note, ticks "원문 파일에서 … 직접 확인했습니다", and marks disputed deadlines, amounts, institutions and mandatory conditions; a third person records the second review on 검증 › 골드·봉인 검토.
+- Sealed rows are reviewed only in the owner's terminal: `gold show --candidate-id <id>`, `gold decide ... --original-inspected`, `gold second-review ...`. They live under `.runtime/sealed/`; the 검증 and 데이터셋 만들기 pages never show them, and `evaluate-retrieval`/`plan-run --action answer-finalists` refuse the `test` split.
 - A set below the per-type targets (60 + 60) validates as `pilot`. Report it as a pilot; never call it gold.
 
 ### 10.2 Retrieval-first development comparison (free)
@@ -207,12 +210,12 @@ The report (`.runtime/releases/<F-id or draft-date>/report.md` plus `manifest.js
 
 Mentor walkthrough on the frozen candidate (record the outcome as `.runtime/releases/<F-id>/walkthrough-results.json` in the shape of the phase-3 browser results):
 
-1. 컨설턴트: search a project, select it, ask about a fact beyond the opening pages; show a claim, open its evidence (exact quote, location), download the original.
+1. 질문하기: search a project, select it, ask about a fact beyond the opening pages; show a claim, open its evidence (exact quote, location), download the original.
 2. Show the shared cost strip before and after (settled cost of that request).
 3. Select the duplicated/conflicting record pair and show the conflict state; show a document with missing metadata (기본 정보) and the quarantined/unsupported source.
 4. Select two documents and run a balanced comparison.
 5. Change the scope while a request runs: the old answer stays history.
-6. 검증: the trace of the same question, a comparison of two frozen runs, and the 평가 tab (development scores, the sealed set as a count only, the release decision).
+6. 검증: the trace of the same question, a comparison of two frozen runs, and the 평가·릴리스 tab (development scores, the sealed set as a count only, the release decision).
 7. A budget cap and failure-state example: use a temporary fake-provider runtime (`load-check`, or a config with `{"provider": "fake"}` and its own `RFP_DATA_DIR`). Never drain the shared academy balance to demonstrate the cap.
 
 ## 11. Index activation and rollback
