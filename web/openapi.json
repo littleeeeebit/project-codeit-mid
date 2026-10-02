@@ -1,0 +1,1809 @@
+{
+ "components": {
+  "schemas": {
+   "Answer": {
+    "properties": {
+     "billing_state": {
+      "title": "Billing State",
+      "type": "string"
+     },
+     "claims": {
+      "items": {
+       "$ref": "#/components/schemas/Claim"
+      },
+      "title": "Claims",
+      "type": "array"
+     },
+     "conflicts": {
+      "items": {
+       "$ref": "#/components/schemas/Conflict"
+      },
+      "title": "Conflicts",
+      "type": "array"
+     },
+     "coverage": {
+      "items": {
+       "$ref": "#/components/schemas/Coverage"
+      },
+      "title": "Coverage",
+      "type": "array"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "evidence": {
+      "additionalProperties": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Evidence",
+      "type": "object"
+     },
+     "facts": {
+      "items": {
+       "$ref": "#/components/schemas/Fact"
+      },
+      "title": "Facts",
+      "type": "array"
+     },
+     "generation_id": {
+      "title": "Generation Id",
+      "type": "string"
+     },
+     "inventory": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Inventory"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "limitations": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+     },
+     "missing_fields": {
+      "items": {
+       "$ref": "#/components/schemas/MissingField"
+      },
+      "title": "Missing Fields",
+      "type": "array"
+     },
+     "mode": {
+      "title": "Mode",
+      "type": "string"
+     },
+     "next_action": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Action"
+     },
+     "request_id": {
+      "title": "Request Id",
+      "type": "string"
+     },
+     "status": {
+      "description": "Domain status, or technical_error / budget_blocked / ingestion_unavailable",
+      "title": "Status",
+      "type": "string"
+     },
+     "summary": {
+      "title": "Summary",
+      "type": "string"
+     }
+    },
+    "required": [
+     "request_id",
+     "status",
+     "summary",
+     "claims",
+     "missing_fields",
+     "conflicts",
+     "next_action",
+     "evidence",
+     "billing_state",
+     "error",
+     "generation_id",
+     "mode",
+     "facts",
+     "inventory",
+     "coverage",
+     "limitations"
+    ],
+    "title": "Answer",
+    "type": "object"
+   },
+   "AskIn": {
+    "properties": {
+     "mode": {
+      "enum": [
+       "single",
+       "compare",
+       "metadata",
+       "inventory"
+      ],
+      "title": "Mode",
+      "type": "string"
+     },
+     "question": {
+      "default": "",
+      "title": "Question",
+      "type": "string"
+     },
+     "scope": {
+      "items": {
+       "$ref": "#/components/schemas/ScopeRef"
+      },
+      "maxItems": 2,
+      "minItems": 1,
+      "title": "Scope",
+      "type": "array"
+     }
+    },
+    "required": [
+     "scope",
+     "mode"
+    ],
+    "title": "AskIn",
+    "type": "object"
+   },
+   "Budget": {
+    "properties": {
+     "snapshot": {
+      "$ref": "#/components/schemas/BudgetSnapshot"
+     },
+     "warnings": {
+      "description": "Only the highest cap level, then the other warnings",
+      "items": {
+       "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+     }
+    },
+    "required": [
+     "snapshot",
+     "warnings"
+    ],
+    "title": "Budget",
+    "type": "object"
+   },
+   "BudgetSnapshot": {
+    "properties": {
+     "allowance_micro_usd": {
+      "title": "Allowance Micro Usd",
+      "type": "integer"
+     },
+     "available_micro_usd": {
+      "title": "Available Micro Usd",
+      "type": "integer"
+     },
+     "cap_micro_usd": {
+      "title": "Cap Micro Usd",
+      "type": "integer"
+     },
+     "cap_percent": {
+      "default": 0.0,
+      "title": "Cap Percent",
+      "type": "number"
+     },
+     "committed_percent": {
+      "title": "Committed Percent",
+      "type": "number"
+     },
+     "frozen_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Frozen Reason"
+     },
+     "last_reconciliation": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Reconciliation"
+     },
+     "ledger_revision": {
+      "title": "Ledger Revision",
+      "type": "string"
+     },
+     "open_attempts": {
+      "title": "Open Attempts",
+      "type": "integer"
+     },
+     "pacing": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Pacing"
+     },
+     "paid_enabled": {
+      "title": "Paid Enabled",
+      "type": "boolean"
+     },
+     "pending_micro_usd": {
+      "title": "Pending Micro Usd",
+      "type": "integer"
+     },
+     "per_member": {
+      "additionalProperties": true,
+      "title": "Per Member",
+      "type": "object"
+     },
+     "project_end": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project End"
+     },
+     "project_start": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Start"
+     },
+     "read_at": {
+      "default": "",
+      "title": "Read At",
+      "type": "string"
+     },
+     "spent_micro_usd": {
+      "title": "Spent Micro Usd",
+      "type": "integer"
+     },
+     "spent_percent": {
+      "title": "Spent Percent",
+      "type": "number"
+     },
+     "tokens": {
+      "additionalProperties": true,
+      "title": "Tokens",
+      "type": "object"
+     },
+     "tracking_scope": {
+      "title": "Tracking Scope",
+      "type": "string"
+     },
+     "unknown_micro_usd": {
+      "default": 0,
+      "title": "Unknown Micro Usd",
+      "type": "integer"
+     },
+     "warnings": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+     }
+    },
+    "required": [
+     "allowance_micro_usd",
+     "cap_micro_usd",
+     "spent_micro_usd",
+     "pending_micro_usd",
+     "available_micro_usd",
+     "spent_percent",
+     "committed_percent",
+     "paid_enabled",
+     "frozen_reason",
+     "tokens",
+     "per_member",
+     "open_attempts",
+     "ledger_revision",
+     "tracking_scope",
+     "last_reconciliation"
+    ],
+    "title": "BudgetSnapshot",
+    "type": "object"
+   },
+   "Cancelled": {
+    "properties": {
+     "status": {
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "status"
+    ],
+    "title": "Cancelled",
+    "type": "object"
+   },
+   "Claim": {
+    "properties": {
+     "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+     },
+     "evidence_ids": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Evidence Ids",
+      "type": "array"
+     },
+     "kind": {
+      "enum": [
+       "source_fact",
+       "inference"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "text",
+     "kind",
+     "doc_id",
+     "evidence_ids"
+    ],
+    "title": "Claim",
+    "type": "object"
+   },
+   "Conflict": {
+    "properties": {
+     "alternatives": {
+      "items": {
+       "$ref": "#/components/schemas/ConflictAlternative"
+      },
+      "title": "Alternatives",
+      "type": "array"
+     },
+     "field": {
+      "title": "Field",
+      "type": "string"
+     }
+    },
+    "required": [
+     "field",
+     "alternatives"
+    ],
+    "title": "Conflict",
+    "type": "object"
+   },
+   "ConflictAlternative": {
+    "properties": {
+     "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+     },
+     "evidence_ids": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Evidence Ids",
+      "type": "array"
+     },
+     "value": {
+      "title": "Value"
+     }
+    },
+    "required": [
+     "doc_id",
+     "value"
+    ],
+    "title": "ConflictAlternative",
+    "type": "object"
+   },
+   "Coverage": {
+    "properties": {
+     "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+     },
+     "evidence": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Evidence units found; absent for basic information",
+      "title": "Evidence"
+     },
+     "limitation": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Limitation"
+     },
+     "source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "csv_metadata for basic information",
+      "title": "Source"
+     }
+    },
+    "required": [
+     "doc_id"
+    ],
+    "title": "Coverage",
+    "type": "object"
+   },
+   "Dated": {
+    "properties": {
+     "precision": {
+      "title": "Precision",
+      "type": "string"
+     },
+     "value": {
+      "title": "Value",
+      "type": "string"
+     }
+    },
+    "required": [
+     "value",
+     "precision"
+    ],
+    "title": "Dated",
+    "type": "object"
+   },
+   "Document": {
+    "properties": {
+     "amount_krw": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Amount Krw"
+     },
+     "bid_close": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Dated"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "conflicts": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Conflicts",
+      "type": "array"
+     },
+     "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+     },
+     "filter_undecided": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Filter Undecided",
+      "type": "array"
+     },
+     "format": {
+      "title": "Format",
+      "type": "string"
+     },
+     "indexed": {
+      "title": "Indexed",
+      "type": "boolean"
+     },
+     "institution": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Institution"
+     },
+     "notice": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Notice"
+     },
+     "parse_status": {
+      "title": "Parse Status",
+      "type": "string"
+     },
+     "published_at": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Dated"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "resolutions": {
+      "additionalProperties": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Resolutions",
+      "type": "object"
+     },
+     "review_status": {
+      "title": "Review Status",
+      "type": "string"
+     },
+     "snippet": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Snippet"
+     },
+     "source_hash": {
+      "title": "Source Hash",
+      "type": "string"
+     },
+     "title": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Title"
+     },
+     "unavailable_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unavailable Reason"
+     }
+    },
+    "required": [
+     "doc_id",
+     "source_hash",
+     "title",
+     "institution",
+     "amount_krw",
+     "published_at",
+     "bid_close",
+     "notice",
+     "format",
+     "parse_status",
+     "review_status",
+     "indexed",
+     "unavailable_reason",
+     "conflicts",
+     "resolutions",
+     "filter_undecided",
+     "snippet"
+    ],
+    "title": "Document",
+    "type": "object"
+   },
+   "Evidence": {
+    "properties": {
+     "context": {
+      "items": {
+       "$ref": "#/components/schemas/EvidenceContext"
+      },
+      "title": "Context",
+      "type": "array"
+     },
+     "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+     },
+     "download_available": {
+      "title": "Download Available",
+      "type": "boolean"
+     },
+     "evidence_id": {
+      "title": "Evidence Id",
+      "type": "string"
+     },
+     "location": {
+      "additionalProperties": true,
+      "title": "Location",
+      "type": "object"
+     },
+     "quote": {
+      "title": "Quote",
+      "type": "string"
+     },
+     "review_status": {
+      "title": "Review Status",
+      "type": "string"
+     },
+     "source_format": {
+      "title": "Source Format",
+      "type": "string"
+     },
+     "source_hash": {
+      "title": "Source Hash",
+      "type": "string"
+     },
+     "title": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Title"
+     },
+     "warnings": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+     }
+    },
+    "required": [
+     "evidence_id",
+     "doc_id",
+     "title",
+     "quote",
+     "context",
+     "location",
+     "source_format",
+     "download_available",
+     "source_hash",
+     "review_status",
+     "warnings"
+    ],
+    "title": "Evidence",
+    "type": "object"
+   },
+   "EvidenceContext": {
+    "properties": {
+     "cited": {
+      "title": "Cited",
+      "type": "boolean"
+     },
+     "element_id": {
+      "title": "Element Id",
+      "type": "string"
+     },
+     "location": {
+      "additionalProperties": true,
+      "title": "Location",
+      "type": "object"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "element_id",
+     "text",
+     "cited",
+     "location"
+    ],
+    "title": "EvidenceContext",
+    "type": "object"
+   },
+   "Fact": {
+    "properties": {
+     "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+     },
+     "evidence": {
+      "title": "Evidence"
+     },
+     "field": {
+      "title": "Field",
+      "type": "string"
+     },
+     "provenance": {
+      "enum": [
+       "csv",
+       "resolution"
+      ],
+      "title": "Provenance",
+      "type": "string"
+     },
+     "state": {
+      "enum": [
+       "known",
+       "unknown",
+       "conflict",
+       "zero_review",
+       "resolved"
+      ],
+      "title": "State",
+      "type": "string"
+     },
+     "value": {
+      "title": "Value"
+     }
+    },
+    "required": [
+     "doc_id",
+     "field",
+     "value",
+     "state",
+     "provenance"
+    ],
+    "title": "Fact",
+    "type": "object"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "title": "Detail",
+      "type": "array"
+     }
+    },
+    "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "Info": {
+    "properties": {
+     "build": {
+      "title": "Build",
+      "type": "string"
+     },
+     "question_max_characters": {
+      "title": "Question Max Characters",
+      "type": "integer"
+     },
+     "today": {
+      "title": "Today",
+      "type": "string"
+     }
+    },
+    "required": [
+     "build",
+     "today",
+     "question_max_characters"
+    ],
+    "title": "Info",
+    "type": "object"
+   },
+   "Inventory": {
+    "properties": {
+     "completeness_text": {
+      "title": "Completeness Text",
+      "type": "string"
+     },
+     "counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Counts",
+      "type": "object"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/InventoryItem"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "repeated_detail_codes": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Repeated Detail Codes",
+      "type": "array"
+     },
+     "summary_only": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Summary Only",
+      "type": "array"
+     }
+    },
+    "required": [
+     "items",
+     "counts",
+     "summary_only",
+     "repeated_detail_codes",
+     "completeness_text"
+    ],
+    "title": "Inventory",
+    "type": "object"
+   },
+   "InventoryItem": {
+    "properties": {
+     "code": {
+      "title": "Code",
+      "type": "string"
+     },
+     "evidence_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Evidence Id"
+     },
+     "kind": {
+      "enum": [
+       "detail",
+       "summary"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "location": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Location",
+      "type": "object"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "source_form": {
+      "title": "Source Form",
+      "type": "string"
+     }
+    },
+    "required": [
+     "code",
+     "source_form",
+     "kind",
+     "name"
+    ],
+    "title": "InventoryItem",
+    "type": "object"
+   },
+   "MissingField": {
+    "properties": {
+     "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+     },
+     "field": {
+      "title": "Field",
+      "type": "string"
+     },
+     "reason": {
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "doc_id",
+     "field",
+     "reason"
+    ],
+    "title": "MissingField",
+    "type": "object"
+   },
+   "Owned": {
+    "description": "What the screen keeps for the one request it owns.",
+    "properties": {
+     "generation_id": {
+      "title": "Generation Id",
+      "type": "string"
+     },
+     "request_id": {
+      "title": "Request Id",
+      "type": "string"
+     },
+     "target": {
+      "title": "Target",
+      "type": "string"
+     }
+    },
+    "required": [
+     "request_id",
+     "generation_id",
+     "target"
+    ],
+    "title": "Owned",
+    "type": "object"
+   },
+   "RequestOut": {
+    "properties": {
+     "attachable": {
+      "description": "May render as the owner's current answer (service.may_attach)",
+      "title": "Attachable",
+      "type": "boolean"
+     },
+     "view": {
+      "$ref": "#/components/schemas/RequestView"
+     }
+    },
+    "required": [
+     "view",
+     "attachable"
+    ],
+    "title": "RequestOut",
+    "type": "object"
+   },
+   "RequestView": {
+    "properties": {
+     "as_of": {
+      "title": "As Of",
+      "type": "string"
+     },
+     "billing_state": {
+      "title": "Billing State",
+      "type": "string"
+     },
+     "cancel_requested": {
+      "title": "Cancel Requested",
+      "type": "boolean"
+     },
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "generation_id": {
+      "title": "Generation Id",
+      "type": "string"
+     },
+     "member_id": {
+      "title": "Member Id",
+      "type": "string"
+     },
+     "mode": {
+      "title": "Mode",
+      "type": "string"
+     },
+     "question": {
+      "title": "Question",
+      "type": "string"
+     },
+     "request_id": {
+      "title": "Request Id",
+      "type": "string"
+     },
+     "reserved_micro_usd": {
+      "title": "Reserved Micro Usd",
+      "type": "integer"
+     },
+     "result": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Answer"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "scope": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Scope",
+      "type": "array"
+     },
+     "settled_micro_usd": {
+      "title": "Settled Micro Usd",
+      "type": "integer"
+     },
+     "status": {
+      "enum": [
+       "queued",
+       "running",
+       "completed",
+       "failed",
+       "cancelled",
+       "interrupted"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "request_id",
+     "member_id",
+     "status",
+     "mode",
+     "generation_id",
+     "question",
+     "as_of",
+     "scope",
+     "created_at",
+     "updated_at",
+     "cancel_requested",
+     "billing_state",
+     "reserved_micro_usd",
+     "settled_micro_usd",
+     "result"
+    ],
+    "title": "RequestView",
+    "type": "object"
+   },
+   "ScopeRef": {
+    "properties": {
+     "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+     },
+     "source_hash": {
+      "title": "Source Hash",
+      "type": "string"
+     }
+    },
+    "required": [
+     "doc_id",
+     "source_hash"
+    ],
+    "title": "ScopeRef",
+    "type": "object"
+   },
+   "ValidationError": {
+    "properties": {
+     "ctx": {
+      "title": "Context",
+      "type": "object"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "title": "Location",
+      "type": "array"
+     },
+     "msg": {
+      "title": "Message",
+      "type": "string"
+     },
+     "type": {
+      "title": "Error Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "title": "RFP assistant",
+  "version": "1"
+ },
+ "openapi": "3.1.0",
+ "paths": {
+  "/api/ask": {
+   "post": {
+    "description": "Answers are as of today (DESIGN.md: the 기준일 control was removed).",
+    "operationId": "ask_api_ask_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AskIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Owned"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Ask"
+   }
+  },
+  "/api/budget": {
+   "get": {
+    "operationId": "budget_api_budget_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Budget"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Budget"
+   }
+  },
+  "/api/documents": {
+   "get": {
+    "operationId": "documents_api_documents_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "query",
+      "required": false,
+      "schema": {
+       "default": "",
+       "title": "Query",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "institution",
+      "required": false,
+      "schema": {
+       "default": "",
+       "title": "Institution",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "amount_min",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Amount Min"
+      }
+     },
+     {
+      "in": "query",
+      "name": "amount_max",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Amount Max"
+      }
+     },
+     {
+      "in": "query",
+      "name": "closing_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Closing From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "closing_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Closing To"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Document"
+         },
+         "title": "Response Documents Api Documents Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Documents"
+   }
+  },
+  "/api/info": {
+   "get": {
+    "operationId": "info_api_info_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Info"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Info"
+   }
+  },
+  "/api/originals/{doc_id}/{source_hash}": {
+   "get": {
+    "operationId": "original_api_originals__doc_id___source_hash__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "source_hash",
+      "required": true,
+      "schema": {
+       "title": "Source Hash",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Original"
+   }
+  },
+  "/api/requests": {
+   "get": {
+    "operationId": "requests_api_requests_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "all_members",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "All Members",
+       "type": "boolean"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/RequestView"
+         },
+         "title": "Response Requests Api Requests Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Requests"
+   }
+  },
+  "/api/requests/{request_id}": {
+   "get": {
+    "description": "Read-only; safe to poll. Pass the owned generation and target to learn whether it may attach.",
+    "operationId": "request_api_requests__request_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "request_id",
+      "required": true,
+      "schema": {
+       "title": "Request Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "generation_id",
+      "required": false,
+      "schema": {
+       "default": "",
+       "title": "Generation Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "target",
+      "required": false,
+      "schema": {
+       "default": "",
+       "title": "Target",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RequestOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Request"
+   }
+  },
+  "/api/requests/{request_id}/abandon": {
+   "post": {
+    "operationId": "abandon_api_requests__request_id__abandon_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "request_id",
+      "required": true,
+      "schema": {
+       "title": "Request Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Abandon"
+   }
+  },
+  "/api/requests/{request_id}/cancel": {
+   "post": {
+    "operationId": "cancel_api_requests__request_id__cancel_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "request_id",
+      "required": true,
+      "schema": {
+       "title": "Request Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Cancelled"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Cancel"
+   }
+  },
+  "/api/requests/{request_id}/evidence/{evidence_id}": {
+   "get": {
+    "operationId": "evidence_api_requests__request_id__evidence__evidence_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "request_id",
+      "required": true,
+      "schema": {
+       "title": "Request Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "evidence_id",
+      "required": true,
+      "schema": {
+       "title": "Evidence Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Evidence"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Evidence"
+   }
+  },
+  "/api/requests/{request_id}/export": {
+   "get": {
+    "operationId": "export_request_api_requests__request_id__export_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "request_id",
+      "required": true,
+      "schema": {
+       "title": "Request Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Export Request Api Requests  Request Id  Export Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Export Request"
+   }
+  }
+ }
+}

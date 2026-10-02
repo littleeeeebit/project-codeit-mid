@@ -17,6 +17,10 @@ numpy==2.5.3
 
 # Interfaces
 streamlit==1.64.0
+# HTTP API for the Next.js app in web/ (httpx drives FastAPI's TestClient in tests/test_api.py)
+fastapi==0.142.2
+uvicorn==0.54.0
+httpx==0.28.1
 
 # ZoneInfo("Asia/Seoul") on Windows
 tzdata==2026.4; sys_platform == "win32"
