@@ -6,6 +6,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 from urllib.parse import quote
 
 from fastapi.testclient import TestClient
@@ -95,6 +96,38 @@ class ApiFlowTest(unittest.TestCase):
 
     def test_a_question_needs_one_or_two_documents(self):
         self.assertEqual(self.client.post("/api/ask", json={"scope": [], "mode": "single"}).status_code, 422)
+
+    def test_a_trace_is_frozen_generated_once_and_corrected_by_its_ids(self):
+        sources = self.client.get("/api/verify/trace-sources", headers=self.headers).json()
+        doc = sources["documents"][0]
+        body = {"question": "하자보수 기간은 얼마인가요?", "mode": sources["modes"][0],
+                "scope": [{"doc_id": doc["doc_id"], "source_hash": doc["source_hash"]}]}
+        run = self.client.post("/api/verify/traces", json=body, headers=self.headers).json()
+        self.assertEqual((run["member_id"], run["generation_block"]), ("김검토", None))
+        self.assertEqual(self.client.get(f"/api/verify/traces/{run['run_id']}").json()["run_id"], run["run_id"])
+        first, again = (self.client.post(f"/api/verify/traces/{run['run_id']}/generate", headers=self.headers)
+                        for _ in range(2))
+        self.assertEqual(first.json(), again.json())  # one idempotent request per run
+        ev = run["retrieval"]["evidence"][0]
+        quote = self.res.index().elements[(ev["extraction_id"], ev["element_ids"][0])]["raw_text"][:20]
+        fix = {"run_id": run["run_id"], "evidence_id": ev["evidence_id"], "element_id": ev["element_ids"][0],
+               "reason": "기대 근거 위치 수정", "quote": quote}
+        wrong = self.client.post("/api/verify/corrections", json={**fix, "evidence_id": "E99"}, headers=self.headers)
+        self.assertEqual(wrong.status_code, 400)
+        cid = self.client.post("/api/verify/corrections", json=fix, headers=self.headers).json()["id"]
+        [row] = self.client.get("/api/verify/corrections").json()
+        self.assertEqual((row["reviewer"], row["run_id"]), ("김검토", run["run_id"]))
+        self.assertTrue(cid)
+        overview = self.client.get("/api/verify/overview").json()
+        self.assertEqual(overview["evaluation"]["answer_runs"], [])
+
+    def test_a_run_whose_configuration_changed_cannot_generate(self):
+        sources = self.client.get("/api/verify/trace-sources").json()
+        doc = sources["documents"][0]
+        run = service.run_trace(self.res, service.visitor("v"), "하자보수", [(doc["doc_id"], doc["source_hash"])],
+                                "2026-09-30", sources["modes"][0])
+        with mock.patch.object(service, "resolve_verifier_config", side_effect=service.ServiceError("바뀜")):
+            self.assertEqual(service.run_generation_block(self.res, service.visitor("v"), run["run_id"]), "바뀜")
 
     def test_the_budget_lists_only_visible_warnings(self):
         b = self.client.get("/api/budget").json()

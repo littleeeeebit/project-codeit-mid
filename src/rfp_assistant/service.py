@@ -1470,6 +1470,18 @@ def record_correction(res: Resources, principal: Principal, *, reason: str, evid
     return correction_id
 
 
+def record_run_correction(res: Resources, principal: Principal, run_id: str, evidence_id: str, element_id: str,
+                          reason: str, quote: str, proposal: dict) -> str:
+    """`record_correction` against one packed evidence unit of a frozen run, named by its IDs."""
+    run = verifier_run(res, principal, run_id)
+    ev = next((e for e in run["retrieval"]["evidence"] if e["evidence_id"] == evidence_id), None)
+    if ev is None or element_id not in ev["element_ids"]:
+        raise ServiceError("검증 실행에 없는 근거 또는 원문 요소입니다.")
+    return record_correction(res, principal, reason=reason, quote=quote, proposal=proposal, run_id=run_id,
+                             evidence={"doc_id": ev["doc_id"], "source_hash": ev["source_hash"],
+                                       "extraction_id": ev["extraction_id"], "element_id": element_id})
+
+
 def list_corrections(res: Resources, principal: Principal) -> list[dict]:
     principal = _authorize(res, principal, "verifier")
     with open_db(res.settings.db_path) as conn:
@@ -1938,6 +1950,24 @@ def generate_from_run(res: Resources, principal: Principal, run: dict) -> str:
         idempotency_key=key, generation_id=key, question=run["question"], scope=scope,
         mode="compare" if len(scope) == 2 else "single", as_of=run.get("as_of") or date.today().isoformat(),
         config_id=run["config"]["config_id"], verifier_run_id=run["run_id"]))
+
+
+def generate_from_run_id(res: Resources, principal: Principal, run_id: str) -> str:
+    """`generate_from_run` for a screen that holds only the run's ID."""
+    return generate_from_run(res, principal, verifier_run(res, principal, run_id))
+
+
+def run_generation_block(res: Resources, principal: Principal, run_id: str) -> str | None:
+    """Why a paid answer cannot be generated from this frozen run now (None when it can): the model has no price,
+    or the serving configuration changed since the run was frozen, so its estimate no longer applies."""
+    run = verifier_run(res, principal, run_id)
+    if run.get("estimate_micro_usd") is None:
+        return "현재 요금표에 없는 모델이라 비용을 추정할 수 없어 유료 생성을 막습니다."
+    try:
+        resolve_verifier_config(res, run["config"]["config_id"])
+    except ServiceError as exc:
+        return str(exc)
+    return None
 
 
 def candidate_spans(c: dict) -> list[dict]:

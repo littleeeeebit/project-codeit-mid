@@ -67,6 +67,34 @@ export const MISSING_REASON: Record<string, string> = {
   source_absence_verified: "원문에 없음(검증됨)", scope_ambiguous: "문서 범위 모호",
 };
 
+export const MODE: Record<string, string> = {
+  whitespace_bm25: "키워드(공백 분리)", kiwi_bm25: "키워드(형태소 분석)", dense: "의미 검색",
+  hybrid: "키워드+의미 결합", hybrid_rerank: "키워드+의미 결합 후 재정렬",
+};
+
+export const RELEASE: Record<string, { label: string; tone: Tone }> = {
+  ready: { label: "출시 가능", tone: "ok" }, limited: { label: "제한적 출시", tone: "warn" },
+  blocked: { label: "차단", tone: "bad" },
+};
+
+export const REVIEW_TONE: Record<string, Tone> = {
+  unreviewed: "neutral", auto_verified: "ok", auto_flagged: "warn", sample_checked: "ok", reviewed: "ok",
+  needs_recovery: "bad",
+};
+
+export const GOLD_TYPE: Record<string, string> = {
+  direct_fact: "직접 사실", semantic_paraphrase: "다른 표현", exact_identifier: "요구사항 코드", table_numeric: "표·숫자",
+  multi_passage: "한 문서 여러 근거", cross_document: "두 문서 비교", missing_false_premise: "없음·잘못된 전제",
+  revision_conflict: "차수·중복 충돌", metadata_direct: "기본 정보",
+};
+
+/** 0.83 (5/6); an empty denominator is 'not applicable', never 100 %. */
+export function rate(r: { numerator: number; denominator: number; rate: number | null } | null | undefined): string {
+  return !r || !r.denominator || r.rate == null ? "해당 없음" : `${r.rate.toFixed(2)} (${r.numerator}/${r.denominator})`;
+}
+
+export const stamp = (iso: string | null | undefined) => (iso ? iso.slice(0, 16).replace("T", " ") : "-");
+
 export const label = (map: Record<string, string>, key: string | null | undefined) =>
   (key && map[key]) || key || "";
 

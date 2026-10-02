@@ -60,6 +60,15 @@ Status: in the click-through on 2026-10-02 the user rejected the rendered screen
 | (f) Typography and density | System font 15 px normal; bundled Pretendard 15 px; system 14 px compact; system 16 px roomy | System font, 15 px body, normal density. |
 | (f) Palette | Navy accent; teal accent; neutral with status colours only; the current brick red | Navy accent (section 4). |
 
+### Picks on the Next.js stack
+
+Each screen was built three ways on one named axis in the running app, on live data, behind a picker; the user switched between them and picked one, and the others were deleted. References: Toss for the whole app (Korean readability), Perplexity for 질문하기, Linear for 검증 and the review queue.
+
+| Screen | Axis | Variants built | Picked |
+| --- | --- | --- | --- |
+| 질문하기 answer | Where claims and their E1/E2 evidence sit | 나란히 (claims left, sticky quote pane right); 문장 속 인용 (Perplexity-style source cards above, numbers at sentence ends open a side sheet); 카드로 펼치기 (Toss-style big conclusion, one card per claim, the quote opens under its card) | 나란히: numbered claims with kind badges and `E<n>` chips in a 3:2 grid; the pane opens the first cited quote and is absent when nothing is cited. |
+| 검증 | Page structure | 요약 + 탭 (four summary tiles over eight tabs); 왼쪽 메뉴 (Linear-style grouped menu with counts, one area at a time); 할 일 먼저 (the to-do inbox is the page, tools below) | 왼쪽 메뉴: groups 사람이 볼 차례 (할 일 with its count), 재현 (검색 추적, 실행 비교), 현황 (평가·릴리스 with the release badge, 데이터셋, 수집 상태), 기록 (수정 기록, 요청 기록). 할 일 joins second reviews and auto-flagged originals in one list beside its detail. |
+
 ### Controls decided in (e)
 
 | Control (before) | Decision |
