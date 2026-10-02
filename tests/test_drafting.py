@@ -35,7 +35,8 @@ class DraftingTest(unittest.TestCase):
                 with patch.object(drafting, 'read_api_key', return_value='offline'), \
                      patch.object(generation, 'OpenAITransport', return_value=owned), \
                      patch.object(drafting, 'response_format', side_effect=RuntimeError('schema failure') if schema_failure else None):
-                    with self.assertRaises((FileExistsError, RuntimeError)):
+                    # Windows reports a file in the parent path as FileExistsError, POSIX as NotADirectoryError
+                    with self.assertRaises((OSError, RuntimeError)):
                         drafting.generate(env.settings.with_(provider='openai'), {'slots': [slot]}, out, 100000)
                 self.assertTrue(owned.closed)
                 self.assertEqual(owned.calls, [])
