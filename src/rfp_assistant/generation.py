@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from .chunking import count_tokens
 from .contracts import AnswerPayload, EvidenceUnit
 
-PROMPT_VERSION = "grounded-answer-3"  # 3: explicit comparison mode
+PROMPT_VERSION = "grounded-answer-4"  # 4: atomic obligations, per-document citations and conflict action
 COUNT_METHOD = "tiktoken:o200k_base+per_message_4+schema+margin"
 PER_MESSAGE_TOKENS = 4
 
@@ -27,6 +27,11 @@ Attach supplied evidence IDs to every material factual claim.
 Never invent dates, amounts, eligibility, requirement IDs, page numbers,
 submission methods, document names, or currently-open bid status.
 Preserve units, VAT treatment, conditions, exceptions, and mandatory wording.
+Keep each obligation's verb and direction separate when summarising a list.
+Hypothetical example: "latency reduction, throughput improvement, failure reduction"
+means "지연 감소, 처리량 향상, 장애 감소", never "지연·처리량·장애 감소".
+Check all asked lists, triggers, exceptions and stages in the supplied evidence before finishing.
+Do not infer a submission stage solely from a form's name: preserve its explicit required placement.
 
 If evidence is missing, mark the relevant field unknown.
 If a document was not fully ingested, state that limitation.
@@ -34,11 +39,16 @@ Evidence whose location format is image_ocr was read from a picture by OCR and m
 characters; when a claim rests on it, say so and suggest checking the original image.
 If the document scope is ambiguous, request clarification.
 If sources conflict, show the competing values and their evidence IDs.
+Do not invent precedence; next_action must explicitly ask the purchaser to clarify which condition controls.
 Separate source facts from your inference; do not guarantee bid eligibility.
 Do not claim an exhaustive list from a limited retrieval context.
 In comparison mode, cover every selected document that has evidence: give its claims,
 or list what is missing for it. Never answer for only one side; keep each claim's doc_id.
 Use only the evidence IDs listed in the request; use the given doc_id values exactly.
+Use evidence_ids_by_doc to check every claim and conflict alternative: each cited ID must belong to its doc_id.
+Hypothetical example: if D-A has E1 and D-B has E2, split a two-document fact into
+one D-A claim citing E1 and one D-B claim citing E2; never attach E2 to a D-A claim.
+These examples are instructions, not source facts or IDs to copy into an answer.
 
 Return a short conclusion, supported claims, missing information,
 conflicts, and the suggested next verification step."""
@@ -225,6 +235,8 @@ def build_messages(question: str, as_of: str, docs: list[dict], evidence: list[E
         "selected_documents": docs,
         "retrieval_limitations": limitations,
         "allowed_evidence_ids": [e.evidence_id for e in evidence],
+        "evidence_ids_by_doc": {d["doc_id"]: [e.evidence_id for e in evidence if e.doc_id == d["doc_id"]]
+                                for d in docs},
         "evidence": [{"evidence_id": e.evidence_id, "doc_id": e.doc_id, "source_hash": e.source_hash[:16],
                       "location": {k: v for k, v in e.location.items() if k in
                                    ("format", "page", "page_label", "section_path", "table_ordinal", "path")},

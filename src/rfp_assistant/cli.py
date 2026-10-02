@@ -16,7 +16,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from . import answers, auth, budget, chunking, evaluation, fidelity, gold, ingestion, ops, release, sealed, service, store
+from . import answers, auth, budget, chunking, drafting, evaluation, fidelity, gold, ingestion, ops, release, sealed, service, store
 from .settings import DEFAULT_RATES, RATE_VERSION, REPO_ROOT, load_settings
 
 
@@ -404,7 +404,17 @@ def cmd_budget_status(args, settings) -> int:
 
 
 def cmd_gold(args, settings) -> int:
-    if args.action == "submit":
+    if args.action == "generate":
+        if not args.file or not args.out or not args.max_cost_usd:
+            raise gold.GoldError("generate needs --file <plan.json> --out <new private directory> --max-cost-usd")
+        plan = json.loads(Path(args.file).read_text(encoding="utf-8"))
+        try:
+            ceiling = int((Decimal(args.max_cost_usd) * budget.MICRO).to_integral_value(rounding="ROUND_FLOOR"))
+        except (ArithmeticError, ValueError):
+            raise gold.GoldError("generate needs a finite positive --max-cost-usd") from None
+        _print(drafting.generate(settings, plan, Path(args.out), ceiling,
+                                split="test" if args.dataset == "test" else "dev", principal=auth.OWNER_CLI))
+    elif args.action == "submit":
         evaluation.assign_families(settings)
         _print(gold.submit(settings, Path(args.file), args.batch, args.dataset, args.drafted_by))
     elif args.action == "infer":
@@ -588,15 +598,16 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--file", required=True)
     sub.add_parser("unresolved", help="attempts whose billing is not settled or released")
     s = sub.add_parser("gold", help="dataset candidate queue and rejection wiki")
-    s.add_argument("action", choices=["status", "submit", "infer", "check", "sync", "repin", "excerpts", "show",
+    s.add_argument("action", choices=["status", "submit", "infer", "check", "sync", "repin", "excerpts", "generate", "show",
                                       "decide", "second-review"])
-    s.add_argument("--out", help="excerpts: absolute new directory for excerpts.jsonl and drafting-context.json "
+    s.add_argument("--out", help="generate/excerpts: absolute new private output directory; excerpts writes excerpts.jsonl and drafting-context.json "
                                  "(contains source text; keep it in local inputs unless the owner shares it)")
     s.add_argument("--per-category", type=int, default=2, help="excerpts: elements per document and category")
-    s.add_argument("--file", help="submit: candidate JSONL; infer: JSON with cause, lesson, drafting_rule")
+    s.add_argument("--max-cost-usd", help="generate: total cost ceiling; the shared purpose envelope also applies")
+    s.add_argument("--file", help="generate: plan JSON; submit: candidate JSONL; infer: JSON with cause, lesson, drafting_rule")
     s.add_argument("--batch", help="submit: new batch id; repin: batch id for pending rows moved to the active "
                                    "extraction after a parser revision")
-    s.add_argument("--dataset", default="dev-pilot", help="submit: target dataset")
+    s.add_argument("--dataset", default="dev-pilot", help="submit: target dataset; generate: test for owner-only sealed drafting")
     s.add_argument("--drafted-by", default="", help="submit: drafting agent identity")
     s.add_argument("--candidate-id", help="infer: rejected candidate id")
     s.add_argument("--by", default="", help="infer: inferring agent identity")

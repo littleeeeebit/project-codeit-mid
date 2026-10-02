@@ -282,12 +282,14 @@ def dataset_rows(conn: sqlite3.Connection, dataset: str) -> list[dict]:
         reviews = _reviews(conn, c["candidate_id"])
         first = next((r for r in reviews if r["kind"] == "decision"), None)
         second = [r for r in reviews if r["kind"] == "second"]
+        # Only a corrected revision can clear a disagreement, including in older review histories.
+        second = next((r for r in second if r["decision"] == "disagree"), second[-1] if second else None)
         review = dict(row.get("review") or {})
         review.update(reviewed_by=c["decided_by"], approved_at=c["decided_at"], status="approved",
                       original_inspected=bool(first and first["original_inspected"]),
                       disputed=bool(review.get("disputed")) or bool(first and first["decision"] == "approve:disputed"),
-                      second_review={"reviewer": second[-1]["reviewer"], "agreed": second[-1]["decision"] == "agree",
-                                     "note": second[-1]["note"], "at": second[-1]["created_at"]} if second else None)
+                      second_review={"reviewer": second["reviewer"], "agreed": second["decision"] == "agree",
+                                     "note": second["note"], "at": second["created_at"]} if second else None)
         row.update(review=review, candidate_id=c["candidate_id"], batch_id=c["batch_id"])
         out.append(row)
     return out
@@ -501,11 +503,12 @@ def decide(settings: Settings, candidate_id: str, decision: str, reviewer: str, 
             raise GoldError(f"이미 처리된 질문입니다 ({c['status']}, {c['decided_by']}).")
         if c["row_sha256"] != expected_sha:
             raise GoldError("질문 내용이 바뀌었습니다. 다시 불러오세요.")
-        if c["drafted_by"] == reviewer:
-            raise GoldError("초안 작성자는 자기 질문을 검토할 수 없습니다.")
+        if c["drafted_by"] == reviewer and (decision == "approve" or not note):
+            raise GoldError("초안 작성자는 자기 질문을 승인할 수 없습니다. 철회하려면 거절 사유를 적으세요.")
         row = json.loads(c["row_json"])
         prov = row.get("generation_provenance") or {}
-        if is_gold(c["dataset"]) and prov.get("method") == "llm" and reviewer == prov.get("model"):
+        if (is_gold(c["dataset"]) and prov.get("method") == "llm" and reviewer == prov.get("model")
+                and (decision == "approve" or not note)):
             raise GoldError("초안을 만든 모델은 자기 질문을 승인할 수 없습니다.")
         if is_gold(c["dataset"]) and decision == "approve" and not original_inspected:
             raise GoldError("원문을 직접 확인했다고 표시해야 승인할 수 있습니다.")
@@ -540,7 +543,9 @@ def second_review(settings: Settings, candidate_id: str, reviewer: str, agreed: 
         if c is None or not is_gold(c["dataset"]) or c["status"] != "approved":
             raise GoldError("승인된 평가 질문만 2차 검토할 수 있습니다.")
         _sealed_refusal(c["dataset"], include_sealed)
-        if reviewer in (c["drafted_by"], c["decided_by"]) or not reviewer.strip():
+        prov = json.loads(c["row_json"]).get("generation_provenance") or {}
+        if (reviewer in (c["drafted_by"], c["decided_by"]) or not reviewer.strip()
+                or (prov.get("method") == "llm" and reviewer == prov.get("model"))):
             raise GoldError("2차 검토자는 초안 작성자·1차 검토자와 달라야 합니다.")
         _record_review(conn, candidate_id, reviewer, "second", "agree" if agreed else "disagree", True, note, utcnow())
         write_jsonl_atomic(dataset_path(settings, c["dataset"]), dataset_rows(conn, c["dataset"]))

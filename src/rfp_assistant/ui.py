@@ -725,17 +725,21 @@ def _trace_tab(st, res, principal) -> None:
         st.info("색인된 문서가 없습니다.")
         return
     labels = {f"{i['title']} · {i['institution']} · {i['doc_id'][:8]}": i for i in items}
-    rows = service.dataset_rows(res, principal, "dev-pilot")
+    rows = service.dataset_rows(res, principal, "dev") + service.dataset_rows(res, principal, "dev-pilot")
     source = st.radio("질문", ["직접 입력", "검토된 개발 질문"], horizontal=True, key="vsource",
                       disabled=not rows)
     if source == "검토된 개발 질문" and rows:
-        row = st.selectbox("개발 질문", rows, format_func=lambda r: f"{r.get('id')} · {r.get('question', '')[:60]}")
+        row = st.selectbox("개발 질문", rows, format_func=lambda r: f"{r.get('question_id') or r.get('id')} · {r.get('question', '')[:60]}")
         question = row.get("question", "")
-        default_docs = [k for k, i in labels.items() if i["doc_id"] in (row.get("doc_ids") or [row.get("doc_id")])]
+        doc_ids = [s["doc_id"] for s in row.get("scope") or []] or row.get("doc_ids") or [row.get("doc_id")]
+        default_docs = [k for k, i in labels.items() if i["doc_id"] in doc_ids]
+        doc_key = f"vdocs-{row.get('question_id') or row.get('id')}"
+        as_of = row.get("as_of_date") or row.get("as_of") or date.today().isoformat()
     else:
         question = st.text_input("질문", key="vq")
         default_docs = []
-    docs = st.multiselect("문서 (최대 2개)", list(labels), default=default_docs[:2], max_selections=2, key="vdocs")
+        doc_key, as_of = "vdocs", date.today().isoformat()
+    docs = st.multiselect("문서 (최대 2개)", list(labels), default=default_docs[:2], max_selections=2, key=doc_key)
     c1, c2, c3 = st.columns(3)
     serving = res.serving()
     modes = list(dict.fromkeys([serving["mode"], "kiwi_bm25", "whitespace_bm25", "dense", "hybrid", "hybrid_rerank"]))
@@ -757,7 +761,7 @@ def _trace_tab(st, res, principal) -> None:
         try:
             run = service.verifier_trace(res, principal, question,
                                          [DocRef(labels[d]["doc_id"], labels[d]["source_hash"]) for d in docs],
-                                         date.today().isoformat(),
+                                         as_of,
                                          mode=None if mode == serving["mode"] else mode, limits=limits or None)
             st.session_state["vrun"] = run["run_id"]
         except (service.ServiceError, auth.AuthError) as exc:
@@ -1125,6 +1129,10 @@ def _gold2_candidate(st, res, principal, c: dict, categories: dict) -> None:
     st.markdown("**질문**")
     st.info(plain(row.get("question", "")))
     st.caption("난이도 이유: " + plain(row.get("difficulty_reason")))
+    if isinstance(row.get("expected_answer"), str) and row["expected_answer"].strip():
+        st.markdown("**초안 답변 요약**")
+        st.info(plain(row["expected_answer"]))
+        st.caption("요약도 검토 대상입니다. 아래 필수 주장과 원문 조건을 대조한 뒤 승인하거나 거절하세요.")
     for err in c.get("current_errors") or []:
         st.error(f"현재 원문 상태와 맞지 않습니다: {plain(err)}")
     for i, (doc, sc) in enumerate(zip(ctx.get("documents") or [], row.get("scope") or [])):
@@ -1133,6 +1141,13 @@ def _gold2_candidate(st, res, principal, c: dict, categories: dict) -> None:
             continue
         st.markdown(f"**문서 {i + 1}** {plain(doc.get('title'))} · {plain(doc.get('filename'))} · "
                     f"{(doc.get('format') or '').upper()} · {REVIEW_TEXT.get(doc.get('review_status'), '')}")
+        for loc in row.get("review_locations") or []:
+            if (isinstance(loc, dict) and loc.get("doc_id") == sc["doc_id"]
+                    and loc.get("source_hash") == sc["source_hash"]):
+                pages = loc.get("pdf_pages")
+                if isinstance(pages, list) and pages and all(type(p) is int and p > 0 for p in pages):
+                    st.caption(f"근거 {plain(loc.get('group_id'))} · PDF 파일 {', '.join(map(str, pages))}쪽 "
+                               "(파일 페이지 기준; 문서에 인쇄된 쪽 번호와 다를 수 있습니다)")
         if doc.get("review_status") in REVIEW_WARNING:
             st.warning(REVIEW_WARNING[doc["review_status"]])
         if doc.get("unavailable_reason"):

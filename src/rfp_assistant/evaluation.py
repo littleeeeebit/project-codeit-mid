@@ -302,11 +302,16 @@ def _gold_eval_rows(rows: list[dict], name: str, active: dict) -> tuple[list[dic
     scored, skipped = [], []
     for row in rows:
         review = row.get("review") or {}
+        prov = row.get("generation_provenance") or {}
+        second = review.get("second_review") or {}
         reason = None
         if (review.get("status") != "approved" or not review.get("reviewed_by")
-                or review.get("reviewed_by") == review.get("drafted_by") or review.get("original_inspected") is not True):
+                or review.get("reviewed_by") == review.get("drafted_by") or review.get("original_inspected") is not True
+                or (prov.get("method") == "llm" and review.get("reviewed_by") == prov.get("model"))):
             reason = "not_independently_reviewed"
-        elif review.get("disputed") and not (review.get("second_review") or {}).get("agreed"):
+        elif (review.get("disputed") or second) and (second.get("agreed") is not True
+                or second.get("reviewer") in (None, "", review.get("drafted_by"), review.get("reviewed_by"))
+                or (prov.get("method") == "llm" and second.get("reviewer") == prov.get("model"))):
             reason = "dispute_unresolved"
         elif row.get("split") != name:
             reason = f"not_{name}"
@@ -2291,9 +2296,10 @@ class GoldChecker:
             e.append(f"{tag}: needs an independent reviewer; a drafter (or drafting model) cannot approve itself")
         elif review.get("original_inspected") is not True:
             e.append(f"{tag}: the reviewer must have inspected the original")
-        if review.get("disputed"):
+        if review.get("disputed") or review.get("second_review"):
             second = review.get("second_review") or {}
-            if not second or second.get("reviewer") in (None, "", drafter, reviewer):
+            if (not second or second.get("reviewer") in (None, "", drafter, reviewer)
+                    or (prov.get("method") == "llm" and second.get("reviewer") == prov.get("model"))):
                 e.append(f"{tag}: a disputed row needs an independent second review")
             elif second.get("agreed") is not True:
                 e.append(f"{tag}: the second reviewer disagreed; correct the row as a new revision")

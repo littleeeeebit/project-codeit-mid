@@ -39,6 +39,15 @@ VAT_G = grp("g2", ("vat", "부가가치세를 포함한"))
 class MetricFixtureTest(unittest.TestCase):
     """The plan's metric/check regression fixtures that need no corpus."""
 
+    def test_conflict_status_without_a_next_action_does_not_pass_negative_handling(self):
+        row = {**gold_row([]), 'question_type': 'cross_document', 'answerability': 'conflicting',
+               'expected_status': 'conflicting_evidence', 'mode': 'single', 'scope': [{'doc_id': 'd'}]}
+        for action in (None, ' ', 'Ask the purchaser which conflicting condition controls'):
+            record = {'finalist': 'F', 'outcome': 'conflicting_evidence', 'answer': {'next_action': action}}
+            scored = answers.score_record(row, record, None, {})
+            self.assertEqual(answers.aggregate_answers([scored])['negative_handling']['numerator'],
+                             1 if action and action.strip() else 0)
+
     def test_two_groups_one_recovered(self):
         row = gold_row([AMOUNT_G, VAT_G])
         m = evaluation.score_row(row, [chunk("amount", 0, 30)], [chunk("amount", 0, 30)], ELS)
@@ -513,6 +522,68 @@ class ValidatorTest(Phase4Case):
 
 
 class GoldQueueTest(Phase4Case):
+    def test_a_later_disagreement_blocks_an_ordinary_approval(self):
+        self.submit('ordinary-approval', [p4.amount_row(self.env, reviewed=False)], 'dev')
+        c = gold.candidate(self.s, 'dev-amount-r1')
+        gold.decide(self.s, c['candidate_id'], 'approve', 'first-reviewer', c['row_sha256'],
+                    original_inspected=True)
+        self.assertTrue(evaluation.validate_gold_v2(self.s, 'dev')['ok'])
+        gold.second_review(self.s, c['candidate_id'], 'independent-reviewer', True, 'Ordinary agreement')
+        self.assertTrue(evaluation.validate_gold_v2(self.s, 'dev')['ok'])
+        gold.second_review(self.s, c['candidate_id'], 'independent-reviewer', False,
+                           'Original source contradicts the proposed qualifier')
+        report = evaluation.validate_gold_v2(self.s, 'dev')
+        self.assertFalse(report['ok'])
+        self.assertTrue(any('second reviewer disagreed' in e for e in report['errors']))
+        rows, skipped, _ = evaluation.load_eval_rows(self.s, 'dev')
+        self.assertEqual(rows, [])
+        self.assertEqual(skipped[0]['reason'], 'dispute_unresolved')
+        with self.assertRaises(evaluation.EvaluationError):
+            evaluation.freeze_dataset(self.s, 'dev', 'owner', 'must not freeze disputed evidence')
+        gold.second_review(self.s, c['candidate_id'], 'later-reviewer', True,
+                           'Later agreement without changing the rejected qualifier')
+        self.assertFalse(evaluation.validate_gold_v2(self.s, 'dev')['ok'])
+        self.assertEqual(evaluation.load_eval_rows(self.s, 'dev')[0], [])
+        with self.assertRaises(evaluation.EvaluationError):
+            evaluation.freeze_dataset(self.s, 'dev', 'owner', 'same revision remains disputed')
+
+        corrected = p4.amount_row(self.env, reviewed=False)
+        corrected['revision'] = 2
+        corrected['difficulty_reason'] += '; corrected qualifier checked against the original'
+        self.submit('corrected-approval', [corrected], 'dev')
+        fixed = gold.candidate(self.s, 'dev-amount-r2')
+        gold.decide(self.s, fixed['candidate_id'], 'approve', 'first-reviewer', fixed['row_sha256'],
+                    original_inspected=True, disputed=True)
+        gold.second_review(self.s, fixed['candidate_id'], 'independent-reviewer', True,
+                           'Corrected revision agrees with the original')
+        self.assertTrue(evaluation.validate_gold_v2(self.s, 'dev')['ok'])
+        rows, skipped, _ = evaluation.load_eval_rows(self.s, 'dev')
+        self.assertEqual([r['revision'] for r in rows], [2])
+        self.assertEqual(skipped, [])
+        self.assertEqual(evaluation.freeze_dataset(self.s, 'dev', 'owner', 'corrected revision')['rows'], 1)
+
+    def test_api_generator_cannot_approve_or_second_review_its_draft(self):
+        row = p4.amount_row(self.env, reviewed=False)
+        row['generation_provenance'] = {'method': 'llm', 'model': 'gpt-6-luna', 'prompt_version': 'p',
+                                        'source_set_hash': 'source-set'}
+        self.submit('api-roles', [row], 'dev')
+        c = gold.candidate(self.s, 'dev-amount-r1')
+        with self.assertRaises(gold.GoldError):
+            gold.decide(self.s, c['candidate_id'], 'approve', 'gpt-6-luna', c['row_sha256'], original_inspected=True)
+        gold.decide(self.s, c['candidate_id'], 'approve', 'reviewer', c['row_sha256'],
+                    original_inspected=True, disputed=True)
+        with self.assertRaises(gold.GoldError):
+            gold.second_review(self.s, c['candidate_id'], 'gpt-6-luna', True, 'Self agreement')
+        rows = store.read_jsonl(evaluation.dataset_path(self.s, 'dev'))
+        rows[0]['review']['second_review'] = {'reviewer': 'gpt-6-luna', 'agreed': True}
+        with store.open_db(self.s.db_path) as conn:
+            checker = evaluation.GoldChecker(self.s, conn)
+            self.assertTrue(any('independent second review' in e for e in checker.check(rows[0], 'api')))
+            scored, skipped = evaluation._gold_eval_rows(rows, 'dev',
+                {s['doc_id']: (s['source_hash'], s['extraction_id']) for s in rows[0]['scope']})
+        self.assertEqual(scored, [])
+        self.assertEqual(skipped[0]['reason'], 'dispute_unresolved')
+
     def submit(self, batch: str, rows: list[dict], dataset: str) -> dict:
         for r in rows:
             r["review"].update(reviewed_by=None, approved_at=None, status="pending", original_inspected=False)
@@ -642,6 +713,49 @@ class GoldRetrievalTest(Phase4Case):
 
 
 class AnswerRunTest(GoldRetrievalTest):
+    def test_conflict_action_survives_execution_and_review_finalization(self):
+        first = "Warranty duration is twelve months."
+        second = "Warranty duration is twenty-four months."
+        with mock.patch.object(fixtures, "PDF_A", fixtures.make_pdf([[first, second]])):
+            env = p4.make_env(self.root / "conflict")
+        row = p4.row(env, "conflict", "Warranty duration", key="기관A", qtype="revision_conflict",
+                     groups=[p4.group(env, "g1", "기관A", ("%twelve%", first)),
+                             p4.group(env, "g2", "기관A", ("%twenty-four%", second))],
+                     answerability="conflicting", expected_status="conflicting_evidence")
+        p4.write(env, "dev", [row])
+        (run,) = evaluation.evaluate_retrieval(env.settings, fixtures.analyzer(), None, "dev", ["K1"])
+        action = "Ask the purchaser which conflicting warranty condition controls."
+
+        def respond(messages):
+            body = json.loads(messages[-1]["content"])
+            evidence = [next(e for e in body["evidence"] if text in e["text"]) for text in (first, second)]
+            payload = {"status": "conflicting_evidence", "summary": "Competing warranty durations.",
+                       "claims": [{"text": text, "kind": "source_fact", "doc_id": e["doc_id"],
+                                   "evidence_ids": [e["evidence_id"]]} for text, e in zip((first, second), evidence)],
+                       "missing_fields": [], "conflicts": [{"field": "warranty duration", "alternatives": [
+                           {"doc_id": e["doc_id"], "value": text, "evidence_ids": [e["evidence_id"]]}
+                           for text, e in zip((first, second), evidence)]}], "next_action": action}
+            return generation.ProviderResponse(json.dumps(payload), None, "stop",
+                                               {"prompt_tokens": 300, "completion_tokens": 90}, "fixture")
+
+        res = service.Resources(env.settings, transport=FakeTransport(respond))
+        try:
+            estimate = answers.plan_run(env.settings, "answer-finalists", "dev", [run["run_id"]])
+            out = answers.run_answers(env.settings, res, estimate["estimate_id"], "fixture-reviewer")
+        finally:
+            res.close()
+        self.assertEqual(out["status"], "complete")
+        record = next(iter(answers.load_progress(env.settings, out["run_id"]).values()))
+        self.assertEqual(record["answer"]["next_action"], action)
+        sheet = answers.export_review_sheet(env.settings, out["run_id"])
+        verdicts = [{**i, "verdict": "supporting" if i["kind"] == "link" else "supported"}
+                    for i in store.read_jsonl(Path(sheet["sheet"]))]
+        path = self.root / "conflict-reviews.jsonl"
+        store.write_jsonl_atomic(path, verdicts)
+        answers.import_reviews(env.settings, out["run_id"], path, "fixture-reviewer")
+        scores = json.loads((answers.run_dir(env.settings, out["run_id"]) / "scores.json").read_text(encoding="utf-8"))
+        self.assertEqual(scores["finalists"][run["run_id"]]["negative_handling"]["numerator"], 1)
+
     def setUp(self):
         super().setUp()
         p4.write(self.env, "dev", self.dev_rows() + [self.compare_row()])
@@ -675,6 +789,18 @@ class AnswerRunTest(GoldRetrievalTest):
         _, again = self.answer_run(transport)
         self.assertEqual(len(transport.calls), calls)
         self.assertEqual(again["status"], "complete")
+
+    def test_changed_package_requires_a_fresh_answer_run_and_estimate(self):
+        with mock.patch.object(evaluation, 'code_fingerprint', return_value={'source_sha256': 'before'}):
+            before = answers.plan_run(self.s, 'answer-finalists', 'dev', [self.k1])
+            self.assertEqual(answers.plan_run(self.s, 'answer-finalists', 'dev', [self.k1])['run_id'],
+                             before['run_id'])
+        with mock.patch.object(evaluation, 'code_fingerprint', return_value={'source_sha256': 'after'}):
+            after = answers.plan_run(self.s, 'answer-finalists', 'dev', [self.k1])
+            self.assertNotEqual(after['run_id'], before['run_id'])
+            with self.assertRaisesRegex(answers.AnswerEvalError, 'changed since the estimate'):
+                answers.recheck(self.s, before)
+            self.assertEqual(answers.recheck(self.s, after)['run_id'], after['run_id'])
 
     def assert_cost_matches_ledger(self, run_id: str, expect_partial: bool = False) -> None:
         summary = answers.finalize(self.s, run_id)
@@ -950,6 +1076,21 @@ class EvaluationScreenTest(GoldRetrievalTest):
         app = AppTest.from_string("import streamlit as st\nfrom rfp_assistant import ui\n" + body)
         app.session_state["res"], app.session_state["principal"] = self.res, auth.visitor("person-b")
         return app
+
+    def test_trace_selector_loads_only_approved_gold_with_both_document_scopes(self):
+        compare = self.compare_row()
+        pending = p4.amount_row(self.env, reviewed=False)
+        p4.write(self.env, "dev", [compare, pending])
+        self.assertEqual([r['question_id'] for r in service.dataset_rows(self.res, auth.visitor('reviewer'), 'dev')],
+                         [compare['question_id']])
+        app = self.app("ui._trace_tab(st, st.session_state.res, st.session_state.principal)\n")
+        app.run(timeout=60)
+        app.radio(key='vsource').set_value('검토된 개발 질문').run(timeout=60)
+        self.assertFalse(app.exception, [e.message for e in app.exception])
+        selector = next(s for s in app.selectbox if s.label == '개발 질문')
+        self.assertEqual(selector.options, [f"{compare['question_id']} · {compare['question'][:60]}"])
+        self.assertEqual(len(app.multiselect[0].value), 2)
+        self.assertEqual(len(self.transport.calls), 0)
 
     def test_the_tab_estimates_then_runs_a_development_evaluation_with_consent(self):
         import time

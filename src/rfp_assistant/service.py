@@ -1416,6 +1416,11 @@ def dataset_rows(res: Resources, principal: Principal, dataset: str) -> list[dic
     path = res.settings.data_dir / "datasets" / f"{dataset}.jsonl"
     if not path.exists():
         return []
+    if dataset == "dev":
+        from .evaluation import load_eval_rows
+
+        rows, _, _ = load_eval_rows(res.settings, dataset)
+        return rows
     from .store import read_jsonl
 
     return [r for r in read_jsonl(path) if r.get("reviewed_by")]

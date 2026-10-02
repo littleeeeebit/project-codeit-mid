@@ -103,6 +103,7 @@ def _finalist_identity(cfg: dict) -> dict:
 def _identity(settings: Settings, action: str, dataset: str, dataset_sha: str, population: str,
               finalists: list[dict], extra: dict | None = None) -> str:
     key = dumps({"v": ANSWER_EVAL_VERSION, "action": action, "dataset": dataset, "dataset_sha256": dataset_sha,
+                 "source_sha256": evaluation.code_fingerprint()["source_sha256"],
                  "population": population, "finalists": [_finalist_identity(f) for f in finalists],
                  "prompt": generation.PROMPT_VERSION, "model": settings.generation_model,
                  "reasoning": settings.generation_reasoning_effort,
@@ -456,7 +457,8 @@ def _answer_row(settings: Settings, pinned: PinnedResources, run_id: str, finali
         return {**base, "status": "technical", "outcome": result.status, "error": result.error}
     return {**base, "status": "done", "outcome": result.status,
             "answer": {"summary": result.summary, "claims": result.claims, "missing_fields": result.missing_fields,
-                       "conflicts": result.conflicts, "facts": result.facts, "error": result.error},
+                       "conflicts": result.conflicts, "next_action": result.next_action,
+                       "facts": result.facts, "error": result.error},
             "evidence": {eid: {k: ev.get(k) for k in ("doc_id", "source_hash", "extraction_id", "chunk_id",
                                                       "element_ids", "quote")}
                          for eid, ev in result.evidence.items()},
@@ -515,7 +517,8 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
     prefix = f"{record['finalist']}|{row['question_id']}"
     out = {"question_id": row["question_id"], "finalist": record["finalist"], "type": row["question_type"],
            "answerability": row["answerability"], "expected_status": row["expected_status"], "outcome": outcome,
-           "technical": outcome in TECHNICAL, "status_ok": outcome in evaluation.EXPECTED_STATUS[row["answerability"]],
+           "technical": outcome in TECHNICAL, "status_ok": outcome in evaluation.EXPECTED_STATUS[row["answerability"]]
+           and (outcome != "conflicting_evidence" or bool((answer.get("next_action") or "").strip())),
            "claims": [], "links": [], "answer_claims": [], "settled_micro_usd": record.get("settled_micro_usd", 0),
            "latency_ms": record.get("latency_ms"), "attempt_no": record.get("attempt_no", 1)}
     scope_docs = {s["doc_id"] for s in row.get("scope") or []}
