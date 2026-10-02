@@ -85,7 +85,7 @@ The local reviewer reported 262 tests, 0 failures/errors and 2 platform skips on
 
 ## Owner steps on the local host
 
-1. Pull, run `check --phase all --provider fake --save`. The first command migrates the ledger to schema 6 in place.
+1. Pull and run `check --phase all --provider fake --save` (it runs on a temporary data directory and never touches the ledger). With the app stopped, `backup`, migrate the ledger to schema 6 in place with `init --paid-disabled`, then `backup` and `restore-check` again. The migration ran on the owner host on 2026-10-02; see the [release report](../../docs/operations/release-report.md#live-runtime-migration-and-pilot-archive).
 2. Draft and review gold-2 rows: development on 질문 검토, sealed test in the terminal (`.wiki/gold-drafting.md`, "Phase 4 gold rows"). Validate and freeze both splits.
 3. Rerun `evaluate-retrieval --dataset dev` (D/H reuse cached vectors), compare, activate the selection with its finalist.
 4. `plan-run --action answer-finalists`, review the maximum, `run-answers` with the UI stopped; export, review and import the blind sheet.
@@ -96,7 +96,7 @@ The local reviewer reported 262 tests, 0 failures/errors and 2 platform skips on
 
 ## Open items
 
-- No real-corpus gold, answer run, sealed evaluation or latency sample exists yet (the real corpus has only been parsed, migrated in a snapshot and browsed with the fake provider, see above); every quality number above is synthetic and must not be reported as a result.
+- Every quality number in this folder is synthetic and must not be reported as a result. The real-corpus pilot (50 development and 14 sealed AI-reviewed rows, answer runs, one sealed run, a latency sample) ran in a separate pilot runtime, not the live one; its results are in the [release report](../../docs/operations/release-report.md).
 - The phase-3 host decisions (network exposure, six real browsers, warm/cold latency) remain open.
 - The package-source fingerprint hashes raw file bytes. A Windows checkout with `core.autocrlf` (`git ls-files --eol`: `i/lf w/crlf`) therefore has a different fingerprint than this Linux run (observed in review round 5: Linux `0709d966…`, Windows `5dc4b079…`), so the Linux `checks/check-all.json` is stale on that host by design. `release-report` credits only a full check saved on the host itself: run `check --phase all --provider fake --save` there before the report. Round 7 confirmed this on Windows: a check saved there binds and passes.
 - The plan's judged candidate pool is only partly implemented. The pool is the predeclared source-span labels; a returned passage outside every label grades 0 and is counted (`unlabelled@5` per row, `ndcg_pool` in the aggregate), but no blind review of those passages exists, and selection stays provisional until the review is recorded (decision 12). Before finalizing a development comparison, review the counted passages; a passage holding the fact at an unlabelled place should become a new alternative (a new gold revision), after which the runs are rescored.
