@@ -15,6 +15,11 @@
   },
   {
    "a": "README.md",
+   "b": "docs/operations/release-report.md",
+   "kind": "link"
+  },
+  {
+   "a": "README.md",
    "b": "docs/operations/runbook.md",
    "kind": "link"
   },
@@ -30,7 +35,27 @@
   },
   {
    "a": "README.md",
+   "b": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "kind": "link"
+  },
+  {
+   "a": "README.md",
    "b": "docs/rag/preprocessing.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/operations/release-report.md",
+   "b": "docs/operations/runbook.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/operations/runbook.md",
+   "b": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/operations/runbook.md",
+   "b": "docs/operations/release-report.md",
    "kind": "link"
   },
   {
@@ -275,6 +300,11 @@
   },
   {
    "a": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "b": "docs/operations/release-report.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/4-evaluation-and-release.md",
    "b": "docs/operations/runbook.md",
    "kind": "link"
   },
@@ -445,6 +475,18 @@
    "cross": true
   },
   {
+   "a": ".wiki/gold-drafting",
+   "b": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "kind": "reads",
+   "cross": true
+  },
+  {
+   "a": ".wiki/gold-drafting",
+   "b": "docs/rag/golden-dataset.md",
+   "kind": "reads",
+   "cross": true
+  },
+  {
    "a": ".wiki/rag-research",
    "b": "docs/plan/end-to-end/0-overview.md",
    "kind": "reads",
@@ -495,12 +537,12 @@
  ],
  "orphans": [],
  "counts": {
-  "docs": 25,
+  "docs": 26,
   "linked": 18,
-  "read": 7,
+  "read": 8,
   "orphans": 0,
   "pages": 2,
-  "decisions": 5,
+  "decisions": 8,
   "injectable_decisions": 1
  }
 }

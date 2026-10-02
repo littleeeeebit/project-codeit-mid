@@ -29,7 +29,7 @@ Settings resolve from the repository location, never the working directory. Opti
 
 Without `OPENAI_API_KEY` the app still runs: search, filters, evidence browsing and retrieval traces are free; paid generation reports that the provider is unavailable. `provider: "fake"` in the config file never builds a real SDK client.
 
-Answers use `gpt-6-luna` through Chat Completions with strict structured output, `reasoning_effort: low` and at most 2,000 output tokens, reasoning included. Rates are in `settings.DEFAULT_RATES`: standard tier, $0.10 input, $0.01 cached, $0.125 cache write and $0.50 output per 1M tokens. Evidence is capped at 5,000 tokens, far below the 272K long-context tier.
+Answers use `gpt-6-luna` through Chat Completions with strict structured output, `reasoning_effort: low` and a default maximum of 2,000 output tokens, reasoning included. The separately evaluated phase-4 pilot used 4,000; its results and limitations are in the [release report](docs/operations/release-report.md). Rates are in `settings.DEFAULT_RATES`: standard tier, $0.10 input, $0.01 cached, $0.125 cache write and $0.50 output per 1M tokens. Evidence is capped at 5,000 tokens, far below the 272K long-context tier.
 
 ## Commands
 
@@ -165,7 +165,7 @@ Local verification: `verification.json` lists the major flows for the local veri
 
 Paid answers run in the background on a bounded executor (6 workers, 12 admitted requests); the page polls read-only status every second and shows the reserved maximum, the settled cost or the unknown pending cost of its own request. A request is persisted under its idempotency key before it runs, so reruns and double clicks never start a second call. An answer renders only while the screen still asks exactly what it asked (same documents, question, mode and date); otherwise it stays in "내 최근 요청" as history and its billing still settles. Two selected documents allow a balanced comparison (each side retrieved within half the evidence budget, an answer that drops a side is rejected); basic information (typed CSV values with unknown/zero/conflict states) and the structured requirement list are free.
 
-Paid generation stays disabled until the owner records the project dates, the prior use, the allowance and the cap, after rechecking current model prices. The current configuration is a dedicated $5 allowance with a $5 hard cap:
+Paid generation stays disabled until the owner records the project dates, the prior use, the allowance and the cap, after rechecking current model prices. The current configuration is a dedicated $5 allowance with a $5 hard cap. The live ledger also carries the owner adjustment `external:pr8-pilot-ledger` ($0.448818, what the PR #8 pilot spent on the same account), so its spent total matches the account:
 
 ```powershell
 python -m rfp_assistant.cli configure-budget --start 2026-09-30 --end 2026-10-28 --prior-use-usd 0 --prior-use-evidence "<where the number came from>" --allowance-usd 5 --cap-usd 5 --confirm-rates --enable-paid

@@ -45,7 +45,7 @@ Every rejection page has the same structure:
 
 ## Consistency
 
-The `gold_candidates` table in `.runtime/rfp.sqlite3` is the only authority. The dataset file, the rejection pages and the index are rendered from it in the same transaction as each decision. Never edit them by hand: `gold check` compares every file byte for byte with its rendering and fails on any difference, and `gold sync` rewrites them from the database. Reviewers approve or reject on the `질문 검토` screen; a drafter cannot review its own rows.
+The `gold_candidates` table in `.runtime/rfp.sqlite3` is the only authority. The dataset file, the rejection pages and the index are rendered from it in the same transaction as each decision. Never edit them by hand: `gold check` compares every file byte for byte with its rendering and fails on any difference, and `gold sync` rewrites them from the database. Reviewers approve or reject on the `질문 검토` screen. A drafter cannot approve its own rows; it can withdraw one through rejection with a concrete note.
 
 ## Phase 4 gold rows (`dev` and the sealed `test`)
 
@@ -59,3 +59,9 @@ The phase-4 datasets use schema `gold-2` (`docs/plan/end-to-end/4-evaluation-and
 - Development rows (`--dataset dev`) are reviewed on the `질문 검토` screen. Approval requires ticking that the original was inspected; a reviewer can mark a row disputed, and a third person then records a second review in "2차 검토 대기".
 - Sealed rows (`--dataset test`) are drafted only from families assigned to `test`. Their batch files, dataset and rejection pages live under `.runtime/sealed/`, and the review screen never lists them. The owner shows and decides them in the terminal: `gold show --candidate-id <id>`, then `gold decide --candidate-id <id> --decision approve --reviewer <name> --original-inspected` (or `--decision reject --category <code> --note ...`), and `gold second-review --candidate-id <id> --reviewer <name> --agree|--disagree --note ...`. `gold excerpts` never includes sealed rows.
 - Freeze. `validate-gold --dataset dev|test` must report `ok`. Then `freeze-dataset --dataset dev|test --actor <name> --reason <why>` records the dataset, review-log and family-map hashes. A set below the per-type targets is labeled `pilot`, never `gold`.
+
+## Improving the API generator
+
+Use `gold generate` for source-bound development generation with `gpt-6-luna`; the plan and invocation contract are in [the generation procedure](../docs/rag/golden-dataset.md#rejection-guided-luna-generation). It drafts pending rows and records actual API provenance and billing. A different reviewer inspects the original and decides; do not rename the same drafting agent to bypass independence.
+
+Rejection learning must change the generator, not merely its wiki. Analyze the recurring cause, turn it into a prompt rule, add a synthetic good/bad example when useful, and enforce mechanically checkable constraints in validation. Regenerate immutable revisions with that feedback. Re-measure failure categories and first-pass acceptance after the last prompt or validation change. Never choose easier questions merely to improve retrieval scores, and never feed sealed labels or rejections into development prompts.
