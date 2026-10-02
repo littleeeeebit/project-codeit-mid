@@ -97,9 +97,10 @@ export function AskPage() {
             <form onSubmit={submit} className="space-y-4 rounded-2xl border p-5 shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <ToggleGroup type="single" value={current.id} aria-label="질문 방식" variant="outline" spacing={0}
+                             className="grid w-full auto-cols-fr grid-flow-col sm:flex sm:w-fit"
                              onValueChange={(v) => { if (v) { release(); setMode(v as Mode); } }}>
                   {modes.map((m) => (
-                    <ToggleGroupItem key={m.id} value={m.id} className="h-9 px-3 text-sm">
+                    <ToggleGroupItem key={m.id} value={m.id} className="h-auto min-h-9 flex-wrap px-2 py-1 text-sm whitespace-normal sm:h-9 sm:flex-nowrap sm:px-3 sm:py-0 sm:whitespace-nowrap">
                       {m.text}<span className={cn("ml-1.5 text-xs", m.paid ? "text-warn" : "text-ok")}>{m.paid ? "유료" : "무료"}</span>
                     </ToggleGroupItem>
                   ))}

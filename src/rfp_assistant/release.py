@@ -124,8 +124,7 @@ def backup(settings: Settings, destination: Path, actor: str) -> dict:
                 "data_dir_name": settings.data_dir.name, "db_sha256": _sha_file(db_copy),
                 "ledger": ledger_summary(db_copy), "copied": copied, "referenced": _referenced(settings, db_copy),
                 "code": evaluation.code_fingerprint(),
-                "secrets": "not included: OPENAI_API_KEY, .env and Streamlit secrets are backed up separately by "
-                           "the owner"}
+                "secrets": "not included: OPENAI_API_KEY and .env are backed up separately by the owner"}
     path = destination / "manifest.json"
     write_text_atomic(path, json.dumps(manifest, ensure_ascii=False, indent=1))
     evaluation.record_audit(settings, actor, "backup", str(destination.name), "owner backup",

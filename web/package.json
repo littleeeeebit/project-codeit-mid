@@ -6,6 +6,7 @@
     "api-types": "openapi-typescript openapi.json -o src/lib/api-schema.d.ts",
     "dev": "npm run api-types && next dev --port 8510 --hostname 127.0.0.1",
     "build": "npm run api-types && next build",
+    "postbuild": "node scripts/flatten-segments.mjs",
     "lint": "npm run api-types && eslint",
     "typecheck": "npm run api-types && tsc --noEmit"
   },

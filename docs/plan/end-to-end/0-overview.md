@@ -104,7 +104,7 @@ Metadata lookup, keyword search, requirement inventory browsing, and citation op
 | Fusion | RRF with `1 / (60 + rank)`, ranks starting at one | A frozen development comparison supports another setting |
 | Reranker | Trial local `BAAI/bge-reranker-v2-m3`; explicit bypass | Quality and warm latency gates pass on available hardware |
 | Answer generation | `gpt-4o-mini`, one Chat Completions call with strict structured output | A controlled `gpt-4.1-mini` comparison repairs measured errors affordably |
-| Frontends | Two Streamlit entry points in one application package, no login | Browser-tested requirements exceed the shared application's capabilities |
+| Frontends | One Next.js app in `web/` (질문하기, 검증, 데이터셋 만들기) over a FastAPI wrapper of `service`, served by one process, no login. Replaced the Streamlit pages on 2026-10-02 | Browser-tested requirements exceed the shared application's capabilities |
 | Observation | Persisted traces and ledger exports | Trace volume warrants Langfuse; existing proxy infrastructure makes LiteLLM practical |
 
 Dependencies and exact versions are pinned during implementation after a Windows smoke check. The smallest useful alternative remains original ingestion, scoped BM25, one grounded answer, and the ledger. Every additional component must preserve that path.
@@ -131,7 +131,7 @@ An answer attaches to the scope captured when its request began. Changing the se
 
 ### Shared resource ownership
 
-Create the SDK client and immutable index resources once through the shared service's bootstrap/resource cache, rather than on every Streamlit rerun. The service owns their lifecycle; sessions supply the typed name for attribution and the scope. Verify supported concurrent client use before sharing it; bound local reranker work to available hardware. Open and explicitly close database connections per operation, keeping transactions out of network inference.
+Create the SDK client and immutable index resources once through the shared service's bootstrap/resource cache, rather than on every request (the API's lifespan holds them). The service owns their lifecycle; sessions supply the typed name for attribution and the scope. Verify supported concurrent client use before sharing it; bound local reranker work to available hardware. Open and explicitly close database connections per operation, keeping transactions out of network inference.
 
 On controlled shutdown, stop accepting paid work, finish or persist outstanding attempt states, and close the SDK client through its owner. A crash cannot guarantee cleanup, so startup recovers unresolved reservations. Browser disconnection neither closes shared resources nor establishes a zero-cost attempt.
 

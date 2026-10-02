@@ -15,7 +15,9 @@ The service supplies WIKI_VERIFICATION_HEAD, WIKI_VERIFICATION_ENVIRONMENT, WIKI
 WIKI_VERIFICATION_BROWSER, and copies the owner's env_file to the checkout's `.env` without exporting it. The
 runner therefore reads the supported keys (CONFIG_KEYS) from `.env` first and from the process environment only
 for keys `.env` does not set; every observation names where its corpus came from. OPENAI_API_KEY is never read.
-Browser flows serve the app on RFP_VERIFY_ORIGIN (default http://127.0.0.1:8765) and drive it with Playwright
+Browser flows build the screens in web/ (`npm run build`, so the checked HEAD is what is served; needs Node and
+`npm ci` in web/), serve them with the API through one uvicorn worker on RFP_VERIFY_ORIGIN (default
+http://127.0.0.1:8765) and drive them with Playwright
 (`pip install -e .[verify]`); RFP_VERIFY_BROWSER_EXECUTABLE selects a browser binary, otherwise Playwright's
 Chromium and then the installed Chrome are tried. Under the service, a dataset flow without a configured corpus
 fails with that prerequisite named instead of silently using fixtures.
@@ -29,6 +31,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import signal
 import sqlite3
 import subprocess
@@ -76,11 +79,12 @@ class Context:
 
     # -------------------------------------------------------------- child processes
 
-    def run(self, name: str, argv: list[str], timeout: int = 1800, env: dict | None = None) -> tuple[int, str]:
+    def run(self, name: str, argv: list[str], timeout: int = 1800, env: dict | None = None,
+            cwd: Path = REPO) -> tuple[int, str]:
         log = self.work / f"{name}.log"
         started = time.monotonic()
         try:
-            proc = subprocess.run(argv, cwd=REPO, env=env or self.env, capture_output=True, text=True,
+            proc = subprocess.run(argv, cwd=cwd, env=env or self.env, capture_output=True, text=True,
                                   encoding="utf-8", errors="replace", timeout=timeout)
             code, out = proc.returncode, proc.stdout + proc.stderr
         except subprocess.TimeoutExpired as exc:
@@ -152,17 +156,23 @@ class Context:
         config.write_text(json.dumps({"provider": "fake", "fake_delay_seconds": delay}), encoding="utf-8")
         env = {**self.env, "RFP_SOURCE_DIR": corpus["source_dir"], "RFP_DATA_DIR": corpus["data_dir"],
                "RFP_CONFIG_FILE": str(config)}
+        npm = shutil.which("npm")
+        if npm is None:
+            raise RuntimeError("browser flows need Node.js: npm is not on PATH (then `npm ci` in web/)")
+        code, out = self.run("web-build", [npm, "run", "build"], 600, {**self.env, "NODE_ENV": "production"},
+                             cwd=REPO / "web")
+        if code != 0:
+            raise RuntimeError(f"`npm run build` in web/ failed (exit {code}): {out.strip()[-300:]}")
         log = (self.work / "server.log").open("w", encoding="utf-8")
         self.server = subprocess.Popen(
-            [self.python, "-B", "-m", "streamlit", "run", "app.py", f"--server.address={host}",
-             f"--server.port={port}", "--server.headless=true", "--server.fileWatcherType=none",
-             "--browser.gatherUsageStats=false"], cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT)
+            [self.python, "-B", "-m", "uvicorn", "rfp_assistant.api:app", "--host", host, "--port", port,
+             "--workers", "1"], cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT)
         deadline = time.monotonic() + 90
         while time.monotonic() < deadline:
             if self.server.poll() is not None:
                 raise RuntimeError(f"the app exited with {self.server.returncode}; see {self.work / 'server.log'}")
             try:
-                with urllib.request.urlopen(f"{origin}/_stcore/health", timeout=2) as r:
+                with urllib.request.urlopen(f"{origin}/api/info", timeout=2) as r:
                     if r.status == 200:
                         return origin
             except OSError:
@@ -217,19 +227,17 @@ class Context:
         return ok, actual
 
     def open_app(self, page, origin: str, name: str) -> tuple[bool, str]:
-        page.goto(origin + "/verify")  # the served build is shown at the foot of 검증
+        page.goto(origin + "/verify/")  # the served build is shown at the foot of 검증
         found = wait_text(page, r"빌드 ([0-9a-f]{40}|unknown)", 60000) and re.search(
-            r"빌드 ([0-9a-f]{40}|unknown)", page.locator('[data-testid="stMain"]').inner_text())
+            r"빌드 ([0-9a-f]{40}|unknown)", page.locator("body").inner_text())
         self.build_head = found.group(1) if found else "not shown"
         page.goto(origin + "/")
-        box = page.get_by_label("이름 (사용·검토 기록용)")
+        box = page.get_by_label("이름", exact=True)  # in the header bar; kept in this browser, sent as X-Member
         box.wait_for(timeout=60000)
         login = page.get_by_text("접속 토큰").count() + page.get_by_label("비밀번호").count()
         box.fill(name)
-        box.press("Enter")
-        page.wait_for_timeout(1200)
-        main = page.locator('[data-testid="stMain"]').inner_text()
-        return login == 0 and "질문" in main, f"login controls {login}; served build {self.build_head}; consultant page shown"
+        heading = page.get_by_role("heading", name="질문하기").count()
+        return login == 0 and heading == 1, f"login controls {login}; served build {self.build_head}; 질문하기 shown {heading == 1}"
 
 
 # ---------------------------------------------------------------- helpers
@@ -299,17 +307,34 @@ def rendered(page, row) -> bool:
 
 
 def pick_first_document(page) -> None:
-    """질문하기's sidebar lists documents as checkboxes labelled with their titles; askable ones come first."""
-    page.locator('section[data-testid="stSidebar"] [data-testid="stCheckbox"]').first.click()
+    """질문하기's left column lists documents as checkboxes labelled with their titles; askable ones come first."""
+    box = page.get_by_role("checkbox").first
+    box.wait_for(timeout=60000)
+    box.click()
 
 
-def evidence_heading(page):
-    return page.get_by_role("heading", name="근거 E1", exact=True)
+def current_answer(page):
+    """The answer of the request this screen owns (the history renders its own answers separately)."""
+    return page.get_by_role("region", name="답변", exact=True)
 
 
-def evidence_opened(page, timeout_ms: int) -> bool:
+CHIP = re.compile(r"^근거 (E\d+) 원문 보기$")  # a claim's citation chip (aria-label)
+
+
+def open_evidence(scope, page, which: int = -1) -> tuple[str, bool]:
+    """Clicks one citation chip inside `scope` (the last by default: the first is already open) and returns its
+    evidence ID and whether the quote pane of that answer then shows exactly that evidence."""
+    chip = scope.get_by_role("button", name=CHIP).nth(which)
+    chip.wait_for(timeout=30000)
+    evidence_id = CHIP.match(chip.get_attribute("aria-label")).group(1)
+    chip.click()
+    return evidence_id, evidence_opened(scope, evidence_id, 15000)
+
+
+def evidence_opened(scope, evidence_id: str, timeout_ms: int) -> bool:
     try:
-        evidence_heading(page).first.wait_for(timeout=timeout_ms)
+        scope.get_by_role("complementary", name="근거", exact=True).get_by_text(f"근거 {evidence_id}", exact=True).first.wait_for(
+            timeout=timeout_ms)
         return True
     except Exception:  # noqa: BLE001
         return False
@@ -323,10 +348,21 @@ def wait_text(page, pattern: str, timeout_ms: int = 60000) -> bool:
         return False
 
 
+SUBMIT = re.compile(r"^답변 받기 · 유료 1회$")
+
+
 def ask(page, question: str) -> None:
-    page.get_by_role("textbox", name="질문").wait_for(timeout=30000)
-    page.get_by_role("textbox", name="질문").fill(question)
-    page.get_by_role("button", name=re.compile("근거 기반 답변 받기")).click()
+    box = page.get_by_role("textbox", name="질문", exact=True)
+    box.wait_for(timeout=30000)
+    expect_enabled(page.get_by_role("button", name=SUBMIT))  # the previous request has finished
+    box.fill(question)
+    page.get_by_role("button", name=SUBMIT).click()
+
+
+def expect_enabled(locator, timeout_ms: int = 60000) -> None:
+    deadline = time.monotonic() + timeout_ms / 1000
+    while locator.is_disabled() and time.monotonic() < deadline:
+        time.sleep(0.2)
 
 
 def ask_and_wait(page, data_dir: str, member: str, question: str) -> sqlite3.Row | None:
@@ -455,8 +491,15 @@ def repository_gates(ctx: Context) -> dict:
     code, out = ctx.cli("phase4-gate", ["check", "--phase", "4", "--provider", "fake"])
     gate4 = (code == 0, unittest_summary(out, code))
     code, out = ctx.run("full-suite", [ctx.python, "-B", "-m", "unittest", "discover", "-s", "tests", "-t", "."])
-    return {"whitespace": whitespace, "phase3-gate": gate, "phase4-gate": gate4,
-            "full-suite": (code == 0, unittest_summary(out, code))}
+    suite = (code == 0, unittest_summary(out, code))
+    npm = shutil.which("npm")
+    web = []
+    for script in ("lint", "typecheck"):
+        code, out = ctx.run(f"web-{script}", [npm, "run", script], 600, cwd=REPO / "web") if npm else (-1, "")
+        web.append(f"{script} exit {code}" + (f": {out.strip()[-200:]}" if code else ""))
+    checks = (bool(npm) and all(w.endswith("exit 0") for w in web), "; ".join(web) if npm else "npm is not on PATH")
+    return {"whitespace": whitespace, "phase3-gate": gate, "phase4-gate": gate4, "full-suite": suite,
+            "web-checks": checks}
 
 
 @flow("evaluation-release")
@@ -513,14 +556,15 @@ def consultant_answer(ctx: Context) -> dict:
         out["grounded-answer"] = ctx.act("select the first document and ask", "a settled grounded answer", answer)
 
         def evidence():
-            page.get_by_role("button", name="근거 E1").first.click()
-            opened = evidence_opened(page, 15000)
-            return opened, f"evidence panel {'opened' if opened else 'did not open'} after one click"
-        out["evidence-first-click"] = ctx.act("click 근거 E1 once", "the evidence panel opens", evidence)
+            evidence_id, opened = open_evidence(current_answer(page), page)
+            return opened, f"quote pane {'shows' if opened else 'does not show'} 근거 {evidence_id} after one click"
+        out["evidence-first-click"] = ctx.act("click a citation chip once", "the quote pane shows that evidence",
+                                              evidence)
 
         def download():
             with page.expect_download(timeout=30000) as info:
-                page.get_by_role("button", name="이 근거의 원문 파일 받기").first.click()
+                current_answer(page).get_by_role("complementary", name="근거", exact=True).get_by_role(
+                    "link", name="원문 파일 받기").click()
             path = ctx.work / "download.bin"
             info.value.save_as(path)
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -544,26 +588,27 @@ def request_history(ctx: Context) -> dict:
             pick_first_document(page)
             for _ in range(2):
                 ask_and_wait(page, corpus["data_dir"], member, corpus["question"])
-            page.get_by_text("내 최근 요청").click()
-            page.wait_for_timeout(800)
-            page.locator('[data-testid="stExpander"] [data-testid="stSelectbox"]').last.click()
-            options = page.get_by_role("option").all_inner_texts()
+            page.get_by_role("button", name="내 최근 요청").click()
+            entries = page.get_by_role("button", name=re.compile(r"요청 [0-9a-f]{8} · "))
+            entries.first.wait_for(timeout=30000)
+            options = entries.all_inner_texts()
             rows = member_requests(corpus["data_dir"], member)
             ids = {r["request_id"][:8] for r in rows}
-            shown = {i for i in ids if any(i in o for o in options)}
-            return len(rows) == 2 and shown == ids, f"{len(rows)} requests stored; {len(options)} history options: {options}"
+            shown = {i for i in ids if sum(i in o for o in options) == 1}
+            return len(rows) == 2 and shown == ids, f"{len(rows)} requests stored; {len(options)} history entries: {options}"
         out = {"separate-requests": ctx.act("submit the same question twice and open the history",
-                                            "two separate history choices", twice)}
+                                            "two separate history entries", twice)}
 
         def older_evidence():
             rows = member_requests(corpus["data_dir"], member)
-            page.get_by_role("option", name=re.compile(rows[0]["request_id"][:8])).click()
-            page.wait_for_timeout(1500)
-            expander = page.locator('[data-testid="stExpander"]').filter(has_text="내 최근 요청")
-            expander.get_by_role("button", name="근거 E1").first.click()
-            opened = evidence_opened(page, 15000)
-            panels = evidence_heading(page).count()
-            return opened, f"older request {rows[0]['request_id'][:8]} selected; evidence panels shown {panels} after one click"
+            older = rows[0]["request_id"][:8]
+            entry = page.get_by_role("button", name=re.compile(f"요청 {older} · "))
+            entry.click()
+            item = entry.locator("xpath=..")  # the entry and the answer it opens share one box
+            evidence_id, opened = open_evidence(item, page)
+            panes = page.get_by_role("complementary", name="근거", exact=True).count()
+            return opened, (f"older request {older} opened; its pane shows 근거 {evidence_id} after one click "
+                            f"({panes} quote panes on the page)")
         out["history-evidence-first-click"] = ctx.act("open the older request's evidence once",
                                                       "its evidence opens", older_evidence)
         return out
@@ -578,15 +623,14 @@ def verifier_generation(ctx: Context) -> dict:
         ctx.act("open the app and type a name", "consultant page", lambda: ctx.open_app(page, origin, member))
 
         def freeze():
+            with urllib.request.urlopen(f"{origin}/api/verify/trace-sources", timeout=30) as r:
+                title = json.loads(r.read())["documents"][0]["title"]  # what the form offers first
             page.get_by_role("link", name="검증").click()
-            page.get_by_role("heading", name="검색 추적").wait_for(timeout=30000)
-            page.get_by_role("textbox", name="질문").fill(corpus["question"])
-            page.get_by_role("textbox", name="질문").press("Enter")
-            page.locator('[data-testid="stMultiSelect"]').first.click()
-            page.get_by_role("option").first.click()
-            page.keyboard.press("Escape")
-            page.get_by_role("heading", name="검색 추적").click()  # an open dropdown takes the next click
-            page.get_by_role("button", name="검색만 실행 (무료)").click()
+            page.get_by_role("button", name=re.compile("^검색 추적")).click()  # the left menu
+            page.get_by_role("textbox", name="질문", exact=True).fill(corpus["question"])
+            page.get_by_label(re.compile(r"^문서 \(최대 2개")).fill(title[:20])
+            page.get_by_role("button", name=re.compile(re.escape(title[:20]))).first.click()
+            page.get_by_role("button", name="검색만 실행 · 무료").click()
             shown = wait_text(page, r"실행 vr-", 60000)
             runs = db_rows(corpus["data_dir"], "SELECT run_id, trace_json FROM verifier_runs WHERE member_id = ?",
                            (member,))
@@ -598,9 +642,10 @@ def verifier_generation(ctx: Context) -> dict:
         def generate():
             run = db_rows(corpus["data_dir"], "SELECT run_id, trace_json FROM verifier_runs WHERE member_id = ? "
                                               "ORDER BY created_at DESC LIMIT 1", (member,))[0]
-            page.get_by_text(re.compile("유료 답변 생성을 1회 실행")).click()  # Streamlit hides the input itself
-            page.wait_for_timeout(800)
-            page.get_by_role("button", name="유료 답변 생성").click()
+            button = page.get_by_role("button", name="유료 답변 생성", exact=True)
+            disabled_before = button.is_disabled()  # no consent yet
+            page.get_by_label("이 범위로 유료 답변 생성을 1회 실행합니다").check()
+            button.click()
             key = f"vgen-{run['run_id']}"
             done = wait_request(corpus["data_dir"], "r.idempotency_key = ?", (key,))  # this request, not page text
             shown = rendered(page, done) if done else False
@@ -609,9 +654,10 @@ def verifier_generation(ctx: Context) -> dict:
                                (req[0]["request_id"],)) if req else []
             maximum = json.loads(run["trace_json"])["estimate_micro_usd"]
             reserved = sum(a["reserved_micro_usd"] for a in attempts)
-            ok = bool(shown and req and req[0]["status"] == "completed" and [a["stage"] for a in attempts] == ["generation"]
-                      and maximum is not None and reserved <= maximum)
-            return ok, (f"request {req[0]['status'] if req else None}; rendered {shown}; attempts "
+            ok = bool(disabled_before and shown and req and req[0]["status"] == "completed"
+                      and [a["stage"] for a in attempts] == ["generation"] and maximum is not None and reserved <= maximum)
+            return ok, (f"button disabled before consent {disabled_before}; request {req[0]['status'] if req else None}; "
+                        f"rendered {shown}; attempts "
                         f"{[(a['stage'], a['state']) for a in attempts]}; reserved {reserved} µUSD of max {maximum}")
         out["generation-within-consent"] = ctx.act("consent and generate from the frozen run",
                                                    "one generation attempt within the displayed maximum", generate)
@@ -620,8 +666,9 @@ def verifier_generation(ctx: Context) -> dict:
 
 
 def shared_pending(page) -> float | None:
-    """The reservation shown in the budget row under the menu."""
-    found = re.search(r"진행 중 예약 \$([0-9.,]+)", page.locator('[data-testid="stMain"]').inner_text())
+    """The reservation the header's shared-usage meter carries (its hover text)."""
+    meter = page.locator('[title^="진행 중 예약"]')
+    found = re.search(r"진행 중 예약 \$([0-9.,]+)", meter.first.get_attribute("title") or "") if meter.count() else None
     return float(found.group(1).replace(",", "")) if found else None
 
 
@@ -648,7 +695,7 @@ def six_sessions(ctx: Context) -> dict:
 
         def watch():
             started = time.monotonic()
-            pages[0].get_by_role("button", name=re.compile("근거 기반 답변 받기")).click()
+            pages[0].get_by_role("button", name=SUBMIT).click()
             seen = None
             while time.monotonic() - started < 10 and seen is None:
                 value = shared_pending(pages[5])
@@ -662,7 +709,7 @@ def six_sessions(ctx: Context) -> dict:
 
         def all_submit():
             for page in pages[1:]:
-                page.get_by_role("button", name=re.compile("근거 기반 답변 받기")).click()
+                page.get_by_role("button", name=SUBMIT).click()
             rows = [wait_request(corpus["data_dir"], "r.member_id = ?", (m,), 180) for m in members]
             per = db_rows(corpus["data_dir"], "SELECT r.member_id, COUNT(a.attempt_id) AS n, "
                           "SUM(a.state IN ('reserved', 'dispatching')) AS open, SUM(a.member_id != r.member_id) AS foreign_ "
@@ -728,14 +775,14 @@ def cap_exhaustion(ctx: Context) -> dict:
         def free_and_polling():
             count = attempt_count(data)
             with consultant.expect_download(timeout=30000) as info:
-                consultant.get_by_role("button", name="원문 파일 받기").first.click()
+                consultant.get_by_role("link", name="원문 파일 받기").first.click()
             path = ctx.work / "cap-download.bin"
             info.value.save_as(path)
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             managed = bool(db_rows(data, "SELECT 1 FROM documents WHERE active_source_hash = ?", (digest,)))
             consultant.wait_for_timeout(6000)  # several budget and request polling intervals
             consultant.reload()
-            consultant.get_by_label("이름 (사용·검토 기록용)").wait_for(timeout=60000)
+            consultant.get_by_label("이름", exact=True).wait_for(timeout=60000)
             consultant.wait_for_timeout(4000)
             after = attempt_count(data)
             return managed and after == count, (f"original downloaded ({path.stat().st_size} bytes, managed {managed}); "
@@ -751,19 +798,22 @@ FOCUS_JS = """async () => {
   const chain = []; for (let x = e, i = 0; x && i < 5; x = x.parentElement, i++) chain.push(x);
   const look = () => chain.map(x => { const c = getComputedStyle(x);
     return [c.outlineStyle, c.outlineWidth, c.outlineColor, c.boxShadow, c.borderColor, c.backgroundColor].join('|'); }).join('/');
-  // Some widgets (BaseWeb inputs) restyle on focus/blur events through React state: let them re-render.
+  // Some widgets restyle on focus/blur events through React state: let them re-render.
   const settle = () => new Promise(r => setTimeout(r, 120));
   const focused = look(); e.blur(); await settle(); const plain = look(); e.focus(); await settle();
-  const label = e.closest('label');
+  const label = e.closest('label') || (e.labels && e.labels[0]);
   const name = (e.getAttribute('aria-label') || (label && label.innerText) || e.innerText || e.placeholder || '').trim();
-  return {tag: e.tagName, type: e.type || '', name: name.slice(0, 40), ring: focused !== plain};
+  return {tag: e.tagName, role: e.getAttribute('role') || '', name: name.slice(0, 40), ring: focused !== plain};
 }"""
 
 CONTRAST_JS = """() => {
-  const lum = c => { const v = c.match(/[\\d.]+/g).slice(0, 3).map(Number).map(x => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
-  const bg = el => { for (let x = el; x; x = x.parentElement) { const c = getComputedStyle(x).backgroundColor; const a = c.match(/[\\d.]+/g); if (a && (a.length < 4 || Number(a[3]) > 0.5)) return c; } return 'rgb(255,255,255)'; };
+  // Computed colours may be oklch(), lab() or carry alpha: paint one pixel to read them back as sRGB bytes.
+  const ctx = document.createElement('canvas').getContext('2d', {willReadFrequently: true});
+  const rgba = c => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data]; };
+  const lum = c => { const v = rgba(c).slice(0, 3).map(x => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+  const bg = el => { for (let x = el; x; x = x.parentElement) { const c = getComputedStyle(x).backgroundColor; if (rgba(c)[3] > 128) return c; } return 'rgb(255,255,255)'; };
   const out = [];
-  for (const el of document.querySelectorAll('[data-testid="stMain"] *, [data-testid="stSidebar"] *')) {
+  for (const el of document.querySelectorAll('body *')) {
     const own = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
     if (!own || !el.offsetParent) continue;
     const s = getComputedStyle(el); if (s.visibility === 'hidden' || Number(s.opacity) < 0.5) continue;
@@ -795,8 +845,8 @@ def accessibility(ctx: Context) -> dict:
         def keyboard():
             # Styles are compared focused vs. unfocused; transitions would report a value mid-animation.
             page.add_style_tag(content="*, *::before, *::after { transition: none !important; }")
-            page.get_by_label("검색어").focus()  # the sidebar precedes the page in tab order
-            pick = tab_to(lambda i: i["type"] == "checkbox")
+            page.get_by_label("검색어").focus()  # the document column precedes the question form in tab order
+            pick = tab_to(lambda i: i["role"] == "checkbox")
             if pick:
                 page.keyboard.press("Space")
                 page.wait_for_timeout(1500)
@@ -804,16 +854,17 @@ def accessibility(ctx: Context) -> dict:
             if box:
                 page.keyboard.type(corpus["question"])
             known = [r["request_id"] for r in member_requests(corpus["data_dir"], member)]
-            submit = tab_to(lambda i: i["tag"] == "BUTTON" and "답변 받기" in i["name"])
+            submit = tab_to(lambda i: i["tag"] == "BUTTON" and SUBMIT.match(i["name"]))
             if submit:
                 page.keyboard.press("Enter")
             row = wait_request(corpus["data_dir"], "r.member_id = ?", (member,), 120) if submit else None
             new = bool(row and row["request_id"] not in known)
             opened = False
             if new and rendered(page, row):
-                if tab_to(lambda i: i["tag"] == "BUTTON" and i["name"] == "근거 E1"):
+                chip = tab_to(lambda i: i["tag"] == "BUTTON" and CHIP.match(i["name"]))
+                if chip:
                     page.keyboard.press("Enter")
-                    opened = evidence_opened(page, 15000)
+                    opened = evidence_opened(current_answer(page), CHIP.match(chip["name"]).group(1), 15000)
             return bool(pick and box and submit and new and opened), (
                 f"document selected {bool(pick)}; question typed {bool(box)}; submitted {bool(submit)}; "
                 f"request {row['status'] if row else None}; evidence opened {opened}; {len(focused)} Tab stops")
@@ -825,21 +876,38 @@ def accessibility(ctx: Context) -> dict:
             return bool(controls) and not missing, f"{len(controls)} focused controls; without a visible ring: {missing[:8]}"
         ring = ctx.act("inspect every keyboard focus stop", "a visible focus indicator", rings)
 
+        others = ctx.page(browser, origin)  # 검증 and 데이터셋 만들기, beside the answered 질문하기
+
+        def open_other(path: str):
+            others.goto(origin + path)
+            others.wait_for_load_state("networkidle")
+            others.wait_for_timeout(800)
+            return others
+
         def contrast():
-            items = page.evaluate(CONTRAST_JS)
+            pages = {"질문하기": page.evaluate(CONTRAST_JS)}
+            for name, path in (("검증", "/verify/"), ("데이터셋 만들기", "/dataset/")):
+                pages[name] = open_other(path).evaluate(CONTRAST_JS)
+            items = [i for v in pages.values() for i in v]
             low = sorted((i for i in items if i["ratio"] < 4.5), key=lambda i: i["ratio"])
-            return bool(items) and not low, (f"{len(items)} text elements; minimum ratio "
-                                              f"{min((i['ratio'] for i in items), default=None)}; below 4.5: "
-                                              f"{[(i['text'], i['ratio']) for i in low[:6]]}")
-        readable = ctx.act("measure text contrast", "every text at least 4.5:1", contrast)
+            return all(pages.values()) and not low, (
+                "; ".join(f"{k} {len(v)} texts" for k, v in pages.items()) + f"; minimum ratio "
+                f"{min((i['ratio'] for i in items), default=None)}; below 4.5: {[(i['text'], i['ratio']) for i in low[:6]]}")
+        readable = ctx.act("measure text contrast on the three pages", "every text at least 4.5:1", contrast)
 
         def narrow():
+            width = lambda p: p.evaluate("() => [document.documentElement.scrollWidth, window.innerWidth]")  # noqa: E731
             page.set_viewport_size({"width": 390, "height": 844})
+            others.set_viewport_size({"width": 390, "height": 844})
             page.wait_for_timeout(1500)
-            width = page.evaluate("() => [document.documentElement.scrollWidth, window.innerWidth]")
+            widths = {"질문하기": width(page)}
+            for name, path in (("검증", "/verify/"), ("데이터셋 만들기", "/dataset/")):
+                widths[name] = width(open_other(path))
             status = page.get_by_text(re.compile(r"^(답변|근거 부족|확인 필요|근거 충돌|기술 오류.*)$")).count()
-            return width[0] <= width[1] and status > 0, f"scroll width {width[0]} for a {width[1]} px viewport; status labels in text {status}"
-        layout = ctx.act("narrow the viewport to 390 px", "no horizontal scroll and text status", narrow)
+            return all(w[0] <= w[1] for w in widths.values()) and status > 0, (
+                "; ".join(f"{k} scroll width {w[0]} for {w[1]} px" for k, w in widths.items())
+                + f"; status labels in text {status}")
+        layout = ctx.act("narrow the three pages to 390 px", "no horizontal scroll and text status", narrow)
         return {"keyboard-only": keys, "focus-visible": ring, "contrast": readable, "narrow-layout": layout}
     return with_browser(ctx, body)
 

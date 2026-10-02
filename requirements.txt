@@ -15,9 +15,7 @@ openai==3.22.1
 tiktoken==0.14.0
 numpy==2.5.3
 
-# Interfaces
-streamlit==1.64.0
-# HTTP API for the Next.js app in web/ (httpx drives FastAPI's TestClient in tests/test_api.py)
+# HTTP API that also serves the built Next.js app in web/ (httpx drives FastAPI's TestClient in the tests)
 fastapi==0.142.2
 uvicorn==0.54.0
 httpx==0.28.1

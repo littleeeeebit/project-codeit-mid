@@ -1,8 +1,8 @@
 """Frozen verifier runs on an isolated corpus copy (prepared by tools/verify.py) generate from exactly their evidence.
 
 For the configured HWP and PDF: a single-document run, a two-document run and a two-document `whitespace_bm25`
-run limited to 2 evidence units. Each is frozen with `verifier_trace`, then generated through the verifier page's
-consent checkbox and button (Streamlit AppTest) with the fake provider. Expected for each: same retrieval mode,
+run limited to 2 evidence units. Each is frozen with `verifier_trace`, then generated through the route the 검증
+page's paid button calls (POST /api/verify/traces/{run_id}/generate) with the fake provider. Expected for each: same retrieval mode,
 same `(doc_id, extraction_id, element_ids)` and quotes, same input-token estimate, a single generation attempt
 whose reservation equals the displayed maximum, and no query embedding. Writes verifier runs and fake ledger rows
 into the declared copy only. Writes `<run_dir>/real-corpus-frozen.json`; exit 0 only when every case passes.
@@ -18,31 +18,26 @@ import time
 from datetime import date
 from pathlib import Path
 
-from streamlit.testing.v1 import AppTest
+from fastapi.testclient import TestClient
 
-from rfp_assistant import auth, service, store
+from rfp_assistant import api, auth, service, store
 from rfp_assistant.contracts import DocRef
 from rfp_assistant.settings import load_settings
 
-APP = ("import streamlit as st\nfrom rfp_assistant import ui\n"
-       "ui._render_run(st, st.session_state.res, st.session_state.principal, st.session_state.run)\n")
+MEMBER = "verification-runner"
 
 
 def evidence(run: dict) -> list:
     return [(e["doc_id"], e["extraction_id"], e["element_ids"], e["quote"]) for e in run["retrieval"]["evidence"]]
 
 
-def case(res, principal, name: str, refs: list[DocRef], question: str, **options) -> dict:
+def case(res, client, principal, name: str, refs: list[DocRef], question: str, **options) -> dict:
     frozen = service.verifier_run(res, principal, service.verifier_trace(
         res, principal, question, refs, date.today().isoformat(), **options)["run_id"])
-    app = AppTest.from_string(APP)
-    app.session_state["res"], app.session_state["principal"], app.session_state["run"] = res, principal, frozen
-    app.run(timeout=60)
-    app.checkbox[0].check().run(timeout=60)
-    next(b for b in app.button if b.key == f"vbtn-{frozen['run_id']}").click().run(timeout=60)
-    errors = [e.message for e in app.exception]
-    rid = app.session_state[f"vgen-{frozen['run_id']}"] if not errors else None
-    out = {"case": name, "run_id": frozen["run_id"], "request_id": rid, "ui_errors": errors,
+    r = client.post(f"/api/verify/traces/{frozen['run_id']}/generate")
+    errors = [] if r.status_code == 200 else [f"{r.status_code} {r.text}"]
+    rid = None if errors else r.json()["request_id"]
+    out = {"case": name, "run_id": frozen["run_id"], "request_id": rid, "http_errors": errors,
            "frozen_mode": frozen["retrieval"]["mode"], "coverage": frozen.get("coverage")}
     if rid is None:
         return {**out, "passed": False}
@@ -76,7 +71,9 @@ def main(run_dir: Path) -> int:
         return 2
     settings = load_settings(source_dir=Path(rc["source_dir"]), data_dir=Path(rc["data_dir"]), provider="fake")
     res = service.Resources(settings, recover=True)
-    principal = auth.visitor("verification-runner")
+    principal = auth.visitor(MEMBER)
+    client = TestClient(api.create_app(res), headers={"X-Member": MEMBER})
+    client.__enter__()  # runs the lifespan, which hands `res` to the routes (and leaves closing it to us)
     try:
         serving = {k: v for k, v in res.serving().items() if k in ("run_id", "mode", "index_version", "dense_version")}
         with store.open_db(settings.db_path) as conn:
@@ -88,11 +85,12 @@ def main(run_dir: Path) -> int:
                     raise SystemExit(f"{key} {rc[key]} is not in the copy's database")
                 refs[key] = DocRef(rc[key], row[0])
         q, hwp, pdf = rc["question"], refs["hwp_doc_id"], refs["pdf_doc_id"]
-        results = [case(res, principal, "hwp_single", [hwp], q),
-                   case(res, principal, "pair", [hwp, pdf], q),
-                   case(res, principal, "pair_whitespace_units_2", [hwp, pdf], q, mode="whitespace_bm25",
+        results = [case(res, client, principal, "hwp_single", [hwp], q),
+                   case(res, client, principal, "pair", [hwp, pdf], q),
+                   case(res, client, principal, "pair_whitespace_units_2", [hwp, pdf], q, mode="whitespace_bm25",
                         limits={"evidence_max_units": 2})]
     finally:
+        client.__exit__(None, None, None)
         res.close()
     report = {"serving": serving, "cases": results, "passed": all(r["passed"] for r in results)}
     (run_dir / "real-corpus-frozen.json").write_text(json.dumps(report, ensure_ascii=False, indent=1),

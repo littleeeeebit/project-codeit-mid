@@ -8,29 +8,33 @@ Run the commands with the project environment's interpreter from any directory. 
 
 - One process owns `RFP_DATA_DIR` at a time. The serving app and every paid CLI job take `gateway.lock` there. A second owner is refused with `GatewayLockError`. Stop the UI before paid maintenance (`build-dense`, `evaluate-retrieval --allow-paid-queries`).
 - The ledger, requests, audit events and corrections all live in `rfp.sqlite3` on a local disk. A network share is outside the contract.
-- The operational config (`RFP_CONFIG_FILE`) holds no secrets. `OPENAI_API_KEY` stays in the server environment, `.env` or Streamlit secrets.
+- The operational config (`RFP_CONFIG_FILE`) holds no secrets. `OPENAI_API_KEY` stays in the server environment or `.env`.
 
 ## 2. Access: no login
 
-There is no login (owner decision 2026-09-30, reaffirmed for phase 3 on 2026-10-01). Every visitor gets every page: 질문하기, 검증 and 데이터셋 만들기. The name typed under the menu (default `owner`) is recorded on requests, attempts, reviews and corrections. Budget administration is owner CLI only (section 5); its `--actor` is recorded on audit events.
+There is no login (owner decision 2026-09-30, reaffirmed for phase 3 on 2026-10-01). Every visitor gets every page: 질문하기, 검증 and 데이터셋 만들기. The name typed in the header's 이름 field (default `owner`) is recorded on requests, attempts, reviews and corrections. Budget administration is owner CLI only (section 5); its `--actor` is recorded on audit events.
 
 - Attribution, not authentication. Per-member spend (`budget-status`) is only as accurate as the names people type. Ask each member to use one consistent name.
 - Network reach is the access control. Anyone who can open the page can spend the allowance. Admin actions run from the owner's terminal, require a reason and leave an audit event; there is still no bulk release of unknown billing.
 - Sealed test rows are never served to the 검증 or 데이터셋 만들기 pages. Only the phase-4 freeze procedure, run by the owner from the CLI, reads `sealed/`.
-- A browser reload resets the typed name to `owner`; retype it. Running requests still settle on the server, and the reloaded page shows them under "내 최근 요청" for that name.
+- The typed name is kept in that browser (local storage) and sent with every call as the `X-Member` header. Another browser or a cleared storage starts at `owner`; retype it. Running requests still settle on the server, and a reloaded page shows them under "내 최근 요청" for that name.
 
 ## 3. Launch
 
 Local development and single-host use:
 
 ```powershell
-python -m streamlit run app.py --server.address 127.0.0.1
+cd web; npm ci; npm run build; cd ..        # once per checkout or screen change: writes web/out
+python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
+
+The API serves the built screens from `web/out` and the routes under `/api/`, so members need only this one port.
+Never run more than one worker: the process owns the request executor and `gateway.lock`.
 
 Team access is an **owner decision**. No host, tunnel or network has been configured or verified by this phase. Because there is no login, binding to `0.0.0.0` exposes spending and administration to everyone on that network. Choose deliberately:
 
-- Keep Streamlit on `127.0.0.1` and give members an encrypted path to it. Examples: an SSH local forward (`ssh -L 8501:127.0.0.1:8501 <owner-host>`), or an existing organization VPN.
-- Bind to a trusted team network only (`--server.address <team-network address>`) when every person on that network may spend the allowance.
+- Keep the server on `127.0.0.1` and give members an encrypted path to it. Examples: an SSH local forward (`ssh -L 8501:127.0.0.1:8501 <owner-host>`), or an existing organization VPN.
+- Bind to a trusted team network only (`--host <team-network address>`) when every person on that network may spend the allowance.
 
 Record the chosen host and who can reach it in the phase-3 report (`report --phase 3`) once it exists.
 
@@ -40,14 +44,14 @@ Paid generation stays disabled until `configure-budget` records the dates, prior
 
 - Paid answers run on a process-owned executor with 6 workers and at most 12 admitted unfinished requests (`request_workers`, `request_admission`). A full queue is refused before any paid work.
 - Re-submitting the same request (a rerun, a double click) returns the same request. The same key with a different question is refused.
-- Controlled stop: stop Streamlit with Ctrl+C (SIGINT/SIGTERM). The resource owner then:
+- Controlled stop: stop the server with Ctrl+C (SIGINT/SIGTERM). The resource owner then:
   1. stops accepting work;
   2. waits up to `shutdown_wait_seconds` (20 s) for running workers;
   3. marks queued and unfinished requests `interrupted`;
   4. closes the SDK client and releases the lock.
 - A worker still inside a provider call keeps its attempt `dispatching`. That attempt becomes `unknown` at the next start.
 - A worker that has not yet dispatched never starts a new paid stage once stop begins. That covers query embedding and generation, even after its retrieval finishes. The stop check and the `dispatching` marker share one ledger transaction. Such a request ends `interrupted`, and its reservation, if any, is released.
-- The stop starts from the interpreter's exit as soon as Streamlit's signal handler ends the server. It runs before the executor waits for its workers, so a running request stops at its next paid stage instead of finishing first.
+- The stop starts when uvicorn's signal handler ends the server: the API's lifespan shutdown closes the resource owner, and an exit hook covers an interpreter exit without it. Both run before the executor waits for its workers, so a running request stops at its next paid stage instead of finishing first.
 - Verifier generation: the 검증 page's paid button generates from the frozen run's own evidence and 기준일 (`verifier_run_id`). It never retrieves again, so a query-vector cache miss cannot switch it to hybrid and no query embedding is paid. The reservation never exceeds the displayed maximum. The maximum is passed into the atomic admission, so even a rate change between estimate and reservation refuses the request (`above_consented_maximum`) without a call. If the index, serving run, prompt or model changed since the run was frozen, the button is withheld and the service refuses the run. Make a new run instead. Page traces run at the settings' evidence limits; limit experiments go through `evaluate-retrieval`.
 - Restart: the next owner recovers conservatively and never replays anything:
   - queued and running requests become `interrupted`;
@@ -85,13 +89,13 @@ An `unknown` attempt holds its full reservation until evidence arrives. There is
    The adjustment is the provider total minus local settled cost for the same interval. Covered attempts must be `unknown` and dispatched inside the interval; they move to `reconciled`. Re-importing the same record is harmless. The same ID with a different total is refused, so a changed provider total needs an owner correction. Late usage for a covered attempt settles it and adds one compensating negative adjustment (`late-settlement:<attempt>`).
 3. Spend outside the gateway (a notebook, a direct key): record it on the admin page under 외부 사용 조정, with a unique key, the amount, evidence and a reason. A key cannot be applied twice.
 
-If the provider's billing scope or owner export is unavailable, keep the attempts `unknown`. The sidebar then shows the unknown amount and the last reconciliation time, so nobody mistakes local estimates for provider credit.
+If the provider's billing scope or owner export is unavailable, keep the attempts `unknown`. The header then warns about the unknown amount, so nobody mistakes local estimates for provider credit.
 
 Freeze. If a settled cost ever exceeds its reservation, new paid work freezes. Inspect token counting and rates first. Then resume on the admin page (유료 호출 상태, with a reason) or with `configure-budget`.
 
 ## 6. Cap and pacing
 
-- Sidebar warnings: the highest of 50 %, 75 % and 90 % of the operational cap (spent plus pending), "ahead of pace" when committed spend exceeds the linear share of the project dates, and unknown billing. The $20 percentage is shown separately from these cap warnings.
+- Header warnings: the highest of 50 %, 75 % and 90 % of the operational cap (spent plus pending), "ahead of pace" when committed spend exceeds the linear share of the project dates, and unknown billing. The $20 percentage is shown separately from these cap warnings.
 - At the cap: paid answers are refused before dispatch. Search, filters, basic information, requirement lists, evidence and original downloads keep working.
 - Polling: the budget strip polls every 2 s and the request panel every 1 s. Both are read-only; refreshes and polling never dispatch a call.
 
@@ -110,7 +114,7 @@ python -m rfp_assistant.cli check --phase all --provider fake --save # every tes
 
 ## 8. Managed verification
 
-`verification.json` is the manifest for the local verification service (`wiki-agent/local-verification`). It lists the committed contracts, the prose documents, and every major flow. Each flow has a kind (`command` or `browser`), one command, the impacted paths, the environments it uses, and the assertions it must observe. Each flow command is `python -B tools/verify.py <flow-id>`. Its last output is exactly one `local-evidence` block: the head, flow, `environment_id`, `test_scope`, and one observation per assertion (`id`, the exact `expected`, the observed `actual`, `pass`). Browser flows also record the requests sent to the served origin, the browser tool, the build head read from the served app's sidebar (`빌드 <sha>`), and the browser actions.
+`verification.json` is the manifest for the local verification service (`wiki-agent/local-verification`). It lists the committed contracts, the prose documents, and every major flow. Each flow has a kind (`command` or `browser`), one command, the impacted paths, the environments it uses, and the assertions it must observe. Each flow command is `python -B tools/verify.py <flow-id>`. Its last output is exactly one `local-evidence` block: the head, flow, `environment_id`, `test_scope`, and one observation per assertion (`id`, the exact `expected`, the observed `actual`, `pass`). Browser flows also record the requests sent to the served origin, the browser tool, the build head read from the foot of the served 검증 page (`빌드 <sha>`), and the browser actions. Browser flows build `web/` first (`npm run build`; Node.js and `npm ci` in `web/` are prerequisites) and serve it with the API through uvicorn; `repository-gates` also runs `npm run lint` and `npm run typecheck`.
 
 - Owner settings live in `.wiki/verification.local.json`, saved through the local review settings and bound to the manifest digest. The file is git-ignored, and the implementer never supplies it.
 - Corpus and origin: the service copies the settings' `env_file` to the checkout's `.env` without exporting it. The runner reads these keys from that `.env`, and from the process environment only for keys `.env` does not set: `RFP_SOURCE_DIR`, `RFP_DATA_DIR`, `RFP_VERIFY_ORIGIN`, `RFP_VERIFY_BROWSER_EXECUTABLE`, `RFP_VERIFY_QUESTION`, `RFP_VERIFY_HWP_DOC_ID` and `RFP_VERIFY_PDF_DOC_ID`. It never reads `OPENAI_API_KEY`. `RFP_VERIFY_ENV_FILE` points the runner at another file; tests use it to stay on the fixture corpus.
@@ -126,7 +130,7 @@ python -m rfp_assistant.cli check --phase all --provider fake --save # every tes
 
 1. Create the environment and install the pinned dependencies (README, "Environment"). The tested host is Windows with Python 3.12; this repository's cloud checks ran on Linux with Python 3.12.
 2. Place `원본 데이터/data_list.csv` and `원본 데이터/files/` under the repository, or point `RFP_SOURCE_DIR` at them (absolute path). `RFP_DATA_DIR` (absolute) moves the runtime; the default is `.runtime/` in the repository.
-3. API key placement. Put `OPENAI_API_KEY` in the server's process environment, or in the repository's `.env` (git-ignored), or in `.streamlit/secrets.toml` (git-ignored). Never put it in `RFP_CONFIG_FILE`, a report, an export, a screenshot or a commit. Members never receive the key; they use the shared application.
+3. API key placement. Put `OPENAI_API_KEY` in the server's process environment, or in the repository's `.env` (git-ignored). Never put it in `RFP_CONFIG_FILE`, a report, an export, a screenshot or a commit. Members never receive the key; they use the shared application.
 4. `python -m rfp_assistant.cli init --paid-disabled`, then `manifest`, `ingest`, `build-keyword --include-unreviewed` (README).
 5. Paid generation stays off until `configure-budget` records the dates, the prior use with its evidence, the allowance, the cap and the confirmed rates.
 6. Run `check --phase all --provider fake --save` on the host before the first paid action.
@@ -173,7 +177,7 @@ python -m rfp_assistant.cli export-review --run-id <A-run>                      
 python -m rfp_assistant.cli import-review --run-id <A-run> --file C:\abs\reviewed.jsonl --reviewer <name>
 ```
 
-- `plan-run` prices every remaining answer exactly as the answer path will (no provider call) and stores an estimate bound to the finalists, dataset population, prompt, model, output cap, rates and every row's token count. It refuses more than two finalists or finalists with different evidence ceilings. The 검증 › 평가 tab offers the same plan and a consented run on the application's own gateway.
+- `plan-run` prices every remaining answer exactly as the answer path will (no provider call) and stores an estimate bound to the finalists, dataset population, prompt, model, output cap, rates and every row's token count. It refuses more than two finalists or finalists with different evidence ceilings. The 검증 › 평가·릴리스 section offers the same plan and a consented run on the application's own gateway.
 - `run-answers` refuses a changed configuration or price ("plan again") and a maximum that no longer fits the envelope or cap. It stops at the first budget refusal or the first new unknown billing.
 - Resume by planning and running again: finished rows are kept and never re-sent; a row whose call has unknown billing is skipped until it is settled or reconciled (§5), then runs once more as a recorded new attempt.
 - Deterministic scoring covers typed numbers and dates (with qualifiers such as VAT), negatives and link validity. Text claims, partially supporting citations and unlabelled citations are "needs review" or "unjudged" until the blind sheet is imported. Citation precision is reported twice: over judged links and as a lower bound that counts unjudged links as unsupported.
@@ -215,7 +219,7 @@ Mentor walkthrough on the frozen candidate (record the outcome as `.runtime/rele
 3. Select the duplicated/conflicting record pair and show the conflict state; show a document with missing metadata (기본 정보) and the quarantined/unsupported source.
 4. Select two documents and run a balanced comparison.
 5. Change the scope while a request runs: the old answer stays history.
-6. 검증: the trace of the same question, a comparison of two frozen runs, and the 평가·릴리스 tab (development scores, the sealed set as a count only, the release decision).
+6. 검증: the trace of the same question, a comparison of two frozen runs, and the 평가·릴리스 section (development scores, the sealed set as a count only, the release decision).
 7. A budget cap and failure-state example: use a temporary fake-provider runtime (`load-check`, or a config with `{"provider": "fake"}` and its own `RFP_DATA_DIR`). Never drain the shared academy balance to demonstrate the cap.
 
 ## 11. Index activation and rollback

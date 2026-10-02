@@ -2,7 +2,7 @@
 
 The consultant comes here to find an RFP and obtain a source-backed answer that helps decide the next consulting action. Success is a relevant project or supported requirement answer whose original evidence can be inspected. The team verifier comes here to explain a pipeline failure or compare a frozen experiment. Success is a reproducible trace, a reviewed label, and a recorded quality/cost comparison.
 
-These purposes require separate entry points and access controls. They can share one Streamlit application package and the same pipeline; they do not need separate frontend frameworks. This is a concept and acceptance plan, not a browser-tested screen or a chosen color palette.
+These purposes require separate entry points and access controls. They share one application and the same pipeline; they do not need separate frontend frameworks. (Built first as Streamlit pages; since 2026-10-02 one Next.js app in `web/` over a FastAPI wrapper of the service.) This is a concept and acceptance plan, not a browser-tested screen or a chosen color palette.
 
 ## Consultant workflow
 
@@ -41,7 +41,7 @@ Use explicit loading, completion, insufficient-evidence, clarification, conflict
 
 ## Reusable UI primitives
 
-[Streamlit navigation](https://docs.streamlit.io/develop/api-reference/navigation/st.navigation) can organize separate pages. [Fragments](https://docs.streamlit.io/develop/api-reference/execution-flow/st.fragment) support timed partial reruns, suitable for a small shared budget widget. A polling fragment must read the ledger only: rerunning it cannot invoke generation. Validate polling behavior during a long answer, including updates from other sessions; use a server event channel later if measurements show polling is insufficient.
+Separate pages share one header with the shared budget meter. The meter and a request's status are polled through read-only routes: a poll must read the ledger only and can never invoke generation. Validate polling behavior during a long answer, including updates from other sessions; use a server event channel later if measurements show polling is insufficient.
 
 Start with labeled inputs, keyboard navigation, visible focus, readable contrast, text labels alongside warning colors, and status updates that do not steal focus. Use Korean UI labels and answers. No chart or debug panel should displace the consultant's current task merely to fill whitespace.
 

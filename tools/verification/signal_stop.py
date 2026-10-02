@@ -1,7 +1,7 @@
 """Native Ctrl+C stops a running request before its next paid stage.
 
 A child process owns a fixture runtime with the fake provider, submits one request whose retrieval finishes and
-then pauses, and polls its main loop like Streamlit's server loop. The parent sends a real Ctrl+C: Windows
+then pauses, and polls its main loop like uvicorn's server loop. The parent sends a real Ctrl+C: Windows
 `CTRL_C_EVENT` to the child's own console, POSIX SIGINT. Expected: the request ends `interrupted` with no attempt,
 and the child exits 0. Writes `<run_dir>/signal-stop.json`; exit 0 only on the expected outcome.
 
@@ -42,7 +42,7 @@ def slow(*a, **kw):
 
 service.prepare_answer = slow
 stopping = threading.Event()
-signal.signal(signal.SIGINT, lambda *a: stopping.set())  # like Streamlit: the handler ends the server loop
+signal.signal(signal.SIGINT, lambda *a: stopping.set())  # like uvicorn: the handler ends the server loop
 rid = service.submit_answer(res, env.consultant, AnswerRequest(
     "signal-stop", "signal-stop", "하자보수 기간은 얼마인가요?", [env.refs["기관A"]], as_of="2026-09-30"))
 (root / "child.json").write_text(json.dumps({"request_id": rid, "db": str(env.settings.db_path)}))

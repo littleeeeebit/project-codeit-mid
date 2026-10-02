@@ -4,7 +4,7 @@ Read this with [the overview](0-overview.md) and the phase being implemented. Th
 
 ## Planned package and ownership
 
-Use an editable Python package named `rfp_assistant`, installed from a root `pyproject.toml`, with `src/rfp_assistant/` as its package directory. Launch the single Streamlit application through root `app.py`; its navigation has consultant and verifier entry points. Implement only modules a phase needs.
+Use an editable Python package named `rfp_assistant`, installed from a root `pyproject.toml`, with `src/rfp_assistant/` as its package directory. Serve the single application through `rfp_assistant.api:app` (uvicorn, one worker): FastAPI routes over `service.py` plus the built Next.js screens from `web/`, whose navigation has the 질문하기, 검증 and 데이터셋 만들기 pages. (Phases 1–4 shipped a Streamlit `app.py`; it was replaced on 2026-10-02 because its layout limits made the screens hard to read.) Implement only modules a phase needs.
 
 | File | Responsibility | First owner |
 | --- | --- | --- |
@@ -18,12 +18,12 @@ Use an editable Python package named `rfp_assistant`, installed from a root `pyp
 | `budget.py` | Reservation, settlement, billing recovery, adjustments and snapshots | Phase 1 |
 | `generation.py` | Only runtime SDK call site; embedding/generation gateway, payload counting and output validation | Phase 1 |
 | `service.py` | Role-declaring public functions, resource ownership, request orchestration | Phase 1 |
-| `ui.py` | Visitor name, consultant/verifier/admin render functions and budget widget | Phase 1 |
+| `api.py` | HTTP routes for the screens in `web/`, one `service` function each; the `X-Member` header carries the visitor name; serves the built screens | Phase 1 (as `ui.py` until 2026-10-02) |
 | `cli.py` | Explicit local maintenance commands using the same contracts and gateway | Phase 1 |
 | `dense.py` | Hash-keyed embedding cache, matrix construction/scoring, optional local reranking | Phase 2 |
 | `evaluation.py` | Dataset validation, frozen runs, source-span scoring and reports | Phase 1 pilot; Phase 4 expansion |
 
-Keep `service.py` as orchestration over ordinary functions. No plugins, abstract repository layer, HTTP microservice, task broker, or separate frontend build is needed. Add a small bounded thread executor in phase 3 to keep network inference out of the Streamlit script; it calls the same service.
+Keep `service.py` as orchestration over ordinary functions. No plugins, abstract repository layer, task broker or second API is needed: `api.py` is a thin in-process wrapper, and `web/` is the only frontend. Its build is a static export the same process serves, so there is no Node at run time. A small bounded thread executor (phase 3) keeps network inference out of the request handlers; it calls the same service.
 
 ## Settings and runtime files
 
@@ -35,7 +35,7 @@ Resolve defaults from the installed package/repository location, never the proce
 | `RFP_DATA_DIR` | Repository `.runtime/`; all indexes, databases and reports derive from it |
 | `RFP_CONFIG_FILE` | Optional absolute path to nonsecret operational configuration |
 | `RFP_HWP_CONVERTER` | Absolute path to the isolated converter executable; validate before the HWP trial |
-| `OPENAI_API_KEY` | Server environment or private Streamlit secrets; never print or export it |
+| `OPENAI_API_KEY` | Server environment or the git-ignored `.env`; never print or export it |
 | `allowance_usd`, `operational_cap_usd` | `20`, `16`; prior spending counts against the cap |
 | `project_start`, `project_end` | Required before paid mode; actual dates, not an automatic 28-day forecast |
 | `paid_enabled` | False until prior-use reconciliation and rate checks are recorded |

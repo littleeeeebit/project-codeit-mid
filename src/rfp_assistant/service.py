@@ -101,7 +101,7 @@ class Resources:
         def stop() -> None:
             (closer() or (lambda: None))()
 
-        # A controlled stop (Streamlit's SIGINT/SIGTERM handler ends the server loop, then the interpreter exits)
+        # A controlled stop (uvicorn's SIGINT/SIGTERM handler ends the server loop, then the interpreter exits)
         # must close while the workers are still alive, so their next paid stage sees the stop. Ordinary atexit
         # runs only after `concurrent.futures` has joined every worker; threading's exit hooks run before that
         # join, newest first, so this one precedes the executor's own (registered at import).
@@ -1837,9 +1837,9 @@ def ingestion_overview(res: Resources, principal: Principal) -> list[dict]:
     return [{**dict(r), "warnings": [w.get("code") for w in json.loads(r["warnings_json"])]} for r in rows]
 
 
-# ---------------------------------------------------------------- the Streamlit shell's entry points
-# ui.py imports nothing from this package except this module: every action and every decision that is not
-# rendering lives here, so the screens stay presentation only (tests/test_ui_boundary.py).
+# ---------------------------------------------------------------- the screens' entry points
+# api.py imports nothing from this package except this module and each route calls one function: every action
+# and every decision that is not rendering lives here, so web/ stays presentation only (tests/test_api.py).
 
 AuthError = auth.AuthError
 REJECT_CATEGORIES = gold.REJECT_CATEGORIES

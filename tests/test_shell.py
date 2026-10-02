@@ -1,4 +1,4 @@
-"""The service entry points behind the Streamlit shell: document search order, a candidate's evidence spans, and
+"""The service entry points behind the web screens: document search order, a candidate's evidence spans, and
 dataset generation from development sources through the budget gateway to a decision by someone else."""
 
 import json
