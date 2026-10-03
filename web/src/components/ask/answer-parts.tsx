@@ -63,8 +63,8 @@ export function StateHead({ answer, large = false }: { answer: Answer; large?: b
     );
   }
   return (
-    <div className="space-y-3">
-      <StatusBadge tone={s.tone} size="md">{s.label}</StatusBadge>
+    <div className="space-y-3 rounded-xl border border-primary/25 bg-accent/40 p-5">
+      <div className="flex flex-wrap items-center gap-3"><span className="text-sm font-semibold">답변 요약</span><StatusBadge tone={s.tone} size="md">{s.label}</StatusBadge></div>
       <p className={cn("leading-relaxed font-semibold text-foreground", large ? "text-[22px] leading-snug" : "text-lg")}>
         {answer.summary}
       </p>
@@ -221,7 +221,7 @@ export function Chips({ answer, ids, onCite, active }: {
       {cited.map((id) => (
         <button key={id} type="button" onClick={() => onCite(id)} aria-pressed={active === id}
                 aria-label={`근거 ${id} 원문 보기`}
-                className={cn("inline-flex h-6 min-w-8 items-center justify-center rounded-md px-1.5 text-xs font-bold tabular-nums outline-none",
+                className={cn("inline-flex h-8 min-w-9 items-center justify-center rounded-md border border-primary/20 px-2 text-sm font-bold tabular-nums outline-none",
                   "focus-visible:ring-3 focus-visible:ring-ring/50",
                   active === id ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground hover:bg-primary/15")}>
           {id}
@@ -237,7 +237,7 @@ export function useEvidence(requestId: string, evidenceId: string | null) {
       { params: { path: { request_id: requestId, evidence_id: evidenceId! } } }), errorText), null);
 }
 
-/** The opened citation: the exact quote among its neighbouring paragraphs, where it is, and the original file. */
+/** The opened citation: the exact quote first, optional surrounding paragraphs, location and original file. */
 export function EvidenceDetail({ requestId, evidenceId }: {
   requestId: string; evidenceId: string | null;
 }) {
@@ -245,40 +245,54 @@ export function EvidenceDetail({ requestId, evidenceId }: {
   if (!evidenceId) return null;
   if (loading) return <div className="space-y-2"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-20 w-full" /></div>;
   if (error || !data) return <p role="alert" className="text-sm text-bad">{error}</p>;
-  return <EvidenceBody ev={data} />;
+  return <EvidenceBody key={data.evidence_id} ev={data} />;
 }
 
 export function EvidenceBody({ ev }: { ev: Evidence }) {
-  const [around, setAround] = useState(false);  // neighbouring paragraphs are context: folded to two lines first
+  const [around, setAround] = useState(false);
+  const [fullQuote, setFullQuote] = useState(false);
   const paragraphs = ev.context.length ? ev.context : [{ element_id: "q", text: ev.quote, cited: true, location: {} }];
+  const cited = paragraphs.filter((p) => p.cited);
+  const quoted = cited.length ? cited : [{ element_id: "q", text: ev.quote, cited: true, location: ev.location }];
+  const longQuote = quoted.reduce((n, p) => n + p.text.length, 0) > 400
+    || quoted.reduce((n, p) => n + p.text.split("\n").length, 0) > 12;
   const hasAround = paragraphs.some((p) => !p.cited);
   return (
-    <div className="space-y-3">
-      <div className="space-y-1">
-        <p className="text-[13px] font-semibold text-muted-foreground">근거 {ev.evidence_id}</p>
-        <p className="font-semibold leading-snug">{ev.title || "제목 없음"}</p>
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <h3 className="text-lg font-bold">원문 인용 <span className="ml-1 text-primary">{ev.evidence_id}</span></h3>
+        <p className="text-base font-semibold">{ev.title || "제목 없음"}</p>
         <p className="text-[13px] text-muted-foreground">{locationText(ev.location)} · {label(REVIEW, ev.review_status)}</p>
       </div>
-      {ev.warnings.map((w) => (
-        <p key={w} className="flex gap-2 rounded-lg bg-warn-bg px-3 py-2 text-[13px] text-foreground">
-          <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />{EVIDENCE_WARNING[w] ?? w}
-        </p>
-      ))}
-      <div className="space-y-2 text-base">
-        {paragraphs.map((p) => (
-          <p key={p.element_id} className={cn("whitespace-pre-wrap", !p.cited && "text-muted-foreground", !p.cited && !around && "line-clamp-2")}>
-            {p.cited ? <mark className="rounded bg-cite-bg px-0.5 text-foreground [box-decoration-break:clone]">{p.text}</mark> : p.text}
-          </p>
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted-foreground">
-        <span>노란 바탕이 답변이 인용한 원문입니다.</span>
-        {hasAround && (
-          <button type="button" aria-expanded={around} onClick={() => setAround(!around)}
-                  className="min-h-6 rounded font-semibold text-foreground underline-offset-2 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
-            {around ? "앞뒤 문단 접기" : "앞뒤 문단 모두 보기"}
+      {ev.warnings.length > 0 && (
+        <div className="space-y-2 rounded-lg bg-warn-bg p-3 text-sm">
+          <p className="flex items-center gap-2 font-semibold"><AlertTriangle className="size-4 shrink-0 text-warn" aria-hidden />원문 확인이 필요한 근거</p>
+          <ul className="space-y-2">{ev.warnings.map((w) => <li key={w}>{EVIDENCE_WARNING[w] ?? w}</li>)}</ul>
+        </div>
+      )}
+      <div className="space-y-3">
+        <blockquote className="border-l-4 border-primary pl-4 text-base text-foreground">
+          <div className={cn("space-y-4 whitespace-pre-wrap [overflow-wrap:anywhere]", longQuote && !fullQuote && "line-clamp-[12]")}>
+            {quoted.map((p) => <p key={p.element_id}>{p.text}</p>)}
+          </div>
+        </blockquote>
+        {longQuote && (
+          <button type="button" aria-expanded={fullQuote} onClick={() => setFullQuote(!fullQuote)}
+                  className="min-h-9 rounded-lg border border-input px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50">
+            {fullQuote ? "긴 인용문 접기" : "인용문 일부 표시 · 전체 펼치기"}
           </button>
         )}
+      </div>
+      <div className="space-y-3">
+        {hasAround && (
+          <button type="button" aria-expanded={around} onClick={() => setAround(!around)}
+                  className="min-h-9 rounded-lg border border-input px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50">
+            {around ? "주변 원문 접기" : "앞뒤 문단 포함 전체 원문 보기"}
+          </button>
+        )}
+        {hasAround && around && <div className="space-y-4 rounded-xl border border-input bg-secondary/30 p-4 text-base">
+          {paragraphs.map((p) => <p key={p.element_id} className={cn("whitespace-pre-wrap [overflow-wrap:anywhere]", p.cited && "border-l-4 border-primary pl-3")}>{p.text}</p>)}
+        </div>}
       </div>
       {ev.download_available && (
         <a href={originalHref(ev.doc_id, ev.source_hash)}

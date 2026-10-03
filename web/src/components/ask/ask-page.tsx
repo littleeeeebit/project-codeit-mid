@@ -141,7 +141,7 @@ function SelectedDoc({ doc, index, onRemove }: { doc: Doc; index: number; onRemo
       <div className="flex items-start gap-3">
         {index > 0 && <span className="rounded-md bg-foreground px-1.5 py-0.5 text-xs font-bold text-background">문서 {index}</span>}
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 font-semibold leading-snug">{doc.title}</p>
+          <p className="text-base font-semibold">{doc.title}</p>
           <p className="mt-1 text-[13px] text-muted-foreground">
             {doc.institution || "기관 미상"} · {wonShort(doc.amount_krw)} · 공개 {when(doc.published_at)} · {doc.format.toUpperCase()} · {label(REVIEW, doc.review_status)}
           </p>
@@ -202,10 +202,10 @@ function History({ refresh }: { refresh: string }) {
   const { data } = usePoll(open ? `history-${refresh}` : null, () => must(api.GET("/api/requests", { params: { query: { limit: 20 } } }), errorText), null);
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="border-t pt-6">
-      <CollapsibleTrigger className="group flex min-h-6 items-center gap-1.5 rounded text-[15px] font-bold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+      <CollapsibleTrigger className="group flex min-h-9 items-center gap-2 rounded text-lg font-bold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
         내 최근 요청 <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
       </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-2 pt-4">
+      <CollapsibleContent className="space-y-4 pt-4">
         {!data && <Skeleton className="h-10 w-full" />}
         {data?.length === 0 && <p className="text-sm text-muted-foreground">아직 요청이 없습니다.</p>}
         {data?.map((r) => {
@@ -214,10 +214,10 @@ function History({ refresh }: { refresh: string }) {
           return (
             <div key={r.request_id} className="rounded-xl border">
               <button type="button" aria-expanded={isOpen} onClick={() => setShown(isOpen ? null : r.request_id)}
-                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left outline-none hover:bg-secondary/50 focus-visible:ring-3 focus-visible:ring-ring/50">
+                      className="flex w-full flex-wrap items-center gap-3 rounded-xl px-4 py-4 text-left outline-none hover:bg-secondary/50 focus-visible:ring-3 focus-visible:ring-ring/50">
                 <StatusBadge tone={s?.tone ?? "neutral"}>{s?.label ?? REQUEST[r.status]}</StatusBadge>
-                <span className="min-w-0 flex-1 truncate text-sm">{r.question || ({ metadata: "기본 정보", inventory: "요구사항 목록" } as Record<string, string>)[r.mode] || r.mode}</span>
-                <span className="text-[13px] text-muted-foreground tabular-nums">요청 {r.request_id.slice(0, 8)} · {r.created_at.slice(0, 16).replace("T", " ")}</span>
+                <span className="min-w-0 flex-1 text-base font-semibold [overflow-wrap:anywhere]">{r.question || ({ metadata: "기본 정보", inventory: "요구사항 목록" } as Record<string, string>)[r.mode] || r.mode}</span>
+                <span className="w-full text-[13px] text-muted-foreground tabular-nums sm:w-auto">요청 {r.request_id.slice(0, 8)} · {r.created_at.slice(0, 16).replace("T", " ")}</span>
               </button>
               {isOpen && r.result && <div className="border-t p-5"><AnswerView view={r} answer={r.result} /></div>}
             </div>

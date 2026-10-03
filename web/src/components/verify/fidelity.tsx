@@ -22,12 +22,12 @@ export function FidelityRow({ s, active, onOpen }: { s: Source; active: boolean;
             className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none hover:bg-secondary/70 focus-visible:ring-3 focus-visible:ring-ring/50",
               active && "bg-accent hover:bg-accent")}>
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-1 text-sm font-medium">{s.filename ?? s.source_hash.slice(0, 12)}</span>
-        <span className="text-xs text-muted-foreground">
+        <span className="block text-base font-semibold [overflow-wrap:anywhere]">{s.filename ?? s.source_hash.slice(0, 12)}</span>
+        <span className="mt-1 block text-xs text-muted-foreground">
           {s.metrics ? `표시된 곳 ${s.findings.length}곳 · ${s.metrics.pages ?? "-"}쪽` : "자동 대조 전"}
         </span>
+        <StatusBadge className="mt-2" tone={REVIEW_TONE[s.review_status] ?? "neutral"}>{label(REVIEW, s.review_status)}</StatusBadge>
       </span>
-      <StatusBadge tone={REVIEW_TONE[s.review_status] ?? "neutral"}>{label(REVIEW, s.review_status)}</StatusBadge>
     </button>
   );
 }
@@ -82,10 +82,10 @@ export function FidelityDetail({ s, onConfirmed }: { s: Source; onConfirmed: () 
                   </Button>
                 )}
               </div>
-              <div className="space-y-1 border-t px-4 py-3 text-sm">
+              <div className="space-y-3 border-t px-4 py-4 text-base">
                 <p><span className="mr-2 text-xs font-semibold text-muted-foreground">불일치</span>
                   <mark className="rounded bg-cite-bg px-1">{(f.stretches.length ? f.stretches : [f.stretch]).filter(Boolean).join(" / ") || "-"}</mark></p>
-                {f.text && <p className="leading-6"><span className="mr-2 text-xs font-semibold text-muted-foreground">추출 원문</span>{f.text}</p>}
+                {f.text && <p><span className="mr-2 text-sm font-semibold">추출 원문</span>{f.text}</p>}
               </div>
               {shown === i && f.page && (
                 // eslint-disable-next-line @next/next/no-img-element -- a server-rendered PNG of one printed page

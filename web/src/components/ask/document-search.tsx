@@ -107,10 +107,10 @@ export function DocumentSearch({ selected, onToggle }: { selected: Doc[]; onTogg
                 return (
                   <li key={d.doc_id}>
                     <div className={cn("flex gap-3 rounded-xl border p-3 transition-colors",
-                      on ? "border-primary bg-accent/60" : "border-transparent hover:bg-secondary/70", disabled && "opacity-60")}>
+                      on ? "border-primary bg-accent/60" : "border-input hover:bg-secondary/70")}>
                       <Checkbox id={id} checked={on} disabled={disabled} onCheckedChange={() => onToggle(d)} className="mt-0.5" />
                       <label htmlFor={id} className={cn("min-w-0 flex-1 space-y-1.5", !disabled && "cursor-pointer")}>
-                        <span className="line-clamp-2 text-[14px] leading-5 font-semibold">{d.title || "제목 없음"}</span>
+                        <span className="block text-base font-semibold text-foreground">{d.title || "제목 없음"}</span>
                         <span className="block text-[13px] text-muted-foreground">
                           {d.institution || "기관 미상"} · {wonShort(d.amount_krw)} · 마감 {when(d.bid_close)}
                         </span>

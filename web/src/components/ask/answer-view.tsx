@@ -20,21 +20,24 @@ export function AnswerView({ view, answer }: { view: RequestView; answer: Answer
       <div className="space-y-6">
         <StateHead answer={answer} />
         {answer.claims.length > 0 && (
-          <ol className="space-y-3">
-            {answer.claims.map((c, i) => (
-              <li key={i} className="flex gap-3">
-                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold tabular-nums">{i + 1}</span>
-                <div className="space-y-1.5">
-                  <p className="text-base">{c.text}</p>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {c.kind === "inference" ? <StatusBadge tone="warn">추론</StatusBadge> : <StatusBadge tone="neutral">원문 사실</StatusBadge>}
-                    {docLabel(answer, c.doc_id) && <StatusBadge tone="neutral">{docLabel(answer, c.doc_id)}</StatusBadge>}
-                    <Chips answer={answer} ids={c.evidence_ids} onCite={setOpen} active={open} />
+          <section className="space-y-4" aria-label="답변 내용">
+            <h3 className="text-lg font-bold">답변 내용 <span className="text-sm font-medium text-muted-foreground">{answer.claims.length}개 항목</span></h3>
+            <ol className="divide-y divide-input rounded-xl border border-input bg-background">
+              {answer.claims.map((c, i) => (
+                <li key={i} className="flex gap-3 p-4">
+                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-accent text-sm font-bold text-primary tabular-nums">{i + 1}</span>
+                  <div className="min-w-0 space-y-3">
+                    <p className="text-base">{c.text}</p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {c.kind === "inference" ? <StatusBadge tone="warn">추론</StatusBadge> : <span className="text-xs font-medium text-muted-foreground">원문 사실</span>}
+                      {docLabel(answer, c.doc_id) && <span className="text-xs font-semibold">{docLabel(answer, c.doc_id)}</span>}
+                      <Chips answer={answer} ids={c.evidence_ids} onCite={setOpen} active={open} />
+                    </div>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ol>
+                </li>
+              ))}
+            </ol>
+          </section>
         )}
         <FactsTable answer={answer} />
         <InventoryTable answer={answer} onCite={setOpen} />
@@ -45,7 +48,7 @@ export function AnswerView({ view, answer }: { view: RequestView; answer: Answer
       </div>
       {hasEvidence && (
         <aside aria-label="근거" className="lg:sticky lg:top-20 lg:self-start">
-          <div className="rounded-2xl bg-secondary/60 p-5">
+          <div className="rounded-2xl border border-input bg-background p-5">
             {open ? <EvidenceDetail requestId={answer.request_id} evidenceId={open} />
               : <p className="text-sm text-muted-foreground">근거 번호를 누르면 원문 인용과 주변 내용이 여기에 열립니다.</p>}
           </div>

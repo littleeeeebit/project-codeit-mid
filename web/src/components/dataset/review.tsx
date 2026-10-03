@@ -40,7 +40,7 @@ function DraftCard({ c }: { c: Candidate }) {
       <div className="space-y-2">
         <StatusBadge tone="neutral">{label(GOLD_TYPE, c.type)}</StatusBadge>
         <p className="text-lg font-bold leading-snug">{c.question}</p>
-        {c.expected_answer && <p className="rounded-xl bg-secondary/60 px-4 py-3 text-base"><span className="mr-2 text-xs font-semibold text-muted-foreground">초안 답변</span>{c.expected_answer}</p>}
+        {c.expected_answer && <div className="space-y-2 rounded-xl border border-input bg-secondary/40 p-4"><h3 className="text-sm font-semibold">초안 답변</h3><p className="text-base">{c.expected_answer}</p></div>}
         {c.difficulty_reason && <p className="text-sm text-muted-foreground">난이도 이유: {c.difficulty_reason}</p>}
       </div>
       {c.current_errors.map((e) => <Notice key={e} tone="bad">현재 원문 상태와 맞지 않습니다: {e}</Notice>)}
@@ -104,12 +104,12 @@ function DraftCard({ c }: { c: Candidate }) {
 function Spans({ c }: { c: Candidate }) {
   return (
     <section aria-label="원문 구절" className="space-y-3">
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-lg font-bold">원문 구절 {c.spans.length}개</h3>
         <span className="text-xs text-muted-foreground">노란 바탕이 초안이 인용한 부분</span>
       </div>
       {c.spans.map((s, i) => (
-        <article key={i} className="space-y-2 rounded-xl border p-4">
+        <article key={i} className="space-y-4 rounded-xl border border-input bg-background p-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold">{s.label}</span>
             {s.cited_found ? <StatusBadge tone="ok">인용 위치 확인</StatusBadge> : <StatusBadge tone="bad">인용 구절을 찾지 못함</StatusBadge>}
@@ -185,7 +185,7 @@ function QueueRow({ p, active, onOpen }: { p: Pending; active: boolean; onOpen: 
   return (
     <button type="button" onClick={onOpen} aria-current={active || undefined}
             className={cn("w-full rounded-lg px-3 py-2.5 text-left outline-none hover:bg-secondary/70 focus-visible:ring-3 focus-visible:ring-ring/50", active && "bg-accent hover:bg-accent")}>
-      <span className="line-clamp-2 text-sm font-medium leading-snug">{p.question}</span>
+      <span className="block text-base font-semibold">{p.question}</span>
       <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
         <span className="font-mono">{p.candidate_id}</span>·<span>{label(GOLD_TYPE, p.type)}</span>
       </span>
@@ -207,7 +207,7 @@ export function ColumnsQueue({ pending, onDecided }: { pending: Pending[]; onDec
   const cur = pending.find((p) => p.candidate_id === open) ?? pending[0];
   return (
     <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)_minmax(0,1fr)]">
-      <nav aria-label="검토 대기 목록" className="space-y-0.5 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-7rem)] xl:self-start xl:overflow-y-auto">
+      <nav aria-label="검토 대기 목록" className="space-y-2 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-7rem)] xl:self-start xl:overflow-y-auto">
         {pending.map((p) => <QueueRow key={p.candidate_id} p={p} active={p === cur} onOpen={() => setOpen(p.candidate_id)} />)}
       </nav>
       <Loaded key={cur.candidate_id} id={cur.candidate_id}>{(c) => (

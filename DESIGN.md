@@ -285,3 +285,35 @@ The connected runtime has schema 6 and active keyword index `62bea0c9c27ad3e7`. 
 The actual 한영대학 RFP was found and selected in chat. An ECR-001 question was prepared without pressing the paid submit button. The pending candidate's source spans identify ASP.NET and MSSQL, providing a concrete reference for checking the resulting answer. This continuation has not yet dispatched a live model call, verified that answer, or received the user's three-page acceptance. The earlier fixture measurements establish only rendering and interaction observations.
 
 For future local tasks, the user's workspace preference is a branch in the original checkout rather than a repository copy or a separately created worktree. The current task's existing worktree remains the location of its code changes.
+
+## 7. Readability correction with the real corpus
+
+### Purpose and layout
+
+The user found the page split useful but the rendered screens difficult to read. Inspection of the actual comparison answer confirmed that unselected document cards faded after two selections, repeated badges competed with claims, and an OCR excerpt filled a narrow pane with yellow highlighting. This pass keeps the selected page split, 3:2 answer/evidence layout and three-column review queue. It gives the summary a labeled surface, separates numbered claims into rows, and puts the exact quotation before optional surrounding paragraphs. No answer text is rewritten.
+
+### Browser measurements and button behaviour
+
+Chrome checks used the existing shared corpus and the user's completed comparison request `67575d73`, including its E5 OCR evidence. They did not use fixture answers or dispatch another model call. Checks covered the actual verification inbox and the 23-item dataset queue at 1400 × 1000 and 390 × 844; the viewport override was reset afterwards.
+
+| Measure or interaction | Observed result |
+| --- | --- |
+| Document titles after selecting two documents | 16 px / 25.6 px; disabled-card container opacity 1; selection limit still applies |
+| Answer claims | 16 px / 25.6 px, separated rows and numbered markers |
+| Citation controls | 14 px text, 32 px height |
+| Table headers and sampled single-line row | 14 px headers; 45 px row height |
+| Verification source names and extraction passages | 16 px; source names no longer clipped to one line |
+| Verification section menu | 44 px rows with a visible selected edge |
+| Pending questions and review evidence | 16 px; questions no longer clipped to two lines |
+| Long E5 quotation on mobile | About 307 px preview versus 742 px full content; visible expand control |
+| Keyboard quotation expansion | Enter expands the quotation; the complete source text remains identical |
+| Surrounding paragraphs and citation switching | Context expands in source order and resets to folded when the citation changes |
+| Horizontal page overflow | None on chat, verification or dataset review at either tested width |
+
+### Typography and colours
+
+The selected reading size remains 16 px, tables and menus 14 px, section headings 18 px, and page headings 24 px. Document, verification and queue titles now use the reading size rather than 14 px. Metadata remains 13 px. Repeated fact classifications use plain text; inference warnings keep their badge. The existing navy palette remains selected. Chat quotations use a navy edge on a white surface instead of highlighting whole paragraphs; dataset review still highlights the specific cited spans.
+
+### Remaining space and validation
+
+Spacing separates the summary, claim rows, quotation and optional context; surrounding paragraphs no longer fill the evidence pane before the citation. No filler panels were added. The production build, ESLint, TypeScript and `git diff --check` passed; edited files were checked as UTF-8 without BOM. These browser observations establish the implemented readability changes, not the user's acceptance. The corrected three pages still require the user's confirmation before the overall completion report.
