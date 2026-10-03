@@ -748,6 +748,9 @@ def main(argv: list[str] | None = None) -> int:
         stream.reconfigure(encoding="utf-8")
     args = build_parser().parse_args(argv)
     try:
+        if args.command == "restore-check":
+            # Configuration only: recovery opens the backup and isolated target, never the lost source ledger.
+            return cmd_restore_check(args, load_settings(database_backend="sqlite", provider="fake"))
         settings = load_settings(database_backend="sqlite", provider="fake") if \
             args.command in ("check", "load-check") else load_settings()
         with store.database_lifecycle(settings.db_path):

@@ -220,6 +220,8 @@ def import_snapshot(plan_path, target: postgres.Target, batch_size=1000, max_bat
     plan_sha = file_hash(plan_path)
     with store.database_lifecycle(target), store.open_db(target) as conn, closing(read_source(manifest["snapshot"])) as source:
         raw = conn.raw
+        if postgres.recovery_blocked(conn):
+            raise ValueError("cannot import into an incomplete or failed recovery target; use a fresh isolated database")
         if not raw.execute("SELECT pg_try_advisory_lock(%s)", (IMPORT_LOCK,)).fetchone()[0]:
             raise ValueError("another import owns this PostgreSQL target")
         try:
@@ -278,16 +280,50 @@ def import_snapshot(plan_path, target: postgres.Target, batch_size=1000, max_bat
             "paid_admission": False}
 
 
+def references_valid(references):
+    try:
+        for reference in references:
+            path = Path(reference["path"])
+            if not path.is_file() or file_hash(path) != reference["expected_sha256"]:
+                return False
+            if reference.get("kind") == "index":
+                manifest = json.loads(path.read_text(encoding="utf-8"))
+                for name, digest in manifest["files"].items():
+                    artifact = path.parent / name
+                    if not artifact.is_file() or file_hash(artifact) != digest:
+                        return False
+        return True
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
+def record_validation(conn, snapshot_sha256, references, passed):
+    conn.execute("CREATE TABLE IF NOT EXISTS migration_validation (id bigint PRIMARY KEY CHECK(id=1), "
+                 "snapshot_sha256 text NOT NULL, references_json text NOT NULL, passed boolean NOT NULL)")
+    conn.execute("INSERT INTO migration_validation VALUES (1,?,?,?) ON CONFLICT(id) DO UPDATE SET "
+                 "snapshot_sha256=excluded.snapshot_sha256,references_json=excluded.references_json,passed=excluded.passed",
+                 (snapshot_sha256, json.dumps(references, ensure_ascii=False), passed))
+    if not passed:
+        conn.execute("UPDATE database_control SET paid_admission=false WHERE id=1")
+
+
 def validate(plan_path, target):
     manifest = load_plan(plan_path)
     checks = {}
     with store.database_lifecycle(target), store.open_db(target) as conn:
+        if postgres.recovery_blocked(conn):
+            raise ValueError("recovery must finish before migration validation")
+        identity = conn.execute("SELECT snapshot_sha256,plan_sha256,state FROM migration_import WHERE id=1").fetchone()
+        if identity is None or tuple(identity) != (manifest["snapshot_sha256"], file_hash(plan_path), "complete"):
+            raise ValueError("validation requires the matching complete import and unchanged plan")
+        record_validation(conn, manifest["snapshot_sha256"], manifest["references"], False)
         for name, item in manifest["tables"].items():
             digest = postgres_digest(conn.raw, name, item["columns"])
             checks[name] = {"pass": digest == {k: item[k] for k in ("rows", "canonical_sha256")}, **digest}
-    bad_files = sum(not Path(r["path"]).is_file() or file_hash(r["path"]) != r["expected_sha256"]
-                    for r in manifest["references"])
-    return {"pass": all(item["pass"] for item in checks.values()) and bad_files == 0,
+        bad_files = sum(not references_valid([r]) for r in manifest["references"])
+        passed = all(item["pass"] for item in checks.values()) and bad_files == 0
+        record_validation(conn, manifest["snapshot_sha256"], manifest["references"], passed)
+    return {"pass": passed,
             "tables": checks, "inaccessible_or_changed_artifacts": bad_files, "provider_calls": 0}
 
 

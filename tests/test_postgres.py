@@ -56,7 +56,58 @@ class PostgreSQLTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def imported(self):
-        return migration.import_snapshot(self.plan, self.target)
+        result = migration.import_snapshot(self.plan, self.target)
+        if result["status"] == "complete":
+            self.assertTrue(migration.validate(self.plan, self.target)["pass"])
+        return result
+
+    def test_completed_import_needs_validation_and_index_payload_hashes(self):
+        migration.import_snapshot(self.plan, self.target)
+        with self.assertRaisesRegex(RuntimeError, "validation"):
+            postgres.require_imported_database(self.target)
+        changed = self.root / "omitted-artifacts.json"
+        plan = migration.load_plan(self.plan)
+        plan["references"] = []
+        store.write_text_atomic(changed, json.dumps(plan))
+        with self.assertRaisesRegex(ValueError, "unchanged plan"):
+            migration.validate(changed, self.target)
+        self.assertTrue(migration.validate(self.plan, self.target)["pass"])
+        reference = next(r for r in migration.load_plan(self.plan)["references"] if r["kind"] == "index")
+        manifest = Path(reference["path"])
+        payload = manifest.parent / next(iter(json.loads(manifest.read_text(encoding="utf-8"))["files"]))
+        original = payload.read_bytes()
+        try:
+            payload.write_bytes(original + b"corrupt")
+            self.assertFalse(migration.validate(self.plan, self.target)["pass"])
+            with self.assertRaisesRegex(RuntimeError, "validation"):
+                postgres.require_imported_database(self.target)
+        finally:
+            payload.write_bytes(original)
+
+    def test_failed_artifact_validation_blocks_completed_import_startup(self):
+        self.imported()
+        self.assertTrue(migration.validate(self.plan, self.target)["pass"])
+        artifact = Path(migration.load_plan(self.plan)["references"][0]["path"])
+        original = artifact.read_bytes()
+        try:
+            artifact.write_bytes(original + b"changed")
+            with self.assertRaisesRegex(RuntimeError, "artifact"):
+                postgres.require_imported_database(self.target)
+            with store.open_db(self.target) as conn:
+                conn.execute("UPDATE database_control SET paid_admission=true WHERE id=1")
+            artifact.unlink()
+            self.assertFalse(migration.validate(self.plan, self.target)["pass"])
+            with store.open_db(self.target) as conn:
+                self.assertFalse(conn.execute("SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0])
+                self.assertEqual(postgres.owner_guard(conn), "postgresql_recovery_or_validation")
+            with self.assertRaisesRegex(RuntimeError, "validation|artifact"):
+                postgres.require_imported_database(self.target)
+        finally:
+            artifact.write_bytes(original)
+        with self.assertRaisesRegex(RuntimeError, "validation"):
+            postgres.require_imported_database(self.target)
+        self.assertTrue(migration.validate(self.plan, self.target)["pass"])
+        postgres.require_imported_database(self.target)
 
     def allow_fake_paid(self):
         self.owner = postgres.GatewayOwner(self.target)

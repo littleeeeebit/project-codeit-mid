@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import threading
@@ -146,14 +147,37 @@ def open_db(target: Target):
         yield Connection(conn, target)
 
 
+def recovery_blocked(conn):
+    exists = conn.execute("SELECT to_regclass('bidmate_recovery.control')").fetchone()[0]
+    if not exists:
+        return False
+    row = conn.execute("SELECT state FROM bidmate_recovery.control WHERE id=1").fetchone()
+    return row is None or row[0] != "verified"
+
+
+def validation_ready(conn):
+    exists = conn.execute("SELECT to_regclass(current_schema() || '.migration_validation')").fetchone()[0]
+    if not exists:
+        return False
+    row = conn.execute("SELECT v.passed AND v.snapshot_sha256=m.snapshot_sha256 AND m.state='complete' "
+                       "FROM migration_validation v JOIN migration_import m ON m.id=v.id WHERE v.id=1").fetchone()
+    return row is not None and row[0]
+
+
 def require_imported_database(target: Target):
     """Reject accidental application/maintenance startup on an empty or partial rehearsal."""
     with open_db(target) as conn:
+        if recovery_blocked(conn):
+            raise RuntimeError("PostgreSQL recovery is incomplete or failed; startup and paid work are blocked")
         exists = conn.execute("SELECT to_regclass(current_schema() || '.migration_import')").fetchone()[0]
         imported = conn.execute("SELECT state FROM migration_import WHERE id=1").fetchone() if exists else None
-        if imported is None or imported[0] != "complete":
-            raise RuntimeError("PostgreSQL startup requires a complete verified import; select the validated "
+        if imported is None or imported[0] != "complete" or not validation_ready(conn):
+            raise RuntimeError("PostgreSQL startup requires a complete verified import and successful artifact validation; select the validated "
                                "imported target explicitly. Keep the live SQLite configuration until cutover.")
+        from .migration import references_valid
+        references = json.loads(conn.execute("SELECT references_json FROM migration_validation WHERE id=1").fetchone()[0])
+        if not references_valid(references):
+            raise RuntimeError("PostgreSQL validated artifacts are missing or changed; validation and startup are blocked")
 
 
 @contextmanager
@@ -224,6 +248,8 @@ class GatewayOwner:
                 if not held:
                     self.lost = True
                     raise RuntimeError("PostgreSQL paid gateway ownership was lost")
+                if recovery_blocked(self.conn) or not validation_ready(self.conn):
+                    raise RuntimeError("PostgreSQL recovery or artifact validation is not ready; no paid dispatch allowed")
             except psycopg.Error:
                 self.lost = True
                 raise RuntimeError("PostgreSQL paid gateway ownership was lost; restart and reconcile unknown billing") from None
@@ -253,6 +279,8 @@ def owner_guard(conn):
     """Check the owning session at the durable admission/dispatch boundary as well as before checkout."""
     if not isinstance(conn, Connection):
         return None
+    if recovery_blocked(conn) or not validation_ready(conn):
+        return "postgresql_recovery_or_validation"
     with _mutex:
         owner = _owners.get(conn.target)
     if owner is None or owner.lost or owner.conn.closed:

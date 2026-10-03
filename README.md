@@ -21,6 +21,8 @@ PostgreSQL is the selected migration backend and pgvector is the selected vector
 
 Existing SQLite runtimes require an explicit snapshot/import; startup never silently imports or falls back. Use a new, isolated target for rehearsal and keep paid admission disabled. The production corpus is not yet cut over. The owner selected `text-embedding-3-large` at 1,536 dimensions, pending independent quality acceptance against the native 3,072 reference. The owner approved paid work and a $10 operating cap on 2026-10-03. The Settings page can change the shared cumulative limit while preserving spending and reservations; it uses the existing no-login attribution model.
 
+PostgreSQL startup requires successful `migration validate` for the imported snapshot and rechecks immutable artifact hashes, including index payload files. Table import completion alone cannot authorize startup. Failed validation or a failed recovery fence blocks startup and paid admission. PostgreSQL `restore-check` uses the backup and a distinct empty `RFP_RESTORE_DATABASE_DSN` without connecting to the primary database; recovery leaves paid admission disabled.
+
 The authorized large/1,536 corpus build completed with 79 real metered embedding calls: 18,548 unique payloads cover 18,983 active chunk rows, costing $1.019019. Total recorded spending is $1.631473 of the $10 cap, with no unknown reservations. This pre-cutover build used the sole live ledger; `tools/import_embedding_cache.py` explicitly transfers its verified settled caches into a matching paid-disabled PostgreSQL import without inference. Serving remains on the existing keyword index until quality acceptance and cutover. Receipts and exact commands are in the handover.
 
 ## Configuration
