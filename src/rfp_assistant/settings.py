@@ -11,26 +11,31 @@ from dataclasses import asdict, dataclass, field, replace
 from decimal import Decimal
 from pathlib import Path
 
+from .postgres import Target
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # USD per one million tokens, standard tier, short context (<= 272K input tokens), from
 # https://developers.openai.com/api/docs/pricing checked 2026-09-30. Cache writes bill 1.25x input on
 # GPT-5.6 and later. configure-budget snapshots the rates it was given.
-RATE_VERSION = "openai-standard-gpt-6-luna-2026-09-30"
+RATE_VERSION = "openai-standard-gpt-6-luna+text-embedding-3-large-2026-10-03"
+LARGE_RATE_VERSION = "openai-standard-text-embedding-3-large-2026-10-03"
+LARGE_RATE_CHECKED_AT = "2026-10-03T09:31:30Z"
 DEFAULT_RATES: dict[str, dict[str, str]] = {
     "gpt-6-luna": {"input": "0.10", "cached_input": "0.01", "cache_write": "0.125", "output": "0.50"},
     "text-embedding-3-small": {"input": "0.02"},
+    "text-embedding-3-large": {"input": "0.13"},
 }
 ALLOWED_GENERATION_MODELS = ("gpt-6-luna",)
 REASONING_EFFORTS = ("none", "low", "medium", "high", "xhigh", "max")
-ALLOWED_EMBEDDING_MODELS = ("text-embedding-3-small",)
+ALLOWED_EMBEDDING_MODELS = ("text-embedding-3-small", "text-embedding-3-large")
 # Embedding endpoint limits as documented in the pinned SDK (openai 3.22.1, embedding_create_params.py):
 # 8192 tokens per input, at most 2048 inputs per array, 300,000 tokens summed across one request.
 EMBEDDING_MAX_TOKENS_PER_INPUT = 8192
 EMBEDDING_MAX_INPUTS_PER_REQUEST = 2048
 EMBEDDING_MAX_TOKENS_PER_REQUEST = 300_000
-EMBEDDING_MAX_DIMENSIONS = {"text-embedding-3-small": 1536}
-EMBEDDING_TOKENIZER = {"text-embedding-3-small": "cl100k_base"}
+EMBEDDING_MAX_DIMENSIONS = {"text-embedding-3-small": 1536, "text-embedding-3-large": 3072}
+EMBEDDING_TOKENIZER = {"text-embedding-3-small": "cl100k_base", "text-embedding-3-large": "cl100k_base"}
 
 
 class SettingsError(RuntimeError):
@@ -45,7 +50,7 @@ class Settings:
     provider: str = "openai"  # "openai" or "fake"; fake refuses to build a real SDK client
     generation_model: str = "gpt-6-luna"
     generation_reasoning_effort: str = "low"
-    embedding_model: str = "text-embedding-3-small"
+    embedding_model: str = "text-embedding-3-large"
     evidence_target_tokens: int = 3000
     evidence_max_tokens: int = 5000  # keeps every prompt far below the 272K long-context price tier
     evidence_max_units: int = 6
@@ -53,7 +58,7 @@ class Settings:
     question_max_characters: int = 2000
     retrieval_mode: str = "kiwi_bm25"  # default until `activate-run` records a measured selection
     reranker_enabled: bool = False
-    embedding_dimensions: int = 1536
+    embedding_dimensions: int = 1536  # owner-selected reduction; activation still requires quality acceptance
     embedding_batch_inputs: int = 256
     embedding_batch_tokens: int = 100_000
     embedding_estimate_ttl_hours: int = 24
@@ -74,6 +79,10 @@ class Settings:
     shutdown_wait_seconds: float = 20.0
     fake_delay_seconds: float = 0.0
     extra: dict = field(default_factory=dict)
+    database_backend: str = "postgresql"
+    database_dsn_env: str = "RFP_DATABASE_DSN"
+    database_pool_max: int = 8
+    database_timeout_seconds: float = 5
 
     @property
     def csv_path(self) -> Path:
@@ -84,7 +93,9 @@ class Settings:
         return self.source_dir / "files"
 
     @property
-    def db_path(self) -> Path:
+    def db_path(self) -> Path | Target:
+        if self.database_backend == "postgresql":
+            return Target(self.database_dsn_env, self.database_pool_max, self.database_timeout_seconds)
         return self.data_dir / "rfp.sqlite3"
 
     def fingerprint(self) -> str:
@@ -137,6 +148,12 @@ def load_settings(**overrides) -> Settings:
 
 
 def validate(s: Settings) -> None:
+    if s.database_backend not in ("postgresql", "sqlite"):
+        raise SettingsError("database_backend must be postgresql or explicit legacy sqlite")
+    if not 1 <= s.database_pool_max <= 16 or not 1 <= s.database_timeout_seconds <= 30:
+        raise SettingsError("database pool maximum must be 1..16 and timeout 1..30 seconds")
+    if s.database_backend == "postgresql" and not os.environ.get(s.database_dsn_env):
+        raise SettingsError(f"{s.database_dsn_env} is required; PostgreSQL never falls back to SQLite")
     if s.provider not in ("openai", "fake"):
         raise SettingsError("provider must be 'openai' or 'fake'")
     if s.generation_model not in ALLOWED_GENERATION_MODELS or s.generation_model not in DEFAULT_RATES:

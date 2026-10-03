@@ -13,9 +13,10 @@ const PAGES = [
   { href: "/", label: "질문하기" },
   { href: "/verify", label: "검증" },
   { href: "/dataset", label: "데이터셋 만들기" },
+  { href: "/settings", label: "설정" },
 ];
 
-/** One bar on every page: the three pages, the visitor's name and the shared allowance. There is no login. */
+/** One bar on every page: navigation, visitor attribution and the shared operating limit. */
 export function AppHeader() {
   const path = usePathname();
   const budget = usePoll("budget", () => must(api.GET("/api/budget"), errorText), 2000);  // read-only
@@ -64,13 +65,13 @@ function BudgetMeter({ data, error }: { data?: Budget; error?: string }) {
   if (error && !data) return <StatusBadge tone="bad">사용량 최신 아님</StatusBadge>;
   if (!data) return <span className="h-8 w-48" aria-hidden />;
   const s = data.snapshot;
-  const pct = Math.min(100, Math.max(0, (s.spent_micro_usd / s.allowance_micro_usd) * 100));
+  const pct = Math.min(100, Math.max(0, (s.spent_micro_usd / s.cap_micro_usd) * 100));
   return (
     <div className="flex items-center gap-3" title={`진행 중 예약 ${usd(s.pending_micro_usd, 4)} · 예약 가능 ${usd(Math.max(0, s.available_micro_usd), 4)}`}>
       <div className="text-right leading-tight">
         <div className="hidden text-[13px] text-muted-foreground sm:block">공유 사용량</div>
         <div className="text-sm font-semibold tabular-nums">
-          {usd(s.spent_micro_usd)} <span className="font-normal text-muted-foreground">/ {usd(s.allowance_micro_usd)}</span>
+          {usd(s.spent_micro_usd)} <span className="font-normal text-muted-foreground">/ {usd(s.cap_micro_usd)}</span>
         </div>
       </div>
       <div role="meter" aria-label="공유 사용량" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}

@@ -158,7 +158,7 @@ class ManifestTest(unittest.TestCase):
             rows = [list(fixtures.ROWS[0])]
             rows[0][10] = "../escape.pdf"
             source = fixtures.write_corpus(Path(tmp), rows)
-            s = Settings(source_dir=source, data_dir=Path(tmp) / "d", hwp_converter=None, provider="fake")
+            s = Settings(database_backend="sqlite", source_dir=source, data_dir=Path(tmp) / "d", hwp_converter=None, provider="fake")
             with self.assertRaises(ingestion.IngestionError):
                 ingestion.read_manifest_csv(s)
 
@@ -347,7 +347,7 @@ class FamilyTest(unittest.TestCase):
             rows = [list(r) for r in fixtures.ROWS]
             rows[2][0] = rows[0][0]  # 기관D shares 기관A's notice number: a related revision
             source = fixtures.write_corpus(Path(tmp), rows)
-            s = Settings(source_dir=source, data_dir=Path(tmp) / "data", hwp_converter=None, provider="fake")
+            s = Settings(database_backend="sqlite", source_dir=source, data_dir=Path(tmp) / "data", hwp_converter=None, provider="fake")
             s.data_dir.mkdir()
             store.init_schema(s.db_path)
             ingestion.import_manifest(s)

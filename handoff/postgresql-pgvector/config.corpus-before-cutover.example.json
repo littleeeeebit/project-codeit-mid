@@ -1,0 +1,6 @@
+{
+  "database_backend": "sqlite",
+  "provider": "openai",
+  "embedding_model": "text-embedding-3-large",
+  "embedding_dimensions": 1536
+}

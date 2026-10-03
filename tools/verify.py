@@ -153,7 +153,8 @@ class Context:
             raise RuntimeError(f"RFP_VERIFY_ORIGIN must be scheme://host:port, got {origin!r}")
         host, port = found.groups()
         config = self.work / "fake-config.json"
-        config.write_text(json.dumps({"provider": "fake", "fake_delay_seconds": delay}), encoding="utf-8")
+        config.write_text(json.dumps({"provider": "fake", "database_backend": "sqlite",
+                                      "fake_delay_seconds": delay}), encoding="utf-8")
         env = {**self.env, "RFP_SOURCE_DIR": corpus["source_dir"], "RFP_DATA_DIR": corpus["data_dir"],
                "RFP_CONFIG_FILE": str(config)}
         npm = shutil.which("npm")

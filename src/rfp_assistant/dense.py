@@ -52,7 +52,7 @@ def _encoding(model: str):
     return tiktoken.get_encoding(EMBEDDING_TOKENIZER[model])
 
 
-def count_embedding_tokens(text: str, model: str = "text-embedding-3-small") -> int:
+def count_embedding_tokens(text: str, model: str = "text-embedding-3-large") -> int:
     return len(_encoding(model).encode(text))
 
 
@@ -84,6 +84,21 @@ def unit_vector(values, dims: int) -> np.ndarray:
     return (v / norm).astype(np.float32)
 
 
+def shorten_large_reference(values, dimensions: int, *, model: str) -> tuple[np.ndarray, dict]:
+    """Development-only supported prefix shortening; never converts or relabels small vectors."""
+    if model != "text-embedding-3-large" or dimensions not in (768, 1024, 1280, 1536, 2000):
+        raise DenseError("shortening requires the large model and a specified reduced candidate")
+    original = np.asarray(values, dtype=np.float32)
+    if original.shape != (3072,) or not np.isfinite(original).all() or \
+            abs(float(np.linalg.norm(original)) - 1) > NORM_TOLERANCE:
+        raise DenseError("shortening requires a verified native 3072-dimensional unit vector")
+    return unit_vector(original[:dimensions], dimensions), {
+        "model": model, "source_dimensions": 3072, "dimensions": dimensions,
+        "transformation": "native-prefix:l2-renormalize:float32",
+        "source_vector_checksum": hashlib.sha256(original.astype("<f4").tobytes()).hexdigest(),
+        "production_mixing": "requires a paid paired API-shortening validation sample"}
+
+
 # ---------------------------------------------------------------- cache
 
 
@@ -100,6 +115,9 @@ def _npy_bytes(vec: np.ndarray) -> bytes:
 
 def cache_get(settings: Settings, h: str) -> np.ndarray | None:
     """A verified cached vector, or None. A corrupt entry is a miss, never a silently used vector."""
+    if settings.database_backend == "postgresql":
+        from .vector_store import cache_get as pg_cache_get
+        return pg_cache_get(settings, h)
     d = cache_dir(settings)
     npy, meta = d / f"{h}.npy", d / f"{h}.json"
     if not (npy.exists() and meta.exists()):
@@ -107,7 +125,9 @@ def cache_get(settings: Settings, h: str) -> np.ndarray | None:
     try:
         info = json.loads(meta.read_text(encoding="utf-8"))
         data = npy.read_bytes()
-        if info.get("payload_hash") != h or hashlib.sha256(data).hexdigest() != info.get("npy_sha256"):
+        if info.get("payload_hash") != h or hashlib.sha256(data).hexdigest() != info.get("npy_sha256") or \
+                (info.get("model"), info.get("dims"), info.get("policy")) != \
+                (settings.embedding_model, settings.embedding_dimensions, EMBED_POLICY):
             return None
         vec = np.load(io.BytesIO(data), allow_pickle=False)
     except (OSError, ValueError, json.JSONDecodeError):
@@ -119,6 +139,10 @@ def cache_get(settings: Settings, h: str) -> np.ndarray | None:
 
 
 def cache_put(settings: Settings, h: str, vec: np.ndarray, meta: dict) -> None:
+    if settings.database_backend == "postgresql":
+        from .vector_store import cache_put as pg_cache_put
+        pg_cache_put(settings, h, vec, meta)
+        return
     data = _npy_bytes(vec)
     d = cache_dir(settings)
     write_bytes_atomic(d / f"{h}.npy", data)
@@ -229,7 +253,9 @@ def query_vector(settings: Settings, transport: Transport | None, question: str,
     info = {"cache": "miss", "payload_hash": h, **{k: v for k, v in result.items() if k != "vectors"}}
     if result["status"] != "ok":
         return None, info
-    cache_put(settings, h, result["vectors"][0], {"kind": "query", "attempt_id": result["attempt_id"]})
+    cache_put(settings, h, result["vectors"][0], {"kind": "query", "attempt_id": result["attempt_id"],
+              "normalized_payload_sha256": hashlib.sha256(normalize_payload(text).encode()).hexdigest(),
+              "construction": "provider-explicit-dimensions:l2-float32"})
     return result["vectors"][0], info
 
 
@@ -260,7 +286,7 @@ def index_payloads(settings: Settings, index_version: str) -> tuple[dict, list[d
     out = []
     for c in read_jsonl(chunks_path):
         text = normalize_payload(c["payload"])
-        out.append({"chunk_id": c["chunk_id"], "text": text,
+        out.append({"chunk_id": c["chunk_id"], "extraction_id": c["extraction_id"], "text": text,
                     "payload_hash": payload_hash(text, settings.embedding_model, settings.embedding_dimensions)})
     return row, out
 
@@ -355,6 +381,11 @@ def plan_embeddings(settings: Settings, index_version: str) -> dict:
 
 
 def dense_version_for(settings: Settings, row: dict) -> str:
+    if settings.database_backend == "postgresql":
+        return "p" + hashlib.sha256(dumps({"store": "pgvector-exact-1", "v": DENSE_VERSION,
+                                            "index": row["index_version"], "manifest": row["manifest_hash"],
+                                            "model": settings.embedding_model, "dims": settings.embedding_dimensions,
+                                            "policy": EMBED_POLICY}).encode()).hexdigest()[:15]
     return "d" + hashlib.sha256(dumps({"v": DENSE_VERSION, "index": row["index_version"],
                                        "manifest": row["manifest_hash"], "model": settings.embedding_model,
                                        "dims": settings.embedding_dimensions, "policy": EMBED_POLICY}
@@ -401,7 +432,9 @@ def build_dense(settings: Settings, transport: Transport | None, index_version: 
             finish_job_request(settings, request_id, "failed", out)
             return out
         for p, vec in zip(batch, result["vectors"]):
-            cache_put(settings, p["payload_hash"], vec, {"kind": "chunk", "attempt_id": result["attempt_id"]})
+            cache_put(settings, p["payload_hash"], vec, {"kind": "chunk", "attempt_id": result["attempt_id"],
+                      "normalized_payload_sha256": hashlib.sha256(p["text"].encode()).hexdigest(),
+                      "construction": "provider-explicit-dimensions:l2-float32"})
         done_batches += 1
         if result.get("billing") == "unknown":
             # Vectors arrived but the provider reported no usage: keep them, spend nothing more until reconciled.
@@ -442,6 +475,7 @@ def publish_dense(settings: Settings, row: dict, payloads: list[dict]) -> dict:
                   "base_manifest_hash": row["manifest_hash"], "model": settings.embedding_model,
                   "dimensions": settings.embedding_dimensions, "policy": EMBED_POLICY, "rows": len(payloads),
                   "unique_payloads": len({p["payload_hash"] for p in payloads})}
+        config["vector_store"] = "pgvector-exact" if settings.database_backend == "postgresql" else "numpy"
         manifest = {"index_version": version, "created_at": utcnow(), "config": config, "files": files,
                     "row_order": "keyword index chunks.jsonl line order"}
         write_text_atomic(tmp / "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=1))
@@ -460,6 +494,9 @@ def publish_dense(settings: Settings, row: dict, payloads: list[dict]) -> dict:
             (version, str(manifest_path), hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
              row["source_set_hash"], dumps(config), utcnow()))
     try:
+        if settings.database_backend == "postgresql":
+            from .vector_store import publish
+            publish(settings, version, payloads, config)
         DenseIndex.load(settings, version, require_ready=False)
     except DenseError:
         with open_db(settings.db_path) as conn, tx(conn, immediate=True):
@@ -483,6 +520,9 @@ class DenseIndex:
     def load(cls, settings: Settings, version: str, base=None, require_ready: bool = True) -> "DenseIndex":
         """Verifies manifest, file hashes, dtype, shape, finiteness, unit norms and row order. `base`, when
         given, must be the keyword index the matrix was built from, row for row."""
+        if settings.database_backend == "postgresql":
+            from .vector_store import PgDenseIndex
+            return PgDenseIndex.load(settings, version, base, require_ready)
         with open_db(settings.db_path) as conn:
             row = conn.execute("SELECT * FROM indexes WHERE index_version = ?", (version,)).fetchone()
             base_row = None

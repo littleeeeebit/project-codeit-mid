@@ -4,9 +4,17 @@ This runbook covers launching, giving access, stopping, recovering and reconcili
 
 Run the commands with the project environment's interpreter from any directory. Paths in environment variables must be absolute.
 
+## PostgreSQL migration and Settings limit
+
+The PostgreSQL replacement and its paid-disabled rehearsal are documented in the [migration handover](../../handoff/postgresql-pgvector/README.md). The live production ledger remains explicitly configured as SQLite until the reviewed maintenance-window cutover. PostgreSQL is the implementation default: a missing DSN, failed database or missing complete import stops operation. Start infrastructure with `./tools/start-postgresql.ps1`; this leaves `RFP_DATABASE_DSN` unchanged. Select an imported, validated PostgreSQL database explicitly only for isolated rehearsal or the coordinated cutover. Never initialize an empty rehearsal target before running its import.
+
+Application startup also requires successful persisted artifact validation for the imported snapshot and rechecks artifact hashes. A failed or interrupted validation disables PostgreSQL paid admission and blocks startup until validation passes. A completed table import alone is insufficient.
+
+The owner approved paid migration work and a $10 shared operating cap on 2026-10-03. The Settings page edits that shared cumulative cap, records visitor name and reason, preserves settled/unknown amounts, and scales current purpose envelopes. It does not change API keys, provider account quotas, paid admission or historical prices. Existing no-login visitors have the budget-admin capability; the limit is shared, not a per-person account. Decreasing below committed spend or purpose reservations is refused. CLI equivalents are `set-limit --usd <amount> --actor <name> --reason <reason>` and `set-envelopes --file <absolute JSON> --actor <name> --reason <reason>`.
+
 ## 1. One owner, one data directory
 
-- One process owns `RFP_DATA_DIR` at a time. The serving app and every paid CLI job take `gateway.lock` there. A second owner is refused with `GatewayLockError`. Stop the UI before paid maintenance (`build-dense`, `evaluate-retrieval --allow-paid-queries`).
+- One process owns `RFP_DATA_DIR` at a time. The PostgreSQL serving app and paid CLI jobs take the same database-wide session advisory lock across hosts; legacy SQLite uses `gateway.lock`. A second owner is refused with `GatewayLockError`. Stop the UI before paid maintenance (`build-dense`, `evaluate-retrieval --allow-paid-queries`).
 - The ledger, requests, audit events and corrections all live in `rfp.sqlite3` on a local disk. A network share is outside the contract.
 - The operational config (`RFP_CONFIG_FILE`) holds no secrets. `OPENAI_API_KEY` stays in the server environment or `.env`.
 
@@ -25,11 +33,12 @@ Local development and single-host use:
 
 ```powershell
 cd web; npm ci; npm run build; cd ..        # once per checkout or screen change: writes web/out
+$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.corpus-before-cutover.example.json).Path # until cutover
 python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
 
 The API serves the built screens from `web/out` and the routes under `/api/`, so members need only this one port.
-Never run more than one worker: the process owns the request executor and `gateway.lock`.
+Never run more than one worker: the process owns the request executor and the database-wide paid-gateway lock.
 
 Team access is an **owner decision**. No host, tunnel or network has been configured or verified by this phase. Because there is no login, binding to `0.0.0.0` exposes spending and administration to everyone on that network. Choose deliberately:
 
@@ -235,6 +244,7 @@ python -m rfp_assistant.cli backup --destination D:\rfp-backups\2026-10-02 --act
 python -m rfp_assistant.cli restore-check --backup D:\rfp-backups\2026-10-02\manifest.json
 ```
 
-- `backup` uses SQLite's online backup API (consistent with WAL), copies `datasets/`, `sealed/`, `runs/` and `releases/`, and records the hashes of the immutable extraction and index artifacts it references, the ledger amounts and the reconciliation watermark. It refuses a relative, non-empty or overlapping destination. Keys and `.env` are not included; the owner backs them up separately.
-- `restore-check` restores into a fresh staging directory with paid generation off and the fake provider. It verifies the database hash, schema, settled/pending/unknown/available amounts, prior use, adjustments, attempt states, copied files, extraction artifacts and the active index (and dense matrix) row mapping. It also previews restart recovery: unknown reserves stay pending; nothing is replayed. A summary goes to `.runtime/releases/restore-checks/`.
+- On PostgreSQL, `backup` takes the gateway lock/write mutex and uses a complete native custom-format dump. `restore-check` requires only the backup and `RFP_RESTORE_DATABASE_DSN` for a distinct empty target; the primary database may be lost or its DSN unset. Recovery commits a durable target fence before the atomic native restore and holds gateway/import locks through verification. Any failure keeps startup and paid admission blocked; successful recovery also leaves paid admission disabled. Referenced immutable files currently stay at their managed paths. See the handover for limitations and commands. After new PostgreSQL writes/spending, use a consistent validated PostgreSQL recovery; never resume stale SQLite spending.
+- On explicit legacy SQLite, `backup` uses SQLite's online backup API (consistent with WAL), copies `datasets/`, `sealed/`, `runs/` and `releases/`, and records the hashes of the immutable extraction and index artifacts it references, the ledger amounts and the reconciliation watermark. It refuses a relative, non-empty or overlapping destination. Keys and `.env` are not included; the owner backs them up separately.
+- SQLite `restore-check` restores into a fresh staging directory with paid generation off and the fake provider. It verifies the database hash, schema, settled/pending/unknown/available amounts, prior use, adjustments, attempt states, copied files, extraction artifacts and the active index (and dense matrix) row mapping. It also previews restart recovery: unknown reserves stay pending; nothing is replayed. A summary goes to `.runtime/releases/restore-checks/`. PostgreSQL publishes its authoritative report in `bidmate_recovery.receipt` in the same durable transaction as validation and readiness. Read `SELECT report_json FROM bidmate_recovery.receipt WHERE id=1` on the isolated target; the CLI reports this receipt location. PostgreSQL no longer writes a filesystem success receipt. Startup and paid admission reject verified recovery fences lacking a committed successful receipt; earlier restored targets require a fresh isolated restore.
 - Real recovery (phase 5): stop the old owner, restore-check the backup, reconcile spending after its watermark, then copy the database into place and start one owner. Never let the old and the restored owner dispatch concurrently, and never reset the allowance.

@@ -84,7 +84,9 @@ def write_corpus(root: Path, rows=ROWS) -> Path:
 
 def make_env(root: Path, *, paid: bool = True, index: bool = True) -> Env:
     source = write_corpus(root)
-    settings = Settings(source_dir=source, data_dir=root / "data", hwp_converter=None, provider="fake")
+    settings = Settings(database_backend="sqlite", source_dir=source, data_dir=root / "data",
+                        hwp_converter=None, provider="fake", embedding_model="text-embedding-3-small",
+                        embedding_dimensions=1536)
     settings.data_dir.mkdir()
     store.init_schema(settings.db_path)
     budget.ensure_budget_row(settings.db_path)

@@ -99,13 +99,15 @@ def answer_json_schema() -> dict:
 class OpenAITransport:
     """Hidden SDK retries disabled, finite timeout. One instance is owned by service.Resources."""
 
-    def __init__(self, api_key: str, timeout: float) -> None:
+    def __init__(self, api_key: str, timeout: float, owner_check=None) -> None:
         import openai
 
         self._openai = openai
         self._client = openai.OpenAI(api_key=api_key, max_retries=0, timeout=timeout)
+        self._owner_check = owner_check
 
     def chat(self, *, model, messages, response_format, max_completion_tokens, reasoning_effort) -> ProviderResponse:
+        self._check_owner()
         o = self._openai
         try:
             resp = self._client.chat.completions.create(
@@ -130,6 +132,7 @@ class OpenAITransport:
                                 choice.finish_reason, usage, resp.id)
 
     def embed(self, *, model, inputs, dimensions) -> EmbeddingResponse:
+        self._check_owner()
         o = self._openai
         try:
             resp = self._client.embeddings.create(model=model, input=inputs, dimensions=dimensions,
@@ -146,6 +149,13 @@ class OpenAITransport:
 
     def close(self) -> None:
         self._client.close()
+
+    def _check_owner(self):
+        if self._owner_check is not None:
+            try:
+                self._owner_check()
+            except RuntimeError:
+                raise ProviderError("paid gateway ownership was lost before provider execution", pre_execution=True) from None
 
 
 class FakeTransport:

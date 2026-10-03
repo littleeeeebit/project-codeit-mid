@@ -1,4 +1,4 @@
-"""SQLite initialization, bounded transactions and small shared queries.
+"""Authoritative PostgreSQL operations and explicit legacy SQLite operations.
 
 Connections are opened per operation and closed explicitly; no transaction spans network inference.
 """
@@ -14,6 +14,11 @@ from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
+
+from . import postgres
+
+DATABASE_ERRORS = (sqlite3.Error, postgres.psycopg.Error, postgres.PoolTimeout)
+OPERATIONAL_ERRORS = (sqlite3.OperationalError, postgres.psycopg.OperationalError, postgres.PoolTimeout)
 
 SCHEMA_VERSION = 6  # 5: background requests, audit events, corrections, verifier runs; 6: gold review log, eval estimates
 BUSY_TIMEOUT_MS = 5000
@@ -318,12 +323,26 @@ def connect(db_path: Path) -> sqlite3.Connection:
 
 @contextmanager
 def open_db(db_path: Path) -> Iterator[sqlite3.Connection]:
+    if isinstance(db_path, postgres.Target):
+        with postgres.open_db(db_path) as conn:
+            yield conn
+        return
+    if (db_path.parent / "postgresql-authority.json").exists():
+        with closing(sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True,
+                                    isolation_level=None)) as conn:
+            conn.row_factory = sqlite3.Row
+            yield conn
+        return
     with closing(connect(db_path)) as conn:
         yield conn
 
 
 @contextmanager
 def tx(conn: sqlite3.Connection, immediate: bool = False) -> Iterator[sqlite3.Connection]:
+    if isinstance(conn, postgres.Connection):
+        with postgres.tx(conn, immediate) as operation:
+            yield operation
+        return
     conn.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
     try:
         yield conn
@@ -335,6 +354,8 @@ def tx(conn: sqlite3.Connection, immediate: bool = False) -> Iterator[sqlite3.Co
 
 def init_schema(db_path: Path) -> int:
     """Idempotent: creates missing tables, never resets budget or ledger rows."""
+    if isinstance(db_path, postgres.Target):
+        return postgres.init_schema(db_path, SCHEMA, SCHEMA_VERSION)
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with open_db(db_path) as conn:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
@@ -355,6 +376,20 @@ def init_schema(db_path: Path) -> int:
         conn.executescript(SCHEMA)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         return SCHEMA_VERSION
+
+
+@contextmanager
+def database_lifecycle(db):
+    if isinstance(db, postgres.Target):
+        with postgres.lifecycle(db) as pool:
+            yield pool
+    else:
+        yield None
+
+
+def schema_version(conn):
+    return postgres.schema_version(conn) if isinstance(conn, postgres.Connection) else \
+        conn.execute("PRAGMA user_version").fetchone()[0]
 
 
 def get_app_setting(conn: sqlite3.Connection, key: str) -> str | None:

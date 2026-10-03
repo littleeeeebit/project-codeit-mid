@@ -84,6 +84,11 @@ class Budget(BaseModel):
     warnings: list[str] = Field(description="Only the highest cap level, then the other warnings")
 
 
+class BudgetLimitIn(BaseModel):
+    cap_micro_usd: int = Field(strict=True, gt=0, le=9_000_000_000_000_000)
+    reason: str = Field(min_length=1, max_length=500)
+
+
 class Dated(BaseModel):
     value: str
     precision: str
@@ -274,6 +279,11 @@ def _routes(app: FastAPI) -> None:
     @app.get("/api/budget", response_model=Budget)
     def budget(res: Res, member: Member):
         snap = service.budget_snapshot(res, member)
+        return Budget(snapshot=snap, warnings=service.visible_warnings(snap.warnings))
+
+    @app.put("/api/budget/limit", response_model=Budget)
+    def budget_limit(body: BudgetLimitIn, res: Res, member: Member):
+        snap = service.set_budget_limit(res, member, body.cap_micro_usd, body.reason)
         return Budget(snapshot=snap, warnings=service.visible_warnings(snap.warnings))
 
     @app.get("/api/documents", response_model=list[Document])

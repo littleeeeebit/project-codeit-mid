@@ -15,6 +15,16 @@ python -m pip install -e . --no-deps
 
 The HWP converter (`hwp5proc` from pyhwp 0.1b15) is installed into the same environment and resolved automatically from `Scripts\hwp5proc.exe`. To use an isolated converter environment instead, set `RFP_HWP_CONVERTER` to the absolute path of its `hwp5proc.exe`. The converter prints a harmless warning when `xmllint` is missing.
 
+## PostgreSQL setup and migration status
+
+PostgreSQL is the selected migration backend and pgvector is the selected vector store. The implementation default is PostgreSQL, but the live application must explicitly retain its SQLite configuration until the coordinated, reviewed cutover. For infrastructure rehearsal, start Docker Desktop (Linux containers), then run `./tools/start-postgresql.ps1`. The script starts pinned PostgreSQL 18.6 / pgvector 0.8.6 on loopback port 55432 and leaves `RFP_DATABASE_DSN` unchanged. It never selects the empty `bidmate_rehearsal` database for application startup. Driver and pool versions are pinned in the requirements. See the [PostgreSQL handover](handoff/postgresql-pgvector/README.md) for explicit imported-target configuration, the tested full-record import, backup/restore commands and pending acceptance.
+
+Existing SQLite runtimes require an explicit snapshot/import; startup never silently imports or falls back. Use a new, isolated target for rehearsal and keep paid admission disabled. The production corpus is not yet cut over. The owner selected `text-embedding-3-large` at 1,536 dimensions, pending independent quality acceptance against the native 3,072 reference. The owner approved paid work and a $10 operating cap on 2026-10-03. The Settings page can change the shared cumulative limit while preserving spending and reservations; it uses the existing no-login attribution model.
+
+PostgreSQL startup requires successful `migration validate` for the imported snapshot and rechecks immutable artifact hashes, including index payload files. Table import completion alone cannot authorize startup. Failed validation or a failed recovery fence blocks startup and paid admission. PostgreSQL `restore-check` uses the backup and a distinct empty `RFP_RESTORE_DATABASE_DSN` without connecting to the primary database; recovery leaves paid admission disabled.
+
+The authorized large/1,536 corpus build completed with 79 real metered embedding calls: 18,548 unique payloads cover 18,983 active chunk rows, costing $1.019019. Total recorded spending is $1.631473 of the $10 cap, with no unknown reservations. This pre-cutover build used the sole live ledger; `tools/import_embedding_cache.py` explicitly transfers its verified settled caches into a matching paid-disabled PostgreSQL import without inference. Serving remains on the existing keyword index until quality acceptance and cutover. Receipts and exact commands are in the handover.
+
 ## Configuration
 
 Settings resolve from the repository location, never the working directory. Optional overrides must be absolute paths.
@@ -22,7 +32,8 @@ Settings resolve from the repository location, never the working directory. Opti
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `RFP_SOURCE_DIR` | `<repo>/원본 데이터` | `data_list.csv` and `files/` |
-| `RFP_DATA_DIR` | `<repo>/.runtime` | SQLite ledger, extractions, indexes, datasets, reports |
+| `RFP_DATA_DIR` | `<repo>/.runtime` | Managed extractions, indexes, datasets and reports; retired SQLite snapshots |
+| `RFP_DATABASE_DSN` | required | Secret PostgreSQL connection string in the process environment |
 | `RFP_CONFIG_FILE` | none | JSON with nonsecret `Settings` fields (unknown keys are rejected) |
 | `RFP_HWP_CONVERTER` | env `Scripts\hwp5proc.exe` | HWP → XML converter |
 | `OPENAI_API_KEY` | none | Process environment, then the repository `.env`; never printed |
@@ -34,6 +45,8 @@ Answers use `gpt-6-luna` through Chat Completions with strict structured output,
 ## Commands
 
 Run from any directory with the environment's interpreter:
+
+Before cutover, first set `RFP_CONFIG_FILE` to the absolute path of `handoff/postgresql-pgvector/config.corpus-before-cutover.example.json` in this checkout. These maintenance commands then retain the sole live SQLite ledger. For PostgreSQL rehearsal, use the PostgreSQL configuration and explicitly select the completed imported target from the handover; ordinary commands refuse empty/partial imports. An explicit `init` must never be run on a migration target before import.
 
 ```powershell
 python -m rfp_assistant.cli init --paid-disabled          # schema + allowance row; never resets spending
@@ -52,10 +65,12 @@ a static export that the API serves itself, so one process on one port serves bo
 
 ```powershell
 cd web; npm ci; npm run build; cd ..                     # writes web/out (types come from web/openapi.json)
+# Until coordinated cutover, keep the sole live SQLite ledger and keyword serving:
+$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.corpus-before-cutover.example.json).Path
 python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
 
-Exactly one worker: paid requests run on the process's own executor and the process owns `gateway.lock`. For screen
+Exactly one worker: paid requests run on the process's own executor and the process holds a database-wide gateway advisory lock (legacy SQLite uses `gateway.lock`). For screen
 work, run the API on 8511 and `npm run dev` in `web/` (port 8510, `/api/*` forwarded to `RFP_API_URL`, default
 `http://127.0.0.1:8511`). After changing a route or its shapes, regenerate the schema the screens are typed from with
 `python tools/openapi.py`; `tests/test_api.py` fails while it is stale. `npm run lint` and `npm run typecheck` check

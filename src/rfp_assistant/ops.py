@@ -166,7 +166,7 @@ def write_phase3_report(settings: Settings) -> Path:
         return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
 
     with store.open_db(settings.db_path) as conn:
-        schema = conn.execute("PRAGMA user_version").fetchone()[0]
+        schema = store.schema_version(conn)
         requests = dict(conn.execute("SELECT status, COUNT(*) FROM requests WHERE request_json IS NOT NULL "
                                      "GROUP BY status").fetchall())
         attempts = [dict(r) for r in conn.execute(

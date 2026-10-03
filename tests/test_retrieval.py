@@ -52,7 +52,7 @@ class ScopedCodeTest(unittest.TestCase):
         corpus = [an.tokens(c["payload"]) for c in chunks] + [["무관", f"문서{i}"] for i in range(30)]
         index = KeywordIndex("t", "reviewed_only", chunks, BM25Okapi(corpus), rows, elements)
         with tempfile.TemporaryDirectory() as tmp:
-            s = Settings(source_dir=Path(tmp), data_dir=Path(tmp), hwp_converter=None, provider="fake")
+            s = Settings(database_backend="sqlite", source_dir=Path(tmp), data_dir=Path(tmp), hwp_converter=None, provider="fake")
             r = retrieve(s, index, an, "SFR-001 로그인 요구사항의 세부 내용은?", [(DocRef("A", "ha"), "xa")])
         by_id = {c["chunk_id"]: c for c in chunks}
         self.assertTrue(r.evidence)
@@ -139,7 +139,7 @@ class LexicalTest(unittest.TestCase):
                                                  "지체상금은 계약금액의 1천분의 1로 한다."), "xa")
         cls.index = _index({"xa": els})
         cls.tmp = tempfile.TemporaryDirectory()
-        cls.settings = Settings(source_dir=Path(cls.tmp.name), data_dir=Path(cls.tmp.name), hwp_converter=None,
+        cls.settings = Settings(database_backend="sqlite", source_dir=Path(cls.tmp.name), data_dir=Path(cls.tmp.name), hwp_converter=None,
                                 provider="fake")
         cls.scope = [(DocRef("A", "ha"), "xa")]
 
@@ -177,7 +177,7 @@ class SplitConditionTest(unittest.TestCase):
         self.assertGreaterEqual(len(pieces), 2)
         self.assertTrue(all(c["token_count"] <= chunking.HARD_TOKENS for c in index.chunks))
         with tempfile.TemporaryDirectory() as tmp:
-            s = Settings(source_dir=Path(tmp), data_dir=Path(tmp), hwp_converter=None, provider="fake")
+            s = Settings(database_backend="sqlite", source_dir=Path(tmp), data_dir=Path(tmp), hwp_converter=None, provider="fake")
             r = retrieve(s, index, fixtures.analyzer(), "납품 장비 목록", [(DocRef("A", "ha"), "xa")])
             quotes = "".join(e.quote for e in r.evidence)
             self.assertIn("부가가치세 별도", quotes)  # the condition travels with the fact
@@ -218,7 +218,7 @@ class RerankerScopeTest(unittest.TestCase):
                 return [(99, 9.0), (-1, 8.0)] + [(i, 0.0) for i in range(len(chunks))], {}
 
         with tempfile.TemporaryDirectory() as tmp:
-            s = Settings(source_dir=Path(tmp), data_dir=Path(tmp), hwp_converter=None, provider="fake")
+            s = Settings(database_backend="sqlite", source_dir=Path(tmp), data_dir=Path(tmp), hwp_converter=None, provider="fake")
             r = retrieve(s, index, fixtures.analyzer(), "하자보수 기간", [(DocRef("A", "ha"), "xa")],
                          mode="hybrid_rerank", dense=dense, query_vector=[1.0], reranker=Hostile())
             self.assertEqual(r.mode, "hybrid_rerank")
@@ -266,7 +266,7 @@ class ObservedNumericMissTest(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.settings = Settings(source_dir=Path(self.tmp.name), data_dir=Path(self.tmp.name), hwp_converter=None,
+        self.settings = Settings(database_backend="sqlite", source_dir=Path(self.tmp.name), data_dir=Path(self.tmp.name), hwp_converter=None,
                                  provider="fake")
 
     def tearDown(self):
