@@ -1,0 +1,87 @@
+{
+  "id": "frontend-redesign-shell",
+  "goal": "The existing Next.js frontend is a presentation shell over the existing FastAPI adapter and backend service. RAG chat, verification and dataset generation have separate pages. The screens follow the user's recorded choices and render structured, readable results. Verification shows automatic saved-review history and scannable task and retrieval views. Streamlit remains removed.",
+  "out": [
+    "Changing retrieval, generation, budget, gold, sealed evaluation or release decision logic beyond exposing existing service calls and read-only saved-review history",
+    "Adding another API or frontend stack beyond the existing Next.js frontend and FastAPI adapter, or restoring Streamlit",
+    "Adding login or authentication (Phase 3 decision: no login)",
+    "Copying the repository or creating another checkout for this task",
+    "Pushing or opening a pull request from the agent; the task server owns publication after checking completion"
+  ],
+  "done": [
+    "git diff --check",
+    "DESIGN.md records the user's concrete choices for navigation and page split, chat claims with E1/E2 citations and source preview, verification trace and review layout, dataset generation and candidate review, every original UI setting or control, typography and density, and accessible colours. The recorded alternatives cover at least three navigation, chat, verification, dataset and palette variants. Existing accepted choices are retained rather than reopening the abandoned Streamlit decision.",
+    "DESIGN.md records the current Next.js design pass in order: purpose and layout, browser-measured widths/spacing/button behaviour, typography, user-selected accessible colours, remaining space. Historical Streamlit measurements and fixture observations are clearly distinguished from current measurements on the real runtime.",
+    "RAG chat, verification and dataset generation are separate Next.js pages at /, /verify/ and /dataset/, served through the existing API. Chat has no evaluation, trace or debug controls. Verification holds retrieval trace, run comparison, evaluation and release results, original review, development gold review and permitted sealed status.",
+    "The dataset page calls the existing source-bound gpt-6-luna draft, submit and decide service functions through the API. Drafting goes through the budget gateway with an estimate and explicit paid consent. Pending candidates appear beside their original evidence spans. A reviewer other than the drafter approves or rejects with a note; self-approval is refused by the service, and sealed questions and labels never reach development generation or the candidate UI.",
+    "Frontend domain actions call the typed API client, and API domain actions call service.py. Retrieval, generation, store and budget logic stay behind the service boundary; tests confirm api.py imports no package internals other than service and cover logic exposed by this task. The committed OpenAPI schema matches the adapter. Streamlit app.py and ui.py remain absent.",
+    "Results render as structured components: numbered claims with citation chips, labelled status badges, tables and expandable exact evidence. Loading, complete, insufficient-evidence, clarification, conflict, budget-blocked and technical-error states each have a distinct rendering. Verification tasks use a searchable queue beside one selected finding; retrieval stages expose structured stage details and warnings. Revision history reads saved source reviews and development gold decisions automatically without a second manual record form; legacy rejection reasons remain visible, prior unapplied proposals are labelled, and sealed content is excluded.",
+    "Controls marked remove in DESIGN.md are absent from the UI; controls marked move-to-CLI remain available through their CLI operations. Settings still used by the backend are retained. The manual verification revision-record form is removed; saving an actual review is sufficient for its history entry.",
+    "Accessibility basics hold on the current frontend: Korean UI labels, labelled inputs, keyboard navigation, visible focus and readable contrast. Answer text, exact evidence, task titles and source names use the accepted 16 px reading size; desktop and 390 px layouts keep the page within the viewport, with wide tables scrolling inside their containers. Production build, TypeScript, relevant lint and focused service/API tests pass. Fixture tests establish contracts, not real-answer quality or user visual acceptance.",
+    "The user has clicked through chat, verification and dataset generation on the actual corpus and runtime and explicitly confirmed each screen before the done report and server publication. Chat and verification acceptance are recorded; dataset acceptance remains pending until confirmed. No acceptance is inferred from a synthetic provider response, a smoke test or an agent's own browser inspection. Paid provider calls require explicit consent."
+  ],
+  "grounds": {
+    "pages": [
+      "web/src/app/page.tsx",
+      "web/src/app/verify/page.tsx",
+      "web/src/app/dataset/page.tsx"
+    ],
+    "files": [
+      "DESIGN.md",
+      "src/rfp_assistant/api.py",
+      "src/rfp_assistant/service.py",
+      "src/rfp_assistant/settings.py",
+      "web/src/components/ask",
+      "web/src/components/verify",
+      "web/src/components/dataset",
+      "web/openapi.json",
+      "web/package.json",
+      "tests/test_api.py",
+      "tests/test_shell.py"
+    ],
+    "rules": [
+      "This is the repository replacement specification prepared with the user's approval on 2026-10-03. The task runner must adopt it to replace the externally supplied specification; this file alone does not modify active session instructions or server configuration.",
+      "Keep the task's existing rules: work only in this worktree, commit changes with repository conventions, obtain approval for writes and non-read commands, and leave a clean worktree.",
+      "The agent must not push or open a PR. The server owns both after checking the completed work.",
+      "Emit a done-report only after every adopted done item passes, preserving its order and exact text with evidence. The server reruns the first done item.",
+      "Write files as UTF-8 without BOM. Do not copy credentials, create a replacement budget ledger, reset the index or use fake-provider results as live acceptance evidence."
+    ],
+    "evidence": [
+      "DESIGN.md records the original choice pass and the later live Next.js layout choices, followed by the real-runtime connection, chat readability pass and verification redesign.",
+      "Commit d280ec3 removed Streamlit; commits 906c8ad, 965833a and 973bc03 introduced the existing API and three frontend pages; commit 0290aeb served the built frontend through that API.",
+      "Commits 896dd4a, 9172b2a and 99b4b90 implement reading hierarchy, automatic verification history and legacy rejection reasons. Commit e64666e records the user's verification approval.",
+      "tests/test_api.py checks the service-only API import boundary, schema parity, saved source reviews without a second write, development decisions and sealed-question exclusion. tests/test_shell.py checks development-only drafting sources and decisions by someone other than the requester.",
+      "The user approved preparing this revised specification on 2026-10-03. Dataset acceptance has not been recorded."
+    ]
+  },
+  "decisions": [
+    {
+      "what": "Continue the existing Next.js frontend and FastAPI adapter over service.py; keep Streamlit removed",
+      "why": "The user explicitly abandoned Streamlit because of limited layout flexibility. The current branch already contains the selected replacement and the three working pages.",
+      "rejected": "Restoring Streamlit or creating another frontend/API implementation to satisfy the obsolete stack requirement"
+    },
+    {
+      "what": "Retain the concrete design choices recorded in DESIGN.md and inspect the actual rendered screens when repairing readability",
+      "why": "The user already selected layouts and colours, accepted chat, then required repeated visual inspection and repair of verification. Repeating those choices would reverse settled decisions.",
+      "rejected": "Choosing a fresh layout or palette without the user, treating historical fixture screenshots as current acceptance, or claiming zero slop from an unmeasured percentage"
+    },
+    {
+      "what": "Derive revision history automatically from actual saved reviews and decisions",
+      "why": "A verifier should perform the review once. Asking for a separate manual revision record duplicates work and does not reliably describe saved outcomes.",
+      "rejected": "Requiring copied IDs, quotes and proposal JSON in a second revision-record form"
+    },
+    {
+      "what": "Keep one local task branch and one service/API boundary; preserve backend decision and budget safeguards",
+      "why": "The user requested work in branches without repository copies. The existing linked worktree is the assigned workspace, and UI improvements do not require another implementation of backend rules.",
+      "rejected": "Another repository copy or worktree, a second service implementation, new login, or paid test calls without consent"
+    },
+    {
+      "what": "Preserve explicit three-page user acceptance and server-owned PR publication",
+      "why": "Changing the obsolete stack requirement must not invent acceptance evidence or bypass the task's publication boundary. Chat and verification are accepted; dataset acceptance remains outstanding.",
+      "rejected": "Marking all criteria passed because the branch is committed or editing a local file as if the server had already adopted it"
+    }
+  ],
+  "review_profile": "code",
+  "review_profile_version": 1,
+  "artifact_root": null
+}
