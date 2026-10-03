@@ -25,7 +25,7 @@ Settings resolve from the repository location, never the working directory. Opti
 | `RFP_DATA_DIR` | `<repo>/.runtime` | SQLite ledger, extractions, indexes, datasets, reports |
 | `RFP_CONFIG_FILE` | none | JSON with nonsecret `Settings` fields (unknown keys are rejected) |
 | `RFP_HWP_CONVERTER` | env `Scripts\hwp5proc.exe` | HWP → XML converter |
-| `OPENAI_API_KEY` | none | Process environment, then the repository `.env`, then `.streamlit/secrets.toml`; never printed |
+| `OPENAI_API_KEY` | none | Process environment, then the repository `.env`; never printed |
 
 Without `OPENAI_API_KEY` the app still runs: search, filters, evidence browsing and retrieval traces are free; paid generation reports that the provider is unavailable. `provider: "fake"` in the config file never builds a real SDK client.
 
@@ -45,8 +45,31 @@ python -m rfp_assistant.cli check --phase 3 --provider fake   # service, budget 
 python -m rfp_assistant.cli load-check --users 6 --provider fake   # six concurrent members, temporary ledger
 python -m rfp_assistant.cli check --phase 4 --provider fake   # gold, evaluation, sealed run, backup and report gate
 python -m rfp_assistant.cli check --phase all --provider fake --save   # every test; recorded for release-report
-python -m streamlit run app.py --server.address 127.0.0.1
 ```
+
+The screens are a Next.js app in `web/` over a FastAPI wrapper of `service` (`src/rfp_assistant/api.py`). A build is
+a static export that the API serves itself, so one process on one port serves both. Node.js is needed only to build:
+
+```powershell
+cd web; npm ci; npm run build; cd ..                     # writes web/out (types come from web/openapi.json)
+python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
+```
+
+Exactly one worker: paid requests run on the process's own executor and the process owns `gateway.lock`. For screen
+work, run the API on 8511 and `npm run dev` in `web/` (port 8510, `/api/*` forwarded to `RFP_API_URL`, default
+`http://127.0.0.1:8511`). After changing a route or its shapes, regenerate the schema the screens are typed from with
+`python tools/openapi.py`; `tests/test_api.py` fails while it is stale. `npm run lint` and `npm run typecheck` check
+`web/`.
+
+For local work, use a branch in the original checkout rather than copying the repository. The original corpus,
+`.env` and runtime are ignored by Git and do not appear in a linked worktree. If a task already requires a
+worktree, set `RFP_SOURCE_DIR` and `RFP_DATA_DIR` to the existing corpus and shared runtime before starting the
+server, with permission to write to that runtime. Keep the API key in the server environment. Never copy the
+budget DB to create a second independently spendable ledger. The shared runtime still has exactly one gateway
+owner.
+
+A fixture server with `FakeTransport` is for isolated UI or invariant checks. It is not the running application
+for user acceptance and cannot establish real retrieval or model-answer quality.
 
 The operating index includes sources whose extraction has not been compared with the original yet; the consultant screen and every trace label them. `build-keyword --reviewed-only` builds the stricter index from sources that passed the automatic check (`auto_verified`) or a human review; the operating index also keeps `unreviewed` and `auto_flagged` sources, labeled.
 
@@ -82,7 +105,7 @@ python -m rfp_assistant.cli ingest                        # merge OCR text; then
 
 ### Dataset questions
 
-Drafted questions wait in a review queue. On the `질문 검토` screen, a reviewer whose sidebar name differs from the drafter either approves each one into the dataset or rejects it with a reason into the rejection wiki. The drafting procedure for agents, including exact file locations, is [.wiki/gold-drafting.md](.wiki/gold-drafting.md).
+Drafted questions wait in a review queue. On the `데이터셋 만들기` page a verifier picks development documents and source passages, has gpt-6-luna draft source-bound questions within a consented maximum (charged to `gold_eval`), and sends the valid drafts to the queue. A reviewer whose typed name differs from both the drafter and whoever started the drafting run then approves each one into the dataset or rejects it into the rejection wiki, always with a note, with the draft shown next to its original passages. The drafting procedure for agents, including exact file locations, is [.wiki/gold-drafting.md](.wiki/gold-drafting.md).
 
 ```powershell
 python -m rfp_assistant.cli gold status                   # counts, rejection wiki path, rejections awaiting an inferred reason
@@ -159,7 +182,7 @@ python -m rfp_assistant.cli release-report --latest                            #
 
 ## Access and paid use
 
-There is no login (owner decision, reaffirmed for phase 3): every visitor gets the consultant, verification, question-review and 사용량 관리 (budget administration) screens. The name in the sidebar (default `owner`) is recorded on paid requests, review decisions, corrections and audited owner actions; it attributes work but does not authenticate anyone. Anyone who can reach the server can spend the budget and use the admin page, so keep `--server.address 127.0.0.1` unless everyone on that network may do so (see the [runbook](docs/operations/runbook.md)).
+There is no login (owner decision, reaffirmed for phase 3): every visitor gets the three pages 질문하기, 검증 and 데이터셋 만들기 (layout in [DESIGN.md](DESIGN.md)). The name typed in the header's 이름 field (default `owner`, kept in that browser) is recorded on paid requests, review decisions and corrections; it attributes work but does not authenticate anyone. Budget administration (settlement, reconciliation, external adjustments, paid on/off, the audit log) is owner CLI only: `unresolved`, `settle`, `reconcile`, `adjust`, `paid`, `audit`, each with `--actor` and a reason. Anyone who can reach the server can spend the budget, so keep `--host 127.0.0.1` unless everyone on that network may do so (see the [runbook](docs/operations/runbook.md)).
 
 Local verification: `verification.json` lists the major flows for the local verification service. Each flow runs as `python -B tools/verify.py <flow-id>` with the fake provider and ends with one `local-evidence` block. Browser flows need `pip install -e .[verify]`. See runbook §8.
 
@@ -187,4 +210,4 @@ Recorded before any distribution decision:
 
 ## Layout
 
-`src/rfp_assistant/` holds one package: `settings`, `contracts`, `store`, `auth`, `ingestion`, `chunking`, `retrieval`, `dense` (embedding cache, matrix, reranker), `budget`, `generation` (the only SDK call site), `service` (also the bounded request executor), `ui`, `cli`, `evaluation` (pilot and gold-2 validation, frozen retrieval runs, source-span metrics), `gold` (the review queue), `answers` (phase-4 answer runs, scoring, blind review, latency sample), `sealed` (release freeze and the single sealed run), `release` (backup, staged restore, release report), `ops` (fake-provider load check and the phase-3 report). `app.py` launches the consultant, verifier, question-review and budget-administration pages. Tests are standard `unittest` under `tests/`.
+`src/rfp_assistant/` holds one package: `settings`, `contracts`, `store`, `auth`, `ingestion`, `chunking`, `retrieval`, `dense` (embedding cache, matrix, reranker), `budget`, `generation` (the only SDK call site), `service` (also the bounded request executor), `api` (the HTTP routes the screens call, one service function each), `cli`, `evaluation` (pilot and gold-2 validation, frozen retrieval runs, source-span metrics), `gold` (the review queue), `answers` (phase-4 answer runs, scoring, blind review, latency sample), `sealed` (release freeze and the single sealed run), `release` (backup, staged restore, release report), `ops` (fake-provider load check and the phase-3 report). `web/` holds the three pages, 질문하기, 검증 and 데이터셋 만들기; budget administration is owner CLI only. Tests are standard `unittest` under `tests/`.

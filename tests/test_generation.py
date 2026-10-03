@@ -135,12 +135,13 @@ class SafetyTest(unittest.TestCase):
                 res.close()
 
     def test_source_markup_is_rendered_as_text(self):
-        from rfp_assistant.ui import plain
-
-        out = plain("<script>alert(1)</script> [x](javascript:alert(1)) **b**")
-        self.assertNotIn("<script>", out)
-        self.assertNotIn("](", out)
-        self.assertNotIn("**", out)
+        """Source and model text reach the screens only as React text nodes, which escape markup; nothing in web/
+        injects raw HTML or renders markdown."""
+        web = Path(__file__).resolve().parents[1] / "web" / "src"
+        for path in web.rglob("*.tsx"):
+            source = path.read_text(encoding="utf-8")
+            self.assertNotIn("dangerouslySetInnerHTML", source, path)
+            self.assertNotIn("react-markdown", source, path)
 
     def test_strict_schema_rejects_unknown_fields(self):
         schema = generation.answer_json_schema()["json_schema"]["schema"]

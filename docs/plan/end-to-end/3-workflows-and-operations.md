@@ -8,7 +8,7 @@ Expected window: day 2. The minimal pages already exist from phase 1. Enter with
 
 ## Required reading and files
 
-Read [shared contracts](implementation-contracts.md), [frontend research](../../rag/frontend.md), [budget research](../../rag/budget.md) and both preceding handoffs. Inspect current `app.py`, `ui.py`, `auth.py`, `service.py`, `generation.py`, `budget.py` and `store.py` before editing them. Do not create a second API/frontend stack.
+Read [shared contracts](implementation-contracts.md), [frontend research](../../rag/frontend.md), [budget research](../../rag/budget.md) and both preceding handoffs. Inspect current `api.py`, `web/`, `auth.py`, `service.py`, `generation.py`, `budget.py` and `store.py` before editing them. Do not create a second API/frontend stack.
 
 Extend those files and create `tests/test_service.py` for request ownership, role declarations and concurrency. Add `DESIGN.md` before substantial layout changes and `docs/operations/runbook.md` for actual deployment/recovery commands. Follow the frontend design skill when implementation begins; this planning task does not choose a palette or claim browser measurements.
 
@@ -55,7 +55,7 @@ Extend the service with `submit_answer(principal, request) -> request_id`, `requ
 
 1. Create a bounded process-owned `ThreadPoolExecutor` with at most six workers and bounded pending capacity. Use a semaphore/admission guard before submission; default total admitted unfinished requests is 12. Queue saturation returns a visible local rejection before paid work. No persistent task broker is needed.
 2. Persist the input snapshot/idempotency key before submitting. Under a short transaction, claim `queued -> running` exactly once. Concurrent duplicate submissions return the same request. If local scheduling fails, mark technical failure; no unused reservation may remain.
-3. Worker receives immutable request/principal IDs, obtains allowed current settings, uses the shared retrieval/gateway functions and persists result/attempt states. It never calls Streamlit functions or mutates `st.session_state`.
+3. Worker receives immutable request/principal IDs, obtains allowed current settings, uses the shared retrieval/gateway functions and persists result/attempt states. It never touches the HTTP layer or any screen state.
 4. Keep the synchronous SDK's settings immutable. Verify the pinned client's concurrent transport behavior with six worker calls. If its documented runtime cannot share safely, use service-owned per-worker clients and close every one on controlled shutdown; do not mutate one global key/model per member.
 5. Request status distinguishes `queued|running|completed|failed|cancelled|interrupted`. Domain status and billing state are separate fields. Queued cancellation is conclusive before dispatch; running cancellation suppresses further stages/rendering but cannot assert the active provider call cost zero.
 6. On controlled stop, reject new submissions, wait a bounded time for workers, persist unfinished state and close owned clients. On restart, queued requests become interrupted unless safely requeued before any dispatch; running attempts recover as unknown. No automatic replay of uncertain paid work.
@@ -70,7 +70,7 @@ Navigating away or changing the target cancels screen ownership and requests can
 
 ### 4. Implement reactive, read-only status
 
-Use a one- or two-second Streamlit fragment to poll budget and request status. Keep network inference in the worker, so the main script returns promptly and fragment scheduling can continue. The fragment performs reads only; it must never call `submit_answer`, generation, embedding, indexing or LLM judging. [Streamlit fragments](https://docs.streamlit.io/develop/api-reference/execution-flow/st.fragment) support timed partial reruns, whose scheduling still requires real-browser verification.
+The screens poll budget (every two seconds) and their own request's status (every second) with read-only `GET` routes, and stop polling a request once it is terminal. Keep network inference in the worker, so every route returns promptly. A polling route performs reads only; it must never call `submit_answer`, generation, embedding, indexing or LLM judging. A late poll result is dropped unless it still belongs to the request the screen owns (`web/src/lib/use-poll.ts`). Polling behaviour still requires real-browser verification (`tools/verify.py six-sessions`).
 
 Show reserved maximum when a request starts, settled measured cost when usage arrives, and unknown pending cost after interruption. The shared strip updates for other members as well. Warn at 50%, 75%, 90% of the $16 operational cap and when cumulative spend runs ahead of the configured project timeline. Keep the $20 percentage denominator distinct from cap warnings.
 

@@ -20,7 +20,8 @@
    "kind": "command",
    "command": "python -B tools/verify.py access",
    "paths": [
-    "app.py",
+    "src/rfp_assistant/api.py",
+    "web/*",
     "pyproject.toml",
     "requirements.txt",
     "src/rfp_assistant/auth.py",
@@ -30,7 +31,6 @@
     "src/rfp_assistant/service.py",
     "src/rfp_assistant/settings.py",
     "src/rfp_assistant/store.py",
-    "src/rfp_assistant/ui.py",
     "tests/fixtures.py",
     "tests/test_generation.py",
     "tests/test_service.py",
@@ -89,7 +89,8 @@
    "kind": "command",
    "command": "python -B tools/verify.py request-lifecycle",
    "paths": [
-    "app.py",
+    "src/rfp_assistant/api.py",
+    "web/*",
     "pyproject.toml",
     "requirements.txt",
     "src/rfp_assistant/auth.py",
@@ -101,7 +102,6 @@
     "src/rfp_assistant/service.py",
     "src/rfp_assistant/settings.py",
     "src/rfp_assistant/store.py",
-    "src/rfp_assistant/ui.py",
     "tests/fixtures.py",
     "tests/test_service.py",
     "tools/verify.py",
@@ -275,9 +275,9 @@
    "kind": "command",
    "command": "python -B tools/verify.py repository-gates",
    "paths": [
+    "web/*",
     "DESIGN.md",
     "README.md",
-    "app.py",
     "docs/*",
     "handoff/*",
     "pyproject.toml",
@@ -311,6 +311,10 @@
     {
      "id": "full-suite",
      "expected": "The full unittest discovery passes"
+    },
+    {
+     "id": "web-checks",
+     "expected": "npm run lint and npm run typecheck pass in web/"
     }
    ]
   },
@@ -331,7 +335,6 @@
     "src/rfp_assistant/sealed.py",
     "src/rfp_assistant/service.py",
     "src/rfp_assistant/store.py",
-    "src/rfp_assistant/ui.py",
     "tests/fixtures.py",
     "tests/phase4_fixtures.py",
     "tests/test_evaluation.py",
@@ -363,7 +366,8 @@
    "kind": "browser",
    "command": "python -B tools/verify.py consultant-answer",
    "paths": [
-    "app.py",
+    "src/rfp_assistant/api.py",
+    "web/*",
     "pyproject.toml",
     "requirements.txt",
     "src/rfp_assistant/auth.py",
@@ -375,7 +379,6 @@
     "src/rfp_assistant/service.py",
     "src/rfp_assistant/settings.py",
     "src/rfp_assistant/store.py",
-    "src/rfp_assistant/ui.py",
     "tests/fixtures.py",
     "tools/verify.py",
     "verification.json"
@@ -409,7 +412,8 @@
    "kind": "browser",
    "command": "python -B tools/verify.py request-history",
    "paths": [
-    "app.py",
+    "src/rfp_assistant/api.py",
+    "web/*",
     "pyproject.toml",
     "requirements.txt",
     "src/rfp_assistant/auth.py",
@@ -419,7 +423,6 @@
     "src/rfp_assistant/service.py",
     "src/rfp_assistant/settings.py",
     "src/rfp_assistant/store.py",
-    "src/rfp_assistant/ui.py",
     "tests/fixtures.py",
     "tools/verify.py",
     "verification.json"
@@ -445,7 +448,8 @@
    "kind": "browser",
    "command": "python -B tools/verify.py verifier-generation",
    "paths": [
-    "app.py",
+    "src/rfp_assistant/api.py",
+    "web/*",
     "pyproject.toml",
     "requirements.txt",
     "src/rfp_assistant/auth.py",
@@ -456,7 +460,6 @@
     "src/rfp_assistant/service.py",
     "src/rfp_assistant/settings.py",
     "src/rfp_assistant/store.py",
-    "src/rfp_assistant/ui.py",
     "tests/fixtures.py",
     "tools/verify.py",
     "verification.json"
@@ -482,7 +485,8 @@
    "kind": "browser",
    "command": "python -B tools/verify.py six-sessions",
    "paths": [
-    "app.py",
+    "src/rfp_assistant/api.py",
+    "web/*",
     "pyproject.toml",
     "requirements.txt",
     "src/rfp_assistant/auth.py",
@@ -492,7 +496,6 @@
     "src/rfp_assistant/service.py",
     "src/rfp_assistant/settings.py",
     "src/rfp_assistant/store.py",
-    "src/rfp_assistant/ui.py",
     "tests/fixtures.py",
     "tests/test_generation.py",
     "tests/test_service.py",
@@ -510,7 +513,7 @@
     },
     {
      "id": "shared-reservation-visible",
-     "expected": "While the first session's request is running, another session's sidebar shows the shared reservation within the polling interval"
+     "expected": "While the first session's request is running, another session's budget row shows the shared reservation within the polling interval"
     }
    ]
   },
@@ -520,17 +523,18 @@
    "kind": "browser",
    "command": "python -B tools/verify.py cap-exhaustion",
    "paths": [
-    "app.py",
+    "src/rfp_assistant/api.py",
+    "web/*",
     "pyproject.toml",
     "requirements.txt",
     "src/rfp_assistant/auth.py",
     "src/rfp_assistant/budget.py",
+    "src/rfp_assistant/cli.py",
     "src/rfp_assistant/contracts.py",
     "src/rfp_assistant/generation.py",
     "src/rfp_assistant/service.py",
     "src/rfp_assistant/settings.py",
     "src/rfp_assistant/store.py",
-    "src/rfp_assistant/ui.py",
     "tests/fixtures.py",
     "tests/test_generation.py",
     "tests/test_service.py",
@@ -548,7 +552,7 @@
     },
     {
      "id": "adjustment-audited",
-     "expected": "An owner adjustment with a reason is recorded and appears in the audit log tab"
+     "expected": "An owner adjustment with a reason (CLI adjust) is recorded and appears in the audit log (CLI audit)"
     },
     {
      "id": "paid-blocked-at-cap",
@@ -566,8 +570,9 @@
    "kind": "browser",
    "command": "python -B tools/verify.py accessibility",
    "paths": [
+    "src/rfp_assistant/api.py",
+    "web/*",
     "DESIGN.md",
-    "app.py",
     "pyproject.toml",
     "requirements.txt",
     "src/rfp_assistant/auth.py",
@@ -577,7 +582,6 @@
     "src/rfp_assistant/service.py",
     "src/rfp_assistant/settings.py",
     "src/rfp_assistant/store.py",
-    "src/rfp_assistant/ui.py",
     "tests/fixtures.py",
     "tests/test_generation.py",
     "tests/test_service.py",
@@ -599,11 +603,11 @@
     },
     {
      "id": "contrast",
-     "expected": "Every visible text has a contrast ratio of at least 4.5:1 against its background"
+     "expected": "Every visible text on 질문하기, 검증 and 데이터셋 만들기 has a contrast ratio of at least 4.5:1 against its background"
     },
     {
      "id": "narrow-layout",
-     "expected": "At a 390 px wide viewport the page does not scroll horizontally and the answer status is shown as text"
+     "expected": "At a 390 px wide viewport none of the three pages scrolls horizontally and the answer status is shown as text"
     }
    ]
   }

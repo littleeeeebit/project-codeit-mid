@@ -601,10 +601,10 @@ class GoldQueueTest(Phase4Case):
             c = service.gold_candidate(res, v, "dev-amount-r1")
             self.assertEqual(len(c["context"]["evidence"]), 2)
             with self.assertRaises(service.ServiceError):
-                service.gold_decide(res, v, "dev-amount-r1", "approve", c["row_sha256"])
+                service.gold_decide(res, v, "dev-amount-r1", "approve", c["row_sha256"], note="원문 확인")
             for cid in ("dev-amount-r1", "dev-deadline-r1", "dev-warranty-r1", "dev-absent-r1"):
                 sha = service.gold_candidate(res, v, cid)["row_sha256"]
-                service.gold_decide(res, v, cid, "approve", sha, original_inspected=True,
+                service.gold_decide(res, v, cid, "approve", sha, note="원문 확인", original_inspected=True,
                                     disputed=cid == "dev-deadline-r1")
             self.assertEqual([r["question_id"] for r in service.gold_awaiting_second_review(res, v)], ["dev-deadline"])
             report = evaluation.validate_gold(self.s, "dev")
@@ -1059,37 +1059,33 @@ class SealedTest(Phase4Case):
 
 
 class EvaluationScreenTest(GoldRetrievalTest):
-    """The verifier's phase-4 tab and the gold-2 review form, rendered with Streamlit's AppTest."""
+    """The 검증 page's evaluation section and the 데이터셋 review form, over the HTTP API the web screens call."""
 
     def setUp(self):
         super().setUp()
+        from fastapi.testclient import TestClient
+
+        from rfp_assistant import api
+
         self.transport = FakeTransport()
         self.res = service.Resources(self.s, transport=self.transport, recover=True)
+        self.client = TestClient(api.create_app(self.res), headers={"X-Member": "person-b"})
+        self.client.__enter__()
 
     def tearDown(self):
+        self.client.__exit__(None, None, None)
         self.res.close()
         super().tearDown()
-
-    def app(self, body: str):
-        from streamlit.testing.v1 import AppTest
-
-        app = AppTest.from_string("import streamlit as st\nfrom rfp_assistant import ui\n" + body)
-        app.session_state["res"], app.session_state["principal"] = self.res, auth.visitor("person-b")
-        return app
 
     def test_trace_selector_loads_only_approved_gold_with_both_document_scopes(self):
         compare = self.compare_row()
         pending = p4.amount_row(self.env, reviewed=False)
         p4.write(self.env, "dev", [compare, pending])
-        self.assertEqual([r['question_id'] for r in service.dataset_rows(self.res, auth.visitor('reviewer'), 'dev')],
-                         [compare['question_id']])
-        app = self.app("ui._trace_tab(st, st.session_state.res, st.session_state.principal)\n")
-        app.run(timeout=60)
-        app.radio(key='vsource').set_value('검토된 개발 질문').run(timeout=60)
-        self.assertFalse(app.exception, [e.message for e in app.exception])
-        selector = next(s for s in app.selectbox if s.label == '개발 질문')
-        self.assertEqual(selector.options, [f"{compare['question_id']} · {compare['question'][:60]}"])
-        self.assertEqual(len(app.multiselect[0].value), 2)
+        r = self.client.get("/api/verify/trace-sources")
+        self.assertEqual(r.status_code, 200, r.text)
+        questions = r.json()["questions"]
+        self.assertEqual([q["question_id"] for q in questions], [compare["question_id"]])
+        self.assertEqual(len(questions[0]["scope"]), 2)
         self.assertEqual(len(self.transport.calls), 0)
 
     def test_the_tab_estimates_then_runs_a_development_evaluation_with_consent(self):
@@ -1102,22 +1098,16 @@ class EvaluationScreenTest(GoldRetrievalTest):
         decision.write_text(json.dumps({"run_id": k1["run_id"], "mode": "kiwi_bm25", "decided_by": "owner",
                                         "rationale": "baseline"}), encoding="utf-8")
         evaluation.activate_run(self.s, k1["run_id"], decision)
-        app = self.app("ui._evaluation_tab(st, st.session_state.res, st.session_state.principal)\n")
-        app.run(timeout=60)
-        self.assertFalse(app.exception, [e.message for e in app.exception])
-        self.assertTrue(any("봉인 시험 세트" in c.value for c in app.caption))
-        next(b for b in app.button if b.key == "eval-plan").click().run(timeout=60)
-        est = app.session_state["eval_estimate"]
-        run_button = next(b for b in app.button if b.key == f"eval-run-{est['estimate_id']}")
-        self.assertTrue(run_button.disabled)  # no consent yet
+        est = self.client.post("/api/verify/evaluation/plan").json()  # free: prices only
+        self.assertTrue(est["fits"], est)
         self.assertEqual(len(self.transport.calls), 0)
-        app.checkbox(key=f"eval-agree-{est['estimate_id']}").check().run(timeout=60)
-        next(b for b in app.button if b.key == f"eval-run-{est['estimate_id']}").click().run(timeout=60)
-        self.assertFalse(app.exception, [e.message for e in app.exception])
+        r = self.client.post("/api/verify/evaluation/start", json={"estimate_id": est["estimate_id"]})
+        self.assertEqual(r.status_code, 200, r.text)
+        run_id = r.json()["run_id"]
         deadline = time.monotonic() + 60
-        while time.monotonic() < deadline and service._EVAL_JOBS[est["run_id"]].is_alive():
+        while time.monotonic() < deadline and service._EVAL_JOBS[run_id].is_alive():
             time.sleep(0.1)
-        scores = json.loads((answers.run_dir(self.s, est["run_id"]) / "scores.json").read_text(encoding="utf-8"))
+        scores = json.loads((answers.run_dir(self.s, run_id) / "scores.json").read_text(encoding="utf-8"))
         self.assertEqual(scores["status"], "complete")
         with self.assertRaises(service.ServiceError):  # the sealed path is not a verifier action
             service.start_answer_evaluation(self.res, auth.visitor("x"), "missing")
@@ -1128,17 +1118,20 @@ class EvaluationScreenTest(GoldRetrievalTest):
         path = self.root / "b.jsonl"
         store.write_jsonl_atomic(path, rows)
         gold.submit(self.s, path, "b1", "dev", "agent-a")
-        app = self.app("ui.gold_review_page(st, st.session_state.res, st.session_state.principal)\n")
-        app.run(timeout=60)
-        self.assertFalse(app.exception, [e.message for e in app.exception])
-        self.assertTrue(any("필수 주장" in m.value for m in app.markdown))
-        submit = lambda: next(b for b in app.button if "승인" in b.label)  # noqa: E731
-        submit().click().run(timeout=60)
-        self.assertTrue(any("원문을 직접 확인" in e.value for e in app.error))
+        self.assertEqual([p["candidate_id"] for p in self.client.get("/api/gold/pending").json()], ["dev-deadline-r1"])
+        card = self.client.get("/api/gold/dev-deadline-r1").json()
+        self.assertTrue(card["required_claims"])
+        decide = lambda **kw: self.client.post("/api/gold/dev-deadline-r1/decide", json={  # noqa: E731
+            "decision": "approve", "expected_sha": card["row_sha256"], **kw})
+        r = decide(note="")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("메모", r.text)  # every decision carries a note
+        r = decide(note="원문 4쪽 마감 일시 확인")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("원문을 직접 확인", r.text)
         self.assertEqual(gold.candidate(self.s, "dev-deadline-r1")["status"], "pending")
-        app.checkbox[0].check().run(timeout=60)
-        submit().click().run(timeout=60)
-        self.assertFalse(app.exception, [e.message for e in app.exception])
+        r = decide(note="원문 4쪽 마감 일시 확인", original_inspected=True)
+        self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(gold.candidate(self.s, "dev-deadline-r1")["status"], "approved")
 
 

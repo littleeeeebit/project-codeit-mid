@@ -17,7 +17,9 @@ dependencies = [
     "pydantic",
     "tiktoken",
     "numpy",
-    "streamlit",
+    "fastapi",
+    "uvicorn",
+    "httpx",
     "tzdata; sys_platform == 'win32'",
 ]
 

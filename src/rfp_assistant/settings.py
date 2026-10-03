@@ -184,7 +184,7 @@ def rate_card(model: str) -> dict[str, Decimal]:
 
 
 def read_api_key(name: str) -> str | None:
-    """Process environment, then the repository's gitignored .env, then Streamlit secrets. Never logged."""
+    """Process environment, then the repository's gitignored .env. Never logged."""
     key = os.environ.get(name)
     if key:
         return key
@@ -194,9 +194,4 @@ def read_api_key(name: str) -> str | None:
             found, sep, value = line.strip().partition("=")
             if sep and found.strip() == name and value.strip().strip("'\""):
                 return value.strip().strip("'\"")
-    try:  # private Streamlit secrets, when running inside Streamlit
-        import streamlit as st
-
-        return st.secrets.get(name)
-    except Exception:  # noqa: BLE001 - no secrets file is a normal state
-        return None
+    return None

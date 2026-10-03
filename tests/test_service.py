@@ -15,7 +15,7 @@ from datetime import date
 from pathlib import Path
 from unittest import mock
 
-from rfp_assistant import auth, budget, service, store, ui
+from rfp_assistant import auth, budget, service, store
 from rfp_assistant.contracts import AnswerRequest, Principal
 from rfp_assistant.generation import FakeTransport, ProviderResponse
 from rfp_assistant.settings import DEFAULT_RATES
@@ -186,12 +186,12 @@ class SubmissionTest(Base):
         with store.open_db(self.settings.db_path) as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM requests WHERE idempotency_key = 'dup'").fetchone()[0], 1)
 
-    def test_workers_never_touch_streamlit(self):
+    def test_workers_never_touch_the_http_layer(self):
         import inspect
 
-        # The worker path (service and everything it imports) has no UI dependency at all.
+        # The worker path (service and everything it imports) has no web dependency at all; api.py wraps it.
         for module in (service, budget, auth, store, __import__("rfp_assistant.generation", fromlist=["x"])):
-            self.assertNotIn("streamlit", inspect.getsource(module))
+            self.assertNotIn("fastapi", inspect.getsource(module))
 
 
 class QueueTest(Base):
@@ -229,7 +229,7 @@ class CancellationTest(Base):
         view = self.wait_done(rid)
         self.assertEqual((view.status, view.billing_state), ("cancelled", "settled"))
         self.assertTrue(view.cancel_requested)
-        self.assertFalse(ui.may_attach({"request_id": rid, "generation_id": "g1", "target": "t"}, "t", view))
+        self.assertFalse(service.may_attach({"request_id": rid, "generation_id": "g1", "target": "t"}, "t", view))
 
     def test_cancellation_before_generation_releases_nothing_because_nothing_was_reserved(self):
         real = service.prepare_answer
@@ -248,119 +248,20 @@ class CancellationTest(Base):
 
 
 class ScopeOwnershipTest(Base):
-    def test_the_current_answer_can_also_be_opened_from_the_history(self):
-        """Review finding: the same request rendered in the current panel and the history collided on widget
-        keys (StreamlitDuplicateElementKey)."""
-        from streamlit.testing.v1 import AppTest
-
-        self.transport.gate.set()
-        rid = service.submit_answer(self.res, self.env.consultant, req(self.a, gen="gen-a"))
-        self.assertEqual(self.wait_done(rid).result.status, "answered")
-        scope = [(self.a.doc_id, self.a.source_hash)]
-        app = AppTest.from_string("import streamlit as st\nfrom rfp_assistant import ui\n"
-                                  "ui._answer_area(st, st.session_state.res, st.session_state.principal)\n"
-                                  "ui._history(st, st.session_state.res, st.session_state.principal)\n")
-        app.session_state["res"], app.session_state["principal"] = self.res, self.env.consultant
-        app.session_state["current"] = {"scope": scope, "question": Q, "mode": "single", "as_of": "2026-09-30"}
-        app.session_state["owned"] = {"request_id": rid, "generation_id": "gen-a",
-                                      "target": ui.target_key(scope, Q, "single", "2026-09-30")}
-        app.run(timeout=30)
-        self.assertFalse(app.exception, [e.message for e in app.exception])
-        app.selectbox[0].select(app.selectbox[0].options[0]).run(timeout=30)
-        self.assertFalse(app.exception, [e.message for e in app.exception])
-        keys = [b.key for b in app.button if b.key and b.key.startswith("ev-")]
-        self.assertTrue(any(k.startswith("ev-cur-") for k in keys) and any(k.startswith("ev-hist-") for k in keys),
-                        keys)
-        placeholder = "근거 버튼을 누르면"
-        self.assertTrue(any(placeholder in c.value for c in app.caption))
-        next(b for b in app.button if b.key.startswith("ev-hist-")).click().run(timeout=30)  # one click
-        self.assertFalse(app.exception, [e.message for e in app.exception])
-        self.assertEqual(app.session_state["evidence_open"], (rid, "E1"))
-        self.assertFalse(any(placeholder in c.value for c in app.caption), [c.value for c in app.caption])
-        self.assertEqual(len([b for b in app.get("download_button") if b.key.startswith("evdl-")]), 1)  # once
-
-    def test_requests_with_the_same_history_label_stay_separately_selectable(self):
-        """Review finding: history options were keyed by their label (minute, status, question prefix), so two
-        same-question requests in one minute collapsed into one."""
-        from streamlit.testing.v1 import AppTest
-
-        self.transport.gate.set()
-        rids = [service.submit_answer(self.res, self.env.consultant, req(self.a, gen=f"gen-{i}")) for i in (1, 2)]
-        for rid in rids:
-            self.assertEqual(self.wait_done(rid).result.status, "answered")
-        with store.open_db(self.settings.db_path) as conn:
-            conn.execute("UPDATE requests SET created_at = '2026-10-01T08:00:30+00:00'")
-        app = AppTest.from_string("import streamlit as st\nfrom rfp_assistant import ui\n"
-                                  "ui._history(st, st.session_state.res, st.session_state.principal)\n")
-        app.session_state["res"], app.session_state["principal"] = self.res, self.env.consultant
-        app.run(timeout=30)
-        box = app.selectbox[0]
-        self.assertEqual(len(box.options), 2)
-        shown = []
-        for option in list(box.options):
-            app.selectbox[0].select(option).run(timeout=30)
-            self.assertFalse(app.exception, [e.message for e in app.exception])
-            shown += [b.key[len("exp-"):] for b in app.get("download_button") if b.key.startswith("exp-")]
-        self.assertEqual(sorted(shown), sorted(rids))
-
-    def test_the_chosen_history_request_survives_another_request_finishing(self):
-        """Review finding: option labels carry the live status, so another request finishing changed the
-        unkeyed selectbox and cleared the choice; the older request's answer disappeared."""
-        from streamlit.testing.v1 import AppTest
-
-        self.transport.gate.set()
-        older, newer = (service.submit_answer(self.res, self.env.consultant, req(self.a, gen=f"g-{i}")) for i in (1, 2))
-        for rid in (older, newer):
-            self.wait_done(rid)
-
-        def status(rid, value):
-            with store.open_db(self.settings.db_path) as conn:
-                conn.execute("UPDATE requests SET status = ? WHERE request_id = ?", (value, rid))
-
-        status(newer, "running")
-        app = AppTest.from_string("import streamlit as st\nfrom rfp_assistant import ui\n"
-                                  "ui._history(st, st.session_state.res, st.session_state.principal)\n")
-        app.session_state["res"], app.session_state["principal"] = self.res, self.env.consultant
-        app.run(timeout=30)
-        app.selectbox[0].select(older).run(timeout=30)
-        exports = lambda: [b.key for b in app.get("download_button") if b.key.startswith("exp-")]  # noqa: E731
-        self.assertEqual(exports(), [f"exp-{older}"])
-        status(newer, "completed")  # only the other row's label changes
-        app.run(timeout=30)
-        self.assertFalse(app.exception, [e.message for e in app.exception])
-        self.assertEqual((app.selectbox[0].value, exports()), (older, [f"exp-{older}"]))
-
-    def test_evidence_of_an_older_history_request_opens_in_the_history(self):
-        from streamlit.testing.v1 import AppTest
-
-        self.transport.gate.set()
-        old = service.submit_answer(self.res, self.env.consultant, req(self.a, gen="gen-old"))
-        self.assertEqual(self.wait_done(old).result.status, "answered")
-        app = AppTest.from_string("import streamlit as st\nfrom rfp_assistant import ui\n"
-                                  "ui._answer_area(st, st.session_state.res, st.session_state.principal)\n"
-                                  "ui._history(st, st.session_state.res, st.session_state.principal)\n")
-        app.session_state["res"], app.session_state["principal"] = self.res, self.env.consultant
-        app.run(timeout=30)  # nothing current on screen
-        app.selectbox[0].select(app.selectbox[0].options[0]).run(timeout=30)
-        next(b for b in app.button if (b.key or "").startswith("ev-hist-")).click().run(timeout=30)
-        self.assertFalse(app.exception, [e.message for e in app.exception])
-        self.assertEqual([b.key[:9] for b in app.get("download_button") if b.key.startswith("evdl-")],
-                         ["evdl-hist"])
-
     def test_a_late_answer_cannot_attach_to_a_changed_scope_but_still_settles(self):
-        target_a = ui.target_key([(self.a.doc_id, self.a.source_hash)], Q, "single", "2026-09-30")
+        target_a = service.target_key([(self.a.doc_id, self.a.source_hash)], Q, "single", "2026-09-30")
         rid = service.submit_answer(self.res, self.env.consultant, req(self.a, gen="gen-a"))
         owned = {"request_id": rid, "generation_id": "gen-a", "target": target_a}
         self.assertTrue(self.transport.entered.acquire(timeout=10))
-        target_d = ui.target_key([(self.d.doc_id, self.d.source_hash)], Q, "single", "2026-09-30")  # user moved on
+        target_d = service.target_key([(self.d.doc_id, self.d.source_hash)], Q, "single", "2026-09-30")  # user moved on
         self.transport.gate.set()
         view = self.wait_done(rid)
         self.assertEqual((view.result.status, view.billing_state), ("answered", "settled"))
-        self.assertTrue(ui.may_attach(owned, target_a, view))
-        self.assertFalse(ui.may_attach(owned, target_d, view))
-        changed_question = ui.target_key([(self.a.doc_id, self.a.source_hash)], "다른 질문", "single", "2026-09-30")
-        self.assertFalse(ui.may_attach(owned, changed_question, view))
-        self.assertFalse(ui.may_attach({**owned, "generation_id": "gen-b"}, target_a, view))
+        self.assertTrue(service.may_attach(owned, target_a, view))
+        self.assertFalse(service.may_attach(owned, target_d, view))
+        changed_question = service.target_key([(self.a.doc_id, self.a.source_hash)], "다른 질문", "single", "2026-09-30")
+        self.assertFalse(service.may_attach(owned, changed_question, view))
+        self.assertFalse(service.may_attach({**owned, "generation_id": "gen-b"}, target_a, view))
         self.assertEqual(view.scope, [{"doc_id": self.a.doc_id, "source_hash": self.a.source_hash}])
 
 
@@ -477,7 +378,7 @@ def slow(*a, **kw):  # retrieval finishes, then the signal arrives before genera
 
 service.prepare_answer = slow
 stopping = threading.Event()
-signal.signal(signal.SIGINT, lambda *a: stopping.set())  # like Streamlit: the handler ends the server loop
+signal.signal(signal.SIGINT, lambda *a: stopping.set())  # like uvicorn: the handler ends the server loop
 rid = service.submit_answer(res, env.consultant, AnswerRequest(
     "sigint", "sigint", "하자보수 기간은 얼마인가요?", [env.refs["기관A"]], as_of="2026-09-30"))
 print(json.dumps({"request_id": rid, "db": str(env.settings.db_path)}), flush=True)
@@ -835,8 +736,8 @@ class SearchFilterTest(Base):
         self.assertNotIn(self.e.doc_id, shown)  # a known 0원 amount fails amount_min; it is not "unknown"
 
     def test_only_the_highest_cap_warning_is_shown(self):
-        self.assertEqual(ui.visible_warnings(["cap_50", "cap_75", "ahead_of_pace"]), ["cap_75", "ahead_of_pace"])
-        self.assertEqual(ui.visible_warnings(["cap_50", "cap_75", "cap_90", "cap_exhausted"]), ["cap_exhausted"])
+        self.assertEqual(service.visible_warnings(["cap_50", "cap_75", "ahead_of_pace"]), ["cap_75", "ahead_of_pace"])
+        self.assertEqual(service.visible_warnings(["cap_50", "cap_75", "cap_90", "cap_exhausted"]), ["cap_exhausted"])
 
 
 class SourceAndExportTest(Base):
@@ -913,22 +814,12 @@ class VerifierTest(Base):
         return service.verifier_run(self.res, self.env.verifier, run["run_id"])
 
     def test_paid_generation_from_a_frozen_run_executes_its_configuration(self):
-        """Review finding: the paid button of a whitespace_bm25 / 1-unit run generated with the serving mode."""
-        from streamlit.testing.v1 import AppTest
-
+        """Review finding: the paid button of a whitespace_bm25 / 1-unit run generated with the serving mode. The
+        screen holds only the run's ID, so the paid call goes through `generate_from_run_id`."""
         self.transport.gate.set()
         frozen = self._frozen_run()
-        app = AppTest.from_string("import streamlit as st\nfrom rfp_assistant import ui\n"
-                                  "ui._render_run(st, st.session_state.res, st.session_state.principal, "
-                                  "st.session_state.run)\n")
-        app.session_state["res"], app.session_state["principal"] = self.res, self.env.verifier
-        app.session_state["run"] = frozen
-        app.run(timeout=30)
-        self.assertFalse(app.exception, [e.message for e in app.exception])
-        app.checkbox[0].check().run(timeout=30)
-        app.button[0].click().run(timeout=30)
-        self.assertFalse(app.exception, [e.message for e in app.exception])
-        rid = app.session_state[f"vgen-{frozen['run_id']}"]
+        self.assertIsNone(service.run_generation_block(self.res, self.env.verifier, frozen["run_id"]))
+        rid = service.generate_from_run_id(self.res, self.env.verifier, frozen["run_id"])
         view = self.wait_done(rid, self.env.verifier)
         self.assertEqual(view.result.status, "answered")
         trace = json.loads(service.get_request(self.res, self.env.verifier, rid)["trace_json"])

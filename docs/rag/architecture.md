@@ -52,7 +52,7 @@ Ambiguous document names should trigger a choice in the UI. Do not silently scop
 
 ## Minimal components to reuse
 
-Use Python standard CSV, Unicode, hashing, XML and SQLite tools; pyhwp for the structured HWP trial; PyMuPDF for PDF; Kiwi and `rank_bm25` for lexical retrieval; OpenAI SDK for embeddings and one answer call; NumPy for cosine scoring; and Streamlit for the two interfaces. There is no existing application dependency stack to preserve.
+Use Python standard CSV, Unicode, hashing, XML and SQLite tools; pyhwp for the structured HWP trial; PyMuPDF for PDF; Kiwi and `rank_bm25` for lexical retrieval; OpenAI SDK for embeddings and one answer call; NumPy for cosine scoring; and FastAPI with a Next.js app for the interfaces (Streamlit until 2026-10-02). There is no existing application dependency stack to preserve.
 
 For this corpus, exact vector scoring over a normalized, persisted matrix is a reasonable first measurement. Store document/chunk metadata in SQLite and the array with a matching version manifest. Benchmark actual chunk count and memory before adding FAISS or a database server. Do not load arbitrary user-supplied pickle files.
 
