@@ -1495,6 +1495,58 @@ def list_corrections(res: Resources, principal: Principal) -> list[dict]:
     return out
 
 
+def verification_history(res: Resources, principal: Principal, limit: int = 100) -> list[dict]:
+    """Read saved review actions directly; proposals remain explicitly unapplied. Never expose sealed labels."""
+    _authorize(res, principal, "verifier")
+    limit = max(1, min(limit, 200))
+    with open_db(res.settings.db_path) as conn:
+        sources = conn.execute(
+            "SELECT r.*, (SELECT MIN(d.filename) FROM documents d WHERE d.active_source_hash = r.source_hash) "
+            "AS filename FROM reviews r ORDER BY r.created_at DESC, r.review_id DESC LIMIT ?", (limit,)).fetchall()
+        placeholders = ",".join("?" for _ in SEALED_DATASETS)
+        decisions = conn.execute(
+            "SELECT r.*, c.row_json, c.dataset FROM gold_reviews r JOIN gold_candidates c "
+            f"ON c.candidate_id = r.candidate_id WHERE c.dataset NOT IN ({placeholders}) "
+            "ORDER BY r.created_at DESC, r.review_id DESC LIMIT ?", (*SEALED_DATASETS, limit)).fetchall()
+        legacy = conn.execute(
+            f"SELECT c.* FROM gold_candidates c WHERE c.dataset NOT IN ({placeholders}) "
+            "AND c.status != 'pending' AND c.decided_at IS NOT NULL AND NOT EXISTS "
+            "(SELECT 1 FROM gold_reviews r WHERE r.candidate_id = c.candidate_id AND r.kind = 'decision') "
+            "ORDER BY c.decided_at DESC, c.candidate_id DESC LIMIT ?", (*SEALED_DATASETS, limit)).fetchall()
+        proposals = conn.execute(
+            f"SELECT * FROM corrections WHERE dataset IS NULL OR dataset NOT IN ({placeholders}) "
+            "ORDER BY created_at DESC, correction_id DESC LIMIT ?", (*SEALED_DATASETS, limit)).fetchall()
+    events = []
+    for r in sources:
+        findings = json.loads(r["findings_json"])
+        events.append({"event_id": r["review_id"], "kind": "source", "action": r["status"],
+                       "target_id": r["source_hash"], "target": r["filename"] or r["source_hash"][:12],
+                       "reviewer": r["reviewer"], "created_at": r["created_at"],
+                       "note": findings.get("note", ""), "quote": "",
+                       "locations": json.loads(r["locations_json"])})
+    for r in decisions:
+        row = json.loads(r["row_json"])
+        events.append({"event_id": r["review_id"], "kind": "gold", "action": f'{r["kind"]}:{r["decision"]}',
+                       "target_id": r["candidate_id"], "target": row.get("question") or r["candidate_id"],
+                       "reviewer": r["reviewer"], "created_at": r["created_at"],
+                       "note": r["note"], "quote": "", "locations": []})
+    for r in legacy:
+        row = json.loads(r["row_json"])
+        rejection = json.loads(r["reject_json"] or "{}")
+        events.append({"event_id": f'legacy:{r["candidate_id"]}', "kind": "gold",
+                       "action": "decision:approve" if r["status"] == "approved" else "decision:reject",
+                       "target_id": r["candidate_id"], "target": row.get("question") or r["candidate_id"],
+                       "reviewer": r["decided_by"] or "", "created_at": r["decided_at"],
+                       "note": rejection.get("note", ""), "quote": "", "locations": []})
+    for r in proposals:
+        events.append({"event_id": r["correction_id"], "kind": "proposal", "action": "unapplied",
+                       "target_id": r["run_id"] or r["request_id"] or r["row_id"],
+                       "target": r["run_id"] or r["request_id"] or r["row_id"],
+                       "reviewer": r["reviewer"], "created_at": r["created_at"],
+                       "note": r["reason"], "quote": r["quote"], "locations": []})
+    return sorted(events, key=lambda e: (e["created_at"], e["event_id"]), reverse=True)[:limit]
+
+
 _SECRET_RE = re.compile(r"(sk-[A-Za-z0-9_\-]{8,}|Bearer\s+\S+)")
 _PATH_RE = re.compile(r"([A-Za-z]:\\[^\s\"']+|/(?:home|root|Users|tmp|mnt|var)/[^\s\"']+)")
 _REDACT_KEYS = {"original_path", "artifact_path", "messages", "api_key"}

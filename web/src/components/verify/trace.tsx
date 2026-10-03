@@ -31,8 +31,9 @@ function limitationText(code: string): string {
     compare: "비교: 문서별로 근거를 나눠 담음", index_includes_unreviewed_sources: "원문 대조 전 문서가 색인에 포함됨",
     scope_not_indexed: "색인에 없는 문서", code_not_found: "요구사항 코드 없음", code_detail_unavailable: "요구사항 상세 없음",
     code_ambiguous: "요구사항 코드가 여러 곳", index_outdated: "색인이 문서 기록보다 오래됨 (build-keyword로 다시 만들기)", scope_redundant_terms: "범위와 겹쳐 뺀 검색어", linked_evidence_missing: "이어진 근거 일부 누락",
+    idf: "전체 색인을 기준으로 단어 중요도 계산", expansion: "연결된 근거 조각을 함께 포함",
   };
-  if (known[head]) return `${known[head]}${rest.length && head !== "compare" ? ` (${rest.join(":")})` : ""}`;
+  if (known[head]) return `${known[head]}${rest.length && ["code_not_found", "code_detail_unavailable", "code_ambiguous", "scope_redundant_terms"].includes(head) ? ` (${rest.join(":")})` : ""}`;
   if (rest.length && known[rest[0]]) return `${known[rest[0]]} (문서 ${head})`;
   return code;
 }
@@ -102,7 +103,7 @@ export function TraceForm({ onRun }: { onRun: (runId: string) => void }) {
               <li key={d.doc_id}>
                 <button type="button" onClick={() => { setDocs([...docs, d]); setFilter(""); }}
                         className="w-full px-3 py-2 text-left text-sm outline-none hover:bg-secondary/70 focus-visible:bg-accent">
-                  <span className="line-clamp-1 font-medium">{d.title}</span>
+                  <span className="block text-base font-semibold">{d.title}</span>
                   <span className="text-xs text-muted-foreground">{d.institution}</span>
                 </button>
               </li>
@@ -114,7 +115,7 @@ export function TraceForm({ onRun }: { onRun: (runId: string) => void }) {
             {docs.map((d, i) => (
               <li key={d.doc_id} className="flex items-center gap-2 rounded-lg bg-secondary/70 px-3 py-2 text-sm">
                 {docs.length > 1 && <span className="rounded bg-foreground px-1.5 text-xs font-bold text-background">문서 {i + 1}</span>}
-                <span className="line-clamp-1 flex-1">{d.title}</span>
+                <span className="min-w-0 flex-1 text-base">{d.title}</span>
                 <button type="button" aria-label={`${d.title} 빼기`} onClick={() => setDocs(docs.filter((x) => x !== d))}
                         className="rounded p-0.5 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
                   <X className="size-4" aria-hidden />
@@ -138,13 +139,14 @@ export function TraceForm({ onRun }: { onRun: (runId: string) => void }) {
 export function RunList({ runs, active, onOpen }: { runs: Summary[]; active: string | null; onOpen: (id: string) => void }) {
   if (!runs.length) return <p className="text-sm text-muted-foreground">아직 실행이 없습니다.</p>;
   return (
-    <ul className="space-y-0.5">
+    <ul className="max-h-[44dvh] divide-y overflow-y-auto rounded-xl border border-input xl:max-h-[calc(100dvh-15rem)]">
       {runs.map((r) => (
         <li key={r.run_id}>
           <button type="button" onClick={() => onOpen(r.run_id)} aria-current={active === r.run_id || undefined}
-                  className={cn("w-full rounded-lg px-3 py-2 text-left outline-none hover:bg-secondary/70 focus-visible:ring-3 focus-visible:ring-ring/50", active === r.run_id && "bg-accent hover:bg-accent")}>
-            <span className="line-clamp-1 text-sm font-medium">{r.question}</span>
-            <span className="text-xs text-muted-foreground tabular-nums">{stamp(r.created_at)} · {r.member_id}</span>
+                  className={cn("w-full border-l-4 px-3 py-3 text-left outline-none hover:bg-secondary/70 focus-visible:ring-3 focus-visible:ring-ring/50", active === r.run_id ? "border-primary bg-accent hover:bg-accent" : "border-transparent")}>
+            <span className="block text-base font-semibold">{r.question}</span>
+            <span className="mt-1 block text-[13px] text-muted-foreground tabular-nums">{stamp(r.created_at)} · {r.member_id}</span>
+            <span className="mt-1 block font-mono text-[13px] text-muted-foreground">{r.run_id}</span>
           </button>
         </li>
       ))}
@@ -154,12 +156,13 @@ export function RunList({ runs, active, onOpen }: { runs: Summary[]; active: str
 
 // ---------------------------------------------------------------- one frozen run
 
-function Stage({ n, title, value, note }: { n: number; title: string; value: string; note?: string }) {
+function Stage({ n, title, value, active, onOpen }: { n: number; title: string; value: string; active: boolean; onOpen: () => void }) {
   return (
-    <li className="min-w-0 rounded-xl bg-secondary/60 p-3">
-      <p className="text-xs font-semibold text-muted-foreground">{n}. {title}</p>
-      <p className="mt-1 text-[15px] font-bold">{value}</p>
-      {note && <p className="mt-0.5 text-xs text-muted-foreground">{note}</p>}
+    <li className="min-w-0">
+      <button type="button" aria-pressed={active} onClick={onOpen} className={cn("h-full min-h-20 w-full rounded-lg border px-3 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50", active ? "border-primary bg-accent text-primary" : "border-input hover:bg-secondary")}>
+        <span className="block text-sm font-semibold">{n}. {title}</span>
+        <span className="mt-2 block text-base font-bold tabular-nums">{value}</span>
+      </button>
     </li>
   );
 }
@@ -176,62 +179,71 @@ function Fold({ title, children, open }: { title: string; children: React.ReactN
 }
 
 export function RunView({ runId }: { runId: string }) {
+  const [stage, setStage] = useState(4);
   const run = usePoll(`run-${runId}`, () => must(api.GET("/api/verify/traces/{run_id}", { params: { path: { run_id: runId } } }), errorText), null);
   if (run.error) return <Notice tone="bad">{run.error}</Notice>;
   if (!run.data) return <Skeleton className="h-96 w-full" />;
   const t: Run = run.data;
   const r = t.retrieval;
   const parsed = t.docs.filter((d) => d.parse_status === "parsed").length;
-  const checked = t.docs.filter((d) => !["unreviewed", "needs_recovery"].includes(d.review_status)).length;
-  const docNo = (id: string | null | undefined) => (t.scope.length > 1 ? `문서 ${t.scope.findIndex((s) => s.doc_id === id) + 1}` : "");
+  const checked = t.docs.filter((d) => ["sample_checked", "reviewed"].includes(d.review_status)).length;
+  const docNo = (id: string | null | undefined) => `문서 ${t.scope.findIndex((s) => s.doc_id === id) + 1}`;
   return (
     <article className="space-y-6">
-      <header className="space-y-1">
+      <header className="space-y-3">
         <h3 className="text-lg font-bold leading-snug">{t.question}</h3>
-        <p className="text-xs text-muted-foreground tabular-nums">
-          실행 {t.run_id} · 설정 {t.config.config_id} · {stamp(t.created_at)} · {t.member_id} · 기준일 {t.as_of ?? "-"}
-        </p>
+        <dl className="grid grid-cols-2 gap-3 rounded-xl border border-input p-4 text-sm sm:grid-cols-3">
+          {[["실행 시각", stamp(t.created_at)], ["실행자", t.member_id], ["기준일", t.as_of ?? "-"]].map(([k, v]) => <div key={k}><dt className="text-[13px] text-muted-foreground">{k}</dt><dd className="mt-1 font-semibold tabular-nums">{v}</dd></div>)}
+        </dl>
+        <dl className="space-y-2 text-sm"><dt className="font-semibold">문서 범위</dt>{t.scope.map((s, i) => <dd key={String(s.doc_id)} className="flex gap-2"><span className="shrink-0 text-muted-foreground">{i + 1}.</span><span className="[overflow-wrap:anywhere]">{t.docs.find((d) => d.doc_id === s.doc_id)?.filename ?? String(s.doc_id)}</span></dd>)}</dl>
       </header>
-      <ol className="grid gap-2 sm:grid-cols-3 xl:grid-cols-5">
-        <Stage n={1} title="수집·검수" value={`${parsed}/${t.docs.length} 수집됨`} note={`원문 대조 ${checked}/${t.docs.length}`} />
-        <Stage n={2} title="범위·분석" value={`질의 토큰 ${t.query_tokens.length}개`} note={`색인 ${t.index_version ?? "-"}`} />
-        <Stage n={3} title="채널 순위" value={label(MODE, r.mode)} note={`후보 ${r.candidates.length}개 · 대체 ${r.fallback ?? "없음"}`} />
-        <Stage n={4} title="선택된 근거" value={`${r.evidence.length}개 · ${r.evidence_tokens}토큰`} note={`입력 추정 ${t.input_tokens}토큰 · ${r.timings_ms.total ?? "-"}ms`} />
-        <Stage n={5} title="답변 생성" value={t.generation_block ? "막힘" : "별도 유료"} note={`최대 예상 ${usd(t.estimate_micro_usd, 4)}`} />
+      <ol aria-label="검색 단계" className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        <Stage n={1} title="수집·검수" value={`${parsed}/${t.docs.length} 수집`} active={stage === 1} onOpen={() => setStage(1)} />
+        <Stage n={2} title="범위·분석" value={`${t.query_tokens.length}개 토큰`} active={stage === 2} onOpen={() => setStage(2)} />
+        <Stage n={3} title="채널 순위" value={`${r.candidates.length}개 후보`} active={stage === 3} onOpen={() => setStage(3)} />
+        <Stage n={4} title="선택된 근거" value={`${r.evidence.length}개 근거`} active={stage === 4} onOpen={() => setStage(4)} />
+        <Stage n={5} title="답변 생성" value={t.generation_block ? "차단됨" : "유료 · 별도 실행"} active={stage === 5} onOpen={() => setStage(5)} />
       </ol>
 
-      <Section title={`선택된 근거 ${r.evidence.length}개`} aside={
+      {stage === 4 && <Section title={`선택된 근거 ${r.evidence.length}개`} aside={
         r.limitations.length ? <StatusBadge tone="warn">제한 사항 {r.limitations.length}건</StatusBadge> : <StatusBadge tone="ok">제한 사항 없음</StatusBadge>}>
         {r.limitations.length > 0 && (
-          <ul className="space-y-1 text-sm text-warn">{r.limitations.map((x) => <li key={x}>· {limitationText(x)}</li>)}</ul>
+          <details className="rounded-xl border border-warn/30 bg-warn-bg">
+            <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold text-warn outline-none focus-visible:ring-3 focus-visible:ring-ring/50">검색 제한 {r.limitations.length}건 보기</summary>
+            <Table caption="검색 제한" head={["대상", "제한 사항"]}>{r.limitations.map((x) => {
+              const [head, ...rest] = x.split(":");
+              const scope = t.scope.find((s) => String(s.doc_id).startsWith(head));
+              const target = scope ? t.docs.find((d) => d.doc_id === scope.doc_id)?.filename ?? docNo(String(scope.doc_id)) : "전체 검색";
+              return <tr key={x}><td className={cn(td, "min-w-28 max-w-48 [overflow-wrap:anywhere]")}>{target}</td><td className={td}>{limitationText(scope ? rest.join(":") : x)}</td></tr>;
+            })}</Table>
+          </details>
         )}
         {t.coverage && t.coverage.length > 1 && (
-          <p className="text-sm text-muted-foreground">{t.coverage.map((c, i) => `문서 ${i + 1}: 근거 ${c.evidence ?? 0}개${c.limitation ? ` (${c.limitation})` : ""}`).join(" · ")}</p>
+          <dl className="grid gap-3 sm:grid-cols-2">{t.coverage.map((c, i) => <div key={i} className="rounded-lg border border-input p-3"><dt className="text-sm font-semibold">문서 {i + 1} · 근거 {c.evidence ?? 0}개</dt><dd className="mt-2 text-sm [overflow-wrap:anywhere]">{t.docs.find((d) => d.doc_id === t.scope[i]?.doc_id)?.filename ?? "파일명 없음"}{c.limitation ? ` · ${c.limitation}` : ""}</dd></div>)}</dl>
         )}
         <ol className="space-y-2">
           {r.evidence.map((e) => (
             <li key={e.evidence_id}>
               <details className="group rounded-xl border">
-                <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl px-4 py-2.5 outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-                  <span className="rounded-md bg-cite-bg px-1.5 py-0.5 text-xs font-bold">{e.evidence_id}</span>
-                  {docNo(e.doc_id) && <StatusBadge tone="neutral">{docNo(e.doc_id)}</StatusBadge>}
-                  <span className="text-sm font-medium" title={locationText(e.location)}>{locationShort(e.location)}</span>
-                  <span className="line-clamp-1 flex-1 text-sm text-muted-foreground">{e.quote}</span>
-                  <span className="text-xs tabular-nums text-muted-foreground">{e.token_count}토큰</span>
+                <summary className="cursor-pointer list-none rounded-xl px-4 py-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+                  <span className="flex flex-wrap items-center gap-3"><span className="rounded-md bg-accent px-2 py-1 text-sm font-bold text-primary">{e.evidence_id}</span>
+                  <span className="text-sm font-semibold">{docNo(e.doc_id)} · {locationShort(e.location)}</span>
+                  <span className="ml-auto text-[13px] tabular-nums text-muted-foreground">{e.token_count}토큰 · 원문 펼치기</span></span>
+                  <span className="mt-2 line-clamp-2 text-base">{e.quote}</span>
                 </summary>
                 <div className="space-y-2 border-t px-4 py-3">
                   <p className="text-xs text-muted-foreground">{locationText(e.location)}</p>
-                  <p className="text-sm leading-7 whitespace-pre-wrap">{e.quote}</p>
-                  <p className="font-mono text-[11px] text-muted-foreground">조각 {e.chunk_id} · 추출 {e.extraction_id.slice(0, 12)} · 요소 {e.element_ids.join(", ")}</p>
+                  <blockquote className="border-l-4 border-primary pl-4 text-base leading-relaxed whitespace-pre-wrap">{e.quote}</blockquote>
+                  <details><summary className="min-h-8 cursor-pointer text-[13px] text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50">근거 식별 정보</summary><dl className="grid gap-2 pt-2 text-[13px] [overflow-wrap:anywhere]">{[["조각", e.chunk_id], ["추출", e.extraction_id], ["요소", e.element_ids.join(", ")]].map(([k,v]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="font-mono">{v}</dd></div>)}</dl></details>
                 </div>
               </details>
             </li>
           ))}
         </ol>
-      </Section>
+      </Section>}
 
       <div className="space-y-2">
-        <Fold title={`1. 수집·검수 상태 · 문서 ${t.docs.length}개`}>
+        {stage === 1 && <Section title={`수집·검수 · 문서 ${t.docs.length}개`} aside={<span className="text-sm">사람 대조 완료 {checked}/{t.docs.length}</span>}>
           <Table caption="수집·검수 상태" head={["파일", "수집", "원문 대조", "사유"]}>
             {t.docs.map((d) => (
               <tr key={d.doc_id}>
@@ -242,16 +254,17 @@ export function RunView({ runId }: { runId: string }) {
               </tr>
             ))}
           </Table>
-        </Fold>
-        <Fold title="2. 범위·분석">
+        </Section>}
+        {stage === 2 && <Section title="범위·분석">
           <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
-            <dt className="text-muted-foreground">색인</dt><dd>{t.index_version} ({t.review_scope ?? "-"})</dd>
+            <dt className="text-muted-foreground">검수 범위</dt><dd>{t.review_scope === "includes_unreviewed" ? "미검수 원문 포함" : t.review_scope === "reviewed_only" ? "검수된 원문만" : t.review_scope ?? "정보 없음"}</dd>
             <dt className="text-muted-foreground">질의 토큰</dt><dd className="flex flex-wrap gap-1">{t.query_tokens.map((q, i) => <span key={i} className="rounded bg-secondary px-1.5 text-xs">{q}</span>)}</dd>
             <dt className="text-muted-foreground">요구사항 코드</dt><dd>{t.codes.join(", ") || "없음"}</dd>
           </dl>
-        </Fold>
-        <Fold title={`3. 채널 순위 · 후보 ${r.candidates.length}개`}>
-          <p className="mb-3 text-xs text-muted-foreground">요청 방식 {label(MODE, t.config.mode)} → 실제 {label(MODE, r.mode)}. 점수는 각 채널 안의 순위용 값이며 답변 신뢰도가 아닙니다.</p>
+        </Section>}
+        {stage === 3 && <Section title={`채널 순위 · 후보 ${r.candidates.length}개`}>
+          <dl className="grid grid-cols-2 gap-3 text-sm">{[["요청 방식", label(MODE, t.config.mode)], ["실제 방식", label(MODE, r.mode)], ["대체 실행", r.fallback ?? "없음"], ["검색 소요", `${r.timings_ms.total ?? "-"} ms`]].map(([k,v]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="mt-1 font-semibold">{v}</dd></div>)}</dl>
+          <p className="text-[13px] text-muted-foreground">점수는 채널 내 순위용 값입니다. 답변 신뢰도가 아닙니다.</p>
           <Table caption="채널 순위" head={["채널", "순위", "점수", "조각"]}>
             {r.candidates.map((c, i) => (
               <tr key={i}>
@@ -262,8 +275,8 @@ export function RunView({ runId }: { runId: string }) {
               </tr>
             ))}
           </Table>
-        </Fold>
-        {r.excluded.length > 0 && (
+        </Section>}
+        {stage === 3 && r.excluded.length > 0 && (
           <Fold title={`제외된 후보 ${r.excluded.length}개`}>
             <Table caption="제외된 후보" head={["조각", "사유"]}>
               {r.excluded.map((x, i) => (
@@ -274,13 +287,16 @@ export function RunView({ runId }: { runId: string }) {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <details className="rounded-xl border border-input"><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">실행 식별 정보·내보내기</summary>
+      <dl className="grid gap-3 p-4 text-[13px] [overflow-wrap:anywhere]">{[["실행", t.run_id], ["설정", t.config.config_id], ["색인", t.index_version ?? "-"]].map(([k,v]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="font-mono">{v}</dd></div>)}</dl>
+      <div className="flex flex-wrap gap-2 px-4 pb-4">
         <Button variant="outline" asChild>
           <a href={`/api/verify/traces/${t.run_id}/export`} download={`${t.run_id}.json`}><Download aria-hidden />실행 내보내기 (JSON)</a>
         </Button>
       </div>
+      </details>
 
-      <Generate key={t.run_id} run={t} />
+      <div hidden={stage !== 5}><Generate key={t.run_id} run={t} /></div>
     </article>
   );
 }
@@ -307,7 +323,7 @@ function Generate({ run }: { run: Run }) {
       </div>
       {run.generation_block ? <Notice tone="warn">{run.generation_block}</Notice> : !requestId ? (
         <>
-          <p className="text-sm text-muted-foreground">다시 검색하지 않고 4단계의 고정 근거 {run.retrieval.evidence.length}개와 기준일 {run.as_of ?? "-"}로 1회 실행합니다. 예약이 최대 예상 비용을 넘으면 호출 없이 거절됩니다.</p>
+          <dl className="grid grid-cols-2 gap-3 text-sm">{[["고정 근거", `${run.retrieval.evidence.length}개`], ["입력 추정", `${run.input_tokens}토큰`], ["기준일", run.as_of ?? "-"], ["실행 횟수", "1회 · 재검색 없음"]].map(([k,v]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="mt-1 font-semibold">{v}</dd></div>)}</dl>
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="size-4 accent-primary" />
@@ -335,7 +351,7 @@ export function CompareRuns({ runs }: { runs: Summary[] }) {
   const diff = usePoll(a && b && a !== b ? `cmp-${a}-${b}` : null,
     () => must(api.GET("/api/verify/compare", { params: { query: { a, b } } }), errorText), null);
   if (runs.length < 2) return <Empty>비교하려면 검색 추적 실행이 두 개 이상 필요합니다.</Empty>;
-  const name = (r: Summary) => `${r.question.slice(0, 30)} · ${stamp(r.created_at)}`;
+  const name = (r: Summary) => `${r.question.slice(0, 30)} · ${stamp(r.created_at)} · ${r.run_id.slice(-6)}`;
   const d = diff.data;
   return (
     <div className="space-y-4">

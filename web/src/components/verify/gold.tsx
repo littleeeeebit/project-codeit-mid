@@ -98,7 +98,7 @@ export function WaitingRow({ w, active, onOpen }: { w: Waiting; active: boolean;
             className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none hover:bg-secondary/70 focus-visible:ring-3 focus-visible:ring-ring/50",
               active && "bg-accent hover:bg-accent")}>
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-1 text-sm font-medium">{w.question}</span>
+        <span className="block text-base font-semibold">{w.question}</span>
         <span className="font-mono text-xs text-muted-foreground">{w.candidate_id}</span>
       </span>
       <StatusBadge tone="info">2차 검토</StatusBadge>
@@ -143,7 +143,7 @@ export function SecondReviewDetail({ w, onDone }: { w: Waiting; onDone: () => vo
       <Section title="근거">
         <ul className="space-y-2">
           {w.evidence_groups.flatMap((g) => g.alternatives.map((a, i) => (
-            <li key={`${g.group_id}-${i}`} className="rounded-xl border px-4 py-3 text-sm leading-6">
+            <li key={`${g.group_id}-${i}`} className="rounded-xl border px-4 py-3 text-base leading-relaxed">
               <span className="mr-2 text-xs font-semibold text-muted-foreground">{g.group_id}</span>{a.quote ?? "-"}
             </li>
           )))}
@@ -163,7 +163,7 @@ export function SecondReviewDetail({ w, onDone }: { w: Waiting; onDone: () => vo
         <Field id={`${id}-note`} label="확인 내용 (원문 위치 포함)">
           <textarea id={`${id}-note`} rows={3} required value={note} onChange={(e) => setNote(e.target.value)} className={cn(field, "py-2")} />
         </Field>
-        <Button type="submit" size="lg" disabled={state.busy}>2차 검토 기록</Button>
+        <div className="flex flex-wrap items-center gap-3"><Button type="submit" size="lg" disabled={state.busy}>2차 검토 저장</Button><span className="text-[13px] text-muted-foreground">결과와 메모가 수정 기록에 자동으로 남습니다.</span></div>
         {state.error && <Notice tone="bad">{state.error}</Notice>}
       </form>
     </article>

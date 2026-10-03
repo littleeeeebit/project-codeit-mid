@@ -3994,6 +3994,65 @@
     "title": "ValidationError",
     "type": "object"
    },
+   "VerificationEvent": {
+    "properties": {
+     "action": {
+      "title": "Action",
+      "type": "string"
+     },
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "event_id": {
+      "title": "Event Id",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "locations": {
+      "items": {},
+      "title": "Locations",
+      "type": "array"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "quote": {
+      "title": "Quote",
+      "type": "string"
+     },
+     "reviewer": {
+      "title": "Reviewer",
+      "type": "string"
+     },
+     "target": {
+      "title": "Target",
+      "type": "string"
+     },
+     "target_id": {
+      "title": "Target Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "event_id",
+     "kind",
+     "action",
+     "target_id",
+     "target",
+     "reviewer",
+     "created_at",
+     "note",
+     "quote",
+     "locations"
+    ],
+    "title": "VerificationEvent",
+    "type": "object"
+   },
    "VerifyOverview": {
     "properties": {
      "awaiting_second_review": {
@@ -5668,6 +5727,62 @@
      }
     },
     "summary": "Fidelity Page"
+   }
+  },
+  "/api/verify/history": {
+   "get": {
+    "operationId": "history_api_verify_history_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 200,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/VerificationEvent"
+         },
+         "title": "Response History Api Verify History Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "History"
    }
   },
   "/api/verify/ingestion": {

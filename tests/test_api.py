@@ -133,6 +133,46 @@ class ApiFlowTest(unittest.TestCase):
         b = self.client.get("/api/budget").json()
         self.assertEqual(b["warnings"], service.visible_warnings(b["snapshot"]["warnings"]))
 
+    def test_saved_source_review_appears_in_history_without_a_second_write(self):
+        doc = next(d for d in self.client.get("/api/documents").json() if d["indexed"])
+        source = doc["source_hash"]
+        automatic = {"findings_json": '[{"side":"extraction","page":1}]', "method": "test"}
+        with mock.patch.object(service.fidelity, "latest", return_value=automatic):
+            saved = self.client.post(f"/api/verify/fidelity/{source}/confirm", json={"note": "Checked page 1"},
+                                     headers=self.headers)
+        self.assertEqual(saved.status_code, 200)
+        history = self.client.get("/api/verify/history", headers=self.headers).json()
+        event = next(e for e in history if e["event_id"] == saved.json()["id"])
+        self.assertEqual((event["reviewer"], event["action"], event["note"]),
+                         ("김검토", "sample_checked", "Checked page 1"))
+        self.assertEqual(event["locations"], [{"side": "extraction", "page": 1, "element_id": None, "cell": None}])
+        self.assertEqual(self.client.get("/api/verify/history", headers=self.headers).json(), history)
+        self.assertEqual(self.client.get("/api/verify/history?limit=0").status_code, 422)
+
+    def test_history_includes_development_decisions_but_never_sealed_questions(self):
+        from rfp_assistant.store import open_db
+
+        with open_db(self.env.settings.db_path) as conn:
+            for dataset in ("dev", "test"):
+                conn.execute("INSERT INTO gold_candidates(candidate_id,batch_id,batch_sha256,dataset,row_json,"
+                             "row_sha256,question_key,drafted_by,submitted_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                             (dataset, "batch", "sha", dataset, '{"question":"' + dataset + ' question"}',
+                              "sha", dataset, "drafter", "2026-10-03"))
+                conn.execute("INSERT INTO gold_reviews(review_id,candidate_id,reviewer,kind,decision,note,created_at) "
+                             "VALUES (?,?,?,?,?,?,?)", (dataset, dataset, "reviewer", "decision", "approve",
+                                                       "Reviewed original", "2026-10-03"))
+            conn.execute("INSERT INTO gold_candidates(candidate_id,batch_id,batch_sha256,dataset,row_json,"
+                         "row_sha256,question_key,drafted_by,submitted_at,status,decided_by,decided_at,reject_json) "
+                         "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", ("legacy", "batch", "sha", "dev",
+                         '{"question":"Legacy question"}', "sha", "legacy", "drafter", "2026-10-03",
+                         "rejected", "reviewer", "2026-10-03", '{"note":"Too easy"}'))
+        history = self.client.get("/api/verify/history").json()
+        decisions = [e for e in history if e["kind"] == "gold"]
+        self.assertCountEqual([(e["target"], e["action"], e["note"]) for e in decisions],
+                              [("dev question", "decision:approve", "Reviewed original"),
+                               ("Legacy question", "decision:reject", "Too easy")])
+        self.assertEqual(len(self.client.get("/api/verify/history?limit=1").json()), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

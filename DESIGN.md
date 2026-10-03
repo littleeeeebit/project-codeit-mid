@@ -40,7 +40,7 @@ components:
 
 The initial redesign of 2026-10-02 made the Streamlit app a thin shell over `service.py`. The initial design pass ran in the fixed order below; its choices were picked by the user from concrete sketches, one question per turn, before layout code was written.
 
-Current code checkpoint (2026-10-03): the frontend is now the three Next.js pages in `web/src/app/`, served through `api.py` over `service.py`; `app.py` and `ui.py` are absent. Streamlit was abandoned for its limited layout flexibility; this continuation polishes the existing frontend without adding another API or framework. The front matter now records the current frontend's tokens. Sections 2–5 preserve the earlier Streamlit pass; section 6 records the code checkpoint and current browser measurements. User acceptance of the finished three pages remains pending.
+Current code checkpoint (2026-10-03): the frontend is now the three Next.js pages in `web/src/app/`, served through `api.py` over `service.py`; `app.py` and `ui.py` are absent. Streamlit was abandoned for its limited layout flexibility; this continuation polishes the existing frontend without adding another API or framework. The front matter now records the current frontend's tokens. Sections 2–5 preserve the earlier Streamlit pass; section 6 records the code checkpoint and current browser measurements. The user accepted the chat UI on 2026-10-03. Verification and dataset acceptance remain pending.
 
 ## 1. Purpose and layout
 
@@ -317,3 +317,43 @@ The selected reading size remains 16 px, tables and menus 14 px, section heading
 ### Remaining space and validation
 
 Spacing separates the summary, claim rows, quotation and optional context; surrounding paragraphs no longer fill the evidence pane before the citation. No filler panels were added. The production build, ESLint, TypeScript and `git diff --check` passed; edited files were checked as UTF-8 without BOM. These browser observations establish the implemented readability changes, not the user's acceptance. The corrected three pages still require the user's confirmation before the overall completion report.
+
+## 8. Verification workflow and visual review
+
+### Purpose and layout
+
+A verifier comes here to locate a problem, compare it with its source, and see the saved outcome. The user accepted chat and requested repeated visual inspection and repair of verification, specifically automatic revision history and readable task and retrieval views.
+
+The running screen showed a manual correction form requiring an evidence ID, element ID, copied quotation and JSON proposal. Its service only appended a proposal; it did not apply a correction. The actual source and gold review actions already saved their own records, which the screen ignored. The form is removed. History reads those saved actions, including legacy decisions without a newer review-log entry, and refreshes every five seconds. Prior proposals remain visible as unapplied. This adds a read-only service function and API route; it changes no review decision, retrieval, generation, budget or release policy. Sealed questions and labels are excluded.
+
+The selected desktop menu remains. Tasks now have search and review-kind filters, a bounded queue, a compact list of mismatch locations and one selected excerpt. Printed-page previews remain available. Trace inputs open only when requested; saved runs identify their otherwise identical questions with a short run ID. The five trace stages select separate structured panels. Document scope is explicit, warnings use a table, and technical identities and exports are folded. Expanded evidence preserves the exact quotation.
+
+### Browser measurements and button behaviour
+
+Chrome inspection used the shared original runtime at `http://127.0.0.1:8765`, at 1400 × 1000 and 390 × 844. Each layout repair was rebuilt and inspected again. The second pass corrected a CSS display rule that defeated excerpt clamping. Mobile inspection then replaced the cramped menu grid with a labeled native selector. The final pass corrected a misleading human-review count and untranslated diagnostic codes. Screenshots were captured at the actual viewport scale rather than judging a downscaled browser surface.
+
+| Measurement or action | Observation |
+| --- | --- |
+| Desktop task and trace queue | 300 px; selected rows use the existing navy edge |
+| Mobile verification navigation | 140 px high, with a 44 px native selector |
+| Mobile history filters | 44 px high, 16 px input text |
+| Evidence previews | Two lines, about 51.2 px high at 16 px / 25.6 px |
+| Task search | Filtering for the actual 한영대학교 RFP reduced 58 flagged sources to one matching document |
+| Finding selection | Enter changed the selected finding; the focus ring remained visible |
+| Printed source | The selected original page loaded as a 910 × 1287 image |
+| Trace execution | One free keyword search for the actual 한영대학교 RFP saved run `vr-455f1a7fb037` and opened its six evidence units |
+| Stage switching | All five panels opened; paid-generation consent survived stage changes and was cleared after checking, without submitting |
+| Evidence expansion | Keyboard activation opened the full quotation; its text equalled the unclipped source text |
+| History | Existing source reviews appeared without a second write; kind and text filters worked; the screen has no submit action |
+| Other verification areas | Comparison, evaluation, dataset state, ingestion and request records were inspected on actual runtime data |
+| Mobile overflow | None at page level in any of the eight verification areas; wide tables scroll within their own container |
+
+No source was marked reviewed and no gold decision was made during these checks. There were no paid model or evaluation calls. The free trace is the only new application action. Automated checks use isolated SQLite data to prove successful saves appear once in history, legacy decisions are included without duplicates, and sealed questions are excluded; those checks are not evidence of answer quality.
+
+### Typography and selected colours
+
+The existing user-selected navy palette and status colours remain. Titles and exact quotations use the selected reading size, 16 px; tables and menus use 14 px; metadata uses 13 px. Repeated warning pills are removed from the task queue. Human review completion counts only human-reviewed statuses; an automatic flag is not presented as completed human review. Technical warning strings are replaced with Korean labels, while exact source content and recorded reviewer notes remain intact.
+
+### Remaining space and validation
+
+Only the selected finding or trace stage fills the detail area. Empty evaluation and release states remain empty rather than gaining invented metrics. Read failures show errors instead of appearing as empty results or indefinite loading. Production build, TypeScript, focused ESLint, the ten API tests and `git diff --check` pass. User acceptance of verification and dataset remains required before the overall completion report.

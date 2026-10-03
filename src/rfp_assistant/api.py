@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import quote, unquote
 
-from fastapi import Depends, FastAPI, Header, Request
+from fastapi import Depends, FastAPI, Header, Query, Request
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
@@ -651,6 +651,19 @@ class CorrectionIn(BaseModel):
     proposal: dict[str, Any] = {}
 
 
+class VerificationEvent(_Read):
+    event_id: str
+    kind: str
+    action: str
+    target_id: str
+    target: str
+    reviewer: str
+    created_at: str
+    note: str
+    quote: str
+    locations: list[Any]
+
+
 class Decided(_Read):
     candidate_id: str
     status: str
@@ -735,6 +748,10 @@ def _verify_routes(app: FastAPI) -> None:
     @app.get("/api/verify/corrections", response_model=list[Correction])
     def corrections(res: Res, member: Member):
         return service.list_corrections(res, member)
+
+    @app.get("/api/verify/history", response_model=list[VerificationEvent])
+    def history(res: Res, member: Member, limit: int = Query(100, ge=1, le=200)):
+        return service.verification_history(res, member, limit)
 
     @app.post("/api/verify/corrections", response_model=Recorded)
     def add_correction(body: CorrectionIn, res: Res, member: Member):
