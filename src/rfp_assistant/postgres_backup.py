@@ -151,24 +151,29 @@ def restore_check(settings, manifest_path, staging=None):
                 after = release.ledger_summary(target)
                 report = {"restore_check_version": "postgresql-restore-check-1", "passed": all(checks.values()),
                           "checks": checks, "restored_ledger": restored_ledger, "after_restart_recovery": after,
-                          "provider": "fake", "paid_admission": False, "provider_calls": 0}
-                # Publish on the session that still owns both locks. Losing it cannot
-                # let a separate pooled connection declare a restore safe.
-                with raw.transaction():
-                    for lock in (postgres.GATEWAY_LOCK, migration.IMPORT_LOCK):
-                        held = raw.execute("SELECT EXISTS(SELECT 1 FROM pg_locks WHERE pid=pg_backend_pid() "
-                                           "AND locktype='advisory' AND classid=%s AND objid=%s AND granted)",
-                                           (lock >> 32, lock & 0xFFFFFFFF)).fetchone()[0]
-                        if not held:
-                            raise RuntimeError("restore ownership was lost; target remains fenced")
-                    snapshot = conn.execute("SELECT snapshot_sha256 FROM migration_import WHERE id=1").fetchone()[0]
-                    control = postgres.Connection(raw, target)
-                    migration.record_validation(control, snapshot, manifest["references"], report["passed"])
-                    if report["passed"]:
-                        control.execute("UPDATE migration_import SET state='complete' WHERE id=1")
-                    control.execute("UPDATE bidmate_recovery.control SET state=? WHERE id=1",
-                                    ("verified" if report["passed"] else "failed",))
-            store.write_text_atomic(receipt, json.dumps(report, ensure_ascii=False, indent=2))
+                          "provider": "fake", "paid_admission": False, "provider_calls": 0,
+                          "checked_at": store.utcnow(), "backup_dump_sha256": manifest["dump_sha256"],
+                          "receipt": "bidmate_recovery.receipt/1"}
+                snapshot = conn.execute("SELECT snapshot_sha256 FROM migration_import WHERE id=1").fetchone()[0]
+            # Finish pool shutdown before publishing on the session that still owns both locks.
+            # The receipt and readiness become visible together; no filesystem export follows.
+            with raw.transaction():
+                raw.execute("SET LOCAL synchronous_commit='on'")
+                if raw.execute("SHOW fsync").fetchone()[0] != "on":
+                    raise RuntimeError("durable recovery publication requires PostgreSQL fsync=on")
+                for lock in (postgres.GATEWAY_LOCK, migration.IMPORT_LOCK):
+                    held = raw.execute("SELECT EXISTS(SELECT 1 FROM pg_locks WHERE pid=pg_backend_pid() "
+                                       "AND locktype='advisory' AND classid=%s AND objid=%s AND granted)",
+                                       (lock >> 32, lock & 0xFFFFFFFF)).fetchone()[0]
+                    if not held:
+                        raise RuntimeError("restore ownership was lost; target remains fenced")
+                control = postgres.Connection(raw, target)
+                migration.record_validation(control, snapshot, manifest["references"], report["passed"])
+                if report["passed"]:
+                    control.execute("UPDATE migration_import SET state='complete' WHERE id=1")
+                control.execute("UPDATE bidmate_recovery.control SET state=? WHERE id=1",
+                                ("verified" if report["passed"] else "failed",))
+                _publish_restore_receipt(raw, report)
             return report
         except BaseException:
             try:
@@ -177,6 +182,14 @@ def restore_check(settings, manifest_path, staging=None):
             except psycopg.Error:
                 pass  # The already-committed 'restoring' fence survives even when cleanup cannot connect.
             raise
+
+
+def _publish_restore_receipt(raw, report):
+    """The authoritative receipt and readiness share one durable PostgreSQL commit."""
+    raw.execute("CREATE TABLE bidmate_recovery.receipt "
+                "(id bigint PRIMARY KEY CHECK(id=1), report_json text NOT NULL)")
+    raw.execute("INSERT INTO bidmate_recovery.receipt VALUES (1,%s)",
+                (json.dumps(report, ensure_ascii=False, indent=2),))
 
 
 def _disable_restored_control(raw):

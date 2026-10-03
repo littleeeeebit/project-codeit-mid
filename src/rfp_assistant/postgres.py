@@ -152,7 +152,16 @@ def recovery_blocked(conn):
     if not exists:
         return False
     row = conn.execute("SELECT state FROM bidmate_recovery.control WHERE id=1").fetchone()
-    return row is None or row[0] != "verified"
+    if row is None or row[0] != "verified":
+        return True
+    if not conn.execute("SELECT to_regclass('bidmate_recovery.receipt')").fetchone()[0]:
+        return True
+    receipt = conn.execute("SELECT report_json FROM bidmate_recovery.receipt WHERE id=1").fetchone()
+    try:
+        report = json.loads(receipt[0]) if receipt else {}
+        return report.get("passed") is not True or report.get("restore_check_version") != "postgresql-restore-check-1"
+    except (ValueError, TypeError, AttributeError):
+        return True
 
 
 def validation_ready(conn):

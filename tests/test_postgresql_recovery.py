@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import uuid
 from pathlib import Path
@@ -14,7 +15,7 @@ import psycopg
 from psycopg import sql
 from psycopg.conninfo import make_conninfo
 
-from rfp_assistant import budget, migration, postgres, postgres_backup, store
+from rfp_assistant import cli, migration, postgres, postgres_backup, service, store
 from tests import fixtures
 
 
@@ -97,6 +98,8 @@ class PostgreSQLRecoveryTest(unittest.TestCase):
             conn.execute("CREATE SCHEMA bidmate_recovery")
             conn.execute("CREATE TABLE bidmate_recovery.control (id bigint PRIMARY KEY, state text NOT NULL)")
             conn.execute("INSERT INTO bidmate_recovery.control VALUES (1,'verified')")
+            postgres_backup._publish_restore_receipt(conn.raw, {"passed": True,
+                "restore_check_version": "postgresql-restore-check-1"})
         manifest = Path(postgres_backup.backup(self.settings, self.root / "backup-again", "test")["manifest"])
         report = postgres_backup.restore_check(self.settings, manifest)
         self.assertTrue(report["passed"])
@@ -111,6 +114,8 @@ class PostgreSQLRecoveryTest(unittest.TestCase):
         self.assertFalse(report["passed"])
         with store.database_lifecycle(self.target), store.open_db(self.target) as conn:
             self.assertFalse(conn.execute("SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0])
+            saved = json.loads(conn.execute("SELECT report_json FROM bidmate_recovery.receipt WHERE id=1").fetchone()[0])
+            self.assertFalse(saved["passed"])
             with self.assertRaisesRegex(RuntimeError, "recovery"):
                 postgres.require_imported_database(self.target)
 
@@ -157,37 +162,95 @@ class PostgreSQLRecoveryTest(unittest.TestCase):
             self.assertIsNone(other.execute("SELECT to_regclass('public.database_control')").fetchone()[0])
             self.assertTrue(postgres.recovery_blocked(other))
 
-    def test_success_receipt_requires_committed_readiness(self):
+    def test_receipt_and_readiness_are_published_in_one_commit(self):
         receipt = self.manifest.parent / "postgresql-restore-check.json"
-        original_write = store.write_text_atomic
+        original_publish = postgres_backup._publish_restore_receipt
         writes = []
-        def check_committed(path, text):
-            if path == receipt:
-                with psycopg.connect(self.target.dsn(), autocommit=True) as other:
-                    state = other.execute("SELECT c.paid_admission,m.state,v.passed,r.state "
-                                          "FROM database_control c JOIN migration_import m USING(id) "
-                                          "JOIN migration_validation v USING(id) "
-                                          "JOIN bidmate_recovery.control r USING(id)").fetchone()
-                self.assertEqual(state, (False, "complete", True, "verified"))
-                writes.append(json.loads(text)["passed"])
-            return original_write(path, text)
-        with mock.patch.object(store, "write_text_atomic", side_effect=check_committed):
-            self.assertTrue(postgres_backup.restore_check(self.settings, self.manifest)["passed"])
+        def check_uncommitted(raw, report):
+            original_publish(raw, report)
+            self.assertEqual(raw.execute("SHOW synchronous_commit").fetchone()[0], "on")
+            with psycopg.connect(self.target.dsn(), autocommit=True) as other:
+                state = other.execute("SELECT c.paid_admission,m.state,v.passed,r.state "
+                                      "FROM database_control c JOIN migration_import m USING(id) "
+                                      "JOIN migration_validation v USING(id) "
+                                      "JOIN bidmate_recovery.control r USING(id)").fetchone()
+                self.assertEqual(state, (False, "restore_pending", False, "restoring"))
+                self.assertIsNone(other.execute("SELECT to_regclass('bidmate_recovery.receipt')").fetchone()[0])
+            staged = self.settings.with_(database_dsn_env=self.target.dsn_env)
+            with self.assertRaisesRegex(RuntimeError, "recovery"):
+                service.Resources(staged, recover=False)
+            with mock.patch.object(cli, "load_settings", return_value=staged):
+                self.assertEqual(cli.main(["budget-status"]), 1)
+            writes.append(report["passed"])
+        with mock.patch.object(postgres_backup, "_publish_restore_receipt", side_effect=check_uncommitted):
+            report = postgres_backup.restore_check(self.settings, self.manifest)
+            self.assertTrue(report["passed"])
         self.assertEqual(writes, [True])
-        self.assertTrue(json.loads(receipt.read_text(encoding="utf-8"))["passed"])
+        self.assertFalse(receipt.exists())
+        with store.database_lifecycle(self.target), store.open_db(self.target) as conn:
+            postgres.require_imported_database(self.target)
+            saved = json.loads(conn.execute("SELECT report_json FROM bidmate_recovery.receipt WHERE id=1").fetchone()[0])
+            self.assertEqual(saved, report)
+            # Removing the authoritative receipt must close startup and admission again.
+            conn.execute("DELETE FROM bidmate_recovery.receipt WHERE id=1")
+            with self.assertRaisesRegex(RuntimeError, "recovery"):
+                postgres.require_imported_database(self.target)
+            self.assertEqual(postgres.owner_guard(conn), "postgresql_recovery_or_validation")
 
-    def test_receipt_write_failure_blocks_target_and_leaves_no_success(self):
+    def test_process_loss_at_receipt_publication_keeps_startup_blocked(self):
+        boundary = self.root / "publication-boundary"
+        script = """
+import sys, time
+from pathlib import Path
+from rfp_assistant import postgres_backup
+from rfp_assistant.settings import Settings
+original = postgres_backup._publish_restore_receipt
+def paused(raw, report):
+    original(raw, report)
+    Path(sys.argv[4]).write_text('paused', encoding='utf-8')
+    while True:
+        time.sleep(0.1)
+postgres_backup._publish_restore_receipt = paused
+settings = Settings(database_backend='postgresql', database_dsn_env=sys.argv[1],
+                    source_dir=Path(sys.argv[2]), data_dir=Path(sys.argv[3]), hwp_converter=None, provider='fake')
+postgres_backup.restore_check(settings, Path(sys.argv[5]))
+"""
+        child = subprocess.Popen([sys.executable, "-c", script, self.source.dsn_env,
+                                  str(self.settings.source_dir), str(self.settings.data_dir),
+                                  str(boundary), str(self.manifest)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            deadline = time.monotonic() + 60
+            while not boundary.exists() and child.poll() is None and time.monotonic() < deadline:
+                time.sleep(0.1)
+            if not boundary.exists() and child.poll() is not None:
+                stdout, stderr = child.communicate()
+                self.fail("restore did not reach publication boundary: " + (stdout + stderr).decode('utf-8'))
+            self.assertTrue(boundary.exists(), "restore did not reach publication boundary")
+            with store.database_lifecycle(self.target):
+                with self.assertRaisesRegex(RuntimeError, "recovery"):
+                    postgres.require_imported_database(self.target)
+        finally:
+            child.kill()
+            child.communicate(timeout=10)
+        with store.database_lifecycle(self.target), store.open_db(self.target) as conn:
+            self.assertTrue(postgres.recovery_blocked(conn))
+            self.assertIsNone(conn.execute("SELECT to_regclass('bidmate_recovery.receipt')").fetchone()[0])
+            self.assertFalse(conn.execute("SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0])
+            with self.assertRaisesRegex(RuntimeError, "recovery"):
+                postgres.require_imported_database(self.target)
+
+    def test_receipt_publication_failure_blocks_target_and_leaves_no_success(self):
         receipt = self.manifest.parent / "postgresql-restore-check.json"
-        original_write = store.write_text_atomic
-        def failed_write(path, text):
-            if path == receipt:
-                raise OSError("injected receipt write failure")
-            return original_write(path, text)
-        with mock.patch.object(store, "write_text_atomic", side_effect=failed_write):
-            with self.assertRaisesRegex(OSError, "receipt write failure"):
+        original_publish = postgres_backup._publish_restore_receipt
+        def failed_publish(raw, report):
+            original_publish(raw, report)
+            raise RuntimeError("injected receipt publication failure")
+        with mock.patch.object(postgres_backup, "_publish_restore_receipt", side_effect=failed_publish):
+            with self.assertRaisesRegex(RuntimeError, "receipt publication failure"):
                 postgres_backup.restore_check(self.settings, self.manifest)
         self.assertFalse(receipt.exists())
         with store.database_lifecycle(self.target), store.open_db(self.target) as conn:
+            self.assertIsNone(conn.execute("SELECT to_regclass('bidmate_recovery.receipt')").fetchone()[0])
             self.assertFalse(conn.execute("SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0])
             with self.assertRaisesRegex(RuntimeError, "recovery"):
                 postgres.require_imported_database(self.target)

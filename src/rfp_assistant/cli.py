@@ -424,6 +424,7 @@ def cmd_backup(args, settings) -> int:
 def cmd_restore_check(args, settings) -> int:
     report = release.restore_check(settings, Path(args.backup), Path(args.staging) if args.staging else None)
     _print({"passed": report["passed"], "checks": report["checks"],
+            **({"receipt": report["receipt"]} if "receipt" in report else {}),
             **({"staging": report["staging"]} if "staging" in report else {})})
     return 0 if report["passed"] else 1
 
