@@ -40,7 +40,7 @@ components:
 
 The initial redesign of 2026-10-02 made the Streamlit app a thin shell over `service.py`. The initial design pass ran in the fixed order below; its choices were picked by the user from concrete sketches, one question per turn, before layout code was written.
 
-Current code checkpoint (2026-10-03): the frontend is now the three Next.js pages in `web/src/app/`, served through `api.py` over `service.py`; `app.py` and `ui.py` are absent. Streamlit was abandoned for its limited layout flexibility; this continuation polishes the existing frontend without adding another API or framework. The front matter now records the current frontend's tokens. Sections 2–5 preserve the earlier Streamlit pass; section 6 records the code checkpoint and current browser measurements. The user accepted the chat UI on 2026-10-03. Verification and dataset acceptance remain pending.
+Current code checkpoint (2026-10-03): the frontend is now the three Next.js pages in `web/src/app/`, served through `api.py` over `service.py`; `app.py` and `ui.py` are absent. Streamlit was abandoned for its limited layout flexibility; this continuation polishes the existing frontend without adding another API or framework. The front matter now records the current frontend's tokens. Sections 2–5 preserve the earlier Streamlit pass; section 6 records the code checkpoint and current browser measurements. The user accepted the chat and verification UI on 2026-10-03 and requested a commit and PR after the verification pass. Dataset acceptance remains pending.
 
 ## 1. Purpose and layout
 
@@ -356,4 +356,4 @@ The existing user-selected navy palette and status colours remain. Titles and ex
 
 ### Remaining space and validation
 
-Only the selected finding or trace stage fills the detail area. Empty evaluation and release states remain empty rather than gaining invented metrics. Read failures show errors instead of appearing as empty results or indefinite loading. Production build, TypeScript, focused ESLint, the ten API tests and `git diff --check` pass. User acceptance of verification and dataset remains required before the overall completion report.
+Only the selected finding or trace stage fills the detail area. Empty evaluation and release states remain empty rather than gaining invented metrics. Read failures show errors instead of appearing as empty results or indefinite loading. Production build, TypeScript, focused ESLint, the ten API tests and `git diff --check` pass. The user accepted the verification UI on 2026-10-03 and requested a commit and PR. Dataset acceptance remains required before the overall completion report.
