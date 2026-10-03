@@ -58,7 +58,7 @@ class Settings:
     question_max_characters: int = 2000
     retrieval_mode: str = "kiwi_bm25"  # default until `activate-run` records a measured selection
     reranker_enabled: bool = False
-    embedding_dimensions: int = 768  # first development candidate; activation still requires quality acceptance
+    embedding_dimensions: int = 1536  # owner-selected reduction; activation still requires quality acceptance
     embedding_batch_inputs: int = 256
     embedding_batch_tokens: int = 100_000
     embedding_estimate_ttl_hours: int = 24

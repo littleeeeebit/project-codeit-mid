@@ -291,7 +291,7 @@ def validate(plan_path, target):
             "tables": checks, "inaccessible_or_changed_artifacts": bad_files, "provider_calls": 0}
 
 
-def embedding_preflight(target, dimensions=768):
+def embedding_preflight(target, dimensions=1536):
     """Proposed-rate estimate only. Neither approves rates nor dispatches provider requests."""
     from . import budget, dense, vector_store
     from .settings import DEFAULT_RATES, LARGE_RATE_VERSION, Settings
@@ -340,7 +340,7 @@ def main(argv=None):
     planning.add_argument("--output", required=True, type=Path)
     embedding = commands.add_parser("embedding-preflight")
     embedding.add_argument("--dsn-env", default="RFP_DATABASE_DSN")
-    embedding.add_argument("--dimensions", type=int, default=768)
+    embedding.add_argument("--dimensions", type=int, default=1536)
     for command in ("import", "validate"):
         sub = commands.add_parser(command)
         sub.add_argument("--plan", required=True, type=Path)

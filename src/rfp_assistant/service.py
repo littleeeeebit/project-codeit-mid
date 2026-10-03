@@ -160,9 +160,10 @@ class Resources:
         if run:
             cfg = json.loads(run)
             if self.settings.database_backend == "postgresql" and cfg.get("embedding") and \
-                    cfg["embedding"]["model"] != self.settings.embedding_model:
+                    (cfg["embedding"].get("model"), cfg["embedding"].get("dims")) != \
+                    (self.settings.embedding_model, self.settings.embedding_dimensions):
                 return {**cfg, "mode": "kiwi_bm25", "dense_version": None, "embedding": None,
-                        "reranker": None, "fallback_reason": "activated_embedding_model_requires_migration"}
+                        "reranker": None, "fallback_reason": "activated_embedding_identity_requires_migration"}
             if cfg["mode"] == "hybrid_rerank" and cfg.get("eval_version") != EVAL_VERSION:
                 # Promoted under a superseded gate: keep hybrid retrieval, drop the reranker until a current
                 # trial passes and is activated.

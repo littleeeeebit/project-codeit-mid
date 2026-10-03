@@ -267,7 +267,7 @@ class PostgreSQLTests(unittest.TestCase):
 
         self.imported()
         self.allow_fake_paid()
-        settings = self.settings.with_(embedding_model="text-embedding-3-large", embedding_dimensions=768)
+        settings = self.settings.with_(embedding_model="text-embedding-3-large", embedding_dimensions=1536)
         transport = FakeTransport()
         request = self.request("large-query")
         vector, info = dense.query_vector(settings, transport, "dimension dispatch", request_id=request,
@@ -275,7 +275,7 @@ class PostgreSQLTests(unittest.TestCase):
         self.assertIsNotNone(vector)
         self.assertAlmostEqual(float(np.linalg.norm(vector)), 1, places=6)
         self.assertEqual((transport.embed_calls[0]["model"], transport.embed_calls[0]["dimensions"]),
-                         ("text-embedding-3-large", 768))
+                         ("text-embedding-3-large", 1536))
         self.assertEqual(info["status"], "ok")
         cached, _ = dense.query_vector(settings, transport, "dimension dispatch", allow_paid=False,
                                       request_id=None, member_id="member", purpose="interactive")
@@ -295,6 +295,24 @@ class PostgreSQLTests(unittest.TestCase):
         after = budget.snapshot(self.target)
         self.assertEqual((after.spent_micro_usd, after.pending_micro_usd, after.cap_micro_usd),
                          (before.spent_micro_usd, before.pending_micro_usd, before.cap_micro_usd))
+
+    def test_historical_activation_cannot_override_selected_large_dimensions(self):
+        self.imported()
+        settings = self.settings.with_(embedding_model="text-embedding-3-large", embedding_dimensions=1536)
+        res = service.Resources(settings)
+        try:
+            for model, dimensions in (("text-embedding-3-small", 1536), ("text-embedding-3-large", 768)):
+                with store.open_db(self.target) as conn, store.tx(conn, immediate=True):
+                    store.set_app_setting(conn, "active_run", store.dumps({"mode": "hybrid", "dense_version": "historical",
+                        "embedding": {"model": model, "dims": dimensions}}))
+                serving = res.serving()
+                self.assertEqual(serving["mode"], "kiwi_bm25")
+                self.assertEqual(serving["fallback_reason"], "activated_embedding_identity_requires_migration")
+                self.assertEqual((res.run_settings().embedding_model, res.run_settings().embedding_dimensions),
+                                 ("text-embedding-3-large", 1536))
+                self.assertFalse(res.transport.embed_calls)
+        finally:
+            res.close()
 
     def test_limit_change_preserves_unknown_reservations_and_price_history(self):
         self.imported()

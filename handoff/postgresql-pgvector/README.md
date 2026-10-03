@@ -6,7 +6,7 @@ PostgreSQL persistence replacement is the first priority, as requested on 2026-1
 
 The user chose to expand the development population before dimension selection. Private inputs now contain 53 development-family documents and 413 excerpts (numeric qualifiers, late tables, repeated codes and deadlines). These are inputs for independent label review, not approved gold or a frozen evaluation population. Sealed questions and first sealed results remain untouched.
 
-The assignment remains spec `migrate-postgresql-pgvector-reduced-embeddings`, revision 2. Storage parity, model comparison, shortening acceptance, ANN evaluation, production cutover and rollback are separate requirements. No quality threshold has been weakened. The first candidate is `text-embedding-3-large`, 768 dimensions; no serving dimension has yet passed acceptance.
+The assignment starts from spec `migrate-postgresql-pgvector-reduced-embeddings`, revision 2, with subsequent owner updates recorded below. Storage parity, model comparison, shortening acceptance, ANN evaluation, production cutover and rollback are separate requirements. No quality threshold has been weakened. The owner subsequently selected `text-embedding-3-large`, 1,536 dimensions, replacing the 768-first ladder and smallest-passing selection. The selected dimension has not yet passed quality acceptance.
 
 ## Observed source and rehearsal
 
@@ -31,7 +31,7 @@ docker desktop start
 $env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.example.json).Path
 ```
 
-The script starts `bidmate-postgresql` on `127.0.0.1:55432`, initializes extension 0.8.6, and sets `RFP_DATABASE_DSN` in this shell. It generates a secret in ignored `.runtime/postgresql.env`; never paste that file or print the DSN. The example configuration uses a fake provider and large/768. Changing dimensions does not itself authorize or activate a candidate.
+The script starts `bidmate-postgresql` on `127.0.0.1:55432`, initializes extension 0.8.6, and sets `RFP_DATABASE_DSN` in this shell. It generates a secret in ignored `.runtime/postgresql.env`; never paste that file or print the DSN. The example configuration uses a fake provider and large/1,536. Selecting dimensions does not itself activate a candidate.
 
 The default database backend is PostgreSQL. Initialization and connection failures stop operation; writes never fall back to SQLite. Explicit `database_backend: "sqlite"` remains for historical fixtures and controlled rollback only. Initializing a fresh PostgreSQL database also leaves paid admission disabled. Use a dedicated application database with the public schema.
 
@@ -66,7 +66,7 @@ The paid owner holds a database-wide session advisory lock, across processes and
 ## Large-model estimates and vector serving
 
 ```powershell
-python -m rfp_assistant.migration embedding-preflight --dimensions 768
+python -m rfp_assistant.migration embedding-preflight --dimensions 1536
 python -m rfp_assistant.cli budget-status
 ```
 
@@ -126,7 +126,7 @@ Tests create and delete private schemas, reject public application tables, and u
 Still required before completion:
 
 1. Independent review and freezing of the expanded development labels; record the approved $10 budget/rates/envelopes and verify model access.
-2. Bounded native-large reference and paired shortening calls, complete genuinely new corpus/query set, then 768, 1,024, 1,280, 1,536 and 2,000 trials only as needed. Select the smallest passing candidate, never weaken nDCG@5 (0.02), complete-support (two percentage points), or zero-new-critical-failure thresholds. Report dense/hybrid eligible denominators separately.
+2. Bounded native-large reference and paired shortening calls, complete genuinely new 1,536-dimensional corpus/query set and acceptance of the owner's selected dimension. The later 1,536 instruction supersedes the 768-first ladder and smallest-passing selection. Retain nDCG@5 (0.02), complete-support (two percentage points), and zero-new-critical-failure thresholds. Report dense/hybrid eligible denominators separately; if 1,536 fails, retain the safe baseline and report incomplete.
 3. Actual old-vector storage parity (private old vectors are currently absent), controlled model/shortening comparisons, identical-vector warm/cold p50/p95 benchmarks at one/six clients, storage/build/cost measurements and EXPLAIN ANALYZE. HNSW is not selected; optional filtered ANN/iterative-scan recall acceptance is unimplemented.
 4. Dimension-comparison/benchmark automation, sealed/configuration preservation checks, relocated artifact restore and tested rollback after new writes. These do not yet have implemented CLI commands.
 5. Final maintenance-window cutover, original evidence and local single/two-document answer acceptance with verifier/review/correction/budget checks. No cutover command or paid-admission enabling procedure is published until these safety prerequisites are implemented and reviewed.
@@ -143,3 +143,7 @@ The approved live limit has now been applied: allowance/cap $10, purpose envelop
 The approved rehearsal is database `bidmate_import_approved_20261003`, snapshot SHA256 `73ececde5a6d13ae08323e9dcf4f5be9ee2a42dbd1308a773bbd3869503ae703`. All 27 tables / 645,950 records and 733 artifacts validate. The three extra records are append-only approval audit events; no application history was removed. Paid admission remains false. Updated corpus preflight fits the embedding envelope: remaining $2.343197, estimated $1.019020; total remaining cap $9.387546. Private evidence: `approved-source-plan.json`, `approved-validation.json`, `approved-embedding-preflight.json`.
 
 The Settings save flow passed in actual Chrome/Playwright against this PostgreSQL rehearsal with no inference calls and admission still disabled. It deliberately appended a new settings audit record after snapshot validation; a repeated completed import must preserve this newer target state. The live SQLite ledger was not touched by that browser check. Frontend production build and lint passed. The targeted API/PostgreSQL suite passed 23 tests, with subsequent price-history, ownership/pool and initialization-failure checks. A verification-runner reconciliation test failed once under concurrent work, then all three underlying tests and the standalone `budget-recovery` flow passed without a code change; retain this failure in review evidence rather than calling the first result green.
+
+The owner's subsequent instruction fixes new serving embeddings at 1,536 dimensions. Code defaults, nonsecret configuration and preflight defaults now agree. Historical activation overrides at a different model or dimension use visible lexical fallback until compatible acceptance; they are not relabeled. Existing 768 preflight receipts remain historical, and the 1,536 estimate must be recorded separately. Token costs do not decrease with dimensions.
+
+The separate 1,536 preflight is recorded in `.runtime/postgresql-migration/approved-1536-preflight.json`: 18,548 unique payloads, 7,838,299 tokens, 79 batches, zero genuine large cache hits, and maximum corpus cost $1.019019, fitting the approved $2.343197 remaining embedding envelope. Explicit 1,536 query dispatch/normalization/cache behavior and historical model/dimension override rejection passed two real-PostgreSQL tests in 10.509 seconds. These tests use fake inference; actual provider access remains untested. Paid calls were deliberately deferred during implementation/rehearsal with PostgreSQL admission disabled and development review/freezing pending; no API refusal occurred and owner approval/funding are recorded. The manually requested extra review was stopped by the owner and must not be restarted without a new instruction.

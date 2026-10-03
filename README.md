@@ -19,7 +19,7 @@ The HWP converter (`hwp5proc` from pyhwp 0.1b15) is installed into the same envi
 
 PostgreSQL is the default application database and pgvector is the selected vector store. Start Docker Desktop (Linux containers), then dot-source `tools/start-postgresql.ps1` in the shell that launches the application. The script starts pinned PostgreSQL 18.6 / pgvector 0.8.6 on loopback port 55432 and sets a secret DSN without printing it. Driver and pool versions are pinned in the requirements. See the [PostgreSQL handover](handoff/postgresql-pgvector/README.md) for the tested full-record import, backup/restore commands and pending acceptance.
 
-Existing SQLite runtimes require an explicit snapshot/import; startup never silently imports or falls back. Use a new, isolated target for rehearsal and keep paid admission disabled. The production corpus is not yet cut over. Large-model 768 dimensions is the first candidate, pending independent quality selection. The owner approved paid work and a $10 operating cap on 2026-10-03. The Settings page can change the shared cumulative limit while preserving spending and reservations; it uses the existing no-login attribution model.
+Existing SQLite runtimes require an explicit snapshot/import; startup never silently imports or falls back. Use a new, isolated target for rehearsal and keep paid admission disabled. The production corpus is not yet cut over. The owner selected `text-embedding-3-large` at 1,536 dimensions, pending independent quality acceptance against the native 3,072 reference. The owner approved paid work and a $10 operating cap on 2026-10-03. The Settings page can change the shared cumulative limit while preserving spending and reservations; it uses the existing no-login attribution model.
 
 ## Configuration
 

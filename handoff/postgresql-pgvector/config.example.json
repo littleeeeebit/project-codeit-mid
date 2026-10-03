@@ -5,5 +5,5 @@
   "database_timeout_seconds": 5,
   "provider": "fake",
   "embedding_model": "text-embedding-3-large",
-  "embedding_dimensions": 768
+  "embedding_dimensions": 1536
 }
