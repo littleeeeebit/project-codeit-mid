@@ -313,7 +313,7 @@ def generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, tra
         lock.release()
 
 
-def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, transport, split: str) -> dict:
+def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, transport, split: str, *, guard=None) -> dict:
     """Five slots per billed request. Cache and settle before validation; never retry or approve automatically."""
     if settings.generation_model != MODEL or max_cost_micro <= 0:
         raise gold.GoldError("Generation requires gpt-6-luna and a positive consented cost ceiling")
@@ -333,6 +333,14 @@ def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, tr
         owned = False
     request_id = None
     rows, invalid, cost = [], [], 0
+
+    def checkpoint():
+        if guard is not None:
+            with store.open_db(settings.db_path) as conn:
+                reason = guard(conn)
+            if reason:
+                raise budget.DispatchRefused(reason)
+
     try:
         out.mkdir(parents=True)
         store.write_text_atomic(out / "plan.json", store.dumps(plan))
@@ -341,6 +349,7 @@ def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, tr
                                               {"job": "gold_drafting", "out": str(out), "model": MODEL})
         fmt = response_format()
         for batch, start in enumerate(range(0, len(slots), 5), 1):
+            checkpoint()
             subset = slots[start:start+5]
             max_output = min(MAX_OUTPUT, 1200 * len(subset))
             payload = messages(subset, learned)
@@ -360,7 +369,7 @@ def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, tr
             if not admission["admitted"]:
                 raise gold.GoldError(f"Drafting budget refused: {admission['reason']}")
             aid = admission["attempt_id"]
-            budget.mark_dispatching(settings.db_path, aid)
+            budget.mark_dispatching(settings.db_path, aid, guard)
             began = time.monotonic()
             try:
                 response = transport.chat(model=MODEL, messages=payload, response_format=fmt,
@@ -422,9 +431,11 @@ def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, tr
                         invalid.append({"question_id": slot["question_id"], "draft": draft, "reason": str(exc)})
             store.write_jsonl_atomic(out / "candidates.jsonl", rows)
             store.write_text_atomic(out / "invalid.json", store.dumps(invalid))
-    except Exception:
+        checkpoint()
+    except Exception as exc:
         if request_id is not None:
-            dense.finish_job_request(settings, request_id, "failed", {"out": str(out), "settled_micro_usd": cost})
+            status = "interrupted" if isinstance(exc, budget.DispatchRefused) else "failed"
+            dense.finish_job_request(settings, request_id, status, {"out": str(out), "settled_micro_usd": cost})
         raise
     finally:
         if owned:

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Download, X } from "lucide-react";
 import { cn } from "cn";
-import { api, type Doc, errorText, originalHref, type Owned, type RequestView } from "@/lib/api";
+import { api, type Doc, errorText, memberHeaders, originalHref, type Owned, type RequestView } from "@/lib/api";
 import { FIELD, label, REQUEST, REVIEW, REVIEW_WARNING, STATUS, usd, when, wonShort } from "@/lib/format";
-import { readMember } from "@/lib/member";
+import { readMember, useMember } from "@/lib/member";
 import { must, usePoll } from "@/lib/use-poll";
 import { StatusBadge } from "@/components/status-badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -31,22 +31,46 @@ const SUBMIT: Record<Mode, string> = {
 /** The one request this screen owns, with the name it was asked under (taken once, at submit). */
 type Ownership = Owned & { member: string };
 
+async function abandon(owned: Ownership) {
+  const { error, response } = await api.POST("/api/requests/{request_id}/abandon", {
+    params: { path: { request_id: owned.request_id } }, headers: memberHeaders(owned.member), keepalive: true,
+  });
+  if (!response.ok) throw new Error(errorText(error));
+}
+
 export function AskPage() {
   const [selected, setSelected] = useState<Doc[]>([]);
   const [mode, setMode] = useState<Mode>("single");
   const [question, setQuestion] = useState("");
   const [owned, setOwned] = useState<Ownership | null>(null);
+  const owner = useRef<Ownership | null>(null);
+  const pending = useRef<{ valid: boolean } | null>(null);
+  const mounted = useRef(true);
+  const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const modes = selected.length === 2 ? TWO : ONE;
   const current = modes.find((m) => m.id === mode) ?? modes[0];
 
-  // A changed selection or mode means the screen no longer asks what the owned request asked: let it go.
-  const release = () => {
-    if (owned) {
-      void api.POST("/api/requests/{request_id}/abandon", { params: { path: { request_id: owned.request_id } } });
-      setOwned(null);
+  // Context changes also invalidate an initial POST that has not returned its ownership record yet.
+  const release = useCallback(() => {
+    if (pending.current) pending.current.valid = false;
+    const previous = owner.current;
+    owner.current = null;
+    setOwned(null);
+    if (previous) {
+      void abandon(previous).catch((error) => {
+        if (mounted.current) setSubmitError(`이전 요청을 중단하지 못했습니다: ${error.message}`);
+        else console.error("Could not abandon the queued request", error);
+      });
     }
-  };
+  }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      release();
+    };
+  }, [release]);
   const toggle = (d: Doc) => {
     release();
     setSelected((s) => (s.some((x) => x.doc_id === d.doc_id) ? s.filter((x) => x.doc_id !== d.doc_id)
@@ -55,22 +79,42 @@ export function AskPage() {
   const status = usePoll(owned ? `${owned.request_id}/${owned.generation_id}` : null, () => must(
     api.GET("/api/requests/{request_id}", {
       params: { path: { request_id: owned!.request_id }, query: { generation_id: owned!.generation_id, target: owned!.target } },
+      headers: memberHeaders(owned!.member),
     }), errorText), 1000, (d) => !["queued", "running"].includes(d.view.status));
-  const busy = !!owned && (!status.data || ["queued", "running"].includes(status.data.view.status));
+  const busy = submitting || (!!owned && (!status.data || ["queued", "running"].includes(status.data.view.status)));
   const historyKey = `${owned?.request_id ?? ""}:${busy}`;  // reload the history when the owned request finishes
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pending.current || busy) return;
     setSubmitError(null);
     const q = current.paid ? question.trim() : "";
     if (current.paid && !q) return setSubmitError("질문을 입력하세요.");
     const member = readMember();
-    const { data, error } = await api.POST("/api/ask", {
-      body: { scope: selected.map((d) => ({ doc_id: d.doc_id, source_hash: d.source_hash })), question: q, mode: current.id },
-    });
-    if (error || !data) return setSubmitError(errorText(error));
     release();
-    setOwned({ ...data, member });
+    const attempt = { valid: true };
+    pending.current = attempt;
+    setSubmitting(true);
+    try {
+      const { data, error } = await api.POST("/api/ask", {
+        body: { scope: selected.map((d) => ({ doc_id: d.doc_id, source_hash: d.source_hash })), question: q, mode: current.id },
+        headers: memberHeaders(member),
+      });
+      if (error || !data) throw new Error(errorText(error));
+      const request = { ...data, member };
+      if (mounted.current && attempt.valid) {
+        owner.current = request;
+        setOwned(request);
+      } else {
+        await abandon(request);
+      }
+    } catch (error) {
+      if (mounted.current) setSubmitError(error instanceof Error ? error.message : errorText(error));
+      else console.error("Could not finish request ownership cleanup", error);
+    } finally {
+      if (pending.current === attempt) pending.current = null;
+      if (mounted.current) setSubmitting(false);
+    }
   };
 
   return (
@@ -110,7 +154,7 @@ export function AskPage() {
                 <div>
                   <label htmlFor="question" className="sr-only">질문</label>
                   <textarea id="question" rows={3} maxLength={2000} value={question} disabled={busy}
-                            onChange={(e) => setQuestion(e.target.value)}
+onChange={(e) => { release(); setQuestion(e.target.value); }}
                             placeholder={current.id === "compare" ? "예: 두 사업의 하자보수 조건을 비교해 주세요." : "예: 하자보수 기간과 조건은 무엇인가요?"}
                             className="w-full resize-y rounded-xl border border-input bg-background p-3 text-[16px] leading-7 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60" />
                 </div>
@@ -163,6 +207,19 @@ function SelectedDoc({ doc, index, onRemove }: { doc: Doc; index: number; onRemo
 }
 
 function OwnedAnswer({ owned, status }: { owned: Ownership; status: ReturnType<typeof usePoll<{ view: RequestView; attachable: boolean }>> }) {
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const cancel = async () => {
+    setCancelError(null);
+    try {
+      const { error, response } = await api.POST("/api/requests/{request_id}/cancel", {
+        params: { path: { request_id: owned.request_id } }, headers: memberHeaders(owned.member),
+      });
+      if (!response.ok) throw new Error(errorText(error));
+      status.reload();
+    } catch (error) {
+      setCancelError(error instanceof Error ? error.message : errorText(error));
+    }
+  };
   if (status.error && !status.data) return <p role="alert" className="text-sm text-bad">{status.error}</p>;
   const v = status.data?.view;
   if (!v || ["queued", "running"].includes(v.status)) {
@@ -175,11 +232,12 @@ function OwnedAnswer({ owned, status }: { owned: Ownership; status: ReturnType<t
           </span>
           {v && (
             <button type="button" className="ml-auto h-8 rounded-lg border px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
-                    onClick={() => api.POST("/api/requests/{request_id}/cancel", { params: { path: { request_id: owned.request_id } } })}>
+                    onClick={cancel}>
               요청 취소
             </button>
           )}
         </div>
+        {cancelError && <p role="alert" className="text-sm text-bad">{cancelError}</p>}
         <div className="space-y-2"><Skeleton className="h-5 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6" /></div>
       </section>
     );
@@ -197,9 +255,12 @@ function OwnedAnswer({ owned, status }: { owned: Ownership; status: ReturnType<t
 }
 
 function History({ refresh }: { refresh: string }) {
+  const member = useMember();
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState<string | null>(null);
-  const { data } = usePoll(open ? `history-${refresh}` : null, () => must(api.GET("/api/requests", { params: { query: { limit: 20 } } }), errorText), null);
+  const { data } = usePoll(open ? `history-${member}-${refresh}` : null, () => must(api.GET("/api/requests", {
+    params: { query: { limit: 20 } }, headers: memberHeaders(member),
+  }), errorText), null);
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="border-t pt-6">
       <CollapsibleTrigger className="group flex min-h-9 items-center gap-2 rounded text-lg font-bold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">

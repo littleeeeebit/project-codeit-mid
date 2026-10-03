@@ -1,0 +1,185 @@
+"""Browser regressions for screen-owned requests, using only isolated fixtures and a fake provider.
+
+Build web/ first, then run with the verification environment's Python. These checks establish request
+lifecycle behaviour, not actual-corpus answer quality or user acceptance.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import socket
+import sys
+import tempfile
+import threading
+import time
+import unittest
+import uuid
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path[:0] = [str(REPO / "src"), str(REPO)]
+
+import uvicorn
+from playwright.sync_api import expect, sync_playwright
+
+from rfp_assistant import api, service
+from rfp_assistant.generation import FakeTransport
+from rfp_assistant.store import open_db
+from tests import fixtures
+
+QUESTION = "하자보수 기간은 얼마인가요?"
+
+
+class AskOwnershipTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if not api.WEB.is_dir():
+            raise AssertionError("Run npm run build in web/ before this browser check")
+        cls.tmp = tempfile.TemporaryDirectory(prefix="ask-ownership-")
+        cls.env = fixtures.make_env(Path(cls.tmp.name))
+        cls.gate, cls.entered = threading.Event(), threading.Event()
+        cls.gate.set()
+        cls.transport = FakeTransport()
+        echo = cls.transport.responder
+
+        def reply(messages):
+            cls.entered.set()
+            if not cls.gate.wait(30):
+                raise AssertionError("fake provider was not released")
+            return echo(messages)
+
+        cls.transport.responder = reply
+        cls.res = service.Resources(cls.env.settings.with_(request_workers=1, request_admission=16),
+                                    transport=cls.transport)
+        app = api.create_app(cls.res)
+        cls.post_delay = 0
+
+        @app.middleware("http")
+        async def delay_ownership_response(request, call_next):
+            response = await call_next(request)
+            if request.url.path == "/api/ask":
+                await asyncio.sleep(cls.post_delay)
+            return response
+
+        cls.listener = socket.socket()
+        cls.listener.bind(("127.0.0.1", 0))
+        cls.origin = f"http://127.0.0.1:{cls.listener.getsockname()[1]}"
+        cls.server = uvicorn.Server(uvicorn.Config(app, log_level="warning"))
+        cls.thread = threading.Thread(target=cls.server.run, kwargs={"sockets": [cls.listener]}, daemon=True)
+        cls.thread.start()
+        deadline = time.monotonic() + 15
+        while not cls.server.started and time.monotonic() < deadline:
+            time.sleep(0.01)
+        if not cls.server.started:
+            raise AssertionError("isolated fixture API did not start")
+        cls.playwright = sync_playwright().start()
+        chrome = Path("C:/Program Files/Google/Chrome/Application/chrome.exe")
+        cls.browser = cls.playwright.chromium.launch(**({"executable_path": str(chrome)} if chrome.exists() else {}))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.gate.set()
+        cls.browser.close()
+        cls.playwright.stop()
+        cls.server.should_exit = True
+        cls.thread.join(timeout=15)
+        cls.res.close()
+        cls.listener.close()
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        self.gate.set()
+        self.entered.clear()
+        self.__class__.post_delay = 0
+        self.member = f"alice-{uuid.uuid4().hex[:8]}"
+        self.context = self.browser.new_context()
+        self.context.add_init_script(f"localStorage.setItem('rfp-member', '{self.member}')")
+        self.page = self.context.new_page()
+        self.page.goto(self.origin)
+        self.pick_document()
+
+    def tearDown(self):
+        self.gate.set()
+        self.context.close()
+        if self.res._runner is not None:
+            for future in list(self.res._runner._futures.values()):
+                future.result(timeout=15)
+
+    def pick_document(self):
+        self.page.get_by_role("checkbox").first.check()
+        self.page.locator("#question").fill(QUESTION)
+
+    def rows(self):
+        with open_db(self.env.settings.db_path) as conn:
+            return [dict(r) for r in conn.execute("SELECT * FROM requests WHERE member_id = ? ORDER BY created_at",
+                                                  (self.member,))]
+
+    def wait_for(self, condition, message):
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            if condition():
+                return
+            self.page.wait_for_timeout(50)
+        self.fail(message)
+
+    def occupy_worker(self):
+        self.gate.clear()
+        self.entered.clear()
+        doc = next(d for d in service.find_documents(self.res, service.visitor("worker")) if d["indexed"])
+        service.ask(self.res, service.visitor("worker"), [(doc["doc_id"], doc["source_hash"])],
+                    QUESTION, "single", "2026-09-30")
+        self.assertTrue(self.entered.wait(15))
+
+    def test_double_submit_during_the_initial_post_creates_one_request(self):
+        self.gate.clear()
+        self.__class__.post_delay = 1
+        self.page.locator("main form").evaluate("form => { form.requestSubmit(); form.requestSubmit(); }")
+        self.wait_for(lambda: len(self.rows()) >= 1, "initial request was not created")
+        self.page.wait_for_timeout(1500)
+        self.assertEqual(len(self.rows()), 1)
+
+    def test_cancel_and_poll_keep_the_submitting_member_after_the_header_changes(self):
+        self.gate.clear()
+        self.page.locator("main button[type=submit]").click()
+        cancel = self.page.get_by_role("button", name="요청 취소", exact=True)
+        cancel.wait_for()
+        self.page.locator("#member").fill("bob")
+        headers = []
+        def observe(request):
+            if "/api/requests/" in request.url:
+                headers.append((request.method, request.headers.get("x-member")))
+        self.page.on("request", observe)
+        cancel.click()
+        self.wait_for(lambda: self.rows()[0]["cancel_requested"] == 1, "cancel used the editable header member")
+        self.wait_for(lambda: any(method == "GET" for method, _ in headers), "ownership was not polled")
+        self.page.remove_listener("request", observe)
+        self.assertTrue(headers and all(name == self.member for _, name in headers), headers)
+
+    def test_navigation_abandons_queued_work(self):
+        self.occupy_worker()
+        self.page.locator("main button[type=submit]").click()
+        self.page.get_by_role("button", name="요청 취소", exact=True).wait_for()
+        self.assertEqual(self.rows()[0]["status"], "queued")
+        self.page.get_by_role("link", name="검증", exact=True).click()
+        self.wait_for(lambda: self.rows()[0]["status"] == "cancelled", "navigation left a queued paid request")
+
+    def test_navigation_before_the_initial_post_returns_abandons_its_late_ownership(self):
+        self.occupy_worker()
+        self.__class__.post_delay = 1
+        self.page.locator("main button[type=submit]").click()
+        self.wait_for(lambda: bool(self.rows()), "initial request was not created")
+        self.page.get_by_role("link", name="검증", exact=True).click()
+        self.wait_for(lambda: self.rows()[0]["status"] == "cancelled", "late initial response escaped navigation cleanup")
+
+    def test_editing_a_completed_question_detaches_the_previous_answer(self):
+        self.page.locator("main button[type=submit]").click()
+        answer = self.page.locator('section[aria-label="답변"]')
+        expect(answer).to_be_visible(timeout=15000)
+        self.page.locator("#question").fill("사업 예산과 부가가치세 조건은 무엇인가요?")
+        expect(answer).to_have_count(0)
+        self.page.get_by_role("button", name="내 최근 요청").click()
+        expect(self.page.get_by_role("button", name=QUESTION, exact=False)).to_be_visible()
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

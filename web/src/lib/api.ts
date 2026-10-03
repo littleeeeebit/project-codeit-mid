@@ -13,13 +13,20 @@ export type Owned = Schemas["Owned"];
 /** There is no login: the typed name rides along on every call, for attribution only. */
 const member: Middleware = {
   onRequest({ request }) {
-    request.headers.set("X-Member", encodeURIComponent(readMember()));
+    if (!request.headers.has("X-Member")) {
+      request.headers.set("X-Member", encodeURIComponent(readMember()));
+    }
     return request;
   },
 };
 
 export const api = createClient<paths>({ baseUrl: "" });
 api.use(member);
+
+/** Ownership actions keep the member captured when the request was submitted. */
+export function memberHeaders(name: string): Record<string, string> {
+  return { "X-Member": encodeURIComponent(name) };
+}
 
 /** The service's Korean message for a refused call, or a generic one when the server gave none. */
 export function errorText(error: unknown): string {

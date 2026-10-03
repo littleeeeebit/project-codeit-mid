@@ -3,12 +3,16 @@ dataset generation from development sources through the budget gateway to a deci
 
 import json
 import tempfile
+import threading
+import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from rfp_assistant import api, auth, budget, generation, gold, service
+from rfp_assistant.store import ProcessLock, open_db
 from tests import phase4_fixtures as fx
 
 
@@ -89,7 +93,7 @@ class ShellServiceTest(unittest.TestCase):
         found = service.draft_elements(self.res, self.a, self.env.refs["기관F"].doc_id, "부가 가치세")
         self.assertTrue(found and all("부가가치세" in e["text"] for e in found))  # spacing does not matter
 
-    def test_a_drafting_run_is_billed_then_decided_by_someone_other_than_its_requester(self):
+    def numeric_slot(self):
         row = fx.amount_row(self.env, reviewed=False)
         sources = [{"doc_id": g["doc_id"], "element_id": g["alternatives"][0]["element_id"]}
                    for g in row["evidence_groups"]]
@@ -100,6 +104,77 @@ class ShellServiceTest(unittest.TestCase):
             "pins": [{"source": 0, "quote": fx.AMOUNT}, {"source": 1, "quote": fx.VAT}],
             "claims": [{"kind": "number", "value": 130000000, "unit": "KRW", "support": [0, 1],
                         "qualifiers": [["부가가치세를 포함"]], "critical_kind": "amount"}], "skip_reason": None}
+        return slot
+
+    def shutdown_after_response(self, slot_count):
+        entered, finish = threading.Event(), threading.Event()
+
+        def blocked(messages):
+            if len(self.transport.calls) == 1:
+                entered.set()
+                if not finish.wait(15):
+                    raise AssertionError("first drafting batch was not released")
+            return self.reply(messages)
+
+        self.transport.responder = blocked
+        self.res.settings = self.s.with_(shutdown_wait_seconds=0.01)
+        self.res._own(self.res.settings)
+        slots = [self.numeric_slot() for _ in range(slot_count)]
+        maximum = service.plan_drafting(self.res, self.a, slots)["max_micro_usd"]
+        run_id = service.start_drafting(self.res, self.a, slots, maximum)
+        thread = service._DRAFT_JOBS[run_id]
+        try:
+            self.assertTrue(entered.wait(15))
+            self.res.close()
+            replacement = ProcessLock(self.s.data_dir / "gateway.lock")
+            try:
+                finish.set()
+                thread.join(timeout=15)
+                self.assertFalse(thread.is_alive())
+                self.assertEqual(len(self.transport.calls), 1)
+            finally:
+                replacement.release()
+            self.assertTrue(self.transport.closed)
+            self.assertEqual(service.drafting_runs(self.res, self.a)[0]["status"], "interrupted")
+            self.assertEqual(budget.snapshot(self.s.db_path).pending_micro_usd, 0)
+            with open_db(self.s.db_path) as conn:
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM attempts WHERE stage = 'gold_drafting'").fetchone()[0], 1)
+        finally:
+            finish.set()
+            thread.join(timeout=15)
+
+    def test_shutdown_stops_drafting_before_the_next_batch_under_a_replacement_owner(self):
+        self.shutdown_after_response(6)
+
+    def test_shutdown_during_the_last_batch_does_not_report_completion(self):
+        self.shutdown_after_response(1)
+
+    def test_shutdown_between_reservation_and_dispatch_releases_without_a_provider_call(self):
+        ready = threading.Event()
+        dispatch = budget.mark_dispatching
+
+        def stopped_before_marker(db, attempt_id, guard=None):
+            ready.set()
+            deadline = time.monotonic() + 10
+            while not self.res._closed and time.monotonic() < deadline:
+                time.sleep(0.001)
+            self.assertTrue(self.res._closed)
+            return dispatch(db, attempt_id, guard)
+
+        self.res.settings = self.s.with_(shutdown_wait_seconds=1)
+        slot = self.numeric_slot()
+        maximum = service.plan_drafting(self.res, self.a, [slot])["max_micro_usd"]
+        with mock.patch.object(budget, "mark_dispatching", side_effect=stopped_before_marker):
+            run_id = service.start_drafting(self.res, self.a, [slot], maximum)
+            self.assertTrue(ready.wait(15))
+            self.res.close()
+            service._DRAFT_JOBS[run_id].join(timeout=15)
+        self.assertEqual(len(self.transport.calls), 0)
+        self.assertEqual(service.drafting_runs(self.res, self.a)[0]["status"], "interrupted")
+        self.assertEqual(budget.snapshot(self.s.db_path).pending_micro_usd, 0)
+
+    def test_a_drafting_run_is_billed_then_decided_by_someone_other_than_its_requester(self):
+        slot = self.numeric_slot()
         est = service.plan_drafting(self.res, self.a, [slot])
         self.assertTrue(est["fits"])
         self.assertGreater(est["max_micro_usd"], 0)

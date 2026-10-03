@@ -15,6 +15,7 @@ import re
 import sqlite3
 import subprocess
 import threading
+import time
 import uuid
 import weakref
 from concurrent.futures import ThreadPoolExecutor, wait
@@ -95,6 +96,7 @@ class Resources:
         self._index_lock = threading.Lock()
         self._runner: RequestRunner | None = None
         self._runner_lock = threading.Lock()
+        self._draft_jobs: list[threading.Thread] = []
         self._closed = False
         closer = weakref.WeakMethod(self.close)  # atexit must not keep every Resources (and its index) alive
 
@@ -221,8 +223,16 @@ class Resources:
                 return
             self._closed = True
             runner = self._runner
+            drafting = list(self._draft_jobs)
+        deadline = time.monotonic() + self.settings.shutdown_wait_seconds
         if runner is not None:
             runner.shutdown(self.settings.shutdown_wait_seconds)
+        for thread in drafting:
+            if thread is not threading.current_thread():
+                thread.join(timeout=max(0, deadline - time.monotonic()))
+        if any(thread.is_alive() for thread in drafting):
+            recover_requests(self.settings.db_path)
+            budget.recover(self.settings.db_path)
         if self.transport is not None:
             self.transport.close()
         if self._lock is not None:
@@ -2208,9 +2218,9 @@ def start_drafting(res: Resources, principal: Principal, slots: list[dict], cons
         raise ServiceError("최대 비용이 동의한 금액보다 커졌습니다. 다시 추정하세요.")
     if not est["fits"]:
         raise ServiceError("유료 호출이 꺼져 있거나 최대 비용이 평가 예산 또는 운영 한도를 넘습니다.")
-    if res.transport is None or res._closed:
-        raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
-    with _DRAFT_LOCK:
+    with _DRAFT_LOCK, res._runner_lock:
+        if res.transport is None or res._closed:
+            raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
         if any(t.is_alive() for t in _DRAFT_JOBS.values()):
             raise ServiceError("다른 초안 생성이 실행 중입니다. 끝난 뒤 다시 시도하세요.")
         run_id = f"draft-{date.today():%Y%m%d}-{uuid.uuid4().hex[:6]}"
@@ -2223,12 +2233,14 @@ def start_drafting(res: Resources, principal: Principal, slots: list[dict], cons
         def job() -> None:
             try:  # this process already owns the gateway lock that drafting.generate would take
                 drafting._generate(res.settings, est["plan"], run_dir / "output", consented_max_micro,
-                                   res.transport, "dev")
+                                   res.transport, "dev", guard=lambda conn: "interrupted" if res._closed else None)
             except Exception as exc:  # noqa: BLE001 - recorded for the run list; settled calls stay settled
-                write_text_atomic(run_dir / "error.txt", f"{type(exc).__name__}: {exc}"[:500])
+                name = "interrupted.txt" if res._closed else "error.txt"
+                write_text_atomic(run_dir / name, f"{type(exc).__name__}: {exc}"[:500])
 
         thread = threading.Thread(target=job, name=f"rfp-{run_id}", daemon=True)
         _DRAFT_JOBS[run_id] = thread
+        res._draft_jobs.append(thread)
         thread.start()
     return run_id
 
@@ -2253,14 +2265,16 @@ def drafting_runs(res: Resources, principal: Principal) -> list[dict]:
             rows = read_jsonl(out / "candidates.jsonl") if (out / "candidates.jsonl").exists() else []
             invalid = json.loads((out / "invalid.json").read_text(encoding="utf-8")) \
                 if (out / "invalid.json").exists() else []
-            error = (d / "error.txt").read_text(encoding="utf-8") if (d / "error.txt").exists() else None
+            interrupted = (d / "interrupted.txt").exists()
+            error_path = d / ("interrupted.txt" if interrupted else "error.txt")
+            error = error_path.read_text(encoding="utf-8") if error_path.exists() else None
         except (OSError, json.JSONDecodeError):
             continue
         running = d.name in _DRAFT_JOBS and _DRAFT_JOBS[d.name].is_alive()
         runs.append({"run_id": d.name, "requested_by": meta.get("requested_by"), "created_at": meta.get("created_at"),
                      "max_micro_usd": meta.get("max_micro_usd"),
                      "slots": len((meta.get("plan") or {}).get("slots") or []),
-                     "status": "running" if running else "completed" if receipt else "failed" if error
+                     "status": "running" if running else "interrupted" if interrupted else "completed" if receipt else "failed" if error
                      else "interrupted",
                      "receipt": receipt, "rows": rows, "invalid": invalid, "error": error,
                      "submitted": d.name in submitted})

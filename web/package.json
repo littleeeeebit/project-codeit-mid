@@ -8,7 +8,7 @@
     "build": "npm run api-types && next build",
     "postbuild": "node scripts/flatten-segments.mjs",
     "lint": "npm run api-types && eslint",
-    "typecheck": "npm run api-types && tsc --noEmit"
+    "typecheck": "npm run api-types && next typegen && tsc --noEmit"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
