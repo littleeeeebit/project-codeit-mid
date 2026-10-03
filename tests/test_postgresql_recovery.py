@@ -115,6 +115,8 @@ class PostgreSQLRecoveryTest(unittest.TestCase):
                 postgres.require_imported_database(self.target)
 
     def test_restore_owner_loss_during_validation_cannot_publish_ready(self):
+        receipt = self.manifest.parent / "postgresql-restore-check.json"
+        receipt.write_text(json.dumps({"passed": True}), encoding="utf-8")
         original = migration.references_valid
         terminated = False
         def lose_owner(references):
@@ -134,6 +136,7 @@ class PostgreSQLRecoveryTest(unittest.TestCase):
         with mock.patch.object(migration, "references_valid", side_effect=lose_owner):
             with self.assertRaises(psycopg.Error):
                 postgres_backup.restore_check(self.settings, self.manifest)
+        self.assertFalse(receipt.exists(), "failed restore must not leave a success receipt")
         with store.database_lifecycle(self.target), store.open_db(self.target) as conn:
             self.assertTrue(postgres.recovery_blocked(conn))
             self.assertFalse(conn.execute("SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0])
@@ -153,6 +156,41 @@ class PostgreSQLRecoveryTest(unittest.TestCase):
         with psycopg.connect(self.target.dsn(), autocommit=True) as other:
             self.assertIsNone(other.execute("SELECT to_regclass('public.database_control')").fetchone()[0])
             self.assertTrue(postgres.recovery_blocked(other))
+
+    def test_success_receipt_requires_committed_readiness(self):
+        receipt = self.manifest.parent / "postgresql-restore-check.json"
+        original_write = store.write_text_atomic
+        writes = []
+        def check_committed(path, text):
+            if path == receipt:
+                with psycopg.connect(self.target.dsn(), autocommit=True) as other:
+                    state = other.execute("SELECT c.paid_admission,m.state,v.passed,r.state "
+                                          "FROM database_control c JOIN migration_import m USING(id) "
+                                          "JOIN migration_validation v USING(id) "
+                                          "JOIN bidmate_recovery.control r USING(id)").fetchone()
+                self.assertEqual(state, (False, "complete", True, "verified"))
+                writes.append(json.loads(text)["passed"])
+            return original_write(path, text)
+        with mock.patch.object(store, "write_text_atomic", side_effect=check_committed):
+            self.assertTrue(postgres_backup.restore_check(self.settings, self.manifest)["passed"])
+        self.assertEqual(writes, [True])
+        self.assertTrue(json.loads(receipt.read_text(encoding="utf-8"))["passed"])
+
+    def test_receipt_write_failure_blocks_target_and_leaves_no_success(self):
+        receipt = self.manifest.parent / "postgresql-restore-check.json"
+        original_write = store.write_text_atomic
+        def failed_write(path, text):
+            if path == receipt:
+                raise OSError("injected receipt write failure")
+            return original_write(path, text)
+        with mock.patch.object(store, "write_text_atomic", side_effect=failed_write):
+            with self.assertRaisesRegex(OSError, "receipt write failure"):
+                postgres_backup.restore_check(self.settings, self.manifest)
+        self.assertFalse(receipt.exists())
+        with store.database_lifecycle(self.target), store.open_db(self.target) as conn:
+            self.assertFalse(conn.execute("SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0])
+            with self.assertRaisesRegex(RuntimeError, "recovery"):
+                postgres.require_imported_database(self.target)
 
     def test_restore_failure_after_copied_control_rows_never_admits_paid_work(self):
         original_run = postgres_backup._run

@@ -103,6 +103,9 @@ def restore_check(settings, manifest_path, staging=None):
     dump = manifest_path.parent / "database.dump"
     if manifest.get("backup_version") != "postgresql-backup-1" or migration.file_hash(dump) != manifest["dump_sha256"]:
         raise ValueError("PostgreSQL backup format or dump hash is invalid")
+    receipt = manifest_path.parent / "postgresql-restore-check.json"
+    # This is the latest attempt's receipt; an earlier success must not describe a failed retry.
+    receipt.unlink(missing_ok=True)
     target = postgres.Target("RFP_RESTORE_DATABASE_DSN")
     source_dsn = os.environ.get(settings.database_dsn_env)
     if source_dsn and conninfo_to_dict(target.dsn()) == conninfo_to_dict(source_dsn):
@@ -149,8 +152,6 @@ def restore_check(settings, manifest_path, staging=None):
                 report = {"restore_check_version": "postgresql-restore-check-1", "passed": all(checks.values()),
                           "checks": checks, "restored_ledger": restored_ledger, "after_restart_recovery": after,
                           "provider": "fake", "paid_admission": False, "provider_calls": 0}
-                store.write_text_atomic(manifest_path.parent / "postgresql-restore-check.json",
-                                        json.dumps(report, ensure_ascii=False, indent=2))
                 # Publish on the session that still owns both locks. Losing it cannot
                 # let a separate pooled connection declare a restore safe.
                 with raw.transaction():
@@ -167,6 +168,7 @@ def restore_check(settings, manifest_path, staging=None):
                         control.execute("UPDATE migration_import SET state='complete' WHERE id=1")
                     control.execute("UPDATE bidmate_recovery.control SET state=? WHERE id=1",
                                     ("verified" if report["passed"] else "failed",))
+            store.write_text_atomic(receipt, json.dumps(report, ensure_ascii=False, indent=2))
             return report
         except BaseException:
             try:
