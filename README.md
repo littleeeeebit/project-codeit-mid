@@ -61,6 +61,16 @@ work, run the API on 8511 and `npm run dev` in `web/` (port 8510, `/api/*` forwa
 `python tools/openapi.py`; `tests/test_api.py` fails while it is stale. `npm run lint` and `npm run typecheck` check
 `web/`.
 
+For local work, use a branch in the original checkout rather than copying the repository. The original corpus,
+`.env` and runtime are ignored by Git and do not appear in a linked worktree. If a task already requires a
+worktree, set `RFP_SOURCE_DIR` and `RFP_DATA_DIR` to the existing corpus and shared runtime before starting the
+server, with permission to write to that runtime. Keep the API key in the server environment. Never copy the
+budget DB to create a second independently spendable ledger. The shared runtime still has exactly one gateway
+owner.
+
+A fixture server with `FakeTransport` is for isolated UI or invariant checks. It is not the running application
+for user acceptance and cannot establish real retrieval or model-answer quality.
+
 The operating index includes sources whose extraction has not been compared with the original yet; the consultant screen and every trace label them. `build-keyword --reviewed-only` builds the stricter index from sources that passed the automatic check (`auto_verified`) or a human review; the operating index also keeps `unreviewed` and `auto_flagged` sources, labeled.
 
 ### Fidelity check against the original

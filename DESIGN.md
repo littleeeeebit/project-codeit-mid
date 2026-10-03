@@ -275,3 +275,13 @@ Button behaviour was observed for document selection, fixture answer submission,
 Rendered leaf-text contrast was checked by reading computed foreground and ancestor background colours, converting sRGB/OKLab values and compositing alpha. Samples: chat 41 texts (minimum 5.58:1), verification 25 (5.15:1), dataset review 71 (5.15:1). No sampled pair fell below 4.5:1; these samples are not a complete accessibility certification. No new palette was selected; the navy accent and existing status colours remain.
 
 The whitespace pass keeps the established answer/evidence split, left menus and review queue. No filler panels or additional controls were added. Validation includes the production build, ESLint, TypeScript, the 14 API/shell tests and `git diff --check`. A user click-through of the finished three pages remains required before a completion report.
+
+### Real runtime connection and acceptance boundary
+
+The user rejected the fixture preview as acceptance evidence on 2026-10-03 and supplied the original checkout at `C:\Users\dasdk\PycharmProjects\project-codeit-mid`. The fixture server was stopped. After the user authorized writes to the shared runtime, this branch's API was started on `http://127.0.0.1:8765` with `RFP_SOURCE_DIR` pointing to that checkout's `원본 데이터` and `RFP_DATA_DIR` to its `.runtime`. No repository, corpus, API key file or budget DB was copied. The normal application resource factory selects the default OpenAI provider; the fixture script and its explicit `FakeTransport` are not used.
+
+The connected runtime has schema 6 and active keyword index `62bea0c9c27ad3e7`. The API returned 100 documents and 53 development documents for drafting. Browser checks after reload showed the actual verification inbox and the 23-candidate review queue, including original evidence spans. The shared ledger reported paid generation enabled, $4.388678 available and no pending reservations at connection time; this is the application ledger, not the provider account balance.
+
+The actual 한영대학 RFP was found and selected in chat. An ECR-001 question was prepared without pressing the paid submit button. The pending candidate's source spans identify ASP.NET and MSSQL, providing a concrete reference for checking the resulting answer. This continuation has not yet dispatched a live model call, verified that answer, or received the user's three-page acceptance. The earlier fixture measurements establish only rendering and interaction observations.
+
+For future local tasks, the user's workspace preference is a branch in the original checkout rather than a repository copy or a separately created worktree. The current task's existing worktree remains the location of its code changes.
