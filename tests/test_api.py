@@ -43,6 +43,19 @@ class ApiBoundaryTest(unittest.TestCase):
 
 
 class ApiFlowTest(unittest.TestCase):
+    def test_shared_budget_limit_is_exact_attributed_and_does_not_enable_paid(self):
+        before = self.client.get("/api/budget").json()["snapshot"]
+        out = self.client.put("/api/budget/limit", headers=self.headers,
+                              json={"cap_micro_usd": 10_000_000, "reason": "personal API"})
+        self.assertEqual(out.status_code, 200, out.text)
+        snap = out.json()["snapshot"]
+        self.assertEqual(snap["cap_micro_usd"], 10_000_000)
+        self.assertEqual(snap["spent_micro_usd"], before["spent_micro_usd"])
+        self.assertEqual(snap["paid_enabled"], before["paid_enabled"])
+        for invalid in (0, -1, 0.5, True, "100"):
+            self.assertEqual(self.client.put("/api/budget/limit", json={"cap_micro_usd": invalid, "reason": "test"}).status_code, 422)
+        self.assertEqual(self.client.put("/api/budget/limit", json={"cap_micro_usd": 10_000_000, "reason": " "}).status_code, 400)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.env = fixtures.make_env(Path(self.tmp.name))

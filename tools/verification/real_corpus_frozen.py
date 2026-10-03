@@ -69,7 +69,8 @@ def main(run_dir: Path) -> int:
     if not rc or rc.get("isolated_copy") is not True:
         print("real_corpus is not configured as an isolated copy", file=sys.stderr)
         return 2
-    settings = load_settings(source_dir=Path(rc["source_dir"]), data_dir=Path(rc["data_dir"]), provider="fake")
+    settings = load_settings(source_dir=Path(rc["source_dir"]), data_dir=Path(rc["data_dir"]),
+                             provider="fake", database_backend="sqlite")
     res = service.Resources(settings, recover=True)
     principal = auth.visitor(MEMBER)
     client = TestClient(api.create_app(res), headers={"X-Member": MEMBER})

@@ -23,7 +23,7 @@ from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
-from . import auth, budget, fidelity, generation, gold
+from . import auth, budget, fidelity, generation, gold, postgres
 from . import dense as dense_mod
 from .auth import require_any
 from .contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, EvidenceUnit, EvidenceView,
@@ -34,7 +34,7 @@ from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extra
 from .retrieval import retrieve as _retrieve
 from .evaluation import EVAL_VERSION
 from .settings import Settings, read_api_key
-from .store import LockHeld, ProcessLock, dumps, init_schema, open_db, tx, utcnow
+from .store import DATABASE_ERRORS, LockHeld, dumps, init_schema, open_db, tx, utcnow
 
 
 class ServiceError(RuntimeError):
@@ -63,6 +63,25 @@ class Resources:
 
     def __init__(self, settings: Settings, transport: generation.Transport | None = None,
                  recover: bool = False) -> None:
+        from .store import database_lifecycle
+
+        self._database_lifecycle = database_lifecycle(settings.db_path)
+        self._database_lifecycle.__enter__()
+        try:
+            self._initialize(settings, transport, recover)
+        except BaseException:
+            try:
+                if getattr(self, "transport", None) is not None:
+                    self.transport.close()
+            finally:
+                try:
+                    if getattr(self, "_lock", None) is not None:
+                        self._lock.release()
+                finally:
+                    self._database_lifecycle.__exit__(None, None, None)
+            raise
+
+    def _initialize(self, settings, transport, recover):
         """`recover=True` claims exclusive ownership of the data directory (the serving application does; a real
         gateway always does) and resolves what a previous process left: unfinished requests become interrupted,
         dispatching attempts unknown, never-dispatched reservations released. Nothing is replayed."""
@@ -83,7 +102,8 @@ class Resources:
             if key:
                 if self._lock is None:
                     self._own(settings)
-                self.transport = generation.OpenAITransport(key, settings.request_timeout_seconds)
+                self.transport = generation.OpenAITransport(key, settings.request_timeout_seconds,
+                    owner_check=self._lock.check if isinstance(self._lock, postgres.GatewayOwner) else None)
             else:
                 self.provider_note = "OPENAI_API_KEY is not configured; paid generation is unavailable"
         self.analyzer = shared_analyzer()
@@ -115,10 +135,10 @@ class Resources:
 
     def _own(self, settings: Settings) -> None:
         try:
-            self._lock = ProcessLock(settings.data_dir / "gateway.lock")
+            self._lock = postgres.gateway_lock(settings.db_path, settings.data_dir)
         except LockHeld:
             raise GatewayLockError(
-                "another process already owns the paid gateway for this data directory") from None
+                "another process already owns the paid gateway for this database") from None
         # No older worker can still dispatch: recover its requests and attempts conservatively.
         self.recovered = {"requests": recover_requests(settings.db_path), **budget.recover(settings.db_path)}
 
@@ -139,6 +159,10 @@ class Resources:
             active = get_app_setting(conn, "active_index")
         if run:
             cfg = json.loads(run)
+            if self.settings.database_backend == "postgresql" and cfg.get("embedding") and \
+                    cfg["embedding"]["model"] != self.settings.embedding_model:
+                return {**cfg, "mode": "kiwi_bm25", "dense_version": None, "embedding": None,
+                        "reranker": None, "fallback_reason": "activated_embedding_model_requires_migration"}
             if cfg["mode"] == "hybrid_rerank" and cfg.get("eval_version") != EVAL_VERSION:
                 # Promoted under a superseded gate: keep hybrid retrieval, drop the reranker until a current
                 # trial passes and is activated.
@@ -233,10 +257,15 @@ class Resources:
         if any(thread.is_alive() for thread in drafting):
             recover_requests(self.settings.db_path)
             budget.recover(self.settings.db_path)
-        if self.transport is not None:
-            self.transport.close()
-        if self._lock is not None:
-            self._lock.release()
+        try:
+            if self.transport is not None:
+                self.transport.close()
+        finally:
+            try:
+                if self._lock is not None:
+                    self._lock.release()
+            finally:
+                self._database_lifecycle.__exit__(None, None, None)
 
 
 class RequestRunner:
@@ -1244,11 +1273,20 @@ def budget_snapshot(res: Resources, principal: Principal) -> BudgetSnapshot:
     principal = _authorize(res, principal, "consultant", "verifier", "budget_admin")
     try:
         return budget.snapshot(res.settings.db_path)
-    except (sqlite3.Error, budget.BudgetError) as exc:
+    except (*DATABASE_ERRORS, budget.BudgetError) as exc:
         raise ServiceError(f"ledger_unavailable: {type(exc).__name__}") from None
 
 
 # ---------------------------------------------------------------- verifier runs, corrections and exports
+
+def set_budget_limit(res: Resources, principal: Principal, cap_micro_usd: int, reason: str) -> BudgetSnapshot:
+    """The shared Settings control uses the existing budget-admin capability and visitor attribution."""
+    principal = _authorize(res, principal, "budget_admin")
+    try:
+        budget.set_limit(res.settings.db_path, principal.member_id, cap_micro_usd, reason)
+    except (*DATABASE_ERRORS, budget.BudgetError) as exc:
+        raise ServiceError(str(exc) if isinstance(exc, budget.BudgetError) else "ledger_unavailable") from None
+    return budget_snapshot(res, principal)
 
 VERIFIER_MODES = ("whitespace_bm25", "kiwi_bm25", "dense", "hybrid", "hybrid_rerank")
 

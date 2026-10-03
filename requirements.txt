@@ -14,6 +14,9 @@ rank_bm25==0.2.2
 openai==3.22.1
 tiktoken==0.14.0
 numpy==2.5.3
+psycopg[binary]==3.3.6
+psycopg-pool==3.3.3
+pgvector==0.5.0
 
 # HTTP API that also serves the built Next.js app in web/ (httpx drives FastAPI's TestClient in the tests)
 fastapi==0.142.2

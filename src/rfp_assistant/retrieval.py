@@ -210,8 +210,8 @@ def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreview
               c["chunk_type"], c["requirement_key"]) for i, c in enumerate(chunks)],
         )
         conn.executemany(
-            "INSERT OR IGNORE INTO requirements(index_version, extraction_id, requirement_key, source_form, kind, "
-            "element_id, name) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO requirements(index_version, extraction_id, requirement_key, source_form, kind, "
+            "element_id, name) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
             [(version, r["extraction_id"], r["requirement_key"], r["source_form"], r["kind"], r["element_id"],
               r["name"]) for r in inventory],
         )

@@ -10,7 +10,7 @@ Use an editable Python package named `rfp_assistant`, installed from a root `pyp
 | --- | --- | --- |
 | `settings.py` | Absolute paths, validated limits, model/rate configuration, configuration fingerprint | Phase 1 |
 | `contracts.py` | Request/result records and strict answer schema | Phase 1 |
-| `store.py` | SQLite initialization, bounded transactions, source/trace queries | Phase 1 |
+| `store.py` | PostgreSQL dispatch/lifecycle and explicit legacy SQLite operations | Phase 1 |
 | `auth.py` | Principal and capability checks; the no-login visitor principal | Phase 1 |
 | `ingestion.py` | CSV manifest, converter invocation, HWP/PDF element extraction and review records | Phase 1 |
 | `chunking.py` | Structural chunks, exact requirement inventory, source-span mappings | Phase 1 |
@@ -39,7 +39,7 @@ Resolve defaults from the installed package/repository location, never the proce
 | `allowance_usd`, `operational_cap_usd` | `20`, `16`; prior spending counts against the cap |
 | `project_start`, `project_end` | Required before paid mode; actual dates, not an automatic 28-day forecast |
 | `paid_enabled` | False until prior-use reconciliation and rate checks are recorded |
-| `generation_model`, `embedding_model` | `gpt-4o-mini`, `text-embedding-3-small`; explicit allowlist |
+| `generation_model`, `embedding_model` | `gpt-6-luna`, `text-embedding-3-large`; historical small identities retained; 768 is the first unaccepted dimension candidate |
 | `evidence_target_tokens`, `evidence_max_tokens` | `3000`, `5000`, counted after expansion |
 | `generation_max_output_tokens` | `800`; no UI override above the authorized configuration |
 | `question_max_characters` | `2000`; comparison initially limited to two selected documents |
@@ -83,9 +83,19 @@ Parse amounts with Decimal, rejecting fractional KRW or unsupported text instead
 
 Locations use PDF one-based physical page, optional printed label, bounding box, table/cell coordinates; HWP uses section path, paragraph/table/cell structural path and requirement code. HWP page numbers appear only when a verified native conversion establishes a map. Recovery artifacts retain the original hash, converted hash, method, reviewer and mapping limitations.
 
-## SQLite records and constraints
+## PostgreSQL persistence contract (2026-10-03)
 
-Implement these tables with `sqlite3`; JSON payloads keep nonindexed structured details compact. Use schema versioning through `PRAGMA user_version`. Enable foreign keys on every connection; use WAL on a local disk, a bounded busy timeout, and explicit connection closing. SQLite files on network shares are outside the initial deployment contract.
+PostgreSQL is the default authoritative backend; paid-disabled rehearsal and production cutover are separate. `postgres.py` owns pinned extension/schema initialization, a refcounted bounded psycopg pool, qmark parameter translation and a session gateway advisory lock. Each operation owns its connection/transaction; inference holds neither. Allowance admission and mutable writes serialize on the application mutex row. Never silently redirect failed PostgreSQL writes to SQLite. Preserve every actual source table, including retired authentication records, through the generic consistent-snapshot importer.
+
+BIGINT micro-USD retains exact money. Immutable serialized JSON remains TEXT; C-collated text retains deterministic identity ordering. Foreign keys, original values, canonical digests, nullable zero distinctions and historical attempt price snapshots remain checked. Schema versions are in `schema_migrations`, not PRAGMA. Typed pgvector values have dimension checks; homogeneous embedding sets include source/payload/checksum/model/policy/provenance identities. Scoped exact cosine search precedes ranking and never silently selects NumPy when PostgreSQL is configured.
+
+The owner approved a $10 cumulative operating cap and paid migration work. The Settings control may change that cap through the existing budget-admin capability and visitor attribution, without resetting spending/reservations or enabling paid admission. It scales current envelopes and refuses any reduction below committed costs. This supersedes the earlier CLI-only limit-edit contract, while rate registration and unknown billing reconciliation remain maintenance actions.
+
+See the [PostgreSQL handover](../../../handoff/postgresql-pgvector/README.md) for real-database receipts, pinned versions, tested commands, production cutover prerequisites and unfinished quality/recovery acceptance.
+
+## Historical SQLite records and constraints
+
+The original phase implementation used `sqlite3`; JSON payloads keep nonindexed structured details compact. Use schema versioning through `PRAGMA user_version`. Enable foreign keys on every connection; use WAL on a local disk, a bounded busy timeout, and explicit connection closing. SQLite files on network shares are outside the initial deployment contract.
 
 | Table | Key and essential columns/constraints |
 | --- | --- |
@@ -183,7 +193,7 @@ There is no login (owner decision 2026-09-30, reaffirmed 2026-10-01). No account
 
 `Principal` still carries `consultant`, `verifier`, `budget_admin` and `sealed_evaluator` capabilities, and every service entry point checks one, including cached reads and file access. Those checks declare each function's role; in-process callers (CLI jobs, tests) may pass narrower principals, and a later login could reuse them. Protections that do not depend on identity stay mandatory: managed `(doc_id, source_hash)` downloads, sealed rows never served to the verifier page, a reason and an audit event for every owner action, and no bulk release of unknown billing. Labels and cost estimates are not client-controlled authority.
 
-Maintenance CLI commands run on the owner-controlled host. Paid CLI work is exclusive maintenance mode: stop the UI, validate the configuration, and reuse the same database, rates and gateway. Establish a process-owner file lock in phase 1, hold it until service cleanup, and refuse a second real gateway against that data directory. Ordinary team members use verifier actions; no raw-key notebooks or second billing store. CLI fake checks use a temporary data directory and never write production state.
+Maintenance CLI commands run on the owner-controlled host. Paid CLI work is exclusive maintenance mode: stop the UI, validate the configuration, and reuse the same database, rates and gateway. PostgreSQL holds a dedicated session advisory lock until resource cleanup and refuses a second paid owner across all hosts sharing the database. Lost ownership is terminal and checked again immediately before SDK dispatch; legacy SQLite retains its process-owner file lock. Ordinary team members use verifier actions; no raw-key notebooks or second billing store. CLI fake checks use a temporary data directory and never write production state.
 
 ## Handoff format
 

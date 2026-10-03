@@ -756,8 +756,8 @@ def ingest_source(settings: Settings, source_hash: str, force: bool = False) -> 
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
         _record_input(conn, source_hash, key, extraction_id, sha256_file(artifact), stats)
         conn.execute(
-            "INSERT OR IGNORE INTO extractions(extraction_id, source_hash, parser_fingerprint, artifact_path, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO extractions(extraction_id, source_hash, parser_fingerprint, artifact_path, created_at) "
+            "VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
             (extraction_id, source_hash, fp, str(artifact), utcnow()),
         )
         conn.execute("DELETE FROM elements WHERE extraction_id = ?", (extraction_id,))
@@ -1102,8 +1102,8 @@ def recover_source(settings: Settings, doc_id: str, converted_file: Path, review
                                                    "converted_sha256": converted_hash}]
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
         conn.execute(
-            "INSERT OR IGNORE INTO extractions(extraction_id, source_hash, parser_fingerprint, artifact_path, "
-            "created_at, recovery_json) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO extractions(extraction_id, source_hash, parser_fingerprint, artifact_path, "
+            "created_at, recovery_json) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
             (extraction_id, source_hash, fp, str(artifact), utcnow(), dumps(recovery)))
         conn.execute("DELETE FROM elements WHERE extraction_id = ?", (extraction_id,))
         conn.executemany(

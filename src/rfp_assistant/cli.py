@@ -452,6 +452,25 @@ def cmd_budget_status(args, settings) -> int:
     return 0
 
 
+def cmd_set_envelopes(args, settings):
+    values = json.loads(Path(args.file).read_text(encoding="utf-8"))
+    _print(budget.set_envelopes(settings.db_path, args.actor, values, args.reason))
+    return 0
+
+
+def cmd_set_limit(args, settings):
+    exact = Decimal(args.usd) * budget.MICRO
+    if not exact.is_finite() or exact != exact.to_integral_value():
+        raise budget.BudgetError("limit must be finite with at most six decimal places")
+    _print(budget.set_limit(settings.db_path, args.actor, int(exact), args.reason))
+    return 0
+
+
+def cmd_register_embedding_rate(args, settings):
+    _print(budget.register_large_rate(settings.db_path, args.actor, args.reason))
+    return 0
+
+
 def cmd_gold(args, settings) -> int:
     if args.action == "generate":
         if not args.file or not args.out or not args.max_cost_usd:
@@ -616,7 +635,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--answer-run", required=True, help="the complete development answer run behind the selection")
     s.add_argument("--decided-by", required=True)
     s.add_argument("--rationale", required=True)
-    s = sub.add_parser("backup", help="owner: consistent SQLite snapshot and artifact manifest")
+    s = sub.add_parser("backup", help="owner: consistent database snapshot and artifact manifest")
     s.add_argument("--destination", required=True, help="absolute new directory outside the runtime")
     s.add_argument("--actor", default="owner-cli")
     s = sub.add_parser("restore-check", help="restore into fresh staging with paid generation off and verify")
@@ -691,10 +710,22 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--note", default="", help="decide / second-review: note")
     s.add_argument("--agree", action="store_true", help="second-review")
     s.add_argument("--disagree", action="store_true", help="second-review")
+    envelopes = sub.add_parser("set-envelopes", help="owner reallocation in exact micro-USD, retaining the cap")
+    envelopes.add_argument("--file", required=True)
+    envelopes.add_argument("--actor", required=True)
+    envelopes.add_argument("--reason", required=True)
+    limit = sub.add_parser("set-limit", help="change the shared exact USD operating limit without resetting history")
+    limit.add_argument("--usd", required=True)
+    limit.add_argument("--actor", required=True)
+    limit.add_argument("--reason", required=True)
+    rate = sub.add_parser("register-embedding-rate", help="register the approved large-model price, preserving historical rates")
+    rate.add_argument("--actor", required=True)
+    rate.add_argument("--reason", required=True)
     return p
 
 
-COMMANDS = {"init": cmd_init, "manifest": cmd_manifest, "ingest": cmd_ingest, "review": cmd_review,
+COMMANDS = {"init": cmd_init, "set-limit": cmd_set_limit, "register-embedding-rate": cmd_register_embedding_rate,
+            "set-envelopes": cmd_set_envelopes, "manifest": cmd_manifest, "ingest": cmd_ingest, "review": cmd_review,
             "import-reviews": cmd_import_reviews, "recover-source": cmd_recover_source, "identity": cmd_identity,
             "resolve-metadata": cmd_resolve_metadata, "plan-embeddings": cmd_plan_embeddings,
             "build-dense": cmd_build_dense, "evaluate-retrieval": cmd_evaluate_retrieval,
@@ -716,10 +747,15 @@ def main(argv: list[str] | None = None) -> int:
         stream.reconfigure(encoding="utf-8")
     args = build_parser().parse_args(argv)
     try:
-        settings = load_settings()
-        if args.command not in ("init", "check", "load-check"):
-            store.init_schema(settings.db_path)
-        return COMMANDS[args.command](args, settings)
+        settings = load_settings(database_backend="sqlite", provider="fake") if \
+            args.command in ("check", "load-check") else load_settings()
+        with store.database_lifecycle(settings.db_path):
+            if args.command not in ("init", "check", "load-check"):
+                store.init_schema(settings.db_path)
+            return COMMANDS[args.command](args, settings)
+    except store.DATABASE_ERRORS as exc:
+        print(f"error: database unavailable ({type(exc).__name__})", file=sys.stderr)
+        return 1
     except (ingestion.IngestionError, budget.BudgetError, service.ServiceError, auth.AuthError, gold.GoldError,
             evaluation.EvaluationError, release.ReleaseError, ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)

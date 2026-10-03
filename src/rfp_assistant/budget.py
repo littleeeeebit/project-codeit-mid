@@ -1,4 +1,4 @@
-"""Reservation, settlement, billing recovery, adjustments and snapshots over one shared SQLite ledger.
+"""Reservation, settlement, billing recovery, adjustments and snapshots over one shared ledger.
 
 State machine (docs/plan/end-to-end/implementation-contracts.md):
     reserved -> dispatching -> settled
@@ -18,8 +18,9 @@ from decimal import Decimal
 from pathlib import Path
 
 from .contracts import BudgetSnapshot
-from .settings import DEFAULT_RATES, RATE_VERSION
-from .store import dumps, get_app_setting, open_db, set_app_setting, tx, utcnow
+from .settings import DEFAULT_RATES, RATE_VERSION, LARGE_RATE_VERSION, LARGE_RATE_CHECKED_AT
+from .store import OPERATIONAL_ERRORS, dumps, get_app_setting, open_db, set_app_setting, tx, utcnow
+from .postgres import owner_guard, require_owner, Target
 
 MICRO = 1_000_000
 ENVELOPE_SHARES = {"embedding": 1, "gold_eval": 3, "interactive": 12}  # sixteenths of the operating cap
@@ -57,8 +58,8 @@ def ensure_budget_row(db: Path) -> None:
     """Creates the single allowance row paid-disabled. Never touches an existing row."""
     with open_db(db) as conn, tx(conn, immediate=True):
         conn.execute(
-            "INSERT OR IGNORE INTO budget_settings(id, allowance_micro_usd, cap_micro_usd, envelopes_json, rates_json, "
-            "rate_version) VALUES (1, ?, ?, ?, ?, ?)",
+            "INSERT INTO budget_settings(id, allowance_micro_usd, cap_micro_usd, envelopes_json, rates_json, "
+            "rate_version) VALUES (1, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
             (20 * MICRO, 16 * MICRO, dumps(DEFAULT_ENVELOPES), dumps(DEFAULT_RATES), RATE_VERSION),
         )
 
@@ -134,6 +135,77 @@ def set_paid_enabled(db: Path, actor: str, enabled: bool, reason: str) -> None:
                      (int(enabled), dumps(history)))
 
 
+def set_envelopes(db, actor: str, envelopes: dict[str, int], reason: str):
+    """Explicit owner reallocation, retaining the cap, settled spend and open reservations."""
+    if not actor.strip() or not reason.strip() or set(envelopes) != set(ENVELOPE_SHARES) or \
+            any(type(value) is not int or value < 0 for value in envelopes.values()):
+        raise BudgetError("envelopes require an actor, reason and nonnegative integer micro-units for every purpose")
+    with open_db(db) as conn, tx(conn, immediate=True):
+        row = _settings_row(conn)
+        if sum(envelopes.values()) != row["cap_micro_usd"]:
+            raise BudgetError("purpose envelopes must sum to the existing operating cap")
+        if any(value < _purpose_used(conn, purpose) for purpose, value in envelopes.items()):
+            raise BudgetError("an envelope cannot be reduced below settled spending and open reservations")
+        history = json.loads(row["history_json"]) + [{"at": utcnow(), "actor": actor, "reason": reason,
+                                                    "envelopes_micro_usd": envelopes}]
+        conn.execute("UPDATE budget_settings SET envelopes_json=?,history_json=?,revision=revision+1 WHERE id=1",
+                     (dumps(envelopes), dumps(history)))
+        conn.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?)",
+                     (str(uuid.uuid4()), actor, "set_envelopes", "budget", reason, dumps(envelopes), utcnow()))
+        _bump(conn)
+    return envelopes
+
+
+def set_limit(db, actor: str, cap_micro: int, reason: str):
+    """Change a shared limit atomically, without resetting spending, paid state or rate identities."""
+    if type(cap_micro) is not int or not 0 < cap_micro <= 9_000_000_000_000_000 or not actor.strip() or not reason.strip():
+        raise BudgetError("a positive exact limit, actor and reason are required")
+    with open_db(db) as conn, tx(conn, immediate=True):
+        row = _settings_row(conn)
+        totals = _totals(conn)
+        if cap_micro < totals["spent"] + totals["pending"]:
+            raise BudgetError("limit cannot be below settled spending and open reservations")
+        old = json.loads(row["envelopes_json"])
+        if sum(old.values()) != row["cap_micro_usd"]:
+            raise BudgetError("existing envelopes do not match the operating cap; reconcile before changing the limit")
+        # Preserve the owner's current purpose allocation, including any embedding reallocation.
+        envelopes = {key: cap_micro * value // row["cap_micro_usd"] for key, value in old.items()}
+        envelopes["interactive"] += cap_micro - sum(envelopes.values())
+        if any(value < _purpose_used(conn, key) for key, value in envelopes.items()):
+            raise BudgetError("scaled purpose limit is below its spending/reservations; reallocate envelopes first")
+        allowance = max(row["allowance_micro_usd"], cap_micro)
+        record = {"at": utcnow(), "actor": actor, "reason": reason, "cap_micro_usd": cap_micro,
+                  "allowance_micro_usd": allowance, "envelopes_micro_usd": envelopes}
+        history = json.loads(row["history_json"]) + [record]
+        conn.execute("UPDATE budget_settings SET cap_micro_usd=?,allowance_micro_usd=?,envelopes_json=?,"
+                     "history_json=?,revision=revision+1 WHERE id=1",
+                     (cap_micro, allowance, dumps(envelopes), dumps(history)))
+        conn.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?)",
+                     (str(uuid.uuid4()), actor, "set_limit", "budget", reason, dumps(record), utcnow()))
+        _bump(conn)
+    return record
+
+
+def register_large_rate(db, actor: str, reason: str):
+    """Register the approved embedding price without rewriting historical model rates or attempts."""
+    if not actor.strip() or not reason.strip():
+        raise BudgetError("rate registration requires an actor and reason")
+    model = "text-embedding-3-large"
+    with open_db(db) as conn, tx(conn, immediate=True):
+        row = _settings_row(conn)
+        rates = json.loads(row["rates_json"])
+        rates[model] = DEFAULT_RATES[model]
+        record = {"at": utcnow(), "actor": actor, "reason": reason, "model": model,
+                  "rate_version": LARGE_RATE_VERSION, "checked_at": LARGE_RATE_CHECKED_AT, "rates": rates[model]}
+        history = json.loads(row["history_json"]) + [record]
+        conn.execute("UPDATE budget_settings SET rates_json=?,rate_version=?,history_json=?,revision=revision+1 WHERE id=1",
+                     (dumps(rates), LARGE_RATE_VERSION, dumps(history)))
+        conn.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?)",
+                     (str(uuid.uuid4()), actor, "register_embedding_rate", "budget", reason, dumps(record), utcnow()))
+        _bump(conn)
+    return record
+
+
 def _totals(conn: sqlite3.Connection) -> dict:
     spent = conn.execute("SELECT COALESCE(SUM(settled_micro_usd), 0) FROM attempts WHERE state = 'settled'").fetchone()[0]
     adjust = conn.execute("SELECT COALESCE(SUM(amount_micro_usd), 0) FROM adjustments").fetchone()[0]
@@ -164,7 +236,14 @@ def reserve(db: Path, *, request_id: str, member_id: str, stage: str, purpose: s
     the estimate) is refused in the same transaction that would have admitted it."""
     attempt_id = str(uuid.uuid4())
     try:
+        require_owner(db)
         with open_db(db) as conn, tx(conn, immediate=True):
+            ownership_error = owner_guard(conn)
+            if ownership_error:
+                return {"admitted": False, "reason": ownership_error, "attempt_id": None}
+            if isinstance(db, Target) and not conn.execute(
+                    "SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0]:
+                return {"admitted": False, "reason": "postgresql_maintenance", "attempt_id": None}
             row = _settings_row(conn)
             if not row["paid_enabled"]:
                 return {"admitted": False, "reason": "paid_disabled", "attempt_id": None}
@@ -196,8 +275,8 @@ def reserve(db: Path, *, request_id: str, member_id: str, stage: str, purpose: s
                  count_method, dumps({"model": model, "rates": rates, "rate_version": row["rate_version"]}), utcnow()),
             )
             _bump(conn)
-    except sqlite3.OperationalError as exc:  # lock wait exceeded or database unavailable: fail closed
-        return {"admitted": False, "reason": f"ledger_unavailable:{exc}", "attempt_id": None}
+    except OPERATIONAL_ERRORS:  # lock wait exceeded or database unavailable: fail closed, no DSN in errors
+        return {"admitted": False, "reason": "ledger_unavailable", "attempt_id": None}
     return {"admitted": True, "attempt_id": attempt_id, "reserved_micro_usd": amount, "reason": None}
 
 
@@ -220,8 +299,16 @@ class DispatchRefused(BudgetError):
 def mark_dispatching(db: Path, attempt_id: str, guard=None) -> None:
     """Durable marker before the network call. `guard(conn)` runs in the same transaction and returns a refusal
     reason (or None), so a request marked interrupted or cancelled can never be dispatched after the check."""
+    require_owner(db)
     with open_db(db) as conn, tx(conn, immediate=True):
         reason = guard(conn) if guard is not None else None
+        reason = reason or owner_guard(conn)
+        if isinstance(db, Target) and not conn.execute(
+                "SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0]:
+            reason = "postgresql_maintenance"
+        if isinstance(db, Target) and conn.execute(
+                "SELECT count(*) FROM attempts WHERE state = 'unknown'").fetchone()[0]:
+            reason = "unknown PostgreSQL billing must be reconciled before dispatch"
         if reason:
             cur = conn.execute("UPDATE attempts SET state = 'released', finished_at = ?, error_json = ? "
                                "WHERE attempt_id = ? AND state = 'reserved'",

@@ -304,16 +304,19 @@ def generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, tra
         if not out.resolve().is_relative_to((settings.data_dir / "sealed").resolve()):
             raise gold.GoldError("Sealed drafts must stay inside the private sealed directory")
     try:
-        lock = store.ProcessLock(settings.data_dir / "gateway.lock")
+        from .postgres import gateway_lock
+        lock = gateway_lock(settings.db_path, settings.data_dir)
     except store.LockHeld:
         raise gold.GoldError("another process already owns the paid gateway for this data directory") from None
     try:
-        return _generate(settings, plan, out, max_cost_micro, transport, split)
+        return _generate(settings, plan, out, max_cost_micro, transport, split,
+                         owner_check=getattr(lock, "check", None))
     finally:
         lock.release()
 
 
-def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, transport, split: str, *, guard=None) -> dict:
+def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, transport, split: str, *, guard=None,
+              owner_check=None) -> dict:
     """Five slots per billed request. Cache and settle before validation; never retry or approve automatically."""
     if settings.generation_model != MODEL or max_cost_micro <= 0:
         raise gold.GoldError("Generation requires gpt-6-luna and a positive consented cost ceiling")
@@ -327,7 +330,7 @@ def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, tr
     if transport is None:
         if settings.provider != "openai" or not (key := read_api_key("OPENAI_API_KEY")):
             raise gold.GoldError("An explicitly configured OpenAI provider and API key are required")
-        transport = generation.OpenAITransport(key, settings.request_timeout_seconds)
+        transport = generation.OpenAITransport(key, settings.request_timeout_seconds, owner_check=owner_check)
         owned = True
     else:
         owned = False

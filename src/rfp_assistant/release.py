@@ -90,6 +90,10 @@ def _referenced(settings: Settings, db: Path) -> dict:
 
 def backup(settings: Settings, destination: Path, actor: str) -> dict:
     """Owner backup to an absolute directory outside the runtime and sources. Original state is not modified."""
+    from .postgres import Target
+    if isinstance(settings.db_path, Target):
+        from .postgres_backup import backup as pg_backup
+        return pg_backup(settings, destination, actor)
     if not destination.is_absolute():
         raise ReleaseError("--destination must be an absolute directory")
     for live in (settings.data_dir, settings.source_dir):
@@ -139,6 +143,9 @@ def restore_check(settings: Settings, manifest_path: Path, staging: Path | None 
     """Restores the backup into a fresh staging directory with paid generation off and the fake provider, then
     compares the ledger amounts, the copied files and the referenced artifacts with the manifest. Nothing in the
     live runtime is changed and no provider is contacted."""
+    if json.loads(manifest_path.read_text(encoding="utf-8")).get("backup_version") == "postgresql-backup-1":
+        from .postgres_backup import restore_check as pg_restore_check
+        return pg_restore_check(settings, manifest_path, staging)
     from . import dense
     from .retrieval import KeywordIndex
 
@@ -191,7 +198,8 @@ def restore_check(settings: Settings, manifest_path: Path, staging: Path | None 
             bad.append(rel)
     check("copied datasets, sealed files, runs and releases", not bad, {"files": len(manifest["copied"]),
                                                                        "mismatched": bad})
-    staged = Settings(source_dir=settings.source_dir, data_dir=staging, hwp_converter=None, provider="fake")
+    staged = Settings(database_backend="sqlite", source_dir=settings.source_dir, data_dir=staging,
+                      hwp_converter=None, provider="fake")
     ref = manifest["referenced"]
     missing = [x["extraction_id"] for x in ref["extractions"]
                if x["sha256"] is None or not (settings.data_dir / x["artifact"]).exists()

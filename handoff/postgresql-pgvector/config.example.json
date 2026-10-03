@@ -1,0 +1,9 @@
+{
+  "database_backend": "postgresql",
+  "database_dsn_env": "RFP_DATABASE_DSN",
+  "database_pool_max": 8,
+  "database_timeout_seconds": 5,
+  "provider": "fake",
+  "embedding_model": "text-embedding-3-large",
+  "embedding_dimensions": 768
+}

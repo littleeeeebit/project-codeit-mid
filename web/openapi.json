@@ -228,6 +228,28 @@
     "title": "Budget",
     "type": "object"
    },
+   "BudgetLimitIn": {
+    "properties": {
+     "cap_micro_usd": {
+      "exclusiveMinimum": 0.0,
+      "maximum": 9000000000000000.0,
+      "title": "Cap Micro Usd",
+      "type": "integer"
+     },
+     "reason": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "cap_micro_usd",
+     "reason"
+    ],
+    "title": "BudgetLimitIn",
+    "type": "object"
+   },
    "BudgetSnapshot": {
     "properties": {
      "allowance_micro_usd": {
@@ -4175,6 +4197,56 @@
      }
     },
     "summary": "Budget"
+   }
+  },
+  "/api/budget/limit": {
+   "put": {
+    "operationId": "budget_limit_api_budget_limit_put",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BudgetLimitIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Budget"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Budget Limit"
    }
   },
   "/api/documents": {
