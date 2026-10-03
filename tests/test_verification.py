@@ -238,7 +238,7 @@ class BrowserFlowTest(unittest.TestCase):
         [block] = fenced("\n".join(proc.stdout.splitlines()[-80:]), "local-evidence")  # the service's tail
         self.assertEqual(proc.returncode, 0, json.dumps(block["observations"], ensure_ascii=False))
         self.assertEqual(block["build_head"], verify.git_head())
-        self.assertEqual({a["action"] for a in block["actions"]} >= {"click 근거 E1 once"}, True)
+        self.assertEqual({a["action"] for a in block["actions"]} >= {"click a citation chip once"}, True)
         self.assertTrue(block["requests"] and all(r["url"].startswith("http://127.0.0.1:8779")
                                                   for r in block["requests"]))
         self.assertTrue(all(set(r) == {"method", "url", "status"} for r in block["requests"]))

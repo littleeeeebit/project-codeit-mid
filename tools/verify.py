@@ -227,10 +227,11 @@ class Context:
         return ok, actual
 
     def open_app(self, page, origin: str, name: str) -> tuple[bool, str]:
-        page.goto(origin + "/verify/")  # the served build is shown at the foot of 검증
-        found = wait_text(page, r"빌드 ([0-9a-f]{40}|unknown)", 60000) and re.search(
-            r"빌드 ([0-9a-f]{40}|unknown)", page.locator("body").inner_text())
-        self.build_head = found.group(1) if found else "not shown"
+        page.goto(origin + "/verify/")
+        build = page.locator("details").filter(has=page.get_by_text("빌드 정보", exact=True))
+        build.locator("summary").click(timeout=60000)
+        found = re.fullmatch(r"[0-9a-f]{40}|unknown", build.locator("p").inner_text().strip())
+        self.build_head = found.group(0) if found else "not shown"
         page.goto(origin + "/")
         box = page.get_by_label("이름", exact=True)  # in the header bar; kept in this browser, sent as X-Member
         box.wait_for(timeout=60000)
@@ -333,8 +334,9 @@ def open_evidence(scope, page, which: int = -1) -> tuple[str, bool]:
 
 def evidence_opened(scope, evidence_id: str, timeout_ms: int) -> bool:
     try:
-        scope.get_by_role("complementary", name="근거", exact=True).get_by_text(f"근거 {evidence_id}", exact=True).first.wait_for(
-            timeout=timeout_ms)
+        pane = scope.get_by_role("complementary", name="근거", exact=True)
+        pane.get_by_role("heading", name=f"원문 인용 {evidence_id}", exact=True).wait_for(timeout=timeout_ms)
+        pane.locator("blockquote").wait_for(timeout=timeout_ms)
         return True
     except Exception:  # noqa: BLE001
         return False
