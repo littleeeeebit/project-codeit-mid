@@ -4,11 +4,6 @@
  "nodes_from": ".wiki/corpus.json",
  "edges": [
   {
-   "a": "DESIGN.md",
-   "b": "docs/plan/end-to-end/3-workflows-and-operations.md",
-   "kind": "link"
-  },
-  {
    "a": "README.md",
    "b": "DESIGN.md",
    "kind": "link"
@@ -542,7 +537,7 @@
   "read": 8,
   "orphans": 0,
   "pages": 2,
-  "decisions": 8,
-  "injectable_decisions": 1
+  "decisions": 11,
+  "injectable_decisions": 2
  }
 }
