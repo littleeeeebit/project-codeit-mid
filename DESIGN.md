@@ -357,3 +357,9 @@ The existing user-selected navy palette and status colours remain. Titles and ex
 ### Remaining space and validation
 
 Only the selected finding or trace stage fills the detail area. Empty evaluation and release states remain empty rather than gaining invented metrics. Read failures show errors instead of appearing as empty results or indefinite loading. Production build, TypeScript, focused ESLint, the ten API tests and `git diff --check` pass. The user accepted the verification UI on 2026-10-03 and requested a commit and PR. Dataset acceptance remains required before the overall completion report.
+
+## 9. Publication recovery
+
+On 2026-10-03 the user asked the assistant to retrieve the wiki-agent's work from its other folder, commit it and open the PR. The 14 existing commits through `5144ae1` were brought from `frontend-redesign-shell` into the Orca worktree on `LittleBitAI/fix-wiki-agent-worktree` by a fast-forward merge. The original checkout and source branch were preserved.
+
+This request transfers publication from the wiki task server to the assistant and supersedes the server-only publication restriction in the handoff specification. Chat and verification acceptance remain recorded; dataset acceptance remains pending and must be disclosed in the PR. Opening the PR does not establish overall acceptance or authorize merging.
