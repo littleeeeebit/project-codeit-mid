@@ -165,12 +165,12 @@ class ApiFlowTest(unittest.TestCase):
                          "row_sha256,question_key,drafted_by,submitted_at,status,decided_by,decided_at,reject_json) "
                          "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", ("legacy", "batch", "sha", "dev",
                          '{"question":"Legacy question"}', "sha", "legacy", "drafter", "2026-10-03",
-                         "rejected", "reviewer", "2026-10-03", '{"note":"Too easy"}'))
+                         "rejected", "reviewer", "2026-10-03", '{"categories":["too_easy"],"note":""}'))
         history = self.client.get("/api/verify/history").json()
         decisions = [e for e in history if e["kind"] == "gold"]
         self.assertCountEqual([(e["target"], e["action"], e["note"]) for e in decisions],
                               [("dev question", "decision:approve", "Reviewed original"),
-                               ("Legacy question", "decision:reject", "Too easy")])
+                               ("Legacy question", "decision:reject", "너무 쉬움 (앞부분·목차 수준)")])
         self.assertEqual(len(self.client.get("/api/verify/history?limit=1").json()), 1)
 
 

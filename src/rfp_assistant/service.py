@@ -1533,11 +1533,13 @@ def verification_history(res: Resources, principal: Principal, limit: int = 100)
     for r in legacy:
         row = json.loads(r["row_json"])
         rejection = json.loads(r["reject_json"] or "{}")
+        note = rejection.get("note") or ", ".join(gold.REJECT_CATEGORIES.get(c, c)
+                                                 for c in rejection.get("categories", []))
         events.append({"event_id": f'legacy:{r["candidate_id"]}', "kind": "gold",
                        "action": "decision:approve" if r["status"] == "approved" else "decision:reject",
                        "target_id": r["candidate_id"], "target": row.get("question") or r["candidate_id"],
                        "reviewer": r["decided_by"] or "", "created_at": r["decided_at"],
-                       "note": rejection.get("note", ""), "quote": "", "locations": []})
+                       "note": note, "quote": "", "locations": []})
     for r in proposals:
         events.append({"event_id": r["correction_id"], "kind": "proposal", "action": "unapplied",
                        "target_id": r["run_id"] or r["request_id"] or r["row_id"],
