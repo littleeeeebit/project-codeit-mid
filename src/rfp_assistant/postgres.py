@@ -146,6 +146,16 @@ def open_db(target: Target):
         yield Connection(conn, target)
 
 
+def require_imported_database(target: Target):
+    """Reject accidental application/maintenance startup on an empty or partial rehearsal."""
+    with open_db(target) as conn:
+        exists = conn.execute("SELECT to_regclass(current_schema() || '.migration_import')").fetchone()[0]
+        imported = conn.execute("SELECT state FROM migration_import WHERE id=1").fetchone() if exists else None
+        if imported is None or imported[0] != "complete":
+            raise RuntimeError("PostgreSQL startup requires a complete verified import; select the validated "
+                               "imported target explicitly. Keep the live SQLite configuration until cutover.")
+
+
 @contextmanager
 def tx(conn: Connection, immediate=False):
     with conn.raw.transaction():

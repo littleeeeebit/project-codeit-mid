@@ -4,6 +4,9 @@ import json
 import tempfile
 import unittest
 from datetime import date
+from argparse import Namespace
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from unittest import mock
 
@@ -13,6 +16,24 @@ from rfp_assistant.generation import FakeTransport
 from rfp_assistant.settings import DEFAULT_RATES
 from tests import fixtures
 from tests import phase4_fixtures as p4
+
+
+class RestoreCLIReportTest(unittest.TestCase):
+    def test_reports_both_restore_formats_and_pass_fail_exit_codes(self):
+        args = Namespace(backup="C:/isolated/manifest.json", staging=None)
+        for backend in ("sqlite", "postgresql"):
+            for passed in (True, False):
+                report = {"passed": passed, "checks": {"parity": passed}}
+                if backend == "sqlite":
+                    report["staging"] = "C:/isolated/runtime"
+                else:
+                    report["restore_check_version"] = "postgresql-restore-check-1"
+                with self.subTest(backend=backend, passed=passed), \
+                        mock.patch.object(release, "restore_check", return_value=report), \
+                        redirect_stdout(StringIO()) as output:
+                    code = cli.cmd_restore_check(args, None)
+                    self.assertEqual(code, 0 if passed else 1)
+                    self.assertEqual(json.loads(output.getvalue())["passed"], passed)
 
 
 def _configure(settings, prior_use: int) -> None:

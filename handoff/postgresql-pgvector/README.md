@@ -6,7 +6,7 @@ PostgreSQL persistence replacement is the first priority, as requested on 2026-1
 
 The user chose to expand the development population before dimension selection. Private inputs now contain 53 development-family documents and 413 excerpts (numeric qualifiers, late tables, repeated codes and deadlines). These are inputs for independent label review, not approved gold or a frozen evaluation population. Sealed questions and first sealed results remain untouched.
 
-The assignment starts from spec `migrate-postgresql-pgvector-reduced-embeddings`, revision 2, with subsequent owner updates recorded below. Storage parity, model comparison, shortening acceptance, ANN evaluation, production cutover and rollback are separate requirements. No quality threshold has been weakened. The owner subsequently selected `text-embedding-3-large`, 1,536 dimensions, replacing the 768-first ladder and smallest-passing selection. The selected dimension has not yet passed quality acceptance.
+The assignment starts from spec `migrate-postgresql-pgvector-reduced-embeddings`, revision 2, with subsequent owner updates recorded below. Storage parity, model comparison, shortening acceptance, ANN evaluation, production cutover and rollback are separate requirements. No quality threshold has been weakened. The owner's later explicit instruction, "Use 1,536 dimensions," replaces the 768-first ladder and smallest-passing selection for this task. This changes the candidate choice, not acceptance: freeze the independently reviewed development population before quality evaluation, compare against the bounded native-large reference, and retain every scope/code/critical-support gate before activation. The selected dimension has not yet passed quality acceptance.
 
 ## Observed source and rehearsal
 
@@ -27,13 +27,13 @@ conda activate rfp-assistant
 python -m pip install -r requirements.txt
 python -m pip install -e . --no-deps
 docker desktop start
-. ./tools/start-postgresql.ps1
+./tools/start-postgresql.ps1
 $env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.example.json).Path
 ```
 
-The script starts `bidmate-postgresql` on `127.0.0.1:55432`, initializes extension 0.8.6, and sets `RFP_DATABASE_DSN` in this shell. It generates a secret in ignored `.runtime/postgresql.env`; never paste that file or print the DSN. The example configuration uses a fake provider and large/1,536. Selecting dimensions does not itself activate a candidate.
+The script starts `bidmate-postgresql` on `127.0.0.1:55432` and initializes extension 0.8.6. It generates a secret in ignored `.runtime/postgresql.env`; never paste that file or print the DSN. It leaves `RFP_DATABASE_DSN` unchanged and does not select an application database. The PostgreSQL example configuration uses a fake provider and large/1,536 and is for isolated rehearsal only. Explicitly select the imported target in the import commands below before running maintenance/application commands; an empty or incomplete import is refused before schema initialization. Selecting dimensions does not itself activate a candidate.
 
-The default database backend is PostgreSQL. Initialization and connection failures stop operation; writes never fall back to SQLite. Explicit `database_backend: "sqlite"` remains for historical fixtures, authorized pre-cutover construction and controlled rollback. Initializing a fresh PostgreSQL database also leaves paid admission disabled. Use a dedicated application database with the public schema.
+The implementation default database backend is PostgreSQL. The production launch must explicitly use the existing SQLite ledger/configuration until the reviewed maintenance-window cutover (the root README and runbook show that command). Initialization and connection failures stop operation; writes never fall back to SQLite. Explicit `database_backend: "sqlite"` remains for historical fixtures, live operation before cutover, authorized pre-cutover construction and controlled rollback. An explicit PostgreSQL `init` remains a schema-only maintenance action; it leaves paid admission disabled, does not authorize application startup, and must never precede a migration import. Application startup and ordinary maintenance require the complete, canonically verified import marker. Use a dedicated application database with the public schema.
 
 The real installed extension accepted `vector(16000)` storage and `vector(3072)` values. Standard-vector HNSW and IVFFlat both rejected 3,072 dimensions and accepted 2,000. Storage and ANN limits are different. [pgvector's documented limits](https://github.com/pgvector/pgvector#hnsw) and the [large-model documentation](https://developers.openai.com/api/docs/models/text-embedding-3-large) describe these constraints.
 
@@ -197,3 +197,27 @@ Post-publication verification passed canonical digests for all 27 imported table
 Observed `pg_total_relation_size` values, including table/TOAST/index storage, are 177,840,128 bytes for `embedding_payloads`, 32,768 bytes for `embedding_sets`, and 8,503,296 bytes for `embedding_set_rows`. These are construction-state measurements, not concurrency/latency benchmarks. The focused real-PostgreSQL transfer test covers repeated publication with no dispatch and rejection of a cache lacking a matching settled source attempt.
 
 Quality reference/paired shortening, evaluation query caches, benchmarks, production activation/cutover and post-write rollback acceptance remain outstanding. No manual review was restarted.
+
+## Review round 1 disposition
+
+F1's documentation observation is reproducible, but its proposed return to the ladder conflicts with the owner's later explicit 1,536 instruction. The owner also expressly authorized paid corpus construction before label freezing. Neither instruction approves activation or changes quality thresholds. `spec-update.json` records the full revision proposal against revision 2, preserving all 26 completion conditions while updating these requirements and the approved $10 editable cap. The server must apply the fenced revision; task metadata was not manually altered. Candidate choice, paid construction and quality acceptance are separate. There is no claim of smallest-passing selection or completed acceptance. The dimension choice also applies to defaults/configuration, corpus/query dispatch, cache/set identities, estimates and future activation; these retain 1,536 rather than reintroducing the superseded ladder.
+
+F2 reproduced in two independent paths: the reviewed launcher replaced an explicit DSN with `bidmate_rehearsal` in an isolated PowerShell fixture, and real-PostgreSQL `Resources` initialized an empty target instead of refusing it. The launcher now starts infrastructure only and leaves both an existing DSN and an unset DSN unchanged. A shared import check runs before schema writes in both application `Resources` and ordinary maintenance CLI startup. It requires the complete import marker produced only after canonical import checks. Empty and partial imports are refused; rejection leaves an empty target eligible for subsequent import. Explicit `init` remains a separate non-migration action. Scope counted separately: one infrastructure launcher, two application/maintenance entry points, and three launch/setup documents (root README, runbook, this handover). Compose's `bidmate_rehearsal` remains an infrastructure/healthcheck database, not an implicit serving target. Production instructions explicitly retain SQLite until coordinated cutover.
+
+An additional real FastAPI lifespan check refused extension-only database `bidmate_startup_f2_20261004` with application table counts 0 before and 0 after; no SDK/provider dispatch occurred. The first attempt to use `bidmate_rehearsal` for this extra check stopped at its read-only precondition because that database already contained tables; it was preserved, and no application startup was attempted against it. The integration check also proves successful import after rejected startup, refusal of a partial import and successful `Resources` creation after a complete import.
+
+F3 reproduced with the CLI-format test and with the actual documented PostgreSQL CLI command. The pre-fix isolated restore completed its checks, wrote its receipt, then raised `KeyError: 'staging'` and exited 1. The CLI now requires `passed`/`checks` and includes `staging` only when the backend returns that filesystem path. After the repair, the actual command restored into isolated `bidmate_restore_f3_after_20261004`, returned 0 and printed all 19 checks as true, with paid admission disabled and zero provider calls. Scope counted separately: one CLI report consumer, two backend report producers (SQLite directory and PostgreSQL database), and one verification walkthrough calling that CLI. The pass/fail test covers both formats and both exit statuses. Managed immutable references remain at their original locations; this does not close the outstanding relocation/post-write rollback requirements.
+
+Focused verification commands for these repairs:
+
+```powershell
+# Set RFP_POSTGRES_TEST_DSN privately to the isolated bidmate_tests database, extension only.
+python -m unittest tests.test_postgres tests.test_release tests.test_postgresql_launcher tests.test_api tests.test_service -q
+python -m unittest tests.test_generation tests.test_dense tests.test_evaluation tests.test_retrieval tests.test_shell -q
+# The settings environment selects the imported source and a distinct empty restore target privately.
+python -m rfp_assistant.cli restore-check --backup <absolute-postgresql-backup-manifest>
+```
+
+No paid evaluation, activation, maintenance cutover or independent-review dispatch was performed in this repair round.
+
+The first scoped command passed 82 tests in 309.957 seconds with one skip; the remaining shared-resource callers passed 124 tests in 395.554 seconds. The earlier focused pre-fix run failed with the expected empty-startup assertion and PostgreSQL `staging` exception; the post-fix focused run passed. All 11 changed files validate as UTF-8 without BOM, and the complete revision proposal retains the repository gate. The separate actual PostgreSQL restore command returned exit code 0, not only a Python API report.

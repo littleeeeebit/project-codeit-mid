@@ -87,6 +87,8 @@ class Resources:
         dispatching attempts unknown, never-dispatched reservations released. Nothing is replayed."""
         self.settings = settings
         self.paid_purpose = "interactive"  # ledger envelope of every paid stage this owner dispatches
+        if settings.database_backend == "postgresql":
+            postgres.require_imported_database(settings.db_path)
         init_schema(settings.db_path)
         budget.ensure_budget_row(settings.db_path)
         self._lock: ProcessLock | None = None

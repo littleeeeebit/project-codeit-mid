@@ -6,7 +6,7 @@ Run the commands with the project environment's interpreter from any directory. 
 
 ## PostgreSQL migration and Settings limit
 
-The PostgreSQL replacement and its paid-disabled rehearsal are documented in the [migration handover](../../handoff/postgresql-pgvector/README.md). The live production ledger remains SQLite until the reviewed maintenance-window cutover. PostgreSQL is the new default: a missing DSN or failed database stops operation. Start the pinned server with `. ./tools/start-postgresql.ps1`, and configure the correct imported database through `RFP_DATABASE_DSN` before application startup. Never initialize an empty rehearsal target before running its import.
+The PostgreSQL replacement and its paid-disabled rehearsal are documented in the [migration handover](../../handoff/postgresql-pgvector/README.md). The live production ledger remains explicitly configured as SQLite until the reviewed maintenance-window cutover. PostgreSQL is the implementation default: a missing DSN, failed database or missing complete import stops operation. Start infrastructure with `./tools/start-postgresql.ps1`; this leaves `RFP_DATABASE_DSN` unchanged. Select an imported, validated PostgreSQL database explicitly only for isolated rehearsal or the coordinated cutover. Never initialize an empty rehearsal target before running its import.
 
 The owner approved paid migration work and a $10 shared operating cap on 2026-10-03. The Settings page edits that shared cumulative cap, records visitor name and reason, preserves settled/unknown amounts, and scales current purpose envelopes. It does not change API keys, provider account quotas, paid admission or historical prices. Existing no-login visitors have the budget-admin capability; the limit is shared, not a per-person account. Decreasing below committed spend or purpose reservations is refused. CLI equivalents are `set-limit --usd <amount> --actor <name> --reason <reason>` and `set-envelopes --file <absolute JSON> --actor <name> --reason <reason>`.
 
@@ -31,6 +31,7 @@ Local development and single-host use:
 
 ```powershell
 cd web; npm ci; npm run build; cd ..        # once per checkout or screen change: writes web/out
+$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.corpus-before-cutover.example.json).Path # until cutover
 python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
 
@@ -243,5 +244,5 @@ python -m rfp_assistant.cli restore-check --backup D:\rfp-backups\2026-10-02\man
 
 - On PostgreSQL, `backup` takes the gateway lock/write mutex and uses a complete native custom-format dump. `restore-check` requires `RFP_RESTORE_DATABASE_DSN` for a distinct empty target and disables paid admission before verification; referenced immutable files currently stay at their managed paths. See the handover for limitations and commands. After new PostgreSQL writes/spending, use a consistent validated PostgreSQL recovery; never resume stale SQLite spending.
 - On explicit legacy SQLite, `backup` uses SQLite's online backup API (consistent with WAL), copies `datasets/`, `sealed/`, `runs/` and `releases/`, and records the hashes of the immutable extraction and index artifacts it references, the ledger amounts and the reconciliation watermark. It refuses a relative, non-empty or overlapping destination. Keys and `.env` are not included; the owner backs them up separately.
-- `restore-check` restores into a fresh staging directory with paid generation off and the fake provider. It verifies the database hash, schema, settled/pending/unknown/available amounts, prior use, adjustments, attempt states, copied files, extraction artifacts and the active index (and dense matrix) row mapping. It also previews restart recovery: unknown reserves stay pending; nothing is replayed. A summary goes to `.runtime/releases/restore-checks/`.
+- SQLite `restore-check` restores into a fresh staging directory with paid generation off and the fake provider. It verifies the database hash, schema, settled/pending/unknown/available amounts, prior use, adjustments, attempt states, copied files, extraction artifacts and the active index (and dense matrix) row mapping. It also previews restart recovery: unknown reserves stay pending; nothing is replayed. A summary goes to `.runtime/releases/restore-checks/`. PostgreSQL reports its database checks without a filesystem staging path and writes `postgresql-restore-check.json` beside the backup manifest.
 - Real recovery (phase 5): stop the old owner, restore-check the backup, reconcile spending after its watermark, then copy the database into place and start one owner. Never let the old and the restored owner dispatch concurrently, and never reset the allowance.

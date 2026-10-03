@@ -17,7 +17,7 @@ import psycopg
 from psycopg import sql
 from psycopg.conninfo import make_conninfo
 
-from rfp_assistant import budget, dense, generation, migration, postgres, service, store, vector_store
+from rfp_assistant import budget, cli, dense, generation, migration, postgres, service, store, vector_store
 from tests import fixtures
 
 
@@ -223,6 +223,23 @@ class PostgreSQLTests(unittest.TestCase):
             self.assertEqual(service.list_corrections(res, self.env.verifier)[0]["correction_id"], correction)
         finally:
             res.close()
+
+    def test_service_rejects_unimported_target_without_initializing_it(self):
+        with self.assertRaisesRegex(RuntimeError, "complete.*import"):
+            service.Resources(self.settings, recover=True)
+        with mock.patch.object(cli, "load_settings", return_value=self.settings):
+            self.assertEqual(cli.main(["budget-status"]), 1)
+        with store.open_db(self.target) as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM pg_tables WHERE schemaname=current_schema()").fetchone()[0], 0)
+        self.imported()  # The refused startup must leave this target eligible for import.
+        with store.open_db(self.target) as conn, store.tx(conn, immediate=True):
+            conn.execute("UPDATE migration_import SET state='importing' WHERE id=1")
+        with self.assertRaisesRegex(RuntimeError, "complete.*import"):
+            service.Resources(self.settings)
+        with store.open_db(self.target) as conn, store.tx(conn, immediate=True):
+            conn.execute("UPDATE migration_import SET state='complete' WHERE id=1")
+        resource = service.Resources(self.settings)
+        resource.close()
 
     def test_pgvector_cache_separation_exact_filtered_parity_and_mixed_set_rejection(self):
         self.imported()

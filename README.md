@@ -17,7 +17,7 @@ The HWP converter (`hwp5proc` from pyhwp 0.1b15) is installed into the same envi
 
 ## PostgreSQL setup and migration status
 
-PostgreSQL is the default application database and pgvector is the selected vector store. Start Docker Desktop (Linux containers), then dot-source `tools/start-postgresql.ps1` in the shell that launches the application. The script starts pinned PostgreSQL 18.6 / pgvector 0.8.6 on loopback port 55432 and sets a secret DSN without printing it. Driver and pool versions are pinned in the requirements. See the [PostgreSQL handover](handoff/postgresql-pgvector/README.md) for the tested full-record import, backup/restore commands and pending acceptance.
+PostgreSQL is the selected migration backend and pgvector is the selected vector store. The implementation default is PostgreSQL, but the live application must explicitly retain its SQLite configuration until the coordinated, reviewed cutover. For infrastructure rehearsal, start Docker Desktop (Linux containers), then run `./tools/start-postgresql.ps1`. The script starts pinned PostgreSQL 18.6 / pgvector 0.8.6 on loopback port 55432 and leaves `RFP_DATABASE_DSN` unchanged. It never selects the empty `bidmate_rehearsal` database for application startup. Driver and pool versions are pinned in the requirements. See the [PostgreSQL handover](handoff/postgresql-pgvector/README.md) for explicit imported-target configuration, the tested full-record import, backup/restore commands and pending acceptance.
 
 Existing SQLite runtimes require an explicit snapshot/import; startup never silently imports or falls back. Use a new, isolated target for rehearsal and keep paid admission disabled. The production corpus is not yet cut over. The owner selected `text-embedding-3-large` at 1,536 dimensions, pending independent quality acceptance against the native 3,072 reference. The owner approved paid work and a $10 operating cap on 2026-10-03. The Settings page can change the shared cumulative limit while preserving spending and reservations; it uses the existing no-login attribution model.
 
@@ -44,6 +44,8 @@ Answers use `gpt-6-luna` through Chat Completions with strict structured output,
 
 Run from any directory with the environment's interpreter:
 
+Before cutover, first set `RFP_CONFIG_FILE` to the absolute path of `handoff/postgresql-pgvector/config.corpus-before-cutover.example.json` in this checkout. These maintenance commands then retain the sole live SQLite ledger. For PostgreSQL rehearsal, use the PostgreSQL configuration and explicitly select the completed imported target from the handover; ordinary commands refuse empty/partial imports. An explicit `init` must never be run on a migration target before import.
+
 ```powershell
 python -m rfp_assistant.cli init --paid-disabled          # schema + allowance row; never resets spending
 python -m rfp_assistant.cli manifest                      # all 100 CSV associations, hashes, duplicates, conflicts
@@ -61,6 +63,8 @@ a static export that the API serves itself, so one process on one port serves bo
 
 ```powershell
 cd web; npm ci; npm run build; cd ..                     # writes web/out (types come from web/openapi.json)
+# Until coordinated cutover, keep the sole live SQLite ledger and keyword serving:
+$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.corpus-before-cutover.example.json).Path
 python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
 

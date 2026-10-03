@@ -8,6 +8,4 @@ if (-not (Test-Path -LiteralPath $taskSecrets)) {
 }
 docker compose --project-directory $taskRepo --env-file $taskSecrets -f (Join-Path $taskRepo 'compose.postgresql.yaml') up -d --wait
 if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL startup failed; check Docker Desktop and port 55432.' }
-$taskPassword = ([System.IO.File]::ReadAllText($taskSecrets)).Trim().Split('=', 2)[1]
-$env:RFP_DATABASE_DSN = "postgresql://bidmate:${taskPassword}@127.0.0.1:55432/bidmate_rehearsal"
-Write-Output 'PostgreSQL rehearsal is ready. RFP_DATABASE_DSN is set in this PowerShell session.'
+Write-Output 'PostgreSQL is ready on port 55432. No application database was selected; RFP_DATABASE_DSN is unchanged.'

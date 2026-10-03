@@ -423,7 +423,8 @@ def cmd_backup(args, settings) -> int:
 
 def cmd_restore_check(args, settings) -> int:
     report = release.restore_check(settings, Path(args.backup), Path(args.staging) if args.staging else None)
-    _print({k: report[k] for k in ("passed", "staging", "checks")})
+    _print({"passed": report["passed"], "checks": report["checks"],
+            **({"staging": report["staging"]} if "staging" in report else {})})
     return 0 if report["passed"] else 1
 
 
@@ -751,6 +752,9 @@ def main(argv: list[str] | None = None) -> int:
             args.command in ("check", "load-check") else load_settings()
         with store.database_lifecycle(settings.db_path):
             if args.command not in ("init", "check", "load-check"):
+                if settings.database_backend == "postgresql":
+                    from .postgres import require_imported_database
+                    require_imported_database(settings.db_path)
                 store.init_schema(settings.db_path)
             return COMMANDS[args.command](args, settings)
     except store.DATABASE_ERRORS as exc:
