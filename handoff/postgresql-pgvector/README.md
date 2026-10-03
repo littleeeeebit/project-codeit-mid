@@ -2,7 +2,7 @@
 
 ## Status and requirements
 
-PostgreSQL persistence replacement is the first priority, as requested on 2026-10-03. The complete live SQLite snapshot has been rehearsed on an isolated, paid-disabled PostgreSQL target. Production cutover and reduced-large embedding acceptance remain incomplete. This handover records implemented commands and prerequisites; the owner approved paid work and a $10 cap on 2026-10-03, while production activation still requires candidate acceptance.
+PostgreSQL persistence replacement is the first priority, as requested on 2026-10-03. The complete live SQLite snapshot has been rehearsed on an isolated, paid-disabled PostgreSQL target. The approved large/1,536 corpus build has now completed with real provider calls, as recorded below. Production cutover and reduced-large embedding acceptance remain incomplete. This handover records implemented commands and prerequisites; the owner approved paid work and a $10 cap on 2026-10-03, while production activation still requires candidate acceptance.
 
 The user chose to expand the development population before dimension selection. Private inputs now contain 53 development-family documents and 413 excerpts (numeric qualifiers, late tables, repeated codes and deadlines). These are inputs for independent label review, not approved gold or a frozen evaluation population. Sealed questions and first sealed results remain untouched.
 
@@ -14,9 +14,9 @@ The live runtime is `.runtime/rfp.sqlite3`, schema 6. It has 100 document associ
 
 All 27 source tables, 645,947 records and 733 referenced artifacts validated in rehearsal. Counts and canonical typed per-record digests preserve serialized JSON, Unicode, evidence offsets, null/zero distinctions and historical identifiers. The consistent SQLite backup includes committed WAL contents. Snapshot SHA256: `218f2a8c626fb0b42fddb32cb3906bb661aaf5130b88db211b1092793682f67d`. The active keyword manifest SHA256 is `a1ea4e92b53df37a8d95ea999ec41542a5f6c1ea411cf4899378e862a7351885`.
 
-The ledger has 108 settled attempts (98 historical small-model embedding attempts and ten generation attempts), no pending/unknown attempts, $0.163636 settled attempts plus $0.448818 adjustments, totaling $0.612454. Cap and allowance remain $5.00. Historical budget settings and attempt price snapshots were imported unchanged. The imported historical paid flag remains recorded; the independent PostgreSQL `database_control.paid_admission=false` blocks dispatch in rehearsal.
+At the initial audit, the ledger had 108 settled attempts (98 historical small-model embedding attempts and ten generation attempts), no pending/unknown attempts, $0.163636 settled attempts plus $0.448818 adjustments, totaling $0.612454. Cap and allowance were $5.00. Historical budget settings and attempt price snapshots were imported unchanged. The imported historical paid flag remains recorded; the independent PostgreSQL `database_control.paid_admission=false` blocks dispatch in rehearsal. Subsequent authorized cap changes and paid construction are recorded below.
 
-Private evidence is under `.runtime/postgresql-migration/`: `source-plan.json`, its immutable SQLite snapshot, `validation.json`, `embedding-preflight.json`, backup/restore receipts and development inputs. Do not commit these files, connection secrets, originals or gold. Production SQLite was not changed, and no provider calls were made.
+Private evidence is under `.runtime/postgresql-migration/`: `source-plan.json`, its immutable SQLite snapshot, `validation.json`, `embedding-preflight.json`, backup/restore receipts and development inputs. Do not commit these files, connection secrets, originals or gold. The initial rehearsal changed no production SQLite records and made no provider calls.
 
 ## Pinned setup on Windows
 
@@ -33,7 +33,7 @@ $env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.example.
 
 The script starts `bidmate-postgresql` on `127.0.0.1:55432`, initializes extension 0.8.6, and sets `RFP_DATABASE_DSN` in this shell. It generates a secret in ignored `.runtime/postgresql.env`; never paste that file or print the DSN. The example configuration uses a fake provider and large/1,536. Selecting dimensions does not itself activate a candidate.
 
-The default database backend is PostgreSQL. Initialization and connection failures stop operation; writes never fall back to SQLite. Explicit `database_backend: "sqlite"` remains for historical fixtures and controlled rollback only. Initializing a fresh PostgreSQL database also leaves paid admission disabled. Use a dedicated application database with the public schema.
+The default database backend is PostgreSQL. Initialization and connection failures stop operation; writes never fall back to SQLite. Explicit `database_backend: "sqlite"` remains for historical fixtures, authorized pre-cutover construction and controlled rollback. Initializing a fresh PostgreSQL database also leaves paid admission disabled. Use a dedicated application database with the public schema.
 
 The real installed extension accepted `vector(16000)` storage and `vector(3072)` values. Standard-vector HNSW and IVFFlat both rejected 3,072 dimensions and accepted 2,000. Storage and ANN limits are different. [pgvector's documented limits](https://github.com/pgvector/pgvector#hnsw) and the [large-model documentation](https://developers.openai.com/api/docs/models/text-embedding-3-large) describe these constraints.
 
@@ -125,8 +125,8 @@ Tests create and delete private schemas, reject public application tables, and u
 
 Still required before completion:
 
-1. Independent review and freezing of the expanded development labels; record the approved $10 budget/rates/envelopes and verify model access.
-2. Bounded native-large reference and paired shortening calls, complete genuinely new 1,536-dimensional corpus/query set and acceptance of the owner's selected dimension. The later 1,536 instruction supersedes the 768-first ladder and smallest-passing selection. Retain nDCG@5 (0.02), complete-support (two percentage points), and zero-new-critical-failure thresholds. Report dense/hybrid eligible denominators separately; if 1,536 fails, retain the safe baseline and report incomplete.
+1. Independent review and freezing of the expanded development labels. The approved $10 budget/rates/envelopes and real large-model access are now evidenced below.
+2. Bounded native-large reference and paired shortening calls, new evaluation/interactive query vectors and acceptance of the owner's selected dimension. The genuinely new corpus construction is now complete (receipt below). The later 1,536 instruction supersedes the 768-first ladder and smallest-passing selection. Retain nDCG@5 (0.02), complete-support (two percentage points), and zero-new-critical-failure thresholds. Report dense/hybrid eligible denominators separately; if 1,536 fails, retain the safe baseline and report incomplete.
 3. Actual old-vector storage parity (private old vectors are currently absent), controlled model/shortening comparisons, identical-vector warm/cold p50/p95 benchmarks at one/six clients, storage/build/cost measurements and EXPLAIN ANALYZE. HNSW is not selected; optional filtered ANN/iterative-scan recall acceptance is unimplemented.
 4. Dimension-comparison/benchmark automation, sealed/configuration preservation checks, relocated artifact restore and tested rollback after new writes. These do not yet have implemented CLI commands.
 5. Final maintenance-window cutover, original evidence and local single/two-document answer acceptance with verifier/review/correction/budget checks. No cutover command or paid-admission enabling procedure is published until these safety prerequisites are implemented and reviewed.
@@ -138,7 +138,7 @@ Continue PostgreSQL review and free preparation first. Do not represent this fou
 
 On 2026-10-03 the owner approved paid migration work, raised the requested operating cap from $5 to $10, and requested an editable limit in Settings for teammates. This updates revision 2's budget-preservation requirement: retain settled spending, purpose reservations and historical records while deliberately changing the approved cap. The full migration/quality/cutover requirements remain. `PUT /api/budget/limit` and the Settings page implement an exact integer micro-USD shared limit with a required reason and audit record. It does not create per-member API accounts or authentication. `register-embedding-rate --actor <owner> --reason <approval>` adds the verified large rate while preserving other model rates and all attempt snapshots.
 
-The approved live limit has now been applied: allowance/cap $10, purpose envelopes embedding $2.50, gold/evaluation $2.50 and interactive $5.00. Historical attempts were compared before/after and remained byte-value identical; settled usage is still $0.612454 and no provider calls were made. The verified large-model rate was registered with owner approval. Private receipt: `.runtime/postgresql-migration/budget-approval.json`. A fresh rehearsal snapshot/import carries these deliberate mutable changes; the original $5 rehearsal is retained for comparison.
+The approved live limit was applied before construction: allowance/cap $10, purpose envelopes embedding $2.50, gold/evaluation $2.50 and interactive $5.00. Historical attempts were compared before/after and remained byte-value identical; settled usage at that checkpoint was $0.612454 and no provider calls had been made. The verified large-model rate was registered with owner approval. Private receipt: `.runtime/postgresql-migration/budget-approval.json`. A fresh rehearsal snapshot/import carries these deliberate mutable changes; the original $5 rehearsal is retained for comparison.
 
 The approved rehearsal is database `bidmate_import_approved_20261003`, snapshot SHA256 `73ececde5a6d13ae08323e9dcf4f5be9ee2a42dbd1308a773bbd3869503ae703`. All 27 tables / 645,950 records and 733 artifacts validate. The three extra records are append-only approval audit events; no application history was removed. Paid admission remains false. Updated corpus preflight fits the embedding envelope: remaining $2.343197, estimated $1.019020; total remaining cap $9.387546. Private evidence: `approved-source-plan.json`, `approved-validation.json`, `approved-embedding-preflight.json`.
 
@@ -146,4 +146,54 @@ The Settings save flow passed in actual Chrome/Playwright against this PostgreSQ
 
 The owner's subsequent instruction fixes new serving embeddings at 1,536 dimensions. Code defaults, nonsecret configuration and preflight defaults now agree. Historical activation overrides at a different model or dimension use visible lexical fallback until compatible acceptance; they are not relabeled. Existing 768 preflight receipts remain historical, and the 1,536 estimate must be recorded separately. Token costs do not decrease with dimensions.
 
-The separate 1,536 preflight is recorded in `.runtime/postgresql-migration/approved-1536-preflight.json`: 18,548 unique payloads, 7,838,299 tokens, 79 batches, zero genuine large cache hits, and maximum corpus cost $1.019019, fitting the approved $2.343197 remaining embedding envelope. Explicit 1,536 query dispatch/normalization/cache behavior and historical model/dimension override rejection passed two real-PostgreSQL tests in 10.509 seconds. These tests use fake inference; actual provider access remains untested. Paid calls were deliberately deferred during implementation/rehearsal with PostgreSQL admission disabled and development review/freezing pending; no API refusal occurred and owner approval/funding are recorded. The manually requested extra review was stopped by the owner and must not be restarted without a new instruction.
+The separate 1,536 preflight is recorded in `.runtime/postgresql-migration/approved-1536-preflight.json`: 18,548 unique payloads, 7,838,299 tokens, 79 batches, zero genuine large cache hits, and maximum corpus cost $1.019019, fitting the approved $2.343197 remaining embedding envelope. Explicit 1,536 query dispatch/normalization/cache behavior and historical model/dimension override rejection passed two real-PostgreSQL tests in 10.509 seconds. Those tests use fake inference; provider access had not yet been attempted at that checkpoint. Paid calls were initially deferred during implementation/rehearsal with PostgreSQL admission disabled and development review/freezing pending; no API refusal occurred and owner approval/funding were recorded. The manually requested extra review was stopped by the owner and must not be restarted without a new instruction.
+
+## Authorized paid corpus build
+
+The owner then explicitly instructed execution of paid corpus work within the approved scope. This permits building the already selected 1,536-dimensional corpus before development-label review; quality evaluation and serving activation still require independent reviewed/frozen labels and the existing thresholds. PostgreSQL rehearsal admission was not enabled. The sole live SQLite ledger billed the transitional construction through its existing exclusive gateway, preserving a consistent ledger for final import. This is explicit pre-cutover execution, not a fallback after PostgreSQL failure or a second spendable ledger.
+
+Actual execution used `service.Resources(recover=True)` and the same `dense.plan_embeddings` / `dense.build_dense` path as the maintenance CLI, with an ignored progress/receipt wrapper. It took a consistent pre-call backup, verified the current envelope and estimate, explicitly dispatched `text-embedding-3-large` / 1,536 with SDK retries disabled, and compared every historical attempt before/after. No generation calls or activation were made.
+
+| Paid result | Observed value |
+| --- | --- |
+| Model / dimensions | `text-embedding-3-large` / 1,536 |
+| Exact unique payloads / chunk rows | 18,548 / 18,983 |
+| Genuine large cache hits before build | 0 |
+| Provider calls / settled batches | 79 / 79 |
+| Input tokens | 7,838,299 |
+| New settled cost | 1,019,019 micro-USD ($1.019019) |
+| Total historical + new spending | 1,631,473 micro-USD ($1.631473) |
+| Remaining global $10 cap | 8,368,527 micro-USD ($8.368527) |
+| Pending / unknown billing | 0 / 0 |
+| Construction wrapper duration, including plan/backup | 392.422 seconds |
+| Transitional immutable NumPy candidate | `dce96f9d2090fedc` |
+| Serving pointer | Original keyword index `62bea0c9c27ad3e7`; no activated run |
+
+The vectors are genuinely new large-model outputs. All rows pass dimension, finite/nonzero, unit normalization, checksum and source mapping checks. Historical small vectors/attempts were not relabeled. NumPy is a preserved construction/comparison artifact, and will not be used implicitly when PostgreSQL is selected. These results establish real provider access and complete corpus construction, not retrieval quality.
+
+Private receipts are `paid-corpus-estimate.json` (estimate `b7211b494d36`), `paid-corpus-receipt.json`, and `before-paid-corpus-backup.json` under `.runtime/postgresql-migration/`. Do not copy source caches or database files into Git. To reproduce/resume this explicitly authorized pre-cutover path, stop the UI and use the existing maintenance commands with the transitional nonsecret configuration; retain the single live data directory and ledger:
+
+```powershell
+$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.corpus-before-cutover.example.json).Path
+python -m rfp_assistant.cli plan-embeddings --index 62bea0c9c27ad3e7
+python -m rfp_assistant.cli build-dense --index 62bea0c9c27ad3e7 --estimate-id <fresh-estimate>
+```
+
+Unchanged reruns must reuse verified cache entries with zero new provider calls. Unknown billed outcomes still block resending. Do not use this SQLite configuration after the PostgreSQL authority/cutover marker is installed.
+
+The post-paid consistent source snapshot is `paid-source-plan.json`, SHA256 `89bf68b3cc12c650c045fcfd2e4ccf7d0b45e98815b5395de69ab704034ece6c`, with 27 tables / 646,033 records. Target `bidmate_corpus_20261003` remains paid-disabled. The provider-free cache-transfer command verifies source plan/index identity, complete imported ledger, each settled source/target attempt, large model/dimensions/payload policy, vector checksums, and complete pgvector publication. It refuses unknown origins and differing newer target entries. It can resume/repeat without inference or overwriting an immutable verified entry:
+
+```powershell
+# Set RFP_DATABASE_DSN privately to the new empty bidmate_corpus_20261003 target; initialize extension first.
+python -m rfp_assistant.migration import --plan "$PWD/.runtime/postgresql-migration/paid-source-plan.json" --batch-size 1000
+python -m rfp_assistant.migration validate --plan "$PWD/.runtime/postgresql-migration/paid-source-plan.json"
+python tools/import_embedding_cache.py --plan "$PWD/.runtime/postgresql-migration/paid-source-plan.json" --source-runtime "$PWD/.runtime" --index 62bea0c9c27ad3e7 --out "$PWD/.runtime/postgresql-migration/paid-pgvector-transfer.json"
+```
+
+The actual transfer completed: 18,548 verified payloads, 18,983 mapped rows and all 79 settled source/target attempts produced PostgreSQL set `p0012817a0267254`. Repeating the full command reused all 18,548 entries, imported zero entries, made zero provider calls and kept the same set identity (`paid-pgvector-repeat.json`). The new PostgreSQL set appends a separate index record after full snapshot parity validation; imported historical rows must remain unchanged.
+
+Post-publication verification passed canonical digests for all 27 imported tables / 646,033 records, excluding only the newly appended PostgreSQL set's index record. All 18,983 stored vector rows are byte-identical float32 values to the preserved construction matrix. Ten exact top-20 comparisons (five corpus-row vectors, each against the full population and its extraction scope) produced identical ordered results, with score differences within 1e-6. This verifies storage/ranking parity for available new vectors; corpus-row probes do not establish query quality or old-model parity. PostgreSQL and live ledger totals agree at $1.631473, with zero pending reservations and target paid admission disabled. Private receipt: `paid-transfer-verification.json`.
+
+Observed `pg_total_relation_size` values, including table/TOAST/index storage, are 177,840,128 bytes for `embedding_payloads`, 32,768 bytes for `embedding_sets`, and 8,503,296 bytes for `embedding_set_rows`. These are construction-state measurements, not concurrency/latency benchmarks. The focused real-PostgreSQL transfer test covers repeated publication with no dispatch and rejection of a cache lacking a matching settled source attempt.
+
+Quality reference/paired shortening, evaluation query caches, benchmarks, production activation/cutover and post-write rollback acceptance remain outstanding. No manual review was restarted.

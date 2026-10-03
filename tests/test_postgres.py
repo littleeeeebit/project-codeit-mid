@@ -314,6 +314,39 @@ class PostgreSQLTests(unittest.TestCase):
         finally:
             res.close()
 
+    def test_explicit_cache_transfer_preserves_settled_attempts_and_repeats_without_dispatch(self):
+        from tools.import_embedding_cache import transfer
+        source_settings = self.env.settings.with_(embedding_model="text-embedding-3-large", embedding_dimensions=1536)
+        with store.open_db(source_settings.db_path) as conn:
+            index = store.get_app_setting(conn, "active_index")
+        estimate = dense.plan_embeddings(source_settings, index)
+        transport = generation.FakeTransport()
+        self.assertEqual(dense.build_dense(source_settings, transport, index, estimate["estimate_id"])["status"], "ready")
+        completed_plan = self.root / "completed-plan.json"
+        migration.plan(source_settings.db_path, completed_plan)
+        migration.import_snapshot(completed_plan, self.target)
+        target_settings = self.settings.with_(embedding_model="text-embedding-3-large", embedding_dimensions=1536)
+        first = transfer(completed_plan, source_settings.data_dir, index, target_settings)
+        second = transfer(completed_plan, source_settings.data_dir, index, target_settings)
+        self.assertTrue(first["pass"] and second["pass"])
+        self.assertGreater(first["imported_payloads"], 0)
+        self.assertEqual(second["imported_payloads"], 0)
+        self.assertEqual(second["reused_payloads"], first["unique_payloads"])
+        self.assertEqual((second["dense_version"], second["provider_calls"]), (first["dense_version"], 0))
+        before = budget.snapshot(self.target)
+        # A cache entry with no settled attempt must be rejected, even if its vector/hash is otherwise valid.
+        _, payloads = dense.index_payloads(source_settings, index)
+        key = payloads[0]["payload_hash"]
+        path = dense.cache_dir(source_settings) / (key + ".json")
+        meta = json.loads(path.read_text(encoding="utf-8"))
+        meta["attempt_id"] = "unsettled-origin"
+        store.write_text_atomic(path, json.dumps(meta))
+        with self.assertRaisesRegex(ValueError, "settled matching"):
+            transfer(completed_plan, source_settings.data_dir, index, target_settings)
+        after = budget.snapshot(self.target)
+        self.assertEqual((after.spent_micro_usd, after.pending_micro_usd),
+                         (before.spent_micro_usd, before.pending_micro_usd))
+
     def test_limit_change_preserves_unknown_reservations_and_price_history(self):
         self.imported()
         self.allow_fake_paid()
