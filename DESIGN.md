@@ -36,7 +36,7 @@ components:
 
 The redesign of 2026-10-02 turns the Streamlit app into a thin shell over `service.py`. The design pass ran in the fixed order below; every choice in section 1 was picked by the user from concrete sketches, one question per turn, before any layout code was written.
 
-Status: in the click-through on 2026-10-02 the user rejected the rendered screens. Built from stock Streamlit widgets, titles, tables and buttons all carry the same weight, and the new pages do not stand out. The user chose to settle a new spec that replaces the frontend stack. The page split, the result states, the settings decisions and the `service.py` boundary below carry over to that stack; the Streamlit-specific measurements in sections 2 and 3 do not.
+Current code checkpoint (2026-10-03): the frontend is now the three Next.js pages in `web/src/app/`, served through `api.py` over `service.py`; `app.py` and `ui.py` are absent. The front matter and measurements in sections 2–5 describe the earlier Streamlit pass, not a browser measurement of the current frontend. Section 6 records the current implementation and the remaining typography work. The supplied assignment still requires Streamlit and forbids a frontend rewrite, so that conflict must be resolved before further frontend implementation.
 
 ## 1. Purpose and layout
 
@@ -203,3 +203,50 @@ Space still left over, kept on purpose:
 ## Accessibility and text
 
 All labels and answers are Korean, every input has a visible label, and everything is reachable by keyboard with Streamlit's visible focus ring. Tables meant to be read use static cells (`st.table`) rather than the canvas grid. Source and model text is escaped before rendering, and no unsafe HTML is used. There are no uncalibrated confidence percentages. Rates show as `0.67 (2/3)`; an empty denominator shows "해당 없음", never 100 %. Citation precision is labelled as a lower bound when unjudged links count against it.
+
+## 6. Current code checkpoint and next typography pass
+
+This checkpoint comes from the source and working diff on 2026-10-03. Source declarations establish what is implemented; they do not establish browser behaviour or the user's acceptance of the rendered screens.
+
+### Implemented paths
+
+| Area | Code evidence | Current implementation |
+| --- | --- | --- |
+| Pages | `web/src/app/page.tsx`, `web/src/app/verify/page.tsx`, `web/src/app/dataset/page.tsx` | Separate chat, verification and dataset pages, with the shared header in `app-header.tsx`. |
+| Chat | `ask/answer-view.tsx`, `ask/answer-parts.tsx` | Numbered claims with citation chips; a 3:2 answer/evidence grid; a sticky evidence pane appears only when evidence exists. |
+| Verification | `verify/verify-page.tsx`, `side-menu.tsx` | A grouped left menu for the review inbox, retrieval trace, comparison, evaluation/release, datasets, ingestion, corrections and exports. |
+| Dataset generation | `dataset/draft.tsx`, `dataset/review.tsx`, `api.py` | Source selection, slot validation, free estimate, consented generation, submit, review and decision call API routes backed by service functions; the review grid is a 260 px queue beside the draft/decision and original spans. |
+| Budget and source boundary | `service.draft_documents`, `service._draft_plan`, `service.start_drafting`, `drafting._generate` | Sources must belong to development families; the service passes the explicit `dev` split; `gpt-6-luna` calls reserve their maximum cost through the budget gateway. |
+| Review boundary | `service.gold_decide`, `gold.decide`, `gold.candidate`, `gold.queue` | Both decisions require a note; approval is refused for the generation requester and the recorded drafter; sealed candidates are excluded from the page's queue and candidate calls. |
+| Existing checks | `tests/test_api.py`, `tests/test_shell.py` | Tests cover the API/service import boundary, schema parity, source filtering, drafting billing and independent approval; their presence is not a new passing test result. |
+
+### Where the working code stopped
+
+The four inherited uncommitted edits are limited to two small-control font sizes and two disclosure click targets:
+
+| File | Working diff |
+| --- | --- |
+| `web/src/components/ui/button.tsx` | Small button text changes from `0.8rem` to `13px`. |
+| `web/src/components/ui/toggle.tsx` | Small toggle text changes from `0.8rem` to `13px`. |
+| `web/src/components/ask/document-search.tsx` | The detailed-filter disclosure gains `min-h-6` (24 px). |
+| `web/src/components/ask/ask-page.tsx` | The request-history disclosure gains `min-h-6` (24 px). |
+
+The code loads Pretendard locally in `web/src/app/layout.tsx`. Chat claims still declare `15px` with `leading-7`; dataset evidence declares `text-sm` (14 px) with `leading-7`. Shared table cells already use `text-sm` and `py-2.5`. These are source values, not measured rendered sizes. The broader reading-size pass is therefore still pending.
+
+### Selected typography and density
+
+The user selected “Reading 16, tables 14” on 2026-10-03 from three concrete alternatives: reading 16/tables 14, balanced 15, and roomy 16 throughout. This choice is recorded as a target pending implementation; it is not inferred from the code checkpoint.
+
+| Role | Selected target |
+| --- | --- |
+| Font | Existing Pretendard |
+| Page title | 24 px |
+| Section title | 18 px |
+| Claims and original quotes | 16 px, unitless line-height 1.6 |
+| Tables and menus | 14 px |
+| Metadata | 13 px |
+| Single-line table rows | At least 40 px; wrapped content may grow |
+
+The existing browser tab at `http://127.0.0.1:8510/` showed “Connection error” and “Connection failed with status 404” during this continuation. It did not provide a rendered current app to measure; this observation does not establish which server build is running or a defect in the current source.
+
+Next steps are to resolve the assignment/implementation conflict, apply these roles through the existing components, then measure the current frontend at wide and narrow browser widths and check button behaviour, focus and contrast. No new palette has been selected in this continuation; the existing navy accent remains the recorded choice. A user click-through of the finished three pages is still required before a completion report.
