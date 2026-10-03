@@ -14,7 +14,7 @@ export function SideMenu<K extends string>({ title, groups, titles, section, onS
   return (
     <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
       <nav aria-label={`${title} 영역`} className="space-y-5 lg:sticky lg:top-20 lg:self-start">
-        <h1 className="px-2 text-xl font-bold tracking-tight">{title}</h1>
+        <h1 className="px-2 text-2xl font-bold tracking-tight">{title}</h1>
         {groups.map((g) => (
           <div key={g.title} className="space-y-0.5">
             <p className="px-2 pb-1 text-xs font-semibold text-muted-foreground">{g.title}</p>

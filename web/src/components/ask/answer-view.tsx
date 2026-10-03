@@ -25,7 +25,7 @@ export function AnswerView({ view, answer }: { view: RequestView; answer: Answer
               <li key={i} className="flex gap-3">
                 <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold tabular-nums">{i + 1}</span>
                 <div className="space-y-1.5">
-                  <p className="text-[15px] leading-7">{c.text}</p>
+                  <p className="text-base">{c.text}</p>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {c.kind === "inference" ? <StatusBadge tone="warn">추론</StatusBadge> : <StatusBadge tone="neutral">원문 사실</StatusBadge>}
                     {docLabel(answer, c.doc_id) && <StatusBadge tone="neutral">{docLabel(answer, c.doc_id)}</StatusBadge>}

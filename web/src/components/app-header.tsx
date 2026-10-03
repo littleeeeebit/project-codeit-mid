@@ -54,7 +54,7 @@ function MemberField() {
       <label htmlFor="member">이름</label>
       <input id="member" value={name} maxLength={40} onChange={(e) => writeMember(e.target.value)}
              aria-describedby="member-hint"
-             className="h-8 w-24 rounded-md border sm:w-28 border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" />
+             className="h-8 w-24 rounded-md border sm:w-28 border-input bg-background px-2 text-base sm:text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" />
       <span id="member-hint" className="sr-only">사용·검토 기록에 남는 이름입니다. 로그인은 없습니다.</span>
     </div>
   );

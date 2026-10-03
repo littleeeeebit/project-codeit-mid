@@ -40,7 +40,7 @@ function DraftCard({ c }: { c: Candidate }) {
       <div className="space-y-2">
         <StatusBadge tone="neutral">{label(GOLD_TYPE, c.type)}</StatusBadge>
         <p className="text-lg font-bold leading-snug">{c.question}</p>
-        {c.expected_answer && <p className="rounded-xl bg-secondary/60 px-4 py-3 text-[15px] leading-7"><span className="mr-2 text-xs font-semibold text-muted-foreground">초안 답변</span>{c.expected_answer}</p>}
+        {c.expected_answer && <p className="rounded-xl bg-secondary/60 px-4 py-3 text-base"><span className="mr-2 text-xs font-semibold text-muted-foreground">초안 답변</span>{c.expected_answer}</p>}
         {c.difficulty_reason && <p className="text-sm text-muted-foreground">난이도 이유: {c.difficulty_reason}</p>}
       </div>
       {c.current_errors.map((e) => <Notice key={e} tone="bad">현재 원문 상태와 맞지 않습니다: {e}</Notice>)}
@@ -105,7 +105,7 @@ function Spans({ c }: { c: Candidate }) {
   return (
     <section aria-label="원문 구절" className="space-y-3">
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-[15px] font-bold">원문 구절 {c.spans.length}개</h3>
+        <h3 className="text-lg font-bold">원문 구절 {c.spans.length}개</h3>
         <span className="text-xs text-muted-foreground">노란 바탕이 초안이 인용한 부분</span>
       </div>
       {c.spans.map((s, i) => (
@@ -116,13 +116,13 @@ function Spans({ c }: { c: Candidate }) {
           </div>
           <p className="text-xs text-muted-foreground">{s.location ? locationText(s.location) : "위치 없음"}</p>
           {s.missing ? <p className="text-sm text-bad">원문 요소를 찾을 수 없습니다.</p> : (
-            <p className="text-sm leading-7 whitespace-pre-wrap">
+            <p className="text-base whitespace-pre-wrap">
               {s.segments.map(({ text, cited }, j) => cited
                 ? <mark key={j} className="rounded bg-cite-bg px-0.5 font-semibold text-foreground [box-decoration-break:clone]">{text}</mark>
                 : <span key={j}>{text}</span>)}
             </p>
           )}
-          {!s.cited_found && s.quote && <p className="text-sm"><span className="mr-2 text-xs font-semibold text-muted-foreground">초안 인용</span>{s.quote}</p>}
+          {!s.cited_found && s.quote && <p className="text-base"><span className="mr-2 text-xs font-semibold text-muted-foreground">초안 인용</span>{s.quote}</p>}
         </article>
       ))}
     </section>
@@ -148,7 +148,7 @@ function DecideForm({ c, onDone }: { c: Candidate; onDone: (text: string) => voi
   const id = `decide-${c.candidate_id}`;
   return (
     <form onSubmit={(e) => e.preventDefault()} className="space-y-4 rounded-2xl border-2 border-foreground/10 bg-secondary/40 p-4">
-      <h3 className="text-[15px] font-bold">결정</h3>
+      <h3 className="text-lg font-bold">결정</h3>
       {isDrafter && <Notice tone="warn">{member} 님이 이 초안의 생성을 요청했습니다. 승인은 다른 검토자가 해야 합니다. 거절은 할 수 있습니다.</Notice>}
       <Field id={`${id}-note`} label="메모 (필수: 확인한 원문 위치, 또는 무엇이 틀렸는지)">
         <textarea id={`${id}-note`} rows={3} required value={note} onChange={(e) => setNote(e.target.value)} className={cn(field, "py-2")} />

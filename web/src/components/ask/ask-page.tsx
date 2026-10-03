@@ -86,7 +86,7 @@ export function AskPage() {
 
         {selected.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-10 text-center">
-            <p className="text-[17px] font-semibold">왼쪽에서 문서를 고르세요</p>
+            <p className="text-lg font-semibold">질문할 문서를 고르세요</p>
             <p className="mt-1 text-sm text-muted-foreground">하나를 고르면 질문할 수 있고, 두 개를 고르면 비교할 수 있습니다.</p>
           </div>
         ) : (
@@ -202,7 +202,7 @@ function History({ refresh }: { refresh: string }) {
   const { data } = usePoll(open ? `history-${refresh}` : null, () => must(api.GET("/api/requests", { params: { query: { limit: 20 } } }), errorText), null);
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="border-t pt-6">
-      <CollapsibleTrigger className="group flex items-center gap-1.5 rounded text-[15px] font-bold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+      <CollapsibleTrigger className="group flex min-h-6 items-center gap-1.5 rounded text-[15px] font-bold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
         내 최근 요청 <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-2 pt-4">

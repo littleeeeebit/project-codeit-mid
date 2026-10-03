@@ -2,7 +2,7 @@
 
 import { cn } from "cn";
 
-export const field = "w-full rounded-lg border border-input bg-background px-3 text-sm outline-none "
+export const field = "w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none "
   + "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60";
 
 export function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: React.ReactNode }) {
@@ -22,7 +22,7 @@ export function Empty({ children }: { children: React.ReactNode }) {
 export function PageTitle({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
     <header className="space-y-1">
-      <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+      <h2 className="text-lg font-bold tracking-tight">{title}</h2>
       {children && <p className="text-sm text-muted-foreground">{children}</p>}
     </header>
   );

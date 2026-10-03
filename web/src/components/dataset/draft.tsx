@@ -81,7 +81,7 @@ function Step({ n, title, note, children }: { n: number; title: string; note?: s
       <div className="flex items-start gap-3">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground text-sm font-bold text-background">{n}</span>
         <div>
-          <h3 className="text-[17px] font-bold">{title}</h3>
+          <h3 className="text-lg font-bold">{title}</h3>
           {note && <p className="text-sm text-muted-foreground">{note}</p>}
         </div>
       </div>
@@ -156,7 +156,7 @@ function PassagePicker({ doc, label: tag, chosen, onToggle }: { doc: Doc; label:
                   <label className={cn("flex cursor-pointer gap-3 px-3 py-2 text-sm hover:bg-secondary/60", on && "bg-accent hover:bg-accent")}>
                     <input type="checkbox" checked={on} onChange={() => onToggle(e.element_id)} className="mt-1 size-4 shrink-0 accent-primary" />
                     <span className="w-20 shrink-0 text-xs text-muted-foreground" title={locationText(e.location)}>{locationShort(e.location)}</span>
-                    <span className="line-clamp-3 flex-1 leading-6">{e.text}</span>
+                    <span className="min-w-0 flex-1 text-base [overflow-wrap:anywhere]">{e.text}</span>
                   </label>
                 </li>
               );

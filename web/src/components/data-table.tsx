@@ -19,7 +19,7 @@ export function Section({ title, children, aside }: { title: string; children: R
   return (
     <section className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-[15px] font-bold">{title}</h3>
+        <h3 className="text-lg font-bold">{title}</h3>
         {aside}
       </div>
       {children}

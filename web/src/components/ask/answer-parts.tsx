@@ -65,7 +65,7 @@ export function StateHead({ answer, large = false }: { answer: Answer; large?: b
   return (
     <div className="space-y-3">
       <StatusBadge tone={s.tone} size="md">{s.label}</StatusBadge>
-      <p className={cn("leading-relaxed font-semibold text-foreground", large ? "text-[22px] leading-snug" : "text-[17px]")}>
+      <p className={cn("leading-relaxed font-semibold text-foreground", large ? "text-[22px] leading-snug" : "text-lg")}>
         {answer.summary}
       </p>
     </div>
@@ -238,17 +238,17 @@ export function useEvidence(requestId: string, evidenceId: string | null) {
 }
 
 /** The opened citation: the exact quote among its neighbouring paragraphs, where it is, and the original file. */
-export function EvidenceDetail({ requestId, evidenceId, compact = false }: {
-  requestId: string; evidenceId: string | null; compact?: boolean;
+export function EvidenceDetail({ requestId, evidenceId }: {
+  requestId: string; evidenceId: string | null;
 }) {
   const { data, error, loading } = useEvidence(requestId, evidenceId);
   if (!evidenceId) return null;
   if (loading) return <div className="space-y-2"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-20 w-full" /></div>;
   if (error || !data) return <p role="alert" className="text-sm text-bad">{error}</p>;
-  return <EvidenceBody ev={data} compact={compact} />;
+  return <EvidenceBody ev={data} />;
 }
 
-export function EvidenceBody({ ev, compact }: { ev: Evidence; compact?: boolean }) {
+export function EvidenceBody({ ev }: { ev: Evidence }) {
   const [around, setAround] = useState(false);  // neighbouring paragraphs are context: folded to two lines first
   const paragraphs = ev.context.length ? ev.context : [{ element_id: "q", text: ev.quote, cited: true, location: {} }];
   const hasAround = paragraphs.some((p) => !p.cited);
@@ -264,7 +264,7 @@ export function EvidenceBody({ ev, compact }: { ev: Evidence; compact?: boolean 
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />{EVIDENCE_WARNING[w] ?? w}
         </p>
       ))}
-      <div className={cn("space-y-2 text-[15px] leading-7", compact && "text-sm leading-6")}>
+      <div className="space-y-2 text-base">
         {paragraphs.map((p) => (
           <p key={p.element_id} className={cn("whitespace-pre-wrap", !p.cited && "text-muted-foreground", !p.cited && !around && "line-clamp-2")}>
             {p.cited ? <mark className="rounded bg-cite-bg px-0.5 text-foreground [box-decoration-break:clone]">{p.text}</mark> : p.text}
@@ -275,7 +275,7 @@ export function EvidenceBody({ ev, compact }: { ev: Evidence; compact?: boolean 
         <span>노란 바탕이 답변이 인용한 원문입니다.</span>
         {hasAround && (
           <button type="button" aria-expanded={around} onClick={() => setAround(!around)}
-                  className="rounded font-semibold text-foreground underline-offset-2 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
+                  className="min-h-6 rounded font-semibold text-foreground underline-offset-2 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
             {around ? "앞뒤 문단 접기" : "앞뒤 문단 모두 보기"}
           </button>
         )}

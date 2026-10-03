@@ -16,7 +16,7 @@ const PAGE = 12;
 type Filters = { query: string; institution: string; amount_min?: number; amount_max?: number;
   closing_from?: string; closing_to?: string };
 
-const field = "h-10 w-full rounded-lg border border-input bg-background px-3 text-[15px] outline-none placeholder:text-muted-foreground/80 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+const field = "h-10 w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none placeholder:text-muted-foreground/80 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export function DocBadges({ doc }: { doc: Doc }) {
   const conflicts = [...new Set(doc.conflicts.map((c) => String(c.field)))].filter((f) => !(f in doc.resolutions));
@@ -53,7 +53,7 @@ export function DocumentSearch({ selected, onToggle }: { selected: Doc[]; onTogg
     <div className="flex h-full flex-col">
       <form className="space-y-3 border-b p-5" role="search" aria-label="문서 찾기"
             onSubmit={(e) => { e.preventDefault(); setFilters(draft); setLimit(PAGE); }}>
-        <h2 className="text-[17px] font-bold">문서 찾기</h2>
+        <h2 className="text-lg font-bold">문서 찾기</h2>
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <label htmlFor="q" className="sr-only">검색어</label>
@@ -66,7 +66,7 @@ export function DocumentSearch({ selected, onToggle }: { selected: Doc[]; onTogg
                  onChange={(e) => setDraft({ ...draft, institution: e.target.value })} />
         </div>
         <Collapsible>
-          <CollapsibleTrigger className="group flex items-center gap-1 rounded text-[13px] font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
+          <CollapsibleTrigger className="group flex min-h-6 items-center gap-1 rounded text-[13px] font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
             상세 조건 <ChevronDown className="size-3.5 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
           </CollapsibleTrigger>
           <CollapsibleContent className="grid grid-cols-2 gap-2 pt-2">

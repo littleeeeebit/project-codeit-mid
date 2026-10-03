@@ -2,41 +2,45 @@
 colors:
   primary: "#1F4E9A"
   on-primary: "#FFFFFF"
-  text: "#1A1D23"
+  text: "#191F28"
   background: "#FFFFFF"
-  surface: "#F3F5F8"
-  muted-text: "#5A6270"
+  surface: "#F2F4F6"
+  muted-text: "#5B6573"
+  citation-background: "#FFF3BF"
   status-answered: { text: "#1E6B3A", background: "#E6F4EA" }
   status-clarification: { text: "#1F4E9A", background: "#E8F0FB" }
   status-insufficient-or-conflict: { text: "#8A4B00", background: "#FFF1DC" }
   status-error-or-blocked: { text: "#B3261E", background: "#FDECEA" }
   status-neutral: { text: "#4A5160", background: "#EEF0F3" }
 typography:
-  font: "Malgun Gothic, Apple SD Gothic Neo, Noto Sans KR, sans-serif"
+  font: "Pretendard Variable, sans-serif"
   page-title: { size: 24px, weight: 700 }
-  section-title: { size: 17px, weight: 700 }
-  body: { size: 15px, weight: 400 }
-  label: { size: 13.125px, weight: 400 }
-  caption: { size: 13.125px, weight: 400, color: muted-text }
-  table: { size: 13.125px }
+  section-title: { size: 18px, weight: 700 }
+  body: { size: 16px, weight: 400, line-height: 1.6 }
+  menu: { size: 14px, weight: 500 }
+  label: { size: 13px, weight: 600 }
+  caption: { size: 13px, weight: 400, color: muted-text }
+  table: { size: 14px }
 spacing:
-  page-padding-wide: "120px top, 75px sides"
-  page-padding-narrow: "90px top, 15px sides"
-  sidebar-width: 300px
-  input-height: 33px
-  button-height: 38px
-  table-row-height: 28px
-rounded: 8px
+  page-padding-wide: "32px top, 40px sides on chat"
+  page-padding-narrow: "32px top, 24px sides on chat"
+  chat-sidebar-width: 360px
+  section-menu-width: 220px
+  review-queue-width: 260px
+  input-height: "40px main fields; 32px header name"
+  button-height: "44px answer submission; 28px small controls"
+  table-row-min-height: 40px
+rounded: 10px
 components:
-  status-badge: "st.badge with a text label; colour never carries the state alone"
-  citation-chip: "tertiary button labelled 근거 E<n>"
+  status-badge: "StatusBadge with a text label; colour never carries the state alone"
+  citation-chip: "24px-high native button with accessible name 근거 E<n> 원문 보기"
 ---
 
 # Interface design
 
-The redesign of 2026-10-02 turns the Streamlit app into a thin shell over `service.py`. The design pass ran in the fixed order below; every choice in section 1 was picked by the user from concrete sketches, one question per turn, before any layout code was written.
+The initial redesign of 2026-10-02 made the Streamlit app a thin shell over `service.py`. The initial design pass ran in the fixed order below; its choices were picked by the user from concrete sketches, one question per turn, before layout code was written.
 
-Current code checkpoint (2026-10-03): the frontend is now the three Next.js pages in `web/src/app/`, served through `api.py` over `service.py`; `app.py` and `ui.py` are absent. The front matter and measurements in sections 2–5 describe the earlier Streamlit pass, not a browser measurement of the current frontend. Section 6 records the current implementation and the remaining typography work. The supplied assignment still requires Streamlit and forbids a frontend rewrite, so that conflict must be resolved before further frontend implementation.
+Current code checkpoint (2026-10-03): the frontend is now the three Next.js pages in `web/src/app/`, served through `api.py` over `service.py`; `app.py` and `ui.py` are absent. Streamlit was abandoned for its limited layout flexibility; this continuation polishes the existing frontend without adding another API or framework. The front matter now records the current frontend's tokens. Sections 2–5 preserve the earlier Streamlit pass; section 6 records the code checkpoint and current browser measurements. User acceptance of the finished three pages remains pending.
 
 ## 1. Purpose and layout
 
@@ -116,17 +120,17 @@ Every answer opens with a status badge carrying its text label, and each state h
 
 ### Request ownership
 
-There is no login. Session state holds the typed name, the selected scope, the mode and the owned request `{request_id, generation_id, target}`; `target` hashes the scope, question, mode and date (`service.target_key`). Submitting creates one generation and idempotency ID; reruns reuse it and never resubmit. While the owned request is unfinished, the input is disabled. The answer pane renders a request only when `service.may_attach` holds: same request, generation and target, and not cancelled. Changing the selection or mode makes the old request history; it is cancelled only while still queued (`service.abandon_request`), and its billing continues regardless.
+There is no login. The typed name lives in browser storage; React state holds the selected scope, mode and owned request `{request_id, generation_id, target}`. `target` hashes the scope, question, mode and date (`service.target_key`). Submitting creates one generation and idempotency ID; read-only polling reuses it and never resubmits. While the owned request is unfinished, the input is disabled. The answer pane renders a request only when `service.may_attach` holds: same request, generation and target, and not cancelled. Changing the selection or mode makes the old request history; it is cancelled only while still queued (`service.abandon_request`), and its billing continues regardless.
 
 ### Polling
 
-Read-only fragments only: the budget row every 2 s, the owned request every 1 s while unfinished, a development evaluation or a drafting run every 2 s while it runs. None of them can submit, embed, generate, index or judge. When the watched work finishes, the fragment triggers one app rerun. A failed ledger read shows "최신 아님" and never shows numbers as live.
+Read-only client polling: the budget row every 2 s, the owned request every 1 s while unfinished, and a development evaluation or drafting run every 2 s while it runs. None of these polls can submit, embed, generate, index or judge. Finished results update the current component. A failed ledger read shows "최신 아님" and never shows numbers as live.
 
 ### Shell boundary
 
-`ui.py` imports only `service` from the package, plus Streamlit and the standard library; `tests/test_ui_boundary.py` checks this. Every action calls one `service.py` function. Sealed questions and labels never reach the verifier or dataset pages, and the dataset page drafts only from development-split documents.
+`api.py` imports only `service` from the package, plus FastAPI, Pydantic and the standard library; `tests/test_api.py` checks this boundary. The pages call the existing API routes, each backed by a service function. Sealed questions and labels never reach the verifier or dataset pages, and the dataset page drafts only from development-split documents.
 
-## 2. Browser measurements
+## 2. Browser measurements (historical Streamlit pass)
 
 Measured on 2026-10-02 in headless Chromium (Playwright 1.63) against this branch served on live `.runtime` data, at 1400 px and 400 px wide, after each rerun had settled. No step raised a Streamlit exception and no page scrolled sideways at either width.
 
@@ -164,11 +168,11 @@ An open multiselect dropdown swallowed the next click, so the first press of 검
 
 `tools/verify.py accessibility` passed on this branch: the pages are usable by keyboard alone (21 Tab stops while asking a question and opening a citation; all 19 stops that are inputs, buttons or links draw a visible focus ring), the lowest contrast among 73 sampled texts is 5.72:1, and at 390 px nothing scrolls sideways.
 
-## 3. Typography
+## 3. Typography (historical Streamlit pass)
 
 Four levels, each with one meaning: page title 24/700 (one per page), section title 17/700 (a tab's or pane's heading), body 15/400 (answers, quotes), small 13.125/400 (form labels, captions, table cells; captions in the muted colour for locations, IDs, costs and hints). The font is the operating system's Korean UI face; nothing is bundled. On the review queue each source span is shown as the text before the quote, the quote, and the text after; the quote carries the blue background, applied line by line because an inline mark cannot cross a line break.
 
-## 4. Colours
+## 4. Colours (original user choice)
 
 Picked by the user from four candidates, all checked against WCAG AA.
 
@@ -186,7 +190,7 @@ Picked by the user from four candidates, all checked against WCAG AA.
 
 Red appears only for errors and blocks, so a red element always means a problem. States are always spelled out next to the colour.
 
-## 5. Remaining space
+## 5. Remaining space (historical Streamlit pass)
 
 What the measurement pass found and changed:
 
@@ -200,11 +204,11 @@ Space still left over, kept on purpose:
 - On 검증 and 데이터셋 만들기 there is no sidebar, so tables run to 1248 px at 1400 px wide. They are left at full width because the evidence and claim columns use it; a reading-width cap would wrap the Korean quotes more often.
 - The 120 px top padding is Streamlit's room for the top menu and is not overridden; the app sets no custom CSS.
 
-## Accessibility and text
+## Accessibility and text (historical Streamlit pass)
 
 All labels and answers are Korean, every input has a visible label, and everything is reachable by keyboard with Streamlit's visible focus ring. Tables meant to be read use static cells (`st.table`) rather than the canvas grid. Source and model text is escaped before rendering, and no unsafe HTML is used. There are no uncalibrated confidence percentages. Rates show as `0.67 (2/3)`; an empty denominator shows "해당 없음", never 100 %. Citation precision is labelled as a lower bound when unjudged links count against it.
 
-## 6. Current code checkpoint and next typography pass
+## 6. Current code checkpoint and typography pass
 
 This checkpoint comes from the source and working diff on 2026-10-03. Source declarations establish what is implemented; they do not establish browser behaviour or the user's acceptance of the rendered screens.
 
@@ -218,11 +222,11 @@ This checkpoint comes from the source and working diff on 2026-10-03. Source dec
 | Dataset generation | `dataset/draft.tsx`, `dataset/review.tsx`, `api.py` | Source selection, slot validation, free estimate, consented generation, submit, review and decision call API routes backed by service functions; the review grid is a 260 px queue beside the draft/decision and original spans. |
 | Budget and source boundary | `service.draft_documents`, `service._draft_plan`, `service.start_drafting`, `drafting._generate` | Sources must belong to development families; the service passes the explicit `dev` split; `gpt-6-luna` calls reserve their maximum cost through the budget gateway. |
 | Review boundary | `service.gold_decide`, `gold.decide`, `gold.candidate`, `gold.queue` | Both decisions require a note; approval is refused for the generation requester and the recorded drafter; sealed candidates are excluded from the page's queue and candidate calls. |
-| Existing checks | `tests/test_api.py`, `tests/test_shell.py` | Tests cover the API/service import boundary, schema parity, source filtering, drafting billing and independent approval; their presence is not a new passing test result. |
+| Existing checks | `tests/test_api.py`, `tests/test_shell.py` | All 14 tests passed during this continuation, covering the API/service import boundary, schema parity, source filtering, drafting billing and independent approval. |
 
 ### Where the working code stopped
 
-The four inherited uncommitted edits are limited to two small-control font sizes and two disclosure click targets:
+At the start of this continuation, the four inherited uncommitted edits were limited to two small-control font sizes and two disclosure click targets; they are included in this typography pass:
 
 | File | Working diff |
 | --- | --- |
@@ -231,11 +235,11 @@ The four inherited uncommitted edits are limited to two small-control font sizes
 | `web/src/components/ask/document-search.tsx` | The detailed-filter disclosure gains `min-h-6` (24 px). |
 | `web/src/components/ask/ask-page.tsx` | The request-history disclosure gains `min-h-6` (24 px). |
 
-The code loads Pretendard locally in `web/src/app/layout.tsx`. Chat claims still declare `15px` with `leading-7`; dataset evidence declares `text-sm` (14 px) with `leading-7`. Shared table cells already use `text-sm` and `py-2.5`. These are source values, not measured rendered sizes. The broader reading-size pass is therefore still pending.
+The code loads Pretendard locally in `web/src/app/layout.tsx`. At the checkpoint, chat claims declared `15px` with `leading-7`, and dataset evidence declared `text-sm` (14 px) with `leading-7`. Shared table cells already used `text-sm` and `py-2.5`. The pass now uses native `text-base` for claims and original quotes, with its line-height set to 1.6, and `text-lg` for section headings. Source selection shows full passages rather than clipping them to three lines; the existing scroll container bounds the list. Form text is 16 px below the `sm` breakpoint and 14 px above it. Small-text utilities use 13 px. The chat empty-state instruction no longer says “on the left” because its document list is above it on narrow screens.
 
 ### Selected typography and density
 
-The user selected “Reading 16, tables 14” on 2026-10-03 from three concrete alternatives: reading 16/tables 14, balanced 15, and roomy 16 throughout. This choice is recorded as a target pending implementation; it is not inferred from the code checkpoint.
+The user selected “Reading 16, tables 14” on 2026-10-03 from three concrete alternatives: reading 16/tables 14, balanced 15, and roomy 16 throughout. The following roles are now implemented; the choice was not inferred from the code checkpoint.
 
 | Role | Selected target |
 | --- | --- |
@@ -247,6 +251,27 @@ The user selected “Reading 16, tables 14” on 2026-10-03 from three concrete 
 | Metadata | 13 px |
 | Single-line table rows | At least 40 px; wrapped content may grow |
 
-The existing browser tab at `http://127.0.0.1:8510/` showed “Connection error” and “Connection failed with status 404” during this continuation. It did not provide a rendered current app to measure; this observation does not establish which server build is running or a defect in the current source.
+### Browser measurements and behaviour
 
-Next steps are to resolve the assignment/implementation conflict, apply these roles through the existing components, then measure the current frontend at wide and narrow browser widths and check button behaviour, focus and contrast. No new palette has been selected in this continuation; the existing navy accent remains the recorded choice. A user click-through of the finished three pages is still required before a completion report.
+The old tab at `http://127.0.0.1:8510/` showed a connection error. Measurements instead used an isolated preview at `http://127.0.0.1:8765/`, with the existing phase-4 fixture corpus, two pending candidates and `FakeTransport`; no live API calls were made. Chrome was measured at 1400 × 1000 and 390 × 844, and its temporary viewport override was reset afterwards.
+
+| Rendered measure | Observed value |
+| --- | --- |
+| Page title on all three pages | 24 px |
+| Verification and dataset section headings | 18 px |
+| Chat claims, chat evidence and pending-candidate spans | 16 px / 25.6 px line-height |
+| Drafting source picker | 16 px / 25.6 px line-height; full passages wrap without a line clamp and fit at 390 px |
+| Review-queue metadata | 13 px / 19.5 px line-height |
+| Verification table cells | 14 px; sampled single-line rows 44.25–44.75 px high |
+| Citation chip | 32 × 24 px; 13 px text |
+| Detailed filters, request history and evidence-context disclosures | At least 24 px high |
+| Chat main padding at the desktop width | 32 px top/bottom, 40 px sides |
+| Review queue at the desktop width | 260 px |
+| Mobile name, search, institution, review-note and drafting inputs/select | 16 px |
+| Page-level horizontal overflow | None on any of the three pages at either width; the expanded chat history answer also fits at 390 px |
+
+Button behaviour was observed for document selection, fixture answer submission, citation selection, context expansion, request history, verification/dataset menu navigation and drafting document selection. The answer textarea and submit button disabled while the fake request ran and re-enabled on completion. Keyboard activation opened the citation and expanded its surrounding paragraphs; 17 sampled input/button/link focus stops showed visible rings. A screen-reader walkthrough and a complete audit of every button were not performed.
+
+Rendered leaf-text contrast was checked by reading computed foreground and ancestor background colours, converting sRGB/OKLab values and compositing alpha. Samples: chat 41 texts (minimum 5.58:1), verification 25 (5.15:1), dataset review 71 (5.15:1). No sampled pair fell below 4.5:1; these samples are not a complete accessibility certification. No new palette was selected; the navy accent and existing status colours remain.
+
+The whitespace pass keeps the established answer/evidence split, left menus and review queue. No filler panels or additional controls were added. Validation includes the production build, ESLint, TypeScript, the 14 API/shell tests and `git diff --check`. A user click-through of the finished three pages remains required before a completion report.
