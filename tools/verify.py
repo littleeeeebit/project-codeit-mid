@@ -5,11 +5,11 @@
 
 Every flow uses the fake provider and never needs an API key: OPENAI_API_KEY is removed from every child process.
 Command flows run repository tests and scripts against fixture corpora. Dataset flows (`environments` contains
-`dataset`) use RFP_SOURCE_DIR / RFP_DATA_DIR when the service's environment supplies them, through an isolated
-copy: the SQLite database is backed up through a read-only connection into a temporary runtime and the read-only
-artifact folders are linked, so verifier runs, requests and fake ledger rows never reach the configured runtime.
-(Like any reader of a WAL database, that connection may create the empty `-wal`/`-shm` sidecar files; the database
-content is not changed.) Without them, the fixture corpus is used and the observation says so.
+`dataset`) use RFP_SOURCE_DIR / RFP_DATA_DIR / RFP_DATABASE_DSN when the service's environment supplies them,
+through an isolated copy: the PostgreSQL database is dumped (pg_dump, a read-only snapshot) and restored into a
+private test database on the server tools/start-postgresql.ps1 runs, and the read-only artifact folders are linked,
+so verifier runs, requests and fake ledger rows never reach the configured runtime. Without them, the fixture corpus
+is used and the observation says so.
 
 The service supplies WIKI_VERIFICATION_HEAD, WIKI_VERIFICATION_ENVIRONMENT, WIKI_VERIFICATION_SCOPE and
 WIKI_VERIFICATION_BROWSER, and copies the owner's env_file to the checkout's `.env` without exporting it. The
@@ -33,18 +33,19 @@ import os
 import re
 import shutil
 import signal
-import sqlite3
 import subprocess
 import sys
 import tempfile
 import time
 import urllib.request
-from contextlib import closing
 from pathlib import Path
+
+import psycopg
+from psycopg.rows import dict_row
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(REPO / "src"), str(REPO)]
-CONFIG_KEYS = ("RFP_SOURCE_DIR", "RFP_DATA_DIR", "RFP_VERIFY_ORIGIN", "RFP_VERIFY_BROWSER_EXECUTABLE",
+CONFIG_KEYS = ("RFP_SOURCE_DIR", "RFP_DATA_DIR", "RFP_DATABASE_DSN", "RFP_VERIFY_ORIGIN", "RFP_VERIFY_BROWSER_EXECUTABLE",
                "RFP_VERIFY_QUESTION", "RFP_VERIFY_HWP_DOC_ID", "RFP_VERIFY_PDF_DOC_ID")
 TERMINAL = ("completed", "failed", "cancelled", "interrupted")
 MANIFEST = REPO / "verification.json"
@@ -104,35 +105,35 @@ class Context:
 
     def dataset(self) -> dict:
         """An isolated runtime for the configured corpus, or a fresh fixture corpus when none is configured."""
-        source, data = self.config.get("RFP_SOURCE_DIR"), self.config.get("RFP_DATA_DIR")
+        keys = ("RFP_SOURCE_DIR", "RFP_DATA_DIR", "RFP_DATABASE_DSN")
+        source, data, dsn = (self.config.get(k) for k in keys)
         origin = self.config_source.get("RFP_DATA_DIR") or self.config_source.get("RFP_SOURCE_DIR")
         if source or data:
-            missing = [k for k, v in (("RFP_SOURCE_DIR", source), ("RFP_DATA_DIR", data)) if not v]
+            missing = [k for k in keys if not self.config.get(k)]
             if missing:
                 raise RuntimeError(f"incomplete corpus configuration in {origin}: {', '.join(missing)} not set")
             source, data = Path(source).resolve(), Path(data).resolve()
-            db = data / "rfp.sqlite3"
-            if not source.is_dir() or not db.is_file():
+            if not source.is_dir() or not data.is_dir():
                 raise RuntimeError(f"configured corpus from {origin} is unavailable: "
-                                   f"{'source dir missing' if not source.is_dir() else db.name + ' missing'}")
+                                   f"{'source dir missing' if not source.is_dir() else 'data dir missing'}")
             copy = self.work / "dataset-runtime"
             copy.mkdir()
-            with closing(sqlite3.connect(f"{db.as_uri()}?mode=ro", uri=True)) as src, \
-                    closing(sqlite3.connect(copy / "rfp.sqlite3")) as dst:
-                src.backup(dst)
+            self.env["RFP_DATABASE_DSN"] = copied = copy_database(dsn, self.work)  # every child serves the copy
             for name in READ_ONLY_DIRS:
                 if (data / name).is_dir():
                     self.link(data / name, copy / name)
             return {"kind": f"configured corpus from {origin} (isolated copy)", "source_dir": str(source),
-                    "data_dir": str(copy), "question": self.config.get("RFP_VERIFY_QUESTION") or DATASET_QUESTION}
+                    "data_dir": str(copy), "dsn": copied,
+                    "question": self.config.get("RFP_VERIFY_QUESTION") or DATASET_QUESTION}
         if os.environ.get("WIKI_VERIFICATION_ENVIRONMENT"):
-            raise RuntimeError("dataset flow without a corpus: set RFP_SOURCE_DIR and RFP_DATA_DIR in the env_file "
-                               "(copied to .env)")
+            raise RuntimeError("dataset flow without a corpus: set RFP_SOURCE_DIR, RFP_DATA_DIR and RFP_DATABASE_DSN "
+                               "in the env_file (copied to .env)")
         from tests import fixtures
 
         env = fixtures.make_env(self.work / "fixture")
+        self.env["RFP_DATABASE_DSN"] = os.environ[env.settings.database_dsn_env]
         return {"kind": "fixture corpus (no dataset configured)", "source_dir": str(env.settings.source_dir),
-                "data_dir": str(env.settings.data_dir), "question": FAKE_QUESTION,
+                "data_dir": str(env.settings.data_dir), "dsn": self.env["RFP_DATABASE_DSN"], "question": FAKE_QUESTION,
                 "pair": (env.refs["기관A"].doc_id, env.refs["기관D"].doc_id), "pair_question": "시스템 구축"}
 
     def link(self, target: Path, link: Path) -> None:
@@ -153,8 +154,7 @@ class Context:
             raise RuntimeError(f"RFP_VERIFY_ORIGIN must be scheme://host:port, got {origin!r}")
         host, port = found.groups()
         config = self.work / "fake-config.json"
-        config.write_text(json.dumps({"provider": "fake", "database_backend": "sqlite",
-                                      "fake_delay_seconds": delay}), encoding="utf-8")
+        config.write_text(json.dumps({"provider": "fake", "fake_delay_seconds": delay}), encoding="utf-8")
         env = {**self.env, "RFP_SOURCE_DIR": corpus["source_dir"], "RFP_DATA_DIR": corpus["data_dir"],
                "RFP_CONFIG_FILE": str(config)}
         npm = shutil.which("npm")
@@ -262,10 +262,31 @@ def load_check_summary(code: int, out: str) -> tuple[bool, str]:  # takes Contex
         keys, ensure_ascii=False)[:400]
 
 
-def db_rows(data_dir: str, sql: str, args=()) -> list[sqlite3.Row]:
-    with closing(sqlite3.connect(Path(data_dir) / "rfp.sqlite3")) as conn:
-        conn.row_factory = sqlite3.Row
-        return conn.execute(sql, args).fetchall()
+def copy_database(source_dsn: str, work: Path) -> str:
+    """DSN of a private copy of the configured database: pg_dump (one read-only snapshot) restored into a fresh
+    test database. The dump file is removed; the copy is dropped when this process exits."""
+    from psycopg.conninfo import conninfo_to_dict
+
+    from rfp_assistant import postgres, postgres_backup
+    from tests import fixtures
+
+    os.environ["RFP_VERIFY_SOURCE_DSN"] = source_dsn
+    dump = work / "dataset.dump"
+    postgres_backup._run("pg_dump", postgres.Target("RFP_VERIFY_SOURCE_DSN"), [
+        "--format=custom", "--no-owner", "--no-privileges", "--exclude-schema=bidmate_recovery",
+        "--file=" + str(dump)], work)
+    target = postgres.Target(fixtures.database(ready=False))
+    postgres_backup._run("pg_restore", target, ["--no-owner", "--no-privileges", "--exit-on-error",
+                                                "--dbname=" + conninfo_to_dict(target.dsn())["dbname"], str(dump)], work)
+    dump.unlink()
+    return target.dsn()
+
+
+def db_rows(dsn: str, sql: str, args=()) -> list[dict]:
+    from rfp_assistant.postgres import bind_sql
+
+    with psycopg.connect(dsn, row_factory=dict_row, autocommit=True) as conn:
+        return conn.execute(bind_sql(sql), args).fetchall()
 
 
 def owner_config(repo: Path | None = None) -> tuple[dict, dict]:
@@ -287,13 +308,16 @@ def owner_config(repo: Path | None = None) -> tuple[dict, dict]:
     return values, source
 
 
-def wait_request(data_dir: str, where: str, args=(), timeout: float = 120) -> sqlite3.Row | None:
+ATTEMPTS = ("(SELECT string_agg(a.stage || ':' || a.state, ',' ORDER BY a.created_at) FROM attempts a "
+            "WHERE a.request_id = r.request_id) AS attempts")
+
+
+def wait_request(dsn: str, where: str, args=(), timeout: float = 120) -> dict | None:
     """The newest matching request once it is terminal (None at the deadline)."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        rows = db_rows(data_dir, f"SELECT r.request_id, r.status, r.result_json, (SELECT group_concat(a.stage || ':' "
-                                 f"|| a.state) FROM attempts a WHERE a.request_id = r.request_id) AS attempts "
-                                 f"FROM requests r WHERE {where} ORDER BY r.created_at DESC LIMIT 1", args)
+        rows = db_rows(dsn, f"SELECT r.request_id, r.status, r.result_json, {ATTEMPTS} "
+                            f"FROM requests r WHERE {where} ORDER BY r.created_at DESC LIMIT 1", args)
         if rows and rows[0]["status"] in TERMINAL:
             return rows[0]
         time.sleep(0.25)
@@ -368,22 +392,21 @@ def expect_enabled(locator, timeout_ms: int = 60000) -> None:
         time.sleep(0.2)
 
 
-def ask_and_wait(page, data_dir: str, member: str, question: str) -> sqlite3.Row | None:
+def ask_and_wait(page, dsn: str, member: str, question: str) -> dict | None:
     """Submits once and waits for that new request to finish and render."""
-    known = [r["request_id"] for r in member_requests(data_dir, member)]
+    known = [r["request_id"] for r in member_requests(dsn, member)]
     ask(page, question)
     marks = ",".join("?" * len(known))
-    row = wait_request(data_dir, "r.member_id = ?" + (f" AND r.request_id NOT IN ({marks})" if known else ""),
+    row = wait_request(dsn, "r.member_id = ?" + (f" AND r.request_id NOT IN ({marks})" if known else ""),
                        (member, *known))
     if row is not None:
         rendered(page, row)  # let the page show it before the next step
     return row
 
 
-def member_requests(data_dir: str, member: str) -> list[sqlite3.Row]:
-    return db_rows(data_dir, "SELECT r.request_id, r.status, (SELECT group_concat(a.stage || ':' || a.state) "
-                             "FROM attempts a WHERE a.request_id = r.request_id) AS attempts FROM requests r "
-                             "WHERE r.member_id = ? ORDER BY r.created_at", (member,))
+def member_requests(dsn: str, member: str) -> list[dict]:
+    return db_rows(dsn, f"SELECT r.request_id, r.status, {ATTEMPTS} FROM requests r "
+                        "WHERE r.member_id = ? ORDER BY r.created_at", (member,))
 
 
 # ---------------------------------------------------------------- command flows
@@ -447,7 +470,7 @@ def pick_documents(ctx: Context, corpus: dict) -> tuple[str, str]:
     hwp, pdf = ctx.config.get("RFP_VERIFY_HWP_DOC_ID"), ctx.config.get("RFP_VERIFY_PDF_DOC_ID")
     if hwp and pdf:
         return hwp, pdf
-    rows = db_rows(corpus["data_dir"], "SELECT d.doc_id, d.filename FROM documents d JOIN sources s "
+    rows = db_rows(corpus["dsn"],"SELECT d.doc_id, d.filename FROM documents d JOIN sources s "
                                        "ON s.source_hash = d.active_source_hash WHERE s.parse_status = 'parsed' "
                                        "ORDER BY d.csv_row_id")
 
@@ -548,7 +571,7 @@ def consultant_answer(ctx: Context) -> dict:
 
         def answer():
             pick_first_document(page)
-            last = ask_and_wait(page, corpus["data_dir"], member, corpus["question"])
+            last = ask_and_wait(page, corpus["dsn"],member, corpus["question"])
             result = json.loads(last["result_json"]) if last and last["result_json"] else {}
             shown = bool(last) and rendered(page, last)
             ok = bool(shown and last["status"] == "completed" and result.get("status") == "answered"
@@ -571,7 +594,7 @@ def consultant_answer(ctx: Context) -> dict:
             path = ctx.work / "download.bin"
             info.value.save_as(path)
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            match = db_rows(corpus["data_dir"], "SELECT d.filename FROM documents d WHERE d.active_source_hash = ?",
+            match = db_rows(corpus["dsn"],"SELECT d.filename FROM documents d WHERE d.active_source_hash = ?",
                             (digest,))
             return bool(match), (f"{path.stat().st_size} bytes, sha256 {digest[:16]}…, suggested name "
                                  f"{info.value.suggested_filename!r}; managed source {match[0]['filename'] if match else 'none'}")
@@ -590,12 +613,12 @@ def request_history(ctx: Context) -> dict:
         def twice():
             pick_first_document(page)
             for _ in range(2):
-                ask_and_wait(page, corpus["data_dir"], member, corpus["question"])
+                ask_and_wait(page, corpus["dsn"],member, corpus["question"])
             page.get_by_role("button", name="내 최근 요청").click()
             entries = page.get_by_role("button", name=re.compile(r"요청 [0-9a-f]{8} · "))
             entries.first.wait_for(timeout=30000)
             options = entries.all_inner_texts()
-            rows = member_requests(corpus["data_dir"], member)
+            rows = member_requests(corpus["dsn"],member)
             ids = {r["request_id"][:8] for r in rows}
             shown = {i for i in ids if sum(i in o for o in options) == 1}
             return len(rows) == 2 and shown == ids, f"{len(rows)} requests stored; {len(options)} history entries: {options}"
@@ -603,7 +626,7 @@ def request_history(ctx: Context) -> dict:
                                             "two separate history entries", twice)}
 
         def older_evidence():
-            rows = member_requests(corpus["data_dir"], member)
+            rows = member_requests(corpus["dsn"],member)
             older = rows[0]["request_id"][:8]
             entry = page.get_by_role("button", name=re.compile(f"요청 {older} · "))
             entry.click()
@@ -635,7 +658,7 @@ def verifier_generation(ctx: Context) -> dict:
             page.get_by_role("button", name=re.compile(re.escape(title[:20]))).first.click()
             page.get_by_role("button", name="검색만 실행 · 무료").click()
             shown = wait_text(page, r"실행 vr-", 60000)
-            runs = db_rows(corpus["data_dir"], "SELECT run_id, trace_json FROM verifier_runs WHERE member_id = ?",
+            runs = db_rows(corpus["dsn"],"SELECT run_id, trace_json FROM verifier_runs WHERE member_id = ?",
                            (member,))
             est = json.loads(runs[-1]["trace_json"])["estimate_micro_usd"] if runs else None
             units = len(json.loads(runs[-1]["trace_json"])["retrieval"]["evidence"]) if runs else 0
@@ -643,17 +666,17 @@ def verifier_generation(ctx: Context) -> dict:
         out = {"frozen-run": ctx.act("run a free search-only verification", "a frozen run with evidence", freeze)}
 
         def generate():
-            run = db_rows(corpus["data_dir"], "SELECT run_id, trace_json FROM verifier_runs WHERE member_id = ? "
+            run = db_rows(corpus["dsn"],"SELECT run_id, trace_json FROM verifier_runs WHERE member_id = ? "
                                               "ORDER BY created_at DESC LIMIT 1", (member,))[0]
             button = page.get_by_role("button", name="유료 답변 생성", exact=True)
             disabled_before = button.is_disabled()  # no consent yet
             page.get_by_label("이 범위로 유료 답변 생성을 1회 실행합니다").check()
             button.click()
             key = f"vgen-{run['run_id']}"
-            done = wait_request(corpus["data_dir"], "r.idempotency_key = ?", (key,))  # this request, not page text
+            done = wait_request(corpus["dsn"],"r.idempotency_key = ?", (key,))  # this request, not page text
             shown = rendered(page, done) if done else False
-            req = db_rows(corpus["data_dir"], "SELECT request_id, status FROM requests WHERE idempotency_key = ?", (key,))
-            attempts = db_rows(corpus["data_dir"], "SELECT stage, state, reserved_micro_usd FROM attempts WHERE request_id = ?",
+            req = db_rows(corpus["dsn"],"SELECT request_id, status FROM requests WHERE idempotency_key = ?", (key,))
+            attempts = db_rows(corpus["dsn"],"SELECT stage, state, reserved_micro_usd FROM attempts WHERE request_id = ?",
                                (req[0]["request_id"],)) if req else []
             maximum = json.loads(run["trace_json"])["estimate_micro_usd"]
             reserved = sum(a["reserved_micro_usd"] for a in attempts)
@@ -675,8 +698,8 @@ def shared_pending(page) -> float | None:
     return float(found.group(1).replace(",", "")) if found else None
 
 
-def attempt_count(data_dir: str) -> int:
-    return db_rows(data_dir, "SELECT COUNT(*) AS n FROM attempts")[0]["n"]
+def attempt_count(dsn: str) -> int:
+    return db_rows(dsn, "SELECT COUNT(*) AS n FROM attempts")[0]["n"]
 
 
 @flow("six-sessions")
@@ -713,9 +736,10 @@ def six_sessions(ctx: Context) -> dict:
         def all_submit():
             for page in pages[1:]:
                 page.get_by_role("button", name=SUBMIT).click()
-            rows = [wait_request(corpus["data_dir"], "r.member_id = ?", (m,), 180) for m in members]
-            per = db_rows(corpus["data_dir"], "SELECT r.member_id, COUNT(a.attempt_id) AS n, "
-                          "SUM(a.state IN ('reserved', 'dispatching')) AS open, SUM(a.member_id != r.member_id) AS foreign_ "
+            rows = [wait_request(corpus["dsn"],"r.member_id = ?", (m,), 180) for m in members]
+            per = db_rows(corpus["dsn"],"SELECT r.member_id, COUNT(a.attempt_id) AS n, "
+                          "COUNT(*) FILTER (WHERE a.state IN ('reserved', 'dispatching')) AS open, "
+                          "COUNT(*) FILTER (WHERE a.member_id <> r.member_id) AS foreign_ "
                           "FROM requests r LEFT JOIN attempts a ON a.request_id = r.request_id "
                           f"WHERE r.member_id IN ({','.join('?' * 6)}) GROUP BY r.member_id", members)
             statuses = [json.loads(r["result_json"])["status"] if r and r["result_json"] else None for r in rows]
@@ -731,7 +755,7 @@ def six_sessions(ctx: Context) -> dict:
 @flow("cap-exhaustion")
 def cap_exhaustion(ctx: Context) -> dict:
     def body(ctx, browser, origin, corpus):
-        data = corpus["data_dir"]
+        data = corpus["dsn"]
         cap = db_rows(data, "SELECT cap_micro_usd FROM budget_settings WHERE id = 1")[0]["cap_micro_usd"]
         amount = f"{cap / 1_000_000 + 1:.6f}"
         # Budget administration is an owner CLI path beside the running app (it never takes the gateway lock).
@@ -856,11 +880,11 @@ def accessibility(ctx: Context) -> dict:
             box = tab_to(lambda i: i["tag"] == "TEXTAREA")
             if box:
                 page.keyboard.type(corpus["question"])
-            known = [r["request_id"] for r in member_requests(corpus["data_dir"], member)]
+            known = [r["request_id"] for r in member_requests(corpus["dsn"],member)]
             submit = tab_to(lambda i: i["tag"] == "BUTTON" and SUBMIT.match(i["name"]))
             if submit:
                 page.keyboard.press("Enter")
-            row = wait_request(corpus["data_dir"], "r.member_id = ?", (member,), 120) if submit else None
+            row = wait_request(corpus["dsn"],"r.member_id = ?", (member,), 120) if submit else None
             new = bool(row and row["request_id"] not in known)
             opened = False
             if new and rendered(page, row):

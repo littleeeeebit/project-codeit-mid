@@ -11,8 +11,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from rfp_assistant import api, auth, budget, generation, gold, service
-from rfp_assistant.store import ProcessLock, open_db
+from rfp_assistant import api, auth, budget, generation, gold, postgres, service
+from rfp_assistant.store import open_db
 from tests import phase4_fixtures as fx
 
 
@@ -117,8 +117,7 @@ class ShellServiceTest(unittest.TestCase):
             return self.reply(messages)
 
         self.transport.responder = blocked
-        self.res.settings = self.s.with_(shutdown_wait_seconds=0.01)
-        self.res._own(self.res.settings)
+        self.res.settings = self.s.with_(shutdown_wait_seconds=0.01)  # self.res owns the gateway (it has a transport)
         slots = [self.numeric_slot() for _ in range(slot_count)]
         maximum = service.plan_drafting(self.res, self.a, slots)["max_micro_usd"]
         run_id = service.start_drafting(self.res, self.a, slots, maximum)
@@ -126,7 +125,7 @@ class ShellServiceTest(unittest.TestCase):
         try:
             self.assertTrue(entered.wait(15))
             self.res.close()
-            replacement = ProcessLock(self.s.data_dir / "gateway.lock")
+            replacement = postgres.GatewayOwner(self.s.db_path)
             try:
                 finish.set()
                 thread.join(timeout=15)

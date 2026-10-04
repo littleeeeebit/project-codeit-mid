@@ -16,7 +16,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from . import answers, auth, budget, chunking, drafting, evaluation, fidelity, generation, gold, ingestion, ops, release, sealed, service, store
+from . import answers, auth, budget, chunking, drafting, evaluation, fidelity, gold, ingestion, ops, release, sealed, service, store
 from .contracts import Principal
 from .settings import DEFAULT_RATES, RATE_VERSION, REPO_ROOT, load_settings
 
@@ -278,7 +278,7 @@ def cmd_load_check(args, settings) -> int:
 
 def cmd_reconcile(args, settings) -> int:
     record = json.loads(Path(args.file).read_text(encoding="utf-8"))
-    res = service.Resources(settings)
+    res = service.Resources(settings, dispatch=False)  # ledger only: runs beside the serving app
     try:
         _print(asdict(service.reconcile(res, auth.OWNER_CLI, record)))
     finally:
@@ -287,7 +287,7 @@ def cmd_reconcile(args, settings) -> int:
 
 
 def cmd_unresolved(args, settings) -> int:
-    res = service.Resources(settings)
+    res = service.Resources(settings, dispatch=False)  # ledger only: runs beside the serving app
     try:
         _print(service.unresolved_attempts(res, auth.OWNER_CLI))
     finally:
@@ -298,7 +298,7 @@ def cmd_unresolved(args, settings) -> int:
 def _ledger_owner(args, settings):
     """Ledger-only owner actions never dispatch, so they run beside the serving app without claiming its gateway
     lock; the typed actor is recorded in the audit log as the UI used to record the visitor's name."""
-    res = service.Resources(settings, transport=generation.FakeTransport())
+    res = service.Resources(settings, dispatch=False)
     return res, Principal(args.actor, auth.OWNER_CLI.capabilities)
 
 
@@ -603,7 +603,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("validate-gold", help="dev-pilot (phase 2 rules) or the gold-2 splits dev / test")
     s.add_argument("--dataset", required=True)
     s = sub.add_parser("freeze-dataset", help="validate and freeze a gold split: dataset, review log, family map")
-    s.add_argument("--dataset", required=True, choices=["dev", "test"])
+    s.add_argument("--dataset", required=True, choices=["dev", "test", "corpus"])
     s.add_argument("--actor", required=True)
     s.add_argument("--reason", required=True)
     s = sub.add_parser("plan-run", help="estimate an answer evaluation before anything is sent (no provider call)")
@@ -751,14 +751,19 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "restore-check":
             # Configuration only: recovery opens the backup and isolated target, never the lost source ledger.
-            return cmd_restore_check(args, load_settings(database_backend="sqlite", provider="fake"))
-        settings = load_settings(database_backend="sqlite", provider="fake") if \
-            args.command in ("check", "load-check") else load_settings()
+            return cmd_restore_check(args, load_settings(provider="fake", database_dsn_env="RFP_RESTORE_DATABASE_DSN"))
+        if args.command in ("check", "load-check"):
+            # The automated checks build their own isolated test databases, never touching the live one; by
+            # default on the local server tools/start-postgresql.ps1 runs.
+            from tests.fixtures import server_dsn
+
+            os.environ.setdefault("RFP_POSTGRES_TEST_DSN", server_dsn())
+            return COMMANDS[args.command](args, load_settings(provider="fake", database_dsn_env="RFP_POSTGRES_TEST_DSN"))
+        settings = load_settings()
         with store.database_lifecycle(settings.db_path):
-            if args.command not in ("init", "check", "load-check"):
-                if settings.database_backend == "postgresql":
-                    from .postgres import require_imported_database
-                    require_imported_database(settings.db_path)
+            if args.command != "init":
+                from .postgres import require_imported_database
+                require_imported_database(settings.db_path)
                 store.init_schema(settings.db_path)
             return COMMANDS[args.command](args, settings)
     except store.DATABASE_ERRORS as exc:

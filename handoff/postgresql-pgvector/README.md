@@ -1,5 +1,292 @@
 # PostgreSQL and pgvector migration handover
 
+## PostgreSQL-only operation (2026-10-04)
+
+BidMate now runs only on PostgreSQL 18.6 + pgvector 0.8.6 (database `bidmate_app`), with `text-embedding-3-large` at a fixed 1,536 dimensions. This was spec `cutover-postgresql-remove-sqlite` rev 1. The application records, billing ledger, keyword and vector retrieval sets all live there. No code path reads or writes SQLite: `database_backend`, the SQLite backup format and rollback path, the NumPy dense-matrix serving path and the importer `rfp_assistant.migration` were deleted after the final import validated and the owner confirmed it. Everything after this section is the pre-cutover history; its SQLite commands, `rfp_assistant.migration` and `config.corpus-before-cutover.example.json` no longer exist.
+
+Operate it as follows:
+
+```powershell
+./tools/start-postgresql.ps1                       # container with init: true, so the postmaster is not PID 1
+$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.example.json).Path
+$env:RFP_DATABASE_DSN = "postgresql://bidmate:<password>@127.0.0.1:55432/bidmate_app"   # password from .runtime/postgresql.env
+python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
+```
+
+Startup refuses, with a message, a missing `RFP_DATABASE_DSN`, an unreachable server and a database without a persisted, passing import validation. There is no fallback. Tests create an isolated database per run from the same server (`RFP_POSTGRES_TEST_DSN`, defaulting to the local server).
+
+The container crashed three times during the cutover with "untracked child process exited with exit code 2". The cause was the postmaster running as PID 1 and reaping orphaned healthcheck processes. `compose.postgresql.yaml` now sets `init: true` and uses an exec-form `pg_isready` healthcheck, and the database was verified intact after each recovery.
+
+### Final import
+
+The final import ran with the UI and all writes stopped. A consistent snapshot of the live SQLite database (SHA256 `ca299be9…`) was imported into `bidmate_app`, and `python -m rfp_assistant.migration validate` passed:
+
+- 27 tables and 674,049 records, matching the source.
+- Every referenced artifact hash verified, with 0 inaccessible.
+- Historical attempts unchanged.
+- Spent total unchanged.
+- Zero pending or unknown billing.
+
+The private reports are in `.runtime/postgresql-migration/final/` (`plan-output.json`, `import-output.json`, `validation.json`).
+
+### Vector parity and keyword index
+
+All 18,983 active chunk vectors are in pgvector (1,536 dimensions, set `p8d1aa8594d18b47`). They are byte-identical to the verified ready set, with per-row checksums matching (`final/vector-parity.json`). Keyword index `29f261abafeb1f8c` passes `retrieval.index_compatibility` and is active, so `index_outdated` is cleared.
+
+### HNSW against exact search
+
+`python tools/check_vector_search.py --out <RFP_DATA_DIR>/vector-search` builds an HNSW index on the 1,536 vectors. It then compares the HNSW top 20 with the exact top 20 for every frozen pilot (dev, 55 questions) and whole-corpus (33 needles plus the pilot) passage question, on its own scope and over all documents. Nothing in this check is paid.
+
+Mean recall@20 by `hnsw.ef_search`:
+
+| ef_search | dev scoped | dev unscoped | corpus scoped | corpus unscoped |
+| --- | --- | --- | --- | --- |
+| 40 | 0.8127 | 0.9355 | 0.7924 | 0.9515 |
+| 100 | 0.8536 | 0.9545 | 0.8379 | 0.9682 |
+| 200 | 0.9045 | 0.9891 | 0.9152 | 0.9939 |
+| 400 | 0.9473 | 0.9982 | 0.9636 | 1.0 |
+
+No value reaches 0.99 in every group. Scoped queries filter the HNSW candidates after the graph search, so the needle passage can drop out. Exact search therefore stays the serving path (`dense_search: "exact"`), and the HNSW index is kept only for measurement.
+
+Warm latency in ms, p50 / p95:
+
+| Mode | Clients | dev scoped | dev unscoped |
+| --- | --- | --- | --- |
+| Exact | 1 | 3.7 / 6.3 | 183 / 227 |
+| Exact | 6 | 8.3 / 18.4 | 238 / 286 |
+| HNSW | 1 | 17.3 / 46 | 39.5 / 48.6 |
+| HNSW | 6 | 24.9 / 71.4 | 101 / 148 |
+
+EXPLAIN ANALYZE results:
+
+- Exact, scoped: 1.7 ms (top-N heapsort over the scope rows).
+- Exact, unscoped: 69.6 ms (sequential scan).
+- HNSW, scoped: 34.7 ms.
+- HNSW, unscoped: 4.2 ms (index scan on `embedding_payloads_hnsw_1536`).
+
+Exact unscoped search costs roughly 0.2 s per All documents question, which is small next to generation.
+
+### Fusion gate
+
+`python tools/check_large_quality.py --out <RFP_DATA_DIR>/fusion-gate/final-2 --run --max-cost-usd 0.05 --variant …` compares keyword-only K1 with seven fusion settings on two populations:
+
+- The frozen 55-question pilot (dataset `a3b4d5cc…`) on its own scopes.
+- The 88-question whole-corpus set: the pilot unscoped plus 33 needles.
+
+The selected setting is `keyword_first:60:1.0:6`. The BM25 top 6 keep their order, then weighted RRF (k 60, dense weight 1.0) fills the remaining slots. Evidence limits are unchanged.
+
+| Population | Setting | nDCG@5 | Complete support | New critical failures vs K1 |
+| --- | --- | --- | --- | --- |
+| Pilot, scoped | K1 | 0.9405 (n=48 graded) | 53/55 | — |
+| Pilot, scoped | keyword_first:60:1.0:6 | 0.9405 | 53/55 | 0 |
+| Whole corpus | K1 | 0.7832 (n=88) | 71/88 | — |
+| Whole corpus | keyword_first:60:1.0:6 | 0.7832 | 71/88 | 0 |
+
+Plain RRF (`rrf:60:1.0`, `rrf:60:0.25`) still loses `refresh50-b-training-handover` and `refresh50-eg-input-error`: dense ranks push K1's packed rows out of the top 5. `keyword_first` with a head of 3 also fails. The gate's query embeddings were 33 settled attempts costing 466 micro-USD. That setting first served through run `H-0f2bf03e9d`. It was superseded after the owner's acceptance round below.
+
+### Owner acceptance round: routing, overview questions and evidence depth
+
+The owner asked an All documents question, "한영대학교의 사업에 대해 알려줘. 어떤 사업을 하는거야?". The answer said the project scope could not be explained. Two causes were found:
+
+- Routing added a wrong document. 서영대학교 shares only the generic title words 대학교 and 사업 with the question. Its IDF weight was 4.457, which passed the cutoff of half of 한영대학교's 7.824. `route_corpus` now takes documents best first and weighs each only on terms no earlier document explains. Two named projects still both route, and editions with the same name are kept.
+- Overview questions matched filler words. Once the documents are known, the restated project name is dropped as non-discriminating, and BM25 then matched words like 알리 and 대하 (a login-security table came first). Now, when a question names its documents and no other content noun remains, evidence is ranked by dense similarity within the named documents. That limitation is recorded as `name_only_question:dense_within_named_documents`. Title vocabulary that names a project (사업, 구축, 시스템) is not counted as content. A question with a fact term ("…의 하자보수 기간은?") keeps the keyword path.
+
+The owner also set 50 candidates per channel and after fusion, asked to measure 10, 15, 20, 25 and 30 evidence units, and asked for the local reranker (`BAAI/bge-reranker-v2-m3`, revision `953dc6f6…`, CUDA fp32) to be measured too. The command was:
+
+```powershell
+python tools/check_large_quality.py --out <RFP_DATA_DIR>/fusion-gate/depth50-units --run --max-cost-usd 0.05 --variant keyword_first:60:1.0:6 --depth 50 --units 10,15,20,25,30 --rerank-revision 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+```
+
+Each setting is gated against K1 at the same depth and evidence limits. The token budget is 400 tokens per unit, plus 800 for the first unit. Among passing settings, the most complete support wins, then nDCG@5, then fewer units. No query embedding was paid; all vectors were cached.
+
+| Setting | Gate | Pilot scoped (nDCG@5, complete) | Whole corpus (nDCG@5, complete) | Failing reason |
+| --- | --- | --- | --- | --- |
+| Hybrid, 10 units | pass (selected) | 0.9405, 55/55 (K1 54/55) | 0.8195, 73/88 (K1 72/88) | — |
+| Hybrid, 15 units | pass | 0.9405, 55/55 (K1 55/55) | 0.8195, 73/88 (K1 72/88) | same support, more tokens |
+| Hybrid, 20, 25 and 30 units | fail | 0.9405, 55/55 | 0.8195, 73/88 (K1 75/88) | loses `refresh50-a-stabilization` and `refresh50-ad-migration-design` |
+| Hybrid + reranker, 10 and 15 units | fail | 0.8948, 50/55 and 52/55 | 0.7656, 70/88 and 72/88 | three to five new critical failures, including `refresh50-eg-input-error` and `refresh50-dh-linked-data` |
+| Hybrid + reranker, 20 and 25 units | fail | 0.8948, 54/55 and 55/55 | 0.7656, 74/88 | new critical `refresh50-dh-linked-data` and `refresh50-a-stabilization` |
+| Hybrid + reranker, 30 units | fail | 0.8948, 55/55 | 0.7656, 76/88 (K1 75/88) | nDCG@5 below K1 |
+
+The reranker reorders the whole candidate list, including the BM25 head that `keyword_first` protects, and loses rows K1 keeps. It is not served. More than 10 evidence units help keyword-only retrieval more than hybrid, which fills later slots with dense rows.
+
+`evaluate-retrieval --dataset dev --runs K1,H` recorded the selected limits as run `H-af9967ca81`. It reached packed complete 1.0 (55/55) with 0 critical failures, against K1-0351093f32's 54/55 and 1. The run was activated with a decision file. The top 5 equals `H-0f2bf03e9d`'s on all 55 rows, so the earlier pool review of the same 83 passages carries over. Serving now uses keyword_first:60:1.0:6, 50/50 candidates, 10 evidence units (4,000/4,800 tokens) and exact pgvector search. In review round 3 the same limits were re-recorded under the corrected routing rule as `H-0fffb2a6ec`, which now serves.
+
+### Whole-corpus needle set
+
+The owner's point was that selecting one or two documents first proves nothing. To test retrieval without that help, a needle set was built:
+
+- gpt-6-luna drafted 33 needle questions (10 drafting attempts, $0.0132).
+- Each was independently reviewed against the original page before freezing (`needles/corpus-freeze.json`).
+- Each targets one passage over 22 sources: 27 on middle pages and 6 on late pages.
+- The questions use exact identifiers, numbers and table cells.
+
+Over all 18,983 chunks with the serving setting (first as run `H-af9967ca81`; the same result held under the round-3 routing rule and the serving run `H-0fffb2a6ec`):
+
+| Measure | Hits | Rate | Wilson 95% |
+| --- | --- | --- | --- |
+| Target chunk in top 5 | 32/33 | 0.9697 | [0.8468, 0.9946] |
+| Target chunk in top 10 | 32/33 | 0.9697 | [0.8468, 0.9946] |
+
+K1 misses the same needle, needle-24, a table-cell question. Before the routing fix both systems also missed needle-09: 31/33, 0.9394, Wilson [0.8039, 0.9832].
+
+### Paid end-to-end check
+
+Paid admission was enabled on PostgreSQL only. The same 26 questions ran through the app on `H-af9967ca81`, the serving run at the time (repeated later on `H-0fffb2a6ec`, below; private results in `.runtime/postgresql-migration/e2e-depth50/`):
+
+| Mode | Requests | Answered |
+| --- | --- | --- |
+| All documents | 12 | 12 |
+| Two-document comparison | 9 | 8 answered, plus `refresh50-ah-ip` returning `conflicting_evidence` as expected |
+| Single document | 5 | 5 |
+
+- Every request reached its expected status.
+- 24 of 26 cite the expected passages.
+- Listed citation failures:
+  - `refresh50-ad-migration-design` (comparison): 4 of 13 required evidence groups retrieved and cited.
+  - `cutover-late-06` (single): both groups retrieved, neither cited.
+- All 26 attempts were reserved, dispatched and settled in the PostgreSQL ledger; the query vectors were cached.
+- The budget meter and `budget-status` agree: spent $1.820089, ledger revision 1409, pending 0, unknown 0.
+
+The first run on `H-0f2bf03e9d` (6 evidence units, 20 candidates) answered 21 of 26 and cited correctly in 23. Its failures were `refresh50-ad-migration-design` (output truncated), `refresh50-eg-input-error` and `pair-warranty`. All 28 of its attempts settled.
+
+A headless browser check against `bidmate_app` (private screenshots in `.runtime/browser-check-cutover/`) covered four screens:
+
+- All documents: one question, answered from PSR-002 of the 벤처기업협회 RFP, settled at $0.000683.
+- Two-document comparison: QUR-006 against QUR-002, answered with citations from both documents, settled at $0.000939.
+- Verification: loads.
+- Settings: shows the $10 cap and spent amount.
+
+The check found that the Verification fidelity overview still used a SQLite-only ungrouped `GROUP BY`. It is fixed and covered by `tests.test_api`.
+
+### Owner acceptance round 2: comparison claims
+
+The All documents answer was accepted. The owner's comparison, "한영대학교와 을지 대학교의 제안서에서, 어떤 차이가 있어?", failed with `claim_without_evidence`. The model stated each side's absence twice: once as an uncited `inference` claim, and again as a `missing_fields` entry for the same document. The owner chose to fix both the prompt and the validation:
+
+- The prompt is now `grounded-answer-6`. Every claim, including an inference, cites at least one evidence ID of its own document. What the evidence does not show goes only in `missing_fields`.
+- `validate_answer` dropped an uncited inference when its document already had a `missing_fields` entry. Review rounds 1 to 3 showed that this rule, and the text-matching rule that followed it, also dropped unrelated claims. The current rule (a declared `absence` kind whose text is exactly a listed field, prompt `grounded-answer-9`) is under "Review rounds 4 and 5" below.
+
+The same comparison then answered with 9 cited claims ($0.001541). The 26 paid questions ran again under prompt 6 (private results in `.runtime/postgresql-migration/e2e-prompt6/`):
+
+- 25 of 26 reached their expected status, and 23 of 26 cite the expected passages.
+- All documents: 12/12 answered. Single document: 5/5 answered.
+- Comparison: 6 answered, plus `refresh50-ah-ip` returning `conflicting_evidence` as expected.
+- Listed failures:
+  - `refresh50-ad-migration-design` returned `insufficient_evidence` after retrieving 4 of 13 groups.
+  - `refresh50-eg-input-error` failed with `evidence_scope_mismatch`. Three repeats all answered, so that was model variance.
+  - `cutover-late-06` retrieved both groups and cited neither, as before.
+- All 26 attempts settled. The meter and `budget-status` agreed at revision 1499 with pending and unknown at 0.
+
+`refresh50-ad-migration-design` then hit `output_truncated` in three repeats out of three. To test whether prompt 6 caused this, the same three repeats ran with the prompt-5 text, and all three truncated as well. Its 13 required groups exceed the 2,000-token answer limit whichever prompt is used, so it stays a listed failure. Raising the output limit is outside this PR.
+
+In the third round, the owner asked one All documents question ($0.001090) and one two-document comparison ($0.001572) in the running app. They confirmed both answers and their costs.
+
+New paid work in this PR totals $0.160100 against the $1.00 ceiling, which `--max-cost-usd` and the envelopes enforce:
+
+| Item | Cost (USD) |
+| --- | --- |
+| Needle drafting | 0.013226 |
+| Evaluation query embeddings | 0.001158 |
+| Interactive embeddings | 0.000032 |
+| First paid end-to-end answers | 0.019744 |
+| Browser check and the owner's first acceptance question | 0.002386 |
+| Paid end-to-end rerun on `H-af9967ca81` | 0.026166 |
+| The owner's second acceptance round and the comparison retry | 0.004095 |
+| Paid end-to-end rerun under prompt 6 | 0.025906 |
+| Repeats under prompt 6 and the prompt-5 A/B | 0.008887 |
+| The owner's third acceptance round | 0.002662 |
+| Review round 3: the owner's comparison and the 26 questions under prompt 7 | 0.028969 |
+| Review rounds 4–5: the owner's comparison under prompts 8 and 9, and the 26 questions under prompt 9 | 0.026869 |
+
+The ledger after this work reads $1.917477 spent, revision 1712, with 0 open, pending or unknown attempts.
+
+### Archive and rollback
+
+Cold archives are kept under `.runtime/archive/` (private, ignored, referenced by no code; see `ARCHIVE.json`):
+
+- `sqlite-final-2026-10-04/`: the final `.sqlite3` snapshot (`ca299be9…`) and the former live file (`ceead767…`).
+- `postgresql-2026-10-04-r5/`: the rollback dump. It is a `python -m rfp_assistant.cli backup` custom-format dump (`database.dump`, `9ef1696d…`) with its manifest, taken with the app stopped after the last paid write (the prompt-9 rerun in review round 5). Its ledger watermark is revision 1712: spent 1,917,477 micro-USD, all 569 attempts settled, 182 requests, pending and unknown 0. That equals the final ledger.
+- `postgresql-2026-10-04-r3/` (`c909b51c…`, revision 1628), `postgresql-2026-10-04-final/` (`f33f74b1…`, revision 1547) and `postgresql-2026-10-04/` (`dc71fe72…`, revision 1319): earlier dumps. All predate later paid writes, so they are history only and must not be restored.
+
+Rollback is a restore of the newest dump. Create an empty database, set `RFP_RESTORE_DATABASE_DSN` to it and run `python -m rfp_assistant.cli restore-check --backup <abs>/postgresql-2026-10-04-r5/manifest.json`. It passed all 62 checks into the empty `bidmate_restore_r5`, leaving paid admission disabled and all 569 attempts settled.
+
+Before turning paid admission on, compare the dump's watermark with the ledger being replaced. If that ledger is past revision 1712, every later request, attempt and adjustment must be reconciled into the restored database first (runbook §12). Restoring without that step loses settled spending. Only then point `RFP_DATABASE_DSN` at the restored database and run `paid on`. After any new paid write, take a new dump and restore-check it. The rollback dump is always the newest one that has passed.
+
+### Review rounds 1 and 2 (PR #13)
+
+Each finding was reproduced with a failing test before it was fixed:
+
+- F1: the rollback dump predated the final ledger. It was replaced by `postgresql-2026-10-04-final`, which the paid reruns of rounds 3 and 5 superseded with `postgresql-2026-10-04-r3` and then `postgresql-2026-10-04-r5`, as described above. The watermark rule is now in the README, in the runbook's PostgreSQL section and §12, and in `ARCHIVE.json`.
+- F2: an uncited inference was dropped whenever its document had any missing field. The round-2 repair dropped it only when it named a listed missing field, but round 3 showed that this still dropped claims that assert something else. Round 3 replaced it (below).
+- F3: ledger-only commands took the gateway lock because they passed a `FakeTransport`. `Resources(dispatch=False)` opens no provider client and takes no owner. It covers `paid`, `settle`, `adjust` and `audit`, plus two more commands under the same documented rule: `unresolved` and `reconcile`. It also covers the estimate-only `PinnedResources` (no transport), which took the lock the same way. `tests.test_service` runs the commands and the estimate beside a foreign gateway owner.
+- F4: a borrowed gateway owner died with its creator. `GatewayOwner` now counts its users (`postgres.borrow_owner`), and the advisory lock is released with the last one. A test closes the first resource and answers through the borrower.
+
+### Review round 3 (PR #13)
+
+Both findings were reproduced with a failing test first:
+
+- F2: an uncited inference such as "B 문서의 예산은 충분하다" was dropped because it named B's missing field 예산. Text cannot show that a claim asserts an absence, so the model now declares it. Prompt `grounded-answer-7` adds a claim kind `absence` for a claim that only repeats a `missing_fields` entry of its own document.
+  - `validate_answer` drops such a claim, which is never shown. It fails the answer with `absence_without_missing_field` when that document lists no missing field.
+  - Every uncited `source_fact` or `inference` fails with `claim_without_evidence`, whatever its text says (`tests.test_generation`).
+  - `validate_answer` is the only path that parses model output, so the `absence` kind never reaches the API, scoring or screens.
+- F5: a question made only of generic title words ("대학교 사업") routed All documents retrieval to 서영대학교, the one title containing both. A document is now routed only when the question restates one of its title terms found in fewer than `ROUTE_MAX` (4) titles.
+  - In the live corpus that leaves 대학교, 교육 and 학사 (4 titles each) generic, while 국민연금공단 (2) and 한국수자원공사 (3) still route.
+  - The rule is versioned (`ROUTE_RULE = greedy-rare-term-1`) in frozen run configurations, so runs recorded under the old rule are not reused.
+  - Over the 91 evaluation and acceptance questions, routing changed for 8 pilot questions (fewer documents), 1 pilot question (now routed) and the generic probe (no longer routed). It did not change for any needle or either owner question.
+
+Retrieval was measured again after the routing change. `tools/check_large_quality.py --variant keyword_first:60:1.0:6 --depth 50 --units 10,15` passed and kept 10 units:
+
+| Set | Hybrid | K1 |
+| --- | --- | --- |
+| Pilot scoped | nDCG@5 0.9405, 55/55 | 0.9405, 54/55 |
+| Whole corpus (88 questions) | nDCG@5 0.8081, 73/88 | 0.8081, 71/88 |
+| Needles, top 5 and top 10 | 32/33 (Wilson [0.8468, 0.9946]) | 32/33 |
+
+New critical failures against K1: zero. `evaluate-retrieval --dataset dev --runs K1,H` recorded the serving limits as run `H-0fffb2a6ec`, with packed complete 55/55 and 0 critical failures (K1-99fae07108: 54/55 and 1). Its top 5 equals `H-af9967ca81`'s on all 55 rows, so the review of the same 83 passages carries over. It was activated with a decision file and replaces `H-af9967ca81` in serving.
+
+Answers were measured again under prompt 7. The owner's comparison answered with 9 cited claims ($0.001620). The 26 paid questions ran through the app (private results in `.runtime/postgresql-migration/e2e-prompt7/`):
+
+- 24 of 26 cite the expected passages: All documents 12/12, single document 5/5, comparisons 6 answered plus `refresh50-ah-ip` with the expected `conflicting_evidence`.
+- Listed failures:
+  - `refresh50-ad-migration-design`: `output_truncated`, as before; its 13 groups exceed the 2,000-token answer limit.
+  - `refresh50-eg-input-error`: `evidence_scope_mismatch`, the model variance seen under prompt 6 (three of three repeats answered then).
+- No answer failed with `claim_without_evidence` or `absence_without_missing_field`.
+- All 26 attempts settled. The meter and `budget-status` agree at revision 1628 with pending and unknown at 0.
+
+A new rollback dump was then taken after this last paid write and restore-checked (see "Archive and rollback").
+
+### Review rounds 4 and 5 (PR #13)
+
+Each finding was reproduced with a failing test first:
+
+- F2 (round 4): an assertion labelled `absence` was dropped whenever its document listed any missing field. An `absence` claim is now dropped only when its whitespace-normalized text equals a `missing_fields` field of its own document. Any other `absence` claim fails with `absence_not_listed`, and every uncited `source_fact` or `inference` still fails with `claim_without_evidence` (`tests.test_generation`). Prompt `grounded-answer-8` stated this.
+- F6 (round 4): startup accepted any allowed embedding identity. `load_settings` now refuses everything but `text-embedding-3-large` at 1,536 dimensions, and activation refuses a run recorded under another identity.
+- F7 (round 5): only the pgvector version was checked. Every connection now refuses a server other than PostgreSQL 18.6 (`server_version_num` 180006): the pool's startup probe and every later pooled connection, the paid gateway's own connection and `restore-check`'s connection to the restore target. Two diagnostic tools open read-only connections of their own, `tools/phase2_handoff.py` and `tools/verify.py`'s `db_rows`. They start nothing and write nothing, so they are left unchecked.
+- F8 (round 5): `run_errors` did not compare the recorded corpus-routing rule. It now refuses a run whose `limits.corpus_route` differs from the current share, maximum and `ROUTE_RULE`. Activation, answer evaluation, sealed runs and the release status all call `run_errors`, so the superseded `H-af9967ca81` is refused everywhere while the serving `H-0fffb2a6ec` passes. Round 6 showed that an already activated run was still served after a routing change; see below.
+- F8 (round 6): after a routing change and a restart without re-activation, `Resources.serving()` returned the persisted run while retrieval applied the new rule. Every reader of the activation now goes through `service.active_serving`: requests (`Resources.serving()`) and `answers.plan_latency`, which read the stored run directly before. A run whose recorded `limits.corpus_route` differs from `retrieval.corpus_route_record()` is not served. Requests get the unselected keyword default with `fallback_reason` `activated_corpus_route_requires_rerun`, and every retrieval lists `activated_run_stale:corpus_route` until a rerun is activated. `run_errors` and the frozen configuration use the same `corpus_route_record()`. The other readers were already guarded or only report: answer evaluation and the sealed freeze call `run_errors`, `activate-run` keeps history, and `build-keyword` only tests that an activation exists. Round 7 showed that the reports still named the stored activation as serving; see below. The fusion-gate tool keeps working, because it passes its own mode and limits.
+- F8 (round 7): the phase-2, phase-3 and release reports printed the stored `active_run` as "serving", so after a routing change they named the stale hybrid run while requests served the keyword default. All three now print `service.describe_serving(service.active_serving())`. That reads, for example, "keyword default (kiwi_bm25); activated run `H-…` not served: activated_corpus_route_requires_rerun". The phase-2 report lists the stored activation separately as "activated", and both manifests record `serving` beside `active_run`. The other places the same rule applies to:
+  - The release report's latency sample now has to match the served run, not the stored one.
+  - The release decision counts an activation that is not served as stale evidence, so it cannot read "ready".
+  - Its served retrieval metrics already skipped a run that `run_errors` blocks.
+  - The development answer and sealed evidence must match the current package source hash, which any real routing change alters.
+  - The phase-2 selection gate already called `run_errors`.
+  - The API and verification status read `Resources.serving()`.
+  - `tools/phase2_handoff.py` exports the raw `active_run` setting under that name, as a database snapshot, without claiming it serves.
+- F9 (round 5): the README named `H-af9967ca81` as the serving run. It now names `H-0fffb2a6ec`, as do the overview and this handover.
+
+Under prompt 8 the owner's comparison failed with `absence_not_listed`. The model wrote "을지대학교 발췌에는 제안서의 제출 부수나 제출 방법에 관한 내용이 확인되지 않습니다" as an `absence` claim while listing no missing field for 을지대학교. Validation was right to refuse it, so the prompt changed instead. `grounded-answer-9` says an absence goes only to a `missing_fields` entry, never to a claim, and that an absence without such an entry fails the whole answer. The same comparison then answered with 8 cited claims ($0.001506), listing 을지대학교's submission count and method as missing.
+
+The 26 paid questions then ran through the app under prompt 9 (private results in `.runtime/postgresql-migration/e2e-prompt9/`):
+
+- 23 of 26 cite the expected passages: All documents 12/12, single document 5/5, comparisons 6 answered plus `refresh50-ah-ip` with the expected `conflicting_evidence`.
+- Listed failures:
+  - `refresh50-ad-migration-design`: `output_truncated`, as before; its 13 groups exceed the 2,000-token answer limit.
+  - `refresh50-eg-input-error` and `refresh50-dh-linked-data`: `evidence_scope_mismatch`. In each, a comparison inference cited the other document's evidence beside its own, which the per-document citation rule refuses. That rule predates prompt 9, and `eg` showed the same variance under prompts 6 and 7.
+- No answer failed with `claim_without_evidence` or `absence_not_listed`.
+- All 26 attempts settled ($0.023721). The meter and `budget-status` agree at revision 1712 with pending and unknown at 0.
+
+A new rollback dump was then taken after this last paid write and restore-checked (see "Archive and rollback").
+
 ## Status and requirements
 
 PostgreSQL persistence replacement is the first priority, as requested on 2026-10-03. The complete live SQLite snapshot has been rehearsed on an isolated, paid-disabled PostgreSQL target. The approved large/1,536 corpus build has now completed with real provider calls, as recorded below. Production cutover and reduced-large embedding acceptance remain incomplete. This handover records implemented commands and prerequisites; the owner approved paid work and a $10 cap on 2026-10-03, while production activation still requires candidate acceptance.

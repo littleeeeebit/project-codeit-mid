@@ -1,4 +1,4 @@
-"""Real PostgreSQL checks; opt in with RFP_POSTGRES_TEST_DSN pointing at an isolated database."""
+"""Real PostgreSQL checks on an isolated database per test (tests/fixtures.py)."""
 
 from __future__ import annotations
 
@@ -7,106 +7,75 @@ import hashlib
 import os
 import tempfile
 import unittest
-import uuid
 from unittest import mock
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
 import psycopg
-from psycopg import sql
-from psycopg.conninfo import make_conninfo
 
-from rfp_assistant import budget, cli, dense, generation, migration, postgres, service, store, vector_store
+from rfp_assistant import budget, cli, dense, generation, postgres, postgres_backup, service, store, vector_store
+from rfp_assistant.settings import Settings
 from tests import fixtures
 
 
-@unittest.skipUnless(os.environ.get("RFP_POSTGRES_TEST_DSN"), "isolated PostgreSQL DSN is required")
 class PostgreSQLTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        self.env = fixtures.make_env(self.root)
-        self.schema = "pgtest_" + uuid.uuid4().hex
-        self.admin = psycopg.connect(os.environ["RFP_POSTGRES_TEST_DSN"], autocommit=True)
-        if self.admin.execute("SELECT 1 FROM pg_tables WHERE schemaname='public' LIMIT 1").fetchone():
-            self.admin.close()
-            self.tmp.cleanup()
-            raise RuntimeError("integration checks require an isolated database with no public application tables")
-        self.admin.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(self.schema)))
-        self.key = "RFP_TEST_" + uuid.uuid4().hex
-        os.environ[self.key] = make_conninfo(os.environ["RFP_POSTGRES_TEST_DSN"],
-                                            options=f"-csearch_path={self.schema},public")
-        self.target = postgres.Target(self.key, max_connections=4)
-        self.settings = self.env.settings.with_(database_backend="postgresql", database_dsn_env=self.key,
-                                                database_pool_max=4)
-        self.plan = self.root / "plan.json"
-        migration.plan(self.env.settings.db_path, self.plan)
+        self.env = fixtures.make_env(self.root, paid=False)
+        self.settings = self.env.settings
+        self.target = self.settings.db_path
+        self.admin = psycopg.connect(fixtures.server_dsn(), autocommit=True)
         self.owner = None
-        self.lease = store.database_lifecycle(self.target)
-        self.lease.__enter__()
 
     def tearDown(self):
         if self.owner:
             self.owner.release()
-        self.lease.__exit__(None, None, None)
-        self.admin.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(self.schema)))
         self.admin.close()
-        os.environ.pop(self.key, None)
         self.tmp.cleanup()
 
-    def imported(self):
-        result = migration.import_snapshot(self.plan, self.target)
-        if result["status"] == "complete":
-            self.assertTrue(migration.validate(self.plan, self.target)["pass"])
-        return result
+    def validate_with_artifacts(self, passed=True):
+        """What the final import's validation recorded: the references every startup re-checks."""
+        with store.open_db(self.target) as conn, store.tx(conn):
+            references = postgres_backup.references(conn)
+            postgres.record_validation(conn, "fixture", references, passed)
+        return references
 
-    def test_completed_import_needs_validation_and_index_payload_hashes(self):
-        migration.import_snapshot(self.plan, self.target)
-        with self.assertRaisesRegex(RuntimeError, "validation"):
-            postgres.require_imported_database(self.target)
-        changed = self.root / "omitted-artifacts.json"
-        plan = migration.load_plan(self.plan)
-        plan["references"] = []
-        store.write_text_atomic(changed, json.dumps(plan))
-        with self.assertRaisesRegex(ValueError, "unchanged plan"):
-            migration.validate(changed, self.target)
-        self.assertTrue(migration.validate(self.plan, self.target)["pass"])
-        reference = next(r for r in migration.load_plan(self.plan)["references"] if r["kind"] == "index")
+    def test_startup_requires_the_validated_marker_and_unchanged_index_payloads(self):
+        postgres.require_imported_database(self.target)
+        reference = next(r for r in self.validate_with_artifacts() if r["kind"] == "index")
         manifest = Path(reference["path"])
         payload = manifest.parent / next(iter(json.loads(manifest.read_text(encoding="utf-8"))["files"]))
         original = payload.read_bytes()
         try:
             payload.write_bytes(original + b"corrupt")
-            self.assertFalse(migration.validate(self.plan, self.target)["pass"])
-            with self.assertRaisesRegex(RuntimeError, "validation"):
+            with self.assertRaisesRegex(RuntimeError, "artifacts"):
                 postgres.require_imported_database(self.target)
         finally:
             payload.write_bytes(original)
+        postgres.require_imported_database(self.target)
 
-    def test_failed_artifact_validation_blocks_completed_import_startup(self):
-        self.imported()
-        self.assertTrue(migration.validate(self.plan, self.target)["pass"])
-        artifact = Path(migration.load_plan(self.plan)["references"][0]["path"])
-        original = artifact.read_bytes()
-        try:
-            artifact.write_bytes(original + b"changed")
-            with self.assertRaisesRegex(RuntimeError, "artifact"):
-                postgres.require_imported_database(self.target)
-            with store.open_db(self.target) as conn:
-                conn.execute("UPDATE database_control SET paid_admission=true WHERE id=1")
-            artifact.unlink()
-            self.assertFalse(migration.validate(self.plan, self.target)["pass"])
-            with store.open_db(self.target) as conn:
-                self.assertFalse(conn.execute("SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0])
-                self.assertEqual(postgres.owner_guard(conn), "postgresql_recovery_or_validation")
-            with self.assertRaisesRegex(RuntimeError, "validation|artifact"):
-                postgres.require_imported_database(self.target)
-        finally:
-            artifact.write_bytes(original)
-        with self.assertRaisesRegex(RuntimeError, "validation"):
+    def test_failed_validation_closes_paid_admission_and_blocks_startup(self):
+        from datetime import date
+
+        from rfp_assistant.settings import DEFAULT_RATES
+
+        budget.configure(self.target, "owner", project_start=date(2026, 9, 30), project_end=date(2026, 10, 28),
+                         prior_use_micro=0, prior_use_evidence="test", rates=DEFAULT_RATES, rate_version="t",
+                         enable_paid=False)  # so only the validation can refuse paid admission below
+        self.validate_with_artifacts()
+        with store.open_db(self.target) as conn:
+            conn.execute("UPDATE database_control SET paid_admission=true WHERE id=1")
+        self.validate_with_artifacts(passed=False)
+        with store.open_db(self.target) as conn:
+            self.assertFalse(conn.execute("SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0])
+            self.assertEqual(postgres.owner_guard(conn), "postgresql_recovery_or_validation")
+        with self.assertRaisesRegex(RuntimeError, "no validated import"):
             postgres.require_imported_database(self.target)
-        self.assertTrue(migration.validate(self.plan, self.target)["pass"])
+        with self.assertRaisesRegex(budget.BudgetError, "validated import"):
+            budget.set_paid_enabled(self.target, "owner", True, "test")
+        self.validate_with_artifacts()
         postgres.require_imported_database(self.target)
 
     def allow_fake_paid(self):
@@ -124,38 +93,15 @@ class PostgreSQLTests(unittest.TestCase):
                               purpose="interactive", model=self.settings.generation_model, input_tokens=800,
                               max_output_tokens=0, count_method="test")
 
-    def test_snapshot_import_resume_repeat_preserves_all_records_and_rejects_changes(self):
-        first = migration.import_snapshot(self.plan, self.target, batch_size=1, max_batches=3)
-        self.assertEqual(first["status"], "checkpointed")
-        self.assertEqual(self.imported()["status"], "complete")
-        self.assertTrue(migration.validate(self.plan, self.target)["pass"])
-        self.assertEqual(self.imported()["status"], "already_complete")
-        with store.open_db(self.target) as conn:
-            conn.execute("INSERT INTO app_settings VALUES ('newer','do not overwrite')")
-        self.assertEqual(self.imported()["overwritten_rows"], 0)
-        with store.open_db(self.target) as conn:
-            self.assertEqual(store.get_app_setting(conn, "newer"), "do not overwrite")
-        changed = self.root / "changed.json"
-        manifest = json.loads(self.plan.read_text(encoding="utf-8"))
-        manifest["created_at"] = "changed"
-        store.write_text_atomic(changed, json.dumps(manifest))
-        with self.assertRaisesRegex(ValueError, "changed plan"):
-            migration.import_snapshot(changed, self.target)
-
-    def test_unrelated_target_is_rejected_and_rehearsal_cannot_dispatch(self):
-        with store.open_db(self.target) as conn:
-            conn.execute("CREATE TABLE unrelated (id bigint)")
-        with self.assertRaisesRegex(ValueError, "unrelated"):
-            self.imported()
-        with store.open_db(self.target) as conn:
-            conn.execute("DROP TABLE unrelated")
-        self.imported()
+    def test_closed_paid_admission_cannot_dispatch(self):
         self.owner = postgres.GatewayOwner(self.target)
-        with self.assertRaisesRegex(RuntimeError, "disabled for rehearsal"):
-            self.reserve(self.request("blocked"))
+        with store.open_db(self.target) as conn:  # the ledger flag on, PostgreSQL admission still closed
+            conn.execute("UPDATE budget_settings SET paid_enabled = 1")
+        self.assertEqual(self.reserve(self.request("blocked"))["reason"], "postgresql_maintenance")
+        with store.open_db(self.target) as conn:
+            self.assertEqual(conn.execute("SELECT count(*) FROM attempts").fetchone()[0], 0)
 
     def test_independent_connections_cap_duplicate_dispatch_and_exactly_once_settlement(self):
-        self.imported()
         self.allow_fake_paid()
         requests = [self.request(str(i)) for i in range(12)]
         with ThreadPoolExecutor(max_workers=6) as executor:
@@ -172,10 +118,8 @@ class PostgreSQLTests(unittest.TestCase):
         self.assertEqual(sorted(r["duplicate"] for r in results), [False, True])
         self.assertEqual(budget.snapshot(self.target).spent_micro_usd, 80)
         self.assertEqual(budget.snapshot(self.target).pending_micro_usd, 0)
-        self.assertEqual(budget.snapshot(self.env.settings.db_path).spent_micro_usd, 0)
 
     def test_owner_exclusion_loss_and_restart_preserve_unknown_billing(self):
-        self.imported()
         self.allow_fake_paid()
         with self.assertRaises(store.LockHeld):
             postgres.GatewayOwner(self.target)
@@ -215,25 +159,23 @@ class PostgreSQLTests(unittest.TestCase):
             conn.execute("CREATE INDEX reduced_ivf ON reduced_vectors USING ivfflat (v vector_cosine_ops)")
 
     def test_pool_is_bounded_shared_and_closed_with_last_resource_owner(self):
-        with postgres.lifecycle(self.target) as shared:
-            self.assertIs(shared, postgres._pools[self.target][0])
-            with shared.connection() as first, shared.connection() as second, shared.connection() as third, shared.connection() as fourth:
-                with self.assertRaises(postgres.PoolTimeout):
-                    with shared.connection(timeout=0.1):
-                        pass
-                self.assertEqual(len({connection.info.backend_pid for connection in (first, second, third, fourth)}), 4)
-        self.assertFalse(shared.closed)
-        self.lease.__exit__(None, None, None)
+        target = postgres.Target(self.target.dsn_env, max_connections=4)
+        with postgres.lifecycle(target) as shared:
+            with postgres.lifecycle(target) as again:
+                self.assertIs(again, shared)
+                self.assertIs(shared, postgres._pools[target][0])
+                with shared.connection() as first, shared.connection() as second, shared.connection() as third, shared.connection() as fourth:
+                    with self.assertRaises(postgres.PoolTimeout):
+                        with shared.connection(timeout=0.1):
+                            pass
+                    self.assertEqual(len({connection.info.backend_pid for connection in (first, second, third, fourth)}), 4)
+            self.assertFalse(shared.closed)
         self.assertTrue(shared.closed)
         with self.assertRaisesRegex(RuntimeError, "no resource owner"):
-            with store.open_db(self.target):
+            with store.open_db(target):
                 pass
-        # Re-enter the fixture's lease so tearDown owns and closes exactly one resource.
-        self.lease = store.database_lifecycle(self.target)
-        self.lease.__enter__()
 
     def test_failed_resource_initialization_releases_owner_even_if_transport_close_fails(self):
-        self.imported()
         def fail(resource, settings, transport, recover):
             resource._lock = postgres.GatewayOwner(settings.db_path)
             resource.transport = mock.Mock()
@@ -247,7 +189,6 @@ class PostgreSQLTests(unittest.TestCase):
         self.owner.check()
 
     def test_service_uses_postgresql_for_search_evidence_and_review_writes(self):
-        self.imported()
         res = service.Resources(self.settings, recover=True)
         try:
             projects = service.search_projects(res, self.env.consultant, {}, "하자보수")
@@ -275,25 +216,75 @@ class PostgreSQLTests(unittest.TestCase):
         finally:
             res.close()
 
-    def test_service_rejects_unimported_target_without_initializing_it(self):
-        with self.assertRaisesRegex(RuntimeError, "complete.*import"):
-            service.Resources(self.settings, recover=True)
-        with mock.patch.object(cli, "load_settings", return_value=self.settings):
+    def test_service_rejects_unvalidated_database_without_initializing_it(self):
+        empty = self.settings.with_(database_dsn_env=fixtures.database(ready=False))
+        with self.assertRaisesRegex(RuntimeError, "no validated import"):
+            service.Resources(empty, recover=True)
+        with mock.patch.object(cli, "load_settings", return_value=empty):
             self.assertEqual(cli.main(["budget-status"]), 1)
-        with store.open_db(self.target) as conn:
+        with store.open_db(empty.db_path) as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM pg_tables WHERE schemaname=current_schema()").fetchone()[0], 0)
-        self.imported()  # The refused startup must leave this target eligible for import.
-        with store.open_db(self.target) as conn, store.tx(conn, immediate=True):
+        store.init_schema(empty.db_path)
+        fixtures.mark_validated(empty.db_path)
+        with store.open_db(empty.db_path) as conn, store.tx(conn, immediate=True):
             conn.execute("UPDATE migration_import SET state='importing' WHERE id=1")
-        with self.assertRaisesRegex(RuntimeError, "complete.*import"):
-            service.Resources(self.settings)
-        with store.open_db(self.target) as conn, store.tx(conn, immediate=True):
+        with self.assertRaisesRegex(RuntimeError, "no validated import"):
+            service.Resources(empty)
+        with store.open_db(empty.db_path) as conn, store.tx(conn, immediate=True):
             conn.execute("UPDATE migration_import SET state='complete' WHERE id=1")
-        resource = service.Resources(self.settings)
+        resource = service.Resources(empty)
         resource.close()
 
+    def test_startup_without_a_dsn_fails_with_no_fallback(self):
+        from rfp_assistant.settings import SettingsError, load_settings
+
+        environment = {k: v for k, v in os.environ.items() if k not in ("RFP_DATABASE_DSN", "RFP_CONFIG_FILE")}
+        environment["RFP_DATA_DIR"] = str(self.root / "startup")
+        with mock.patch.dict("os.environ", environment, clear=True):
+            with self.assertRaisesRegex(SettingsError, "RFP_DATABASE_DSN is required.*no fallback"):
+                load_settings()
+        self.assertNotIn("backend", " ".join(Settings.__dataclass_fields__))
+
+    def test_startup_refuses_any_embedding_identity_but_large_1536(self):
+        from rfp_assistant.settings import SettingsError, load_settings
+
+        environment = {k: v for k, v in os.environ.items() if k != "RFP_CONFIG_FILE"}
+        environment.update(RFP_DATA_DIR=str(self.root / "startup"), RFP_DATABASE_DSN=self.target.dsn())
+        with mock.patch.dict("os.environ", environment, clear=True):
+            settings = load_settings()
+            self.assertEqual((settings.embedding_model, settings.embedding_dimensions), ("text-embedding-3-large", 1536))
+            for model, dims in (("text-embedding-3-small", 1536), ("text-embedding-3-large", 768),
+                                ("text-embedding-3-large", 3072)):
+                with self.subTest(model=model, dims=dims), \
+                        self.assertRaisesRegex(SettingsError, "text-embedding-3-large at 1536"):
+                    load_settings(embedding_model=model, embedding_dimensions=dims)
+
+    def test_every_connection_path_refuses_a_server_other_than_postgresql_18_6(self):
+        restore = postgres.Target(fixtures.database(ready=False))
+        manifest = Path(postgres_backup.backup(self.settings, self.root / "backup", "test")["manifest"])
+        old =mock.patch.object(psycopg.ConnectionInfo, "server_version", new_callable=mock.PropertyMock,
+                                return_value=170006)
+        unpooled = postgres.Target("RFP_TEST_UNPOOLED_DSN")  # the fixture already owns a pool for self.target
+        with old, mock.patch.dict(os.environ, {unpooled.dsn_env: self.target.dsn()}), \
+                self.assertRaisesRegex(RuntimeError, "PostgreSQL 18.6 is required; server reports 170006"):
+            with postgres.lifecycle(unpooled):
+                pass
+        with postgres.lifecycle(self.target):  # the paid gateway's own connection, opened after the pool
+            with old, self.assertRaisesRegex(RuntimeError, "PostgreSQL 18.6 is required"):
+                postgres.GatewayOwner(self.target)
+        conn = psycopg.connect(self.target.dsn(), autocommit=True)
+        try:
+            with old, self.assertRaisesRegex(RuntimeError, "PostgreSQL 18.6 is required"):
+                postgres._configure(conn)  # every later pool connection, not only the first
+        finally:
+            conn.close()
+        with old, mock.patch.dict(os.environ, {"RFP_RESTORE_DATABASE_DSN": restore.dsn()}), \
+                self.assertRaisesRegex(RuntimeError, "PostgreSQL 18.6 is required"):
+            postgres_backup.restore_check(self.settings, manifest)
+        with psycopg.connect(restore.dsn()) as raw:  # refused before the restore fence or any table
+            self.assertIsNone(raw.execute("SELECT to_regnamespace('bidmate_recovery')").fetchone()[0])
+
     def test_pgvector_cache_separation_exact_filtered_parity_and_mixed_set_rejection(self):
-        self.imported()
         settings = self.settings.with_(embedding_dimensions=64)
         with store.open_db(self.target) as conn:
             version = store.get_app_setting(conn, "active_index")
@@ -313,10 +304,11 @@ class PostgreSQLTests(unittest.TestCase):
         self.assertIsInstance(index, vector_store.PgDenseIndex)
         query = dense.unit_vector(rng.normal(size=64), 64)
         matrix = np.stack([vectors[p["payload_hash"]] for p in payloads])
-        baseline = dense.DenseIndex(index.version, version, settings.embedding_model, 64, matrix,
-                                    [p["chunk_id"] for p in payloads])
         allowed = list(range(0, len(payloads), 2))
-        expected, actual = baseline.search(query, allowed, 20), index.search(query, allowed, 20)
+        scores = matrix[allowed] @ query  # brute-force cosine over unit rows, ties by chunk ID
+        expected = sorted(((r, float(s)) for r, s in zip(allowed, scores)),
+                          key=lambda p: (-p[1], payloads[p[0]]["chunk_id"]))[:20]
+        actual = index.search(query, allowed, 20)
         self.assertEqual([p[0] for p in actual], [p[0] for p in expected])
         np.testing.assert_allclose([p[1] for p in actual], [p[1] for p in expected], atol=1e-6)
         self.assertTrue(all(p[0] in allowed for p in actual))
@@ -333,7 +325,6 @@ class PostgreSQLTests(unittest.TestCase):
     def test_large_query_explicit_dimensions_normalization_and_pool_release(self):
         from rfp_assistant.generation import FakeTransport
 
-        self.imported()
         self.allow_fake_paid()
         settings = self.settings.with_(embedding_model="text-embedding-3-large", embedding_dimensions=1536)
         transport = FakeTransport()
@@ -353,7 +344,6 @@ class PostgreSQLTests(unittest.TestCase):
             self.assertFalse(conn.raw.info.transaction_status)
 
     def test_envelope_reallocation_keeps_money_and_open_reservations(self):
-        self.imported()
         self.allow_fake_paid()
         self.reserve(self.request("reserved"))
         before = budget.snapshot(self.target)
@@ -365,7 +355,6 @@ class PostgreSQLTests(unittest.TestCase):
                          (before.spent_micro_usd, before.pending_micro_usd, before.cap_micro_usd))
 
     def test_historical_activation_cannot_override_selected_large_dimensions(self):
-        self.imported()
         settings = self.settings.with_(embedding_model="text-embedding-3-large", embedding_dimensions=1536)
         res = service.Resources(settings)
         try:
@@ -382,41 +371,7 @@ class PostgreSQLTests(unittest.TestCase):
         finally:
             res.close()
 
-    def test_explicit_cache_transfer_preserves_settled_attempts_and_repeats_without_dispatch(self):
-        from tools.import_embedding_cache import transfer
-        source_settings = self.env.settings.with_(embedding_model="text-embedding-3-large", embedding_dimensions=1536)
-        with store.open_db(source_settings.db_path) as conn:
-            index = store.get_app_setting(conn, "active_index")
-        estimate = dense.plan_embeddings(source_settings, index)
-        transport = generation.FakeTransport()
-        self.assertEqual(dense.build_dense(source_settings, transport, index, estimate["estimate_id"])["status"], "ready")
-        completed_plan = self.root / "completed-plan.json"
-        migration.plan(source_settings.db_path, completed_plan)
-        migration.import_snapshot(completed_plan, self.target)
-        target_settings = self.settings.with_(embedding_model="text-embedding-3-large", embedding_dimensions=1536)
-        first = transfer(completed_plan, source_settings.data_dir, index, target_settings)
-        second = transfer(completed_plan, source_settings.data_dir, index, target_settings)
-        self.assertTrue(first["pass"] and second["pass"])
-        self.assertGreater(first["imported_payloads"], 0)
-        self.assertEqual(second["imported_payloads"], 0)
-        self.assertEqual(second["reused_payloads"], first["unique_payloads"])
-        self.assertEqual((second["dense_version"], second["provider_calls"]), (first["dense_version"], 0))
-        before = budget.snapshot(self.target)
-        # A cache entry with no settled attempt must be rejected, even if its vector/hash is otherwise valid.
-        _, payloads = dense.index_payloads(source_settings, index)
-        key = payloads[0]["payload_hash"]
-        path = dense.cache_dir(source_settings) / (key + ".json")
-        meta = json.loads(path.read_text(encoding="utf-8"))
-        meta["attempt_id"] = "unsettled-origin"
-        store.write_text_atomic(path, json.dumps(meta))
-        with self.assertRaisesRegex(ValueError, "settled matching"):
-            transfer(completed_plan, source_settings.data_dir, index, target_settings)
-        after = budget.snapshot(self.target)
-        self.assertEqual((after.spent_micro_usd, after.pending_micro_usd),
-                         (before.spent_micro_usd, before.pending_micro_usd))
-
     def test_limit_change_preserves_unknown_reservations_and_price_history(self):
-        self.imported()
         self.allow_fake_paid()
         aid = self.reserve(self.request("limit-reservation"))["attempt_id"]
         budget.mark_dispatching(self.target, aid)
@@ -448,7 +403,7 @@ class SQLBoundaryTests(unittest.TestCase):
         self.assertEqual(row[0], 1)
         self.assertEqual(dict(row), {"id": 1, "value": "é 한국어"})
         self.assertEqual(list(row), [1, "é 한국어"])
-        with self.assertRaisesRegex(ValueError, "SQLite-only"):
+        with self.assertRaisesRegex(ValueError, "non-PostgreSQL SQL"):
             postgres.bind_sql("PRAGMA user_version")
 
     def test_native_large_shortening_preserves_source_and_rejects_small(self):

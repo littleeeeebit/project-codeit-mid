@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 from rfp_assistant import auth, budget, generation, service, store
-from rfp_assistant.contracts import AnswerRequest
+from rfp_assistant.contracts import AnswerRequest, EvidenceUnit
 from rfp_assistant.generation import FakeTransport, ProviderError, ProviderResponse
 from tests import fixtures
 
@@ -150,6 +150,44 @@ class SafetyTest(unittest.TestCase):
                                            "conflicts": [], "next_action": None, "url": "x"}), None, "stop", None, None)
         with self.assertRaises(generation.TechnicalError):
             generation.validate_answer(bad, [], set(), {})
+
+    def test_only_a_declared_absence_of_a_listed_missing_field_is_dropped(self):
+        # The owner's comparison: each side's absence was stated twice, as an uncited claim and a missing field. A
+        # restatement is declared kind "absence"; text never decides it, so every uncited inference or fact fails.
+        ev = EvidenceUnit("E1", "A", "h", "x", "c", ["e"], "제안서 10부", {}, 5)
+
+        def respond(claims, missing=()):
+            return ProviderResponse(json.dumps({
+                "status": "answered", "summary": "s", "conflicts": [], "next_action": None,
+                "claims": [{"text": t, "kind": k, "doc_id": d, "evidence_ids": ids} for t, k, d, ids in claims],
+                "missing_fields": [{"doc_id": d, "field": f, "reason": "not_found_in_context"} for d, f in missing]},
+                ensure_ascii=False), None, "stop", None, None)
+
+        def validate(response):
+            return generation.validate_answer(response, [ev], {"A", "B"}, {"E1": ev.quote}, {"A", "B"})
+
+        fact = ("A는 제안서 10부를 요구한다", "source_fact", "A", ["E1"])
+        absence = ("제안서  제출 부수", "absence", "B", [])  # exactly the listed field (whitespace aside)
+        payload = validate(respond([fact, absence], missing=[("B", "제안서 제출 부수")]))
+        self.assertEqual([c.text for c in payload.claims], [fact[0]])
+        for text, missing in (("B 문서의 예산은 충분하다", [("B", "일정")]),  # an assertion labelled absence
+                              ("B 문서의 예산은 충분하다", [("B", "예산")]),  # names the field, asserts more
+                              ("B 문서에서는 제안서 제출 부수를 확인할 수 없다", [("B", "제안서 제출 부수")])):
+            with self.subTest(text=text, missing=missing), \
+                    self.assertRaisesRegex(generation.TechnicalError, "absence_not_listed"):
+                validate(respond([fact, (text, "absence", "B", [])], missing))
+        for claims, missing in (
+                ([fact, absence[:1] + ("inference",) + absence[2:]], [("B", "제안서 제출 부수")]),  # undeclared
+                ([fact, ("B의 일정은 위험해 보인다", "inference", "B", [])], [("B", "예산")]),  # unrelated
+                ([fact, ("B 문서의 예산은 충분하다", "inference", "B", [])], [("B", "예산")]),  # names the field
+                ([fact, ("B는 5부", "source_fact", "B", [])], [("B", "부수")])):  # an uncited fact
+            with self.subTest(claims=claims[1][0], missing=missing), \
+                    self.assertRaisesRegex(generation.TechnicalError, "claim_without_evidence"):
+                validate(respond(claims, missing))
+        for missing in ([], [("A", "제안서 제출 부수")]):  # nothing listed for B
+            with self.subTest(missing=missing), \
+                    self.assertRaisesRegex(generation.TechnicalError, "absence_not_listed"):
+                validate(respond([fact, absence], missing))
 
 
 if __name__ == "__main__":

@@ -842,7 +842,7 @@ class AnswerRunTest(GoldRetrievalTest):
             per_request = conn.execute("SELECT request_id, COUNT(*) FROM attempts WHERE stage = 'generation' "
                                        "GROUP BY request_id HAVING COUNT(*) > 1").fetchall()
         self.assertEqual(per_request, [])
-        self.assertGreater(len(transport.calls), before)
+        self.assertEqual(len(transport.calls), before)  # any unknown PostgreSQL billing blocks every dispatch
         # once its billing is settled from provider evidence, the row may run again as a recorded new attempt
         res = service.Resources(self.s, transport=transport)
         try:
@@ -1001,6 +1001,13 @@ class SealedTest(Phase4Case):
         first = self.sealed_run(FakeTransport(flaky))
         self.assertEqual(first["status"], "partial")
         self.assertEqual(sum(r["status"] == "done" for r in answers.load_progress(self.s, first["run_id"]).values()), 1)
+        res = service.Resources(self.s, transport=FakeTransport())  # nothing dispatches while billing is unknown
+        try:
+            for attempt in service.unresolved_attempts(res, auth.OWNER_CLI):
+                service.settle_from_evidence(res, auth.OWNER_CLI, attempt["attempt_id"],
+                                             {"prompt_tokens": 100, "completion_tokens": 10}, None, "export", "reconciled")
+        finally:
+            res.close()
         with mock.patch.object(generation, "PROMPT_VERSION", "grounded-answer-tuned"):
             self.assertTrue(sealed.freeze_problems(self.s, freeze))  # the tuned candidate breaks the old freeze
             _, dev = self.answer_run(FakeTransport(), runs=[self.k1])

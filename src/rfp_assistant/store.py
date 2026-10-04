@@ -1,4 +1,4 @@
-"""Authoritative PostgreSQL operations and explicit legacy SQLite operations.
+"""Authoritative PostgreSQL operations: schema, connections, transactions and atomic private files.
 
 Connections are opened per operation and closed explicitly; no transaction spans network inference.
 """
@@ -7,21 +7,19 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
 import tempfile
 import time
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
 from . import postgres
 
-DATABASE_ERRORS = (sqlite3.Error, postgres.psycopg.Error, postgres.PoolTimeout)
-OPERATIONAL_ERRORS = (sqlite3.OperationalError, postgres.psycopg.OperationalError, postgres.PoolTimeout)
+DATABASE_ERRORS = (postgres.psycopg.Error, postgres.PoolTimeout)
+OPERATIONAL_ERRORS = (postgres.psycopg.OperationalError, postgres.PoolTimeout)
 
 SCHEMA_VERSION = 6  # 5: background requests, audit events, corrections, verifier runs; 6: gold review log, eval estimates
-BUSY_TIMEOUT_MS = 5000
 
 SOURCES_DDL = """
 CREATE TABLE IF NOT EXISTS sources (
@@ -304,100 +302,41 @@ CREATE TABLE IF NOT EXISTS activations (
 """
 
 
-REQUEST_COLUMNS_V5 = {"request_json": "TEXT", "mode": "TEXT",
-                      "cancel_requested": "INTEGER NOT NULL DEFAULT 0"}
-
-
 def utcnow() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="microseconds")
 
 
-def connect(db_path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path, timeout=BUSY_TIMEOUT_MS / 1000, isolation_level=None, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
-    conn.execute("PRAGMA journal_mode = WAL")
-    return conn
-
-
 @contextmanager
-def open_db(db_path: Path) -> Iterator[sqlite3.Connection]:
-    if isinstance(db_path, postgres.Target):
-        with postgres.open_db(db_path) as conn:
-            yield conn
-        return
-    if (db_path.parent / "postgresql-authority.json").exists():
-        with closing(sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True,
-                                    isolation_level=None)) as conn:
-            conn.row_factory = sqlite3.Row
-            yield conn
-        return
-    with closing(connect(db_path)) as conn:
+def open_db(db: postgres.Target) -> Iterator[postgres.Connection]:
+    with postgres.open_db(db) as conn:
         yield conn
 
 
 @contextmanager
-def tx(conn: sqlite3.Connection, immediate: bool = False) -> Iterator[sqlite3.Connection]:
-    if isinstance(conn, postgres.Connection):
-        with postgres.tx(conn, immediate) as operation:
-            yield operation
-        return
-    conn.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
-    try:
-        yield conn
-    except BaseException:
-        conn.execute("ROLLBACK")
-        raise
-    conn.execute("COMMIT")
+def tx(conn: postgres.Connection, immediate: bool = False) -> Iterator[postgres.Connection]:
+    with postgres.tx(conn, immediate) as operation:
+        yield operation
 
 
-def init_schema(db_path: Path) -> int:
+def init_schema(db: postgres.Target) -> int:
     """Idempotent: creates missing tables, never resets budget or ledger rows."""
-    if isinstance(db_path, postgres.Target):
-        return postgres.init_schema(db_path, SCHEMA, SCHEMA_VERSION)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    with open_db(db_path) as conn:
-        version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version > SCHEMA_VERSION:
-            raise RuntimeError(f"database schema {version} is newer than this code ({SCHEMA_VERSION})")
-        if 0 < version < 3:  # widen the review_status CHECK: SQLite rebuilds the table to change a constraint
-            conn.execute("PRAGMA foreign_keys = OFF")
-            conn.executescript(
-                "BEGIN;" + SOURCES_DDL.replace("IF NOT EXISTS sources", "sources_v3")
-                + "INSERT INTO sources_v3 SELECT * FROM sources; DROP TABLE sources;"
-                  "ALTER TABLE sources_v3 RENAME TO sources; COMMIT;")
-            conn.execute("PRAGMA foreign_keys = ON")
-        if 0 < version < 5:  # phase 3 request columns; existing rows keep their history
-            have = {r[1] for r in conn.execute("PRAGMA table_info(requests)")}
-            for column, ddl in REQUEST_COLUMNS_V5.items():
-                if column not in have:
-                    conn.execute(f"ALTER TABLE requests ADD COLUMN {column} {ddl}")
-        conn.executescript(SCHEMA)
-        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-        return SCHEMA_VERSION
+    return postgres.init_schema(db, SCHEMA, SCHEMA_VERSION)
 
 
-@contextmanager
-def database_lifecycle(db):
-    if isinstance(db, postgres.Target):
-        with postgres.lifecycle(db) as pool:
-            yield pool
-    else:
-        yield None
+def database_lifecycle(db: postgres.Target):
+    return postgres.lifecycle(db)
 
 
-def schema_version(conn):
-    return postgres.schema_version(conn) if isinstance(conn, postgres.Connection) else \
-        conn.execute("PRAGMA user_version").fetchone()[0]
+def schema_version(conn: postgres.Connection) -> int:
+    return postgres.schema_version(conn)
 
 
-def get_app_setting(conn: sqlite3.Connection, key: str) -> str | None:
+def get_app_setting(conn: postgres.Connection, key: str) -> str | None:
     row = conn.execute("SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
     return row["value"] if row else None
 
 
-def set_app_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+def set_app_setting(conn: postgres.Connection, key: str, value: str) -> None:
     conn.execute(
         "INSERT INTO app_settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         (key, value),
