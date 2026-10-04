@@ -847,6 +847,22 @@ class ServingTest(unittest.TestCase):
         self.assertEqual(serving["fallback_reason"], "activated_corpus_route_requires_rerun")
         self.assertEqual(result.mode, "kiwi_bm25")
         self.assertIn("activated_run_stale:corpus_route", result.limitations)
+        # Reports state what requests serve, not the stored activation.
+        from rfp_assistant import ops, release
+
+        stale = self.res.serving()["run_id"]
+        with unittest.mock.patch.object(retrieval, "ROUTE_RULE", "greedy-rare-term-2"):
+            reports = {"phase 2": evaluation.write_phase2_report(self.env.settings),
+                       "phase 3": ops.write_phase3_report(self.env.settings),
+                       "release": release.write_release_report(self.env.settings)}
+        for name, path in reports.items():
+            text = path.read_text(encoding="utf-8")
+            serving = [line for line in text.splitlines() if "serv" in line.lower() and "keyword index" in line
+                       or line.startswith("- Serving")]
+            with self.subTest(report=name):
+                self.assertTrue(serving, text)
+                self.assertFalse([line for line in serving if stale in line and "not served" not in line], serving)
+                self.assertIn(f"activated run `{stale}` not served: activated_corpus_route_requires_rerun", text)
 
     def test_generation_from_a_frozen_cache_miss_run_uses_its_fallback_evidence_and_estimate(self):
         """Review finding: the free run fell back to kiwi_bm25 on a query-vector miss, but its paid generation

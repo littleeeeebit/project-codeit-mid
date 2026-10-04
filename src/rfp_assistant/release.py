@@ -183,8 +183,11 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
         unresolved = conn.execute("SELECT COUNT(*) FROM attempts WHERE state IN ('reserved', 'dispatching', 'unknown')"
                                   ).fetchone()[0]
         history = json.loads(conn.execute("SELECT history_json FROM budget_settings WHERE id = 1").fetchone()[0])
-    active = json.loads(active_run) if active_run else None
-    snap = budget.snapshot(settings.db_path)
+    active = json.loads(active_run) if active_run else None  # the stored activation; `now` is what requests serve
+    from .service import active_serving, describe_serving
+
+    now = active_serving(settings)
+    snap =budget.snapshot(settings.db_path)
     manifest_rep = ingestion.manifest_report(settings)
     coverage = ingestion.review_coverage(settings)
     identity = ingestion.identity_report(settings)
@@ -246,11 +249,13 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
         run = next((r for r in retrieval_runs if r["run_id"] == active["run_id"] and not r.get("blocking")), None)
         served = {"single_evidence": {"hit@20": run.get("hit@20")}, "multi_evidence": {
             "complete@20": run.get("complete@20")}} if run else {}
+    if now.get("fallback_reason"):
+        stale.append(describe_serving(now))
     lat = None
     for x in reversed(latency):
         if not x or x.get("provider") != "real":
             continue
-        if (x.get("serving") or {}).get("run_id") != (active or {}).get("run_id") or \
+        if (x.get("serving") or {}).get("run_id") != now.get("run_id") or \
                 (x.get("code") or {}).get("source_sha256") != current_code:
             stale.append(f"latency sample {x.get('run_id')}: recorded for another serving run or package source")
             continue
@@ -314,7 +319,7 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
         "settings_fingerprint": settings.fingerprint(), "model": settings.generation_model,
         "reasoning_effort": settings.generation_reasoning_effort,
         "max_output_tokens": settings.generation_max_output_tokens, "prompt_version": generation.PROMPT_VERSION,
-        "rate_version": history[-1].get("rate_version") if history else None, "active_run": active,
+        "rate_version": history[-1].get("rate_version") if history else None, "active_run": active, "serving": now,
         "active_index": active_index, "datasets": {n: {k: (frozen[n] or {}).get(k) for k in (
             "dataset_sha256", "rows", "label", "review_log_sha256", "current")} for n in ("dev", "test")},
         "requirements_lock_sha256": _sha_file(lock) if lock.exists() else None, "hardware": evaluation.hardware(),
@@ -362,9 +367,9 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
           f"- model {settings.generation_model}, reasoning {settings.generation_reasoning_effort}, output cap "
           f"{settings.generation_max_output_tokens}, prompt {release_manifest['prompt_version']}, rates "
           f"{release_manifest['rate_version']}, settings `{release_manifest['settings_fingerprint']}`",
-          f"- serving: {('run `' + active['run_id'] + '` (' + active['mode'] + ')') if active else 'keyword default (kiwi_bm25), no activated run'}, "
-          f"keyword index `{active_index}`, dense `{(active or {}).get('dense_version')}`, reranker "
-          f"{(active or {}).get('reranker')}; fallback kiwi_bm25",
+          f"- serving: {describe_serving(now)}, "
+          f"keyword index `{active_index}`, dense `{now.get('dense_version')}`, reranker "
+          f"{now.get('reranker')}; fallback kiwi_bm25",
           f"- dependencies: requirements-lock.txt `{(release_manifest['requirements_lock_sha256'] or '')[:16]}`; "
           f"hardware {release_manifest['hardware']}",
           f"- freeze: {release_manifest['freeze'] or 'none (draft release)'}", "",

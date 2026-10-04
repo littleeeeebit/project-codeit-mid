@@ -1761,10 +1761,14 @@ def write_phase2_report(settings: Settings) -> Path:
     L += ["", "Envelopes (used incl. open reservations / envelope): " + ", ".join(
         f"{k} {usd(used[k])}/{usd(v)}" for k, v in envelopes.items()), "",
           "## Selection", ""]
+    from .service import active_serving, describe_serving
+
+    now = active_serving(settings)  # what requests serve; a stored activation can be refused (routing changed)
     if active_run:
         a = json.loads(active_run)
-        L += [f"- active: run `{a['run_id']}` ({a['label']}, {a['mode']}), keyword index `{a['index_version']}`, "
+        L += [f"- activated: run `{a['run_id']}` ({a['label']}, {a['mode']}), keyword index `{a['index_version']}`, "
               f"dense `{a.get('dense_version')}`, reranker {a.get('reranker')}",
+              f"- requests serve: {describe_serving(now)}",
               f"- fallback: {a.get('fallback_mode')}; retrieval finalist for phase 4: {a.get('finalist_run_id')}"]
         for act in activations:
             L.append(f"  - {act['created_at'][:19]} {act['actor']}: {json.loads(act['decision_json']).get('rationale')}")
@@ -1828,9 +1832,9 @@ def write_phase2_report(settings: Settings) -> Path:
     write_text_atomic(release / "source-map.json", json.dumps(source_map, ensure_ascii=False, indent=1))
     previous = [json.loads(x["config_json"])["run_id"] for x in activations[:-1]] if activations else []
     L += ["", "## Inputs for phase 3", "",
-          f"- serving: {('run `' + a['run_id'] + '` (' + a['mode'] + ')') if a else 'keyword default'}, keyword index "
-          f"`{(a or {}).get('index_version') or active_index}`, dense `{(a or {}).get('dense_version')}`, "
-          f"reranker {(a or {}).get('reranker')}, limits {(a or {}).get('limits')}",
+          f"- serving: {describe_serving(now)}, keyword index "
+          f"`{now.get('index_version') or active_index}`, dense `{now.get('dense_version')}`, "
+          f"reranker {now.get('reranker')}, limits {now.get('limits')}",
           f"- rollback: keyword fallback `kiwi_bm25` always; earlier activations {previous or 'none'}; every earlier "
           "index directory stays on disk",
           f"- immutable evidence mapping: `releases/phase-2/source-map.json` ({len(source_map)} associations → "
@@ -1840,7 +1844,7 @@ def write_phase2_report(settings: Settings) -> Path:
     path = release / "report.md"
     write_text_atomic(path, "\n".join(L))
     write_text_atomic(release / "manifest.json", json.dumps({
-        "release_id": "phase-2", "created_at": utcnow(), "eval_version": EVAL_VERSION, "active_run": a,
+        "release_id": "phase-2", "created_at": utcnow(), "eval_version": EVAL_VERSION, "active_run": a, "serving": now,
         "active_index": active_index, "gates": [{"gate": g, "met": ok, "evidence": ev} for g, ok, ev in gates],
         "runs": [r["run_id"] for r in runs]}, ensure_ascii=False, indent=1))
     return path

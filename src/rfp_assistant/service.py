@@ -347,7 +347,7 @@ def active_serving(settings: Settings) -> dict:
     if cfg.get("run_id") and (cfg.get("limits") or {}).get("corpus_route") != corpus_route_record():
         # Routing changed since the run was measured: its gate evidence no longer describes retrieval, so serve the
         # unselected default (retrieve flags it) until a rerun is activated (run_errors refuses the old run).
-        return {**default, "fallback_reason": "activated_corpus_route_requires_rerun"}
+        return {**default, "fallback_reason": "activated_corpus_route_requires_rerun", "stale_run_id": cfg["run_id"]}
     if cfg.get("embedding") and \
             (cfg["embedding"].get("model"), cfg["embedding"].get("dims")) != \
             (settings.embedding_model, settings.embedding_dimensions):
@@ -358,6 +358,16 @@ def active_serving(settings: Settings) -> dict:
         # trial passes and is activated.
         cfg = {**cfg, "mode": "hybrid", "reranker": None, "stale_policy": cfg.get("eval_version")}
     return cfg
+
+
+def describe_serving(cfg: dict) -> str:
+    """The one report wording for what requests serve (`active_serving`), naming a stored activation that is not."""
+    if cfg.get("fallback_reason"):
+        return (f"keyword default (kiwi_bm25); activated run `{cfg.get('stale_run_id') or cfg.get('run_id')}` "
+                f"not served: {cfg['fallback_reason']}")
+    if cfg.get("run_id"):
+        return f"run `{cfg['run_id']}` ({cfg['mode']})"
+    return "keyword default (kiwi_bm25), no activated run"
 
 
 def get_resources(settings: Settings) -> Resources:
