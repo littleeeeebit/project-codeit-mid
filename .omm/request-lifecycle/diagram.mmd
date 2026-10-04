@@ -1,0 +1,17 @@
+graph TD
+  ask-page["Ask screen\nweb/src/components/ask/ask-page.tsx"]
+  admission["Validate, persist, admit\nsrc/rfp_assistant/service.py"]
+  executor["Bounded executor\nsrc/rfp_assistant/service.py"]
+  paid-stages["Paid answer stages\nsrc/rfp_assistant/service.py"]
+  finish-record["Request record\nsrc/rfp_assistant/service.py"]
+  status-poll["Status polling\nweb/src/lib/use-poll.ts"]
+  cancellation["Cancel and abandon\nsrc/rfp_assistant/service.py"]
+  ask-page -->|POST ask with scope| admission
+  admission -->|free modes inline| finish-record
+  admission -->|request id queued| executor
+  executor -->|claims queued to running| paid-stages
+  paid-stages -->|result and billing| finish-record
+  ask-page -->|poll every second| status-poll
+  status-poll -->|reads view and attachable| finish-record
+  ask-page -->|cancel or context change| cancellation
+  cancellation -->|cancel flag checked| paid-stages

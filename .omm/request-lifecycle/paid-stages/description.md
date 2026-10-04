@@ -1,0 +1,1 @@
+`_paid_answer` runs the paid stages in order. Each stage either continues or ends the request through `done(...)` with a typed status, so a failure is never left as a running row.

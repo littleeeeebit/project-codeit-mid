@@ -1,0 +1,1 @@
+SDK retries are disabled (`max_retries=0`) and nothing retries automatically. An unknown outcome is never resent; it stays a pending reservation until it is settled from evidence or reconciled.

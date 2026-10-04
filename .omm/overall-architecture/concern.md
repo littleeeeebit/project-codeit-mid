@@ -1,0 +1,1 @@
+`PUT /api/budget/limit` calls `service.set_budget_limit`, which requires `budget_admin`. Because `auth.visitor` grants every capability, any reachable visitor can raise the shared cap from `web/src/app/settings/page.tsx`. The README says this is intended for the Settings page, yet also calls budget administration owner-CLI only. The two statements disagree.

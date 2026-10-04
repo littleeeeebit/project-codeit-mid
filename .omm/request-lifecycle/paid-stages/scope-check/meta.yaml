@@ -1,0 +1,9 @@
+created: 2026-10-04T13:34:50.153Z
+updated: 2026-10-04T13:34:50.154Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: scope-check
+children: []
+parentPath:
+  - paid-stages

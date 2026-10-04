@@ -1,0 +1,9 @@
+created: 2026-10-04T13:34:47.788Z
+updated: 2026-10-04T13:34:47.927Z
+update_count: 2
+last_field: note
+kind: nested-class
+title: postgresql
+children: []
+parentPath:
+  - persistence

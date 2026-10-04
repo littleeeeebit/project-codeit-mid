@@ -1,0 +1,15 @@
+created: 2026-10-04T13:34:46.770Z
+updated: 2026-10-04T13:34:47.067Z
+update_count: 3
+last_field: todo
+kind: nested-class
+title: persistence
+children:
+  - gateway-owner
+  - migration-tool
+  - pgvector-store
+  - postgresql
+  - runtime-artifacts
+  - sqlite-ledger
+  - store-adapter
+parentPath: []

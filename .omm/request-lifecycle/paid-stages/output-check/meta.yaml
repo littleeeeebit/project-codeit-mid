@@ -1,0 +1,9 @@
+created: 2026-10-04T13:34:51.030Z
+updated: 2026-10-04T13:34:51.032Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: output-check
+children: []
+parentPath:
+  - paid-stages

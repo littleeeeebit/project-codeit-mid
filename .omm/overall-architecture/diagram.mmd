@@ -1,11 +1,20 @@
-graph LR
-    handoff["handoff\nhandoff/"]
-    src["src\nsrc/"]
-    tests["tests\ntests/"]
-    tools["tools\ntools/"]
-    web["web\nweb/"]
-    handoff -->|"imports"| tests
-    src -->|"imports"| tests
-    tests -->|"imports"| src
-    tools -->|"imports"| src
-    tools -->|"imports"| tests
+graph TD
+  web-screens["Web screens\nweb/src/components"]
+  http-api["HTTP API\nsrc/rfp_assistant/api.py"]
+  service-layer["Service layer\nsrc/rfp_assistant/service.py"]
+  retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval.py"]
+  budget-ledger["Budget ledger\nsrc/rfp_assistant/budget.py"]
+  provider-gateway["Provider gateway\nsrc/rfp_assistant/generation.py"]
+  persistence["Persistence\nsrc/rfp_assistant/store.py"]
+  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"]
+  web-screens -->|JSON routes, 1s polling| http-api
+  http-api -->|one service call per route| service-layer
+  owner-cli -->|same service and ledger| service-layer
+  owner-cli -->|ingest, index, evaluate| persistence
+  service-layer -->|scoped retrieval| retrieval-engine
+  service-layer -->|reserve, dispatch, settle| budget-ledger
+  service-layer -->|strict-schema chat| provider-gateway
+  retrieval-engine -->|metered query embedding| provider-gateway
+  retrieval-engine -->|indexes and vectors| persistence
+  budget-ledger -->|attempts and adjustments| persistence
+  service-layer -->|requests, runs, gold rows| persistence

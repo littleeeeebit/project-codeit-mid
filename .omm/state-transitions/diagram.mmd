@@ -1,0 +1,12 @@
+graph TD
+  request-states["Request status\nsrc/rfp_assistant/service.py"]
+  attempt-states["Attempt billing state\nsrc/rfp_assistant/budget.py"]
+  startup-recovery["Startup recovery\nsrc/rfp_assistant/service.py"]
+  owner-reconciliation["Owner reconciliation\nsrc/rfp_assistant/cli.py"]
+  billing-rollup["Billing roll-up\nsrc/rfp_assistant/service.py"]
+  request-states -->|each paid stage reserves| attempt-states
+  startup-recovery -->|queued and running interrupted| request-states
+  startup-recovery -->|dispatching becomes unknown| attempt-states
+  owner-reconciliation -->|unknown settled or reconciled| attempt-states
+  attempt-states -->|unknown wins precedence| billing-rollup
+  billing-rollup -->|billing state on view| request-states

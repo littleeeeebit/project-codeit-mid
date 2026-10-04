@@ -1,0 +1,1 @@
+The ledger state machine is documented at the top of `budget.py` and enforced by `_transition`'s conditional `UPDATE ... WHERE state IN (...)`, by `mark_dispatching`, by `settle` and by `reconcile`. Open states (`reserved`, `dispatching`, `unknown`) hold their full reservation against both the cap and the envelope.

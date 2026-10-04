@@ -1,0 +1,9 @@
+`Resources.__init__` enters `store.database_lifecycle` (a PostgreSQL pool when the target is PostgreSQL). `_initialize` then runs these steps in order:
+1. On PostgreSQL, `postgres.require_imported_database`.
+2. `init_schema` and `budget.ensure_budget_row`.
+3. With `recover=True`, `_own()`: claim `postgres.gateway_lock` and run `recover_requests` plus `budget.recover`.
+4. Build the transport. `provider='fake'` gives `FakeTransport`. Otherwise an `OPENAI_API_KEY` gives `OpenAITransport`, and claims ownership first if not already held. No key leaves `provider_note` set and paid generation reports the provider unavailable.
+
+`serving()` reads the `active_run` and `active_index` app settings on every call. It falls back to `kiwi_bm25` with `fallback_reason` when a PostgreSQL activated embedding identity differs from the settings, and downgrades `hybrid_rerank` to `hybrid` when the run's `eval_version` is stale. `run_settings()` overlays the activated run's measured limits, embedding model/dimensions and reranker settings on the process settings. `index()`, `dense()` and `reranker()` load lazily under `_index_lock`. A dense verification failure is remembered in `_dense_failed` and `stage_errors` and is not retried until a new activation or a restart.
+
+`close()` performs the controlled stop: it rejects new work, calls `runner.shutdown`, joins drafting threads up to `shutdown_wait_seconds`, re-runs recovery if a drafting thread is still alive, closes the transport and releases the lock. It is registered through `threading._register_atexit`, so it runs before `concurrent.futures` joins the workers.

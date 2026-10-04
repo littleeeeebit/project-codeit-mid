@@ -1,0 +1,1 @@
+Gemini spending uses its own append-only ledger (`.runtime/ocr/gemini-ledger.jsonl`, `ProcessLock` on `gemini-ledger.lock`) with a $0.50 cap (`GEMINI_CAP_MICRO`). It is not part of `budget.snapshot` or the main cap.

@@ -1,0 +1,1 @@
+Serve with exactly one uvicorn worker (`--workers 1`). Paid work runs on in-process executors, and the process holds the database-wide gateway lock: a PostgreSQL advisory lock, or `gateway.lock` on legacy SQLite. Keep `--host 127.0.0.1` unless everyone on the network may spend the shared budget.
