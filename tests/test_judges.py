@@ -76,7 +76,8 @@ def fake_reference(data_dir: Path, n: int = 400) -> SimpleNamespace:
     out = data_dir / "judges" / "reference"
     out.mkdir(parents=True)
     (out / "reference.jsonl").write_text(body, encoding="utf-8", newline="")
-    (out / "manifest.json").write_text(json.dumps({"reference_sha256": judges._sha(body)}), encoding="utf-8")
+    manifest = {"run_id": "A-test", "items": n, "reference_sha256": judges._sha(body), "labels": {}}
+    (out / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     return SimpleNamespace(data_dir=data_dir)
 
 
@@ -144,33 +145,94 @@ class CalibrationCoverageTest(unittest.TestCase):
 
 
 class ShutdownTest(unittest.TestCase):
-    """Review round 1, F3: close() joins a running judge job before it closes the transport the job uses."""
+    """Review round 1, F3: close() joins a running judge job before it closes the transport the job uses.
+    Review round 2, F4: a start publishes its run before it returns, so progress polling can see it."""
 
-    def test_close_joins_the_judge_thread_before_closing_the_transport(self):
-        events = []
+    verifier = SimpleNamespace(member_id="v1")
+
+    def resources(self, settings, events):
         res = object.__new__(service.Resources)
-        res.settings = SimpleNamespace(shutdown_wait_seconds=10)
+        res.settings = settings
         res.transport = SimpleNamespace(close=lambda: events.append("transport closed"))
         res.provider_note, res._runner, res._lock = None, None, None
         res._runner_lock, res._jobs, res._closed = threading.Lock(), [], False
         res._database_lifecycle = SimpleNamespace(__exit__=lambda *a: events.append("database released"))
+        return res
 
-        def run(settings, transport, estimate_id, member, closing):
+    def test_close_joins_the_judge_thread_before_closing_the_transport(self):
+        events = []
+        res = self.resources(SimpleNamespace(shutdown_wait_seconds=10), events)
+
+        def run(settings, transport, estimate_id, member, closing, begun):
             while not closing():
                 time.sleep(0.01)
             time.sleep(0.2)  # the in-flight call still finishes on the transport
             events.append("judge job finished")
 
-        est = {"run_id": "J-held_out-000000000000"}
-        verifier = SimpleNamespace(member_id="v1")
+        begun = {"run_id": "J-held_out-000000000000"}
         with mock.patch.object(service, "_authorize", lambda res, p, role: p), \
-                mock.patch.object(judges, "load_estimate", lambda s, e: est), \
-                mock.patch.object(judges, "recheck", lambda s, e: None), mock.patch.object(judges, "run", run):
-            service.start_judges(res, verifier, "E-1")
+                mock.patch.object(judges, "begin", lambda s, e, a: begun), mock.patch.object(judges, "run", run):
+            service.start_judges(res, self.verifier, "E-1")
             res.close()
             self.assertEqual(events, ["judge job finished", "transport closed", "database released"])
             with self.assertRaisesRegex(service.ServiceError, "종료"):  # no new job once closing began
-                service.start_judges(res, verifier, "E-2")
+                service.start_judges(res, self.verifier, "E-2")
+
+    def test_a_started_judge_run_is_listed_as_running_before_its_worker_proceeds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = fake_reference(Path(tmp))
+            settings.shutdown_wait_seconds, settings.generation_reasoning_effort = 10, "low"
+            settings.jev_model = "jev-test"
+            judges.make_split(settings)
+            res = self.resources(settings, [])
+            release, seen = threading.Event(), []
+
+            def run(*a, begun, **kw):  # the worker is held before anything it does on its own
+                seen.append(begun["run_id"])
+                release.wait(10)
+
+            with mock.patch.object(service, "_authorize", lambda res, p, role: p), \
+                    mock.patch.object(judges, "load_estimate", lambda s, e: {"part": "calibration", "max_micro_usd": 1}), \
+                    mock.patch.object(judges, "recheck", lambda s, e: None), \
+                    mock.patch.object(judges, "organisations", lambda s: []), mock.patch.object(judges, "run", run):
+                try:
+                    run_id = service.start_judges(res, self.verifier, "E-1")
+                    runs = {r["run_id"]: r for r in judges.overview(settings, service._judge_running())["runs"]}
+                finally:
+                    release.set()
+                    res.close()
+            self.assertEqual((runs[run_id]["running"], runs[run_id]["status"], runs[run_id]["progress"]["luna"]),
+                             (True, "running", {"done": 0, "total": 200}))
+            self.assertEqual(seen, [run_id])
+
+    def test_a_started_answer_evaluation_is_published_before_its_worker_proceeds(self):
+        from rfp_assistant import answers
+
+        with tempfile.TemporaryDirectory() as tmp:
+            res = self.resources(SimpleNamespace(shutdown_wait_seconds=10, data_dir=Path(tmp)), [])
+            release, seen = threading.Event(), []
+
+            def begin(settings, estimate_id, actor):
+                d = answers.run_dir(settings, "A-000000000000")
+                d.mkdir(parents=True)
+                (d / "config.json").write_text("{}", encoding="utf-8")
+                return {"estimate_id": estimate_id, "run_id": "A-000000000000"}
+
+            def run(*a, begun, **kw):
+                seen.append(begun["run_id"])
+                release.wait(10)
+
+            with mock.patch.object(service, "_authorize", lambda res, p, role: p), \
+                    mock.patch.object(answers, "load_estimate", lambda s, e: {"action": "answer-finalists"}), \
+                    mock.patch.object(answers, "begin_answers", begin), mock.patch.object(answers, "run_answers", run):
+                try:
+                    run_id = service.start_answer_evaluation(res, self.verifier, "E-1")
+                    published = (answers.run_dir(res.settings, run_id) / "config.json").exists()
+                    running = service._EVAL_JOBS[run_id].is_alive()
+                finally:
+                    release.set()
+                    res.close()
+            self.assertEqual((published, running, seen), (True, True, [run_id]))
 
 
 if __name__ == "__main__":

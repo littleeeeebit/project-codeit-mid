@@ -902,10 +902,9 @@ def _paid(settings: Settings, transport, request_id: str, stage: str, messages: 
     return response, settlement["settled_micro_usd"], latency, None
 
 
-def run(settings: Settings, transport, estimate_id: str, actor: str, *, closing=lambda: False) -> dict:
-    """Executes a planned part with the owner's gateway: translations, the Luna judge, Jev bridged and Jev raw,
-    then fits thresholds (calibration) or scores the comparison (held-out). Resumable: finished judgements are kept
-    and rerunning (with a new estimate) does only what is left."""
+def begin(settings: Settings, estimate_id: str, actor: str) -> dict:
+    """Free and synchronous: checks the estimate and inputs, then publishes the run (its `config.json`) so the
+    overview lists it from the moment a start returns, before any paid call."""
     est = load_estimate(settings, estimate_id)
     recheck(settings, est)
     inputs = _inputs(settings, est["part"])
@@ -920,6 +919,19 @@ def run(settings: Settings, transport, estimate_id: str, actor: str, *, closing=
                                 "started_at": utcnow()})
     write_text_atomic(config_path, json.dumps(config, ensure_ascii=False, indent=1))
     (d / "last-error.txt").unlink(missing_ok=True)
+    return {"estimate_id": estimate_id, "est": est, "inputs": inputs, "run_id": run_id}
+
+
+def run(settings: Settings, transport, estimate_id: str, actor: str, *, closing=lambda: False,
+        begun: dict | None = None) -> dict:
+    """Executes a planned part with the owner's gateway: translations, the Luna judge, Jev bridged and Jev raw,
+    then fits thresholds (calibration) or scores the comparison (held-out). Resumable: finished judgements are kept
+    and rerunning (with a new estimate) does only what is left. `begun` is this estimate's `begin`, when the caller
+    already published the run."""
+    if begun is None or begun["estimate_id"] != estimate_id:
+        begun = begin(settings, estimate_id, actor)
+    est, inputs, run_id = begun["est"], begun["inputs"], begun["run_id"]
+    d = run_dir(settings, run_id)
     request_id = dense.ensure_job_request(settings, MEMBER, f"judge:{run_id}", {"job": ACTION, "run_id": run_id})
     spent = 0
     guard = lambda conn: "interrupted" if closing() else None  # noqa: E731

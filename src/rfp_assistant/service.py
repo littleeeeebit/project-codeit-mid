@@ -1869,29 +1869,44 @@ def start_answer_evaluation(res: Resources, principal: Principal, estimate_id: s
         est = answers.load_estimate(res.settings, estimate_id)
         if est["action"] != "answer-finalists":
             raise ServiceError("검증 화면에서는 개발 질문 평가만 실행할 수 있습니다. 봉인 평가는 소유자 CLI로 실행합니다.")
-        answers.recheck(res.settings, est)
     except answers.AnswerEvalError as exc:
         raise ServiceError(str(exc)) from None
-    with _EVAL_LOCK, res._runner_lock:  # close() must see and join every thread that uses its transport
-        if res.transport is None or res._closed:
-            raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
-        if any(t.is_alive() for t in [*_EVAL_JOBS.values(), *_JUDGE_JOBS.values()]):
-            raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
+    with _EVAL_LOCK:
+        _refuse_closed_or_busy(res)
+        try:  # published before the start returns, so the overview lists the run on its very next read
+            begun = answers.begin_answers(res.settings, estimate_id, principal.member_id)
+        except answers.AnswerEvalError as exc:
+            raise ServiceError(str(exc)) from None
+        run_id = begun["run_id"]
 
         def job() -> None:
             try:
-                answers.run_answers(res.settings, res, estimate_id, principal.member_id)
+                answers.run_answers(res.settings, res, estimate_id, principal.member_id, begun=begun)
             except Exception as exc:  # noqa: BLE001 - recorded for the overview; rows already finished stay
                 from .store import write_text_atomic
 
-                write_text_atomic(answers.run_dir(res.settings, est["run_id"]) / "last-error.txt",
+                write_text_atomic(answers.run_dir(res.settings, run_id) / "last-error.txt",
                                   f"{type(exc).__name__}: {exc}"[:500])
 
-        thread = threading.Thread(target=job, name=f"rfp-eval-{est['run_id']}", daemon=True)
-        _EVAL_JOBS[est["run_id"]] = thread
+        _start_job(res, _EVAL_JOBS, run_id, threading.Thread(target=job, name=f"rfp-eval-{run_id}", daemon=True))
+    return run_id
+
+
+def _refuse_closed_or_busy(res: Resources) -> None:
+    if res.transport is None or res._closed:
+        raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
+    if any(t.is_alive() for t in [*_EVAL_JOBS.values(), *_JUDGE_JOBS.values()]):
+        raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
+
+
+def _start_job(res: Resources, jobs: dict[str, threading.Thread], run_id: str, thread: threading.Thread) -> None:
+    """Registers and starts a paid background job; called under `_EVAL_LOCK` after its run was published."""
+    with res._runner_lock:  # close() must see and join every thread that uses its transport
+        if res.transport is None or res._closed:  # the run stays listed as partial; rerunning resumes it
+            raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
+        jobs[run_id] = thread
         res._jobs.append(thread)
         thread.start()
-    return est["run_id"]
 
 
 # ---------------------------------------------------------------- judge comparison (judges.py)
@@ -1931,28 +1946,24 @@ def start_judges(res: Resources, principal: Principal, estimate_id: str) -> str:
     principal = _authorize(res, principal, "verifier")
     from . import judges
 
-    est = _judge_call(judges.load_estimate, res.settings, estimate_id)
-    _judge_call(judges.recheck, res.settings, est)
-    with _EVAL_LOCK, res._runner_lock:  # close() must see and join every thread that uses its transport
-        if res.transport is None or res._closed:
-            raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
-        if any(t.is_alive() for t in [*_EVAL_JOBS.values(), *_JUDGE_JOBS.values()]):
-            raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
+    with _EVAL_LOCK:
+        _refuse_closed_or_busy(res)
+        # published before the start returns, so the overview lists the run on its very next read
+        begun = _judge_call(judges.begin, res.settings, estimate_id, principal.member_id)
+        run_id = begun["run_id"]
 
         def job() -> None:
             try:
-                judges.run(res.settings, res.transport, estimate_id, principal.member_id, closing=lambda: res._closed)
+                judges.run(res.settings, res.transport, estimate_id, principal.member_id,
+                           closing=lambda: res._closed, begun=begun)
             except Exception as exc:  # noqa: BLE001 - recorded for the overview; finished judgements stay
                 from .store import write_text_atomic
 
-                write_text_atomic(judges.run_dir(res.settings, est["run_id"]) / "last-error.txt",
+                write_text_atomic(judges.run_dir(res.settings, run_id) / "last-error.txt",
                                   f"{type(exc).__name__}: {exc}"[:500])
 
-        thread = threading.Thread(target=job, name=f"rfp-judge-{est['run_id']}", daemon=True)
-        _JUDGE_JOBS[est["run_id"]] = thread
-        res._jobs.append(thread)
-        thread.start()
-    return est["run_id"]
+        _start_job(res, _JUDGE_JOBS, run_id, threading.Thread(target=job, name=f"rfp-judge-{run_id}", daemon=True))
+    return run_id
 
 
 def judge_results(res: Resources, principal: Principal, run_id: str) -> dict:

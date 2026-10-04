@@ -157,6 +157,8 @@ False accepts are compared directly because they are the failure that would pass
 4. Start calibration. A complete calibration run writes `thresholds.json`. After a change to the fitting rule, `judge-refit` rewrites it from the stored judgements, at no cost.
 5. Plan and start the held-out part. Its identity includes the thresholds hash.
 
+A start first checks the estimate and inputs and writes the run's `config.json`, all before it returns. Only then do the paid calls begin, in one background thread. As a result, the progress screen lists the run as running from its first refresh. The development answer evaluation starts the same way.
+
 Runs resume: finished judgements are kept, and only the remainder runs again under a new estimate. The run stops at the first budget refusal or unknown billing, and a blocked run stays partial, labelled with its status.
 
 ## Limits
