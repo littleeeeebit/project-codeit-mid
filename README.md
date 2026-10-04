@@ -15,17 +15,15 @@ python -m pip install -e . --no-deps
 
 The HWP converter (`hwp5proc` from pyhwp 0.1b15) is installed into the same environment and resolved automatically from `Scripts\hwp5proc.exe`. To use an isolated converter environment instead, set `RFP_HWP_CONVERTER` to the absolute path of its `hwp5proc.exe`. The converter prints a harmless warning when `xmllint` is missing.
 
-## PostgreSQL setup and migration status
+## Database: PostgreSQL only
 
-PostgreSQL is the selected migration backend and pgvector is the selected vector store. The implementation default is PostgreSQL, but the live application must explicitly retain its SQLite configuration until the coordinated, reviewed cutover. For infrastructure rehearsal, start Docker Desktop (Linux containers), then run `./tools/start-postgresql.ps1`. The script starts pinned PostgreSQL 18.6 / pgvector 0.8.6 on loopback port 55432 and leaves `RFP_DATABASE_DSN` unchanged. It never selects the empty `bidmate_rehearsal` database for application startup. Driver and pool versions are pinned in the requirements. See the [PostgreSQL handover](handoff/postgresql-pgvector/README.md) for explicit imported-target configuration, the tested full-record import, backup/restore commands and pending acceptance.
+The application runs only on PostgreSQL 18.6 with pgvector 0.8.6. Every record lives there: documents, extractions, chunks, requests, traces, the billing ledger, audit events and the 1,536-dimensional `text-embedding-3-large` vectors. No code path reads or writes SQLite, and there is no fallback. Start Docker Desktop (Linux containers), then run `./tools/start-postgresql.ps1`. It starts the pinned server on loopback port 55432 and leaves `RFP_DATABASE_DSN` unchanged; it never selects the empty `bidmate_rehearsal` database. The application database is `bidmate_app`. Point `RFP_DATABASE_DSN` at it in the process environment, never in a file the repository tracks.
 
-Existing SQLite runtimes require an explicit snapshot/import; startup never silently imports or falls back. Use a new, isolated target for rehearsal and keep paid admission disabled. The production corpus is not yet cut over. The owner selected `text-embedding-3-large` at 1,536 dimensions, pending independent quality acceptance against the native 3,072 reference. The owner approved paid work and a $10 operating cap on 2026-10-03. The Settings page can change the shared cumulative limit while preserving spending and reservations; it uses the existing no-login attribution model.
+Startup refuses to run with a clear message when `RFP_DATABASE_DSN` is missing, or when the database has no validated import (the `migration_import` / `migration_validation` marker plus unchanged artifact hashes, index payload files included). A failed validation or an open recovery fence also closes paid admission. Paid dispatch needs both the ledger switch and PostgreSQL paid admission, which `paid on` sets together, plus the database-wide gateway advisory lock that the serving process holds.
 
-PostgreSQL startup requires successful `migration validate` for the imported snapshot and rechecks immutable artifact hashes, including index payload files. Table import completion alone cannot authorize startup. Failed validation or a failed recovery fence blocks startup and paid admission. PostgreSQL `restore-check` uses the backup and a distinct empty `RFP_RESTORE_DATABASE_DSN` without connecting to the primary database; recovery leaves paid admission disabled.
+The cutover ran on 2026-10-04. With the UI and writes stopped, a final consistent snapshot of the SQLite database was imported and validated: 27 tables, 674,049 rows, 18,983 active chunks, every referenced artifact hash matching, the ledger and every historical attempt unchanged, and no pending or unknown billing. All 18,983 active vectors are in pgvector, byte-identical to the verified set. Keyword index `29f261abafeb1f8c` is active. Serving is hybrid with keyword-first fusion over exact pgvector search: the BM25 top 6 stay in BM25 order and ranks 7–20 come from weighted RRF (k 60, dense weight 1.0). That setting is the one that passed the fusion gate against keyword-only K1. HNSW did not reach recall@20 0.99 against exact search on scoped questions, so exact search serves. Ask has an All documents scope across all 98 active sources. Its needle set finds the target passage in the top 5 for 31 of 33 questions (Wilson 95% 0.80–0.98). Measurements, the paid end-to-end check, the archive and the rollback are in the [PostgreSQL handover](handoff/postgresql-pgvector/README.md#postgresql-only-operation-2026-10-04).
 
-The authorized large/1,536 corpus build completed with 79 real metered embedding calls: 18,548 unique payloads cover 18,983 active chunk rows, costing $1.019019. Subsequent development drafting and offline reference/query comparisons bring total recorded spending to $1.752661 of the $10 cap, with no unknown reservations. All pre-cutover paid work used the sole live ledger; `tools/import_embedding_cache.py` explicitly transfers its verified settled caches into a matching paid-disabled PostgreSQL import without inference.
-
-The fixed 1,536-dimensional candidate failed the 2026-10-04 quality gate on 55 frozen source-reviewed pilot questions: dense and hybrid both introduced critical support failures against the offline reference and the lexical baseline. That run used an active keyword index that predates the frozen title/institution snapshot, and the command now refuses such an index. A re-measurement on a compatible, unactivated rebuild (`29f261abafeb1f8c`) also failed. Hybrid now matches its native control, but it adds two critical failures that the lexical baseline does not have. Dense adds one critical failure against its native control and 16 against the lexical baseline. Dimensions remain 1,536; production cutover and activation remain blocked. `tools/check_large_quality.py` plans and reproduces the comparison with separate dense/hybrid outcomes and unchanged thresholds. The native reference is development-only and never a serving set. Receipts, measurements and commands are in the [handover](handoff/postgresql-pgvector/README.md#production-cutover-request-and-quality-gate-2026-10-04).
+The SQLite importer and the SQLite backup/rollback paths were deleted after the final import validated. The final `.sqlite3` snapshot and a verified PostgreSQL custom-format dump are kept under `.runtime/archive/` as cold archives that no code references. Rollback means restoring that dump into an empty database with `restore-check`, which leaves paid admission off ([runbook §12](docs/operations/runbook.md)). The owner approved paid work and a $10 operating cap on 2026-10-03. The Settings page can change the shared cumulative limit while preserving spending and reservations; it uses the existing no-login attribution model.
 
 ## Configuration
 
@@ -34,8 +32,10 @@ Settings resolve from the repository location, never the working directory. Opti
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `RFP_SOURCE_DIR` | `<repo>/원본 데이터` | `data_list.csv` and `files/` |
-| `RFP_DATA_DIR` | `<repo>/.runtime` | Managed extractions, indexes, datasets and reports; retired SQLite snapshots |
-| `RFP_DATABASE_DSN` | required | Secret PostgreSQL connection string in the process environment |
+| `RFP_DATA_DIR` | `<repo>/.runtime` | Managed extractions, indexes, datasets and reports; `archive/` holds the cold archives |
+| `RFP_DATABASE_DSN` | required | Secret PostgreSQL connection string of the validated application database, in the process environment |
+| `RFP_POSTGRES_TEST_DSN` | local server | Tests and `check`: a server where the test user may create one isolated database per environment |
+| `RFP_RESTORE_DATABASE_DSN` | none | `restore-check` only: an empty isolated database to restore into |
 | `RFP_CONFIG_FILE` | none | JSON with nonsecret `Settings` fields (unknown keys are rejected) |
 | `RFP_HWP_CONVERTER` | env `Scripts\hwp5proc.exe` | HWP → XML converter |
 | `OPENAI_API_KEY` | none | Process environment, then the repository `.env`; never printed |
@@ -48,7 +48,7 @@ Answers use `gpt-6-luna` through Chat Completions with strict structured output,
 
 Run from any directory with the environment's interpreter:
 
-Before cutover, first set `RFP_CONFIG_FILE` to the absolute path of `handoff/postgresql-pgvector/config.corpus-before-cutover.example.json` in this checkout. These maintenance commands then retain the sole live SQLite ledger. For PostgreSQL rehearsal, use the PostgreSQL configuration and explicitly select the completed imported target from the handover; ordinary commands refuse empty/partial imports. An explicit `init` must never be run on a migration target before import.
+Every command except `check`, `load-check` and `restore-check` runs against `RFP_DATABASE_DSN` and refuses a database without a validated import. `check` and `load-check` use temporary databases on the server named by `RFP_POSTGRES_TEST_DSN` (default: the local server from `tools/start-postgresql.ps1`), and `restore-check` uses `RFP_RESTORE_DATABASE_DSN`. `init` creates the schema in a database the application owns; it never resets spending.
 
 ```powershell
 python -m rfp_assistant.cli init --paid-disabled          # schema + allowance row; never resets spending
@@ -67,12 +67,11 @@ a static export that the API serves itself, so one process on one port serves bo
 
 ```powershell
 cd web; npm ci; npm run build; cd ..                     # writes web/out (types come from web/openapi.json)
-# Until coordinated cutover, keep the sole live SQLite ledger and keyword serving:
-$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.corpus-before-cutover.example.json).Path
+$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.example.json).Path   # RFP_DATABASE_DSN set
 python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
 
-Exactly one worker: paid requests run on the process's own executor and the process holds a database-wide gateway advisory lock (legacy SQLite uses `gateway.lock`). For screen
+Exactly one worker: paid requests run on the process's own executor and the process holds a database-wide gateway advisory lock. For screen
 work, run the API on 8511 and `npm run dev` in `web/` (port 8510, `/api/*` forwarded to `RFP_API_URL`, default
 `http://127.0.0.1:8511`). After changing a route or its shapes, regenerate the schema the screens are typed from with
 `python tools/openapi.py`; `tests/test_api.py` fails while it is stale. `npm run lint` and `npm run typecheck` check

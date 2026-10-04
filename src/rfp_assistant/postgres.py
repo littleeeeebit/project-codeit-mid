@@ -11,6 +11,7 @@ import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 
 import psycopg
 from pgvector.psycopg import register_vector
@@ -35,7 +36,7 @@ class Target:
 
 
 class Row(dict):
-    """Named access and positional scalar access, matching the existing SQLite row contract."""
+    """Named access and positional scalar access (`row["name"]`, `row[0]`)."""
 
     def __init__(self, names, values):
         self.values_tuple = values
@@ -59,10 +60,10 @@ def bind_sql(sql: str) -> str:
     """Translate qmark parameters outside literals; escape literal percent signs for psycopg.
 
     Application SQL uses no dollar quoted strings. Refuse unhandled dialect features.
-    Migration DDL uses psycopg.sql identifiers directly, outside this boundary.
+    Backup parity reads use psycopg.sql identifiers directly, outside this boundary.
     """
     if re.search(r"\b(PRAGMA|INSERT\s+OR|REPLACE\s+INTO)\b", sql, re.I):
-        raise ValueError("SQLite-only SQL reached the PostgreSQL application boundary")
+        raise ValueError("non-PostgreSQL SQL (PRAGMA, INSERT OR, REPLACE INTO) reached the application boundary")
     parts = re.split(r"('(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"|--[^\n]*|/\*.*?\*/)", sql, flags=re.S)
     return "".join(part.replace("%", "%%") if i % 2 else part.replace("%", "%%").replace("?", "%s")
                    for i, part in enumerate(parts))
@@ -164,6 +165,43 @@ def recovery_blocked(conn):
         return True
 
 
+def file_hash(path):
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def references_valid(references):
+    """Every recorded original, extraction and index manifest (with the files it lists) is present and unchanged."""
+    try:
+        for reference in references:
+            path = Path(reference["path"])
+            if not path.is_file() or file_hash(path) != reference["expected_sha256"]:
+                return False
+            if reference.get("kind") == "index":
+                manifest = json.loads(path.read_text(encoding="utf-8"))
+                for name, digest in manifest["files"].items():
+                    artifact = path.parent / name
+                    if not artifact.is_file() or file_hash(artifact) != digest:
+                        return False
+        return True
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
+def record_validation(conn, snapshot_sha256, references, passed):
+    """The validated-database marker startup requires; a failed validation also closes paid admission."""
+    conn.execute("CREATE TABLE IF NOT EXISTS migration_validation (id bigint PRIMARY KEY CHECK(id=1), "
+                 "snapshot_sha256 text NOT NULL, references_json text NOT NULL, passed boolean NOT NULL)")
+    conn.execute("INSERT INTO migration_validation VALUES (1,?,?,?) ON CONFLICT(id) DO UPDATE SET "
+                 "snapshot_sha256=excluded.snapshot_sha256,references_json=excluded.references_json,passed=excluded.passed",
+                 (snapshot_sha256, json.dumps(references, ensure_ascii=False), passed))
+    if not passed:
+        conn.execute("UPDATE database_control SET paid_admission=false WHERE id=1")
+
+
 def validation_ready(conn):
     exists = conn.execute("SELECT to_regclass(current_schema() || '.migration_validation')").fetchone()[0]
     if not exists:
@@ -174,16 +212,16 @@ def validation_ready(conn):
 
 
 def require_imported_database(target: Target):
-    """Reject accidental application/maintenance startup on an empty or partial rehearsal."""
+    """Reject application/maintenance startup on an empty, partial or unvalidated database. There is no fallback:
+    the validated database is the final import or a restore of its verified dump that passed restore-check."""
     with open_db(target) as conn:
         if recovery_blocked(conn):
             raise RuntimeError("PostgreSQL recovery is incomplete or failed; startup and paid work are blocked")
         exists = conn.execute("SELECT to_regclass(current_schema() || '.migration_import')").fetchone()[0]
         imported = conn.execute("SELECT state FROM migration_import WHERE id=1").fetchone() if exists else None
         if imported is None or imported[0] != "complete" or not validation_ready(conn):
-            raise RuntimeError("PostgreSQL startup requires a complete verified import and successful artifact validation; select the validated "
-                               "imported target explicitly. Keep the live SQLite configuration until cutover.")
-        from .migration import references_valid
+            raise RuntimeError("this PostgreSQL database has no validated import: point RFP_DATABASE_DSN at the "
+                               "validated application database, or restore the verified dump with restore-check")
         references = json.loads(conn.execute("SELECT references_json FROM migration_validation WHERE id=1").fetchone()[0])
         if not references_valid(references):
             raise RuntimeError("PostgreSQL validated artifacts are missing or changed; validation and startup are blocked")
@@ -193,7 +231,7 @@ def require_imported_database(target: Target):
 def tx(conn: Connection, immediate=False):
     with conn.raw.transaction():
         if immediate:
-            # ponytail: one write mutex preserves SQLite's serialized admission/idempotency;
+            # ponytail: one write mutex serializes admission/idempotency;
             # use per-account locks only if measured throughput requires them.
             conn.execute("SELECT id FROM application_mutex WHERE id = 1 FOR UPDATE")
         yield conn
@@ -272,16 +310,20 @@ class GatewayOwner:
                 del _owners[self.target]
 
 
+def process_owner(target):
+    """This process's live gateway owner for the target, if any (several Resources in one process share it)."""
+    with _mutex:
+        owner = _owners.get(target)
+    return owner if owner is not None and not owner.lost and not owner.conn.closed else None
+
+
 def require_owner(target):
     if isinstance(target, Target):
         with _mutex:
             owner = _owners.get(target)
         if owner is None:
             raise RuntimeError("PostgreSQL paid gateway has no owner")
-        owner.check()
-        with open_db(target) as conn:
-            if not conn.execute("SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0]:
-                raise RuntimeError("PostgreSQL paid admission is disabled for rehearsal; cutover is required")
+        owner.check()  # paid admission itself is refused inside the ledger transaction, as a budget reason
 
 
 def owner_guard(conn):
@@ -300,7 +342,5 @@ def owner_guard(conn):
     return None if held else "gateway_ownership_lost"
 
 
-def gateway_lock(target, data_dir):
-    from .store import ProcessLock
-
-    return GatewayOwner(target) if isinstance(target, Target) else ProcessLock(data_dir / "gateway.lock")
+def gateway_lock(target, data_dir=None):
+    return GatewayOwner(target)

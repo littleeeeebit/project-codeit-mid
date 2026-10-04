@@ -1013,7 +1013,7 @@ def review_coverage(settings: Settings) -> list[dict]:
     with open_db(settings.db_path) as conn:
         sources = conn.execute(
             "SELECT s.source_hash, s.format, s.parse_status, s.review_status, s.reason_code, s.active_extraction_id, "
-            "GROUP_CONCAT(d.filename, '; ') AS filenames FROM sources s JOIN documents d "
+            "string_agg(d.filename, '; ' ORDER BY d.filename) AS filenames FROM sources s JOIN documents d "
             "ON d.active_source_hash = s.source_hash GROUP BY s.source_hash ORDER BY filenames").fetchall()
         out = []
         for s in sources:

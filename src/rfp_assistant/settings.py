@@ -86,7 +86,6 @@ class Settings:
     shutdown_wait_seconds: float = 20.0
     fake_delay_seconds: float = 0.0
     extra: dict = field(default_factory=dict)
-    database_backend: str = "postgresql"
     database_dsn_env: str = "RFP_DATABASE_DSN"
     database_pool_max: int = 8
     database_timeout_seconds: float = 5
@@ -100,10 +99,8 @@ class Settings:
         return self.source_dir / "files"
 
     @property
-    def db_path(self) -> Path | Target:
-        if self.database_backend == "postgresql":
-            return Target(self.database_dsn_env, self.database_pool_max, self.database_timeout_seconds)
-        return self.data_dir / "rfp.sqlite3"
+    def db_path(self) -> Target:
+        return Target(self.database_dsn_env, self.database_pool_max, self.database_timeout_seconds)
 
     def fingerprint(self) -> str:
         data = asdict(self)
@@ -155,12 +152,11 @@ def load_settings(**overrides) -> Settings:
 
 
 def validate(s: Settings) -> None:
-    if s.database_backend not in ("postgresql", "sqlite"):
-        raise SettingsError("database_backend must be postgresql or explicit legacy sqlite")
     if not 1 <= s.database_pool_max <= 16 or not 1 <= s.database_timeout_seconds <= 30:
         raise SettingsError("database pool maximum must be 1..16 and timeout 1..30 seconds")
-    if s.database_backend == "postgresql" and not os.environ.get(s.database_dsn_env):
-        raise SettingsError(f"{s.database_dsn_env} is required; PostgreSQL never falls back to SQLite")
+    if not os.environ.get(s.database_dsn_env):
+        raise SettingsError(f"{s.database_dsn_env} is required: the application runs only on its validated "
+                            "PostgreSQL database and has no fallback")
     if s.provider not in ("openai", "fake"):
         raise SettingsError("provider must be 'openai' or 'fake'")
     if s.generation_model not in ALLOWED_GENERATION_MODELS or s.generation_model not in DEFAULT_RATES:

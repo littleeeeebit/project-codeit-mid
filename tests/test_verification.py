@@ -6,11 +6,9 @@ fields forbidden, lowercase IDs, `api`/`browser`/`command` kinds, a command, imp
 
 import importlib.util
 import inspect
-from contextlib import closing
 import json
 import os
 import re
-import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -19,6 +17,7 @@ from pathlib import Path
 from typing import Literal
 from unittest import mock
 
+import psycopg
 from pydantic import BaseModel, ConfigDict, Field
 
 from tests import fixtures
@@ -133,9 +132,11 @@ class DatasetCopyTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             env = fixtures.make_env(Path(tmp))
             data = env.settings.data_dir
+            source_dsn = os.environ[env.settings.database_dsn_env]
             (data / "indexes").mkdir(exist_ok=True)
             with mock.patch.dict(os.environ, {"RFP_SOURCE_DIR": str(env.settings.source_dir),
                                               "RFP_DATA_DIR": str(data),  # not a checkout .env that may exist
+                                              "RFP_DATABASE_DSN": source_dsn,
                                               "RFP_VERIFY_ENV_FILE": str(Path(tmp) / "no-env-file")}):
                 ctx = verify.Context("t")
                 corpus = ctx.dataset()
@@ -143,10 +144,13 @@ class DatasetCopyTest(unittest.TestCase):
                 self.assertTrue(corpus["kind"].startswith("configured"))
                 copy = Path(corpus["data_dir"])
                 self.assertNotEqual(copy.resolve(), data.resolve())
-                with closing(sqlite3.connect(copy / "rfp.sqlite3")) as conn, conn:
+                self.assertEqual(ctx.env["RFP_DATABASE_DSN"], corpus["dsn"])  # what the served app and tools use
+                self.assertNotEqual(corpus["dsn"], source_dsn)
+                with psycopg.connect(corpus["dsn"], autocommit=True) as conn:
+                    self.assertEqual(conn.execute("SELECT count(*) FROM documents").fetchone()[0], 4)
                     conn.execute("INSERT INTO audit_events(event_id, actor, action, target, reason, details_json, "
                                  "created_at) VALUES ('e', 'a', 'x', 't', 'r', '{}', 'now')")
-                with closing(sqlite3.connect(data / "rfp.sqlite3")) as conn:
+                with psycopg.connect(source_dsn) as conn:
                     self.assertEqual(conn.execute("SELECT COUNT(*) FROM audit_events WHERE event_id = 'e'")
                                      .fetchone()[0], 0)
                 self.assertEqual((copy / "indexes").resolve(), (data / "indexes").resolve())
@@ -164,6 +168,7 @@ class OwnerConfigTest(unittest.TestCase):
         self.repo = Path(self.tmp.name) / "checkout"
         self.repo.mkdir()
         self.env = fixtures.make_env(Path(self.tmp.name) / "corpus")
+        self.dsn = os.environ[self.env.settings.database_dsn_env]  # the env clean below drops RFP_* keys
         clean = {k: v for k, v in os.environ.items() if not k.startswith(("RFP_", "WIKI_VERIFICATION_"))}
         self.patches = [mock.patch.dict(os.environ, clean, clear=True), mock.patch.object(verify, "REPO", self.repo)]
         for patch in self.patches:
@@ -181,6 +186,7 @@ class OwnerConfigTest(unittest.TestCase):
 
     def test_the_copied_env_file_alone_selects_the_corpus_and_origin(self):
         self.write_env(RFP_SOURCE_DIR=self.env.settings.source_dir, RFP_DATA_DIR=self.env.settings.data_dir,
+                       RFP_DATABASE_DSN=self.dsn,
                        RFP_VERIFY_ORIGIN="http://127.0.0.1:8799")
         ctx = verify.Context("t")
         try:
@@ -201,9 +207,11 @@ class OwnerConfigTest(unittest.TestCase):
         self.assertEqual((values["RFP_DATA_DIR"], source["RFP_DATA_DIR"]), (str(self.env.settings.data_dir), ".env"))
 
     def test_missing_prerequisites_fail_instead_of_falling_back_to_fixtures(self):
-        cases = [({"RFP_SOURCE_DIR": self.env.settings.source_dir}, "RFP_DATA_DIR not set"),
-                 ({"RFP_SOURCE_DIR": self.env.settings.source_dir, "RFP_DATA_DIR": Path(self.tmp.name) / "none"},
-                  "rfp.sqlite3 missing"),
+        cases = [({"RFP_SOURCE_DIR": self.env.settings.source_dir}, "RFP_DATA_DIR, RFP_DATABASE_DSN not set"),
+                 ({"RFP_SOURCE_DIR": self.env.settings.source_dir, "RFP_DATA_DIR": self.env.settings.data_dir},
+                  "RFP_DATABASE_DSN not set"),
+                 ({"RFP_SOURCE_DIR": self.env.settings.source_dir, "RFP_DATA_DIR": Path(self.tmp.name) / "none",
+                   "RFP_DATABASE_DSN": self.dsn}, "data dir missing"),
                  ({}, "dataset flow without a corpus")]
         for values, message in cases:
             self.write_env(**values)
@@ -269,8 +277,9 @@ class ScriptTest(unittest.TestCase):
             (run_dir / "inputs.json").write_text(json.dumps({"real_corpus": {
                 "source_dir": str(env.settings.source_dir), "data_dir": str(env.settings.data_dir),
                 "isolated_copy": True, "hwp_doc_id": a.doc_id, "pdf_doc_id": d.doc_id, "question": "시스템 구축"}}))
+            copy = {"RFP_DATABASE_DSN": os.environ[env.settings.database_dsn_env]}  # what tools/verify.py passes
             out = subprocess.run([sys.executable, "-B", "tools/verification/real_corpus_frozen.py", str(run_dir)],
-                                 cwd=REPO, env=self.env(), capture_output=True, text=True, timeout=600)
+                                 cwd=REPO, env={**self.env(), **copy}, capture_output=True, text=True, timeout=600)
             report = json.loads((run_dir / "real-corpus-frozen.json").read_text(encoding="utf-8"))
             self.assertEqual(out.returncode, 0, json.dumps(report, ensure_ascii=False)[:2000] + out.stderr[-2000:])
             self.assertEqual([c["case"] for c in report["cases"]], ["hwp_single", "pair", "pair_whitespace_units_2"])

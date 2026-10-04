@@ -98,10 +98,10 @@ Metadata lookup, keyword search, requirement inventory browsing, and citation op
 | Component | Default | Change only when |
 | --- | --- | --- |
 | Original parsing | Structured `pyhwp` XML and PyMuPDF; approved/native conversion fallback | Original checks expose missing or malformed content |
-| Metadata, elements, traces, and allowance | SQLite; short atomic write transactions | Measured concurrency or deployment requires a shared database server |
+| Metadata, elements, traces, and allowance | PostgreSQL 18.6 only (`bidmate_app`); short atomic write transactions, database-wide advisory lock for the paid gateway. SQLite retired on 2026-10-04 after a validated final import; the last `.sqlite3` file is a cold archive, and rollback is a verified `pg_dump` restore | A measured failure of the single PostgreSQL server |
 | Korean keyword retrieval | Kiwi plus `rank_bm25`, typed filters, scoped exact identifiers | Development failures show a concrete tokenizer/query limitation |
-| Dense retrieval | `text-embedding-3-small`; normalized NumPy matrix with a matching manifest | Measured chunk volume or scoring latency requires another index |
-| Fusion | RRF with `1 / (60 + rank)`, ranks starting at one | A frozen development comparison supports another setting |
+| Dense retrieval | `text-embedding-3-large` at a fixed 1,536 dimensions in pgvector 0.8.6; exact cosine search serves (HNSW recall@20 stayed below 0.99 for scoped queries even at `ef_search` 400) | HNSW, or a successor, reaches recall@20 ≥ 0.99 against exact search in every scope group |
+| Fusion | `keyword_first`: the BM25 top 6 keep their order, then weighted RRF (`1 / (60 + rank)`, dense weight 1.0) fills the rest; zero new critical failures against keyword-only K1 on the 55-question pilot and the 88-question whole-corpus set | A frozen comparison passes the same gate with better nDCG@5 or complete support |
 | Reranker | Trial local `BAAI/bge-reranker-v2-m3`; explicit bypass | Quality and warm latency gates pass on available hardware |
 | Answer generation | `gpt-4o-mini`, one Chat Completions call with strict structured output | A controlled `gpt-4.1-mini` comparison repairs measured errors affordably |
 | Frontends | One Next.js app in `web/` (질문하기, 검증, 데이터셋 만들기) over a FastAPI wrapper of `service`, served by one process, no login. Replaced the Streamlit pages on 2026-10-02 | Browser-tested requirements exceed the shared application's capabilities |
@@ -160,7 +160,7 @@ The primary indicator is cumulative dollar cost divided by $20, because input, o
 
 Use a $16 operational cap and actual project start/end dates. A 28-day horizon is only a planning example. Record prior allowance spending before enabling calls and scale allocations to the real remainder. This cumulative allowance does not reset when a provider's monthly budget resets.
 
-Every paid stage follows one contract: attribute → count bounded input/output → reserve atomically → persist attempt → dispatch → settle once. Reserve query embeddings before dense search; reserve generation after final evidence packing, assuming uncached input plus maximum output. Use a short SQLite `BEGIN IMMEDIATE` transaction and release its lock before inference. Account for every retry, disabling or bounding hidden SDK retries.
+Every paid stage follows one contract: attribute → count bounded input/output → reserve atomically → persist attempt → dispatch → settle once. Reserve query embeddings before dense search; reserve generation after final evidence packing, assuming uncached input plus maximum output. Use a short PostgreSQL transaction that locks the ledger row and release its lock before inference. Account for every retry, disabling or bounding hidden SDK retries.
 
 Settlement replaces a reservation with measured cost and returns the unused portion atomically. Duplicate completion cannot bill twice. Disconnects, timeouts, cancellations, or missing final usage remain pending/unknown until reconciled; TTL expiration alone cannot release them. Persist price snapshots and use integer microdollars or Decimal. Recover pending attempts on restart.
 

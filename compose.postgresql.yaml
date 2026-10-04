@@ -4,6 +4,10 @@ services:
     # linux/amd64 manifest of pgvector/pgvector:0.8.6-pg18, resolved 2026-10-03.
     image: pgvector/pgvector@sha256:1d50c689b0a6511b9ea0a15615281c81a59fd04a08eb35057ec8646fb3a2118a
     platform: linux/amd64
+    # docker-init is PID 1 and reaps orphans. As PID 1 the postmaster would adopt any orphaned exec'd process (a
+    # healthcheck killed at its timeout, an interrupted `docker exec`), treat its exit as a crashed backend and
+    # restart the whole server.
+    init: true
     environment:
       POSTGRES_DB: bidmate_rehearsal
       POSTGRES_USER: bidmate
@@ -15,10 +19,11 @@ services:
       - database:/var/lib/postgresql
       - ./tools/postgresql-init.sql:/docker-entrypoint-initdb.d/01-vector.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bidmate -d bidmate_rehearsal"]
-      interval: 2s
-      timeout: 3s
+      test: ["CMD", "pg_isready", "-U", "bidmate", "-d", "bidmate_rehearsal"]  # no shell to leave an orphan
+      interval: 5s
+      timeout: 15s
       retries: 30
+      start_period: 30s
     stop_grace_period: 60s
 volumes:
   database:

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import math
-import sqlite3
 import uuid
 from datetime import date
 from decimal import Decimal
@@ -20,7 +19,7 @@ from pathlib import Path
 from .contracts import BudgetSnapshot
 from .settings import DEFAULT_RATES, RATE_VERSION, LARGE_RATE_VERSION, LARGE_RATE_CHECKED_AT
 from .store import OPERATIONAL_ERRORS, dumps, get_app_setting, open_db, set_app_setting, tx, utcnow
-from .postgres import owner_guard, require_owner, Target
+from .postgres import Connection, Row, owner_guard, require_owner, Target
 
 MICRO = 1_000_000
 ENVELOPE_SHARES = {"embedding": 1, "gold_eval": 3, "interactive": 12}  # sixteenths of the operating cap
@@ -50,7 +49,7 @@ def max_cost(rates: dict, input_tokens: int, max_output_tokens: int) -> int:
     return micro_cost(rates, input_tokens, 0, max_output_tokens, cache_write_tokens=input_tokens)
 
 
-def _bump(conn: sqlite3.Connection) -> None:
+def _bump(conn: Connection) -> None:
     set_app_setting(conn, "ledger_revision", str(int(get_app_setting(conn, "ledger_revision") or 0) + 1))
 
 
@@ -64,7 +63,7 @@ def ensure_budget_row(db: Path) -> None:
         )
 
 
-def _settings_row(conn: sqlite3.Connection) -> sqlite3.Row:
+def _settings_row(conn: Connection) -> Row:
     row = conn.execute("SELECT * FROM budget_settings WHERE id = 1").fetchone()
     if row is None:
         raise BudgetError("budget is not initialized; run init")
@@ -216,7 +215,7 @@ def register_large_rate(db, actor: str, reason: str):
     return record
 
 
-def _totals(conn: sqlite3.Connection) -> dict:
+def _totals(conn: Connection) -> dict:
     spent = conn.execute("SELECT COALESCE(SUM(settled_micro_usd), 0) FROM attempts WHERE state = 'settled'").fetchone()[0]
     adjust = conn.execute("SELECT COALESCE(SUM(amount_micro_usd), 0) FROM adjustments").fetchone()[0]
     pending = conn.execute(
@@ -224,7 +223,7 @@ def _totals(conn: sqlite3.Connection) -> dict:
     return {"spent": spent + adjust, "pending": pending}
 
 
-def _purpose_used(conn: sqlite3.Connection, purpose: str) -> int:
+def _purpose_used(conn: Connection, purpose: str) -> int:
     return conn.execute(
         f"SELECT COALESCE(SUM(CASE WHEN state = 'settled' THEN settled_micro_usd "
         f"WHEN state IN {OPEN_STATES} THEN reserved_micro_usd ELSE 0 END), 0) FROM attempts WHERE purpose = ?",
@@ -251,12 +250,12 @@ def reserve(db: Path, *, request_id: str, member_id: str, stage: str, purpose: s
             ownership_error = owner_guard(conn)
             if ownership_error:
                 return {"admitted": False, "reason": ownership_error, "attempt_id": None}
-            if isinstance(db, Target) and not conn.execute(
-                    "SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0]:
-                return {"admitted": False, "reason": "postgresql_maintenance", "attempt_id": None}
             row = _settings_row(conn)
             if not row["paid_enabled"]:
                 return {"admitted": False, "reason": "paid_disabled", "attempt_id": None}
+            if isinstance(db, Target) and not conn.execute(
+                    "SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0]:
+                return {"admitted": False, "reason": "postgresql_maintenance", "attempt_id": None}
             if row["frozen_reason"]:
                 return {"admitted": False, "reason": "frozen", "attempt_id": None}
             rates = json.loads(row["rates_json"]).get(model)
@@ -444,7 +443,7 @@ def reconcile(db: Path, actor: str, reconciliation_id: str, interval_start: str,
     return True
 
 
-def _provider_total(conn: sqlite3.Connection, adjustment: sqlite3.Row) -> int | None:
+def _provider_total(conn: Connection, adjustment: Row) -> int | None:
     """The provider total an imported reconciliation recorded (reason text written by `reconcile`)."""
     for part in adjustment["reason"].split(";"):
         name, _, value = part.strip().partition("=")

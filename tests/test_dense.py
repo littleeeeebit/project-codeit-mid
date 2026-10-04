@@ -28,6 +28,7 @@ class DenseBuildTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.env = fixtures.make_env(Path(self.tmp.name))
+        self.enterContext(fixtures.paid_gateway(self.env.settings))  # owner jobs run here directly
         self.transport = generation.FakeTransport()
 
     def tearDown(self):
@@ -78,13 +79,14 @@ class DenseBuildTest(unittest.TestCase):
         # the previous index and matrix remain loadable for already-issued citations and rollback
         dense.DenseIndex.load(s, first["dense_version"], base=KeywordIndex.load(s, old_index))
 
-    def test_corrupt_matrix_is_refused(self):
+    def test_corrupt_vector_is_refused(self):
         _, out = _plan_and_build(self.env, self.transport)
         s = self.env.settings
-        path = s.data_dir / "indexes" / out["dense_version"] / "embeddings.npy"
-        data = bytearray(path.read_bytes())
-        data[-1] ^= 0xFF
-        path.write_bytes(bytes(data))
+        with store.open_db(s.db_path) as conn:  # one stored vector no longer matches its recorded checksum
+            payload = conn.execute("SELECT payload_hash FROM embedding_set_rows WHERE set_version = ? "
+                                   "ORDER BY row_order LIMIT 1", (out["dense_version"],)).fetchone()[0]
+            conn.execute("UPDATE embedding_payloads SET embedding = embedding + embedding WHERE payload_hash = ?",
+                         (payload,))
         with self.assertRaises(dense.DenseError):
             dense.DenseIndex.load(s, out["dense_version"])
 
@@ -232,6 +234,7 @@ class EvaluationRunTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.env = fixtures.make_env(Path(self.tmp.name))
+        self.enterContext(fixtures.paid_gateway(self.env.settings))  # owner jobs run here directly
         self.transport = generation.FakeTransport()
         _plan_and_build(self.env, self.transport)
         _dataset(self.env)
@@ -570,6 +573,7 @@ class PopulationAndGateTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         self.env = fixtures.make_env(self.root)
+        self.enterContext(fixtures.paid_gateway(self.env.settings))  # owner jobs run here directly
         self.transport = generation.FakeTransport()
         _plan_and_build(self.env, self.transport)
         s = self.env.settings
@@ -739,6 +743,7 @@ class IndexUpgradeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with unittest.mock.patch.object(retrieval, "QUERY_POLICY", "scope-redundant-1"):
                 env = fixtures.make_env(Path(tmp))  # keyword index built under the earlier policy
+                self.enterContext(fixtures.paid_gateway(env.settings))
                 transport = generation.FakeTransport()
                 _plan_and_build(env, transport)
                 _dataset(env)
@@ -781,6 +786,7 @@ class ServingTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.env = fixtures.make_env(Path(self.tmp.name))
+        self.enterContext(fixtures.paid_gateway(self.env.settings))  # owner jobs run here directly
         self.transport = generation.FakeTransport()
         _, self.built = _plan_and_build(self.env, self.transport)
         _dataset(self.env)
@@ -798,7 +804,8 @@ class ServingTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_serving_uses_the_activated_runs_embedding_and_limits(self):
-        s = self.env.settings.with_(embedding_dimensions=256, channel_top_k=3, evidence_max_units=1)
+        # Limits come from the run; a different embedding identity falls back to keyword (test_postgres covers it).
+        s = self.env.settings.with_(channel_top_k=3, evidence_max_units=1)
         res = service.Resources(s, transport=self.transport)
         before = len(self.transport.embed_calls)
         try:
@@ -918,8 +925,9 @@ class ServingTest(unittest.TestCase):
         with store.open_db(self.env.settings.db_path) as conn:
             stages = {a["stage"]: a["state"] for a in conn.execute(
                 "SELECT stage, state FROM attempts WHERE request_id = ?", (r.request_id,))}
-        self.assertEqual(stages, {"embedding": "unknown", "generation": "settled"})
-        self.assertEqual((r.status, r.billing_state, len(r.attempt_ids)), ("answered", "unknown", 2))
+        # An embedding with no usage stays unknown, and unknown billing blocks every later dispatch.
+        self.assertEqual(stages, {"embedding": "unknown", "generation": "released"})
+        self.assertEqual((r.status, r.billing_state, len(r.attempt_ids)), ("technical_error", "unknown", 2))
         real = budget.reserve
 
         def no_generation(*args, **kw):
@@ -931,7 +939,7 @@ class ServingTest(unittest.TestCase):
             r = service.answer(self.res, self.env.consultant, AnswerRequest(
                 idempotency_key=str(uuid.uuid4()), generation_id="g", question="또 다른 하자보수 질문",
                 scope=[self.env.refs["기관A"]]))
-        self.assertEqual((r.status, r.billing_state, len(r.attempt_ids)), ("budget_blocked", "settled", 1))
+        self.assertEqual((r.status, r.billing_state, len(r.attempt_ids)), ("budget_blocked", "released", 1))
 
     def test_free_retrieval_never_pays_for_a_query_vector(self):
         ref = self.env.refs["기관A"]
@@ -961,10 +969,12 @@ class ServingTest(unittest.TestCase):
                 "SELECT stage, state FROM attempts WHERE attempt_id IN (?, ?)", tuple(result.attempt_ids))}
         self.assertEqual(stages, {"embedding": "settled", "generation": "settled"})
 
-    def test_corrupt_matrix_falls_back_to_keyword_with_a_reason(self):
+    def test_corrupt_vector_falls_back_to_keyword_with_a_reason(self):
         s = self.env.settings
-        path = s.data_dir / "indexes" / self.built["dense_version"] / "rows.jsonl"
-        path.write_text(path.read_text(encoding="utf-8").replace('"row": 0', '"row": 9'), encoding="utf-8")
+        with store.open_db(s.db_path) as conn:  # a stored vector no longer matches its checksum
+            conn.execute("UPDATE embedding_payloads SET embedding = embedding + embedding WHERE payload_hash = "
+                         "(SELECT payload_hash FROM embedding_set_rows WHERE set_version = ? ORDER BY row_order "
+                         "LIMIT 1)", (self.built["dense_version"],))
         res = service.Resources(s, transport=self.transport)
         try:
             r = service.retrieve(res, self.env.consultant, "검수 후 하자 보수 기간은 얼마인가?", [self.env.refs["기관A"]])

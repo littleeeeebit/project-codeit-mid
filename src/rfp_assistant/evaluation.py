@@ -1232,7 +1232,8 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
     if h_config["analyzer"] != analyzer_fingerprint(analyzer):
         raise EvaluationError("the analyzer differs from the frozen H run; rerun H before the trial")
     # Retrieval runs exactly as H was frozen; only the reranker is new. A changed retrieval setting needs a new H.
-    trial_settings = settings.with_(**h_config["limits"], embedding_model=h_config["embedding"]["model"],
+    limits = {k: v for k, v in h_config["limits"].items() if k != "corpus_route"}  # a code constant, recorded only
+    trial_settings = settings.with_(**limits, embedding_model=h_config["embedding"]["model"],
                                     embedding_dimensions=h_config["embedding"]["dims"])
     h_traces = {t["id"]: t for t in read_jsonl(_run_dir(settings, h_run) / "traces.jsonl")}
     dense = dense_mod.DenseIndex.load(settings, h_config["dense_version"], base=index)

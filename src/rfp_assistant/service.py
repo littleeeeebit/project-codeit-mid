@@ -12,7 +12,6 @@ import functools
 import hashlib
 import json
 import re
-import sqlite3
 import subprocess
 import threading
 import time
@@ -33,6 +32,7 @@ from .ingestion import (CODE_RE, QUARANTINE_TEXT, load_elements, nfc, printed_pd
 from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extraction, corpus_scope, scope_rows
 from .retrieval import retrieve as _retrieve
 from .evaluation import EVAL_VERSION
+from .postgres import Row
 from .settings import Settings, read_api_key
 from .store import DATABASE_ERRORS, LockHeld, dumps, init_schema, open_db, tx, utcnow
 
@@ -87,11 +87,11 @@ class Resources:
         dispatching attempts unknown, never-dispatched reservations released. Nothing is replayed."""
         self.settings = settings
         self.paid_purpose = "interactive"  # ledger envelope of every paid stage this owner dispatches
-        if settings.database_backend == "postgresql":
-            postgres.require_imported_database(settings.db_path)
+        postgres.require_imported_database(settings.db_path)
         init_schema(settings.db_path)
         budget.ensure_budget_row(settings.db_path)
-        self._lock: ProcessLock | None = None
+        self._lock: postgres.GatewayOwner | None = None  # owned here: released by close()
+        self._borrowed_owner: postgres.GatewayOwner | None = None  # this process's owner, held by another Resources
         self.transport: generation.Transport | None = transport
         self.provider_note = ""
         self.recovered: dict = {}
@@ -102,12 +102,14 @@ class Resources:
         elif transport is None:
             key = read_api_key("OPENAI_API_KEY")
             if key:
-                if self._lock is None:
+                if self._lock is None and self._borrowed_owner is None:
                     self._own(settings)
                 self.transport = generation.OpenAITransport(key, settings.request_timeout_seconds,
-                    owner_check=self._lock.check if isinstance(self._lock, postgres.GatewayOwner) else None)
+                    owner_check=(self._lock or self._borrowed_owner).check)
             else:
                 self.provider_note = "OPENAI_API_KEY is not configured; paid generation is unavailable"
+        if self.transport is not None and self._lock is None and self._borrowed_owner is None:
+            self._own(settings)  # every PostgreSQL dispatch has a gateway owner
         self.analyzer = shared_analyzer()
         self._index: KeywordIndex | None = None
         self._dense: dense_mod.DenseIndex | None = None
@@ -136,6 +138,10 @@ class Resources:
         atexit.register(stop)
 
     def _own(self, settings: Settings) -> None:
+        shared = postgres.process_owner(settings.db_path)
+        if shared is not None:  # another Resources of this process owns it: its work is live, so no recovery
+            self._borrowed_owner = shared
+            return
         try:
             self._lock = postgres.gateway_lock(settings.db_path, settings.data_dir)
         except LockHeld:
@@ -161,7 +167,7 @@ class Resources:
             active = get_app_setting(conn, "active_index")
         if run:
             cfg = json.loads(run)
-            if self.settings.database_backend == "postgresql" and cfg.get("embedding") and \
+            if cfg.get("embedding") and \
                     (cfg["embedding"].get("model"), cfg["embedding"].get("dims")) != \
                     (self.settings.embedding_model, self.settings.embedding_dimensions):
                 return {**cfg, "mode": "kiwi_bm25", "dense_version": None, "embedding": None,
@@ -674,7 +680,7 @@ def _request_snapshot(principal: Principal, request: AnswerRequest, question: st
 
 
 def _create(res: Resources, principal: Principal, request: AnswerRequest, question: str, status: str,
-            before_insert=None) -> tuple[str, sqlite3.Row | None]:
+            before_insert=None) -> tuple[str, Row | None]:
     """Persists the input snapshot under its idempotency key in one short transaction. Returns (request_id, prior
     row) where a prior row means this key already exists with the same input."""
     input_hash = _input_hash(request)
@@ -1125,7 +1131,7 @@ def requirement_inventory(res: Resources, doc: dict) -> dict:
 # ---------------------------------------------------------------- request status, listing and cancellation
 
 
-def _view(conn, row: sqlite3.Row) -> RequestView:
+def _view(conn, row: Row) -> RequestView:
     attempts, billing = _billing(conn, row["request_id"])
     snap = json.loads(row["request_json"]) if row["request_json"] else {}
     open_states = ("reserved", "dispatching", "unknown")
@@ -1920,7 +1926,8 @@ def fidelity_overview(res: Resources, principal: Principal) -> list[dict]:
             "SELECT s.source_hash, s.review_status, MIN(d.filename) AS filename, f.metrics_json, f.findings_json "
             "FROM sources s JOIN documents d ON d.active_source_hash = s.source_hash "
             "LEFT JOIN fidelity_checks f ON f.extraction_id = s.active_extraction_id AND f.method = ? "
-            "WHERE s.format = 'hwp' GROUP BY s.source_hash ORDER BY filename", (fidelity.FIDELITY_VERSION,)).fetchall()
+            "WHERE s.format = 'hwp' GROUP BY s.source_hash, f.metrics_json, f.findings_json ORDER BY filename",
+            (fidelity.FIDELITY_VERSION,)).fetchall()
     return [{"source_hash": r["source_hash"], "filename": r["filename"], "review_status": r["review_status"],
              "metrics": json.loads(r["metrics_json"]) if r["metrics_json"] else None,
              "findings": json.loads(r["findings_json"]) if r["findings_json"] else []} for r in rows]

@@ -751,14 +751,19 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "restore-check":
             # Configuration only: recovery opens the backup and isolated target, never the lost source ledger.
-            return cmd_restore_check(args, load_settings(database_backend="sqlite", provider="fake"))
-        settings = load_settings(database_backend="sqlite", provider="fake") if \
-            args.command in ("check", "load-check") else load_settings()
+            return cmd_restore_check(args, load_settings(provider="fake", database_dsn_env="RFP_RESTORE_DATABASE_DSN"))
+        if args.command in ("check", "load-check"):
+            # The automated checks build their own isolated test databases, never touching the live one; by
+            # default on the local server tools/start-postgresql.ps1 runs.
+            from tests.fixtures import server_dsn
+
+            os.environ.setdefault("RFP_POSTGRES_TEST_DSN", server_dsn())
+            return COMMANDS[args.command](args, load_settings(provider="fake", database_dsn_env="RFP_POSTGRES_TEST_DSN"))
+        settings = load_settings()
         with store.database_lifecycle(settings.db_path):
-            if args.command not in ("init", "check", "load-check"):
-                if settings.database_backend == "postgresql":
-                    from .postgres import require_imported_database
-                    require_imported_database(settings.db_path)
+            if args.command != "init":
+                from .postgres import require_imported_database
+                require_imported_database(settings.db_path)
                 store.init_schema(settings.db_path)
             return COMMANDS[args.command](args, settings)
     except store.DATABASE_ERRORS as exc:

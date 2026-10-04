@@ -1,5 +1,152 @@
 # PostgreSQL and pgvector migration handover
 
+## PostgreSQL-only operation (2026-10-04)
+
+BidMate now runs only on PostgreSQL 18.6 + pgvector 0.8.6 (database `bidmate_app`), with `text-embedding-3-large` at a fixed 1,536 dimensions. This was spec `cutover-postgresql-remove-sqlite` rev 1. The application records, billing ledger, keyword and vector retrieval sets all live there. No code path reads or writes SQLite: `database_backend`, the SQLite backup format and rollback path, the NumPy dense-matrix serving path and the importer `rfp_assistant.migration` were deleted after the final import validated and the owner confirmed it. Everything after this section is the pre-cutover history; its SQLite commands, `rfp_assistant.migration` and `config.corpus-before-cutover.example.json` no longer exist.
+
+Operate it as follows:
+
+```powershell
+./tools/start-postgresql.ps1                       # container with init: true, so the postmaster is not PID 1
+$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.example.json).Path
+$env:RFP_DATABASE_DSN = "postgresql://bidmate:<password>@127.0.0.1:55432/bidmate_app"   # password from .runtime/postgresql.env
+python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
+```
+
+Startup refuses, with a message, a missing `RFP_DATABASE_DSN`, an unreachable server and a database without a persisted, passing import validation. There is no fallback. Tests create an isolated database per run from the same server (`RFP_POSTGRES_TEST_DSN`, defaulting to the local server).
+
+The container crashed three times during the cutover with "untracked child process exited with exit code 2". The cause was the postmaster running as PID 1 and reaping orphaned healthcheck processes. `compose.postgresql.yaml` now sets `init: true` and uses an exec-form `pg_isready` healthcheck, and the database was verified intact after each recovery.
+
+### Final import
+
+The final import ran with the UI and all writes stopped. A consistent snapshot of the live SQLite database (SHA256 `ca299be9…`) was imported into `bidmate_app`, and `python -m rfp_assistant.migration validate` passed:
+
+- 27 tables and 674,049 records, matching the source.
+- Every referenced artifact hash verified, with 0 inaccessible.
+- Historical attempts unchanged.
+- Spent total unchanged.
+- Zero pending or unknown billing.
+
+The private reports are in `.runtime/postgresql-migration/final/` (`plan-output.json`, `import-output.json`, `validation.json`).
+
+### Vector parity and keyword index
+
+All 18,983 active chunk vectors are in pgvector (1,536 dimensions, set `p8d1aa8594d18b47`). They are byte-identical to the verified ready set, with per-row checksums matching (`final/vector-parity.json`). Keyword index `29f261abafeb1f8c` passes `retrieval.index_compatibility` and is active, so `index_outdated` is cleared.
+
+### HNSW against exact search
+
+`python tools/check_vector_search.py --out <RFP_DATA_DIR>/vector-search` builds an HNSW index on the 1,536 vectors. It then compares the HNSW top 20 with the exact top 20 for every frozen pilot (dev, 55 questions) and whole-corpus (33 needles plus the pilot) passage question, on its own scope and over all documents. Nothing in this check is paid.
+
+Mean recall@20 by `hnsw.ef_search`:
+
+| ef_search | dev scoped | dev unscoped | corpus scoped | corpus unscoped |
+| --- | --- | --- | --- | --- |
+| 40 | 0.8127 | 0.9355 | 0.7924 | 0.9515 |
+| 100 | 0.8536 | 0.9545 | 0.8379 | 0.9682 |
+| 200 | 0.9045 | 0.9891 | 0.9152 | 0.9939 |
+| 400 | 0.9473 | 0.9982 | 0.9636 | 1.0 |
+
+No value reaches 0.99 in every group. Scoped queries filter the HNSW candidates after the graph search, so the needle passage can drop out. Exact search therefore stays the serving path (`dense_search: "exact"`), and the HNSW index is kept only for measurement.
+
+Warm latency in ms, p50 / p95:
+
+| Mode | Clients | dev scoped | dev unscoped |
+| --- | --- | --- | --- |
+| Exact | 1 | 3.7 / 6.3 | 183 / 227 |
+| Exact | 6 | 8.3 / 18.4 | 238 / 286 |
+| HNSW | 1 | 17.3 / 46 | 39.5 / 48.6 |
+| HNSW | 6 | 24.9 / 71.4 | 101 / 148 |
+
+EXPLAIN ANALYZE results:
+
+- Exact, scoped: 1.7 ms (top-N heapsort over the scope rows).
+- Exact, unscoped: 69.6 ms (sequential scan).
+- HNSW, scoped: 34.7 ms.
+- HNSW, unscoped: 4.2 ms (index scan on `embedding_payloads_hnsw_1536`).
+
+Exact unscoped search costs roughly 0.2 s per All documents question, which is small next to generation.
+
+### Fusion gate
+
+`python tools/check_large_quality.py --out <RFP_DATA_DIR>/fusion-gate/final-2 --run --max-cost-usd 0.05 --variant …` compares keyword-only K1 with seven fusion settings on two populations:
+
+- The frozen 55-question pilot (dataset `a3b4d5cc…`) on its own scopes.
+- The 88-question whole-corpus set: the pilot unscoped plus 33 needles.
+
+The selected setting is `keyword_first:60:1.0:6`. The BM25 top 6 keep their order, then weighted RRF (k 60, dense weight 1.0) fills the remaining slots. Evidence limits are unchanged.
+
+| Population | Setting | nDCG@5 | Complete support | New critical failures vs K1 |
+| --- | --- | --- | --- | --- |
+| Pilot, scoped | K1 | 0.9405 (n=48 graded) | 53/55 | — |
+| Pilot, scoped | keyword_first:60:1.0:6 | 0.9405 | 53/55 | 0 |
+| Whole corpus | K1 | 0.7832 (n=88) | 71/88 | — |
+| Whole corpus | keyword_first:60:1.0:6 | 0.7832 | 71/88 | 0 |
+
+Plain RRF (`rrf:60:1.0`, `rrf:60:0.25`) still loses `refresh50-b-training-handover` and `refresh50-eg-input-error`: dense ranks push K1's packed rows out of the top 5. `keyword_first` with a head of 3 also fails. The gate's query embeddings were 33 settled attempts costing 466 micro-USD. Serving uses this setting through the activated run `H-0f2bf03e9d`, whose recorded limits (`fusion`, `keyword_head`, `dense_weight`, `rrf_k`, `dense_search: "exact"`, `corpus_route`) override the process configuration. It was activated with `activate-run` and a decision file.
+
+### Whole-corpus needle set
+
+The owner's point was that selecting one or two documents first proves nothing. To test retrieval without that help, a needle set was built:
+
+- gpt-6-luna drafted 33 needle questions (10 drafting attempts, $0.0132).
+- Each was independently reviewed against the original page before freezing (`needles/corpus-freeze.json`).
+- Each targets one passage over 22 sources: 27 on middle pages and 6 on late pages.
+- The questions use exact identifiers, numbers and table cells.
+
+Over all 18,983 chunks with the serving fusion:
+
+| Measure | Hits | Rate | Wilson 95% |
+| --- | --- | --- | --- |
+| Target chunk in top 5 | 31/33 | 0.9394 | [0.8039, 0.9832] |
+| Target chunk in top 10 | 31/33 | 0.9394 | [0.8039, 0.9832] |
+
+K1 misses the same two needles, needle-09 and needle-24. Both are table-cell questions.
+
+### Paid end-to-end check
+
+Paid admission was enabled on PostgreSQL only, and 26 real answers ran through the app:
+
+| Mode | Requests | Answered |
+| --- | --- | --- |
+| All documents | 12 | 12 |
+| Two-document comparison | 9 | 5 |
+| Single document | 5 | 4 |
+
+- 23 answers cite the expected passage.
+- Listed failures:
+  - `refresh50-ad-migration-design`: comparison, `output_truncated`.
+  - `refresh50-eg-input-error`: evidence scope mismatch.
+  - `pair-warranty`: wrong passage.
+- All 28 attempts were reserved, dispatched and settled in the PostgreSQL ledger.
+- The budget meter and `budget-status` agree: spent $1.791537, ledger revision 1319, pending 0, unknown 0.
+
+A headless browser check against `bidmate_app` (private screenshots in `.runtime/browser-check-cutover/`) covered four screens:
+
+- All documents: one question, answered from PSR-002 of the 벤처기업협회 RFP, settled at $0.000683.
+- Two-document comparison: QUR-006 against QUR-002, answered with citations from both documents, settled at $0.000939.
+- Verification: loads.
+- Settings: shows the $10 cap and spent amount.
+
+The check found that the Verification fidelity overview still used a SQLite-only ungrouped `GROUP BY`. It is fixed and covered by `tests.test_api`.
+
+New paid work in this PR, before those two browser answers, totals $0.034160 over 126 settled attempts, against the $1.00 ceiling enforced by `--max-cost-usd` and the envelopes:
+
+| Item | Cost (USD) |
+| --- | --- |
+| Needle drafting | 0.013226 |
+| Evaluation query embeddings | 0.001158 |
+| Interactive embeddings | 0.000032 |
+| Answers | 0.019744 |
+
+### Archive and rollback
+
+Cold archives are kept under `.runtime/archive/` (private, ignored, referenced by no code; see `ARCHIVE.json`):
+
+- `sqlite-final-2026-10-04/`: the final `.sqlite3` snapshot (`ca299be9…`) and the former live file (`ceead767…`).
+- `postgresql-2026-10-04/`: a `python -m rfp_assistant.cli backup` custom-format dump (`database.dump`, `dc71fe72…`) with its manifest. Its ledger: spent 1,791,537 micro-USD, 438 attempts settled, pending and unknown 0.
+
+Rollback is a restore of that dump. Create an empty database, set `RFP_RESTORE_DATABASE_DSN` to it and run `python -m rfp_assistant.cli restore-check --backup <abs>/postgresql-2026-10-04/manifest.json`. The restore-check passed 39 of 39 checks with paid admission disabled. After a pass, point `RFP_DATABASE_DSN` at the restored database and re-enable paid admission deliberately with `paid on`.
+
 ## Status and requirements
 
 PostgreSQL persistence replacement is the first priority, as requested on 2026-10-03. The complete live SQLite snapshot has been rehearsed on an isolated, paid-disabled PostgreSQL target. The approved large/1,536 corpus build has now completed with real provider calls, as recorded below. Production cutover and reduced-large embedding acceptance remain incomplete. This handover records implemented commands and prerequisites; the owner approved paid work and a $10 cap on 2026-10-03, while production activation still requires candidate acceptance.
