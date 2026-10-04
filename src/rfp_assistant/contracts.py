@@ -175,7 +175,7 @@ class _Strict(BaseModel):
 
 class Claim(_Strict):
     text: str
-    kind: Literal["source_fact", "inference"]
+    kind: Literal["source_fact", "inference", "absence"]  # "absence" repeats a missing_fields entry; never shown
     doc_id: str
     evidence_ids: list[str]
 

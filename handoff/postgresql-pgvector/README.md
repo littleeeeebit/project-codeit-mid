@@ -110,7 +110,7 @@ Each setting is gated against K1 at the same depth and evidence limits. The toke
 
 The reranker reorders the whole candidate list, including the BM25 head that `keyword_first` protects, and loses rows K1 keeps. It is not served. More than 10 evidence units help keyword-only retrieval more than hybrid, which fills later slots with dense rows.
 
-`evaluate-retrieval --dataset dev --runs K1,H` recorded the selected limits as run `H-af9967ca81`. It reached packed complete 1.0 (55/55) with 0 critical failures, against K1-0351093f32's 54/55 and 1. The run was activated with a decision file. The top 5 equals `H-0f2bf03e9d`'s on all 55 rows, so the earlier pool review of the same 83 passages carries over. Serving now uses keyword_first:60:1.0:6, 50/50 candidates, 10 evidence units (4,000/4,800 tokens) and exact pgvector search.
+`evaluate-retrieval --dataset dev --runs K1,H` recorded the selected limits as run `H-af9967ca81`. It reached packed complete 1.0 (55/55) with 0 critical failures, against K1-0351093f32's 54/55 and 1. The run was activated with a decision file. The top 5 equals `H-0f2bf03e9d`'s on all 55 rows, so the earlier pool review of the same 83 passages carries over. Serving now uses keyword_first:60:1.0:6, 50/50 candidates, 10 evidence units (4,000/4,800 tokens) and exact pgvector search. In review round 3 the same limits were re-recorded under the corrected routing rule as `H-0fffb2a6ec`, which now serves.
 
 ### Whole-corpus needle set
 
@@ -164,7 +164,7 @@ The check found that the Verification fidelity overview still used a SQLite-only
 The All documents answer was accepted. The owner's comparison, "한영대학교와 을지 대학교의 제안서에서, 어떤 차이가 있어?", failed with `claim_without_evidence`. The model stated each side's absence twice: once as an uncited `inference` claim, and again as a `missing_fields` entry for the same document. The owner chose to fix both the prompt and the validation:
 
 - The prompt is now `grounded-answer-6`. Every claim, including an inference, cites at least one evidence ID of its own document. What the evidence does not show goes only in `missing_fields`.
-- `validate_answer` drops an uncited inference when its document already has a `missing_fields` entry, since the claim only restates that listed absence. An uncited source fact, or an uncited inference with no listed absence, is still rejected (`tests.test_generation`).
+- `validate_answer` dropped an uncited inference when its document already had a `missing_fields` entry. Review rounds 1 to 3 showed that this rule, and the text-matching rule that followed it, also dropped unrelated claims. The current rule (prompt `grounded-answer-7`, a declared `absence` kind) is under "Review round 3" below.
 
 The same comparison then answered with 9 cited claims ($0.001541). The 26 paid questions ran again under prompt 6 (private results in `.runtime/postgresql-migration/e2e-prompt6/`):
 
@@ -181,7 +181,7 @@ The same comparison then answered with 9 cited claims ($0.001541). The 26 paid q
 
 In the third round, the owner asked one All documents question ($0.001090) and one two-document comparison ($0.001572) in the running app. They confirmed both answers and their costs.
 
-New paid work in this PR totals $0.104262 against the $1.00 ceiling, which `--max-cost-usd` and the envelopes enforce:
+New paid work in this PR totals $0.133231 against the $1.00 ceiling, which `--max-cost-usd` and the envelopes enforce:
 
 | Item | Cost (USD) |
 | --- | --- |
@@ -195,29 +195,64 @@ New paid work in this PR totals $0.104262 against the $1.00 ceiling, which `--ma
 | Paid end-to-end rerun under prompt 6 | 0.025906 |
 | Repeats under prompt 6 and the prompt-5 A/B | 0.008887 |
 | The owner's third acceptance round | 0.002662 |
+| Review round 3: the owner's comparison and the 26 questions under prompt 7 | 0.028969 |
 
-The ledger after this work reads $1.861639 spent, revision 1547, with 0 open, pending or unknown attempts.
+The ledger after this work reads $1.890608 spent, revision 1628, with 0 open, pending or unknown attempts.
 
 ### Archive and rollback
 
 Cold archives are kept under `.runtime/archive/` (private, ignored, referenced by no code; see `ARCHIVE.json`):
 
 - `sqlite-final-2026-10-04/`: the final `.sqlite3` snapshot (`ca299be9…`) and the former live file (`ceead767…`).
-- `postgresql-2026-10-04-final/`: the rollback dump. It is a `python -m rfp_assistant.cli backup` custom-format dump (`database.dump`, `f33f74b1…`) with its manifest, taken with the app stopped after the last paid and acceptance write. Its ledger watermark is revision 1547: spent 1,861,639 micro-USD, all 514 attempts settled, 127 requests, pending and unknown 0. That equals the final ledger above.
-- `postgresql-2026-10-04/`: an earlier dump (`dc71fe72…`, revision 1319, spent 1,791,537 micro-USD, 438 attempts). It predates the paid end-to-end reruns and acceptance rounds, so it is history only and must not be restored.
+- `postgresql-2026-10-04-r3/`: the rollback dump. It is a `python -m rfp_assistant.cli backup` custom-format dump (`database.dump`, `c909b51c…`) with its manifest, taken with the app stopped after the last paid write (the prompt-7 rerun in review round 3). Its ledger watermark is revision 1628: spent 1,890,608 micro-USD, all 541 attempts settled, 154 requests, pending and unknown 0. That equals the final ledger.
+- `postgresql-2026-10-04-final/` (`f33f74b1…`, revision 1547) and `postgresql-2026-10-04/` (`dc71fe72…`, revision 1319): earlier dumps. Both predate later paid writes, so they are history only and must not be restored.
 
-Rollback is a restore of the final dump. Create an empty database, set `RFP_RESTORE_DATABASE_DSN` to it and run `python -m rfp_assistant.cli restore-check --backup <abs>/postgresql-2026-10-04-final/manifest.json`. It passed 50 of 50 checks into the empty `bidmate_restore_final`, leaving paid admission disabled and all 514 attempts settled.
+Rollback is a restore of the newest dump. Create an empty database, set `RFP_RESTORE_DATABASE_DSN` to it and run `python -m rfp_assistant.cli restore-check --backup <abs>/postgresql-2026-10-04-r3/manifest.json`. It passed all 61 checks into the empty `bidmate_restore_r3`, leaving paid admission disabled and all 541 attempts settled.
 
-Before turning paid admission on, compare the dump's watermark with the ledger being replaced. If that ledger is past revision 1547, every later request, attempt and adjustment must be reconciled into the restored database first (runbook §12). Restoring without that step loses settled spending. Only then point `RFP_DATABASE_DSN` at the restored database and run `paid on`. After any new paid write, take a new dump and restore-check it. The rollback dump is always the newest one that has passed.
+Before turning paid admission on, compare the dump's watermark with the ledger being replaced. If that ledger is past revision 1628, every later request, attempt and adjustment must be reconciled into the restored database first (runbook §12). Restoring without that step loses settled spending. Only then point `RFP_DATABASE_DSN` at the restored database and run `paid on`. After any new paid write, take a new dump and restore-check it. The rollback dump is always the newest one that has passed.
 
 ### Review rounds 1 and 2 (PR #13)
 
 Each finding was reproduced with a failing test before it was fixed:
 
-- F1: the rollback dump predated the final ledger. It was replaced by `postgresql-2026-10-04-final` as described above. The watermark rule is now in the README, in the runbook's PostgreSQL section and §12, and in `ARCHIVE.json`.
-- F2: an uncited inference was dropped whenever its document had any missing field. Now it is dropped only when it names a missing field listed for its own document. An unrelated inference, an absence listed for another document, or an uncited source fact still fails with `claim_without_evidence` (`tests.test_generation`).
+- F1: the rollback dump predated the final ledger. It was replaced by `postgresql-2026-10-04-final`, which round 3's paid rerun superseded with `postgresql-2026-10-04-r3`, as described above. The watermark rule is now in the README, in the runbook's PostgreSQL section and §12, and in `ARCHIVE.json`.
+- F2: an uncited inference was dropped whenever its document had any missing field. The round-2 repair dropped it only when it named a listed missing field, but round 3 showed that this still dropped claims that assert something else. Round 3 replaced it (below).
 - F3: ledger-only commands took the gateway lock because they passed a `FakeTransport`. `Resources(dispatch=False)` opens no provider client and takes no owner. It covers `paid`, `settle`, `adjust` and `audit`, plus two more commands under the same documented rule: `unresolved` and `reconcile`. It also covers the estimate-only `PinnedResources` (no transport), which took the lock the same way. `tests.test_service` runs the commands and the estimate beside a foreign gateway owner.
 - F4: a borrowed gateway owner died with its creator. `GatewayOwner` now counts its users (`postgres.borrow_owner`), and the advisory lock is released with the last one. A test closes the first resource and answers through the borrower.
+
+### Review round 3 (PR #13)
+
+Both findings were reproduced with a failing test first:
+
+- F2: an uncited inference such as "B 문서의 예산은 충분하다" was dropped because it named B's missing field 예산. Text cannot show that a claim asserts an absence, so the model now declares it. Prompt `grounded-answer-7` adds a claim kind `absence` for a claim that only repeats a `missing_fields` entry of its own document.
+  - `validate_answer` drops such a claim, which is never shown. It fails the answer with `absence_without_missing_field` when that document lists no missing field.
+  - Every uncited `source_fact` or `inference` fails with `claim_without_evidence`, whatever its text says (`tests.test_generation`).
+  - `validate_answer` is the only path that parses model output, so the `absence` kind never reaches the API, scoring or screens.
+- F5: a question made only of generic title words ("대학교 사업") routed All documents retrieval to 서영대학교, the one title containing both. A document is now routed only when the question restates one of its title terms found in fewer than `ROUTE_MAX` (4) titles.
+  - In the live corpus that leaves 대학교, 교육 and 학사 (4 titles each) generic, while 국민연금공단 (2) and 한국수자원공사 (3) still route.
+  - The rule is versioned (`ROUTE_RULE = greedy-rare-term-1`) in frozen run configurations, so runs recorded under the old rule are not reused.
+  - Over the 91 evaluation and acceptance questions, routing changed for 8 pilot questions (fewer documents), 1 pilot question (now routed) and the generic probe (no longer routed). It did not change for any needle or either owner question.
+
+Retrieval was measured again after the routing change. `tools/check_large_quality.py --variant keyword_first:60:1.0:6 --depth 50 --units 10,15` passed and kept 10 units:
+
+| Set | Hybrid | K1 |
+| --- | --- | --- |
+| Pilot scoped | nDCG@5 0.9405, 55/55 | 0.9405, 54/55 |
+| Whole corpus (88 questions) | nDCG@5 0.8081, 73/88 | 0.8081, 71/88 |
+| Needles, top 5 and top 10 | 32/33 (Wilson [0.8468, 0.9946]) | 32/33 |
+
+New critical failures against K1: zero. `evaluate-retrieval --dataset dev --runs K1,H` recorded the serving limits as run `H-0fffb2a6ec`, with packed complete 55/55 and 0 critical failures (K1-99fae07108: 54/55 and 1). Its top 5 equals `H-af9967ca81`'s on all 55 rows, so the review of the same 83 passages carries over. It was activated with a decision file and replaces `H-af9967ca81` in serving.
+
+Answers were measured again under prompt 7. The owner's comparison answered with 9 cited claims ($0.001620). The 26 paid questions ran through the app (private results in `.runtime/postgresql-migration/e2e-prompt7/`):
+
+- 24 of 26 cite the expected passages: All documents 12/12, single document 5/5, comparisons 6 answered plus `refresh50-ah-ip` with the expected `conflicting_evidence`.
+- Listed failures:
+  - `refresh50-ad-migration-design`: `output_truncated`, as before; its 13 groups exceed the 2,000-token answer limit.
+  - `refresh50-eg-input-error`: `evidence_scope_mismatch`, the model variance seen under prompt 6 (three of three repeats answered then).
+- No answer failed with `claim_without_evidence` or `absence_without_missing_field`.
+- All 26 attempts settled. The meter and `budget-status` agree at revision 1628 with pending and unknown at 0.
+
+A new rollback dump was then taken after this last paid write and restore-checked (see "Archive and rollback").
 
 ## Status and requirements
 

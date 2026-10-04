@@ -151,8 +151,9 @@ class SafetyTest(unittest.TestCase):
         with self.assertRaises(generation.TechnicalError):
             generation.validate_answer(bad, [], set(), {})
 
-    def test_an_uncited_inference_restating_a_listed_absence_is_dropped_and_nothing_else(self):
-        # The owner's comparison: each side's absence was stated twice, as an uncited inference and a missing field.
+    def test_only_a_declared_absence_of_a_listed_missing_field_is_dropped(self):
+        # The owner's comparison: each side's absence was stated twice, as an uncited claim and a missing field. A
+        # restatement is declared kind "absence"; text never decides it, so every uncited inference or fact fails.
         ev = EvidenceUnit("E1", "A", "h", "x", "c", ["e"], "제안서 10부", {}, 5)
 
         def respond(claims, missing=()):
@@ -166,16 +167,21 @@ class SafetyTest(unittest.TestCase):
             return generation.validate_answer(response, [ev], {"A", "B"}, {"E1": ev.quote}, {"A", "B"})
 
         fact = ("A는 제안서 10부를 요구한다", "source_fact", "A", ["E1"])
-        absence = ("B 문서에서는 제안서 제출 부수를 확인할 수 없다", "inference", "B", [])
+        absence = ("B 문서에서는 제안서 제출 부수를 확인할 수 없다", "absence", "B", [])
         payload = validate(respond([fact, absence], missing=[("B", "제안서 제출 부수")]))
         self.assertEqual([c.text for c in payload.claims], [fact[0]])
-        for claims, missing in (([fact, absence], []),  # no listed absence to restate
-                                ([fact, absence], [("A", "제안서 제출 부수")]),  # listed for another document
-                                ([fact, ("B의 일정은 위험해 보인다", "inference", "B", [])], [("B", "예산")]),  # unrelated
-                                ([fact, ("B는 5부", "source_fact", "B", [])], [("B", "부수")])):  # an uncited fact
+        for claims, missing in (
+                ([fact, absence[:1] + ("inference",) + absence[2:]], [("B", "제안서 제출 부수")]),  # undeclared
+                ([fact, ("B의 일정은 위험해 보인다", "inference", "B", [])], [("B", "예산")]),  # unrelated
+                ([fact, ("B 문서의 예산은 충분하다", "inference", "B", [])], [("B", "예산")]),  # names the field
+                ([fact, ("B는 5부", "source_fact", "B", [])], [("B", "부수")])):  # an uncited fact
             with self.subTest(claims=claims[1][0], missing=missing), \
                     self.assertRaisesRegex(generation.TechnicalError, "claim_without_evidence"):
                 validate(respond(claims, missing))
+        for missing in ([], [("A", "제안서 제출 부수")]):  # nothing listed for B
+            with self.subTest(missing=missing), \
+                    self.assertRaisesRegex(generation.TechnicalError, "absence_without_missing_field"):
+                validate(respond([fact, absence], missing))
 
 
 if __name__ == "__main__":

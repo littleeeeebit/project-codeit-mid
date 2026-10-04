@@ -111,6 +111,13 @@ class RoutingTest(unittest.TestCase):
         # 서영대학교 shares "대학교" and "사업" with the question; only 한영대학교 is named.
         self.assertEqual(self.route(["한영", "대학교", "사업", "알리"]), ["a"])
 
+    def test_generic_title_words_alone_route_nothing(self):
+        # Only 서영대학교 has both "대학교" (four titles) and "사업" (29), but neither names a project.
+        self.assertEqual(self.route(["대학교", "사업"]), [])
+        generic = {"c": ["조선", "대학교", "학사"], "d": ["남서울", "대학교", "학사"], "e": ["학사", "관리"]}
+        self.assertEqual(self.route(["대학교", "학사", "사업"], generic), [])  # "학사" in four titles, as live
+        self.assertEqual(self.route(["청주", "구축"], {"q": ["청주", "구축"]}), ["q"])  # a name in one title routes
+
     def test_two_named_projects_are_both_routed(self):
         self.assertEqual(self.route(["한영", "대학교", "트랙", "서영", "교육"]), ["a", "b"])
 

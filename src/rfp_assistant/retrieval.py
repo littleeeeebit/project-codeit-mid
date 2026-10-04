@@ -403,6 +403,7 @@ def metadata_term_snapshot(settings: Settings, analyzer, doc_ids: list[str]) -> 
 
 ROUTE_SHARE = 0.5  # a routed document carries at least half the best-matching document's name weight
 ROUTE_MAX = 4  # more matching documents than this: the question names no particular project
+ROUTE_RULE = "greedy-rare-term-1"  # recorded in frozen run configurations; change it whenever route_corpus changes
 
 
 def route_corpus(index: KeywordIndex, analyzer, question: str,
@@ -422,8 +423,10 @@ def route_corpus(index: KeywordIndex, analyzer, question: str,
         for t in matched:
             df[t] = df.get(t, 0) + 1
     idf = {t: math.log(len(names) / n) for t, n in df.items()}
+    # A term in ROUTE_MAX or more titles names a kind of project ("대학교", "교육"), not one: a document is a
+    # candidate only when the question also restates one of its rarer terms.
     weight = {d: sum(idf[t] for t in matched) for d, matched in names.items()
-              if len(matched) >= METADATA_RESTATEMENT_MIN}
+              if len(matched) >= METADATA_RESTATEMENT_MIN and any(df[t] < ROUTE_MAX for t in matched)}
     top = max(weight.values(), default=0.0)
     keep: set[str] = set()
     explained: set[str] = set()
