@@ -232,7 +232,7 @@ class LangfuseLauncherTest(unittest.TestCase):
             self.assertTrue(secrets["LANGFUSE_PUBLIC_KEY"].startswith("pk-lf-"))
             self.assertEqual(len(secrets["LANGFUSE_ENCRYPTION_KEY"]), 64)
             dotenv = (root / ".env").read_text(encoding="utf-8").splitlines()
-            self.assertEqual(dotenv, ["OPENAI_API_KEY=keep-me", "LANGFUSE_HOST=http://127.0.0.1:3100",
+            self.assertEqual(dotenv, ["OPENAI_API_KEY=keep-me", "LANGFUSE_HOST=http://127.0.0.2:3100",
                                       f"LANGFUSE_PUBLIC_KEY={secrets['LANGFUSE_PUBLIC_KEY']}",
                                       f"LANGFUSE_SECRET_KEY={secrets['LANGFUSE_SECRET_KEY']}"])
             calls = (root / "calls.txt").read_text(encoding="utf-8").splitlines()

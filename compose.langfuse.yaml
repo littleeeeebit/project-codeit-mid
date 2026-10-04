@@ -4,9 +4,10 @@
 # Only the UI and MinIO (browser media URLs) are published, both on loopback; the databases stay internal.
 name: bidmate-langfuse
 x-langfuse-env: &langfuse-env
-  NEXTAUTH_URL: http://127.0.0.1:3100
-  # Cookies ignore ports: another local Langfuse on 127.0.0.1 would otherwise overwrite these sessions.
-  NEXTAUTH_COOKIE_NAME_SUFFIX: bidmate
+  # 127.0.0.2, a loopback host of its own: cookies ignore ports, so another NextAuth app on 127.0.0.1 (a second local
+  # Langfuse) would share these session cookies. A cookie name suffix does not help: NextAuth reads every cookie
+  # whose name starts with the session cookie name as a chunk, so it breaks the other app's sessions instead.
+  NEXTAUTH_URL: http://127.0.0.2:3100
   DATABASE_URL: postgresql://postgres:${LANGFUSE_POSTGRES_PASSWORD:?Run tools/start-langfuse.ps1 first}@postgres:5432/postgres
   SALT: ${LANGFUSE_SALT:?}
   ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?}
@@ -58,11 +59,11 @@ services:
     restart: unless-stopped
     depends_on: *depends
     ports:
-      - "127.0.0.1:3100:3000"
+      - "127.0.0.2:3100:3000"
     environment:
       <<: *langfuse-env
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?}
-      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://127.0.0.1:9190
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://127.0.0.2:9190
       LANGFUSE_S3_MEDIA_UPLOAD_INTERNAL_ENDPOINT: http://minio:9000
       AUTH_DISABLE_SIGNUP: "true"
       LANGFUSE_INIT_ORG_ID: bidmate
@@ -107,7 +108,7 @@ services:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:?}
     ports:
-      - "127.0.0.1:9190:9000"
+      - "127.0.0.2:9190:9000"
     volumes:
       - minio_data:/data
     healthcheck:
