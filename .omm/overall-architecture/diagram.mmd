@@ -1,0 +1,11 @@
+graph LR
+    handoff["handoff\nhandoff/"]
+    src["src\nsrc/"]
+    tests["tests\ntests/"]
+    tools["tools\ntools/"]
+    web["web\nweb/"]
+    handoff -->|"imports"| tests
+    src -->|"imports"| tests
+    tests -->|"imports"| src
+    tools -->|"imports"| src
+    tools -->|"imports"| tests

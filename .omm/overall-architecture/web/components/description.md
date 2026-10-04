@@ -1,0 +1,42 @@
+# web/components
+
+Source files (38):
+
+- `web/src/components/app-header.tsx`
+- `web/src/components/ask/answer-parts.tsx`
+- `web/src/components/ask/answer-view.tsx`
+- `web/src/components/ask/ask-page.tsx`
+- `web/src/components/ask/document-search.tsx`
+- `web/src/components/data-table.tsx`
+- `web/src/components/dataset/dataset-page.tsx`
+- `web/src/components/dataset/draft.tsx`
+- `web/src/components/dataset/review.tsx`
+- `web/src/components/side-menu.tsx`
+- `web/src/components/status-badge.tsx`
+- `web/src/components/ui/alert.tsx`
+- `web/src/components/ui/badge.tsx`
+- `web/src/components/ui/button.tsx`
+- `web/src/components/ui/card.tsx`
+- `web/src/components/ui/checkbox.tsx`
+- `web/src/components/ui/collapsible.tsx`
+- `web/src/components/ui/input.tsx`
+- `web/src/components/ui/label.tsx`
+- `web/src/components/ui/progress.tsx`
+- `web/src/components/ui/scroll-area.tsx`
+- `web/src/components/ui/select.tsx`
+- `web/src/components/ui/separator.tsx`
+- `web/src/components/ui/skeleton.tsx`
+- `web/src/components/ui/table.tsx`
+- `web/src/components/ui/tabs.tsx`
+- `web/src/components/ui/textarea.tsx`
+- `web/src/components/ui/toggle-group.tsx`
+- `web/src/components/ui/toggle.tsx`
+- `web/src/components/ui/tooltip.tsx`
+- `web/src/components/verify/evaluation.tsx`
+- `web/src/components/verify/fidelity.tsx`
+- `web/src/components/verify/gold.tsx`
+- `web/src/components/verify/judges.tsx`
+- `web/src/components/verify/parts.tsx`
+- `web/src/components/verify/records.tsx`
+- `web/src/components/verify/trace.tsx`
+- `web/src/components/verify/verify-page.tsx`
