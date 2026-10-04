@@ -65,6 +65,13 @@ class Settings:
     channel_top_k: int = 20  # BM25 top 20 and dense top 20
     fused_top_k: int = 20
     rrf_k: int = 60
+    # Hybrid fusion: "rrf" (weighted reciprocal rank fusion) or "keyword_first" (BM25 order, then dense-only rows by
+    # fused score). Serving takes both from the activated run; change them only through a measured comparison.
+    fusion: str = "rrf"
+    dense_weight: float = 1.0  # RRF weight of the dense channel; the keyword channel weighs 1
+    keyword_head: int = 20  # keyword_first: leading BM25 rows kept in BM25 order; the rest fuse by weighted RRF
+    dense_search: str = "exact"  # "hnsw" only through a run whose recall against exact search was measured
+    hnsw_ef_search: int = 100
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
     reranker_revision: str = ""  # commit hash from the model card; the trial refuses to load an unpinned model
     reranker_max_length: int = 512
@@ -180,6 +187,10 @@ def validate(s: Settings) -> None:
         raise SettingsError("reranker_max_concurrency must be 1 until per-worker tokenizer isolation exists")
     if s.reranker_precision not in ("fp32", "fp16"):
         raise SettingsError("reranker_precision must be 'fp32' or 'fp16'")
+    if s.fusion not in ("rrf", "keyword_first") or not 0 < s.dense_weight <= 2 or not 0 <= s.keyword_head <= 100:
+        raise SettingsError("fusion must be 'rrf' or 'keyword_first', dense_weight within (0, 2], keyword_head 0..100")
+    if s.dense_search not in ("exact", "hnsw") or not 1 <= s.hnsw_ef_search <= 1000:
+        raise SettingsError("dense_search must be 'exact' or 'hnsw' and hnsw_ef_search within 1..1000")
     if s.rrf_k < 1 or s.channel_top_k < 1 or s.fused_top_k < 1 or s.reranker_max_concurrency < 1:
         raise SettingsError("rrf_k, top-k depths and reranker concurrency must be positive")
     if not 1 <= s.request_workers <= 6 or not s.request_workers <= s.request_admission <= 48:

@@ -30,7 +30,7 @@ from .contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, Evi
                         ManagedDownload, Principal, RequestView, RetrievalResult)
 from .ingestion import (CODE_RE, QUARANTINE_TEXT, load_elements, nfc, printed_pdf_path, record_review,
                         resolutions_by_doc)
-from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extraction, scope_rows
+from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extraction, corpus_scope, scope_rows
 from .retrieval import retrieve as _retrieve
 from .evaluation import EVAL_VERSION
 from .settings import Settings, read_api_key
@@ -475,12 +475,13 @@ def _narrow_limits(s: Settings, limits: dict | None) -> dict:
 
 def retrieve(res: Resources, principal: Principal, question: str, scope: list[DocRef], *,
              request_id: str | None = None, allow_paid: bool = False, limits: dict | None = None,
-             mode: str | None = None) -> RetrievalResult:
+             mode: str | None = None, all_documents: bool = False) -> RetrievalResult:
     """Serves the activated mode. A dense query vector comes from the cache, or through the gateway only when
     the caller is a paid request (`allow_paid`); an empty scope never pays for one. `limits` may only narrow the
-    evidence/depth limits (comparison sides, verifier configurations); `mode` lets a verifier pick a free mode."""
+    evidence/depth limits (comparison sides, verifier configurations); `mode` lets a verifier pick a free mode.
+    `all_documents` searches every indexed original instead of `scope`."""
     principal = _authorize(res, principal, "consultant", "verifier")
-    docs = _resolve_scope(res, scope)
+    docs = [] if all_documents else _resolve_scope(res, scope)
     idx = res.index()
     if idx is None:
         raise ServiceError("검색 색인이 아직 없습니다.")
@@ -492,7 +493,8 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
     s = res.run_settings(cfg)
     if limits:
         s = s.with_(**_narrow_limits(s, limits))
-    pairs = [(DocRef(d["doc_id"], d["active_source_hash"]), d["active_extraction_id"]) for d in docs]
+    pairs = corpus_scope(res.settings, idx) if all_documents else \
+        [(DocRef(d["doc_id"], d["active_source_hash"]), d["active_extraction_id"]) for d in docs]
     dense = qvec = qinfo = None
     if cfg["mode"] in DENSE_MODES:
         dense = res.dense()
@@ -543,7 +545,7 @@ def _input_hash(request: AnswerRequest) -> str:
 
 
 BILLING_PRECEDENCE = ("unknown", "pending", "reconciled", "settled", "released")
-PAID_MODES = ("single", "compare")
+PAID_MODES = ("single", "compare", "corpus")
 FREE_MODES = ("metadata", "inventory")
 
 
@@ -591,11 +593,20 @@ def _evidence_map(evidence: list[EvidenceUnit]) -> dict[str, dict]:
 
 def prepare_answer(res: Resources, principal: Principal, question: str, scope: list[DocRef], as_of: str, *,
                    request_id: str | None = None, allow_paid: bool = False, mode: str | None = None,
-                   limits: dict | None = None) -> dict:
+                   limits: dict | None = None, all_documents: bool = False) -> dict:
     """Retrieval plus exact prompt counting and the maximum reservation estimate. Free unless `allow_paid`
     lets a dense mode pay for an uncached query embedding. `mode`/`limits` come from a frozen verifier
-    configuration."""
+    configuration. With `all_documents` the prompt names only the documents whose passages were retrieved."""
     principal = _authorize(res, principal, "consultant", "verifier")
+    if all_documents:
+        retrieval = retrieve(res, principal, question, [], request_id=request_id, allow_paid=allow_paid, mode=mode,
+                             limits=limits, all_documents=True)
+        cited = [e.doc_id for e in retrieval.evidence]
+        order = list(dict.fromkeys(cited))
+        docs = sorted(_doc_rows(res, order), key=lambda d: order.index(d["doc_id"]))
+        prep = _priced(res, question, as_of, docs, retrieval, "corpus")
+        prep["coverage"] = [{"doc_id": d, "evidence": cited.count(d)} for d in order]
+        return prep
     docs = _resolve_scope(res, scope)
     retrieval = retrieve(res, principal, question, scope, request_id=request_id, allow_paid=allow_paid, mode=mode,
                          limits=limits)
@@ -641,6 +652,10 @@ def _validate_request(res: Resources, request: AnswerRequest) -> str:
     refs = [(r.doc_id, r.source_hash) for r in request.scope]
     if len(set(refs)) != len(refs):
         raise ServiceError("같은 문서를 두 번 선택했습니다.")
+    if request.mode == "corpus" and refs:
+        raise ServiceError("전체 문서 질문은 문서를 선택하지 않습니다.")
+    if request.mode != "corpus" and not 1 <= len(refs) <= 2:
+        raise ServiceError("문서를 한두 개 선택하거나 전체 문서로 질문하세요.")
     if request.mode == "compare" and len(refs) != 2:
         raise ServiceError("비교 질문은 문서를 정확히 두 개 선택해야 합니다.")
     if request.mode == "metadata" and not 1 <= len(refs) <= 2:
@@ -816,11 +831,11 @@ def _execute(res: Resources, principal: Principal, request_id: str, request: Ans
 def _paid_answer(res: Resources, principal: Principal, request_id: str, request: AnswerRequest, question: str,
                  trace: dict, done) -> AnswerResult:
     s = res.settings
-    docs = _resolve_scope(res, request.scope)
+    docs = [] if request.mode == "corpus" else _resolve_scope(res, request.scope)
     unavailable = [d for d in docs if d["parse_status"] != "parsed" or not _indexed(res, d["active_extraction_id"])]
     missing_unavailable = [{"doc_id": d["doc_id"], "field": "document", "reason": "ingestion_unavailable"}
                            for d in unavailable]
-    if len(unavailable) == len(docs):
+    if docs and len(unavailable) == len(docs):
         reason = QUARANTINE_TEXT.get(unavailable[0]["reason_code"] or "",
                                      "이 문서는 아직 검색 색인에 포함되지 않았습니다.")
         return done("ingestion_unavailable", f"원문 전체를 확인할 수 없어 답변하지 않습니다. {reason}",
@@ -834,6 +849,10 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
             prep = _frozen_prep(res, question, request, docs, frozen)
         elif request.mode == "compare":
             prep = _prepare_compare(res, principal, question, docs, request.as_of, request_id)
+        elif request.mode == "corpus":
+            prep = prepare_answer(res, principal, question, [], request.as_of, request_id=request_id,
+                                  allow_paid=True, all_documents=True)
+            docs = prep["docs"]
         else:
             prep = prepare_answer(res, principal, question, request.scope, request.as_of, request_id=request_id,
                                   allow_paid=True)
@@ -857,7 +876,8 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
     evidence_map = _evidence_map(retrieval.evidence)
     common = {"coverage": coverage, "limitations": retrieval.limitations}
     if not retrieval.evidence:
-        return done("insufficient_evidence", "선택한 문서에서 질문과 관련된 근거를 찾지 못했습니다.",
+        where = "전체 문서" if request.mode == "corpus" else "선택한 문서"
+        return done("insufficient_evidence", f"{where}에서 질문과 관련된 근거를 찾지 못했습니다.",
                     missing_fields=server_missing, **common)
     principal = _checkpoint(res, request_id, principal)
     admission = budget.reserve(s.db_path, request_id=request_id, member_id=principal.member_id, stage="generation",

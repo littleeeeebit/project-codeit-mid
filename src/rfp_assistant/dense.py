@@ -561,7 +561,7 @@ class DenseIndex:
             raise DenseError("dense rows do not match the keyword index rows")
         return cls(version, config["base_index_version"], config["model"], dims, matrix, chunk_ids)
 
-    def search(self, query: np.ndarray, allowed: list[int], k: int) -> list[tuple[int, float]]:
+    def search(self, query: np.ndarray, allowed: list[int], k: int, settings=None) -> list[tuple[int, float]]:
         """Cosine by dot product over unit rows, restricted to admitted rows. Ties by chunk ID."""
         if not allowed:
             return []

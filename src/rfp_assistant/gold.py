@@ -24,7 +24,7 @@ import uuid
 from pathlib import Path
 
 from .evaluation import (GOLD_DATASETS, METADATA_TYPES, OPERATIONAL_TYPES, SEALED_SPLITS, GoldChecker, RowChecker,
-                         dataset_path)
+                         dataset_path, split_of)
 from .ingestion import CODE_RE, QUARANTINE_TEXT, nfc
 from .settings import Settings
 from .store import dumps, open_db, tx, utcnow, write_jsonl_atomic, write_text_atomic
@@ -105,7 +105,7 @@ def row_checker(settings: Settings, conn, dataset: str):
 
 def check_row(checker, row: dict, tag: str, dataset: str) -> list[str]:
     if isinstance(checker, GoldChecker):
-        return checker.check(row, tag, split=dataset, require_review=False)
+        return checker.check(row, tag, split=split_of(dataset), require_review=False)
     return checker.check(row, tag)
 
 

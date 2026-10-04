@@ -125,10 +125,20 @@ def configure(db: Path, actor: str, *, project_start: date, project_end: date, p
 
 
 def set_paid_enabled(db: Path, actor: str, enabled: bool, reason: str) -> None:
+    """The one paid switch: the ledger flag and PostgreSQL admission change together. Enabling requires the
+    validated import, no recovery fence and no unknown billing; a restored database stays off until this runs."""
+    from .postgres import recovery_blocked, validation_ready
+
     with open_db(db) as conn, tx(conn, immediate=True):
         row = _settings_row(conn)
         if enabled and not (row["prior_use_recorded"] and row["project_start"] and row["project_end"]):
             raise BudgetError("configure-budget must record dates and prior use first")
+        if isinstance(db, Target):
+            if enabled and (recovery_blocked(conn) or not validation_ready(conn)):
+                raise BudgetError("paid admission requires a validated import and no open recovery fence")
+            if enabled and conn.execute("SELECT count(*) FROM attempts WHERE state = 'unknown'").fetchone()[0]:
+                raise BudgetError("reconcile unknown billing before enabling paid admission")
+            conn.execute("UPDATE database_control SET paid_admission = ? WHERE id = 1", (enabled,))
         history = json.loads(row["history_json"]) + [{"at": utcnow(), "actor": actor, "paid_enabled": enabled,
                                                       "reason": reason}]
         conn.execute("UPDATE budget_settings SET paid_enabled = ?, frozen_reason = NULL, history_json = ? WHERE id = 1",

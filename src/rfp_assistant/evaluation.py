@@ -313,8 +313,8 @@ def _gold_eval_rows(rows: list[dict], name: str, active: dict) -> tuple[list[dic
                 or second.get("reviewer") in (None, "", review.get("drafted_by"), review.get("reviewed_by"))
                 or (prov.get("method") == "llm" and second.get("reviewer") == prov.get("model"))):
             reason = "dispute_unresolved"
-        elif row.get("split") != name:
-            reason = f"not_{name}"
+        elif row.get("split") != split_of(name):
+            reason = f"not_{split_of(name)}"
         elif any(s.get("doc_id") not in active for s in row.get("scope") or []):
             reason = "unknown_doc"
         elif row.get("mode") != "metadata" and any(active[s["doc_id"]][1] != s.get("extraction_id")
@@ -748,6 +748,7 @@ def score_row(row: dict, ranking: list[dict], packed: list[dict], elements: dict
     n = len(units)
     return {
         "units": n, "hit@1": int(any(g == 2 for g in at(1))), "hit@5": int(any(g == 2 for g in top5)),
+        "hit@10": int(any(g == 2 for g in at(10))),
         "hit@20": int(any(g == 2 for g in top20)),
         "recall@20": round(sum(g == 2 for g in top20) / n, 4), "complete@20": int(all(g == 2 for g in top20)),
         "ndcg@5": round(min(1.0, dcg / sum(2 / math.log2(j + 1) for j in range(1, min(n, NDCG_AT) + 1))), 4), "mrr": round(1 / first_full, 4) if first_full else 0.0,
@@ -907,7 +908,7 @@ def _ready_dense_for(settings: Settings, index_version: str) -> str | None:
 
 def _frozen_config(settings: Settings, label: str, dataset: str, dataset_sha: str, index, dense, analyzer,
                    extra: dict | None = None, population: tuple[str, int] | None = None) -> dict:
-    from .retrieval import RUN_MODES, WhitespaceAnalyzer, analyzer_fingerprint
+    from .retrieval import ROUTE_MAX, ROUTE_SHARE, RUN_MODES, WhitespaceAnalyzer, analyzer_fingerprint
 
     return {"eval_version": EVAL_VERSION, "label": label, "mode": RUN_MODES[label], "dataset": dataset,
             "dataset_sha256": dataset_sha, "population_sha256": population[0] if population else None,
@@ -918,15 +919,22 @@ def _frozen_config(settings: Settings, label: str, dataset: str, dataset_sha: st
             "embedding": {"model": settings.embedding_model, "dims": settings.embedding_dimensions}
             if label in ("D", "H", "HR") else None,
             "limits": {"channel_top_k": settings.channel_top_k, "fused_top_k": settings.fused_top_k,
-                       "rrf_k": settings.rrf_k, "evidence_target_tokens": settings.evidence_target_tokens,
+                       "rrf_k": settings.rrf_k, "fusion": settings.fusion, "dense_weight": settings.dense_weight,
+                       "keyword_head": settings.keyword_head,
+                       "corpus_route": {"share": ROUTE_SHARE, "max": ROUTE_MAX},
+                       "dense_search": settings.dense_search, "hnsw_ef_search": settings.hnsw_ef_search,
+                       "evidence_target_tokens": settings.evidence_target_tokens,
                        "evidence_max_tokens": settings.evidence_max_tokens,
                        "evidence_max_units": settings.evidence_max_units}, **(extra or {})}
 
 
 def _execute(settings: Settings, index, analyzer, rows: list[dict], mode: str, dense=None, vectors=None,
-             reranker=None, rerank_depth=None) -> list[dict]:
-    from .retrieval import retrieve
+             reranker=None, rerank_depth=None, unscoped: bool = False) -> list[dict]:
+    """`unscoped` asks every question once over the whole corpus (the all-documents scope) instead of its row's
+    selected documents; every evidence group is then scored on that single ranking."""
+    from .retrieval import corpus_scope, retrieve
 
+    corpus = corpus_scope(settings, index) if unscoped else None
     results = []
     for row in rows:
         out = {"id": row_id(row), "type": row_type(row), "critical": row_critical(row),
@@ -934,10 +942,10 @@ def _execute(settings: Settings, index, analyzer, rows: list[dict], mode: str, d
         if not is_passage_row(row):
             results.append(out)  # metadata, operational and unanswerable rows: reported, not ranked
             continue
-        scope, groups = row_scope(row), row_groups(row)
+        scope, groups = corpus or row_scope(row), row_groups(row)
         allowed = {x for _, x in scope}
         sides = []  # one scoped retrieval per selected document, as the balanced comparison serves it
-        for ref, x in ([(None, None)] if len(scope) == 1 else scope):
+        for ref, x in ([(None, None)] if len(scope) == 1 or corpus else scope):
             r = retrieve(settings, index, analyzer, row["question"], scope if ref is None else [(ref, x)], mode=mode,
                          dense=dense, query_vector=(vectors or {}).get(row_id(row)), reranker=reranker,
                          rerank_depth=rerank_depth)
@@ -1833,7 +1841,13 @@ def write_phase2_report(settings: Settings) -> Path:
 # rechunked index is scored against the same ground truth.
 
 GOLD_SCHEMA = "gold-2"
-GOLD_DATASETS = ("dev", "test")
+# corpus: whole-corpus needle questions; its rows belong to dev families (split "dev") and are never sealed.
+GOLD_DATASETS = ("dev", "test", "corpus")
+
+
+def split_of(dataset: str) -> str:
+    """The family split a gold dataset's rows must belong to."""
+    return "test" if dataset in SEALED_SPLITS else "dev"
 GOLD_TYPE_TARGETS = {  # per split; the combined target is twice this (120 rows)
     "direct_fact": 12, "semantic_paraphrase": 9, "exact_identifier": 6, "table_numeric": 9, "multi_passage": 6,
     "cross_document": 6, "missing_false_premise": 6, "revision_conflict": 6,
@@ -2324,7 +2338,7 @@ def validate_gold_v2(settings: Settings, name: str) -> dict:
     if raw.startswith(b"\xef\xbb\xbf"):
         return {"ok": False, "dataset": name, "errors": ["dataset must be UTF-8 without BOM"], "rows": 0}
     rows = read_jsonl(path)
-    other_name = "test" if name == "dev" else "dev"
+    other_name = "dev" if name == "test" else "test"
     other = _gold_split_rows(settings, other_name)
     errors: list[str] = []
     rejected: dict[str, list[str]] = {}
@@ -2339,7 +2353,7 @@ def validate_gold_v2(settings: Settings, name: str) -> dict:
         for i, row in enumerate(rows, start=1):
             qid = str(row.get("question_id") or f"row-{i}")
             tag = qid
-            errs = checker.check(row, tag, split=name)
+            errs = checker.check(row, tag, split=split_of(name))
             if qid in seen_ids:
                 errs.append(f"{tag}: question_id repeated (keep only the latest revision)")
             seen_ids.add(qid)

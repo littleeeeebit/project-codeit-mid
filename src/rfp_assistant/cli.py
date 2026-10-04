@@ -603,7 +603,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("validate-gold", help="dev-pilot (phase 2 rules) or the gold-2 splits dev / test")
     s.add_argument("--dataset", required=True)
     s = sub.add_parser("freeze-dataset", help="validate and freeze a gold split: dataset, review log, family map")
-    s.add_argument("--dataset", required=True, choices=["dev", "test"])
+    s.add_argument("--dataset", required=True, choices=["dev", "test", "corpus"])
     s.add_argument("--actor", required=True)
     s.add_argument("--reason", required=True)
     s = sub.add_parser("plan-run", help="estimate an answer evaluation before anything is sent (no provider call)")

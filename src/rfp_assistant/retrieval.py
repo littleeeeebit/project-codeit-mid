@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import shutil
 import threading
@@ -340,6 +341,20 @@ def index_compatibility(index: KeywordIndex, analyzer=None) -> str | None:
     return None
 
 
+def corpus_scope(settings: Settings, index: KeywordIndex) -> list[tuple[DocRef, str]]:
+    """The scope of an all-documents question: every indexed active extraction once, cited under the first
+    document (CSV order) associated with that original."""
+    with open_db(settings.db_path) as conn:
+        rows = conn.execute("SELECT d.doc_id, d.active_source_hash, s.active_extraction_id FROM documents d "
+                            "JOIN sources s ON s.source_hash = d.active_source_hash ORDER BY d.csv_row_id").fetchall()
+    scope: dict[str, tuple[DocRef, str]] = {}
+    for r in rows:
+        x = r["active_extraction_id"]
+        if x in index.rows_by_extraction and x not in scope:
+            scope[x] = (DocRef(r["doc_id"], r["active_source_hash"]), x)
+    return list(scope.values())
+
+
 def scope_rows(index: KeywordIndex, scope: list[tuple[DocRef, str]]) -> list[int]:
     """Index rows the selected scope admits. Callers check this before paying for a query embedding."""
     return [i for extraction_id in dict.fromkeys(x for _, x in scope)
@@ -376,6 +391,31 @@ def metadata_term_snapshot(settings: Settings, analyzer, doc_ids: list[str]) -> 
         texts.setdefault(r["doc_id"], []).append(str(json.loads(r["value_json"])))
     return {d: sorted({t for text in ts for t in analyzer.tokens(text) if not _protected(t)})
             for d, ts in sorted(texts.items())}
+
+
+ROUTE_SHARE = 0.5  # a routed document carries at least half the best-matching document's name weight
+ROUTE_MAX = 4  # more matching documents than this: the question names no particular project
+
+
+def route_corpus(index: KeywordIndex, analyzer, question: str,
+                 scope: list[tuple[DocRef, str]]) -> list[tuple[DocRef, str]]:
+    """An all-documents question that names a project keeps the documents whose own title/institution terms it
+    restates (two or more, weighted by inverse document frequency across the scope). Chunks rarely repeat the
+    project name, so otherwise a named project's requirement code or clause competes with the same wording in
+    every other RFP. Returns [] (no routing) when no document, or too many, match."""
+    terms = {t for t in analyzer.tokens(question) if not _protected(t)}
+    names = {ref.doc_id: set(index.scope_terms.get(ref.doc_id, [])) & terms for ref, _ in scope}
+    df: dict[str, int] = {}
+    for matched in names.values():
+        for t in matched:
+            df[t] = df.get(t, 0) + 1
+    weight = {d: sum(math.log(len(names) / df[t]) for t in matched) for d, matched in names.items()
+              if len(matched) >= METADATA_RESTATEMENT_MIN}
+    top = max(weight.values(), default=0.0)
+    keep = {d for d, w in weight.items() if top > 0 and w >= ROUTE_SHARE * top}
+    if not keep or len(keep) > ROUTE_MAX:
+        return []
+    return [(ref, x) for ref, x in scope if ref.doc_id in keep]
 
 
 def scope_redundant_terms(index: KeywordIndex, qtokens: list[str], allowed: list[int],
@@ -417,14 +457,25 @@ def rank_lexical(index: KeywordIndex, analyzer, question: str, allowed: list[int
     return ranked[:k]
 
 
-def rrf_fuse(ranked_ids: list[list[str]], k: int = 60) -> list[tuple[str, float]]:
-    """Reciprocal rank fusion: sum(1 / (k + rank)), ranks from one; a list that lacks an ID contributes zero and
+def rrf_fuse(ranked_ids: list[list[str]], k: int = 60, weights: list[float] | None = None) -> list[tuple[str, float]]:
+    """Reciprocal rank fusion: sum(weight / (k + rank)), ranks from one; a list that lacks an ID contributes zero and
     an ID repeated inside one list votes once. Ties by chunk ID."""
     scores: dict[str, float] = {}
-    for ids in ranked_ids:
+    for ids, weight in zip(ranked_ids, weights or [1.0] * len(ranked_ids)):
         for rank, cid in enumerate(dict.fromkeys(ids), start=1):
-            scores[cid] = scores.get(cid, 0.0) + 1.0 / (k + rank)
+            scores[cid] = scores.get(cid, 0.0) + weight / (k + rank)
     return sorted(scores.items(), key=lambda x: (-x[1], x[0]))
+
+
+def fuse(settings: Settings, lexical_ids: list[str], dense_ids: list[str]) -> list[tuple[str, float]]:
+    """Hybrid order. keyword_first keeps the leading `keyword_head` BM25 rows in BM25 order and orders everything
+    else by weighted RRF, so a dense row can never displace a protected keyword match."""
+    fused = rrf_fuse([lexical_ids, dense_ids], settings.rrf_k, [1.0, settings.dense_weight])
+    if settings.fusion == "keyword_first":
+        score = dict(fused)
+        head = list(dict.fromkeys(lexical_ids))[:settings.keyword_head]
+        fused = [(c, score[c]) for c in head] + [x for x in fused if x[0] not in head]
+    return fused[:settings.fused_top_k]
 
 
 def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, question: str,
@@ -450,9 +501,14 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
     if mode == "hybrid_rerank" and reranker is None:
         fallback, mode = "hybrid_rerank->hybrid:reranker_unavailable", "hybrid"
 
+    limitations = [f"idf:{IDF_POLICY}"]
+    if len(scope) > 2:  # only the all-documents scope is larger than a selection
+        routed = route_corpus(index, analyzer, question, scope)
+        if routed:
+            scope = routed
+            limitations.append("corpus_routed:" + ",".join(ref.doc_id for ref, _ in routed))
     by_extraction = {extraction_id: ref for ref, extraction_id in scope}
     allowed = scope_rows(index, scope)
-    limitations = [f"idf:{IDF_POLICY}"]
     if index.review_scope != "reviewed_only":
         limitations.append("index_includes_unreviewed_sources")
     missing = [ref.doc_id for ref, x in scope if x not in index.rows_by_extraction]
@@ -481,7 +537,10 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
         lex_analyzer = WhitespaceAnalyzer() if mode == "whitespace_bm25" else analyzer
         drop: set[str] = set()
         if mode != "whitespace_bm25":  # K0 stays the plain documented baseline
-            metadata_terms = {t for ref, _ in scope for t in index.scope_terms.get(ref.doc_id, [])}
+            # A selected project's restated name says nothing inside its own scope; across the corpus it is what
+            # finds the project, so the restatement rule applies to one or two selected documents only.
+            metadata_terms = {t for ref, _ in scope for t in index.scope_terms.get(ref.doc_id, [])} \
+                if len(scope) <= 2 else set()
             drop = scope_redundant_terms(index, analyzer.tokens(question), allowed, metadata_terms)
             if drop:
                 limitations.append("scope_redundant_terms:" + ",".join(sorted(drop)))
@@ -489,8 +548,11 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
                                drop=drop)
     t2 = time.perf_counter()
     dense_ranked: list[tuple[int, float]] = []
-    if mode in DENSE_MODES:
-        dense_ranked = dense.search(query_vector, allowed, k)
+    if mode in ("hybrid", "hybrid_rerank") and not lexical and not exact:
+        # Nearest neighbours always exist; without one lexical match they are arbitrary passages, not evidence.
+        limitations.append("no_lexical_match:dense_not_used")
+    elif mode in DENSE_MODES:
+        dense_ranked = dense.search(query_vector, allowed, k, settings)
     t3 = time.perf_counter()
 
     cid = lambda i: index.chunks[i]["chunk_id"]  # noqa: E731
@@ -500,8 +562,7 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
     candidates += [{"chunk_id": cid(i), "channel": "dense", "rank": r + 1, "score": round(s, 4)}
                    for r, (i, s) in enumerate(dense_ranked)]
     if mode in ("hybrid", "hybrid_rerank"):
-        fused = rrf_fuse([[cid(i) for i, _ in lexical], [cid(i) for i, _ in dense_ranked]],
-                         settings.rrf_k)[:settings.fused_top_k]
+        fused = fuse(settings, [cid(i) for i, _ in lexical], [cid(i) for i, _ in dense_ranked])
         candidates += [{"chunk_id": c, "channel": "rrf", "rank": r + 1, "score": round(s, 6)}
                        for r, (c, s) in enumerate(fused)]
         ordered = [index.row_of[c] for c, _ in fused]

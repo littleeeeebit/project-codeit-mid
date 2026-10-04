@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from dataclasses import dataclass
 
 import numpy as np
@@ -32,7 +33,48 @@ CREATE TABLE IF NOT EXISTS embedding_set_rows (
     FOREIGN KEY(source_index,chunk_id) REFERENCES chunks(index_version,chunk_id)
 );
 CREATE INDEX IF NOT EXISTS embedding_scope ON embedding_set_rows(set_version,extraction_id,row_order);
+CREATE INDEX IF NOT EXISTS embedding_set_payload ON embedding_set_rows(payload_hash,set_version);
 """
+# Approximate index over one fixed dimension (standard HNSW accepts at most 2,000). Built by `build_hnsw`, not at
+# startup: building takes longer than the application statement timeout.
+HNSW_NAME = "embedding_payloads_hnsw_{d}"
+HNSW_DDL = ("CREATE INDEX IF NOT EXISTS " + HNSW_NAME + " ON embedding_payloads USING hnsw "
+            "((embedding::vector({d})) vector_cosine_ops) WITH (m = 16, ef_construction = 64) WHERE dimensions = {d}")
+HNSW_SQL = ("SELECT r.row_order, 1-(p.embedding::vector({d}) <=> ?) AS score FROM embedding_payloads p "
+            "JOIN embedding_set_rows r USING(payload_hash) WHERE p.dimensions = {d} AND r.set_version = ? "
+            "AND r.row_order = ANY(?) ORDER BY p.embedding::vector({d}) <=> ? LIMIT ?")
+# Transaction-local. At this corpus size the planner prefers a scan plus sort (exact search); disabling those plans
+# makes the ordered HNSW index scan the plan that actually runs, resumed past filtered rows in strict order.
+HNSW_SESSION = ("SELECT set_config('hnsw.ef_search', ?, true), set_config('hnsw.iterative_scan', 'strict_order', true), "
+                "set_config('enable_seqscan', 'off', true), set_config('enable_sort', 'off', true), "
+                "set_config('enable_incremental_sort', 'off', true)")
+EXACT_SQL = ("SELECT r.row_order,1-(p.embedding <=> ?) AS score FROM embedding_set_rows r "
+             "JOIN embedding_payloads p USING(payload_hash) WHERE r.set_version=? "
+             "AND r.row_order=ANY(?) ORDER BY p.embedding <=> ?,r.chunk_id COLLATE \"C\" LIMIT ?")
+
+
+def build_hnsw(settings) -> dict:
+    """Idempotent maintenance: the HNSW index for the serving dimension. Serving uses it only when an activated
+    run selected `dense_search: hnsw` after its recall against exact search was measured."""
+    d = int(settings.embedding_dimensions)
+    started = time.perf_counter()
+    with open_db(settings.db_path) as conn:
+        conn.execute("SET statement_timeout = 0")
+        conn.execute("SET maintenance_work_mem = '512MB'")
+        # A parallel build places the graph in dynamic shared memory, which the container's 64 MB /dev/shm cannot
+        # hold; a serial build keeps it in backend memory. ponytail: serial (~minutes at 19k vectors); raise
+        # shm_size in compose.postgresql.yaml before re-enabling parallel workers for a larger corpus.
+        conn.execute("SET max_parallel_maintenance_workers = 0")
+        try:
+            conn.execute(HNSW_DDL.format(d=d))
+        finally:
+            conn.execute("SET statement_timeout = '60s'")
+            conn.execute("RESET maintenance_work_mem")
+            conn.execute("RESET max_parallel_maintenance_workers")
+        size = conn.execute("SELECT pg_relation_size(to_regclass(?))", (HNSW_NAME.format(d=d),)).fetchone()[0]
+        rows = conn.execute("SELECT count(*) FROM embedding_payloads WHERE dimensions = ?", (d,)).fetchone()[0]
+    return {"index": HNSW_NAME.format(d=d), "dimensions": d, "vectors": rows, "bytes": size,
+            "parameters": {"m": 16, "ef_construction": 64}, "seconds": round(time.perf_counter() - started, 1)}
 
 
 def checksum(vector):
@@ -135,17 +177,22 @@ class PgDenseIndex:
             raise DenseError("pgvector rows do not match the keyword source index")
         return cls(settings, version, meta["source_index"], meta["model"], meta["dimensions"], ids)
 
-    def search(self, query, allowed, k):
+    def search(self, query, allowed, k, settings=None):
+        """Top k admitted rows by cosine. `settings` (the run's) chooses exact search or the HNSW index with an
+        iterative strict-order scan, so a filtered scope still fills k rows. Ties by chunk ID either way."""
         from .dense import DenseError
 
+        settings = settings or self.settings
         if not allowed:
             return []
-        if (self.settings.embedding_model, self.settings.embedding_dimensions) != (self.model, self.dims):
+        if (settings.embedding_model, settings.embedding_dimensions) != (self.model, self.dims):
             raise DenseError("mixed model/dimension search was refused")
         vector = verified(query, self.dims)
         with open_db(self.settings.db_path) as conn:
-            rows = conn.execute("SELECT r.row_order,1-(p.embedding <=> ?) AS score FROM embedding_set_rows r "
-                                "JOIN embedding_payloads p USING(payload_hash) WHERE r.set_version=? "
-                                "AND r.row_order=ANY(?) ORDER BY p.embedding <=> ?,r.chunk_id COLLATE \"C\" LIMIT ?",
-                                (vector, self.version, allowed, vector, k)).fetchall()
-        return [(r[0], r[1]) for r in rows]
+            if settings.dense_search == "hnsw":
+                with tx(conn):
+                    conn.execute(HNSW_SESSION, (str(settings.hnsw_ef_search),))
+                    rows = conn.execute(HNSW_SQL.format(d=self.dims), (vector, self.version, allowed, vector, k)).fetchall()
+            else:
+                rows = conn.execute(EXACT_SQL, (vector, self.version, allowed, vector, k)).fetchall()
+        return sorted(((r[0], r[1]) for r in rows), key=lambda r: (-r[1], self.chunk_ids[r[0]]))
