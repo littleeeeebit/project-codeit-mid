@@ -1353,12 +1353,16 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
 def run_errors(settings: Settings, run_id: str) -> list[str]:
     """Why a run cannot serve: incomplete, superseded policy, failed or unmeasured gate, artifacts not ready."""
     from . import dense as dense_mod
-    from .retrieval import KeywordIndex, RetrievalError
+    from .retrieval import ROUTE_MAX, ROUTE_RULE, ROUTE_SHARE, KeywordIndex, RetrievalError
 
     config, scores = load_run(settings, run_id)
     errors = []
     if scores.get("status") != "complete":
         errors.append("the run is not complete")
+    route = (config.get("limits") or {}).get("corpus_route")
+    if route != {"share": ROUTE_SHARE, "max": ROUTE_MAX, "rule": ROUTE_RULE}:
+        errors.append(f"the run was measured under corpus-routing rule {(route or {}).get('rule')!r}, not "
+                      f"{ROUTE_RULE!r}; rerun the comparison")
     if config.get("eval_version") != EVAL_VERSION:
         errors.append(f"the run was scored under evaluation policy {config.get('eval_version')!r}, not "
                       f"{EVAL_VERSION!r}; rerun the comparison (and the reranker trial) — cached vectors are reused")

@@ -170,6 +170,7 @@ def restore_check(settings, manifest_path, staging=None):
         if source_dsn and conninfo_to_dict(target.dsn()) == conninfo_to_dict(source_dsn):
             raise ValueError("restore must use a different isolated database")
     with psycopg.connect(target.dsn(), autocommit=True, connect_timeout=5) as raw:
+        postgres.require_server(raw)
         if raw.execute("SELECT 1 FROM pg_tables WHERE schemaname='public' LIMIT 1").fetchone():
             raise ValueError("restore target contains tables; use an empty isolated database")
         if not raw.execute("SELECT pg_try_advisory_lock(%s)", (postgres.GATEWAY_LOCK,)).fetchone()[0]:

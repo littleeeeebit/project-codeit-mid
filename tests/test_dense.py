@@ -555,7 +555,12 @@ class EvaluationRunTest(unittest.TestCase):
                                         "finalist_run_id": runs["K1"]}), encoding="utf-8")
         with self.assertRaisesRegex(evaluation.EvaluationError, "embedding identity"):  # it would serve keyword-only
             evaluation.activate_run(s.with_(embedding_dimensions=256), runs["H"], decision)
-        active = evaluation.activate_run(s, runs["H"], decision)
+        from rfp_assistant import retrieval
+
+        with unittest.mock.patch.object(retrieval, "ROUTE_RULE", "greedy-rare-term-2"), \
+                self.assertRaisesRegex(evaluation.EvaluationError, "corpus-routing rule"):  # measured under another
+            evaluation.activate_run(s, runs["H"], decision)
+        active =evaluation.activate_run(s, runs["H"], decision)
         self.assertEqual((active["mode"], active["finalist_run_id"]), ("hybrid", runs["K1"]))
         with store.open_db(s.db_path) as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM activations").fetchone()[0], 1)

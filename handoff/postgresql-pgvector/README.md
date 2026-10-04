@@ -121,7 +121,7 @@ The owner's point was that selecting one or two documents first proves nothing. 
 - Each targets one passage over 22 sources: 27 on middle pages and 6 on late pages.
 - The questions use exact identifiers, numbers and table cells.
 
-Over all 18,983 chunks with the serving setting (run `H-af9967ca81`, including the routing fix):
+Over all 18,983 chunks with the serving setting (first as run `H-af9967ca81`; the same result held under the round-3 routing rule and the serving run `H-0fffb2a6ec`):
 
 | Measure | Hits | Rate | Wilson 95% |
 | --- | --- | --- | --- |
@@ -132,7 +132,7 @@ K1 misses the same needle, needle-24, a table-cell question. Before the routing 
 
 ### Paid end-to-end check
 
-Paid admission was enabled on PostgreSQL only. The same 26 questions ran through the app on the serving run `H-af9967ca81` (private results in `.runtime/postgresql-migration/e2e-depth50/`):
+Paid admission was enabled on PostgreSQL only. The same 26 questions ran through the app on `H-af9967ca81`, the serving run at the time (repeated later on `H-0fffb2a6ec`, below; private results in `.runtime/postgresql-migration/e2e-depth50/`):
 
 | Mode | Requests | Answered |
 | --- | --- | --- |

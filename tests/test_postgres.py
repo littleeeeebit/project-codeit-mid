@@ -259,6 +259,31 @@ class PostgreSQLTests(unittest.TestCase):
                         self.assertRaisesRegex(SettingsError, "text-embedding-3-large at 1536"):
                     load_settings(embedding_model=model, embedding_dimensions=dims)
 
+    def test_every_connection_path_refuses_a_server_other_than_postgresql_18_6(self):
+        restore = postgres.Target(fixtures.database(ready=False))
+        manifest = Path(postgres_backup.backup(self.settings, self.root / "backup", "test")["manifest"])
+        old =mock.patch.object(psycopg.ConnectionInfo, "server_version", new_callable=mock.PropertyMock,
+                                return_value=170006)
+        unpooled = postgres.Target("RFP_TEST_UNPOOLED_DSN")  # the fixture already owns a pool for self.target
+        with old, mock.patch.dict(os.environ, {unpooled.dsn_env: self.target.dsn()}), \
+                self.assertRaisesRegex(RuntimeError, "PostgreSQL 18.6 is required; server reports 170006"):
+            with postgres.lifecycle(unpooled):
+                pass
+        with postgres.lifecycle(self.target):  # the paid gateway's own connection, opened after the pool
+            with old, self.assertRaisesRegex(RuntimeError, "PostgreSQL 18.6 is required"):
+                postgres.GatewayOwner(self.target)
+        conn = psycopg.connect(self.target.dsn(), autocommit=True)
+        try:
+            with old, self.assertRaisesRegex(RuntimeError, "PostgreSQL 18.6 is required"):
+                postgres._configure(conn)  # every later pool connection, not only the first
+        finally:
+            conn.close()
+        with old, mock.patch.dict(os.environ, {"RFP_RESTORE_DATABASE_DSN": restore.dsn()}), \
+                self.assertRaisesRegex(RuntimeError, "PostgreSQL 18.6 is required"):
+            postgres_backup.restore_check(self.settings, manifest)
+        with psycopg.connect(restore.dsn()) as raw:  # refused before the restore fence or any table
+            self.assertIsNone(raw.execute("SELECT to_regnamespace('bidmate_recovery')").fetchone()[0])
+
     def test_pgvector_cache_separation_exact_filtered_parity_and_mixed_set_rejection(self):
         settings = self.settings.with_(embedding_dimensions=64)
         with store.open_db(self.target) as conn:

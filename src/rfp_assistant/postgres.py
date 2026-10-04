@@ -17,6 +17,7 @@ import psycopg
 from pgvector.psycopg import register_vector
 from psycopg_pool import ConnectionPool, PoolTimeout
 
+SERVER_VERSION = 180006  # PostgreSQL 18.6, as libpq reports server_version_num
 EXTENSION_VERSION = "0.8.6"
 GATEWAY_LOCK = 0x4249444D415445
 SCHEMA_LOCK = GATEWAY_LOCK + 1
@@ -88,7 +89,14 @@ _pools: dict[Target, tuple[ConnectionPool, str, int]] = {}
 _owners: dict[Target, "GatewayOwner"] = {}
 
 
+def require_server(conn):
+    """Every connection BidMate opens, pooled or direct, is to PostgreSQL 18.6 or is refused."""
+    if conn.info.server_version != SERVER_VERSION:
+        raise RuntimeError(f"PostgreSQL 18.6 is required; server reports {conn.info.server_version}")
+
+
 def _configure(conn):
+    require_server(conn)
     conn.execute("SET lock_timeout = '5s'")
     conn.execute("SET statement_timeout = '60s'")
     row = conn.execute("SELECT extversion FROM pg_extension WHERE extname = 'vector'").fetchone()
@@ -113,6 +121,9 @@ def lifecycle(target: Target):
                 raise RuntimeError("PostgreSQL DSN changed while its pool was owned")
             _pools[target] = pool, identity, references + 1
         else:
+            # A failing configure only times the pool out; probe once so a wrong server says why.
+            with psycopg.connect(target.dsn(), autocommit=True, connect_timeout=int(target.timeout)) as probe:
+                require_server(probe)
             pool = ConnectionPool(target.dsn(), min_size=1, max_size=target.max_connections,
                                   timeout=target.timeout, max_waiting=48, open=False,
                                   kwargs={"autocommit": True, "connect_timeout": int(target.timeout)},
@@ -275,8 +286,9 @@ class GatewayOwner:
         self.lost = False
         self.users = 1  # this creator plus every borrow_owner(); the lock is released with the last user
         self.conn = psycopg.connect(target.dsn(), autocommit=True, connect_timeout=int(target.timeout))
-        self.conn.execute("SET statement_timeout='5s'")
         try:
+            require_server(self.conn)
+            self.conn.execute("SET statement_timeout='5s'")
             if not self.conn.execute("SELECT pg_try_advisory_lock(%s)", (GATEWAY_LOCK,)).fetchone()[0]:
                 raise LockHeld("PostgreSQL paid gateway already has an owner")
             with _mutex:

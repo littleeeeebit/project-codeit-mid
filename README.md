@@ -21,7 +21,7 @@ The application runs only on PostgreSQL 18.6 with pgvector 0.8.6. Every record l
 
 Startup refuses to run with a clear message when `RFP_DATABASE_DSN` is missing, or when the database has no validated import (the `migration_import` / `migration_validation` marker plus unchanged artifact hashes, index payload files included). A failed validation or an open recovery fence also closes paid admission. Paid dispatch needs both the ledger switch and PostgreSQL paid admission, which `paid on` sets together, plus the database-wide gateway advisory lock that the serving process holds.
 
-The cutover ran on 2026-10-04. With the UI and writes stopped, a final consistent snapshot of the SQLite database was imported and validated: 27 tables, 674,049 rows, 18,983 active chunks, every referenced artifact hash matching, the ledger and every historical attempt unchanged, and no pending or unknown billing. All 18,983 active vectors are in pgvector, byte-identical to the verified set. Keyword index `29f261abafeb1f8c` is active. Serving is hybrid with keyword-first fusion over exact pgvector search, through run `H-af9967ca81`:
+The cutover ran on 2026-10-04. With the UI and writes stopped, a final consistent snapshot of the SQLite database was imported and validated: 27 tables, 674,049 rows, 18,983 active chunks, every referenced artifact hash matching, the ledger and every historical attempt unchanged, and no pending or unknown billing. All 18,983 active vectors are in pgvector, byte-identical to the verified set. Keyword index `29f261abafeb1f8c` is active. Serving is hybrid with keyword-first fusion over exact pgvector search, through run `H-0fffb2a6ec` (measured under the current corpus-routing rule; activation refuses a run measured under another):
 
 - The BM25 top 6 stay in BM25 order, and the rest come from weighted RRF (k 60, dense weight 1.0).
 - Each channel retrieves 50 candidates, fusion keeps 50, and 10 evidence units go to the model.
@@ -55,7 +55,7 @@ Answers use `gpt-6-luna` through Chat Completions with strict structured output,
 
 Run from any directory with the environment's interpreter:
 
-Every command except `check`, `load-check` and `restore-check` runs against `RFP_DATABASE_DSN` and refuses a database without a validated import. Every startup also refuses an embedding identity other than `text-embedding-3-large` at 1,536 dimensions. `check` and `load-check` use temporary databases on the server named by `RFP_POSTGRES_TEST_DSN` (default: the local server from `tools/start-postgresql.ps1`), and `restore-check` uses `RFP_RESTORE_DATABASE_DSN`. `init` creates the schema in a database the application owns; it never resets spending.
+Every command except `check`, `load-check` and `restore-check` runs against `RFP_DATABASE_DSN` and refuses a database without a validated import. Every startup also refuses an embedding identity other than `text-embedding-3-large` at 1,536 dimensions. Every connection, pooled, the paid gateway's or `restore-check`'s, refuses a server other than PostgreSQL 18.6, and pooled connections refuse pgvector other than 0.8.6. `check` and `load-check` use temporary databases on the server named by `RFP_POSTGRES_TEST_DSN` (default: the local server from `tools/start-postgresql.ps1`), and `restore-check` uses `RFP_RESTORE_DATABASE_DSN`. `init` creates the schema in a database the application owns; it never resets spending.
 
 ```powershell
 python -m rfp_assistant.cli init --paid-disabled          # schema + allowance row; never resets spending
