@@ -104,6 +104,23 @@ Each screen was built three ways on one named axis in the running app, on live d
 
 Nothing in `settings.py` became unused: the evidence limits still drive retrieval.
 
+### Ask scope control (2026-10-04)
+
+The owner found that selecting one or two documents before asking proves nothing about finding the right passage, so 질문하기 gained a scope switch above the document list:
+
+```
+[ 선택한 문서 | 전체 문서 ]
+선택한 문서: document search, at most two picks; modes 근거 기반 답변 / 기본 정보 / 요구사항 목록, or the comparison modes for two picks
+전체 문서:   no picks; one mode, 전체 문서에서 답변; a hint to name the project or agency in the question
+```
+
+- 전체 문서 posts `mode: "corpus"` with an empty scope. The service retrieves over every active chunk (98 sources): keyword BM25 over the whole index, fused with exact pgvector search by the measured `keyword_first` setting (50 candidates per channel, 10 evidence units).
+- A question that names a project ("한영대학교 …") is first narrowed to the documents whose own title and institution it restates. A document sharing only generic words such as 대학교 or 사업 is not included, and a question made only of such words ("대학교 사업") is not narrowed at all: a document is narrowed to only when the question restates one of its title terms found in fewer than four titles. Two named projects are both kept, so an All documents comparison still works.
+- A question that only names its project ("…은 어떤 사업이야?") ranks that project's passages by meaning, so it gets the project overview rather than whatever matches 알려줘 or 어떤.
+- A question with no lexical hit returns no evidence and the 근거 부족 state; dense search alone never supplies arbitrary passages.
+- Picking a document switches the scope back to 선택한 문서. Changing the scope releases the owned request exactly like changing the selection.
+- Single-document and two-document comparison behaviour is unchanged. A corpus request with a scope, or a scoped request without one, is refused with 400/422.
+
 ### Result states
 
 Every answer opens with a status badge carrying its text label, and each state has its own body.
@@ -349,7 +366,7 @@ Chrome inspection used the shared original runtime at `http://127.0.0.1:8765`, a
 | Other verification areas | Comparison, evaluation, dataset state, ingestion and request records were inspected on actual runtime data |
 | Mobile overflow | None at page level in any of the eight verification areas; wide tables scroll within their own container |
 
-No source was marked reviewed and no gold decision was made during these checks. There were no paid model or evaluation calls. The free trace is the only new application action. Automated checks use isolated SQLite data to prove successful saves appear once in history, legacy decisions are included without duplicates, and sealed questions are excluded; those checks are not evidence of answer quality.
+No source was marked reviewed and no gold decision was made during these checks. There were no paid model or evaluation calls. The free trace is the only new application action. Automated checks use isolated test databases to prove successful saves appear once in history, legacy decisions are included without duplicates, and sealed questions are excluded; those checks are not evidence of answer quality.
 
 ### Typography and selected colours
 

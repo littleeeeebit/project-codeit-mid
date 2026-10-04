@@ -4,7 +4,8 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from rfp_assistant import budget, store
+from rfp_assistant import budget, postgres, store
+from tests import fixtures
 
 RATES = {"test-model": {"input": "1", "cached_input": "0.5", "output": "1"}}  # 1 micro-USD per token
 
@@ -12,17 +13,19 @@ RATES = {"test-model": {"input": "1", "cached_input": "0.5", "output": "1"}}  # 
 class BudgetLedgerTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.db = Path(self.tmp.name) / "rfp.sqlite3"
-        store.init_schema(self.db)
+        self.db = postgres.Target(fixtures.database())
         budget.ensure_budget_row(self.db)
         budget.configure(self.db, "owner", project_start=date(2026, 9, 30), project_end=date(2026, 10, 28),
                          prior_use_micro=0, prior_use_evidence="test", rates=RATES, rate_version="t",
                          enable_paid=True)
+        budget.set_paid_enabled(self.db, "owner", True, "test")
+        self.owner = postgres.GatewayOwner(self.db)  # the paid gateway this ledger admits through
         with store.open_db(self.db) as conn:  # exactly 100 microdollars available
             conn.execute("UPDATE budget_settings SET cap_micro_usd = 100")
         self.request_id = self._request()
 
     def tearDown(self):
+        self.owner.release()
         self.tmp.cleanup()
 
     def _request(self) -> str:
@@ -121,8 +124,11 @@ class BudgetLedgerTest(unittest.TestCase):
             budget.configure(self.db, "owner", project_start=date(2026, 9, 30), project_end=date(2026, 10, 28),
                              prior_use_micro=5, prior_use_evidence="x", rates=RATES, rate_version="t",
                              enable_paid=True)
-        budget.set_paid_enabled(self.db, "owner", False, "test")
+        budget.set_paid_enabled(self.db, "owner", False, "test")  # closes PostgreSQL paid admission too
         self.assertEqual(self.reserve(1)["reason"], "paid_disabled")
+        with store.open_db(self.db) as conn:  # admission alone closed (a restored database): still refused
+            conn.execute("UPDATE budget_settings SET paid_enabled = 1")
+        self.assertEqual(self.reserve(1)["reason"], "postgresql_maintenance")
 
     def test_overrun_freezes_new_paid_work(self):
         r = self.reserve(10)

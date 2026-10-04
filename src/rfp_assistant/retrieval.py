@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import shutil
 import threading
@@ -25,6 +26,7 @@ from .store import dumps, get_app_setting, open_db, read_jsonl, set_app_setting,
 ANALYZER_VERSION = "kiwi-bm25-2"  # 2: spacing normalization of the analysis copy, scope-redundant query terms
 KEEP_TAGS = {"NNG", "NNP", "NNB", "NR", "NP", "SL", "SN", "SH", "XR", "VV", "VA", "XPN"}
 NEGATIONS = {"않", "안", "못", "없", "아니", "불가", "금지"}
+CONTENT_TAGS = {"NNG", "NNP", "NR", "SL", "SN", "SH", "XR"}
 # Small reviewed domain dictionary; extend only from observed query failures.
 USER_WORDS = ["제안요청서", "요구사항", "하자보수", "하자담보", "부가가치세", "공동수급", "분담이행", "공동이행",
               "입찰참가자격", "기술평가", "가격평가", "지체상금", "사업수행계획서", "산출물", "유지관리", "정보시스템"]
@@ -95,6 +97,13 @@ class Analyzer:
             if t.tag in KEEP_TAGS or t.form in NEGATIONS:
                 out.append(t.form.lower())
         return out
+
+    def content_terms(self, text: str) -> set[str]:
+        """Query-side only: the nouns, foreign words, numbers and roots a question asks about. Verbs, adjectives,
+        dependent nouns and pronouns ("알려줘", "하는 거", "이것") carry no fact to search for."""
+        with self._lock:
+            toks = self._kiwi.tokenize(normalize_for_analysis(nfc(text)))
+        return {t.form.lower() for t in toks if t.tag in CONTENT_TAGS} | {f"code:{c}" for c in CODE_RE.findall(nfc(text))}
 
 
 def analyzer_fingerprint(analyzer: Analyzer | None = None) -> str:
@@ -340,6 +349,20 @@ def index_compatibility(index: KeywordIndex, analyzer=None) -> str | None:
     return None
 
 
+def corpus_scope(settings: Settings, index: KeywordIndex) -> list[tuple[DocRef, str]]:
+    """The scope of an all-documents question: every indexed active extraction once, cited under the first
+    document (CSV order) associated with that original."""
+    with open_db(settings.db_path) as conn:
+        rows = conn.execute("SELECT d.doc_id, d.active_source_hash, s.active_extraction_id FROM documents d "
+                            "JOIN sources s ON s.source_hash = d.active_source_hash ORDER BY d.csv_row_id").fetchall()
+    scope: dict[str, tuple[DocRef, str]] = {}
+    for r in rows:
+        x = r["active_extraction_id"]
+        if x in index.rows_by_extraction and x not in scope:
+            scope[x] = (DocRef(r["doc_id"], r["active_source_hash"]), x)
+    return list(scope.values())
+
+
 def scope_rows(index: KeywordIndex, scope: list[tuple[DocRef, str]]) -> list[int]:
     """Index rows the selected scope admits. Callers check this before paying for a query embedding."""
     return [i for extraction_id in dict.fromkeys(x for _, x in scope)
@@ -376,6 +399,50 @@ def metadata_term_snapshot(settings: Settings, analyzer, doc_ids: list[str]) -> 
         texts.setdefault(r["doc_id"], []).append(str(json.loads(r["value_json"])))
     return {d: sorted({t for text in ts for t in analyzer.tokens(text) if not _protected(t)})
             for d, ts in sorted(texts.items())}
+
+
+ROUTE_SHARE = 0.5  # a routed document carries at least half the best-matching document's name weight
+ROUTE_MAX = 4  # more matching documents than this: the question names no particular project
+ROUTE_RULE = "greedy-rare-term-1"  # recorded in frozen run configurations; change it whenever route_corpus changes
+
+
+def corpus_route_record() -> dict:
+    """What a frozen run records as `limits.corpus_route`; a run recording anything else neither activates nor serves."""
+    return {"share": ROUTE_SHARE, "max": ROUTE_MAX, "rule": ROUTE_RULE}
+
+
+def route_corpus(index: KeywordIndex, analyzer, question: str,
+                 scope: list[tuple[DocRef, str]]) -> list[tuple[DocRef, str]]:
+    """An all-documents question that names a project keeps the documents whose own title/institution terms it
+    restates (two or more, weighted by inverse document frequency across the scope). Chunks rarely repeat the
+    project name, so otherwise a named project's requirement code or clause competes with the same wording in
+    every other RFP. Returns [] (no routing) when no document, or too many, match.
+
+    Documents are taken best first, and each is weighed only on the terms no document taken before it already
+    explains, so a document sharing just the generic words of a better match ("대학교", "사업") stays out. Two named
+    projects both carry their own terms; another edition with the very same matched name is kept."""
+    terms = {t for t in analyzer.tokens(question) if not _protected(t)}
+    names = {ref.doc_id: set(index.scope_terms.get(ref.doc_id, [])) & terms for ref, _ in scope}
+    df: dict[str, int] = {}
+    for matched in names.values():
+        for t in matched:
+            df[t] = df.get(t, 0) + 1
+    idf = {t: math.log(len(names) / n) for t, n in df.items()}
+    # A term in ROUTE_MAX or more titles names a kind of project ("대학교", "교육"), not one: a document is a
+    # candidate only when the question also restates one of its rarer terms.
+    weight = {d: sum(idf[t] for t in matched) for d, matched in names.items()
+              if len(matched) >= METADATA_RESTATEMENT_MIN and any(df[t] < ROUTE_MAX for t in matched)}
+    top = max(weight.values(), default=0.0)
+    keep: set[str] = set()
+    explained: set[str] = set()
+    for d in sorted(weight, key=lambda d: (-weight[d], d)):
+        own = sum(idf[t] for t in names[d] - explained)
+        if top > 0 and (own >= ROUTE_SHARE * top or any(names[d] == names[k] for k in keep)):
+            keep.add(d)
+            explained |= names[d]
+    if not keep or len(keep) > ROUTE_MAX:
+        return []
+    return [(ref, x) for ref, x in scope if ref.doc_id in keep]
 
 
 def scope_redundant_terms(index: KeywordIndex, qtokens: list[str], allowed: list[int],
@@ -417,14 +484,25 @@ def rank_lexical(index: KeywordIndex, analyzer, question: str, allowed: list[int
     return ranked[:k]
 
 
-def rrf_fuse(ranked_ids: list[list[str]], k: int = 60) -> list[tuple[str, float]]:
-    """Reciprocal rank fusion: sum(1 / (k + rank)), ranks from one; a list that lacks an ID contributes zero and
+def rrf_fuse(ranked_ids: list[list[str]], k: int = 60, weights: list[float] | None = None) -> list[tuple[str, float]]:
+    """Reciprocal rank fusion: sum(weight / (k + rank)), ranks from one; a list that lacks an ID contributes zero and
     an ID repeated inside one list votes once. Ties by chunk ID."""
     scores: dict[str, float] = {}
-    for ids in ranked_ids:
+    for ids, weight in zip(ranked_ids, weights or [1.0] * len(ranked_ids)):
         for rank, cid in enumerate(dict.fromkeys(ids), start=1):
-            scores[cid] = scores.get(cid, 0.0) + 1.0 / (k + rank)
+            scores[cid] = scores.get(cid, 0.0) + weight / (k + rank)
     return sorted(scores.items(), key=lambda x: (-x[1], x[0]))
+
+
+def fuse(settings: Settings, lexical_ids: list[str], dense_ids: list[str]) -> list[tuple[str, float]]:
+    """Hybrid order. keyword_first keeps the leading `keyword_head` BM25 rows in BM25 order and orders everything
+    else by weighted RRF, so a dense row can never displace a protected keyword match."""
+    fused = rrf_fuse([lexical_ids, dense_ids], settings.rrf_k, [1.0, settings.dense_weight])
+    if settings.fusion == "keyword_first":
+        score = dict(fused)
+        head = list(dict.fromkeys(lexical_ids))[:settings.keyword_head]
+        fused = [(c, score[c]) for c in head] + [x for x in fused if x[0] not in head]
+    return fused[:settings.fused_top_k]
 
 
 def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, question: str,
@@ -450,9 +528,15 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
     if mode == "hybrid_rerank" and reranker is None:
         fallback, mode = "hybrid_rerank->hybrid:reranker_unavailable", "hybrid"
 
+    limitations = [f"idf:{IDF_POLICY}"]
+    routed: list[tuple[DocRef, str]] = []
+    if len(scope) > 2:  # only the all-documents scope is larger than a selection
+        routed = route_corpus(index, analyzer, question, scope)
+        if routed:
+            scope = routed
+            limitations.append("corpus_routed:" + ",".join(ref.doc_id for ref, _ in routed))
     by_extraction = {extraction_id: ref for ref, extraction_id in scope}
     allowed = scope_rows(index, scope)
-    limitations = [f"idf:{IDF_POLICY}"]
     if index.review_scope != "reviewed_only":
         limitations.append("index_includes_unreviewed_sources")
     missing = [ref.doc_id for ref, x in scope if x not in index.rows_by_extraction]
@@ -481,16 +565,41 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
         lex_analyzer = WhitespaceAnalyzer() if mode == "whitespace_bm25" else analyzer
         drop: set[str] = set()
         if mode != "whitespace_bm25":  # K0 stays the plain documented baseline
-            metadata_terms = {t for ref, _ in scope for t in index.scope_terms.get(ref.doc_id, [])}
+            # A selected project's restated name says nothing inside its own scope; across the corpus it is what
+            # finds the project, so the restatement rule applies to one or two selected documents only.
+            metadata_terms = {t for ref, _ in scope for t in index.scope_terms.get(ref.doc_id, [])} \
+                if len(scope) <= 2 else set()
             drop = scope_redundant_terms(index, analyzer.tokens(question), allowed, metadata_terms)
             if drop:
                 limitations.append("scope_redundant_terms:" + ",".join(sorted(drop)))
         lexical = rank_lexical(index, lex_analyzer, question, allowed, k, whitespace=mode == "whitespace_bm25",
                                drop=drop)
+    # "한영대학교 사업은 어떤 사업이야?": the question names its documents and asks nothing else. The remaining words
+    # ("알려줘", "하는 거") would only match arbitrary passages, so the named documents are ranked by meaning instead.
+    name_only = False
+    if mode in ("hybrid", "hybrid_rerank") and not exact and len(scope) <= ROUTE_MAX:
+        names = {t for ref, _ in scope for t in index.scope_terms.get(ref.doc_id, [])}
+        named = bool(routed) or len(set(analyzer.tokens(question)) & names) >= METADATA_RESTATEMENT_MIN
+        title_df: dict[str, int] = {}
+        for terms in index.scope_terms.values():
+            for t in set(terms):
+                title_df[t] = title_df.get(t, 0) + 1
+        project_words = {t for t, n in title_df.items() if n > ROUTE_MAX}  # "사업", "구축", "시스템": name a project
+        name_only = named and not (analyzer.content_terms(question) - names - drop - project_words)
+    if name_only:
+        lexical = []
+        limitations.append("name_only_question:dense_within_named_documents")
+        qset = set(analyzer.tokens(question))
+        named_rows = scope_rows(index, [(ref, x) for ref, x in scope if len(qset & set(
+            index.scope_terms.get(ref.doc_id, []))) >= METADATA_RESTATEMENT_MIN])
+        allowed = named_rows or allowed  # a routed scope is already named; a selection keeps the named one
     t2 = time.perf_counter()
     dense_ranked: list[tuple[int, float]] = []
-    if mode in DENSE_MODES:
-        dense_ranked = dense.search(query_vector, allowed, k)
+    if mode in ("hybrid", "hybrid_rerank") and not lexical and not exact and not name_only:
+        # Nearest neighbours always exist; without one lexical match they are arbitrary passages, not evidence.
+        limitations.append("no_lexical_match:dense_not_used")
+    elif mode in DENSE_MODES:
+        dense_ranked = dense.search(query_vector, allowed, k, settings)
     t3 = time.perf_counter()
 
     cid = lambda i: index.chunks[i]["chunk_id"]  # noqa: E731
@@ -500,8 +609,7 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
     candidates += [{"chunk_id": cid(i), "channel": "dense", "rank": r + 1, "score": round(s, 4)}
                    for r, (i, s) in enumerate(dense_ranked)]
     if mode in ("hybrid", "hybrid_rerank"):
-        fused = rrf_fuse([[cid(i) for i, _ in lexical], [cid(i) for i, _ in dense_ranked]],
-                         settings.rrf_k)[:settings.fused_top_k]
+        fused = fuse(settings, [cid(i) for i, _ in lexical], [cid(i) for i, _ in dense_ranked])
         candidates += [{"chunk_id": c, "channel": "rrf", "rank": r + 1, "score": round(s, 6)}
                        for r, (c, s) in enumerate(fused)]
         ordered = [index.row_of[c] for c, _ in fused]

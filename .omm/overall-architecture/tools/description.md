@@ -3,7 +3,7 @@
 Source files (9):
 
 - `tools/check_large_quality.py`
-- `tools/import_embedding_cache.py`
+- `tools/check_vector_search.py`
 - `tools/openapi.py`
 - `tools/phase2_handoff.py`
 - `tools/verification/ask_ownership.py`

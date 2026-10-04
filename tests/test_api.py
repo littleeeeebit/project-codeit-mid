@@ -107,8 +107,9 @@ class ApiFlowTest(unittest.TestCase):
         self.assertTrue(got.content)
         self.assertEqual(self.client.get(f"/api/originals/{doc['doc_id']}/bad").status_code, 400)
 
-    def test_a_question_needs_one_or_two_documents(self):
-        self.assertEqual(self.client.post("/api/ask", json={"scope": [], "mode": "single"}).status_code, 422)
+    def test_a_scoped_question_needs_one_or_two_documents(self):  # only mode "corpus" asks without a scope
+        got = self.client.post("/api/ask", json={"question": "하자보수 기간은?", "scope": [], "mode": "single"})
+        self.assertIn(got.status_code, (400, 422))
 
     def test_a_trace_is_frozen_generated_once_and_corrected_by_its_ids(self):
         sources = self.client.get("/api/verify/trace-sources", headers=self.headers).json()
@@ -145,6 +146,12 @@ class ApiFlowTest(unittest.TestCase):
     def test_the_budget_lists_only_visible_warnings(self):
         b = self.client.get("/api/budget").json()
         self.assertEqual(b["warnings"], service.visible_warnings(b["snapshot"]["warnings"]))
+
+    def test_the_fidelity_overview_loads(self):
+        # PostgreSQL refuses ungrouped columns at planning time, so this fails without HWP rows too.
+        r = self.client.get("/api/verify/fidelity", headers=self.headers)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIsInstance(r.json(), list)
 
     def test_saved_source_review_appears_in_history_without_a_second_write(self):
         doc = next(d for d in self.client.get("/api/documents").json() if d["indexed"])

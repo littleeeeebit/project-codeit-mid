@@ -64,7 +64,7 @@ class AnswerRequest:
     generation_id: str
     question: str
     scope: list[DocRef]
-    mode: Literal["single", "compare", "metadata", "inventory"] = "single"
+    mode: Literal["single", "compare", "corpus", "metadata", "inventory"] = "single"  # corpus: all documents, no scope
     as_of: str = ""
     config_id: str = "default"
     verifier_run_id: str = ""  # generate from this frozen verifier run's evidence (its config_id is then implied)
@@ -175,7 +175,7 @@ class _Strict(BaseModel):
 
 class Claim(_Strict):
     text: str
-    kind: Literal["source_fact", "inference"]
+    kind: Literal["source_fact", "inference", "absence"]  # "absence" repeats a missing_fields entry; never shown
     doc_id: str
     evidence_ids: list[str]
 

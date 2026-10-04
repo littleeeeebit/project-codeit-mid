@@ -28,7 +28,8 @@ DEFAULT_RATES: dict[str, dict[str, str]] = {
 }
 ALLOWED_GENERATION_MODELS = ("gpt-6-luna",)
 REASONING_EFFORTS = ("none", "low", "medium", "high", "xhigh", "max")
-ALLOWED_EMBEDDING_MODELS = ("text-embedding-3-small", "text-embedding-3-large")
+ALLOWED_EMBEDDING_MODELS = ("text-embedding-3-small", "text-embedding-3-large")  # small: test fixtures only
+SERVING_EMBEDDING = ("text-embedding-3-large", 1536)  # the only identity load_settings (every startup) accepts
 # Embedding endpoint limits as documented in the pinned SDK (openai 3.22.1, embedding_create_params.py):
 # 8192 tokens per input, at most 2048 inputs per array, 300,000 tokens summed across one request.
 EMBEDDING_MAX_TOKENS_PER_INPUT = 8192
@@ -65,6 +66,13 @@ class Settings:
     channel_top_k: int = 20  # BM25 top 20 and dense top 20
     fused_top_k: int = 20
     rrf_k: int = 60
+    # Hybrid fusion: "rrf" (weighted reciprocal rank fusion) or "keyword_first" (BM25 order, then dense-only rows by
+    # fused score). Serving takes both from the activated run; change them only through a measured comparison.
+    fusion: str = "rrf"
+    dense_weight: float = 1.0  # RRF weight of the dense channel; the keyword channel weighs 1
+    keyword_head: int = 20  # keyword_first: leading BM25 rows kept in BM25 order; the rest fuse by weighted RRF
+    dense_search: str = "exact"  # "hnsw" only through a run whose recall against exact search was measured
+    hnsw_ef_search: int = 100
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
     reranker_revision: str = ""  # commit hash from the model card; the trial refuses to load an unpinned model
     reranker_max_length: int = 512
@@ -80,7 +88,6 @@ class Settings:
     fake_delay_seconds: float = 0.0
     jev_model: str = "jev-1.13.0"  # the TypeSafe judge compared with the Luna judge (judges.py)
     extra: dict = field(default_factory=dict)
-    database_backend: str = "postgresql"
     database_dsn_env: str = "RFP_DATABASE_DSN"
     database_pool_max: int = 8
     database_timeout_seconds: float = 5
@@ -94,10 +101,8 @@ class Settings:
         return self.source_dir / "files"
 
     @property
-    def db_path(self) -> Path | Target:
-        if self.database_backend == "postgresql":
-            return Target(self.database_dsn_env, self.database_pool_max, self.database_timeout_seconds)
-        return self.data_dir / "rfp.sqlite3"
+    def db_path(self) -> Target:
+        return Target(self.database_dsn_env, self.database_pool_max, self.database_timeout_seconds)
 
     def fingerprint(self) -> str:
         data = asdict(self)
@@ -145,16 +150,19 @@ def load_settings(**overrides) -> Settings:
     values.update(overrides)
     settings = Settings(**values)
     validate(settings)
+    if (settings.embedding_model, settings.embedding_dimensions) != SERVING_EMBEDDING:
+        # The corpus vectors and the activated run are this identity; any other would serve keyword-only silently.
+        raise SettingsError(f"the embedding identity is fixed: {SERVING_EMBEDDING[0]} at {SERVING_EMBEDDING[1]} "
+                            f"dimensions, not {settings.embedding_model} at {settings.embedding_dimensions}")
     return settings
 
 
 def validate(s: Settings) -> None:
-    if s.database_backend not in ("postgresql", "sqlite"):
-        raise SettingsError("database_backend must be postgresql or explicit legacy sqlite")
     if not 1 <= s.database_pool_max <= 16 or not 1 <= s.database_timeout_seconds <= 30:
         raise SettingsError("database pool maximum must be 1..16 and timeout 1..30 seconds")
-    if s.database_backend == "postgresql" and not os.environ.get(s.database_dsn_env):
-        raise SettingsError(f"{s.database_dsn_env} is required; PostgreSQL never falls back to SQLite")
+    if not os.environ.get(s.database_dsn_env):
+        raise SettingsError(f"{s.database_dsn_env} is required: the application runs only on its validated "
+                            "PostgreSQL database and has no fallback")
     if s.provider not in ("openai", "fake"):
         raise SettingsError("provider must be 'openai' or 'fake'")
     if s.generation_model not in ALLOWED_GENERATION_MODELS or s.generation_model not in DEFAULT_RATES:
@@ -181,6 +189,10 @@ def validate(s: Settings) -> None:
         raise SettingsError("reranker_max_concurrency must be 1 until per-worker tokenizer isolation exists")
     if s.reranker_precision not in ("fp32", "fp16"):
         raise SettingsError("reranker_precision must be 'fp32' or 'fp16'")
+    if s.fusion not in ("rrf", "keyword_first") or not 0 < s.dense_weight <= 2 or not 0 <= s.keyword_head <= 100:
+        raise SettingsError("fusion must be 'rrf' or 'keyword_first', dense_weight within (0, 2], keyword_head 0..100")
+    if s.dense_search not in ("exact", "hnsw") or not 1 <= s.hnsw_ef_search <= 1000:
+        raise SettingsError("dense_search must be 'exact' or 'hnsw' and hnsw_ef_search within 1..1000")
     if s.rrf_k < 1 or s.channel_top_k < 1 or s.fused_top_k < 1 or s.reranker_max_concurrency < 1:
         raise SettingsError("rrf_k, top-k depths and reranker concurrency must be positive")
     if not 1 <= s.request_workers <= 6 or not s.request_workers <= s.request_admission <= 48:

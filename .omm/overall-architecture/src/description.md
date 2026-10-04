@@ -1,6 +1,6 @@
 # src
 
-Source files (28):
+Source files (27):
 
 - `src/rfp_assistant/__init__.py`
 - `src/rfp_assistant/answers.py`
@@ -18,7 +18,6 @@ Source files (28):
 - `src/rfp_assistant/gold.py`
 - `src/rfp_assistant/ingestion.py`
 - `src/rfp_assistant/judges.py`
-- `src/rfp_assistant/migration.py`
 - `src/rfp_assistant/ocr.py`
 - `src/rfp_assistant/ops.py`
 - `src/rfp_assistant/postgres.py`

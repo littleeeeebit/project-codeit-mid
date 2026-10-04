@@ -172,7 +172,6 @@ def write_phase3_report(settings: Settings) -> Path:
         attempts = [dict(r) for r in conn.execute(
             "SELECT purpose, stage, state, COUNT(*) AS n, COALESCE(SUM(settled_micro_usd), 0) AS settled, "
             "COALESCE(SUM(reserved_micro_usd), 0) AS reserved FROM attempts GROUP BY purpose, stage, state")]
-        active_run = store.get_app_setting(conn, "active_run")
         active_index = store.get_app_setting(conn, "active_index")
         envelopes = json.loads(conn.execute("SELECT envelopes_json FROM budget_settings WHERE id = 1").fetchone()[0])
         used = {p: budget._purpose_used(conn, p) for p in envelopes}
@@ -183,7 +182,7 @@ def write_phase3_report(settings: Settings) -> Path:
              f"Generated {store.utcnow()} from `{settings.data_dir.name}` state (schema {schema}). Only recorded "
              "results appear below; a missing section means the check has not been run on this host.", "",
              "## Configuration", "",
-             f"- Serving: {json.loads(active_run)['mode'] + ' run ' + str(json.loads(active_run)['run_id']) if active_run else 'keyword default (kiwi_bm25)'}; "
+             f"- Serving: {service.describe_serving(service.active_serving(settings))}; "
              f"active keyword index `{active_index}`.",
              "- Access: no login (owner decision); the sidebar name only attributes requests and actions.",
              f"- Executor: {settings.request_workers} workers, {settings.request_admission} admitted unfinished "

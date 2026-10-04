@@ -19,13 +19,13 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import sqlite3
 import uuid
 from pathlib import Path
 
 from .evaluation import (GOLD_DATASETS, METADATA_TYPES, OPERATIONAL_TYPES, SEALED_SPLITS, GoldChecker, RowChecker,
-                         dataset_path)
+                         dataset_path, split_of)
 from .ingestion import CODE_RE, QUARANTINE_TEXT, nfc
+from .postgres import Connection, Row
 from .settings import Settings
 from .store import dumps, open_db, tx, utcnow, write_jsonl_atomic, write_text_atomic
 
@@ -105,14 +105,14 @@ def row_checker(settings: Settings, conn, dataset: str):
 
 def check_row(checker, row: dict, tag: str, dataset: str) -> list[str]:
     if isinstance(checker, GoldChecker):
-        return checker.check(row, tag, split=dataset, require_review=False)
+        return checker.check(row, tag, split=split_of(dataset), require_review=False)
     return checker.check(row, tag)
 
 
 # ---------------------------------------------------------------- source context
 
 
-def _document_context(conn: sqlite3.Connection, doc_id: str | None) -> dict | None:
+def _document_context(conn: Connection, doc_id: str | None) -> dict | None:
     doc = conn.execute(
         "SELECT d.doc_id, d.filename, d.normalized_metadata_json, s.format, s.parse_status, "
         "s.review_status, s.reason_code FROM documents d "
@@ -125,7 +125,7 @@ def _document_context(conn: sqlite3.Connection, doc_id: str | None) -> dict | No
             "review_status": doc["review_status"], "unavailable_reason": QUARANTINE_TEXT.get(doc["reason_code"] or "")}
 
 
-def _evidence_context(conn: sqlite3.Connection, extraction_id: str | None, ev: dict) -> dict:
+def _evidence_context(conn: Connection, extraction_id: str | None, ev: dict) -> dict:
     el = conn.execute("SELECT element_id, kind, raw_text, location_json FROM elements WHERE extraction_id = ? "
                       "AND element_id = ?", (extraction_id, ev.get("element_id"))).fetchone()
     return {"element_id": ev.get("element_id"), "quote": ev.get("quote"),
@@ -133,7 +133,7 @@ def _evidence_context(conn: sqlite3.Connection, extraction_id: str | None, ev: d
             "text": el["raw_text"][:CONTEXT_CHARS] if el else None}
 
 
-def source_context(conn: sqlite3.Connection, row: dict) -> dict:
+def source_context(conn: Connection, row: dict) -> dict:
     """What the reviewer compares the row against: document(s), source state, cited elements, CSV fields."""
     if isinstance(row.get("scope"), list):  # gold-2: every scoped document and every evidence alternative
         docs = [_document_context(conn, s.get("doc_id")) for s in row["scope"] if isinstance(s, dict)]
@@ -180,7 +180,7 @@ def _row_type(row: dict):
     return row.get("question_type", row.get("type"))
 
 
-def render_rejection(c: sqlite3.Row) -> str:
+def render_rejection(c: Row) -> str:
     row = json.loads(c["row_json"])
     reject = json.loads(c["reject_json"])
     ctx = json.loads(c["context_json"])
@@ -234,7 +234,7 @@ def render_rejection(c: sqlite3.Row) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_index(rejected: list[sqlite3.Row]) -> str:
+def render_index(rejected: list[Row]) -> str:
     pending = [c for c in rejected if not c["inference_json"]]
     lines = ["# Rejection wiki", "",
              "Every rejected dataset candidate, rendered from the database. Do not edit these files by hand: "
@@ -257,12 +257,12 @@ def render_index(rejected: list[sqlite3.Row]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _reviews(conn: sqlite3.Connection, candidate_id: str) -> list[sqlite3.Row]:
+def _reviews(conn: Connection, candidate_id: str) -> list[Row]:
     return conn.execute("SELECT * FROM gold_reviews WHERE candidate_id = ? ORDER BY created_at, review_id",
                         (candidate_id,)).fetchall()
 
 
-def dataset_rows(conn: sqlite3.Connection, dataset: str) -> list[dict]:
+def dataset_rows(conn: Connection, dataset: str) -> list[dict]:
     out = []
     rows = conn.execute("SELECT * FROM gold_candidates WHERE dataset = ? AND status = 'approved' "
                         "ORDER BY decided_at, candidate_id", (dataset,)).fetchall()
@@ -272,7 +272,7 @@ def dataset_rows(conn: sqlite3.Connection, dataset: str) -> list[dict]:
             row.update(reviewed_by=c["decided_by"], reviewed_at=c["decided_at"], batch_id=c["batch_id"])
             out.append(row)
         return out
-    latest: dict[str, tuple[int, sqlite3.Row]] = {}  # a correction replaces its earlier approved revision
+    latest: dict[str, tuple[int, Row]] = {}  # a correction replaces its earlier approved revision
     for c in rows:
         row = json.loads(c["row_json"])
         if row["question_id"] not in latest or row["revision"] > latest[row["question_id"]][0]:
@@ -295,20 +295,20 @@ def dataset_rows(conn: sqlite3.Connection, dataset: str) -> list[dict]:
     return out
 
 
-def _rejected(conn: sqlite3.Connection, sealed: bool) -> list[sqlite3.Row]:
+def _rejected(conn: Connection, sealed: bool) -> list[Row]:
     rows = conn.execute("SELECT * FROM gold_candidates WHERE status = 'rejected' "
                         "ORDER BY decided_at, candidate_id").fetchall()
     return [c for c in rows if is_sealed(c["dataset"]) == sealed]
 
 
-def _write_rejection(settings: Settings, conn: sqlite3.Connection, candidate_id: str) -> None:
+def _write_rejection(settings: Settings, conn: Connection, candidate_id: str) -> None:
     c = conn.execute("SELECT * FROM gold_candidates WHERE candidate_id = ?", (candidate_id,)).fetchone()
     folder = rejections_dir(settings, c["dataset"])
     write_text_atomic(folder / f"{candidate_id}.md", render_rejection(c))
     write_text_atomic(folder / "index.md", render_index(_rejected(conn, is_sealed(c["dataset"]))))
 
 
-def _record_review(conn: sqlite3.Connection, candidate_id: str, reviewer: str, kind: str, decision: str,
+def _record_review(conn: Connection, candidate_id: str, reviewer: str, kind: str, decision: str,
                    original_inspected: bool, note: str, at: str) -> None:
     conn.execute("INSERT INTO gold_reviews(review_id, candidate_id, reviewer, kind, decision, original_inspected, "
                  "note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -570,7 +570,7 @@ def infer(settings: Settings, candidate_id: str, by: str, inference: dict) -> di
     return {"candidate_id": candidate_id, **record}
 
 
-def _expected_files(settings: Settings, conn: sqlite3.Connection) -> dict[Path, str]:
+def _expected_files(settings: Settings, conn: Connection) -> dict[Path, str]:
     files: dict[Path, str] = {}
     for sealed in (False, True):
         rejected = _rejected(conn, sealed)

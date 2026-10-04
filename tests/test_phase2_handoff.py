@@ -1,18 +1,17 @@
 """Offline checks for the handoff collector's read-only and source-text boundaries."""
 
-import hashlib
 import importlib.util
 import json
-import sqlite3
+import os
 import sys
 import tempfile
 import unittest
-from contextlib import closing
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from rfp_assistant.store import SCHEMA
+from rfp_assistant import postgres, store
+from tests import fixtures
 
 spec = importlib.util.spec_from_file_location("phase2_handoff", ROOT / "tools" / "phase2_handoff.py")
 kit = importlib.util.module_from_spec(spec)
@@ -25,9 +24,8 @@ class HandoffTest(unittest.TestCase):
             root = Path(directory)
             runtime = root / "runtime"
             runtime.mkdir()
-            db = runtime / "rfp.sqlite3"
-            with closing(sqlite3.connect(db)) as conn, conn:
-                conn.executescript(SCHEMA)
+            db = postgres.Target(fixtures.database())
+            with store.open_db(db) as conn, store.tx(conn):
                 conn.execute("INSERT INTO sources(source_hash, format, original_path, active_extraction_id, "
                              "parse_status) VALUES ('hash','hwp','PRIVATE_PATH','extraction','parsed')")
                 conn.execute("INSERT INTO documents VALUES ('doc',1,'example.hwp','hash','{}','{}','{}')")
@@ -38,10 +36,17 @@ class HandoffTest(unittest.TestCase):
                 conn.execute("INSERT INTO fidelity_checks VALUES ('extraction','native-print','hash','auto_flagged',"
                              "'{}',?, 'render-hash','today')", (json.dumps([
                                  {"page": 3, "element_id": "element", "text": "PRIVATE_SOURCE_BODY"}]),))
-            before = hashlib.sha256(db.read_bytes()).hexdigest()
+
+            def state():
+                with store.open_db(db) as conn:
+                    return [conn.execute(f"SELECT md5(string_agg(t::text, '|' ORDER BY t::text)) FROM {name} t"
+                                         ).fetchone()[0] for name in ("sources", "documents", "elements", "app_settings",
+                                                                      "fidelity_checks", "schema_migrations")]
+
+            before = state()
             out = root / "out"
-            kit.snapshot(runtime, out)
-            self.assertEqual(before, hashlib.sha256(db.read_bytes()).hexdigest())
+            kit.snapshot(os.environ[db.dsn_env], runtime, out)
+            self.assertEqual(before, state())
             manifest = kit.read_json(out / "manifest.json")
             self.assertEqual(manifest["status"], "inventory_only")
             self.assertEqual(manifest["steps"], [])

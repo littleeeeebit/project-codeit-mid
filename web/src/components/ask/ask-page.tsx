@@ -14,8 +14,10 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { AnswerView } from "./answer-view";
 import { DocumentSearch } from "./document-search";
 
-type Mode = "single" | "compare" | "metadata" | "inventory";
-const ONE: { id: Mode; text: string; paid: boolean }[] = [
+type Mode = "single" | "compare" | "corpus" | "metadata" | "inventory";
+type Scope = "selected" | "all";
+const ALL: { id: Mode; text: string; paid: boolean }[] = [{ id: "corpus", text: "전체 문서에서 답변", paid: true }];
+const ONE: typeof ALL = [
   { id: "single", text: "근거 기반 답변", paid: true },
   { id: "metadata", text: "기본 정보", paid: false },
   { id: "inventory", text: "요구사항 목록", paid: false },
@@ -25,7 +27,8 @@ const TWO: typeof ONE = [
   { id: "metadata", text: "기본 정보 비교", paid: false },
 ];
 const SUBMIT: Record<Mode, string> = {
-  single: "답변 받기", compare: "비교 답변 받기", metadata: "기본 정보 보기", inventory: "요구사항 목록 보기",
+  single: "답변 받기", compare: "비교 답변 받기", corpus: "전체 문서에서 답변 받기", metadata: "기본 정보 보기",
+  inventory: "요구사항 목록 보기",
 };
 
 /** The one request this screen owns, with the name it was asked under (taken once, at submit). */
@@ -40,6 +43,7 @@ async function abandon(owned: Ownership) {
 
 export function AskPage() {
   const [selected, setSelected] = useState<Doc[]>([]);
+  const [scope, setScope] = useState<Scope>("selected");
   const [mode, setMode] = useState<Mode>("single");
   const [question, setQuestion] = useState("");
   const [owned, setOwned] = useState<Ownership | null>(null);
@@ -48,7 +52,7 @@ export function AskPage() {
   const mounted = useRef(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const modes = selected.length === 2 ? TWO : ONE;
+  const modes = scope === "all" ? ALL : selected.length === 2 ? TWO : ONE;
   const current = modes.find((m) => m.id === mode) ?? modes[0];
 
   // Context changes also invalidate an initial POST that has not returned its ownership record yet.
@@ -73,6 +77,7 @@ export function AskPage() {
   }, [release]);
   const toggle = (d: Doc) => {
     release();
+    setScope("selected");
     setSelected((s) => (s.some((x) => x.doc_id === d.doc_id) ? s.filter((x) => x.doc_id !== d.doc_id)
       : s.length < 2 ? [...s, d] : s));
   };
@@ -97,7 +102,10 @@ export function AskPage() {
     setSubmitting(true);
     try {
       const { data, error } = await api.POST("/api/ask", {
-        body: { scope: selected.map((d) => ({ doc_id: d.doc_id, source_hash: d.source_hash })), question: q, mode: current.id },
+        body: {
+          scope: scope === "all" ? [] : selected.map((d) => ({ doc_id: d.doc_id, source_hash: d.source_hash })),
+          question: q, mode: current.id,
+        },
         headers: memberHeaders(member),
       });
       if (error || !data) throw new Error(errorText(error));
@@ -128,16 +136,28 @@ export function AskPage() {
           <p className="text-sm text-muted-foreground">제공된 과거 공고(2021-10 ~ 2025-02) 기준입니다. 현재 입찰 가능 여부는 이 자료로 판단할 수 없습니다.</p>
         </header>
 
-        {selected.length === 0 ? (
+        <ToggleGroup type="single" value={scope} aria-label="질문 범위" variant="outline" spacing={0} className="w-fit"
+                     onValueChange={(v) => { if (v) { release(); setScope(v as Scope); } }}>
+          <ToggleGroupItem value="selected" className="h-9 px-3 text-sm">선택한 문서</ToggleGroupItem>
+          <ToggleGroupItem value="all" className="h-9 px-3 text-sm">전체 문서</ToggleGroupItem>
+        </ToggleGroup>
+
+        {scope === "selected" && selected.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-10 text-center">
             <p className="text-lg font-semibold">질문할 문서를 고르세요</p>
-            <p className="mt-1 text-sm text-muted-foreground">하나를 고르면 질문할 수 있고, 두 개를 고르면 비교할 수 있습니다.</p>
+            <p className="mt-1 text-sm text-muted-foreground">하나를 고르면 질문할 수 있고, 두 개를 고르면 비교할 수 있습니다. 문서를 모르면 &lsquo;전체 문서&rsquo;로 질문하세요.</p>
           </div>
         ) : (
           <>
-            <ul className="grid gap-3 md:grid-cols-2">
-              {selected.map((d, i) => <SelectedDoc key={d.doc_id} doc={d} index={selected.length > 1 ? i + 1 : 0} onRemove={() => toggle(d)} />)}
-            </ul>
+            {scope === "all" ? (
+              <p className="rounded-2xl bg-secondary/60 p-4 text-sm text-muted-foreground">
+                색인된 모든 원문에서 근거를 찾습니다. 문서를 고르지 않아도 됩니다. 사업명이나 기관명을 질문에 넣으면 정확한 문서를 찾기 쉽습니다.
+              </p>
+            ) : (
+              <ul className="grid gap-3 md:grid-cols-2">
+                {selected.map((d, i) => <SelectedDoc key={d.doc_id} doc={d} index={selected.length > 1 ? i + 1 : 0} onRemove={() => toggle(d)} />)}
+              </ul>
+            )}
             <form onSubmit={submit} className="space-y-4 rounded-2xl border p-5 shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <ToggleGroup type="single" value={current.id} aria-label="질문 방식" variant="outline" spacing={0}
@@ -155,7 +175,8 @@ export function AskPage() {
                   <label htmlFor="question" className="sr-only">질문</label>
                   <textarea id="question" rows={3} maxLength={2000} value={question} disabled={busy}
 onChange={(e) => { release(); setQuestion(e.target.value); }}
-                            placeholder={current.id === "compare" ? "예: 두 사업의 하자보수 조건을 비교해 주세요." : "예: 하자보수 기간과 조건은 무엇인가요?"}
+                            placeholder={current.id === "compare" ? "예: 두 사업의 하자보수 조건을 비교해 주세요."
+                              : current.id === "corpus" ? "예: ○○기관 ○○ 구축 사업의 하자보수 기간은 얼마인가요?" : "예: 하자보수 기간과 조건은 무엇인가요?"}
                             className="w-full resize-y rounded-xl border border-input bg-background p-3 text-[16px] leading-7 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60" />
                 </div>
               )}

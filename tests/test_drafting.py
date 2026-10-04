@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from rfp_assistant import auth, budget, drafting, evaluation, generation, gold, store
-from tests import phase4_fixtures as fx
+from tests import fixtures, phase4_fixtures as fx
 
 
 class DraftingTest(unittest.TestCase):
@@ -20,14 +20,11 @@ class DraftingTest(unittest.TestCase):
                         {'doc_id': g['doc_id'], 'element_id': g['alternatives'][0]['element_id']}
                         for g in row['evidence_groups']]}
             transport = generation.FakeTransport()
-            lock = store.ProcessLock(env.settings.data_dir/'gateway.lock')
-            try:
+            with fixtures.foreign_gateway(env.settings):  # another process owns the paid gateway
                 with self.assertRaisesRegex(gold.GoldError, 'already owns'):
                     drafting.generate(env.settings, {'slots': [slot]}, Path(folder)/'locked', 100000, transport)
                 self.assertEqual(transport.calls, [])
                 self.assertFalse((Path(folder)/'locked').exists())
-            finally:
-                lock.release()
             parent = Path(folder)/'file'
             parent.write_text('not a directory', encoding='utf-8')
             for out, schema_failure in [(parent/'output', False), (Path(folder)/'setup-failed', True)]:
@@ -40,8 +37,8 @@ class DraftingTest(unittest.TestCase):
                         drafting.generate(env.settings.with_(provider='openai'), {'slots': [slot]}, out, 100000)
                 self.assertTrue(owned.closed)
                 self.assertEqual(owned.calls, [])
-                released = store.ProcessLock(env.settings.data_dir/'gateway.lock')
-                released.release()
+                with fixtures.foreign_gateway(env.settings):  # the failed setup released the gateway
+                    pass
             with store.open_db(env.settings.db_path) as conn:
                 self.assertEqual(conn.execute("SELECT status FROM requests WHERE idempotency_key LIKE 'gold-draft:%'").fetchone()[0], 'failed')
 

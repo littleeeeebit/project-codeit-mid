@@ -4,20 +4,20 @@ This runbook covers launching, giving access, stopping, recovering and reconcili
 
 Run the commands with the project environment's interpreter from any directory. Paths in environment variables must be absolute.
 
-## PostgreSQL migration and Settings limit
+## PostgreSQL only and Settings limit
 
-The PostgreSQL replacement and its paid-disabled rehearsal are documented in the [migration handover](../../handoff/postgresql-pgvector/README.md). The live production ledger remains explicitly configured as SQLite until the reviewed maintenance-window cutover. PostgreSQL is the implementation default: a missing DSN, failed database or missing complete import stops operation. Start infrastructure with `./tools/start-postgresql.ps1`; this leaves `RFP_DATABASE_DSN` unchanged. Select an imported, validated PostgreSQL database explicitly only for isolated rehearsal or the coordinated cutover. Never initialize an empty rehearsal target before running its import.
+Since the 2026-10-04 cutover the application, billing ledger and retrieval sets live only in PostgreSQL 18.6 + pgvector 0.8.6 (the `bidmate_app` database). There is no other backend and no fallback. Start infrastructure with `./tools/start-postgresql.ps1`, then set `RFP_DATABASE_DSN` to the application database. A missing DSN, an unreachable database, a database without a validated import, or an embedding identity other than `text-embedding-3-large` at 1,536 dimensions stops startup with a clear message. `activate-run` likewise refuses a run of another identity, which would otherwise serve keyword-only. After a change to corpus routing (`ROUTE_RULE`), the activated run is no longer served. Requests fall back to the keyword default, and every retrieval lists `activated_run_stale:corpus_route` until `evaluate-retrieval` and `activate-run` record a run under the new rule. The cutover evidence (final import, vector parity, HNSW, fusion gate, needle set, paid end-to-end check) is in the [handover](../../handoff/postgresql-pgvector/README.md#postgresql-only-operation-2026-10-04).
 
-Application startup also requires successful persisted artifact validation for the imported snapshot and rechecks artifact hashes. A failed or interrupted validation disables PostgreSQL paid admission and blocks startup until validation passes. A completed table import alone is insufficient.
+Application startup requires the persisted import validation and rechecks artifact hashes. A failed or interrupted validation disables paid admission and blocks startup until validation passes.
 
-Production cutover switches the authoritative application database, billing ledger and accepted retrieval set together after draining work and verifying the final snapshot. Keep the explicit SQLite configuration while acceptance is blocked. The fixed 1,536-dimensional candidate failed the 2026-10-04 source-reviewed pilot comparison because it introduced critical support failures; do not enable PostgreSQL paid admission or install the SQLite retirement marker on that evidence. The [handover](../../handoff/postgresql-pgvector/README.md#production-cutover-request-and-quality-gate-2026-10-04) records the reproducible quality command and remaining cutover/rollback work. A merged persistence implementation is not a completed production cutover.
+The cold archives under `.runtime/archive/` (the final `.sqlite3` snapshot and a verified PostgreSQL custom-format dump) are history only; no code reads them. Rollback is a `restore-check` of the newest verified dump (`postgresql-2026-10-04-r5`, ledger revision 1712) into an empty database (section 12), which leaves paid admission disabled. Before `paid on`, reconcile every record the replaced ledger wrote after the dump's watermark; after new paid writes, take and restore-check a new dump.
 
 The owner approved paid migration work and a $10 shared operating cap on 2026-10-03. The Settings page edits that shared cumulative cap, records visitor name and reason, preserves settled/unknown amounts, and scales current purpose envelopes. It does not change API keys, provider account quotas, paid admission or historical prices. Existing no-login visitors have the budget-admin capability; the limit is shared, not a per-person account. Decreasing below committed spend or purpose reservations is refused. CLI equivalents are `set-limit --usd <amount> --actor <name> --reason <reason>` and `set-envelopes --file <absolute JSON> --actor <name> --reason <reason>`.
 
 ## 1. One owner, one data directory
 
-- One process owns `RFP_DATA_DIR` at a time. The PostgreSQL serving app and paid CLI jobs take the same database-wide session advisory lock across hosts; legacy SQLite uses `gateway.lock`. A second owner is refused with `GatewayLockError`. Stop the UI before paid maintenance (`build-dense`, `evaluate-retrieval --allow-paid-queries`).
-- The ledger, requests, audit events and corrections all live in `rfp.sqlite3` on a local disk. A network share is outside the contract.
+- One process owns the database at a time. The serving app and paid CLI jobs take the same database-wide session advisory lock across hosts. A second owner is refused with `GatewayLockError`. Stop the UI before paid maintenance (`build-dense`, `evaluate-retrieval --allow-paid-queries`).
+- The ledger, requests, audit events and corrections all live in the PostgreSQL application database. Immutable extraction and index artifacts stay under `RFP_DATA_DIR` on a local disk; a network share is outside the contract.
 - The operational config (`RFP_CONFIG_FILE`) holds no secrets. `OPENAI_API_KEY` stays in the server environment or `.env`.
 
 ## 2. Access: no login
@@ -35,7 +35,8 @@ Local development and single-host use:
 
 ```powershell
 cd web; npm ci; npm run build; cd ..        # once per checkout or screen change: writes web/out
-$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.corpus-before-cutover.example.json).Path # until cutover
+$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.example.json).Path
+$env:RFP_DATABASE_DSN = "postgresql://bidmate:<password>@127.0.0.1:55432/bidmate_app"   # password from .runtime/postgresql.env
 python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
 
@@ -71,7 +72,7 @@ Paid generation stays disabled until `configure-budget` records the dates, prior
 
 ## 5. Budget recovery
 
-Budget administration is owner CLI only. These commands run beside the serving app without taking its gateway lock:
+Budget administration is owner CLI only. These commands, and `settle` and `reconcile` below, are ledger-only: they open no provider client and run beside the serving app without taking its gateway lock:
 
 ```powershell
 python -m rfp_assistant.cli budget-status
@@ -246,7 +247,6 @@ python -m rfp_assistant.cli backup --destination D:\rfp-backups\2026-10-02 --act
 python -m rfp_assistant.cli restore-check --backup D:\rfp-backups\2026-10-02\manifest.json
 ```
 
-- On PostgreSQL, `backup` takes the gateway lock/write mutex and uses a complete native custom-format dump. `restore-check` requires only the backup and `RFP_RESTORE_DATABASE_DSN` for a distinct empty target; the primary database may be lost or its DSN unset. Recovery commits a durable target fence before the atomic native restore and holds gateway/import locks through verification. Any failure keeps startup and paid admission blocked; successful recovery also leaves paid admission disabled. Referenced immutable files currently stay at their managed paths. See the handover for limitations and commands. After new PostgreSQL writes/spending, use a consistent validated PostgreSQL recovery; never resume stale SQLite spending.
-- On explicit legacy SQLite, `backup` uses SQLite's online backup API (consistent with WAL), copies `datasets/`, `sealed/`, `runs/` and `releases/`, and records the hashes of the immutable extraction and index artifacts it references, the ledger amounts and the reconciliation watermark. It refuses a relative, non-empty or overlapping destination. Keys and `.env` are not included; the owner backs them up separately.
-- SQLite `restore-check` restores into a fresh staging directory with paid generation off and the fake provider. It verifies the database hash, schema, settled/pending/unknown/available amounts, prior use, adjustments, attempt states, copied files, extraction artifacts and the active index (and dense matrix) row mapping. It also previews restart recovery: unknown reserves stay pending; nothing is replayed. A summary goes to `.runtime/releases/restore-checks/`. PostgreSQL publishes its authoritative report in `bidmate_recovery.receipt` in the same durable transaction as validation and readiness. Read `SELECT report_json FROM bidmate_recovery.receipt WHERE id=1` on the isolated target; the CLI reports this receipt location. PostgreSQL no longer writes a filesystem success receipt. Startup and paid admission reject verified recovery fences lacking a committed successful receipt; earlier restored targets require a fresh isolated restore.
+- On PostgreSQL, `backup` takes the gateway lock/write mutex and uses a complete native custom-format dump. `restore-check` requires only the backup and `RFP_RESTORE_DATABASE_DSN` for a distinct empty target; the primary database may be lost or its DSN unset. Recovery commits a durable target fence before the atomic native restore and holds gateway/import locks through verification. Any failure keeps startup and paid admission blocked; successful recovery also leaves paid admission disabled. Referenced immutable files currently stay at their managed paths. See the handover for limitations and commands. The backup refuses a relative, non-empty or overlapping destination. Keys and `.env` are not included; the owner backs them up separately.
+- `restore-check` verifies schema, settled/pending/unknown/available amounts, attempt states, copied files, extraction artifacts and the active index; unknown reserves stay pending and nothing is replayed. It publishes its authoritative report in `bidmate_recovery.receipt` in the same durable transaction as validation and readiness. Read `SELECT report_json FROM bidmate_recovery.receipt WHERE id=1` on the isolated target; the CLI reports this receipt location. PostgreSQL no longer writes a filesystem success receipt. Startup and paid admission reject verified recovery fences lacking a committed successful receipt; earlier restored targets require a fresh isolated restore.
 - Real recovery (phase 5): stop the old owner, restore-check the backup, reconcile spending after its watermark, then copy the database into place and start one owner. Never let the old and the restored owner dispatch concurrently, and never reset the allowance.

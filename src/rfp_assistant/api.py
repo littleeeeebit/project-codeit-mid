@@ -120,9 +120,9 @@ class ScopeRef(BaseModel):
 
 
 class AskIn(BaseModel):
-    scope: list[ScopeRef] = Field(min_length=1, max_length=2)
+    scope: list[ScopeRef] = Field(max_length=2)  # empty only for corpus (all documents)
     question: str = ""
-    mode: Literal["single", "compare", "metadata", "inventory"]
+    mode: Literal["single", "compare", "corpus", "metadata", "inventory"]
 
 
 class Owned(BaseModel):
