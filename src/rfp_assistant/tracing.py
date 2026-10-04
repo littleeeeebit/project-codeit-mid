@@ -23,7 +23,9 @@ log = logging.getLogger(__name__)
 
 _NAMES = r"api[_-]?key|secret[_-]?key|client[_-]?secret|password|passwd|access[_-]?token|auth[_-]?token"
 SECRET_NAME = re.compile(rf"(?i:{_NAMES})")
-_GAP = r"(?:[\\\"']|\\[nrt]|\s)*"  # quotes and whitespace, either of which may be JSON-escaped once or more
+# quotes and whitespace, either of which may be JSON-escaped once or more; an escape (\n) is tried before a lone
+# backslash so its letter is never mistaken for the start of the value
+_GAP = r"(?:\\[nrt]|[\\\"']|\s)*"
 SECRET = re.compile(
     r"(?:sk|pk|rk)-[A-Za-z0-9_\-]{16,}"  # OpenAI, Langfuse (pk-lf-/sk-lf-), Anthropic, Stripe-style keys
     r"|AIza[0-9A-Za-z_\-]{30,}"  # Google API keys
@@ -32,7 +34,9 @@ SECRET = re.compile(
     r"|xox[abpors]-[A-Za-z0-9\-]{10,}"
     r"|eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}"  # JWT
     r"|(?i:bearer|basic)\s+[A-Za-z0-9._~+/=\-]{16,}"
-    rf"|(?i:{_NAMES}){_GAP}[:=]{_GAP}[^\s\\\"',}}]{{8,}}")
+    # a secret name and a separator protect whatever follows, however short; an opened container (truncated JSON,
+    # a Python repr) cannot be delimited in plain text, so everything from it to the end of the string goes
+    rf"|(?i:{_NAMES}){_GAP}[:=]{_GAP}(?:[\[{{](?s:.*)|[^\s\\\"',}}]+)")
 REDACTED = "[REDACTED]"
 
 
@@ -42,8 +46,9 @@ def mask(value: str) -> str:
 
 def redact(value):
     """`mask` applied to decoded content: a string holding JSON is decoded, every string and key inside it is masked
-    (recursively, so JSON inside JSON too), the whole value of a secret-named key is redacted, and the result is
-    serialised again. Escaped text therefore reaches the pattern as the plain text it stands for."""
+    (recursively, so JSON inside JSON too), the whole value under a secret-named key is redacted, containers
+    included, and the result is serialised again. Escaped text therefore reaches the pattern as the plain text it
+    stands for. JSON too deep to decode or walk raises (RecursionError): the caller must fail closed."""
     if isinstance(value, str):
         inner = _decoded(value)
         if inner is None:
@@ -51,20 +56,21 @@ def redact(value):
         out = redact(inner)
         return value if out == inner else json.dumps(out, ensure_ascii=False)
     if isinstance(value, dict):
-        return {mask(str(k)): REDACTED if SECRET_NAME.search(str(k)) and isinstance(v, (str, int, float))
-                and not isinstance(v, bool) and v != "" else redact(v) for k, v in value.items()}
+        return {mask(str(k)): REDACTED if SECRET_NAME.search(str(k)) and v not in (None, "") else redact(v)
+                for k, v in value.items()}
     if isinstance(value, list):
         return [redact(v) for v in value]
     return value
 
 
 def _decoded(text: str):
-    """The JSON container or string `text` encodes, or None for plain text (numbers and literals stay text)."""
+    """The JSON container or string `text` encodes, or None for plain text (numbers and literals stay text).
+    Only a syntax error means plain text; a parser that gives up (RecursionError, MemoryError) propagates."""
     if text.lstrip()[:1] not in ('{', '[', '"'):
         return None
     try:
         return json.loads(text)
-    except Exception:  # noqa: BLE001 - not JSON (or nested past the parser's depth): treated as plain text
+    except ValueError:
         return None
 
 

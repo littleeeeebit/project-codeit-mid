@@ -238,9 +238,17 @@ class TracingLifecycleTest(unittest.TestCase):
             self.assertNotIn("s3cr3tv4lue99", tracing.redact(exported))
         self.assertNotIn("hunter2hunter2", tracing.mask(multiline))  # raw text (e.g. truncated JSON) too
         named = json.loads(tracing.redact(json.dumps({"OPENAI_API_KEY": "short1", "password": 12345678,
-                                                      "evidence_tokens": 900})))
+                                                      "evidence_tokens": 900, "usage": {"prompt_tokens": 10}})))
         self.assertEqual(named, {"OPENAI_API_KEY": tracing.REDACTED, "password": tracing.REDACTED,
-                                 "evidence_tokens": 900})
+                                 "evidence_tokens": 900, "usage": {"prompt_tokens": 10}})
+        # a secret name protects its whole value: containers under it, and plain text that cannot be delimited
+        for structured in ({"password": {"value": "hunter2hunter2"}}, {"auth": [{"api_key": ["short1"]}]}):
+            self.assertNotIn("hunter2hunter2", tracing.redact(json.dumps(structured)))
+            self.assertNotIn("short1", tracing.redact(json.dumps(structured)))
+        for raw in ('{"password": {"value": "hunter2hunter2"', "{'password': {'value': 'hunter2hunter2'}}",
+                    "password: short1"):
+            self.assertNotIn("hunter2hunter2", tracing.redact(raw))
+            self.assertNotIn("short1", tracing.redact(raw))
 
     def test_an_attribute_too_deep_to_redact_leaves_redacted(self):
         from types import SimpleNamespace
@@ -253,6 +261,9 @@ class TracingLifecycleTest(unittest.TestCase):
         for depth in (500, 2000, 5000, 100000):  # walkable, parsable but too deep to walk, unparsable
             deep = "[" * depth + json.dumps("password:\n hunter2hunter2") + "]" * depth
             self.assertNotIn("hunter2hunter2", gate(deep)["langfuse.observation.input"])
+        # a parser that gives up is not plain text: the attribute leaves as REDACTED, whatever the pattern would miss
+        deep = "[" * 100000 + json.dumps({"password": "short1"}) + "]" * 100000
+        self.assertEqual(gate(deep), {"langfuse.observation.input": tracing.REDACTED})
         with mock.patch.object(tracing, "redact", side_effect=RecursionError):
             self.assertEqual(gate("password: hunter2hunter2"), {"langfuse.observation.input": tracing.REDACTED,
                                                                 "plain": tracing.REDACTED})
