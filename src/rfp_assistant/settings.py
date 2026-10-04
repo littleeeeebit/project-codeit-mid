@@ -78,6 +78,7 @@ class Settings:
     request_admission: int = 12  # admitted unfinished (queued + running) requests across the process
     shutdown_wait_seconds: float = 20.0
     fake_delay_seconds: float = 0.0
+    jev_model: str = "jev-1.13.0"  # the TypeSafe judge compared with the Luna judge (judges.py)
     extra: dict = field(default_factory=dict)
     database_backend: str = "postgresql"
     database_dsn_env: str = "RFP_DATABASE_DSN"

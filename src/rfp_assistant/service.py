@@ -1798,6 +1798,7 @@ def gold_awaiting_second_review(res: Resources, principal: Principal) -> list[di
 # ---------------------------------------------------------------- phase 4: development answer evaluation
 
 _EVAL_JOBS: dict[str, threading.Thread] = {}
+_JUDGE_JOBS: dict[str, threading.Thread] = {}  # judge comparison parts; never alongside an answer evaluation
 _EVAL_LOCK = threading.Lock()
 
 
@@ -1874,7 +1875,7 @@ def start_answer_evaluation(res: Resources, principal: Principal, estimate_id: s
     if res.transport is None or res._closed:
         raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
     with _EVAL_LOCK:
-        if any(t.is_alive() for t in _EVAL_JOBS.values()):
+        if any(t.is_alive() for t in [*_EVAL_JOBS.values(), *_JUDGE_JOBS.values()]):
             raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
 
         def job() -> None:
@@ -1890,6 +1891,80 @@ def start_answer_evaluation(res: Resources, principal: Principal, estimate_id: s
         _EVAL_JOBS[est["run_id"]] = thread
         thread.start()
     return est["run_id"]
+
+
+# ---------------------------------------------------------------- judge comparison (judges.py)
+
+def _judge_running() -> set[str]:
+    return {run_id for run_id, t in _JUDGE_JOBS.items() if t.is_alive()}
+
+
+def _judge_call(fn, *args):
+    from . import answers, judges
+
+    try:
+        return fn(*args)
+    except (judges.JudgeError, answers.AnswerEvalError, budget.BudgetError) as exc:
+        raise ServiceError(str(exc)) from None
+
+
+def judge_overview(res: Resources, principal: Principal) -> dict:
+    """The judge reference, its split, the declared replacement rule and every judge run with its progress."""
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    return _judge_call(judges.overview, res.settings, _judge_running())
+
+
+def plan_judges(res: Resources, principal: Principal, part: str) -> dict:
+    """Free: prices every translation and Luna judge call a part still needs, and counts the Jev calls."""
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    return _judge_call(judges.plan, res.settings, part)
+
+
+def start_judges(res: Resources, principal: Principal, estimate_id: str) -> str:
+    """Runs a planned judge comparison part on this process's gateway in one background thread, never above the
+    estimate the verifier consented to. One evaluation or comparison at a time; rerunning resumes."""
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    est = _judge_call(judges.load_estimate, res.settings, estimate_id)
+    _judge_call(judges.recheck, res.settings, est)
+    if res.transport is None or res._closed:
+        raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
+    with _EVAL_LOCK:
+        if any(t.is_alive() for t in [*_EVAL_JOBS.values(), *_JUDGE_JOBS.values()]):
+            raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
+
+        def job() -> None:
+            try:
+                judges.run(res.settings, res.transport, estimate_id, principal.member_id, closing=lambda: res._closed)
+            except Exception as exc:  # noqa: BLE001 - recorded for the overview; finished judgements stay
+                from .store import write_text_atomic
+
+                write_text_atomic(judges.run_dir(res.settings, est["run_id"]) / "last-error.txt",
+                                  f"{type(exc).__name__}: {exc}"[:500])
+
+        thread = threading.Thread(target=job, name=f"rfp-judge-{est['run_id']}", daemon=True)
+        _JUDGE_JOBS[est["run_id"]] = thread
+        thread.start()
+    return est["run_id"]
+
+
+def judge_results(res: Resources, principal: Principal, run_id: str) -> dict:
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    return _judge_call(judges.results, res.settings, run_id)
+
+
+def judge_disagreements(res: Resources, principal: Principal, run_id: str) -> list[dict]:
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    return _judge_call(judges.disagreements, res.settings, run_id)
 
 
 def fidelity_overview(res: Resources, principal: Principal) -> list[dict]:
