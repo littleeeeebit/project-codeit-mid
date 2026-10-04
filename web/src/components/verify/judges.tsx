@@ -11,7 +11,7 @@ import { cn } from "cn";
 import { api, errorText, type Schemas } from "@/lib/api";
 import { must, usePoll } from "@/lib/use-poll";
 import { stamp, type Tone, usd } from "@/lib/format";
-import { Section, Table, td } from "@/components/data-table";
+import { Table, td } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -43,7 +43,6 @@ const VERDICT: Record<string, { label: string; tone: Tone; text: string; line: s
   inconclusive: { label: "판단 보류", tone: "warn", text: "text-warn", line: "판정한 항목이 규칙의 최소 개수에 못 미칩니다." },
 };
 const POSITIVE = new Set(["supporting", "supported", "correct"]);
-const labelTone = (l: string | null | undefined): Tone => (!l ? "neutral" : POSITIVE.has(l) ? "ok" : "bad");
 const pct = (x: number | null | undefined) => (x == null ? "-" : `${(x * 100).toFixed(1)}%`);
 const sec = (x: number | null | undefined) => (x == null ? "-" : `${(x / 1000).toFixed(2)}초`);
 const k3 = (x: number | null | undefined) => (x == null ? "-" : x.toFixed(3));
@@ -65,7 +64,7 @@ export function JudgeSection() {
   const r = res.data;
   const scored = !!r && Object.keys(r.arms).length > 0;
   return (
-    <div className="space-y-12">
+    <div className="space-y-16">
       <Verdict ov={ov.data} results={r} run={heldOut} />
       {scored && <Comparison r={r} />}
       {scored && <Review runId={heldOut!.run_id} stamp={key!} />}
@@ -76,27 +75,32 @@ export function JudgeSection() {
 
 // ---------------------------------------------------------------- the answer
 
+/** A fold for what supports the page but is not the answer: small, quiet, closed by default. */
+function More({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <details className="group">
+      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+        <span aria-hidden className="transition-transform group-open:rotate-90">›</span>{label}
+      </summary>
+      <div className="pt-2">{children}</div>
+    </details>
+  );
+}
+
 function Verdict({ ov, results, run }: { ov: Overview; results?: Results; run?: Run }) {
   const v = results?.verdict;
-  const head = (title: string, cls: string, line: string) => (
-    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-      <div className="space-y-1">
-        <p className="text-[13px] font-semibold text-muted-foreground">Jev로 Luna 판정을 바꿀 수 있나</p>
-        <h3 id="judge-answer" className={cn("text-2xl font-bold", cls)}>{title}</h3>
-        <p className="text-sm">{line}</p>
-      </div>
-      <p className="text-[13px] text-muted-foreground">
-        기준 {ov.reference!.run_id} 독립 검토 · 평가용 {ov.split?.held_out ?? "-"}개 · 규칙 {String(v?.rule.version ?? "replacement-rule-1")}
-      </p>
-    </div>
-  );
+  const question = <p className="text-sm font-medium text-muted-foreground">Jev로 Luna 판정을 바꿀 수 있나</p>;
   if (!v) {
     return (
-      <section aria-labelledby="judge-answer" className="space-y-6 rounded-2xl border p-4 sm:p-6">
-        {head(run?.running ? "평가 실행 중" : "아직 판정 전", "", run?.running ? "모든 항목을 판정하면 미리 정한 규칙으로 판정합니다."
-          : run ? "평가 실행이 끝나지 않았습니다. 아래 실행 관리에서 다시 추정하고 실행하면 남은 항목만 이어서 합니다."
-            : "아래 실행 관리에서 보정 → 평가 순서로 실행하세요.")}
-        {run?.running && <ArmProgress r={run} />}
+      <section aria-labelledby="judge-answer" className="space-y-6">
+        <div className="space-y-2">
+          {question}
+          <h3 id="judge-answer" className="text-4xl font-bold tracking-tight">{run?.running ? "평가 실행 중" : "아직 판정 전"}</h3>
+          <p className="text-lg">{run?.running ? "모든 항목을 판정하면 미리 정한 규칙으로 답합니다."
+            : run ? "평가 실행이 끝나지 않았습니다. 아래 실행 관리에서 남은 항목을 이어서 실행하세요."
+              : "아래 실행 관리에서 보정 → 평가 순서로 실행하세요."}</p>
+        </div>
+        {run?.running && <div className="max-w-3xl"><ArmProgress r={run} /></div>}
       </section>
     );
   }
@@ -104,43 +108,45 @@ function Verdict({ ov, results, run }: { ov: Overview; results?: Results; run?: 
   const l = results!.arms.luna, j = results!.arms.jev_bridged;
   const margin = Number(v.rule.kappa_margin ?? 0.05);
   const passed = Object.fromEntries(v.checks.map((c) => [c.condition, c.passed]));
-  const tiles = v.verdict === "inconclusive" || !l || !j ? [] : [
-    { key: "kappa", title: "카파", value: k3(j.kappa), need: l.kappa == null ? "-" : `${(l.kappa - margin).toFixed(3)} 이상`,
-      note: `통과·불통과 일치도 · Luna ${k3(l.kappa)} − ${margin}` },
-    { key: "false_accepts", title: "잘못 통과", value: `${j.false_accepts}건`, need: `${l.false_accepts}건 이하`,
-      note: `기준상 불통과 ${j.reference_negatives}건 중 · Luna ${l.false_accepts}건` },
-    { key: "coverage", title: "판정 비율", value: pct(j.coverage), need: `${pct(Number(v.rule.min_coverage ?? 0.9))} 이상`,
-      note: `${j.judged}/${j.items}개 판정 · 나머지는 보류` },
+  const faster = l?.latency_ms.p50 && j?.latency_ms.p50 ? Math.round(l.latency_ms.p50 / j.latency_ms.p50) : null;
+  const conditions = v.verdict === "inconclusive" || !l || !j ? [] : [
+    { key: "kappa", title: "기준과의 일치도 (카파)", value: k3(j.kappa), need: l.kappa == null ? "-" : `${(l.kappa - margin).toFixed(3)} 이상이어야`, luna: k3(l.kappa) },
+    { key: "false_accepts", title: "틀린 답을 통과시킨 수", value: `${j.false_accepts}건`, need: `${l.false_accepts}건 이하여야`, luna: `${l.false_accepts}건` },
+    { key: "coverage", title: "판정한 비율", value: pct(j.coverage), need: `${pct(Number(v.rule.min_coverage ?? 0.9))} 이상이어야`, luna: pct(l.coverage) },
   ];
   const negatives = j?.reference_negatives ?? 0;
   return (
-    <section aria-labelledby="judge-answer" className="space-y-6 rounded-2xl border p-4 sm:p-6">
-      {head(verdict.label, verdict.text, verdict.line)}
-      {tiles.length > 0 ? (
-        <ul className="grid gap-3 md:grid-cols-3">
-          {tiles.map((t) => (
-            <li key={t.key} className="space-y-2 rounded-xl bg-secondary/60 p-4">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[13px] font-semibold">{t.title}</span>
-                <StatusBadge tone={passed[t.key] ? "ok" : passed[t.key] === false ? "bad" : "neutral"}>
-                  {passed[t.key] ? "충족" : passed[t.key] === false ? "미충족" : "계산 안 함"}
-                </StatusBadge>
-              </div>
-              <p className="flex flex-wrap items-baseline gap-x-2 tabular-nums">
-                <span className="text-xl font-bold">{t.value}</span>
-                <span className="text-sm text-muted-foreground">기준 {t.need}</span>
-              </p>
-              <p className="text-xs text-muted-foreground">{t.note}</p>
-            </li>
+    <section aria-labelledby="judge-answer" className="space-y-10">
+      <div className="space-y-3">
+        {question}
+        <h3 id="judge-answer" className={cn("text-5xl font-bold tracking-tight", verdict.text)}>{verdict.label}</h3>
+        <p className="text-lg">{verdict.line}{v.verdict === "replaceable" && faster && faster > 1 ? ` 판정 속도는 Luna의 ${faster}배입니다.` : ""}</p>
+      </div>
+      {conditions.length > 0 ? (
+        <dl className="grid gap-8 sm:grid-cols-3">
+          {conditions.map((c) => (
+            <div key={c.key} className="space-y-1">
+              <dt className="text-sm text-muted-foreground">{c.title}</dt>
+              <dd className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold tabular-nums">{c.value}</span>
+                <span className={cn("text-sm font-semibold", passed[c.key] ? "text-ok" : "text-bad")}>{passed[c.key] ? "✓ 충족" : "✗ 미충족"}</span>
+              </dd>
+              <dd className="text-sm text-muted-foreground tabular-nums">{c.need} · Luna {c.luna}</dd>
+            </div>
           ))}
-        </ul>
+        </dl>
       ) : <Notice tone="warn">{v.deciding.map((c) => c.detail).join(" · ")}</Notice>}
-      {negatives > 0 && negatives < 30 && (
-        <p className="border-l-2 border-warn pl-3 text-sm text-muted-foreground">
-          기준 세트에서 불통과로 검토된 항목이 {negatives}건뿐이라 카파와 잘못 통과는 한두 건에도 크게 움직입니다.
-          이 결과는 &ldquo;이 기준에서 Luna보다 나쁘지 않다&rdquo;는 뜻이지, 검토자를 대신할 만큼 믿을 만하다는 뜻은 아닙니다.
-        </p>
-      )}
+      <More label={negatives > 0 && negatives < 30 ? `이 답을 얼마나 믿을 수 있나 · 불통과 기준이 ${negatives}건뿐` : "규칙과 기준"}>
+        <div className="max-w-3xl space-y-2 text-sm leading-relaxed text-muted-foreground">
+          {negatives > 0 && negatives < 30 && <p>
+            기준 세트에서 불통과로 검토된 항목이 {negatives}건뿐이라 카파와 잘못 통과는 한두 건에도 크게 움직입니다.
+            이 결과는 &ldquo;이 기준에서 Luna보다 나쁘지 않다&rdquo;는 뜻이지, 검토자를 대신할 만큼 믿을 만하다는 뜻은 아닙니다.
+          </p>}
+          <p>규칙 {String(v.rule.version)}은 평가 실행 전에 코드와 docs/rag/judges.md에 정해 두었습니다. 세 조건을 모두 넘어야 교체 가능이고,
+            어느 쪽이든 판정한 항목이 {String(v.rule.min_judged ?? 100)}개 미만이면 판단 보류입니다.</p>
+          <p>기준: {ov.reference!.run_id}의 독립 검토 {ov.reference!.items}개 중 평가용 {ov.split?.held_out ?? "-"}개. 보정용 {ov.split?.calibration ?? "-"}개는 Jev 임계값을 맞추는 데만 썼습니다.</p>
+        </div>
+      </More>
     </section>
   );
 }
@@ -152,84 +158,86 @@ function Interval({ a }: { a: Arm }) {
   const [lo, hi] = a.agreement.wilson95 ?? [null, null];
   const rate = a.agreement.rate;
   const x = (v: number) => Math.max(0, Math.min(100, ((v - 0.6) / 0.4) * 100));
+  if (lo == null || hi == null || rate == null) return null;
   return (
-    <div className="space-y-1.5">
-      <p className="tabular-nums"><span className="font-semibold">{pct(rate)}</span>
-        <span className="text-xs text-muted-foreground"> {a.agreement.numerator}/{a.agreement.denominator}</span></p>
-      {lo != null && hi != null && rate != null && (
-        <div className="relative h-1.5 w-36 rounded-full bg-secondary" role="img" aria-label={`95% 구간 ${pct(lo)}–${pct(hi)}`}>
-          <span className="absolute inset-y-0 rounded-full bg-primary/30" style={{ left: `${x(lo)}%`, width: `${x(hi) - x(lo)}%` }} />
-          <span className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full bg-primary" style={{ left: `${x(rate)}%` }} />
-        </div>
-      )}
-      {lo != null && <p className="text-xs tabular-nums text-muted-foreground">{pct(lo)}–{pct(hi)}</p>}
+    <div className="relative mt-2 h-1 w-full max-w-36 rounded-full bg-secondary" role="img" aria-label={`95% 구간 ${pct(lo)}–${pct(hi)}`}>
+      <span className="absolute inset-y-0 rounded-full bg-primary/30" style={{ left: `${x(lo)}%`, width: `${x(hi) - x(lo)}%` }} />
+      <span className="absolute top-1/2 size-2 -translate-1/2 rounded-full bg-primary" style={{ left: `${x(rate)}%` }} />
     </div>
   );
 }
 
-function cost(a: Arm, arm: string) {
-  if (a.usd.priced) return <>{usd(a.usd.settled_micro_usd, 4)}<span className="block text-xs text-muted-foreground">{a.usd.calls}회</span></>;
-  const bridge = arm === "jev_bridged" && a.bridge_usd ? ` · 번역 ${usd(a.bridge_usd.settled_micro_usd, 4)}` : "";
-  return <>가격 미제공<span className="block text-xs text-muted-foreground">{a.usd.calls}회{bridge}</span></>;
-}
+const usdOrUnpriced = (a: Arm) => (a.usd.priced ? usd(a.usd.settled_micro_usd, 3) : "가격 미제공");
 
-/** The metric cells of one arm, shared by the wide table and the narrow cards. */
-function cells(a: Arm, k: string): [string, React.ReactNode][] {
-  return [
-    ["판정 비율", <span key="v">{pct(a.coverage)}<span className="block text-xs text-muted-foreground">{a.judged}/{a.items}</span></span>],
-    ["기준과 일치 · 95%", <Interval key="v" a={a} />],
-    ["카파", <span key="v" className="font-semibold">{k3(a.kappa)}</span>],
-    ["잘못 통과", <span key="v"><span className={cn("font-semibold", a.false_accepts > 0 && "text-bad")}>{a.false_accepts}</span>
-      <span className="text-xs text-muted-foreground"> / {a.reference_negatives}</span></span>],
-    ["비용", cost(a, k)],
-    ["지연 p50", <span key="v" className="whitespace-nowrap">{sec(a.latency_ms.p50)}<span className="block text-xs text-muted-foreground">p95 {sec(a.latency_ms.p95)}</span></span>],
-  ];
-}
-
-function ArmName({ k, a }: { k: string; a: Arm }) {
-  return (
-    <>
-      <span className="block font-semibold">{ARM[k]}</span>
-      <span className="block text-xs font-normal text-muted-foreground">{ARM_NOTE[k]}{k === "jev_raw" ? ` ${a.items}개` : ""}</span>
-    </>
-  );
-}
+/** The four numbers a reader compares; everything else waits in the fold below. */
+const KEY_METRICS: { title: string; value: (a: Arm) => React.ReactNode }[] = [
+  { title: "기준과 일치", value: (a) => <>{pct(a.agreement.rate)}<Interval a={a} /></> },
+  { title: "틀린 답 통과", value: (a) => <>{a.false_accepts}<span className="text-sm font-normal text-muted-foreground"> / {a.reference_negatives}건</span></> },
+  { title: "한 건 판정 시간", value: (a) => sec(a.latency_ms.p50) },
+  { title: "비용", value: usdOrUnpriced },
+];
+const COLS = "md:grid-cols-[minmax(13rem,1.3fr)_repeat(4,minmax(0,1fr))]";
 
 function Comparison({ r }: { r: Results }) {
   const arms = ARMS.filter((k) => r.arms[k]);
   return (
-    <Section title="세 판정 모델" aside={<span className="text-[13px] text-muted-foreground">평가용 절반 · 임계값 {r.thresholds_sha256?.slice(0, 8) ?? "-"}</span>}>
-      <div className="hidden md:block">
-        <Table caption="Luna, 영어 다리 Jev, 한국어 원문 Jev의 평가용 지표" head={["판정 모델", ...cells(r.arms.luna ?? r.arms[arms[0]], arms[0]).map(([h]) => h)]}>
-          {arms.map((k) => (
-            <tr key={k}>
-              <th scope="row" className={cn(td, "min-w-44 text-left")}><ArmName k={k} a={r.arms[k]} /></th>
-              {cells(r.arms[k], k).map(([h, v]) => <td key={h} className={cn(td, "tabular-nums")}>{v}</td>)}
-            </tr>
-          ))}
-        </Table>
+    <section aria-labelledby="judge-arms" className="space-y-4">
+      <h3 id="judge-arms" className="text-lg font-bold">세 판정 모델</h3>
+      <div className={cn("hidden gap-6 border-b pb-2 text-sm text-muted-foreground md:grid", COLS)}>
+        <span />{KEY_METRICS.map((m) => <span key={m.title}>{m.title}</span>)}
       </div>
-      <ul className="space-y-3 md:hidden">
-        {arms.map((k) => (
-          <li key={k} className="space-y-3 rounded-xl border p-4">
-            <p><ArmName k={k} a={r.arms[k]} /></p>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm tabular-nums">
-              {cells(r.arms[k], k).map(([h, v]) => <div key={h} className="min-w-0"><dt className="text-xs text-muted-foreground">{h}</dt><dd>{v}</dd></div>)}
-            </dl>
-          </li>
-        ))}
+      <ul className="divide-y">
+        {arms.map((k) => {
+          const a = r.arms[k];
+          return (
+            <li key={k} className={cn("grid grid-cols-2 gap-x-6 gap-y-4 py-5", COLS, k === "jev_raw" && "text-muted-foreground")}>
+              <div className="col-span-2 md:col-span-1">
+                <p className={cn("text-base font-semibold", k !== "jev_raw" && "text-foreground")}>{ARM[k]}</p>
+                <p className="text-sm text-muted-foreground">{ARM_NOTE[k]}{k === "jev_raw" ? ` ${a.items}개` : ""}</p>
+              </div>
+              {KEY_METRICS.map((m) => (
+                <dl key={m.title} className="min-w-0">
+                  <dt className="text-sm text-muted-foreground md:sr-only">{m.title}</dt>
+                  <dd className="text-xl font-semibold tabular-nums">{m.value(a)}</dd>
+                </dl>
+              ))}
+            </li>
+          );
+        })}
       </ul>
-      <p className="text-xs text-muted-foreground">
-        카파는 통과(지지·근거 있음·정확)와 불통과로 나눠 셉니다. 잘못 통과는 기준상 불통과를 통과시킨 건수입니다.
-        보류(불확실 구간, 호출 실패, 번역 불가)는 오답이 아니라 미판정입니다. 값 비교는 코드가 먼저 판정합니다.
+      <More label="모든 지표 · 혼동 행렬">
+        <AllMetrics r={r} arms={arms} />
+      </More>
+    </section>
+  );
+}
+
+function AllMetrics({ r, arms }: { r: Results; arms: readonly string[] }) {
+  const rows: [string, (a: Arm, k: string) => React.ReactNode][] = [
+    ["판정 비율", (a) => `${pct(a.coverage)} (${a.judged}/${a.items})`],
+    ["기준과 일치 · Wilson 95%", (a) => `${pct(a.agreement.rate)} (${a.agreement.numerator}/${a.agreement.denominator}) · ${pct(a.agreement.wilson95?.[0])}–${pct(a.agreement.wilson95?.[1])}`],
+    ["카파 (통과·불통과)", (a) => k3(a.kappa)],
+    ["틀린 답 통과 / 기준상 불통과", (a) => `${a.false_accepts} / ${a.reference_negatives}`],
+    ["코드가 값으로 판정", (a) => `${a.code_settled}건`],
+    ["비용", (a, k) => `${usdOrUnpriced(a)} · ${a.usd.calls}회${k === "jev_bridged" && a.bridge_usd ? ` · 번역 ${usd(a.bridge_usd.settled_micro_usd, 4)}` : ""}`],
+    ["지연 p50 / p95", (a) => `${sec(a.latency_ms.p50)} / ${sec(a.latency_ms.p95)}`],
+  ];
+  return (
+    <div className="space-y-6">
+      <Table caption="세 판정 모델의 평가용 지표 전체" head={["지표", ...arms.map((k) => ARM[k])]}>
+        {rows.map(([name, f]) => (
+          <tr key={name}>
+            <th scope="row" className={cn(td, "text-left font-medium")}>{name}</th>
+            {arms.map((k) => <td key={k} className={cn(td, "tabular-nums")}>{f(r.arms[k], k)}</td>)}
+          </tr>
+        ))}
+      </Table>
+      <p className="max-w-3xl text-sm text-muted-foreground">
+        카파는 통과(지지·근거 있음·정확)와 불통과로 나눠 셉니다. 보류(불확실 구간, 호출 실패, 번역 불가)는 오답이 아니라 미판정입니다.
+        지연은 한 번에 한 호출씩 잰 값입니다. 임계값 {r.thresholds_sha256?.slice(0, 8) ?? "-"}.
       </p>
-      <details className="rounded-xl border">
-        <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">항목 종류별 혼동 행렬</summary>
-        <div className="grid gap-6 border-t p-4 xl:grid-cols-3">
-          {arms.map((k) => <Confusion key={k} arm={k} a={r.arms[k]} />)}
-        </div>
-      </details>
-    </Section>
+      <div className="grid gap-6 xl:grid-cols-3">{arms.map((k) => <Confusion key={k} arm={k} a={r.arms[k]} />)}</div>
+    </div>
   );
 }
 
@@ -261,15 +269,16 @@ function Operations({ ov, runs, open, onChanged }: { ov: Overview; runs: Run[]; 
   const sorted = [...runs].sort((a, b) => b.created_at.localeCompare(a.created_at));
   const summary = sorted.length ? sorted.map((r) => `${PART[r.part]} ${r.running ? "실행 중" : r.status === "complete" ? "완료" : "일부"}`).join(" · ") : "실행 없음";
   return (
-    <details open={open} className="rounded-2xl border">
-      <summary className="flex min-h-14 cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-        <span className="text-lg font-bold">실행 관리</span>
+    <details open={open} className="group border-t pt-4">
+      <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+        <span aria-hidden className="text-muted-foreground transition-transform group-open:rotate-90">›</span>
+        <span className="text-base font-semibold">실행 관리</span>
         <span className="text-sm text-muted-foreground">{summary}</span>
-        <span className="text-[13px] text-muted-foreground md:ml-auto">
-          기준 {ov.reference!.items}개 · 보정 {ov.split?.calibration ?? "-"} / 평가 {ov.split?.held_out ?? "-"} · 원문 대조 표본 {ov.split?.raw_sample ?? "-"}
-        </span>
       </summary>
-      <div className="space-y-6 border-t p-5">
+      <div className="space-y-6 pt-4">
+        <p className="text-sm text-muted-foreground">
+          기준 {ov.reference!.run_id} · {ov.reference!.items}개 · 보정 {ov.split?.calibration ?? "-"} / 평가 {ov.split?.held_out ?? "-"} · 원문 대조 표본 {ov.split?.raw_sample ?? "-"}
+        </p>
         {sorted.length > 0 && <ul className="divide-y rounded-xl border">{sorted.map((r) => <RunRow key={r.run_id} r={r} />)}</ul>}
         <Plan fitted={fitted} running={runs.some((r) => r.running)} onStarted={onChanged} />
       </div>
@@ -376,84 +385,94 @@ function Plan({ fitted, running, onStarted }: { fitted: boolean; running: boolea
 // ---------------------------------------------------------------- disagreements: a list beside one opened item
 
 const FILTERS: Record<string, { label: string; test: (r: Row) => boolean }> = {
-  all: { label: "전체", test: () => true },
-  false_accept: { label: "기준상 불통과를 통과시킴", test: (r) => !POSITIVE.has(r.reference) && ARMS.some((k) => POSITIVE.has(r.arms[k]?.label ?? "")) },
-  luna: { label: "Luna ≠ 기준", test: (r) => !!r.arms.luna && r.arms.luna.label !== r.reference },
-  jev: { label: "Jev(영어) ≠ 기준", test: (r) => !!r.arms.jev_bridged && r.arms.jev_bridged.label !== r.reference },
-  between: { label: "Luna ≠ Jev(영어)", test: (r) => r.arms.luna?.label !== r.arms.jev_bridged?.label },
+  false_accept: { label: "틀린 답을 통과시킴", test: (r) => !POSITIVE.has(r.reference) && ARMS.some((k) => POSITIVE.has(r.arms[k]?.label ?? "")) },
+  luna: { label: "Luna가 기준과 다름", test: (r) => !!r.arms.luna && r.arms.luna.label !== r.reference },
+  jev: { label: "Jev가 기준과 다름", test: (r) => !!r.arms.jev_bridged && r.arms.jev_bridged.label !== r.reference },
   abstain: { label: "Jev 보류", test: (r) => !!r.arms.jev_bridged && r.arms.jev_bridged.label == null },
+  all: { label: "전체", test: () => true },
 };
+const PAGE = 12;
+const sentence = (r: Row) => String((r.kind === "claim" ? r.korean.question : r.korean.claim) ?? "");
+const labelText = (l: string | null | undefined): string => (!l ? "text-muted-foreground" : POSITIVE.has(l) ? "text-ok" : "text-bad");
 
 function Review({ runId, stamp: key }: { runId: string; stamp: string }) {
   const rows = usePoll(`judge-disagreements:${key}`, () => must(api.GET("/api/verify/judges/disagreements/{run_id}",
     { params: { path: { run_id: runId } } }), errorText), null);
   const [kind, setKind] = useState("all");
-  const [filter, setFilter] = useState("all");
+  // the failures that decide replacement come first; the full list is one tap away
+  const [filter, setFilter] = useState("false_accept");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+  const [shown, setShown] = useState(PAGE);
   const visible = useMemo(() => (rows.data ?? []).filter((r) => (kind === "all" || r.kind === kind) && FILTERS[filter].test(r)
     && JSON.stringify([r.korean, r.english]).toLocaleLowerCase().includes(query.toLocaleLowerCase())), [rows.data, kind, filter, query]);
   const cur = visible.find((r) => r.blind_id === open) ?? visible[0];
+  const pick = (f: string) => { setFilter(f); setShown(PAGE); setOpen(null); };
   return (
-    <Section title="판정이 엇갈린 항목" aside={<span className="text-[13px] text-muted-foreground">{rows.data ? `세 판정 중 하나라도 기준과 다르거나 서로 다른 ${rows.data.length}건` : ""}</span>}>
+    <section aria-labelledby="judge-review" className="space-y-5">
+      <h3 id="judge-review" className="text-lg font-bold">판정이 엇갈린 {rows.data?.length ?? ""}건</h3>
       {rows.error ? <Notice tone="bad">{rows.error}</Notice> : !rows.data ? <Skeleton className="h-64 w-full" /> : (
-        <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
-          <nav aria-label="엇갈린 항목 목록" className="min-w-0 xl:sticky xl:top-20 xl:self-start">
-            <div className="overflow-hidden rounded-xl border border-input">
-              <div className="space-y-3 border-b p-4">
-                <Field id="dis-filter" label="엇갈림">
-                  <select id="dis-filter" value={filter} onChange={(e) => setFilter(e.target.value)} className={cn(field, "h-11")}>
-                    {Object.entries(FILTERS).map(([k, f]) => <option key={k} value={k}>{f.label} · {rows.data!.filter(f.test).length}건</option>)}
-                  </select>
-                </Field>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field id="dis-kind" label="항목 종류">
-                    <select id="dis-kind" value={kind} onChange={(e) => setKind(e.target.value)} className={cn(field, "h-11")}>
-                      <option value="all">전체</option>{Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
-                  </Field>
-                  <Field id="dis-query" label="문장에서 찾기">
-                    <input id="dis-query" value={query} onChange={(e) => setQuery(e.target.value)} className={cn(field, "h-11")} />
-                  </Field>
-                </div>
-                <p className="text-sm font-semibold">{visible.length}건</p>
-              </div>
-              <ul className="max-h-[44dvh] divide-y overflow-y-auto xl:max-h-[calc(100dvh-22rem)]">
-                {visible.map((r) => <li key={r.blind_id} className="p-1"><ItemRow r={r} active={r === cur} onOpen={() => {
-                  setOpen(r.blind_id);
-                  // below xl the item opens under the list, out of view; bring it up
-                  if (!matchMedia("(min-width: 80rem)").matches) document.getElementById("judge-item")?.scrollIntoView({ block: "start" });
-                }} /></li>)}
-              </ul>
-              {!visible.length && <p className="p-4 text-sm text-muted-foreground">조건에 맞는 항목이 없습니다.</p>}
+        <>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <div role="group" aria-label="엇갈림 종류" className="flex flex-wrap gap-2">
+              {Object.entries(FILTERS).map(([k, f]) => (
+                <button key={k} type="button" aria-pressed={filter === k} onClick={() => pick(k)}
+                        className={cn("min-h-9 rounded-full px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                          filter === k ? "bg-foreground font-semibold text-background" : "bg-secondary text-foreground hover:bg-secondary/70")}>
+                  {f.label} <span className="tabular-nums opacity-70">{rows.data!.filter(f.test).length}</span>
+                </button>
+              ))}
             </div>
-          </nav>
-          <div id="judge-item" className="min-w-0 scroll-mt-4">{cur ? <ItemDetail key={cur.blind_id} r={cur} /> : <Empty>조건에 맞는 항목이 없습니다.</Empty>}</div>
-        </div>
+            <div className="flex gap-2 xl:ml-auto">
+              <select aria-label="항목 종류" value={kind} onChange={(e) => { setKind(e.target.value); setShown(PAGE); }} className={cn(field, "h-9 w-32")}>
+                <option value="all">모든 종류</option>{Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+              <input aria-label="문장에서 찾기" placeholder="문장에서 찾기" value={query} onChange={(e) => { setQuery(e.target.value); setShown(PAGE); }} className={cn(field, "h-9 w-44")} />
+            </div>
+          </div>
+          {!visible.length ? <Empty>조건에 맞는 항목이 없습니다.</Empty> : (
+            <div className="grid gap-8 xl:grid-cols-[360px_minmax(0,1fr)]">
+              <nav aria-label="엇갈린 항목 목록" className="min-w-0">
+                <ul className="space-y-1">
+                  {visible.slice(0, shown).map((r) => <li key={r.blind_id}><ItemRow r={r} active={r === cur} onOpen={() => {
+                    setOpen(r.blind_id);
+                    // below xl the item opens under the list, out of view; bring it up
+                    if (!matchMedia("(min-width: 80rem)").matches) document.getElementById("judge-item")?.scrollIntoView({ block: "start" });
+                  }} /></li>)}
+                </ul>
+                {visible.length > shown && (
+                  <button type="button" onClick={() => setShown(shown + PAGE)} className="mt-2 min-h-11 px-3 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
+                    {Math.min(PAGE, visible.length - shown)}건 더 보기 · 남은 {visible.length - shown}건
+                  </button>
+                )}
+              </nav>
+              <div id="judge-item" className="min-w-0 scroll-mt-4 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:self-start xl:overflow-y-auto">
+                {cur && <ItemDetail key={cur.blind_id} r={cur} />}
+              </div>
+            </div>
+          )}
+        </>
       )}
-    </Section>
+    </section>
   );
 }
 
 function ItemRow({ r, active, onOpen }: { r: Row; active: boolean; onOpen: () => void }) {
   return (
     <button type="button" onClick={onOpen} aria-current={active || undefined}
-            className={cn("w-full space-y-2 rounded-lg border-l-4 px-3 py-3 text-left outline-none hover:bg-secondary/70 focus-visible:ring-3 focus-visible:ring-ring/50",
-              active ? "border-primary bg-accent hover:bg-accent" : "border-transparent")}>
-      <span className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>{KIND[r.kind]} · 기준 <span className="font-semibold text-foreground">{LABEL[r.reference] ?? r.reference}</span></span>
-        <span className="font-mono">{r.blind_id.slice(0, 6)}</span>
-      </span>
-      <span className="line-clamp-2 block text-sm [overflow-wrap:anywhere]">{String((r.kind === "claim" ? r.korean.question : r.korean.claim) ?? "")}</span>
-      <span className="flex flex-wrap gap-x-3 gap-y-1">
-        {ARMS.filter((k) => r.arms[k]).map((k) => {
+            className={cn("w-full space-y-1.5 rounded-lg px-3 py-3 text-left outline-none hover:bg-secondary/70 focus-visible:ring-3 focus-visible:ring-ring/50",
+              active && "bg-accent hover:bg-accent")}>
+      {r.kind === "claim" ? (
+        <>
+          <span className="line-clamp-2 text-sm [overflow-wrap:anywhere]">필수 사실 · {String(r.korean.required ?? "")}</span>
+          <span className="line-clamp-1 text-xs text-muted-foreground [overflow-wrap:anywhere]">{sentence(r)}</span>
+        </>
+      ) : <span className="line-clamp-2 text-sm [overflow-wrap:anywhere]">{sentence(r)}</span>}
+      <span className="block text-xs text-muted-foreground">
+        기준 <span className={cn("font-semibold", labelText(r.reference))}>{LABEL[r.reference] ?? r.reference}</span>
+        {ARMS.filter((k) => r.arms[k] && r.arms[k]!.label !== r.reference).map((k) => {
           const l = r.arms[k]!.label;
-          return (
-            <span key={k} className={cn("inline-flex items-center gap-1 text-xs", l === r.reference && "opacity-60")}>
-              <span className="text-muted-foreground">{SHORT[k]}</span>
-              <StatusBadge tone={labelTone(l)}>{LABEL[l ?? "abstain"] ?? l}</StatusBadge>
-            </span>
-          );
+          return <span key={k}> · {SHORT[k]} <span className={cn("font-semibold", labelText(l))}>{LABEL[l ?? "abstain"] ?? l}</span></span>;
         })}
       </span>
     </button>
@@ -464,45 +483,42 @@ const FIELDS: [string, string][] = [
   ["question", "질문"], ["claim", "주장"], ["required", "필수 사실"], ["conditions", "조건"],
   ["answer_summary", "답변 요약"], ["answer_claims", "답변 주장"], ["passages", "근거 인용"],
 ];
-const FOLDED = new Set(["answer_claims", "passages"]);
+const FOLDED = new Set(["answer_summary", "answer_claims", "passages"]);
 const lines = (v: unknown) => (Array.isArray(v) ? v.map(String).filter(Boolean) : v ? [String(v)] : []);
 
 function ItemDetail({ r }: { r: Row }) {
   const shown = FIELDS.filter(([k]) => lines(r.korean[k]).length);
   return (
-    <article className="space-y-6 rounded-2xl border p-4 sm:p-6">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <StatusBadge tone="neutral">{KIND[r.kind]}</StatusBadge>
-        <span className="text-sm">기준 판정</span>
-        <StatusBadge tone={labelTone(r.reference)} size="md">{LABEL[r.reference] ?? r.reference}</StatusBadge>
-        <span className="ml-auto font-mono text-xs text-muted-foreground">{r.blind_id}</span>
+    <article className="space-y-8 xl:border-l xl:pl-8">
+      <header className="space-y-2">
+        <p className="text-sm text-muted-foreground">
+          {KIND[r.kind]} · 기준 판정 <span className={cn("font-semibold", labelText(r.reference))}>{LABEL[r.reference] ?? r.reference}</span>
+        </p>
+        <p className="text-lg font-semibold leading-snug [overflow-wrap:anywhere]">{sentence(r)}</p>
+        {r.kind === "claim" && r.korean.required ? <p className="text-sm">필수 사실 · {String(r.korean.required)}</p> : null}
       </header>
-      <ul className="grid gap-3 md:grid-cols-[repeat(auto-fit,minmax(12rem,1fr))]">
+      <ul className="grid gap-6 sm:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]">
         {ARMS.filter((k) => r.arms[k]).map((k) => {
           const a = r.arms[k]!;
           const off = a.label !== r.reference;
           return (
-            <li key={k} className={cn("space-y-2 rounded-xl border p-4", off && "border-bad/40")}>
-              <p className="flex items-center justify-between gap-2 text-[13px] font-semibold">
-                {ARM[k]}{off && <span className="text-xs font-normal text-bad">기준과 다름</span>}
-              </p>
-              <p className="flex flex-wrap items-center gap-2">
-                <StatusBadge tone={labelTone(a.label)} size="md">{LABEL[a.label ?? "abstain"] ?? a.label}</StatusBadge>
-                {a.probability != null && <span className="text-sm tabular-nums text-muted-foreground">지지 확률 {a.probability.toFixed(2)}</span>}
+            <li key={k} className="space-y-1">
+              <p className="text-sm text-muted-foreground">{ARM[k]}</p>
+              <p className="flex flex-wrap items-baseline gap-x-2">
+                <span className={cn("text-base font-bold", labelText(a.label))}>{LABEL[a.label ?? "abstain"] ?? a.label}</span>
+                {off && <span className="text-xs text-muted-foreground">≠ 기준</span>}
+                {a.probability != null && <span className="text-xs tabular-nums text-muted-foreground">지지 확률 {a.probability.toFixed(2)}</span>}
               </p>
               {a.source === "code" && <p className="text-xs text-muted-foreground">코드가 값으로 판정</p>}
-              {a.abstain && <p className="text-xs text-muted-foreground">보류 사유 · {a.abstain}</p>}
-              {a.reason && <p lang="en" className="text-sm">{a.reason}</p>}
+              {a.abstain && <p className="text-xs text-muted-foreground">{a.abstain.startsWith("untranslatable") ? "영어로 옮기지 못해 보내지 않음" : a.abstain}</p>}
+              {a.reason && <p lang="en" className="text-sm leading-relaxed text-muted-foreground">{a.reason}</p>}
             </li>
           );
         })}
       </ul>
-      <div className="space-y-2">
-        {r.english ? (
-          <div className="hidden grid-cols-[6rem_minmax(0,1fr)_minmax(0,1fr)] gap-4 text-xs font-semibold text-muted-foreground md:grid">
-            <span /><span>한국어 원문</span><span>영어 다리 · Jev가 읽은 글</span>
-          </div>
-        ) : <Notice tone="warn">영어 다리 없음 · {r.untranslatable}. 번역이 보호한 값을 바꾸거나 한글을 남겨 Jev에 보내지 않았고, 보류로 셉니다.</Notice>}
+      <div className="space-y-1">
+        <p className="text-sm font-semibold">원문과 Jev가 읽은 영어</p>
+        {!r.english && <p className="text-sm text-warn">영어 다리 없음 · {r.untranslatable}. 번역이 보호한 값을 바꾸거나 한글을 남겨 Jev에 보내지 않았습니다.</p>}
         <dl className="divide-y">
           {shown.map(([k, name]) => <Pair key={k} name={name} ko={lines(r.korean[k])} en={r.english ? lines(r.english[k]) : null} folded={FOLDED.has(k)} />)}
         </dl>
@@ -518,20 +534,20 @@ function Pair({ name, ko, en, folded }: { name: string; ko: string[]; en: string
       {xs.map((x, i) => <p key={i} className="whitespace-pre-wrap [overflow-wrap:anywhere]">{x}</p>)}
     </div>
   );
-  const cols = en ? "md:grid-cols-[6rem_minmax(0,1fr)_minmax(0,1fr)]" : "md:grid-cols-[6rem_minmax(0,1fr)]";
+  const cols = en ? "md:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1fr)]" : "md:grid-cols-[5rem_minmax(0,1fr)]";
   if (folded) {
     return (
-      <details className="py-1">
-        <summary className="flex min-h-11 cursor-pointer items-center text-[13px] font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-          {name} · {ko.length}개
+      <details className="group py-1">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+          <span aria-hidden className="transition-transform group-open:rotate-90">›</span>{name} {ko.length}개
         </summary>
-        <div className={cn("grid gap-x-4 gap-y-2 pb-3", cols)}><span className="hidden md:block" />{body(ko)}{en && body(en, "en")}</div>
+        <div className={cn("grid gap-x-6 gap-y-2 pb-3", cols)}><span className="hidden md:block" />{body(ko)}{en && body(en, "en")}</div>
       </details>
     );
   }
   return (
-    <div className={cn("grid gap-x-4 gap-y-2 py-3", cols)}>
-      <dt className="text-[13px] font-semibold">{name}</dt>
+    <div className={cn("grid gap-x-6 gap-y-2 py-3", cols)}>
+      <dt className="text-sm text-muted-foreground">{name}</dt>
       <dd className="min-w-0">{body(ko)}</dd>
       {en && <dd className="min-w-0">{body(en, "en")}</dd>}
     </div>
