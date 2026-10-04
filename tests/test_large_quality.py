@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from tools.check_large_quality import BoundedReference, ceiling_guard, compare, job_cost, prepare, reference_rows
+from tools.check_large_quality import BoundedReference, candidate_vectors, ceiling_guard, compare, job_cost, prepare, reference_rows
 
 
 class QualityAcceptanceTests(unittest.TestCase):
@@ -15,6 +15,40 @@ class QualityAcceptanceTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "fixed"):
                     prepare(SimpleNamespace(embedding_model="text-embedding-3-large", embedding_dimensions=dimensions))
             frozen.assert_not_called()
+
+    def prepare_with(self, index):
+        row = lambda i, x: {"id": i, "doc_id": "d", "source_hash": "h", "extraction_id": x,
+                            "answerable": True, "evidence": [{}], "type": "fact"}
+        settings = SimpleNamespace(embedding_model="text-embedding-3-large", embedding_dimensions=1536)
+        with patch("tools.check_large_quality.evaluation.frozen_dataset", return_value={"current": True, "rows": 2}), \
+             patch("tools.check_large_quality.evaluation.validate_gold", return_value={"ok": True}), \
+             patch("tools.check_large_quality.evaluation.load_eval_rows",
+                   return_value=([row(1, "x1"), row(2, "x2")], [], "sha")), \
+             patch("tools.check_large_quality.KeywordIndex.load", return_value=index), \
+             patch("tools.check_large_quality.evaluation._ready_dense_for") as dense_lookup:
+            with self.assertRaises(ValueError) as caught:
+                prepare(settings)
+            dense_lookup.assert_not_called()
+        return str(caught.exception)
+
+    def test_unindexed_frozen_scope_is_rejected_before_planning(self):
+        index = SimpleNamespace(version="kw", rows_by_extraction={"x1": [0]}, has_metadata_snapshot=True,
+                                analyzer_fp=None)
+        self.assertIn("[2]", self.prepare_with(index))
+
+    def test_analyzer_incompatible_index_is_rejected_before_planning(self):
+        index = SimpleNamespace(version="kw", rows_by_extraction={"x1": [0], "x2": [1]},
+                                has_metadata_snapshot=True, analyzer_fp="earlier-policy")
+        self.assertIn("analyzer/query policy", self.prepare_with(index))
+
+    def test_paired_probe_reads_the_verified_matrix_not_the_cache(self):
+        matrix = np.eye(3, dtype=np.float32)
+        index = SimpleNamespace(row_of={"a": 0, "b": 2})
+        with patch("tools.check_large_quality.dense.cache_get", side_effect=AssertionError("cache read")):
+            vectors = candidate_vectors(SimpleNamespace(database_backend="sqlite"), SimpleNamespace(matrix=matrix),
+                                        index, [{"chunk_id": "b", "payload_hash": "pb"}])
+        self.assertIs(vectors["pb"].base, matrix)
+        np.testing.assert_array_equal(vectors["pb"], matrix[2])
 
     def aggregate(self, ndcg=.8, packed=.9, critical=()):
         return {"ndcg@5": ndcg, "ndcg_eligible_rows": 50,

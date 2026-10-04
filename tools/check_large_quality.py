@@ -17,7 +17,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from rfp_assistant import budget, dense, evaluation, service, store
-from rfp_assistant.retrieval import KeywordIndex, RUN_MODES
+from rfp_assistant.retrieval import KeywordIndex, RUN_MODES, index_compatibility
 from rfp_assistant.settings import DEFAULT_RATES, load_settings
 
 
@@ -72,6 +72,19 @@ def reference_rows(index, covered, by_payload):
     return {index.row_of[p["chunk_id"]]: by_payload[p["payload_hash"]] for p in covered}
 
 
+def candidate_vectors(settings, candidate, index, payloads):
+    """Candidate vectors from the verified ready set; the mutable cache is not part of its identity."""
+    if settings.database_backend == "sqlite":
+        return {p["payload_hash"]: candidate.matrix[index.row_of[p["chunk_id"]]] for p in payloads}
+    from rfp_assistant.vector_store import verified
+    with store.open_db(settings.db_path) as conn:
+        rows = conn.execute("SELECT r.chunk_id,p.embedding,p.vector_checksum FROM embedding_set_rows r "
+                            "JOIN embedding_payloads p USING(payload_hash) WHERE r.set_version=? AND r.chunk_id=ANY(?)",
+                            (candidate.version, [p["chunk_id"] for p in payloads])).fetchall()
+    by_chunk = {r["chunk_id"]: verified(r["embedding"], candidate.dims, r["vector_checksum"]) for r in rows}
+    return {p["payload_hash"]: by_chunk[p["chunk_id"]] for p in payloads}
+
+
 def job_cost(conn, request_id):
     return conn.execute("SELECT COALESCE(SUM(CASE WHEN state='settled' THEN settled_micro_usd "
                         "WHEN state IN ('reserved','dispatching','unknown') THEN reserved_micro_usd "
@@ -86,7 +99,7 @@ def ceiling_guard(conn, request_id, previous, maximum):
     return None
 
 
-def prepare(settings):
+def prepare(settings, analyzer=None):
     if (settings.embedding_model, settings.embedding_dimensions) != ("text-embedding-3-large", 1536):
         raise ValueError("serving candidate is fixed at text-embedding-3-large/1536")
     frozen = evaluation.frozen_dataset(settings, "dev")
@@ -99,11 +112,20 @@ def prepare(settings):
     if skipped or len(rows) != frozen["rows"]:
         raise ValueError("every frozen development row must remain eligible")
     index = KeywordIndex.load(settings)
+    outdated = index_compatibility(index, analyzer)
+    if outdated:
+        raise ValueError(outdated)
+    passages = [r for r in rows if evaluation.is_passage_row(r)]
+    # Every frozen scope must be indexed: an absent one ranks empty for all three systems and passes unmeasured.
+    unindexed = [evaluation.row_id(r) for r in passages if not evaluation.scope_indexed(index, r)
+                 or not all(index.rows_by_extraction.get(x) for _, x in evaluation.row_scope(r))]
+    if unindexed:
+        raise ValueError(f"frozen passage scopes are absent from the active keyword index: {unindexed[:5]}")
     version = evaluation._ready_dense_for(settings, index.version)
     if not version:
         raise ValueError("complete fixed-dimension corpus is required")
     candidate = dense.DenseIndex.load(settings, version, base=index)
-    scopes = {x for r in rows for _, x in evaluation.row_scope(r) if evaluation.is_passage_row(r)}
+    scopes = {x for r in passages for _, x in evaluation.row_scope(r)}
     _, payloads = dense.index_payloads(settings, index.version)
     covered = [p for p in payloads if p["extraction_id"] in scopes]
     wanted = {p["payload_hash"]: p for p in covered}
@@ -146,7 +168,8 @@ def prepare(settings):
 
 
 def run(settings, resources, out, max_cost_micro):
-    plan, rows, skipped, index, candidate, ref_settings, covered, batches = prepare(settings)
+    plan, rows, skipped, index, candidate, ref_settings, covered, batches = prepare(settings, resources.analyzer)
+    probe = candidate_vectors(settings, candidate, index, list({p["payload_hash"]: p for p in covered}.values())[:8])
     if not plan["fits_envelopes"] or plan["corpus_max_micro_usd"] + plan["query_max_micro_usd"] > max_cost_micro:
         raise ValueError("reference/query estimate exceeds the existing envelopes or explicit ceiling")
     for purpose in ("embedding", "gold_eval"):
@@ -178,9 +201,9 @@ def run(settings, resources, out, max_cost_micro):
         if vector is None:
             raise RuntimeError("incomplete reference cache")
         by_payload[p["payload_hash"]] = vector
-        if len(paired) < 8:
+        if p["payload_hash"] in probe:
             derived, provenance = dense.shorten_large_reference(vector, 1536, model=settings.embedding_model)
-            api = dense.cache_get(settings, p["payload_hash"])
+            api = probe[p["payload_hash"]]
             paired.append({"payload_hash": p["payload_hash"], "cosine": float(derived @ api),
                            "max_abs_difference": float(np.max(np.abs(derived-api))), "provenance": provenance})
     reference = BoundedReference(index, reference_rows(index, covered, by_payload), settings.embedding_model, 3072)
