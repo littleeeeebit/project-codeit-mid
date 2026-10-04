@@ -82,7 +82,35 @@ The selected setting is `keyword_first:60:1.0:6`. The BM25 top 6 keep their orde
 | Whole corpus | K1 | 0.7832 (n=88) | 71/88 | — |
 | Whole corpus | keyword_first:60:1.0:6 | 0.7832 | 71/88 | 0 |
 
-Plain RRF (`rrf:60:1.0`, `rrf:60:0.25`) still loses `refresh50-b-training-handover` and `refresh50-eg-input-error`: dense ranks push K1's packed rows out of the top 5. `keyword_first` with a head of 3 also fails. The gate's query embeddings were 33 settled attempts costing 466 micro-USD. Serving uses this setting through the activated run `H-0f2bf03e9d`, whose recorded limits (`fusion`, `keyword_head`, `dense_weight`, `rrf_k`, `dense_search: "exact"`, `corpus_route`) override the process configuration. It was activated with `activate-run` and a decision file.
+Plain RRF (`rrf:60:1.0`, `rrf:60:0.25`) still loses `refresh50-b-training-handover` and `refresh50-eg-input-error`: dense ranks push K1's packed rows out of the top 5. `keyword_first` with a head of 3 also fails. The gate's query embeddings were 33 settled attempts costing 466 micro-USD. That setting first served through run `H-0f2bf03e9d`. It was superseded after the owner's acceptance round below.
+
+### Owner acceptance round: routing, overview questions and evidence depth
+
+The owner asked an All documents question, "한영대학교의 사업에 대해 알려줘. 어떤 사업을 하는거야?". The answer said the project scope could not be explained. Two causes were found:
+
+- Routing added a wrong document. 서영대학교 shares only the generic title words 대학교 and 사업 with the question. Its IDF weight was 4.457, which passed the cutoff of half of 한영대학교's 7.824. `route_corpus` now takes documents best first and weighs each only on terms no earlier document explains. Two named projects still both route, and editions with the same name are kept.
+- Overview questions matched filler words. Once the documents are known, the restated project name is dropped as non-discriminating, and BM25 then matched words like 알리 and 대하 (a login-security table came first). Now, when a question names its documents and no other content noun remains, evidence is ranked by dense similarity within the named documents. That limitation is recorded as `name_only_question:dense_within_named_documents`. Title vocabulary that names a project (사업, 구축, 시스템) is not counted as content. A question with a fact term ("…의 하자보수 기간은?") keeps the keyword path.
+
+The owner also set 50 candidates per channel and after fusion, asked to measure 10, 15, 20, 25 and 30 evidence units, and asked for the local reranker (`BAAI/bge-reranker-v2-m3`, revision `953dc6f6…`, CUDA fp32) to be measured too. The command was:
+
+```powershell
+python tools/check_large_quality.py --out <RFP_DATA_DIR>/fusion-gate/depth50-units --run --max-cost-usd 0.05 --variant keyword_first:60:1.0:6 --depth 50 --units 10,15,20,25,30 --rerank-revision 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+```
+
+Each setting is gated against K1 at the same depth and evidence limits. The token budget is 400 tokens per unit, plus 800 for the first unit. Among passing settings, the most complete support wins, then nDCG@5, then fewer units. No query embedding was paid; all vectors were cached.
+
+| Setting | Gate | Pilot scoped (nDCG@5, complete) | Whole corpus (nDCG@5, complete) | Failing reason |
+| --- | --- | --- | --- | --- |
+| Hybrid, 10 units | pass (selected) | 0.9405, 55/55 (K1 54/55) | 0.8195, 73/88 (K1 72/88) | — |
+| Hybrid, 15 units | pass | 0.9405, 55/55 (K1 55/55) | 0.8195, 73/88 (K1 72/88) | same support, more tokens |
+| Hybrid, 20, 25 and 30 units | fail | 0.9405, 55/55 | 0.8195, 73/88 (K1 75/88) | loses `refresh50-a-stabilization` and `refresh50-ad-migration-design` |
+| Hybrid + reranker, 10 and 15 units | fail | 0.8948, 50/55 and 52/55 | 0.7656, 70/88 and 72/88 | three to five new critical failures, including `refresh50-eg-input-error` and `refresh50-dh-linked-data` |
+| Hybrid + reranker, 20 and 25 units | fail | 0.8948, 54/55 and 55/55 | 0.7656, 74/88 | new critical `refresh50-dh-linked-data` and `refresh50-a-stabilization` |
+| Hybrid + reranker, 30 units | fail | 0.8948, 55/55 | 0.7656, 76/88 (K1 75/88) | nDCG@5 below K1 |
+
+The reranker reorders the whole candidate list, including the BM25 head that `keyword_first` protects, and loses rows K1 keeps. It is not served. More than 10 evidence units help keyword-only retrieval more than hybrid, which fills later slots with dense rows.
+
+`evaluate-retrieval --dataset dev --runs K1,H` recorded the selected limits as run `H-af9967ca81`. It reached packed complete 1.0 (55/55) with 0 critical failures, against K1-0351093f32's 54/55 and 1. The run was activated with a decision file. The top 5 equals `H-0f2bf03e9d`'s on all 55 rows, so the earlier pool review of the same 83 passages carries over. Serving now uses keyword_first:60:1.0:6, 50/50 candidates, 10 evidence units (4,000/4,800 tokens) and exact pgvector search.
 
 ### Whole-corpus needle set
 
@@ -93,32 +121,34 @@ The owner's point was that selecting one or two documents first proves nothing. 
 - Each targets one passage over 22 sources: 27 on middle pages and 6 on late pages.
 - The questions use exact identifiers, numbers and table cells.
 
-Over all 18,983 chunks with the serving fusion:
+Over all 18,983 chunks with the serving setting (run `H-af9967ca81`, including the routing fix):
 
 | Measure | Hits | Rate | Wilson 95% |
 | --- | --- | --- | --- |
-| Target chunk in top 5 | 31/33 | 0.9394 | [0.8039, 0.9832] |
-| Target chunk in top 10 | 31/33 | 0.9394 | [0.8039, 0.9832] |
+| Target chunk in top 5 | 32/33 | 0.9697 | [0.8468, 0.9946] |
+| Target chunk in top 10 | 32/33 | 0.9697 | [0.8468, 0.9946] |
 
-K1 misses the same two needles, needle-09 and needle-24. Both are table-cell questions.
+K1 misses the same needle, needle-24, a table-cell question. Before the routing fix both systems also missed needle-09: 31/33, 0.9394, Wilson [0.8039, 0.9832].
 
 ### Paid end-to-end check
 
-Paid admission was enabled on PostgreSQL only, and 26 real answers ran through the app:
+Paid admission was enabled on PostgreSQL only. The same 26 questions ran through the app on the serving run `H-af9967ca81` (private results in `.runtime/postgresql-migration/e2e-depth50/`):
 
 | Mode | Requests | Answered |
 | --- | --- | --- |
 | All documents | 12 | 12 |
-| Two-document comparison | 9 | 5 |
-| Single document | 5 | 4 |
+| Two-document comparison | 9 | 8 answered, plus `refresh50-ah-ip` returning `conflicting_evidence` as expected |
+| Single document | 5 | 5 |
 
-- 23 answers cite the expected passage.
-- Listed failures:
-  - `refresh50-ad-migration-design`: comparison, `output_truncated`.
-  - `refresh50-eg-input-error`: evidence scope mismatch.
-  - `pair-warranty`: wrong passage.
-- All 28 attempts were reserved, dispatched and settled in the PostgreSQL ledger.
-- The budget meter and `budget-status` agree: spent $1.791537, ledger revision 1319, pending 0, unknown 0.
+- Every request reached its expected status.
+- 24 of 26 cite the expected passages.
+- Listed citation failures:
+  - `refresh50-ad-migration-design` (comparison): 4 of 13 required evidence groups retrieved and cited.
+  - `cutover-late-06` (single): both groups retrieved, neither cited.
+- All 26 attempts were reserved, dispatched and settled in the PostgreSQL ledger; the query vectors were cached.
+- The budget meter and `budget-status` agree: spent $1.820089, ledger revision 1409, pending 0, unknown 0.
+
+The first run on `H-0f2bf03e9d` (6 evidence units, 20 candidates) answered 21 of 26 and cited correctly in 23. Its failures were `refresh50-ad-migration-design` (output truncated), `refresh50-eg-input-error` and `pair-warranty`. All 28 of its attempts settled.
 
 A headless browser check against `bidmate_app` (private screenshots in `.runtime/browser-check-cutover/`) covered four screens:
 
@@ -129,14 +159,16 @@ A headless browser check against `bidmate_app` (private screenshots in `.runtime
 
 The check found that the Verification fidelity overview still used a SQLite-only ungrouped `GROUP BY`. It is fixed and covered by `tests.test_api`.
 
-New paid work in this PR, before those two browser answers, totals $0.034160 over 126 settled attempts, against the $1.00 ceiling enforced by `--max-cost-usd` and the envelopes:
+New paid work in this PR totals $0.062712 against the $1.00 ceiling, which `--max-cost-usd` and the envelopes enforce:
 
 | Item | Cost (USD) |
 | --- | --- |
 | Needle drafting | 0.013226 |
 | Evaluation query embeddings | 0.001158 |
 | Interactive embeddings | 0.000032 |
-| Answers | 0.019744 |
+| First paid end-to-end answers | 0.019744 |
+| Browser check and the owner's first acceptance question | 0.002386 |
+| Paid end-to-end rerun on `H-af9967ca81` | 0.026166 |
 
 ### Archive and rollback
 

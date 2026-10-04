@@ -26,6 +26,7 @@ from .store import dumps, get_app_setting, open_db, read_jsonl, set_app_setting,
 ANALYZER_VERSION = "kiwi-bm25-2"  # 2: spacing normalization of the analysis copy, scope-redundant query terms
 KEEP_TAGS = {"NNG", "NNP", "NNB", "NR", "NP", "SL", "SN", "SH", "XR", "VV", "VA", "XPN"}
 NEGATIONS = {"않", "안", "못", "없", "아니", "불가", "금지"}
+CONTENT_TAGS = {"NNG", "NNP", "NR", "SL", "SN", "SH", "XR"}
 # Small reviewed domain dictionary; extend only from observed query failures.
 USER_WORDS = ["제안요청서", "요구사항", "하자보수", "하자담보", "부가가치세", "공동수급", "분담이행", "공동이행",
               "입찰참가자격", "기술평가", "가격평가", "지체상금", "사업수행계획서", "산출물", "유지관리", "정보시스템"]
@@ -96,6 +97,13 @@ class Analyzer:
             if t.tag in KEEP_TAGS or t.form in NEGATIONS:
                 out.append(t.form.lower())
         return out
+
+    def content_terms(self, text: str) -> set[str]:
+        """Query-side only: the nouns, foreign words, numbers and roots a question asks about. Verbs, adjectives,
+        dependent nouns and pronouns ("알려줘", "하는 거", "이것") carry no fact to search for."""
+        with self._lock:
+            toks = self._kiwi.tokenize(normalize_for_analysis(nfc(text)))
+        return {t.form.lower() for t in toks if t.tag in CONTENT_TAGS} | {f"code:{c}" for c in CODE_RE.findall(nfc(text))}
 
 
 def analyzer_fingerprint(analyzer: Analyzer | None = None) -> str:
@@ -402,17 +410,28 @@ def route_corpus(index: KeywordIndex, analyzer, question: str,
     """An all-documents question that names a project keeps the documents whose own title/institution terms it
     restates (two or more, weighted by inverse document frequency across the scope). Chunks rarely repeat the
     project name, so otherwise a named project's requirement code or clause competes with the same wording in
-    every other RFP. Returns [] (no routing) when no document, or too many, match."""
+    every other RFP. Returns [] (no routing) when no document, or too many, match.
+
+    Documents are taken best first, and each is weighed only on the terms no document taken before it already
+    explains, so a document sharing just the generic words of a better match ("대학교", "사업") stays out. Two named
+    projects both carry their own terms; another edition with the very same matched name is kept."""
     terms = {t for t in analyzer.tokens(question) if not _protected(t)}
     names = {ref.doc_id: set(index.scope_terms.get(ref.doc_id, [])) & terms for ref, _ in scope}
     df: dict[str, int] = {}
     for matched in names.values():
         for t in matched:
             df[t] = df.get(t, 0) + 1
-    weight = {d: sum(math.log(len(names) / df[t]) for t in matched) for d, matched in names.items()
+    idf = {t: math.log(len(names) / n) for t, n in df.items()}
+    weight = {d: sum(idf[t] for t in matched) for d, matched in names.items()
               if len(matched) >= METADATA_RESTATEMENT_MIN}
     top = max(weight.values(), default=0.0)
-    keep = {d for d, w in weight.items() if top > 0 and w >= ROUTE_SHARE * top}
+    keep: set[str] = set()
+    explained: set[str] = set()
+    for d in sorted(weight, key=lambda d: (-weight[d], d)):
+        own = sum(idf[t] for t in names[d] - explained)
+        if top > 0 and (own >= ROUTE_SHARE * top or any(names[d] == names[k] for k in keep)):
+            keep.add(d)
+            explained |= names[d]
     if not keep or len(keep) > ROUTE_MAX:
         return []
     return [(ref, x) for ref, x in scope if ref.doc_id in keep]
@@ -502,6 +521,7 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
         fallback, mode = "hybrid_rerank->hybrid:reranker_unavailable", "hybrid"
 
     limitations = [f"idf:{IDF_POLICY}"]
+    routed: list[tuple[DocRef, str]] = []
     if len(scope) > 2:  # only the all-documents scope is larger than a selection
         routed = route_corpus(index, analyzer, question, scope)
         if routed:
@@ -546,9 +566,28 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
                 limitations.append("scope_redundant_terms:" + ",".join(sorted(drop)))
         lexical = rank_lexical(index, lex_analyzer, question, allowed, k, whitespace=mode == "whitespace_bm25",
                                drop=drop)
+    # "한영대학교 사업은 어떤 사업이야?": the question names its documents and asks nothing else. The remaining words
+    # ("알려줘", "하는 거") would only match arbitrary passages, so the named documents are ranked by meaning instead.
+    name_only = False
+    if mode in ("hybrid", "hybrid_rerank") and not exact and len(scope) <= ROUTE_MAX:
+        names = {t for ref, _ in scope for t in index.scope_terms.get(ref.doc_id, [])}
+        named = bool(routed) or len(set(analyzer.tokens(question)) & names) >= METADATA_RESTATEMENT_MIN
+        title_df: dict[str, int] = {}
+        for terms in index.scope_terms.values():
+            for t in set(terms):
+                title_df[t] = title_df.get(t, 0) + 1
+        project_words = {t for t, n in title_df.items() if n > ROUTE_MAX}  # "사업", "구축", "시스템": name a project
+        name_only = named and not (analyzer.content_terms(question) - names - drop - project_words)
+    if name_only:
+        lexical = []
+        limitations.append("name_only_question:dense_within_named_documents")
+        qset = set(analyzer.tokens(question))
+        named_rows = scope_rows(index, [(ref, x) for ref, x in scope if len(qset & set(
+            index.scope_terms.get(ref.doc_id, []))) >= METADATA_RESTATEMENT_MIN])
+        allowed = named_rows or allowed  # a routed scope is already named; a selection keeps the named one
     t2 = time.perf_counter()
     dense_ranked: list[tuple[int, float]] = []
-    if mode in ("hybrid", "hybrid_rerank") and not lexical and not exact:
+    if mode in ("hybrid", "hybrid_rerank") and not lexical and not exact and not name_only:
         # Nearest neighbours always exist; without one lexical match they are arbitrary passages, not evidence.
         limitations.append("no_lexical_match:dense_not_used")
     elif mode in DENSE_MODES:

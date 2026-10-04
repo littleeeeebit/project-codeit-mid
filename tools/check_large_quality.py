@@ -40,6 +40,15 @@ def variant_name(v):
                                                                 if v["fusion"] == "keyword_first" else "")
 
 
+def evidence_limits(units, depth=None):
+    """Evidence units with a token budget that scales with them (chunks average 266 tokens, at most 797)."""
+    limits = {"evidence_max_units": units, "evidence_target_tokens": 400 * units,
+              "evidence_max_tokens": 400 * units + 800}
+    if depth:
+        limits.update(channel_top_k=depth, fused_top_k=depth)
+    return limits
+
+
 def gate(candidate, baseline):
     """Zero new critical failures, nDCG@5 and packed complete support no lower than K1, with equal denominators."""
     new = sorted(set(candidate["critical_failures"]) - set(baseline["critical_failures"]), key=str)
@@ -125,7 +134,23 @@ def prepare(settings, analyzer=None, datasets=DATASETS):
     return plan, populations, index, candidate
 
 
-def run(settings, resources, out, max_cost_micro, variants, datasets=DATASETS):
+def systems_for(settings, variants, units=None, depth=None, reranker=None):
+    """(label, mode, settings, baseline label). Each hybrid system is gated against K1 at the same depth and
+    evidence limits; without `units` this is the single comparison at the configured limits."""
+    out = []
+    for u in units or [None]:
+        s = settings.with_(**evidence_limits(u, depth)) if u else settings
+        tag = f"@{u}" if u else ""
+        out.append((f"K1{tag}", "kiwi_bm25", s, None))
+        for v in variants:
+            out.append((variant_name(v) + tag, "hybrid", s.with_(**v), f"K1{tag}"))
+            if reranker is not None:
+                out.append((variant_name(v) + "+rerank" + tag, "hybrid_rerank", s.with_(**v), f"K1{tag}"))
+    return out
+
+
+def run(settings, resources, out, max_cost_micro, variants, datasets=DATASETS, units=None, depth=None,
+        reranker=None):
     plan, populations, index, candidate = prepare(settings, resources.analyzer, datasets)
     if not plan["fits_envelope"] or plan["query_max_micro_usd"] > max_cost_micro:
         raise ValueError("query estimate exceeds the existing envelope or the explicit ceiling")
@@ -152,12 +177,15 @@ def run(settings, resources, out, max_cost_micro, variants, datasets=DATASETS):
     runs = [("pilot-scoped", populations["dev"], False), ("pilot-unscoped", populations["dev"], True)]
     if "corpus" in populations:
         runs.append(("needles", populations["corpus"], True))
-    systems = [("K1", "kiwi_bm25", settings)] + [(variant_name(v), "hybrid", settings.with_(**v)) for v in variants]
+    systems = systems_for(settings, variants, units, depth, reranker)
     traces, aggregates = {}, {}
-    for label, mode, s in systems:
+    for label, mode, s, _ in systems:
         for population, rows, unscoped in runs:
-            traces[population] = evaluation._execute(s, index, resources.analyzer, rows, mode, vectors=vectors,
-                                                     dense=candidate if mode == "hybrid" else None, unscoped=unscoped)
+            traces[population] = evaluation._execute(
+                s, index, resources.analyzer, rows, mode, vectors=vectors,
+                dense=candidate if mode != "kiwi_bm25" else None, unscoped=unscoped,
+                reranker=reranker if mode == "hybrid_rerank" else None,
+                rerank_depth=s.fused_top_k if mode == "hybrid_rerank" else None)
             store.write_jsonl_atomic(out / f"{label.replace(':', '_')}-{population}.jsonl", traces[population])
             aggregates[f"{label}/{population}"] = evaluation.aggregate(traces[population], [])
         whole = traces["pilot-unscoped"] + traces.get("needles", [])
@@ -165,14 +193,22 @@ def run(settings, resources, out, max_cost_micro, variants, datasets=DATASETS):
         if "needles" in traces:
             aggregates[f"{label}/needle-hits"] = needle_hits(traces["needles"])
     gates = {}
-    for label, _, _ in systems[1:]:
-        gates[label] = {p: gate(aggregates[f"{label}/{p}"], aggregates[f"K1/{p}"])
+    for label, _, _, base in systems:
+        if base is None:
+            continue
+        gates[label] = {p: gate(aggregates[f"{label}/{p}"], aggregates[f"{base}/{p}"])
                         for p in ("pilot-scoped", "whole-corpus")}
         gates[label]["passed"] = all(g["passed"] for g in gates[label].values())
     complete = tuple(datasets) == DATASETS
     passing = [label for label in gates if gates[label]["passed"]]
-    best = max(passing, key=lambda label: (aggregates[f"{label}/whole-corpus"]["ndcg@5"],
-                                           aggregates[f"{label}/pilot-scoped"]["ndcg@5"]), default=None)
+    limits = {label: s for label, _, s, _ in systems}
+
+    def merit(label):  # most complete support, then ranking quality, then the smaller (cheaper) evidence set
+        support = lambda p: aggregates[f"{label}/{p}"]["packed_complete"]["numerator"]  # noqa: E731
+        return (support("whole-corpus"), support("pilot-scoped"), aggregates[f"{label}/whole-corpus"]["ndcg@5"],
+                aggregates[f"{label}/pilot-scoped"]["ndcg@5"], -limits[label].evidence_max_units)
+
+    best = max(passing, key=merit, default=None)
     for name in datasets:
         if evaluation.frozen_dataset(settings, name)["dataset_sha256"] != plan["datasets"][name]["dataset_sha256"]:
             raise ValueError(f"{name} changed during comparison; acceptance refused")
@@ -182,6 +218,11 @@ def run(settings, resources, out, max_cost_micro, variants, datasets=DATASETS):
     report = {"version": "fusion-gate-1", "complete": complete, "passed": complete and best is not None,
               "selected": best if complete else None, "best_measured": best, "checked_at": store.utcnow(),
               "plan": plan, "variants": [variant_name(v) for v in variants], "gates": gates,
+              "systems": {label: {"mode": mode, "baseline": base, "rerank": mode == "hybrid_rerank",
+                                  **{k: getattr(s, k) for k in ("channel_top_k", "fused_top_k", "evidence_max_units",
+                                                                "evidence_target_tokens", "evidence_max_tokens")}}
+                          for label, mode, s, base in systems},
+              "reranker": getattr(reranker, "info", None),
               "aggregates": aggregates, "eval_version": evaluation.EVAL_VERSION,
               "billing": {"request_id": job, "attempts": {r[0]: {"count": r[1], "micro_usd": r[2]} for r in attempts}},
               "trace_hashes": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(out.glob("*.jsonl"))}}
@@ -216,6 +257,9 @@ def main():
     parser.add_argument("--variant", action="append", help="fusion:rrf_k:dense_weight (repeatable)")
     parser.add_argument("--pilot-only", action="store_true",
                         help="exploration before the needle set is frozen; never passes the gate")
+    parser.add_argument("--units", help="comma-separated evidence unit counts to measure, e.g. 10,15,20,25,30")
+    parser.add_argument("--depth", type=int, help="candidates per channel and after fusion, e.g. 50")
+    parser.add_argument("--rerank-revision", help="also measure each hybrid variant with the pinned local reranker")
     args = parser.parse_args()
     if not args.out.is_absolute():
         parser.error("--out must be an absolute private directory")
@@ -225,10 +269,16 @@ def main():
         parser.error("private comparison artifacts in this checkout must stay inside RFP_DATA_DIR")
     variants = [parse_variant(v) for v in (args.variant or DEFAULT_VARIANTS)]
     datasets = ("dev",) if args.pilot_only else DATASETS
+    units = [int(u) for u in args.units.split(",")] if args.units else None
     if args.run:
+        reranker = None
+        if args.rerank_revision:
+            reranker, info = dense.load_reranker(settings.with_(reranker_revision=args.rerank_revision))
+            if reranker is None:
+                raise SystemExit(f"reranker unavailable: {info}")
         with closing(service.Resources(settings, recover=True)) as resources:
             report = run(settings, resources, args.out, int(Decimal(args.max_cost_usd) * 1_000_000), variants,
-                         datasets)
+                         datasets, units, args.depth, reranker)
             print(summary(report))
             print(json.dumps({"passed": report["passed"], "selected": report["selected"],
                               "report": str(args.out / "quality.json")}))

@@ -113,7 +113,9 @@ The owner found that selecting one or two documents before asking proves nothing
 전체 문서:   no picks; one mode, 전체 문서에서 답변; a hint to name the project or agency in the question
 ```
 
-- 전체 문서 posts `mode: "corpus"` with an empty scope. The service retrieves over every active chunk (98 sources): keyword BM25 over the whole index, fused with exact pgvector search by the measured `keyword_first` setting, and the evidence is routed to the best-supported documents before generation.
+- 전체 문서 posts `mode: "corpus"` with an empty scope. The service retrieves over every active chunk (98 sources): keyword BM25 over the whole index, fused with exact pgvector search by the measured `keyword_first` setting (50 candidates per channel, 10 evidence units).
+- A question that names a project ("한영대학교 …") is first narrowed to the documents whose own title and institution it restates. A document sharing only generic words such as 대학교 or 사업 is not included. Two named projects are both kept, so an All documents comparison still works.
+- A question that only names its project ("…은 어떤 사업이야?") ranks that project's passages by meaning, so it gets the project overview rather than whatever matches 알려줘 or 어떤.
 - A question with no lexical hit returns no evidence and the 근거 부족 state; dense search alone never supplies arbitrary passages.
 - Picking a document switches the scope back to 선택한 문서. Changing the scope releases the owned request exactly like changing the selection.
 - Single-document and two-document comparison behaviour is unchanged. A corpus request with a scope, or a scoped request without one, is refused with 400/422.

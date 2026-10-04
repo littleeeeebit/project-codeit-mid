@@ -72,6 +72,51 @@ class CorpusAskTest(unittest.TestCase):
         self.assertEqual([ref.doc_id for ref, _ in routed], [self.env.refs["기관D"].doc_id])
         self.assertEqual(route_corpus(index, fixtures.analyzer(), "하자보수 기간은?", scope), [])
 
+    def test_a_question_that_only_names_a_project_ranks_its_documents_by_meaning(self):
+        index = KeywordIndex.load(self.env.settings)
+        scope = corpus_scope(self.env.settings, index)
+        searched = []
+
+        def search(_vector, allowed, k, _settings=None):
+            searched.append(set(allowed))
+            return [(i, 1.0 - n / 100) for n, i in enumerate(sorted(allowed)[:k])]
+        stub = SimpleNamespace(base_index_version=index.version, version="d-stub", dims=4, search=search)
+        got = retrieve(self.env.settings, index, fixtures.analyzer(), "도서관 좌석 예약에 대해 알려줘", scope,
+                       mode="hybrid", dense=stub, query_vector=np.ones(4, dtype=np.float32) / 2)
+        self.assertIn("name_only_question:dense_within_named_documents", got.limitations)
+        self.assertEqual({e.doc_id for e in got.evidence}, {self.env.refs["기관D"].doc_id})
+        self.assertFalse([c for c in got.candidates if c["channel"] == "bm25"])  # no match on "대하" or "알리"
+        self.assertTrue(searched)
+        # A fact term keeps the ordinary keyword path.
+        got = retrieve(self.env.settings, index, fixtures.analyzer(), "도서관 좌석 예약 사업의 하자보수 기간은?", scope,
+                       mode="hybrid", dense=stub, query_vector=np.ones(4, dtype=np.float32) / 2)
+        self.assertNotIn("name_only_question:dense_within_named_documents", got.limitations)
+
+
+class RoutingTest(unittest.TestCase):
+    """route_corpus on title/institution terms alone, with the live corpus's frequencies: 100 projects, "대학교" in
+    four titles and "사업" in 29. The former rule routed 서영대학교 too (4.457 against half of 7.824)."""
+
+    def route(self, question_terms, extra=None):
+        terms = {"a": ["한영", "대학교", "트랙", "학사"], "b": ["서영", "대학교", "사업", "교육"],
+                 "c": ["조선", "대학교"], "d": ["남서울", "대학교"],
+                 **{f"p{n}": (["사업"] if n < 28 else []) + ["구축", f"기관{n}"] for n in range(96)}}
+        terms.update(extra or {})
+        index = SimpleNamespace(scope_terms=terms)
+        analyzer = SimpleNamespace(tokens=lambda _q: list(question_terms))
+        scope = [(SimpleNamespace(doc_id=d), f"x-{d}") for d in terms]
+        return sorted(ref.doc_id for ref, _ in route_corpus(index, analyzer, "q", scope))
+
+    def test_a_document_sharing_only_generic_words_is_not_routed(self):
+        # 서영대학교 shares "대학교" and "사업" with the question; only 한영대학교 is named.
+        self.assertEqual(self.route(["한영", "대학교", "사업", "알리"]), ["a"])
+
+    def test_two_named_projects_are_both_routed(self):
+        self.assertEqual(self.route(["한영", "대학교", "트랙", "서영", "교육"]), ["a", "b"])
+
+    def test_another_edition_with_the_same_name_is_kept(self):
+        self.assertEqual(self.route(["한영", "대학교", "트랙"], {"a2": ["한영", "대학교", "트랙", "고도"]}), ["a", "a2"])
+
 
 # BM25 and dense top 20 recorded on the frozen pilot (chunk ID prefixes), and the BM25 rows K1 packed that weighted
 # RRF pushed out of the top five.
