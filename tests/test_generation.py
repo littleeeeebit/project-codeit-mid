@@ -167,9 +167,15 @@ class SafetyTest(unittest.TestCase):
             return generation.validate_answer(response, [ev], {"A", "B"}, {"E1": ev.quote}, {"A", "B"})
 
         fact = ("A는 제안서 10부를 요구한다", "source_fact", "A", ["E1"])
-        absence = ("B 문서에서는 제안서 제출 부수를 확인할 수 없다", "absence", "B", [])
+        absence = ("제안서  제출 부수", "absence", "B", [])  # exactly the listed field (whitespace aside)
         payload = validate(respond([fact, absence], missing=[("B", "제안서 제출 부수")]))
         self.assertEqual([c.text for c in payload.claims], [fact[0]])
+        for text, missing in (("B 문서의 예산은 충분하다", [("B", "일정")]),  # an assertion labelled absence
+                              ("B 문서의 예산은 충분하다", [("B", "예산")]),  # names the field, asserts more
+                              ("B 문서에서는 제안서 제출 부수를 확인할 수 없다", [("B", "제안서 제출 부수")])):
+            with self.subTest(text=text, missing=missing), \
+                    self.assertRaisesRegex(generation.TechnicalError, "absence_not_listed"):
+                validate(respond([fact, (text, "absence", "B", [])], missing))
         for claims, missing in (
                 ([fact, absence[:1] + ("inference",) + absence[2:]], [("B", "제안서 제출 부수")]),  # undeclared
                 ([fact, ("B의 일정은 위험해 보인다", "inference", "B", [])], [("B", "예산")]),  # unrelated
@@ -180,7 +186,7 @@ class SafetyTest(unittest.TestCase):
                 validate(respond(claims, missing))
         for missing in ([], [("A", "제안서 제출 부수")]):  # nothing listed for B
             with self.subTest(missing=missing), \
-                    self.assertRaisesRegex(generation.TechnicalError, "absence_without_missing_field"):
+                    self.assertRaisesRegex(generation.TechnicalError, "absence_not_listed"):
                 validate(respond([fact, absence], missing))
 
 

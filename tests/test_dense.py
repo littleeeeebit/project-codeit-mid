@@ -553,6 +553,8 @@ class EvaluationRunTest(unittest.TestCase):
         decision.write_text(json.dumps({"run_id": runs["H"], "mode": "hybrid", "decided_by": "owner",
                                         "rationale": "dev hit@20 and nDCG@5 improved over K1",
                                         "finalist_run_id": runs["K1"]}), encoding="utf-8")
+        with self.assertRaisesRegex(evaluation.EvaluationError, "embedding identity"):  # it would serve keyword-only
+            evaluation.activate_run(s.with_(embedding_dimensions=256), runs["H"], decision)
         active = evaluation.activate_run(s, runs["H"], decision)
         self.assertEqual((active["mode"], active["finalist_run_id"]), ("hybrid", runs["K1"]))
         with store.open_db(s.db_path) as conn:

@@ -55,7 +55,7 @@ Answers use `gpt-6-luna` through Chat Completions with strict structured output,
 
 Run from any directory with the environment's interpreter:
 
-Every command except `check`, `load-check` and `restore-check` runs against `RFP_DATABASE_DSN` and refuses a database without a validated import. `check` and `load-check` use temporary databases on the server named by `RFP_POSTGRES_TEST_DSN` (default: the local server from `tools/start-postgresql.ps1`), and `restore-check` uses `RFP_RESTORE_DATABASE_DSN`. `init` creates the schema in a database the application owns; it never resets spending.
+Every command except `check`, `load-check` and `restore-check` runs against `RFP_DATABASE_DSN` and refuses a database without a validated import. Every startup also refuses an embedding identity other than `text-embedding-3-large` at 1,536 dimensions. `check` and `load-check` use temporary databases on the server named by `RFP_POSTGRES_TEST_DSN` (default: the local server from `tools/start-postgresql.ps1`), and `restore-check` uses `RFP_RESTORE_DATABASE_DSN`. `init` creates the schema in a database the application owns; it never resets spending.
 
 ```powershell
 python -m rfp_assistant.cli init --paid-disabled          # schema + allowance row; never resets spending

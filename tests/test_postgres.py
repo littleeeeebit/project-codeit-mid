@@ -245,6 +245,20 @@ class PostgreSQLTests(unittest.TestCase):
                 load_settings()
         self.assertNotIn("backend", " ".join(Settings.__dataclass_fields__))
 
+    def test_startup_refuses_any_embedding_identity_but_large_1536(self):
+        from rfp_assistant.settings import SettingsError, load_settings
+
+        environment = {k: v for k, v in os.environ.items() if k != "RFP_CONFIG_FILE"}
+        environment.update(RFP_DATA_DIR=str(self.root / "startup"), RFP_DATABASE_DSN=self.target.dsn())
+        with mock.patch.dict("os.environ", environment, clear=True):
+            settings = load_settings()
+            self.assertEqual((settings.embedding_model, settings.embedding_dimensions), ("text-embedding-3-large", 1536))
+            for model, dims in (("text-embedding-3-small", 1536), ("text-embedding-3-large", 768),
+                                ("text-embedding-3-large", 3072)):
+                with self.subTest(model=model, dims=dims), \
+                        self.assertRaisesRegex(SettingsError, "text-embedding-3-large at 1536"):
+                    load_settings(embedding_model=model, embedding_dimensions=dims)
+
     def test_pgvector_cache_separation_exact_filtered_parity_and_mixed_set_rejection(self):
         settings = self.settings.with_(embedding_dimensions=64)
         with store.open_db(self.target) as conn:

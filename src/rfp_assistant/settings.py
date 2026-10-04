@@ -28,7 +28,8 @@ DEFAULT_RATES: dict[str, dict[str, str]] = {
 }
 ALLOWED_GENERATION_MODELS = ("gpt-6-luna",)
 REASONING_EFFORTS = ("none", "low", "medium", "high", "xhigh", "max")
-ALLOWED_EMBEDDING_MODELS = ("text-embedding-3-small", "text-embedding-3-large")
+ALLOWED_EMBEDDING_MODELS = ("text-embedding-3-small", "text-embedding-3-large")  # small: test fixtures only
+SERVING_EMBEDDING = ("text-embedding-3-large", 1536)  # the only identity load_settings (every startup) accepts
 # Embedding endpoint limits as documented in the pinned SDK (openai 3.22.1, embedding_create_params.py):
 # 8192 tokens per input, at most 2048 inputs per array, 300,000 tokens summed across one request.
 EMBEDDING_MAX_TOKENS_PER_INPUT = 8192
@@ -148,6 +149,10 @@ def load_settings(**overrides) -> Settings:
     values.update(overrides)
     settings = Settings(**values)
     validate(settings)
+    if (settings.embedding_model, settings.embedding_dimensions) != SERVING_EMBEDDING:
+        # The corpus vectors and the activated run are this identity; any other would serve keyword-only silently.
+        raise SettingsError(f"the embedding identity is fixed: {SERVING_EMBEDDING[0]} at {SERVING_EMBEDDING[1]} "
+                            f"dimensions, not {settings.embedding_model} at {settings.embedding_dimensions}")
     return settings
 
 

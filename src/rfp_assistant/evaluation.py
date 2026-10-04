@@ -1402,6 +1402,12 @@ def decision_errors(settings: Settings, run_id: str, decision: dict) -> list[str
     for key in ("decided_by", "rationale"):
         if not str(decision.get(key) or "").strip():
             errors.append(f"decision requires {key!r}")
+    embedding = config.get("embedding")
+    if embedding and (embedding.get("model"), embedding.get("dims")) != (settings.embedding_model,
+                                                                         settings.embedding_dimensions):
+        # Serving would fall back to keyword-only (Resources.serving); startup fixes the identity at large/1536.
+        errors.append(f"the run's embedding identity {embedding.get('model')}/{embedding.get('dims')} is not the "
+                      f"configured {settings.embedding_model}/{settings.embedding_dimensions}")
     finalist = decision.get("finalist_run_id")
     if finalist:
         try:
