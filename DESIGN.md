@@ -72,6 +72,7 @@ Each screen was built three ways on one named axis in the running app, on live d
 | --- | --- | --- | --- |
 | 질문하기 answer | Where claims and their E1/E2 evidence sit | 나란히 (claims left, sticky quote pane right); 문장 속 인용 (Perplexity-style source cards above, numbers at sentence ends open a side sheet); 카드로 펼치기 (Toss-style big conclusion, one card per claim, the quote opens under its card) | 나란히: numbered claims with kind badges and `E<n>` chips in a 3:2 grid; the pane opens the first cited quote and is absent when nothing is cited. |
 | 검증 | Page structure | 요약 + 탭 (four summary tiles over eight tabs); 왼쪽 메뉴 (Linear-style grouped menu with counts, one area at a time); 할 일 먼저 (the to-do inbox is the page, tools below) | 왼쪽 메뉴: groups 사람이 볼 차례 (할 일 with its count), 재현 (검색 추적, 실행 비교), 현황 (평가·릴리스 with the release badge, 데이터셋, 수집 상태), 기록 (수정 기록, 요청 기록). 할 일 joins second reviews and auto-flagged originals in one list beside its detail. |
+| 검증 › 판정 모델 비교 (2026-10-04) | Skeleton of the judge comparison, after the owner rejected a first build that gave the verdict, metric table, runs and 98 fully expanded disagreements equal weight | 결론 먼저 + 두 칸 검토; 판정 모델별 카드 3열; 엇갈림 행렬 중심 | 결론 먼저 + 두 칸 검토. The owner then rejected the boxed version as slop and asked for importance to set size, so the section uses no cards, borders or pills. Sizes run 48 px for the verdict, 30 px for the three condition values, 20 px for the four arm metrics and 18 px for section titles; everything else is 14 px or smaller.<br><br>Reading order:<br>1. The verdict with a one-line reason.<br>2. The three conditions as value, ✓ and threshold.<br>3. Four key metrics per arm (agreement with its Wilson bar, false accepts, time per item, cost).<br>4. Disagreements: filter chips that open on false accepts, then a 360 px list beside a sticky detail. The detail leads with the judged sentence, then the three verdicts, then Korean and English aligned field by field.<br><br>Folded: trust caveats and rule text, all metrics with the confusion matrices, long answer and evidence fields, and 실행 관리. IDs and hashes appear only inside folds. |
 | 데이터셋 만들기 review queue | How the queue and one draft share the screen | 세 칸 (Linear triage: queue list, draft with the decision, original spans); 한 건씩 (‹ n / 23 › with draft and spans side by side); 표에서 펼치기 (a table of all drafts whose row opens draft, spans and decision in place) | 세 칸: 260 px queue, then the draft card with the decision form under it, then the original spans with the cited part on the citation yellow. The page uses the same left menu as 검증: 검토 대기 (count), 초안 만들기, 초안 생성 기록, 처리 기록. |
 
 ### Controls decided in (e)
@@ -102,6 +103,23 @@ Each screen was built three ways on one named axis in the running app, on live d
 | 사용량 관리 page (settlement, reconciliation, external adjustment, paid on/off, audit log) | Move to CLI: `unresolved`, `reconcile`, and the new `settle`, `adjust`, `paid`, `audit` |
 
 Nothing in `settings.py` became unused: the evidence limits still drive retrieval.
+
+### Ask scope control (2026-10-04)
+
+The owner found that selecting one or two documents before asking proves nothing about finding the right passage, so 질문하기 gained a scope switch above the document list:
+
+```
+[ 선택한 문서 | 전체 문서 ]
+선택한 문서: document search, at most two picks; modes 근거 기반 답변 / 기본 정보 / 요구사항 목록, or the comparison modes for two picks
+전체 문서:   no picks; one mode, 전체 문서에서 답변; a hint to name the project or agency in the question
+```
+
+- 전체 문서 posts `mode: "corpus"` with an empty scope. The service retrieves over every active chunk (98 sources): keyword BM25 over the whole index, fused with exact pgvector search by the measured `keyword_first` setting (50 candidates per channel, 10 evidence units).
+- A question that names a project ("한영대학교 …") is first narrowed to the documents whose own title and institution it restates. A document sharing only generic words such as 대학교 or 사업 is not included, and a question made only of such words ("대학교 사업") is not narrowed at all: a document is narrowed to only when the question restates one of its title terms found in fewer than four titles. Two named projects are both kept, so an All documents comparison still works.
+- A question that only names its project ("…은 어떤 사업이야?") ranks that project's passages by meaning, so it gets the project overview rather than whatever matches 알려줘 or 어떤.
+- A question with no lexical hit returns no evidence and the 근거 부족 state; dense search alone never supplies arbitrary passages.
+- Picking a document switches the scope back to 선택한 문서. Changing the scope releases the owned request exactly like changing the selection.
+- Single-document and two-document comparison behaviour is unchanged. A corpus request with a scope, or a scoped request without one, is refused with 400/422.
 
 ### Result states
 
@@ -348,7 +366,7 @@ Chrome inspection used the shared original runtime at `http://127.0.0.1:8765`, a
 | Other verification areas | Comparison, evaluation, dataset state, ingestion and request records were inspected on actual runtime data |
 | Mobile overflow | None at page level in any of the eight verification areas; wide tables scroll within their own container |
 
-No source was marked reviewed and no gold decision was made during these checks. There were no paid model or evaluation calls. The free trace is the only new application action. Automated checks use isolated SQLite data to prove successful saves appear once in history, legacy decisions are included without duplicates, and sealed questions are excluded; those checks are not evidence of answer quality.
+No source was marked reviewed and no gold decision was made during these checks. There were no paid model or evaluation calls. The free trace is the only new application action. Automated checks use isolated test databases to prove successful saves appear once in history, legacy decisions are included without duplicates, and sealed questions are excluded; those checks are not evidence of answer quality.
 
 ### Typography and selected colours
 

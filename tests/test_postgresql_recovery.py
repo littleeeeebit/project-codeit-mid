@@ -7,70 +7,39 @@ import sys
 import tempfile
 import time
 import unittest
-import uuid
 from pathlib import Path
 from unittest import mock
 
 import psycopg
-from psycopg import sql
-from psycopg.conninfo import make_conninfo
 
-from rfp_assistant import cli, migration, postgres, postgres_backup, service, store
+from rfp_assistant import cli, postgres, postgres_backup, service, store
 from tests import fixtures
 
 
-@unittest.skipUnless(os.environ.get("RFP_POSTGRES_TEST_DSN"), "isolated PostgreSQL DSN is required")
 class PostgreSQLRecoveryTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         self.env = fixtures.make_env(self.root / "live")
-        self.admin = psycopg.connect(os.environ["RFP_POSTGRES_TEST_DSN"], autocommit=True)
-        self.databases = []
-        self.keys = []
         self.original_restore = os.environ.get("RFP_RESTORE_DATABASE_DSN")
-        self.source, self.settings = self.new_database("source")
-        self.lease = store.database_lifecycle(self.source)
-        self.lease.__enter__()
-        plan = self.root / "plan.json"
-        migration.plan(self.env.settings.db_path, plan)
-        migration.import_snapshot(plan, self.source)
-        self.assertTrue(migration.validate(plan, self.source)["pass"])
+        self.settings = self.env.settings
+        self.source = self.settings.db_path
         with store.open_db(self.source) as conn:
             conn.execute("UPDATE database_control SET paid_admission=true WHERE id=1")
         self.manifest = Path(postgres_backup.backup(self.settings, self.root / "backup", "test")["manifest"])
-        self.target, _ = self.new_database("restore")
+        self.target = postgres.Target(fixtures.database(ready=False))  # empty apart from pgvector
         os.environ["RFP_RESTORE_DATABASE_DSN"] = self.target.dsn()
 
-    def new_database(self, purpose):
-        name = "bidmate_recovery_test_" + purpose + "_" + uuid.uuid4().hex[:12]
-        self.admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
-        self.databases.append(name)
-        key = "RFP_RECOVERY_TEST_" + uuid.uuid4().hex
-        self.keys.append(key)
-        os.environ[key] = make_conninfo(os.environ["RFP_POSTGRES_TEST_DSN"], dbname=name)
-        with psycopg.connect(os.environ[key], autocommit=True) as conn:
-            conn.execute("CREATE EXTENSION vector")
-        return postgres.Target(key), self.env.settings.with_(database_backend="postgresql", database_dsn_env=key)
-
     def tearDown(self):
-        self.lease.__exit__(None, None, None)
         if self.original_restore is None:
             os.environ.pop("RFP_RESTORE_DATABASE_DSN", None)
         else:
             os.environ["RFP_RESTORE_DATABASE_DSN"] = self.original_restore
-        for key in self.keys:
-            os.environ.pop(key, None)
-        for name in reversed(self.databases):
-            assert name.startswith("bidmate_recovery_test_")
-            self.admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
-        self.admin.close()
         self.tmp.cleanup()
 
     def cli_recovery(self, primary_dsn):
         config = self.root / "config.json"
-        config.write_text(json.dumps({"database_backend": "postgresql", "provider": "fake",
-                                      "database_timeout_seconds": 1}), encoding="utf-8")
+        config.write_text(json.dumps({"provider": "fake", "database_timeout_seconds": 1}), encoding="utf-8")
         environment = os.environ.copy()
         environment["RFP_CONFIG_FILE"] = str(config)
         environment["RFP_DATA_DIR"] = str(self.settings.data_dir)
@@ -122,7 +91,7 @@ class PostgreSQLRecoveryTest(unittest.TestCase):
     def test_restore_owner_loss_during_validation_cannot_publish_ready(self):
         receipt = self.manifest.parent / "postgresql-restore-check.json"
         receipt.write_text(json.dumps({"passed": True}), encoding="utf-8")
-        original = migration.references_valid
+        original = postgres_backup.references_valid
         terminated = False
         def lose_owner(references):
             nonlocal terminated
@@ -130,7 +99,7 @@ class PostgreSQLRecoveryTest(unittest.TestCase):
                 with psycopg.connect(self.target.dsn(), autocommit=True) as other:
                     with self.assertRaises(store.LockHeld):
                         postgres.GatewayOwner(self.target)
-                    for lock in (postgres.GATEWAY_LOCK, migration.IMPORT_LOCK):
+                    for lock in (postgres.GATEWAY_LOCK, postgres_backup.RESTORE_LOCK):
                         pid = other.execute("SELECT pid FROM pg_locks WHERE locktype='advisory' "
                                             "AND classid=%s AND objid=%s AND granted",
                                             (lock >> 32, lock & 0xFFFFFFFF)).fetchone()[0]
@@ -138,7 +107,7 @@ class PostgreSQLRecoveryTest(unittest.TestCase):
                     other.execute("SELECT pg_terminate_backend(%s)", (pid,))
                 terminated = True
             return original(references)
-        with mock.patch.object(migration, "references_valid", side_effect=lose_owner):
+        with mock.patch.object(postgres_backup, "references_valid", side_effect=lose_owner):
             with self.assertRaises(psycopg.Error):
                 postgres_backup.restore_check(self.settings, self.manifest)
         self.assertFalse(receipt.exists(), "failed restore must not leave a success receipt")
@@ -211,7 +180,7 @@ def paused(raw, report):
     while True:
         time.sleep(0.1)
 postgres_backup._publish_restore_receipt = paused
-settings = Settings(database_backend='postgresql', database_dsn_env=sys.argv[1],
+settings = Settings(database_dsn_env=sys.argv[1],
                     source_dir=Path(sys.argv[2]), data_dir=Path(sys.argv[3]), hwp_converter=None, provider='fake')
 postgres_backup.restore_check(settings, Path(sys.argv[5]))
 """

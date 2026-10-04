@@ -120,9 +120,9 @@ class ScopeRef(BaseModel):
 
 
 class AskIn(BaseModel):
-    scope: list[ScopeRef] = Field(min_length=1, max_length=2)
+    scope: list[ScopeRef] = Field(max_length=2)  # empty only for corpus (all documents)
     question: str = ""
-    mode: Literal["single", "compare", "metadata", "inventory"]
+    mode: Literal["single", "compare", "corpus", "metadata", "inventory"]
 
 
 class Owned(BaseModel):
@@ -596,6 +596,161 @@ class RequestRef(BaseModel):
     request_id: str
 
 
+class JudgeReference(_Read):
+    run_id: str
+    items: int
+    reference_sha256: str
+    labels: dict[str, int]
+
+
+class JudgeSplit(_Read):
+    seed: int
+    calibration: int
+    held_out: int
+    raw_sample: int
+    split_sha256: str
+
+
+class ArmProgress(_Read):
+    done: int
+    total: int
+
+
+class JudgeRun(_Read):
+    run_id: str
+    part: Literal["calibration", "held_out"]
+    created_at: str
+    running: bool
+    status: str
+    stop_reason: str | None = None
+    error: str | None = None
+    progress: dict[str, ArmProgress]
+    translated_batches: int
+    thresholds_fitted: bool
+
+
+class JudgeOverview(_Read):
+    reference: JudgeReference | None
+    split: JudgeSplit | None
+    rule: dict[str, Any] | None = None
+    runs: list[JudgeRun]
+
+
+class JudgePlanIn(BaseModel):
+    part: Literal["calibration", "held_out"]
+
+
+class PaidPlan(_Read):
+    attempts: int
+    max_micro_usd: int
+    segments: int | None = None
+
+
+class JevPlan(_Read):
+    calls: int
+    priced: bool
+    note: str
+
+
+class JudgeEstimate(_Read):
+    estimate_id: str
+    part: Literal["calibration", "held_out"]
+    run_id: str
+    items: int
+    raw_sample: int
+    model: str
+    jev_model: str
+    translation: PaidPlan
+    judge: PaidPlan
+    jev: JevPlan
+    max_micro_usd: int
+    paid_enabled: bool
+    envelope_remaining_micro_usd: int | None = None
+    available_micro_usd: int
+    fits: bool
+    blocked: str | None = None
+    expires_at: str
+
+
+class AgreementRate(_Read):
+    numerator: int
+    denominator: int
+    rate: float | None = None
+    wilson95: list[float] | None = None
+
+
+class Usd(_Read):
+    settled_micro_usd: int | None = None
+    priced: bool = True
+    calls: int
+    source: str
+
+
+class JudgeLatency(_Read):
+    p50: float | None = None
+    p95: float | None = None
+    n: int
+
+
+class ArmMetrics(_Read):
+    items: int
+    judged: int
+    coverage: float | None = None
+    agreement: AgreementRate
+    kappa: float | None = None
+    false_accepts: int
+    reference_negatives: int
+    code_settled: int
+    abstentions: dict[str, int]
+    confusion: dict[str, dict[str, dict[str, int]]]
+    usd: Usd
+    bridge_usd: Usd | None = None
+    latency_ms: JudgeLatency
+
+
+class RuleCheck(_Read):
+    condition: str
+    passed: bool | None = None
+    detail: str
+
+
+class ReplacementVerdict(_Read):
+    verdict: Literal["replaceable", "not_replaceable", "inconclusive"]
+    checks: list[RuleCheck]
+    deciding: list[RuleCheck]
+    rule: dict[str, Any]
+
+
+class JudgeResults(_Read):
+    run_id: str
+    part: str
+    status: str
+    stop_reason: str | None = None
+    progress: dict[str, ArmProgress]
+    arms: dict[str, ArmMetrics] = {}
+    verdict: ReplacementVerdict | None = None
+    thresholds_sha256: str | None = None
+    config_hashes: dict[str, str] = {}
+
+
+class ArmView(_Read):
+    label: str | None = None
+    source: str
+    abstain: str | None = None
+    probability: float | None = None
+    reason: str | None = None
+
+
+class Disagreement(_Read):
+    blind_id: str
+    kind: Literal["link", "answer_claim", "claim"]
+    reference: str
+    korean: dict[str, Any]
+    english: dict[str, Any] | None = None
+    untranslatable: str | None = None
+    arms: dict[str, ArmView | None]
+
+
 class Finding(_Read):
     side: str
     page: int | None = None
@@ -738,6 +893,28 @@ def _verify_routes(app: FastAPI) -> None:
     @app.post("/api/verify/evaluation/start", response_model=Started)
     def start_evaluation(body: EstimateIn, res: Res, member: Member):
         return Started(run_id=service.start_answer_evaluation(res, member, body.estimate_id))
+
+    @app.get("/api/verify/judges/progress", response_model=JudgeOverview)
+    def judge_progress(res: Res, member: Member):
+        return service.judge_overview(res, member)
+
+    @app.post("/api/verify/judges/plan", response_model=JudgeEstimate)
+    def plan_judges(body: JudgePlanIn, res: Res, member: Member):
+        """Free: prices the translations and Luna judge calls a part still needs, and counts its Jev calls."""
+        return service.plan_judges(res, member, body.part)
+
+    @app.post("/api/verify/judges/start", response_model=Started)
+    def start_judges(body: EstimateIn, res: Res, member: Member):
+        """Paid: runs the planned part through the gateway (`judge_eval`), never above the estimate."""
+        return Started(run_id=service.start_judges(res, member, body.estimate_id))
+
+    @app.get("/api/verify/judges/results/{run_id}", response_model=JudgeResults)
+    def judge_results(run_id: str, res: Res, member: Member):
+        return service.judge_results(res, member, run_id)
+
+    @app.get("/api/verify/judges/disagreements/{run_id}", response_model=list[Disagreement])
+    def judge_disagreements(run_id: str, res: Res, member: Member):
+        return service.judge_disagreements(res, member, run_id)
 
     @app.get("/api/verify/fidelity", response_model=list[FidelitySource])
     def fidelity(res: Res, member: Member):

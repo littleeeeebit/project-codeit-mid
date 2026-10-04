@@ -1,16 +1,15 @@
-"""Hash-keyed embedding cache, metered embedding batches, dense matrix build/verification/scoring and the
-optional local reranker.
+"""Hash-keyed pgvector embedding cache, metered embedding batches, embedding-set build and the optional local
+reranker. Dense search itself is `vector_store.PgDenseIndex` (exact or measured HNSW).
 
 Every paid embedding goes through the shared ledger: count -> reserve -> mark dispatching -> transport.embed
 (generation.py is the only SDK call site) -> settle once. An unknown outcome is never resent automatically.
-A matrix becomes `ready` only after every row is verified; nothing here changes what serves users, which is
+A set becomes `ready` only after every row is verified; nothing here changes what serves users, which is
 `activate-run`'s job.
 """
 
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import math
 import os
@@ -18,7 +17,6 @@ import shutil
 import threading
 import time
 import uuid
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -29,7 +27,8 @@ from . import budget
 from .generation import ProviderError, Transport
 from .ingestion import nfc
 from .settings import EMBEDDING_MAX_TOKENS_PER_INPUT, EMBEDDING_TOKENIZER, Settings
-from .store import dumps, open_db, read_jsonl, tx, utcnow, write_bytes_atomic, write_jsonl_atomic, write_text_atomic
+from .store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
+from .vector_store import PgDenseIndex as DenseIndex  # the only dense index: verified pgvector sets
 
 EMBED_POLICY = "nfc-strip:l2-unit:float32"
 DENSE_VERSION = "dense-matrix-1"
@@ -59,10 +58,6 @@ def count_embedding_tokens(text: str, model: str = "text-embedding-3-large") -> 
 def normalize_payload(text: str) -> str:
     """The exact text sent to the embedding endpoint."""
     return nfc(text).strip()
-
-
-def model_fingerprint(model: str, dims: int) -> str:
-    return hashlib.sha256(dumps({"model": model, "dims": dims, "policy": EMBED_POLICY}).encode()).hexdigest()[:16]
 
 
 def payload_hash(text: str, model: str, dims: int) -> str:
@@ -102,54 +97,15 @@ def shorten_large_reference(values, dimensions: int, *, model: str) -> tuple[np.
 # ---------------------------------------------------------------- cache
 
 
-def cache_dir(settings: Settings) -> Path:
-    return settings.data_dir / "embedding-cache" / model_fingerprint(settings.embedding_model,
-                                                                      settings.embedding_dimensions)
-
-
-def _npy_bytes(vec: np.ndarray) -> bytes:
-    buf = io.BytesIO()
-    np.save(buf, vec, allow_pickle=False)
-    return buf.getvalue()
-
-
 def cache_get(settings: Settings, h: str) -> np.ndarray | None:
-    """A verified cached vector, or None. A corrupt entry is a miss, never a silently used vector."""
-    if settings.database_backend == "postgresql":
-        from .vector_store import cache_get as pg_cache_get
-        return pg_cache_get(settings, h)
-    d = cache_dir(settings)
-    npy, meta = d / f"{h}.npy", d / f"{h}.json"
-    if not (npy.exists() and meta.exists()):
-        return None
-    try:
-        info = json.loads(meta.read_text(encoding="utf-8"))
-        data = npy.read_bytes()
-        if info.get("payload_hash") != h or hashlib.sha256(data).hexdigest() != info.get("npy_sha256") or \
-                (info.get("model"), info.get("dims"), info.get("policy")) != \
-                (settings.embedding_model, settings.embedding_dimensions, EMBED_POLICY):
-            return None
-        vec = np.load(io.BytesIO(data), allow_pickle=False)
-    except (OSError, ValueError, json.JSONDecodeError):
-        return None
-    if vec.dtype != np.float32 or vec.shape != (settings.embedding_dimensions,) or not np.all(np.isfinite(vec)) \
-            or abs(float(np.linalg.norm(vec)) - 1.0) > NORM_TOLERANCE:
-        return None
-    return vec
+    """A verified cached vector from pgvector, or None for a miss or another model/dimension/policy."""
+    from .vector_store import cache_get as pg_cache_get
+    return pg_cache_get(settings, h)
 
 
 def cache_put(settings: Settings, h: str, vec: np.ndarray, meta: dict) -> None:
-    if settings.database_backend == "postgresql":
-        from .vector_store import cache_put as pg_cache_put
-        pg_cache_put(settings, h, vec, meta)
-        return
-    data = _npy_bytes(vec)
-    d = cache_dir(settings)
-    write_bytes_atomic(d / f"{h}.npy", data)
-    write_text_atomic(d / f"{h}.json", json.dumps(
-        {**meta, "payload_hash": h, "model": settings.embedding_model, "dims": settings.embedding_dimensions,
-         "policy": EMBED_POLICY, "npy_sha256": hashlib.sha256(data).hexdigest(), "created_at": utcnow()},
-        ensure_ascii=False))
+    from .vector_store import cache_put as pg_cache_put
+    pg_cache_put(settings, h, vec, meta)
 
 
 # ---------------------------------------------------------------- metered calls
@@ -381,15 +337,10 @@ def plan_embeddings(settings: Settings, index_version: str) -> dict:
 
 
 def dense_version_for(settings: Settings, row: dict) -> str:
-    if settings.database_backend == "postgresql":
-        return "p" + hashlib.sha256(dumps({"store": "pgvector-exact-1", "v": DENSE_VERSION,
-                                            "index": row["index_version"], "manifest": row["manifest_hash"],
-                                            "model": settings.embedding_model, "dims": settings.embedding_dimensions,
-                                            "policy": EMBED_POLICY}).encode()).hexdigest()[:15]
-    return "d" + hashlib.sha256(dumps({"v": DENSE_VERSION, "index": row["index_version"],
-                                       "manifest": row["manifest_hash"], "model": settings.embedding_model,
-                                       "dims": settings.embedding_dimensions, "policy": EMBED_POLICY}
-                                      ).encode()).hexdigest()[:15]
+    return "p" + hashlib.sha256(dumps({"store": "pgvector-exact-1", "v": DENSE_VERSION,
+                                        "index": row["index_version"], "manifest": row["manifest_hash"],
+                                        "model": settings.embedding_model, "dims": settings.embedding_dimensions,
+                                        "policy": EMBED_POLICY}).encode()).hexdigest()[:15]
 
 
 def build_dense(settings: Settings, transport: Transport | None, index_version: str, estimate_id: str,
@@ -450,8 +401,8 @@ def build_dense(settings: Settings, transport: Transport | None, index_version: 
 
 
 def publish_dense(settings: Settings, row: dict, payloads: list[dict]) -> dict:
-    """Assemble the matrix from verified cache entries, write it beside a manifest in a temporary sibling,
-    verify it back, then register it `ready`. Never overwrites a published version."""
+    """Register the row-to-chunk mapping of verified pgvector cache entries as an embedding set (manifest and row
+    list in a temporary sibling, verified back), then mark it `ready`. Never overwrites a published version."""
     version = dense_version_for(settings, row)
     final_dir = settings.data_dir / "indexes" / version
     with open_db(settings.db_path) as conn:
@@ -459,23 +410,18 @@ def publish_dense(settings: Settings, row: dict, payloads: list[dict]) -> dict:
     if existing and existing["state"] == "ready" and final_dir.exists():
         DenseIndex.load(settings, version)  # verify before reporting reuse
         return {"status": "ready", "dense_version": version, "reused": True, "published": False}
-    matrix = np.zeros((len(payloads), settings.embedding_dimensions), dtype=np.float32)
     for i, p in enumerate(payloads):
-        vec = cache_get(settings, p["payload_hash"])
-        if vec is None:
-            raise DenseError(f"row {i} has no verified cached vector; the matrix is not published")
-        matrix[i] = vec
+        if cache_get(settings, p["payload_hash"]) is None:
+            raise DenseError(f"row {i} has no verified cached vector; the set is not published")
     tmp = settings.data_dir / "indexes" / f".tmp-{uuid.uuid4().hex}"
     try:
-        write_bytes_atomic(tmp / "embeddings.npy", _npy_bytes(matrix))
         write_jsonl_atomic(tmp / "rows.jsonl", [{"row": i, "chunk_id": p["chunk_id"],
                                                  "payload_hash": p["payload_hash"]} for i, p in enumerate(payloads)])
-        files = {n: hashlib.sha256((tmp / n).read_bytes()).hexdigest() for n in ("embeddings.npy", "rows.jsonl")}
+        files = {"rows.jsonl": hashlib.sha256((tmp / "rows.jsonl").read_bytes()).hexdigest()}
         config = {"kind": "dense", "dense_version": DENSE_VERSION, "base_index_version": row["index_version"],
                   "base_manifest_hash": row["manifest_hash"], "model": settings.embedding_model,
                   "dimensions": settings.embedding_dimensions, "policy": EMBED_POLICY, "rows": len(payloads),
-                  "unique_payloads": len({p["payload_hash"] for p in payloads})}
-        config["vector_store"] = "pgvector-exact" if settings.database_backend == "postgresql" else "numpy"
+                  "unique_payloads": len({p["payload_hash"] for p in payloads}), "vector_store": "pgvector-exact"}
         manifest = {"index_version": version, "created_at": utcnow(), "config": config, "files": files,
                     "row_order": "keyword index chunks.jsonl line order"}
         write_text_atomic(tmp / "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=1))
@@ -494,9 +440,8 @@ def publish_dense(settings: Settings, row: dict, payloads: list[dict]) -> dict:
             (version, str(manifest_path), hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
              row["source_set_hash"], dumps(config), utcnow()))
     try:
-        if settings.database_backend == "postgresql":
-            from .vector_store import publish
-            publish(settings, version, payloads, config)
+        from .vector_store import publish
+        publish(settings, version, payloads, config)
         DenseIndex.load(settings, version, require_ready=False)
     except DenseError:
         with open_db(settings.db_path) as conn, tx(conn, immediate=True):
@@ -505,70 +450,6 @@ def publish_dense(settings: Settings, row: dict, payloads: list[dict]) -> dict:
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
         conn.execute("UPDATE indexes SET state = 'ready' WHERE index_version = ?", (version,))
     return {"status": "ready", "dense_version": version, "rows": len(payloads), "reused": False, "published": True}
-
-
-@dataclass
-class DenseIndex:
-    version: str
-    base_index_version: str
-    model: str
-    dims: int
-    matrix: np.ndarray
-    chunk_ids: list[str]
-
-    @classmethod
-    def load(cls, settings: Settings, version: str, base=None, require_ready: bool = True) -> "DenseIndex":
-        """Verifies manifest, file hashes, dtype, shape, finiteness, unit norms and row order. `base`, when
-        given, must be the keyword index the matrix was built from, row for row."""
-        if settings.database_backend == "postgresql":
-            from .vector_store import PgDenseIndex
-            return PgDenseIndex.load(settings, version, base, require_ready)
-        with open_db(settings.db_path) as conn:
-            row = conn.execute("SELECT * FROM indexes WHERE index_version = ?", (version,)).fetchone()
-            base_row = None
-            if row is not None:
-                cfg = json.loads(row["config_json"])
-                base_row = conn.execute("SELECT manifest_hash FROM indexes WHERE index_version = ?",
-                                        (cfg.get("base_index_version"),)).fetchone()
-        if row is None or (require_ready and row["state"] != "ready"):
-            raise DenseError(f"dense matrix {version} is not ready")
-        manifest_path = Path(row["manifest_path"])
-        if not manifest_path.exists() or hashlib.sha256(manifest_path.read_bytes()).hexdigest() != row["manifest_hash"]:
-            raise DenseError("dense manifest hash mismatch")
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        config = manifest["config"]
-        if config.get("kind") != "dense":
-            raise DenseError(f"{version} is not a dense matrix")
-        if base_row is None or base_row["manifest_hash"] != config["base_manifest_hash"]:
-            raise DenseError("the keyword index this matrix was built from is missing or changed")
-        for name, digest in manifest["files"].items():
-            path = manifest_path.parent / name
-            if not path.exists() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
-                raise DenseError(f"dense file hash mismatch: {name}")
-        matrix = np.load(manifest_path.parent / "embeddings.npy", allow_pickle=False)
-        rows = read_jsonl(manifest_path.parent / "rows.jsonl")
-        dims = int(config["dimensions"])
-        if matrix.dtype != np.float32 or matrix.shape != (config["rows"], dims) or len(rows) != config["rows"]:
-            raise DenseError("dense matrix shape, dtype or row count does not match its manifest")
-        if [r["row"] for r in rows] != list(range(len(rows))):
-            raise DenseError("dense row mapping is not in row order")
-        if matrix.size and (not np.all(np.isfinite(matrix))
-                            or np.max(np.abs(np.linalg.norm(matrix, axis=1) - 1.0)) > NORM_TOLERANCE):
-            raise DenseError("dense matrix has nonfinite or non-unit rows")
-        chunk_ids = [r["chunk_id"] for r in rows]
-        if base is not None and (base.version != config["base_index_version"]
-                                 or [c["chunk_id"] for c in base.chunks] != chunk_ids):
-            raise DenseError("dense rows do not match the keyword index rows")
-        return cls(version, config["base_index_version"], config["model"], dims, matrix, chunk_ids)
-
-    def search(self, query: np.ndarray, allowed: list[int], k: int) -> list[tuple[int, float]]:
-        """Cosine by dot product over unit rows, restricted to admitted rows. Ties by chunk ID."""
-        if not allowed:
-            return []
-        rows = np.asarray(allowed, dtype=np.int64)
-        scores = self.matrix[rows] @ np.asarray(query, dtype=np.float32)
-        order = sorted(range(len(rows)), key=lambda j: (-float(scores[j]), self.chunk_ids[rows[j]]))
-        return [(int(rows[j]), float(scores[j])) for j in order[:k]]
 
 
 # ---------------------------------------------------------------- optional local reranker

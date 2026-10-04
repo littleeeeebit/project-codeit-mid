@@ -1,0 +1,7 @@
+graph LR
+    app["app\nweb/src/app/"]
+    components["components\nweb/src/components/"]
+    lib["lib\nweb/src/lib/"]
+    app -->|"imports"| components
+    app -->|"imports"| lib
+    components -->|"imports"| lib

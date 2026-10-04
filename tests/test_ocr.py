@@ -4,7 +4,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from rfp_assistant import ocr
+from rfp_assistant import ocr, postgres, store
+from tests import fixtures
 
 
 class OcrRulesTest(unittest.TestCase):
@@ -263,7 +264,7 @@ class RunTest(unittest.TestCase):
 
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)
-        self.settings = SimpleNamespace(data_dir=root, db_path=root / "x.sqlite3")
+        self.settings = SimpleNamespace(data_dir=root, db_path=postgres.Target(fixtures.database(ready=False)))
         (root / "doc.pdf").write_bytes(b"%PDF")
         buf = io.BytesIO()
         Image.new("RGB", (40, 20), "white").save(buf, "PNG")
@@ -290,10 +291,13 @@ class RunTest(unittest.TestCase):
         write_jsonl_atomic(path, rows)
 
     def run_ocr(self, regions, fmt="hwp", gemini=True):
-        import sqlite3
-        from contextlib import contextmanager
-
         test = self
+        with store.open_db(self.settings.db_path) as conn:  # only the columns ocr.run reads
+            conn.execute("CREATE TABLE IF NOT EXISTS sources (source_hash text, format text, original_path text, "
+                         "parse_status text)")
+            conn.execute("DELETE FROM sources")
+            conn.execute("INSERT INTO sources VALUES ('h', ?, ?, 'parsed')",
+                         (fmt, str(self.settings.data_dir / "doc.pdf")))
 
         class Local:
             def __enter__(self):
@@ -320,18 +324,8 @@ class RunTest(unittest.TestCase):
                 test.gemini_reads.append(region)
                 return "제미니 판독"
 
-        @contextmanager
-        def db(_):
-            conn = sqlite3.connect(":memory:")
-            conn.row_factory = sqlite3.Row
-            conn.execute("CREATE TABLE sources (source_hash, format, original_path, parse_status)")
-            conn.execute("INSERT INTO sources VALUES ('h', ?, ?, 'parsed')",
-                         (fmt, str(self.settings.data_dir / "doc.pdf")))
-            yield conn
-            conn.close()
-
         with mock.patch.object(ocr, "LocalOCR", Local), mock.patch.object(ocr, "GeminiReader", Gemini), \
-                mock.patch.object(ocr, "open_db", db), mock.patch.object(ocr, "regions", lambda pdf: regions), \
+                mock.patch.object(ocr, "regions", lambda pdf: regions), \
                 mock.patch.object(ocr, "rendering_for", lambda s, src: s.data_dir / "doc.pdf"), \
                 mock.patch.object(ocr, "expected_chars", lambda image: 3.0):
             return ocr.run(self.settings, gemini=gemini)

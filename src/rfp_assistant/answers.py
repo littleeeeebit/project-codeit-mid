@@ -66,9 +66,10 @@ class PinnedResources(service.Resources):
     def __init__(self, settings: Settings, transport, serving: dict, owner: service.Resources | None = None) -> None:
         self._owner = owner  # its controlled stop is this borrower's stop: no new paid stage after it
         self._own_closed = False
-        super().__init__(settings, transport=_Borrowed(transport))
+        # Estimate only (no transport) is ledger-only: it never borrows or takes the gateway owner.
+        super().__init__(settings, transport=None if transport is None else _Borrowed(transport),
+                         dispatch=transport is not None)
         if transport is None:
-            self.transport = None
             self.provider_note = "no provider transport: estimate only"
         self.paid_purpose = "gold_eval"
         self._pinned = dict(serving)
@@ -347,11 +348,9 @@ def _conclusive(states: list[str]) -> bool:
     return not any(s in ("dispatching", "unknown", "reserved") for s in states)
 
 
-def run_answers(settings: Settings, owner: service.Resources, estimate_id: str, actor: str,
-                post_test_reason: str | None = None) -> dict:
-    """Executes a planned answer run (development finalists or the sealed run) with the owner's gateway. Stops on
-    the first budget refusal or unknown billing; rerunning the same command (after reconciliation, or with a new
-    estimate) resumes only unfinished rows."""
+def begin_answers(settings: Settings, estimate_id: str, actor: str, post_test_reason: str | None = None) -> dict:
+    """Free and synchronous: checks the estimate and inputs, then publishes the run (its `config.json`) so the
+    overview lists it from the moment a start returns, before any paid call."""
     est = load_estimate(settings, estimate_id)
     if est["action"] not in ("answer-finalists", "sealed"):
         raise AnswerEvalError("run-answers executes answer-finalists or sealed estimates; latency uses latency-run")
@@ -379,6 +378,18 @@ def run_answers(settings: Settings, owner: service.Resources, estimate_id: str, 
     config["estimates"].append({"estimate_id": estimate_id, "max_micro_usd": est["max_micro_usd"], "actor": actor,
                                 "started_at": utcnow()})
     write_text_atomic(config_path, json.dumps(config, ensure_ascii=False, indent=1))
+    return {"estimate_id": estimate_id, "est": est, "inputs": inputs, "run_id": run_id}
+
+
+def run_answers(settings: Settings, owner: service.Resources, estimate_id: str, actor: str,
+                post_test_reason: str | None = None, begun: dict | None = None) -> dict:
+    """Executes a planned answer run (development finalists or the sealed run) with the owner's gateway. Stops on
+    the first budget refusal or unknown billing; rerunning the same command (after reconciliation, or with a new
+    estimate) resumes only unfinished rows. `begun` is this estimate's `begin_answers`, when the caller already
+    published the run."""
+    if begun is None or begun["estimate_id"] != estimate_id:
+        begun = begin_answers(settings, estimate_id, actor, post_test_reason)
+    inputs, run_id = begun["inputs"], begun["run_id"]
     progress = load_progress(settings, run_id)
     stop_reason = None
     for f in inputs["finalists"]:
@@ -898,20 +909,13 @@ def _latency_questions(settings: Settings) -> list[dict]:
 def plan_latency(settings: Settings, waves: int = 5, users: int = 6, *, store: bool = True) -> dict:
     """Bounded real latency sample: `waves` waves of `users` concurrent answers on the activated configuration
     (development questions), priced before anything is sent."""
-    from .store import get_app_setting
-
     if not 1 <= waves <= 20 or not 1 <= users <= settings.request_workers:
         raise AnswerEvalError(f"latency samples take 1..20 waves of 1..{settings.request_workers} members")
     questions = _latency_questions(settings)
     if not questions:
         raise AnswerEvalError("no reviewed single-document development question to time")
-    with open_db(settings.db_path) as conn:
-        active = get_app_setting(conn, "active_run")
-        index = get_app_setting(conn, "active_index")
-    serving = json.loads(active) if active else {"run_id": None, "mode": settings.retrieval_mode,
-                                                  "index_version": index, "dense_version": None, "reranker": None,
-                                                  "fallback_mode": "kiwi_bm25"}
-    pinned = PinnedResources(settings, None, serving)
+    serving = service.active_serving(settings)  # what requests serve now, a stale activation included
+    pinned =PinnedResources(settings, None, serving)
     picks = [questions[i % len(questions)] for i in range(waves * users)]
     prices = [price_row(pinned, q) for q in picks]
     ledger = _ledger(settings)

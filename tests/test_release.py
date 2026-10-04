@@ -1,6 +1,7 @@
 """Backup and staged restore, the phase-5 reconciliation fixture and the read-only release report."""
 
 import json
+import os
 import tempfile
 import unittest
 from datetime import date
@@ -10,7 +11,7 @@ from io import StringIO
 from pathlib import Path
 from unittest import mock
 
-from rfp_assistant import answers, auth, budget, cli, dense, evaluation, generation, release, sealed, service, store
+from rfp_assistant import answers, auth, budget, cli, dense, evaluation, generation, postgres, release, sealed, service, store
 from rfp_assistant.contracts import AnswerRequest
 from rfp_assistant.generation import FakeTransport
 from rfp_assistant.settings import DEFAULT_RATES
@@ -19,36 +20,36 @@ from tests import phase4_fixtures as p4
 
 
 class RestoreCLIReportTest(unittest.TestCase):
-    def test_reports_both_restore_formats_and_pass_fail_exit_codes(self):
+    def test_reports_pass_fail_exit_codes(self):
         args = Namespace(backup="C:/isolated/manifest.json", staging=None)
-        for backend in ("sqlite", "postgresql"):
-            for passed in (True, False):
-                report = {"passed": passed, "checks": {"parity": passed}}
-                if backend == "sqlite":
-                    report["staging"] = "C:/isolated/runtime"
-                else:
-                    report["restore_check_version"] = "postgresql-restore-check-1"
-                with self.subTest(backend=backend, passed=passed), \
-                        mock.patch.object(release, "restore_check", return_value=report), \
-                        redirect_stdout(StringIO()) as output:
-                    code = cli.cmd_restore_check(args, None)
-                    self.assertEqual(code, 0 if passed else 1)
-                    self.assertEqual(json.loads(output.getvalue())["passed"], passed)
+        for passed in (True, False):
+            report = {"passed": passed, "checks": {"parity": passed},
+                      "restore_check_version": "postgresql-restore-check-1"}
+            with self.subTest(passed=passed), mock.patch.object(release, "restore_check", return_value=report), \
+                    redirect_stdout(StringIO()) as output:
+                code = cli.cmd_restore_check(args, None)
+                self.assertEqual(code, 0 if passed else 1)
+                self.assertEqual(json.loads(output.getvalue())["passed"], passed)
 
 
 def _configure(settings, prior_use: int) -> None:
     budget.configure(settings.db_path, "owner", project_start=date(2026, 9, 30), project_end=date(2026, 10, 28),
                      prior_use_micro=prior_use, prior_use_evidence="dashboard 2026-09-30", rates=DEFAULT_RATES,
                      rate_version="fixture", enable_paid=True)
+    budget.set_paid_enabled(settings.db_path, "owner", True, "fixture")  # with PostgreSQL paid admission
 
 
 def _unknown_attempt(settings, tokens: int = 600) -> str:
     request_id = dense.ensure_job_request(settings, "owner-cli", f"job-{tokens}", {"job": "test"})
-    admission = budget.reserve(settings.db_path, request_id=request_id, member_id="owner-cli", stage="generation",
-                               purpose="interactive", model="gpt-6-luna", input_tokens=tokens, max_output_tokens=0,
-                               count_method="test")
-    budget.mark_dispatching(settings.db_path, admission["attempt_id"])
-    budget.mark_unknown(settings.db_path, admission["attempt_id"], "timeout (test)")
+    owner = postgres.GatewayOwner(settings.db_path)  # an owner CLI job dispatches through the paid gateway
+    try:
+        admission = budget.reserve(settings.db_path, request_id=request_id, member_id="owner-cli", stage="generation",
+                                   purpose="interactive", model="gpt-6-luna", input_tokens=tokens,
+                                   max_output_tokens=0, count_method="test")
+        budget.mark_dispatching(settings.db_path, admission["attempt_id"])
+        budget.mark_unknown(settings.db_path, admission["attempt_id"], "timeout (test)")
+    finally:
+        owner.release()
     return admission["attempt_id"]
 
 
@@ -69,8 +70,12 @@ class BackupRestoreTest(unittest.TestCase):
         finally:
             res.close()
         self.unknown = _unknown_attempt(self.s)
+        restore = os.environ[fixtures.database(ready=False)]  # the empty isolated restore target
+        self.patch = mock.patch.dict(os.environ, {"RFP_RESTORE_DATABASE_DSN": restore})
+        self.patch.start()
 
     def tearDown(self):
+        self.patch.stop()
         self.tmp.cleanup()
 
     def test_backup_refuses_unsafe_destinations(self):
@@ -87,20 +92,21 @@ class BackupRestoreTest(unittest.TestCase):
         before = release.ledger_summary(self.s.db_path)
         out = release.backup(self.s, self.root / "backup-1", "owner")
         self.assertEqual(release.ledger_summary(self.s.db_path), before)  # the live ledger is unchanged
-        report = release.restore_check(self.s, Path(out["manifest"]), self.root / "staging")
-        self.assertTrue(report["passed"], {k: v for k, v in report["checks"].items() if not v["ok"]})
+        report = release.restore_check(self.s, Path(out["manifest"]))
+        self.assertTrue(report["passed"], [k for k, ok in report["checks"].items() if not ok])
         restored = report["restored_ledger"]
         self.assertEqual(restored["prior_use_micro_usd"], 250_000)
         self.assertEqual((restored["spent_micro_usd"], restored["pending_micro_usd"], restored["available_micro_usd"]),
                          (before["spent_micro_usd"], before["pending_micro_usd"], before["available_micro_usd"]))
         self.assertGreater(restored["unknown_micro_usd"], 0)
-        self.assertFalse(restored["paid_enabled"])
+        self.assertTrue(report["checks"]["staging paid admission disabled"])
+        self.assertFalse(report["paid_admission"])
         self.assertTrue(budget.snapshot(self.s.db_path).paid_enabled)  # staging never touches the live setting
         self.assertEqual(report["after_restart_recovery"]["unknown_micro_usd"], restored["unknown_micro_usd"])
-        self.assertTrue(report["checks"]["active index and row mapping"]["ok"])
+        self.assertTrue(report["checks"]["historical evidence index"])
         self.assertEqual(len(list((self.s.data_dir / "releases" / "restore-checks").glob("*.json"))), 1)
-        with self.assertRaises(release.ReleaseError):  # staging inside the live runtime
-            release.restore_check(self.s, Path(out["manifest"]), self.s.data_dir / "stage")
+        with self.assertRaises(ValueError):  # the restored database is no longer empty
+            release.restore_check(self.s, Path(out["manifest"]))
 
     def test_a_tampered_backup_fails_its_check(self):
         evaluation.assign_families(self.s)
@@ -109,7 +115,8 @@ class BackupRestoreTest(unittest.TestCase):
         copied.write_text("{}", encoding="utf-8")
         report = release.restore_check(self.s, Path(out["manifest"]))
         self.assertFalse(report["passed"])
-        self.assertFalse(report["checks"]["copied datasets, sealed files, runs and releases"]["ok"])
+        self.assertEqual([k for k, ok in report["checks"].items() if not ok],
+                         [f"mutable file {copied.relative_to(self.root / 'backup-2' / 'files').as_posix()}"])
 
 
 class ReconciliationFixtureTest(unittest.TestCase):

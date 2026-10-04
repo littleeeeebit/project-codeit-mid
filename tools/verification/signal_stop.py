@@ -13,39 +13,50 @@ from __future__ import annotations
 import json
 import os
 import signal
-import sqlite3
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 CHILD = r'''
-import json, os, signal, sys, threading, time
+import atexit, json, os, signal, sys, threading, time
 from pathlib import Path
 if os.name == "nt":  # a new console may inherit "ignore Ctrl+C"; accept it explicitly
     import ctypes
     ctypes.windll.kernel32.SetConsoleCtrlHandler(None, False)
-from rfp_assistant import service
+from rfp_assistant import service, store
 from rfp_assistant.contracts import AnswerRequest
 from tests import fixtures
 
 root = Path(sys.argv[1])
-env = fixtures.make_env(root / "fixture")
+env = fixtures.make_env(root / "fixture")  # its PostgreSQL database is dropped when this process exits
 res = service.Resources(env.settings.with_(shutdown_wait_seconds=10), recover=True)  # provider fake
 prepare = service.prepare_answer
+rid = None
+
+def attempts():
+    with store.open_db(env.settings.db_path) as conn:
+        return [list(a) for a in conn.execute("SELECT stage, state FROM attempts WHERE request_id = ?", (rid,))]
 
 def slow(*a, **kw):
     out = prepare(*a, **kw)
-    (root / "prepared").write_text("1")
+    (root / "prepared").write_text(json.dumps(len(attempts())))
     time.sleep(2.0)
     return out
+
+def record():  # atexit, newest first: after the controlled stop (a threading exit hook), before the drop
+    with store.open_db(env.settings.db_path) as conn:
+        row = conn.execute("SELECT status, result_json FROM requests WHERE request_id = ?", (rid,)).fetchone()
+    (root / "child-result.json").write_text(json.dumps({"status": row[0], "result_json": row[1],
+                                                        "attempts": attempts()}))
 
 service.prepare_answer = slow
 stopping = threading.Event()
 signal.signal(signal.SIGINT, lambda *a: stopping.set())  # like uvicorn: the handler ends the server loop
 rid = service.submit_answer(res, env.consultant, AnswerRequest(
     "signal-stop", "signal-stop", "하자보수 기간은 얼마인가요?", [env.refs["기관A"]], as_of="2026-09-30"))
-(root / "child.json").write_text(json.dumps({"request_id": rid, "db": str(env.settings.db_path)}))
+atexit.register(record)
+(root / "child.json").write_text(json.dumps({"request_id": rid}))
 deadline = time.monotonic() + 60
 while not stopping.is_set() and time.monotonic() < deadline:  # poll, as an event loop does
     time.sleep(0.05)
@@ -84,9 +95,7 @@ def main(run_dir: Path) -> int:
                 raise RuntimeError("the child never reached the pause after retrieval; see child.log")
             time.sleep(0.02)
         info = json.loads((root / "child.json").read_text())
-        with sqlite3.connect(info["db"]) as conn:
-            before = conn.execute("SELECT COUNT(*) FROM attempts WHERE request_id = ?",
-                                  (info["request_id"],)).fetchone()[0]
+        before = json.loads((root / "prepared").read_text())
         sent_at = time.time()
         if os.name == "nt":
             subprocess.run([sys.executable, "-B", "-c", SENDER, str(child.pid)], check=True, timeout=30)
@@ -95,14 +104,11 @@ def main(run_dir: Path) -> int:
             os.kill(child.pid, signal.SIGINT)
             outcome["signal"] = "SIGINT"
         child.wait(timeout=90)
-        with sqlite3.connect(info["db"]) as conn:
-            status, result = conn.execute("SELECT status, result_json FROM requests WHERE request_id = ?",
-                                          (info["request_id"],)).fetchone()
-            attempts = conn.execute("SELECT stage, state FROM attempts WHERE request_id = ?",
-                                    (info["request_id"],)).fetchall()
+        after = json.loads((root / "child-result.json").read_text())  # read by the child before its database went
+        result = after["result_json"]
         outcome.update(request_id=info["request_id"], attempts_before_signal=before, exit_code=child.returncode,
-                       status=status, result_status=json.loads(result)["status"] if result else None,
-                       attempts=[list(a) for a in attempts], seconds_to_exit=round(time.time() - sent_at, 2))
+                       status=after["status"], result_status=json.loads(result)["status"] if result else None,
+                       attempts=after["attempts"], seconds_to_exit=round(time.time() - sent_at, 2))
     except Exception as exc:  # noqa: BLE001 - recorded as a failed check
         outcome["error"] = f"{type(exc).__name__}: {exc}"
     finally:

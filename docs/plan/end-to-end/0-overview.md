@@ -98,11 +98,11 @@ Metadata lookup, keyword search, requirement inventory browsing, and citation op
 | Component | Default | Change only when |
 | --- | --- | --- |
 | Original parsing | Structured `pyhwp` XML and PyMuPDF; approved/native conversion fallback | Original checks expose missing or malformed content |
-| Metadata, elements, traces, and allowance | SQLite; short atomic write transactions | Measured concurrency or deployment requires a shared database server |
+| Metadata, elements, traces, and allowance | PostgreSQL 18.6 only (`bidmate_app`); short atomic write transactions, database-wide advisory lock for the paid gateway. SQLite retired on 2026-10-04 after a validated final import; the last `.sqlite3` file is a cold archive, and rollback is a verified `pg_dump` restore | A measured failure of the single PostgreSQL server |
 | Korean keyword retrieval | Kiwi plus `rank_bm25`, typed filters, scoped exact identifiers | Development failures show a concrete tokenizer/query limitation |
-| Dense retrieval | `text-embedding-3-small`; normalized NumPy matrix with a matching manifest | Measured chunk volume or scoring latency requires another index |
-| Fusion | RRF with `1 / (60 + rank)`, ranks starting at one | A frozen development comparison supports another setting |
-| Reranker | Trial local `BAAI/bge-reranker-v2-m3`; explicit bypass | Quality and warm latency gates pass on available hardware |
+| Dense retrieval | `text-embedding-3-large` at a fixed 1,536 dimensions in pgvector 0.8.6; exact cosine search serves (HNSW recall@20 stayed below 0.99 for scoped queries even at `ef_search` 400) | HNSW, or a successor, reaches recall@20 ≥ 0.99 against exact search in every scope group |
+| Fusion | `keyword_first`: the BM25 top 6 keep their order, then weighted RRF (`1 / (60 + rank)`, dense weight 1.0) fills the rest. 50 candidates per channel and after fusion; 10 evidence units (4,000/4,800 tokens). Zero new critical failures against keyword-only K1 at the same limits on the 55-question pilot (55/55 complete) and the 88-question whole-corpus set (73/88 against 71/88); 20–30 units failed. All-documents routing needs a restated title term found in fewer than four titles, so generic words such as 대학교 or 사업 route nothing (run `H-0fffb2a6ec`) | A frozen comparison passes the same gate with better nDCG@5 or complete support |
+| Reranker | Local `BAAI/bge-reranker-v2-m3` (CUDA) measured on 2026-10-04 at 10–30 evidence units; not served, every setting failed the fusion gate (new critical failures or nDCG@5 0.8948 against 0.9405) | A reranker setting passes the fusion gate and the warm latency gate |
 | Answer generation | `gpt-4o-mini`, one Chat Completions call with strict structured output | A controlled `gpt-4.1-mini` comparison repairs measured errors affordably |
 | Frontends | One Next.js app in `web/` (질문하기, 검증, 데이터셋 만들기) over a FastAPI wrapper of `service`, served by one process, no login. Replaced the Streamlit pages on 2026-10-02 | Browser-tested requirements exceed the shared application's capabilities |
 | Observation | Persisted traces and ledger exports | Trace volume warrants Langfuse; existing proxy infrastructure makes LiteLLM practical |
@@ -160,7 +160,7 @@ The primary indicator is cumulative dollar cost divided by $20, because input, o
 
 Use a $16 operational cap and actual project start/end dates. A 28-day horizon is only a planning example. Record prior allowance spending before enabling calls and scale allocations to the real remainder. This cumulative allowance does not reset when a provider's monthly budget resets.
 
-Every paid stage follows one contract: attribute → count bounded input/output → reserve atomically → persist attempt → dispatch → settle once. Reserve query embeddings before dense search; reserve generation after final evidence packing, assuming uncached input plus maximum output. Use a short SQLite `BEGIN IMMEDIATE` transaction and release its lock before inference. Account for every retry, disabling or bounding hidden SDK retries.
+Every paid stage follows one contract: attribute → count bounded input/output → reserve atomically → persist attempt → dispatch → settle once. Reserve query embeddings before dense search; reserve generation after final evidence packing, assuming uncached input plus maximum output. Use a short PostgreSQL transaction that locks the ledger row and release its lock before inference. Account for every retry, disabling or bounding hidden SDK retries.
 
 Settlement replaces a reservation with measured cost and returns the unused portion atomically. Duplicate completion cannot bill twice. Disconnects, timeouts, cancellations, or missing final usage remain pending/unknown until reconciled; TTL expiration alone cannot release them. Persist price snapshots and use integer microdollars or Decimal. Recover pending attempts on restart.
 

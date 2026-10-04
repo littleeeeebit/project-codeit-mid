@@ -1,11 +1,10 @@
 """Phase 3 gate: request ownership, authorization, background execution, six-user budget and recovery behavior.
 
-Real SQLite transactions and persisted request state; only the provider (FakeTransport) and the clock are
+Real PostgreSQL transactions and persisted request state; only the provider (FakeTransport) and the clock are
 controlled. Gates make races deterministic instead of sleeping.
 """
 
 import json
-import sqlite3
 import sys
 import tempfile
 import threading
@@ -15,7 +14,9 @@ from datetime import date
 from pathlib import Path
 from unittest import mock
 
-from rfp_assistant import auth, budget, service, store
+import psycopg
+
+from rfp_assistant import auth, budget, postgres, service, store
 from rfp_assistant.contracts import AnswerRequest, Principal
 from rfp_assistant.generation import FakeTransport, ProviderResponse
 from rfp_assistant.settings import DEFAULT_RATES
@@ -349,13 +350,54 @@ class ShutdownRestartTest(Base):
                                   purpose="interactive", guard=service._dispatch_guard(self.res, rid))
         self.assertEqual((out["status"], out["billing"], transport.calls), ("blocked", "released", []))
 
-    def test_a_second_owner_of_the_same_data_directory_is_refused(self):
-        res2 = service.Resources(self.settings, transport=FakeTransport(), recover=True)
-        try:
+    def test_a_second_owner_of_the_same_database_is_refused(self):
+        self.res.close()  # this process no longer owns the gateway ...
+        with fixtures.foreign_gateway(self.settings):  # ... another process does
             with self.assertRaises(service.GatewayLockError):
                 service.Resources(self.settings, transport=FakeTransport(), recover=True)
+        res2 = service.Resources(self.settings, transport=FakeTransport(), recover=True)  # free again
+        try:
+            self.assertIsNotNone(res2._lock)
+            res3 = service.Resources(self.settings, transport=FakeTransport())  # same process: shares, never recovers
+            self.assertIs(res3._borrowed_owner, res2._lock)
+            self.assertEqual(res3.recovered, {})
+            res3.close()
+            self.assertIs(postgres.process_owner(self.settings.db_path), res2._lock)  # closing a borrower keeps it
         finally:
             res2.close()
+
+    def test_closing_the_first_owner_keeps_the_gateway_for_a_live_borrower(self):
+        self.res.close()
+        first = service.Resources(self.settings, transport=FakeTransport(), recover=True)
+        second = service.Resources(self.settings, transport=FakeTransport())
+        try:
+            first.close()
+            owner = postgres.process_owner(self.settings.db_path)
+            self.assertIs(owner, second._borrowed_owner)
+            r = service.answer(second, self.env.consultant, req(self.a))  # paid admission through the borrower
+            self.assertEqual((r.status, r.billing_state), ("answered", "settled"), r.error)
+        finally:
+            second.close()
+        self.assertIsNone(postgres.process_owner(self.settings.db_path))  # the last user released it
+
+    def test_ledger_only_owner_commands_run_beside_another_gateway_owner(self):
+        from argparse import Namespace
+
+        from rfp_assistant import cli
+
+        self.res.close()
+        with fixtures.foreign_gateway(self.settings):  # the serving app in another process
+            for command, extra in ((cli.cmd_audit, {"limit": 5}), (cli.cmd_unresolved, {}),
+                                   (cli.cmd_paid, {"state": "off", "reason": "beside the app"})):
+                with self.subTest(command=command.__name__), mock.patch.object(cli, "_print"):
+                    self.assertEqual(command(Namespace(actor="owner", **extra), self.settings), 0)
+            self.assertFalse(budget.snapshot(self.settings.db_path).paid_enabled)
+            from rfp_assistant import answers
+
+            estimate = answers.PinnedResources(self.settings, None, {"run_id": None})  # estimate only
+            self.assertIsNone(estimate.transport)
+            estimate.close()
+            self.assertIsNone(postgres.process_owner(self.settings.db_path))
 
 
 SIGINT_CHILD = """
@@ -504,7 +546,7 @@ class SixUserBudgetTest(Base):
         real = store.open_db
 
         def flaky(db_path):
-            raise sqlite3.OperationalError("database is locked")
+            raise psycopg.OperationalError("lock timeout")
 
         with mock.patch.object(budget, "open_db", flaky):
             with self.assertRaises(service.ServiceError):
@@ -610,20 +652,18 @@ class ReconciliationTest(Base):
 
 class PacingTest(unittest.TestCase):
     def test_cap_warnings_and_pacing_use_the_cap_not_the_allowance(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            db = Path(tmp) / "rfp.sqlite3"
-            store.init_schema(db)
-            budget.ensure_budget_row(db)
-            budget.configure(db, "owner", project_start=date(2026, 10, 1), project_end=date(2026, 10, 31),
-                             prior_use_micro=0, prior_use_evidence="t", rates=DEFAULT_RATES, rate_version="t",
-                             enable_paid=True)
-            budget.add_adjustment(db, "owner", "k", 12 * budget.MICRO, "e", "r")  # 75% of the $16 cap
-            snap = budget.snapshot(db, today=date(2026, 10, 2))
-            self.assertEqual(snap.warnings[:2], ["cap_50", "cap_75"])
-            self.assertNotIn("cap_90", snap.warnings)
-            self.assertIn("ahead_of_pace", snap.warnings)
-            self.assertAlmostEqual(snap.spent_percent, 60.0)  # the $20 percentage stays separate
-            self.assertNotIn("ahead_of_pace", budget.snapshot(db, today=date(2026, 10, 30)).warnings)
+        db = postgres.Target(fixtures.database())
+        budget.ensure_budget_row(db)
+        budget.configure(db, "owner", project_start=date(2026, 10, 1), project_end=date(2026, 10, 31),
+                         prior_use_micro=0, prior_use_evidence="t", rates=DEFAULT_RATES, rate_version="t",
+                         enable_paid=True)
+        budget.add_adjustment(db, "owner", "k", 12 * budget.MICRO, "e", "r")  # 75% of the $16 cap
+        snap = budget.snapshot(db, today=date(2026, 10, 2))
+        self.assertEqual(snap.warnings[:2], ["cap_50", "cap_75"])
+        self.assertNotIn("cap_90", snap.warnings)
+        self.assertIn("ahead_of_pace", snap.warnings)
+        self.assertAlmostEqual(snap.spent_percent, 60.0)  # the $20 percentage stays separate
+        self.assertNotIn("ahead_of_pace", budget.snapshot(db, today=date(2026, 10, 30)).warnings)
 
 
 # ---------------------------------------------------------------- deterministic modes and comparisons

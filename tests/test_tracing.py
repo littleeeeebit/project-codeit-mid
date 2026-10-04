@@ -264,8 +264,9 @@ class DraftingTracingTest(unittest.TestCase):
             exporter = InMemorySpanExporter()
             tracer = tracing.Tracing(NOWHERE, "pk-lf-test-draft", "sk-lf-test-draft", span_exporter=exporter)
             try:
-                receipt = drafting._generate(env.settings, {'slots': [slot]}, Path(folder) / 'out', 100000,
-                                             transport, 'dev', tracer=tracer)
+                with fixtures.paid_gateway(env.settings):
+                    receipt = drafting._generate(env.settings, {'slots': [slot]}, Path(folder) / 'out', 100000,
+                                                 transport, 'dev', tracer=tracer)
             finally:
                 tracer.close()
             self.assertEqual(receipt['calls'], 1)

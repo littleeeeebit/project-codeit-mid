@@ -95,3 +95,42 @@ The in-place migration ran on the owner host on 2026-10-02, with the app stopped
 4. The pilot's own spending was recorded as owner adjustment `external:pr8-pilot-ledger`, $0.448818, citing the pilot ledger. The live ledger now shows $0.609441 spent, which matches the pilot ledger, with the $5 cap kept by owner decision ($4.390559 available).
 
 The pilot DB was not copied over the live one; the two histories stay separate. The pilot runtime (181 gold candidates, the frozen sealed set and its first run, answer runs) and its private receipts are archived, gitignored, under `.runtime/live-validation/pr8-review-archive/62015a9-owner-setup/`; its runtime is `runtime/` there. Do not publish their payloads or credentials. Use [runbook sections 10–12](runbook.md) for planning, paid execution, freeze, read-only reporting and paid-disabled recovery.
+
+## Judge comparison: Luna versus Jev (2026-10-04)
+
+Method, rule and limits are in [Luna judge versus Jev judge](../rag/judges.md). The reference is the 750 reviewed blind items of development run `A-9ef59b566d64`, copied read-only from the pilot archive after the receipt's packet and verdict hashes matched (reference `7c71e582…`, split `474cfa60…`). The sealed set and run `S-95b3004bd1a8` were not read.
+
+Funding: the owner moved $1.00 from `interactive` to the new `judge_eval` envelope (`set-envelopes`, actor `owner`), leaving embedding $2.50, gold_eval $2.50, interactive $4.00 and judge_eval $1.00 within the unchanged $10 cap.
+
+| Run | Part | Estimate (max) | Actual (ledger) | Outcome |
+| --- | --- | --- | --- | --- |
+| `J-calibration-637edadd55aa` | calibration, 373 items | $0.499313 | $0.093721 | complete; thresholds `b0670027…` fitted, refitted as `d9c0e8ac…` (no new calls) |
+| `J-held_out-3e072719113f` | held-out, 377 items (raw sample 120) | $0.373294 | $0.061321 | complete; superseded, see below |
+| `J-held_out-5b18a0afb471` | held-out, 377 items (raw sample 120) | $0.338342 | $0.053900 | complete; the reported verdict |
+
+Review round 1 found that the threshold fit measured coverage only over Jev's answered calibration items. Failed and untranslatable items were left out, so the fitted bands claimed 100% coverage where the true figure was 94.8% (support) and 91.7% (coverage). The fit now divides by every eligible item, and `judge-refit` refitted it from the stored judgements without any call. The bands came out unchanged and all of them still meet the 90% floor, but the thresholds hash changed. A held-out run's identity includes that hash, so the first held-out run no longer matched the configuration and was run again.
+
+The second held-out run needed no translation: every segment was cached. It paid for 377 Luna calls only. The three runs together cost $0.208942, all of it in `judge_eval`. Afterwards the ledger showed $2.126419 spent, $0 pending and $0 unknown of the $10 cap, with $0.791058 left in `judge_eval`. The 1,410 Jev calls (470 per run) are unpriced: TypeSafe reports usage but no price. An earlier version of this section gave 847 for the first two runs; the judgement files show 940.
+
+Held-out result under `replacement-rule-1` (run `J-held_out-5b18a0afb471`): **not replaceable**. The false-accept condition decided it.
+
+| Arm | Judged / items | Agreement (Wilson 95%) | Kappa (pass/fail) | False accepts / reference negatives | p50 / p95 latency |
+| --- | --- | --- | --- | --- | --- |
+| Luna | 377 / 377 | 89.1% (85.6–91.9) | 0.240 | 5 / 13 | 2.09 s / 4.37 s |
+| Jev, bridged | 350 / 377 (92.8%) | 89.1% (85.5–92.0) | 0.238 | 6 / 13 | 0.24 s / 0.30 s |
+| Jev, raw Korean | 120 / 120 | 80.0% (72.0–86.2) | 0.103 | 1 / 3 | 0.23 s / 0.27 s |
+
+- kappa 0.238 ≥ 0.240 − 0.05: passed.
+- false accepts 6 ≤ 5: failed.
+- coverage 92.8% ≥ 90%: passed.
+
+The superseded run had reached **replaceable** with Luna at 7 false accepts and kappa 0.189. Between the two runs Jev's coverage and false accepts did not move. Luna, called again on the same items with the same prompt, passed two fewer reference negatives. The verdict therefore turns on one or two of the 13 negatives and on Luna's run-to-run variation. Neither run gives Jev a margin. With this reference Jev is not shown to be a safe replacement, and the rule says so.
+
+Jev's 27 abstentions are all bridge rejections: 21 `changed_protected_value` and 6 `residual_hangul`. The bridge lifts Jev's kappa from 0.103 to 0.238. The raw-Korean arm has only 3 negatives in its sample.
+
+### The PostgreSQL work these runs ran on (2026-10-03/04)
+
+- The live app served from PostgreSQL `bidmate_app` as the authoritative database. The authority marker was installed at 2026-10-04 02:06 UTC after the final validated import; the SQLite ledger is a read-only cold archive. Every judge and translation call was admitted and settled on that PostgreSQL ledger.
+- The app had been started with the fake provider. For these runs it was restarted on 8501 with the real provider and the same database. That restart changed no budget settings.
+- Judges never retrieve, so the refused fixed-1,536 dense/hybrid serving switch (PR #12) played no part. It stays refused.
+- `/api/verify/fidelity` failed on PostgreSQL with a `GROUP BY` error, which blanked the whole 검증 page. It was fixed in `7cbe847` and checked live: 94 rows for 94 HWP sources.

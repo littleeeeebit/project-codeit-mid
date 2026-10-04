@@ -6,13 +6,15 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
+import os
 import platform
 import re
-import sqlite3
 import subprocess
-from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
+
+import psycopg
+from psycopg.rows import dict_row
 
 ROOT = Path(__file__).resolve().parents[1]
 TRACE_FIELDS = ("id", "type", "critical", "question", "metrics", "code_check", "wrong_scope",
@@ -57,28 +59,26 @@ def read_rows(conn, sql, params=()):
     return [dict(r) for r in conn.execute(sql, params)]
 
 
-def snapshot(runtime: Path, out: Path):
-    """Query an existing SQLite database in one read transaction; never initialize or migrate it."""
-    db = runtime / "rfp.sqlite3"
-    if not db.is_file():
-        raise ValueError("runtime database does not exist; no empty database will be created")
-    with closing(sqlite3.connect(db.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA query_only = ON")
-        conn.execute("BEGIN")
-        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+def snapshot(dsn: str, runtime: Path, out: Path):
+    """Query the existing PostgreSQL application database in one read-only transaction; never initialize it."""
+    with psycopg.connect(dsn, row_factory=dict_row, connect_timeout=5) as conn, conn.transaction():
+        conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+        if conn.execute("SELECT to_regclass(current_schema() || '.documents') AS t").fetchone()["t"] is None:
+            raise ValueError("the database has no application tables; nothing will be created")
+        tables = {r["tablename"] for r in conn.execute(
+            "SELECT tablename FROM pg_tables WHERE schemaname = current_schema()")}
         documents = read_rows(conn, "SELECT doc_id, filename, active_source_hash FROM documents ORDER BY doc_id")
         sources = read_rows(conn, "SELECT source_hash, format, active_extraction_id, parse_status, review_status, "
                            "reason_code FROM sources ORDER BY source_hash")
         for source in sources:
             extraction = source["active_extraction_id"]
-            sample = read_rows(conn, "SELECT element_id, source_order, kind FROM elements WHERE extraction_id=? "
+            sample = read_rows(conn, "SELECT element_id, source_order, kind FROM elements WHERE extraction_id=%s "
                                "ORDER BY source_order", (extraction,))
             source["element_count"] = len(sample)
             # These are navigation anchors, never evidence that a person inspected them.
             source["navigation_anchors"] = [sample[i] for i in sorted({0, len(sample)//2, len(sample)-1})] if sample else []
             review = conn.execute("SELECT reviewer, status, extraction_id, locations_json, created_at FROM reviews "
-                                  "WHERE source_hash=? ORDER BY created_at DESC LIMIT 1", (source["source_hash"],)).fetchone()
+                                  "WHERE source_hash=%s ORDER BY created_at DESC LIMIT 1", (source["source_hash"],)).fetchone()
             source["latest_review"] = None if review is None else {
                 "reviewer": review["reviewer"], "status": review["status"], "created_at": review["created_at"],
                 "review_is_current": review["extraction_id"] == extraction,
@@ -111,7 +111,7 @@ def snapshot(runtime: Path, out: Path):
         adjustments = read_rows(conn, "SELECT correction_key, amount_micro_usd, scope, created_at FROM adjustments")
         open_attempts = read_rows(conn, "SELECT attempt_id, state, purpose, stage, model, reserved_micro_usd, created_at "
                                  "FROM attempts WHERE state IN ('reserved','dispatching','unknown')")
-        schema = conn.execute("PRAGMA user_version").fetchone()[0]
+        schema = conn.execute("SELECT max(version) AS v FROM schema_migrations").fetchone()["v"]
     dataset = runtime / "datasets" / "dev-pilot.jsonl"
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     packages = {}
@@ -122,7 +122,7 @@ def snapshot(runtime: Path, out: Path):
             packages[name] = None
     write_json(out / "manifest.json", {
         "package_version": 1, "status": "inventory_only", "collected_at": datetime.now(timezone.utc).isoformat(),
-        "commit": commit, "schema_user_version": schema,
+        "commit": commit, "schema_version": schema,
         "host": {"os": platform.platform(), "python": platform.python_version(), "cpu": platform.processor(),
                  "gpu": None, "ram_gb": None}, "packages": packages,
         "decisions": {"D1": "A: local runtime retained", "D2": "see budget-status.json; existing configuration, no change",
@@ -191,6 +191,7 @@ def export_run(runtime: Path, out: Path, run_id: str):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runtime", type=Path, required=True)
+    parser.add_argument("--dsn-env", default="RFP_DATABASE_DSN", help="environment variable holding the database DSN")
     parser.add_argument("--out", type=Path, required=True, help="new snapshot directory; existing directories are refused")
     parser.add_argument("--run-id", action="append", default=[], help="explicitly select a retrieval run to export")
     args = parser.parse_args()
@@ -200,11 +201,15 @@ def main():
     if out.exists():
         parser.error("output already exists; choose a new directory to preserve earlier snapshots")
     try:
-        snapshot(runtime, out)
+        if not os.environ.get(args.dsn_env):
+            raise ValueError(f"{args.dsn_env} must name the application database")
+        snapshot(os.environ[args.dsn_env], runtime, out)
         for run_id in args.run_id:
             export_run(runtime, out, run_id)
-    except (ValueError, OSError, sqlite3.Error) as exc:
+    except (ValueError, OSError) as exc:
         parser.exit(1, f"Collection failed; any partial output is incomplete: {exc}\n")
+    except psycopg.Error as exc:  # driver messages can contain the DSN: report the class only
+        parser.exit(1, f"Collection failed; database unavailable ({type(exc).__name__})\n")
     print(f"Inventory written to {out}; no API calls, migrations, reviews or activations performed.")
 
 

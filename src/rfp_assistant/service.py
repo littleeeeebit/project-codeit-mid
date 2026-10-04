@@ -12,7 +12,6 @@ import functools
 import hashlib
 import json
 import re
-import sqlite3
 import subprocess
 import threading
 import time
@@ -30,9 +29,10 @@ from .contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, Evi
                         ManagedDownload, Principal, RequestView, RetrievalResult)
 from .ingestion import (CODE_RE, QUARANTINE_TEXT, load_elements, nfc, printed_pdf_path, record_review,
                         resolutions_by_doc)
-from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extraction, scope_rows
+from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extraction, corpus_scope, scope_rows
 from .retrieval import retrieve as _retrieve
 from .evaluation import EVAL_VERSION
+from .postgres import Row
 from .settings import Settings, read_api_key
 from .store import DATABASE_ERRORS, LockHeld, dumps, init_schema, open_db, tx, utcnow
 
@@ -62,9 +62,12 @@ class Resources:
     """Process-wide owner. provider='fake' never builds a real SDK client, whatever keys the host has."""
 
     def __init__(self, settings: Settings, transport: generation.Transport | None = None,
-                 recover: bool = False, tracer: tracing.Tracing | None = None) -> None:
+                 recover: bool = False, dispatch: bool = True, tracer: tracing.Tracing | None = None) -> None:
+        """`dispatch=False` is the ledger-only owner (budget administration beside the serving app): no provider
+        client and no gateway ownership, so any paid stage through it is refused at admission."""
         from .store import database_lifecycle
 
+        self._dispatch = dispatch
         self.tracing: tracing.Tracing | None = tracer
         self._database_lifecycle = database_lifecycle(settings.db_path)
         self._database_lifecycle.__enter__()
@@ -78,11 +81,18 @@ class Resources:
                     self.tracing.close()
             finally:
                 try:
-                    if getattr(self, "_lock", None) is not None:
-                        self._lock.release()
+                    self._release_owner()
                 finally:
                     self._database_lifecycle.__exit__(None, None, None)
             raise
+
+    def _release_owner(self) -> None:
+        """Owned or borrowed, the gateway owner counts its users and releases the lock with the last one."""
+        for name in ("_lock", "_borrowed_owner"):
+            owner = getattr(self, name, None)
+            if owner is not None:
+                setattr(self, name, None)
+                owner.release()
 
     def _initialize(self, settings, transport, recover):
         """`recover=True` claims exclusive ownership of the data directory (the serving application does; a real
@@ -90,29 +100,35 @@ class Resources:
         dispatching attempts unknown, never-dispatched reservations released. Nothing is replayed."""
         self.settings = settings
         self.paid_purpose = "interactive"  # ledger envelope of every paid stage this owner dispatches
-        if settings.database_backend == "postgresql":
-            postgres.require_imported_database(settings.db_path)
+        postgres.require_imported_database(settings.db_path)
         init_schema(settings.db_path)
         budget.ensure_budget_row(settings.db_path)
-        self._lock: ProcessLock | None = None
+        self._lock: postgres.GatewayOwner | None = None  # owned here: released by close()
+        self._borrowed_owner: postgres.GatewayOwner | None = None  # this process's owner, held by another Resources
         self.transport: generation.Transport | None = transport
         self.provider_note = ""
         self.recovered: dict = {}
-        if recover:
+        if not self._dispatch:
+            if recover or transport is not None:
+                raise ValueError("a ledger-only Resources neither recovers nor dispatches")
+            self.provider_note = "ledger-only owner: paid stages are not dispatched here"
+        elif recover:
             self._own(settings)
-        if transport is None and settings.provider == "fake":
+        if self._dispatch and transport is None and settings.provider == "fake":
             self.transport = generation.FakeTransport(delay_seconds=settings.fake_delay_seconds)
-        elif transport is None:
+        elif self._dispatch and transport is None:
             key = read_api_key("OPENAI_API_KEY")
             if key:
-                if self._lock is None:
+                if self._lock is None and self._borrowed_owner is None:
                     self._own(settings)
                 self.transport = generation.OpenAITransport(key, settings.request_timeout_seconds,
-                    owner_check=self._lock.check if isinstance(self._lock, postgres.GatewayOwner) else None)
+                    owner_check=(self._lock or self._borrowed_owner).check)
                 if self.tracing is None:  # traced with the transport it observes; an injected transport is not
                     self.tracing = tracing.Tracing.from_settings(settings)
             else:
                 self.provider_note = "OPENAI_API_KEY is not configured; paid generation is unavailable"
+        if self.transport is not None and self._lock is None and self._borrowed_owner is None:
+            self._own(settings)  # every PostgreSQL dispatch has a gateway owner
         self.analyzer = shared_analyzer()
         self._index: KeywordIndex | None = None
         self._dense: dense_mod.DenseIndex | None = None
@@ -123,7 +139,7 @@ class Resources:
         self._index_lock = threading.Lock()
         self._runner: RequestRunner | None = None
         self._runner_lock = threading.Lock()
-        self._draft_jobs: list[threading.Thread] = []
+        self._jobs: list[threading.Thread] = []  # drafting, answer evaluation, judge runs: joined by close()
         self._closed = False
         closer = weakref.WeakMethod(self.close)  # atexit must not keep every Resources (and its index) alive
 
@@ -141,6 +157,10 @@ class Resources:
         atexit.register(stop)
 
     def _own(self, settings: Settings) -> None:
+        shared = postgres.borrow_owner(settings.db_path)
+        if shared is not None:  # another Resources of this process owns it: its work is live, so no recovery
+            self._borrowed_owner = shared
+            return
         try:
             self._lock = postgres.gateway_lock(settings.db_path, settings.data_dir)
         except LockHeld:
@@ -158,26 +178,7 @@ class Resources:
             return self._runner
 
     def serving(self) -> dict:
-        """The activated retrieval configuration (`activate-run`), or the keyword default before any selection."""
-        from .store import get_app_setting
-
-        with open_db(self.settings.db_path) as conn:
-            run = get_app_setting(conn, "active_run")
-            active = get_app_setting(conn, "active_index")
-        if run:
-            cfg = json.loads(run)
-            if self.settings.database_backend == "postgresql" and cfg.get("embedding") and \
-                    (cfg["embedding"].get("model"), cfg["embedding"].get("dims")) != \
-                    (self.settings.embedding_model, self.settings.embedding_dimensions):
-                return {**cfg, "mode": "kiwi_bm25", "dense_version": None, "embedding": None,
-                        "reranker": None, "fallback_reason": "activated_embedding_identity_requires_migration"}
-            if cfg["mode"] == "hybrid_rerank" and cfg.get("eval_version") != EVAL_VERSION:
-                # Promoted under a superseded gate: keep hybrid retrieval, drop the reranker until a current
-                # trial passes and is activated.
-                cfg = {**cfg, "mode": "hybrid", "reranker": None, "stale_policy": cfg.get("eval_version")}
-            return cfg
-        return {"run_id": None, "mode": self.settings.retrieval_mode, "index_version": active,
-                "dense_version": None, "reranker": None, "fallback_mode": "kiwi_bm25"}
+        return active_serving(self.settings)
 
     def run_settings(self, cfg: dict | None = None) -> Settings:
         """Settings the activated run was evaluated with: embedding model/dimensions, depths, RRF constant and
@@ -255,14 +256,14 @@ class Resources:
                 return
             self._closed = True
             runner = self._runner
-            drafting = list(self._draft_jobs)
+            jobs = list(self._jobs)
         deadline = time.monotonic() + self.settings.shutdown_wait_seconds
         if runner is not None:
             runner.shutdown(self.settings.shutdown_wait_seconds)
-        for thread in drafting:
+        for thread in jobs:
             if thread is not threading.current_thread():
                 thread.join(timeout=max(0, deadline - time.monotonic()))
-        if any(thread.is_alive() for thread in drafting):
+        if any(thread.is_alive() for thread in jobs):
             recover_requests(self.settings.db_path)
             budget.recover(self.settings.db_path)
         try:
@@ -274,8 +275,7 @@ class Resources:
                     self.tracing.close()
         finally:
             try:
-                if self._lock is not None:
-                    self._lock.release()
+                self._release_owner()
             finally:
                 self._database_lifecycle.__exit__(None, None, None)
 
@@ -337,6 +337,46 @@ class RequestRunner:
 
 _shared: Resources | None = None
 _shared_lock = threading.Lock()
+
+
+def active_serving(settings: Settings) -> dict:
+    """The activated retrieval configuration (`activate-run`), or the keyword default before any selection. Every
+    reader of the activation goes through here (requests, latency samples), so none serves a run it would refuse."""
+    from .retrieval import corpus_route_record
+    from .store import get_app_setting
+
+    with open_db(settings.db_path) as conn:
+        run = get_app_setting(conn, "active_run")
+        active = get_app_setting(conn, "active_index")
+    default = {"run_id": None, "mode": settings.retrieval_mode, "index_version": active,
+               "dense_version": None, "reranker": None, "fallback_mode": "kiwi_bm25"}
+    if not run:
+        return default
+    cfg = json.loads(run)
+    if cfg.get("run_id") and (cfg.get("limits") or {}).get("corpus_route") != corpus_route_record():
+        # Routing changed since the run was measured: its gate evidence no longer describes retrieval, so serve the
+        # unselected default (retrieve flags it) until a rerun is activated (run_errors refuses the old run).
+        return {**default, "fallback_reason": "activated_corpus_route_requires_rerun", "stale_run_id": cfg["run_id"]}
+    if cfg.get("embedding") and \
+            (cfg["embedding"].get("model"), cfg["embedding"].get("dims")) != \
+            (settings.embedding_model, settings.embedding_dimensions):
+        return {**cfg, "mode": "kiwi_bm25", "dense_version": None, "embedding": None,
+                "reranker": None, "fallback_reason": "activated_embedding_identity_requires_migration"}
+    if cfg["mode"] == "hybrid_rerank" and cfg.get("eval_version") != EVAL_VERSION:
+        # Promoted under a superseded gate: keep hybrid retrieval, drop the reranker until a current
+        # trial passes and is activated.
+        cfg = {**cfg, "mode": "hybrid", "reranker": None, "stale_policy": cfg.get("eval_version")}
+    return cfg
+
+
+def describe_serving(cfg: dict) -> str:
+    """The one report wording for what requests serve (`active_serving`), naming a stored activation that is not."""
+    if cfg.get("fallback_reason"):
+        return (f"keyword default (kiwi_bm25); activated run `{cfg.get('stale_run_id') or cfg.get('run_id')}` "
+                f"not served: {cfg['fallback_reason']}")
+    if cfg.get("run_id"):
+        return f"run `{cfg['run_id']}` ({cfg['mode']})"
+    return "keyword default (kiwi_bm25), no activated run"
 
 
 def get_resources(settings: Settings) -> Resources:
@@ -484,12 +524,13 @@ def _narrow_limits(s: Settings, limits: dict | None) -> dict:
 
 def retrieve(res: Resources, principal: Principal, question: str, scope: list[DocRef], *,
              request_id: str | None = None, allow_paid: bool = False, limits: dict | None = None,
-             mode: str | None = None) -> RetrievalResult:
+             mode: str | None = None, all_documents: bool = False) -> RetrievalResult:
     """Serves the activated mode. A dense query vector comes from the cache, or through the gateway only when
     the caller is a paid request (`allow_paid`); an empty scope never pays for one. `limits` may only narrow the
-    evidence/depth limits (comparison sides, verifier configurations); `mode` lets a verifier pick a free mode."""
+    evidence/depth limits (comparison sides, verifier configurations); `mode` lets a verifier pick a free mode.
+    `all_documents` searches every indexed original instead of `scope`."""
     principal = _authorize(res, principal, "consultant", "verifier")
-    docs = _resolve_scope(res, scope)
+    docs = [] if all_documents else _resolve_scope(res, scope)
     idx = res.index()
     if idx is None:
         raise ServiceError("검색 색인이 아직 없습니다.")
@@ -501,7 +542,8 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
     s = res.run_settings(cfg)
     if limits:
         s = s.with_(**_narrow_limits(s, limits))
-    pairs = [(DocRef(d["doc_id"], d["active_source_hash"]), d["active_extraction_id"]) for d in docs]
+    pairs = corpus_scope(res.settings, idx) if all_documents else \
+        [(DocRef(d["doc_id"], d["active_source_hash"]), d["active_extraction_id"]) for d in docs]
     dense = qvec = qinfo = None
     if cfg["mode"] in DENSE_MODES:
         dense = res.dense()
@@ -525,6 +567,8 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
         outdated = index_compatibility(idx, res.analyzer)
         if outdated:  # still served (search must keep working) but never silently: rebuild and re-evaluate
             result.limitations.append(f"index_outdated:{outdated}")
+        if cfg.get("fallback_reason") == "activated_corpus_route_requires_rerun":
+            result.limitations.append("activated_run_stale:corpus_route")
         wanted = {"dense"} | ({"reranker"} if cfg["mode"] == "hybrid_rerank" else set())
         if cfg["mode"] in DENSE_MODES:
             result.limitations += [f"{stage}_unavailable" for stage in res.stage_errors if stage in wanted]
@@ -570,7 +614,7 @@ def _input_hash(request: AnswerRequest) -> str:
 
 
 BILLING_PRECEDENCE = ("unknown", "pending", "reconciled", "settled", "released")
-PAID_MODES = ("single", "compare")
+PAID_MODES = ("single", "compare", "corpus")
 FREE_MODES = ("metadata", "inventory")
 
 
@@ -618,11 +662,20 @@ def _evidence_map(evidence: list[EvidenceUnit]) -> dict[str, dict]:
 
 def prepare_answer(res: Resources, principal: Principal, question: str, scope: list[DocRef], as_of: str, *,
                    request_id: str | None = None, allow_paid: bool = False, mode: str | None = None,
-                   limits: dict | None = None) -> dict:
+                   limits: dict | None = None, all_documents: bool = False) -> dict:
     """Retrieval plus exact prompt counting and the maximum reservation estimate. Free unless `allow_paid`
     lets a dense mode pay for an uncached query embedding. `mode`/`limits` come from a frozen verifier
-    configuration."""
+    configuration. With `all_documents` the prompt names only the documents whose passages were retrieved."""
     principal = _authorize(res, principal, "consultant", "verifier")
+    if all_documents:
+        retrieval = retrieve(res, principal, question, [], request_id=request_id, allow_paid=allow_paid, mode=mode,
+                             limits=limits, all_documents=True)
+        cited = [e.doc_id for e in retrieval.evidence]
+        order = list(dict.fromkeys(cited))
+        docs = sorted(_doc_rows(res, order), key=lambda d: order.index(d["doc_id"]))
+        prep = _priced(res, question, as_of, docs, retrieval, "corpus")
+        prep["coverage"] = [{"doc_id": d, "evidence": cited.count(d)} for d in order]
+        return prep
     docs = _resolve_scope(res, scope)
     retrieval = retrieve(res, principal, question, scope, request_id=request_id, allow_paid=allow_paid, mode=mode,
                          limits=limits)
@@ -676,6 +729,10 @@ def _validate_request(res: Resources, request: AnswerRequest) -> str:
     refs = [(r.doc_id, r.source_hash) for r in request.scope]
     if len(set(refs)) != len(refs):
         raise ServiceError("같은 문서를 두 번 선택했습니다.")
+    if request.mode == "corpus" and refs:
+        raise ServiceError("전체 문서 질문은 문서를 선택하지 않습니다.")
+    if request.mode != "corpus" and not 1 <= len(refs) <= 2:
+        raise ServiceError("문서를 한두 개 선택하거나 전체 문서로 질문하세요.")
     if request.mode == "compare" and len(refs) != 2:
         raise ServiceError("비교 질문은 문서를 정확히 두 개 선택해야 합니다.")
     if request.mode == "metadata" and not 1 <= len(refs) <= 2:
@@ -694,7 +751,7 @@ def _request_snapshot(principal: Principal, request: AnswerRequest, question: st
 
 
 def _create(res: Resources, principal: Principal, request: AnswerRequest, question: str, status: str,
-            before_insert=None) -> tuple[str, sqlite3.Row | None]:
+            before_insert=None) -> tuple[str, Row | None]:
     """Persists the input snapshot under its idempotency key in one short transaction. Returns (request_id, prior
     row) where a prior row means this key already exists with the same input."""
     input_hash = _input_hash(request)
@@ -880,11 +937,11 @@ def _trace_outcome(root: tracing.Step, result: AnswerResult, trace: dict) -> Non
 def _paid_answer(res: Resources, principal: Principal, request_id: str, request: AnswerRequest, question: str,
                  trace: dict, done) -> AnswerResult:
     s = res.settings
-    docs = _resolve_scope(res, request.scope)
+    docs = [] if request.mode == "corpus" else _resolve_scope(res, request.scope)
     unavailable = [d for d in docs if d["parse_status"] != "parsed" or not _indexed(res, d["active_extraction_id"])]
     missing_unavailable = [{"doc_id": d["doc_id"], "field": "document", "reason": "ingestion_unavailable"}
                            for d in unavailable]
-    if len(unavailable) == len(docs):
+    if docs and len(unavailable) == len(docs):
         reason = QUARANTINE_TEXT.get(unavailable[0]["reason_code"] or "",
                                      "이 문서는 아직 검색 색인에 포함되지 않았습니다.")
         return done("ingestion_unavailable", f"원문 전체를 확인할 수 없어 답변하지 않습니다. {reason}",
@@ -898,6 +955,10 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
             prep = _frozen_prep(res, question, request, docs, frozen)
         elif request.mode == "compare":
             prep = _prepare_compare(res, principal, question, docs, request.as_of, request_id)
+        elif request.mode == "corpus":
+            prep = prepare_answer(res, principal, question, [], request.as_of, request_id=request_id,
+                                  allow_paid=True, all_documents=True)
+            docs = prep["docs"]
         else:
             prep = prepare_answer(res, principal, question, request.scope, request.as_of, request_id=request_id,
                                   allow_paid=True)
@@ -921,7 +982,8 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
     evidence_map = _evidence_map(retrieval.evidence)
     common = {"coverage": coverage, "limitations": retrieval.limitations}
     if not retrieval.evidence:
-        return done("insufficient_evidence", "선택한 문서에서 질문과 관련된 근거를 찾지 못했습니다.",
+        where = "전체 문서" if request.mode == "corpus" else "선택한 문서"
+        return done("insufficient_evidence", f"{where}에서 질문과 관련된 근거를 찾지 못했습니다.",
                     missing_fields=server_missing, **common)
     principal = _checkpoint(res, request_id, principal)
     admission = budget.reserve(s.db_path, request_id=request_id, member_id=principal.member_id, stage="generation",
@@ -1193,7 +1255,7 @@ def requirement_inventory(res: Resources, doc: dict) -> dict:
 # ---------------------------------------------------------------- request status, listing and cancellation
 
 
-def _view(conn, row: sqlite3.Row) -> RequestView:
+def _view(conn, row: Row) -> RequestView:
     attempts, billing = _billing(conn, row["request_id"])
     snap = json.loads(row["request_json"]) if row["request_json"] else {}
     open_states = ("reserved", "dispatching", "unknown")
@@ -1886,6 +1948,7 @@ def gold_awaiting_second_review(res: Resources, principal: Principal) -> list[di
 # ---------------------------------------------------------------- phase 4: development answer evaluation
 
 _EVAL_JOBS: dict[str, threading.Thread] = {}
+_JUDGE_JOBS: dict[str, threading.Thread] = {}  # judge comparison parts; never alongside an answer evaluation
 _EVAL_LOCK = threading.Lock()
 
 
@@ -1956,28 +2019,115 @@ def start_answer_evaluation(res: Resources, principal: Principal, estimate_id: s
         est = answers.load_estimate(res.settings, estimate_id)
         if est["action"] != "answer-finalists":
             raise ServiceError("검증 화면에서는 개발 질문 평가만 실행할 수 있습니다. 봉인 평가는 소유자 CLI로 실행합니다.")
-        answers.recheck(res.settings, est)
     except answers.AnswerEvalError as exc:
         raise ServiceError(str(exc)) from None
-    if res.transport is None or res._closed:
-        raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
     with _EVAL_LOCK:
-        if any(t.is_alive() for t in _EVAL_JOBS.values()):
-            raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
+        _refuse_closed_or_busy(res)
+        try:  # published before the start returns, so the overview lists the run on its very next read
+            begun = answers.begin_answers(res.settings, estimate_id, principal.member_id)
+        except answers.AnswerEvalError as exc:
+            raise ServiceError(str(exc)) from None
+        run_id = begun["run_id"]
 
         def job() -> None:
             try:
-                answers.run_answers(res.settings, res, estimate_id, principal.member_id)
+                answers.run_answers(res.settings, res, estimate_id, principal.member_id, begun=begun)
             except Exception as exc:  # noqa: BLE001 - recorded for the overview; rows already finished stay
                 from .store import write_text_atomic
 
-                write_text_atomic(answers.run_dir(res.settings, est["run_id"]) / "last-error.txt",
+                write_text_atomic(answers.run_dir(res.settings, run_id) / "last-error.txt",
                                   f"{type(exc).__name__}: {exc}"[:500])
 
-        thread = threading.Thread(target=job, name=f"rfp-eval-{est['run_id']}", daemon=True)
-        _EVAL_JOBS[est["run_id"]] = thread
+        _start_job(res, _EVAL_JOBS, run_id, threading.Thread(target=job, name=f"rfp-eval-{run_id}", daemon=True))
+    return run_id
+
+
+def _refuse_closed_or_busy(res: Resources) -> None:
+    if res.transport is None or res._closed:
+        raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
+    if any(t.is_alive() for t in [*_EVAL_JOBS.values(), *_JUDGE_JOBS.values()]):
+        raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
+
+
+def _start_job(res: Resources, jobs: dict[str, threading.Thread], run_id: str, thread: threading.Thread) -> None:
+    """Registers and starts a paid background job; called under `_EVAL_LOCK` after its run was published."""
+    with res._runner_lock:  # close() must see and join every thread that uses its transport
+        if res.transport is None or res._closed:  # the run stays listed as partial; rerunning resumes it
+            raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
+        jobs[run_id] = thread
+        res._jobs.append(thread)
         thread.start()
-    return est["run_id"]
+
+
+# ---------------------------------------------------------------- judge comparison (judges.py)
+
+def _judge_running() -> set[str]:
+    return {run_id for run_id, t in _JUDGE_JOBS.items() if t.is_alive()}
+
+
+def _judge_call(fn, *args):
+    from . import answers, judges
+
+    try:
+        return fn(*args)
+    except (judges.JudgeError, answers.AnswerEvalError, budget.BudgetError) as exc:
+        raise ServiceError(str(exc)) from None
+
+
+def judge_overview(res: Resources, principal: Principal) -> dict:
+    """The judge reference, its split, the declared replacement rule and every judge run with its progress."""
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    return _judge_call(judges.overview, res.settings, _judge_running())
+
+
+def plan_judges(res: Resources, principal: Principal, part: str) -> dict:
+    """Free: prices every translation and Luna judge call a part still needs, and counts the Jev calls."""
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    return _judge_call(judges.plan, res.settings, part)
+
+
+def start_judges(res: Resources, principal: Principal, estimate_id: str) -> str:
+    """Runs a planned judge comparison part on this process's gateway in one background thread, never above the
+    estimate the verifier consented to. One evaluation or comparison at a time; rerunning resumes."""
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    with _EVAL_LOCK:
+        _refuse_closed_or_busy(res)
+        # published before the start returns, so the overview lists the run on its very next read
+        begun = _judge_call(judges.begin, res.settings, estimate_id, principal.member_id)
+        run_id = begun["run_id"]
+
+        def job() -> None:
+            try:
+                judges.run(res.settings, res.transport, estimate_id, principal.member_id,
+                           closing=lambda: res._closed, begun=begun)
+            except Exception as exc:  # noqa: BLE001 - recorded for the overview; finished judgements stay
+                from .store import write_text_atomic
+
+                write_text_atomic(judges.run_dir(res.settings, run_id) / "last-error.txt",
+                                  f"{type(exc).__name__}: {exc}"[:500])
+
+        _start_job(res, _JUDGE_JOBS, run_id, threading.Thread(target=job, name=f"rfp-judge-{run_id}", daemon=True))
+    return run_id
+
+
+def judge_results(res: Resources, principal: Principal, run_id: str) -> dict:
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    return _judge_call(judges.results, res.settings, run_id)
+
+
+def judge_disagreements(res: Resources, principal: Principal, run_id: str) -> list[dict]:
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    return _judge_call(judges.disagreements, res.settings, run_id)
 
 
 def fidelity_overview(res: Resources, principal: Principal) -> list[dict]:
@@ -1988,7 +2138,9 @@ def fidelity_overview(res: Resources, principal: Principal) -> list[dict]:
             "SELECT s.source_hash, s.review_status, MIN(d.filename) AS filename, f.metrics_json, f.findings_json "
             "FROM sources s JOIN documents d ON d.active_source_hash = s.source_hash "
             "LEFT JOIN fidelity_checks f ON f.extraction_id = s.active_extraction_id AND f.method = ? "
-            "WHERE s.format = 'hwp' GROUP BY s.source_hash ORDER BY filename", (fidelity.FIDELITY_VERSION,)).fetchall()
+            # at most one check per (extraction, method), so grouping by its columns is exact; PostgreSQL requires it
+            "WHERE s.format = 'hwp' GROUP BY s.source_hash, s.review_status, f.metrics_json, f.findings_json "
+            "ORDER BY filename", (fidelity.FIDELITY_VERSION,)).fetchall()
     return [{"source_hash": r["source_hash"], "filename": r["filename"], "review_status": r["review_status"],
              "metrics": json.loads(r["metrics_json"]) if r["metrics_json"] else None,
              "findings": json.loads(r["findings_json"]) if r["findings_json"] else []} for r in rows]
@@ -2370,7 +2522,7 @@ def start_drafting(res: Resources, principal: Principal, slots: list[dict], cons
 
         thread = threading.Thread(target=job, name=f"rfp-{run_id}", daemon=True)
         _DRAFT_JOBS[run_id] = thread
-        res._draft_jobs.append(thread)
+        res._jobs.append(thread)
         thread.start()
     return run_id
 

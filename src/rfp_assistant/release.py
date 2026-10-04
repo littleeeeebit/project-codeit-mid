@@ -1,25 +1,23 @@
-"""Consistent backup, paid-disabled staged restore check, and the read-only phase-4 release report.
+"""Consistent backup, paid-disabled isolated restore check, and the read-only phase-4 release report.
 
-`backup` snapshots the live SQLite ledger with the online backup API (WAL-safe), copies the small mutable trees
-(datasets, sealed, runs, releases) and records the hashes of the immutable artifacts they reference. `restore_check`
-restores into a fresh staging directory, forces paid generation off, and proves that settled, prior-use and pending
-amounts, the active index and the source extractions all come back unchanged. `write_release_report` only reads
-recorded evidence: it never generates an answer or calls a provider.
+`backup` writes a PostgreSQL custom-format dump plus the small mutable trees (datasets, sealed, runs, releases) and
+records table digests, the ledger and the hashes of the immutable artifacts they reference (postgres_backup.py).
+`restore_check` restores the dump into an empty isolated database with paid admission off and proves that tables,
+settled, prior-use and pending amounts, the active index and the source extractions all come back unchanged; it is
+the documented rollback. `write_release_report` only reads recorded evidence: it never generates an answer or calls
+a provider.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-import shutil
-import sqlite3
-import tempfile
 from dataclasses import asdict
 from pathlib import Path
 
 from . import budget, evaluation, generation, ingestion
 from .settings import REPO_ROOT, Settings
-from .store import SCHEMA_VERSION, get_app_setting, open_db, utcnow, write_text_atomic
+from .store import get_app_setting, open_db, utcnow, write_text_atomic
 
 COPIED_TREES = ("datasets", "sealed", "runs", "releases")
 MAX_COPY_BYTES = 512 * 1024 * 1024  # the mutable trees are small; refuse to copy a mistaken multi-GB folder
@@ -35,11 +33,6 @@ def _sha_file(path: Path) -> str:
         for block in iter(lambda: f.read(1 << 20), b""):
             h.update(block)
     return h.hexdigest()
-
-
-def _inside(a: Path, b: Path) -> bool:
-    a, b = a.resolve(), b.resolve()
-    return a == b or b in a.parents
 
 
 def ledger_summary(db: Path) -> dict:
@@ -63,169 +56,40 @@ def ledger_summary(db: Path) -> dict:
             "frozen_reason": snap.frozen_reason}
 
 
-def _referenced(settings: Settings, db: Path) -> dict:
-    """Immutable artifacts the ledger and datasets point at, with their hashes."""
-    with open_db(db) as conn:
-        indexes = [dict(r) for r in conn.execute("SELECT index_version, manifest_path, manifest_hash, state, "
-                                                 "config_json FROM indexes ORDER BY created_at")]
-        extractions = [dict(r) for r in conn.execute(
-            "SELECT s.source_hash, s.active_extraction_id AS extraction_id, e.artifact_path FROM sources s "
-            "JOIN extractions e ON e.extraction_id = s.active_extraction_id ORDER BY s.source_hash")]
-        active_index = get_app_setting(conn, "active_index")
-        active_run = get_app_setting(conn, "active_run")
-
-    def rel(p: str) -> str:
-        path = Path(p)
-        return str(path.relative_to(settings.data_dir)) if _inside(path, settings.data_dir) else str(path)
-
-    return {"active_index": active_index, "active_run": json.loads(active_run) if active_run else None,
-            "indexes": [{"index_version": i["index_version"], "state": i["state"], "manifest": rel(i["manifest_path"]),
-                         "manifest_hash": i["manifest_hash"],
-                         "kind": json.loads(i["config_json"]).get("kind", "keyword")} for i in indexes],
-            "extractions": [{"source_hash": x["source_hash"], "extraction_id": x["extraction_id"],
-                             "artifact": rel(x["artifact_path"]),
-                             "sha256": _sha_file(Path(x["artifact_path"])) if Path(x["artifact_path"]).exists()
-                             else None} for x in extractions]}
-
-
 def backup(settings: Settings, destination: Path, actor: str) -> dict:
-    """Owner backup to an absolute directory outside the runtime and sources. Original state is not modified."""
-    from .postgres import Target
-    if isinstance(settings.db_path, Target):
-        from .postgres_backup import backup as pg_backup
-        return pg_backup(settings, destination, actor)
+    """Owner backup (pg_dump custom format plus the mutable trees) to an absolute directory outside the runtime
+    and sources. Original state is not modified."""
+    from .postgres_backup import backup as pg_backup
+
     if not destination.is_absolute():
         raise ReleaseError("--destination must be an absolute directory")
-    for live in (settings.data_dir, settings.source_dir):
-        if _inside(destination, live) or _inside(live, destination):
-            raise ReleaseError(f"the destination overlaps {live}; choose a directory outside the runtime and sources")
-    if destination.exists() and any(destination.iterdir()):
-        raise ReleaseError("the destination is not empty; each backup gets a new directory")
     copy_bytes = sum(p.stat().st_size for t in COPIED_TREES if (settings.data_dir / t).exists()
                      for p in (settings.data_dir / t).rglob("*") if p.is_file())
     if copy_bytes > MAX_COPY_BYTES:
         raise ReleaseError(f"the mutable trees hold {copy_bytes} bytes, more than expected; inspect them first")
-    destination.mkdir(parents=True, exist_ok=True)
-    db_copy = destination / "rfp.sqlite3"
-    src = sqlite3.connect(settings.db_path)
-    dst = sqlite3.connect(db_copy)
     try:
-        src.backup(dst)  # consistent snapshot including committed WAL frames
-    finally:
-        dst.close()
-        src.close()
-    copied = {}
-    for tree in COPIED_TREES:
-        root = settings.data_dir / tree
-        for path in sorted(root.rglob("*")) if root.exists() else []:
-            if path.is_file() and not path.name.startswith("."):
-                rel = path.relative_to(settings.data_dir)
-                target = destination / "files" / rel
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(path, target)
-                copied[str(rel).replace("\\", "/")] = _sha_file(target)
-    manifest = {"backup_version": "backup-1", "created_at": utcnow(), "actor": actor, "schema_version": SCHEMA_VERSION,
-                "data_dir_name": settings.data_dir.name, "db_sha256": _sha_file(db_copy),
-                "ledger": ledger_summary(db_copy), "copied": copied, "referenced": _referenced(settings, db_copy),
-                "code": evaluation.code_fingerprint(),
-                "secrets": "not included: OPENAI_API_KEY and .env are backed up separately by the owner"}
-    path = destination / "manifest.json"
-    write_text_atomic(path, json.dumps(manifest, ensure_ascii=False, indent=1))
+        result = pg_backup(settings, destination, actor)
+    except ValueError as exc:  # an unsafe destination (overlap, non-empty) or a non-dedicated schema
+        raise ReleaseError(str(exc)) from None
     evaluation.record_audit(settings, actor, "backup", str(destination.name), "owner backup",
-                            {"db_sha256": manifest["db_sha256"], "files": len(copied),
-                             "spent_micro_usd": manifest["ledger"]["spent_micro_usd"],
-                             "pending_micro_usd": manifest["ledger"]["pending_micro_usd"]})
-    return {"manifest": str(path), "db_sha256": manifest["db_sha256"], "files": len(copied),
-            "ledger": manifest["ledger"]}
+                            {"tables": result["tables"], "spent_micro_usd": result["ledger"]["spent_micro_usd"],
+                             "pending_micro_usd": result["ledger"]["pending_micro_usd"]})
+    return result
 
 
 def restore_check(settings: Settings, manifest_path: Path, staging: Path | None = None) -> dict:
-    """Restores the backup into a fresh staging directory with paid generation off and the fake provider, then
-    compares the ledger amounts, the copied files and the referenced artifacts with the manifest. Nothing in the
-    live runtime is changed and no provider is contacted."""
-    if json.loads(manifest_path.read_text(encoding="utf-8")).get("backup_version") == "postgresql-backup-1":
-        from .postgres_backup import restore_check as pg_restore_check
-        return pg_restore_check(settings, manifest_path, staging)
-    from . import dense
-    from .retrieval import KeywordIndex
+    """Restores the PostgreSQL dump into the empty isolated database named by RFP_RESTORE_DATABASE_DSN with paid
+    admission off and the fake provider, then compares tables, ledger, copied files and referenced artifacts with
+    the manifest. Nothing in the live database is changed and no provider is contacted. This is the rollback."""
+    from .postgres_backup import restore_check as pg_restore_check
 
     if not manifest_path.is_absolute() or not manifest_path.exists():
         raise ReleaseError("--backup must be the absolute path of a backup's manifest.json")
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    src_dir = manifest_path.parent
-    if staging is None:
-        staging = Path(tempfile.mkdtemp(prefix="rfp-restore-"))
-    elif not staging.is_absolute() or (staging.exists() and any(staging.iterdir())):
-        raise ReleaseError("--staging must be an absolute, empty or new directory")
-    if _inside(staging, settings.data_dir) or _inside(settings.data_dir, staging):
-        raise ReleaseError("staging must be outside the live runtime directory")
-    staging.mkdir(parents=True, exist_ok=True)
-    checks: dict[str, dict] = {}
-
-    def check(name: str, ok: bool, detail) -> None:
-        checks[name] = {"ok": bool(ok), "detail": detail}
-
-    db = staging / "rfp.sqlite3"
-    shutil.copy2(src_dir / "rfp.sqlite3", db)
-    check("database copy hash", _sha_file(db) == manifest["db_sha256"], manifest["db_sha256"][:16])
-    with open_db(db) as conn:
-        version = conn.execute("PRAGMA user_version").fetchone()[0]
-        conn.execute("UPDATE budget_settings SET paid_enabled = 0 WHERE id = 1")  # staging never spends
-    check("schema version", version == manifest["schema_version"], version)
-    restored = ledger_summary(db)
-    for key in ("spent_micro_usd", "pending_micro_usd", "unknown_micro_usd", "available_micro_usd",
-                "prior_use_micro_usd", "adjustments", "attempts_by_state", "allowance_micro_usd", "cap_micro_usd",
-                "requests", "last_reconciliation"):
-        check(f"ledger {key}", restored[key] == manifest["ledger"][key],
-              {"backup": manifest["ledger"][key], "restored": restored[key]})
-    check("staging paid generation off", restored["paid_enabled"] is False,
-          {"backup_paid_enabled": manifest["ledger"]["paid_enabled"]})
-    # What a real recovery would then do: unresolved calls stay conservatively pending, never replayed.
-    recovered_db = staging / "recovery-preview.sqlite3"
-    shutil.copy2(db, recovered_db)
-    recovered = budget.recover(recovered_db)
-    after = ledger_summary(recovered_db)
-    held = sum(v["reserved_micro_usd"] for s, v in manifest["ledger"]["attempts_by_state"].items()
-               if s in ("dispatching", "unknown"))
-    check("restart recovery keeps unknown reserves", after["unknown_micro_usd"] == held,
-          {"recovered": recovered, "unknown_after_micro_usd": after["unknown_micro_usd"]})
-    bad = []
-    for rel, sha in manifest["copied"].items():
-        target = staging / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src_dir / "files" / rel, target)
-        if _sha_file(target) != sha:
-            bad.append(rel)
-    check("copied datasets, sealed files, runs and releases", not bad, {"files": len(manifest["copied"]),
-                                                                       "mismatched": bad})
-    staged = Settings(database_backend="sqlite", source_dir=settings.source_dir, data_dir=staging,
-                      hwp_converter=None, provider="fake")
-    ref = manifest["referenced"]
-    missing = [x["extraction_id"] for x in ref["extractions"]
-               if x["sha256"] is None or not (settings.data_dir / x["artifact"]).exists()
-               or _sha_file(settings.data_dir / x["artifact"]) != x["sha256"]]
-    check("source extraction artifacts", not missing, {"extractions": len(ref["extractions"]), "mismatched": missing})
-    index_ok, detail = True, {}
-    if ref["active_index"]:
-        try:
-            idx = KeywordIndex.load(staged, ref["active_index"])  # the staged rows point at the immutable files
-            detail = {"active_index": idx.version, "chunks": len(idx.chunks)}
-            dense_version = (ref.get("active_run") or {}).get("dense_version")
-            if dense_version:
-                d = dense.DenseIndex.load(staged, dense_version, base=idx)
-                detail["dense"] = {"version": d.version, "rows": d.matrix.shape[0]}
-        except Exception as exc:  # noqa: BLE001 - reported, not raised
-            index_ok, detail = False, f"{type(exc).__name__}: {exc}"[:300]
-    check("active index and row mapping", index_ok, detail)
-    passed = all(c["ok"] for c in checks.values())
-    report = {"restore_check_version": "restore-check-1", "checked_at": utcnow(), "backup": str(manifest_path),
-              "staging": str(staging), "provider": "fake", "paid_enabled": False, "passed": passed, "checks": checks,
-              "restored_ledger": restored, "after_restart_recovery": after}
-    write_text_atomic(staging / "restore-check.json", json.dumps(report, ensure_ascii=False, indent=1))
+    report = pg_restore_check(settings, manifest_path, staging)
     stamp = utcnow()[:19].replace(":", "")
-    write_text_atomic(src_dir / f"restore-check-{stamp}.json", json.dumps(report, ensure_ascii=False, indent=1))
-    summary = {k: report[k] for k in ("checked_at", "backup", "passed", "restored_ledger")}
-    summary["failed_checks"] = [k for k, c in checks.items() if not c["ok"]]
+    summary = {"checked_at": report["checked_at"], "backup": str(manifest_path), "passed": report["passed"],
+               "restored_ledger": report["restored_ledger"],
+               "failed_checks": [k for k, ok in report["checks"].items() if not ok]}
     write_text_atomic(settings.data_dir / "releases" / "restore-checks" / f"{stamp}.json",
                       json.dumps(summary, ensure_ascii=False, indent=1))
     return report
@@ -319,8 +183,11 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
         unresolved = conn.execute("SELECT COUNT(*) FROM attempts WHERE state IN ('reserved', 'dispatching', 'unknown')"
                                   ).fetchone()[0]
         history = json.loads(conn.execute("SELECT history_json FROM budget_settings WHERE id = 1").fetchone()[0])
-    active = json.loads(active_run) if active_run else None
-    snap = budget.snapshot(settings.db_path)
+    active = json.loads(active_run) if active_run else None  # the stored activation; `now` is what requests serve
+    from .service import active_serving, describe_serving
+
+    now = active_serving(settings)
+    snap =budget.snapshot(settings.db_path)
     manifest_rep = ingestion.manifest_report(settings)
     coverage = ingestion.review_coverage(settings)
     identity = ingestion.identity_report(settings)
@@ -382,11 +249,13 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
         run = next((r for r in retrieval_runs if r["run_id"] == active["run_id"] and not r.get("blocking")), None)
         served = {"single_evidence": {"hit@20": run.get("hit@20")}, "multi_evidence": {
             "complete@20": run.get("complete@20")}} if run else {}
+    if now.get("fallback_reason"):
+        stale.append(describe_serving(now))
     lat = None
     for x in reversed(latency):
         if not x or x.get("provider") != "real":
             continue
-        if (x.get("serving") or {}).get("run_id") != (active or {}).get("run_id") or \
+        if (x.get("serving") or {}).get("run_id") != now.get("run_id") or \
                 (x.get("code") or {}).get("source_sha256") != current_code:
             stale.append(f"latency sample {x.get('run_id')}: recorded for another serving run or package source")
             continue
@@ -450,7 +319,7 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
         "settings_fingerprint": settings.fingerprint(), "model": settings.generation_model,
         "reasoning_effort": settings.generation_reasoning_effort,
         "max_output_tokens": settings.generation_max_output_tokens, "prompt_version": generation.PROMPT_VERSION,
-        "rate_version": history[-1].get("rate_version") if history else None, "active_run": active,
+        "rate_version": history[-1].get("rate_version") if history else None, "active_run": active, "serving": now,
         "active_index": active_index, "datasets": {n: {k: (frozen[n] or {}).get(k) for k in (
             "dataset_sha256", "rows", "label", "review_log_sha256", "current")} for n in ("dev", "test")},
         "requirements_lock_sha256": _sha_file(lock) if lock.exists() else None, "hardware": evaluation.hardware(),
@@ -498,9 +367,9 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
           f"- model {settings.generation_model}, reasoning {settings.generation_reasoning_effort}, output cap "
           f"{settings.generation_max_output_tokens}, prompt {release_manifest['prompt_version']}, rates "
           f"{release_manifest['rate_version']}, settings `{release_manifest['settings_fingerprint']}`",
-          f"- serving: {('run `' + active['run_id'] + '` (' + active['mode'] + ')') if active else 'keyword default (kiwi_bm25), no activated run'}, "
-          f"keyword index `{active_index}`, dense `{(active or {}).get('dense_version')}`, reranker "
-          f"{(active or {}).get('reranker')}; fallback kiwi_bm25",
+          f"- serving: {describe_serving(now)}, "
+          f"keyword index `{active_index}`, dense `{now.get('dense_version')}`, reranker "
+          f"{now.get('reranker')}; fallback kiwi_bm25",
           f"- dependencies: requirements-lock.txt `{(release_manifest['requirements_lock_sha256'] or '')[:16]}`; "
           f"hardware {release_manifest['hardware']}",
           f"- freeze: {release_manifest['freeze'] or 'none (draft release)'}", "",
