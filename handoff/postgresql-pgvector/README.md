@@ -302,6 +302,8 @@ python tools/check_large_quality.py --out "$PWD/.runtime/postgresql-migration/cu
 python tools/check_large_quality.py --out "$PWD/.runtime/postgresql-migration/cutover/quality-01" --run --max-cost-usd 0.13
 # Verified cached repeat: no additional provider calls, same failed acceptance result.
 python tools/check_large_quality.py --out "$PWD/.runtime/postgresql-migration/cutover/quality-01" --run --max-cost-usd 0
+# Re-measurement on a compatible, unactivated keyword index (see below).
+python tools/check_large_quality.py --out "$PWD/.runtime/postgresql-migration/cutover/quality-02" --index-version 29f261abafeb1f8c --run --max-cost-usd 0.01
 python -m unittest tests.test_large_quality -q
 ```
 
@@ -309,7 +311,25 @@ The command returns 1 for failed acceptance. It refuses changed/unreviewed devel
 
 Quality review round 1 added three pre-dispatch refusals. A keyword index built under another analyzer or query policy is rejected through `retrieval.index_compatibility` (the standard evaluator already did this). Every frozen passage row must have each of its scopes in the active keyword index. A scope missing from the index ranks empty for candidate, reference and lexical alike, so it could pass without being measured. The paired-shortening probe now reads its eight candidate vectors from the verified ready set: the SQLite matrix, or pgvector rows with checksums. It no longer reads the mutable cache, so a cache gap cannot crash the run after paid reference batches.
 
-A free plan-only rerun against the live data found that the analyzer guard applies to the recorded result. The 2026-10-04 comparison used keyword index `62bea0c9c27ad3e7` (manifest `a1ea4e92…`). `index_compatibility` rejects that index because it predates the frozen title/institution snapshot. Serving marks it `index_outdated` too. The frozen scopes, however, pass the new guard: all 9 scopes of the 55 rows are indexed, with zero reference misses. The table above is therefore a record of what was run, not a valid acceptance measurement. Re-measuring needs a rebuilt keyword index, a dense set rebuilt on that index, and a rerun of the comparison. Until then the candidate remains unaccepted and cutover remains blocked.
+A free plan-only rerun against the live data found that the analyzer guard applies to the recorded result. The 2026-10-04 comparison used keyword index `62bea0c9c27ad3e7` (manifest `a1ea4e92…`). `index_compatibility` rejects that index because it predates the frozen title/institution snapshot. Serving marks it `index_outdated` too. The frozen scopes, however, pass the new guard: all 9 scopes of the 55 rows are indexed, with zero reference misses. The table above is therefore a record of what was run, not a valid acceptance measurement.
+
+The comparison was re-measured on 2026-10-04 without moving the serving pointer:
+
+- `build-keyword --include-unreviewed --no-activate` built index `29f261abafeb1f8c` (manifest `60ce3b43…`). It has the same review scope and structural profile, 98 sources and 18,983 chunks. The active pointer stays `62bea0c9c27ad3e7`.
+- `plan-embeddings` produced estimate `745bc0f0a4a3`. `build-dense` then embedded 53 uncached payloads (4,620 micro-USD settled) to build ready set `d0973ac11268198d`.
+- `check_large_quality.py --index-version 29f261abafeb1f8c --run --max-cost-usd 0.01` embedded 2 missing reference payloads (96 micro-USD) and needed no new query vectors. The run used the same frozen population (dataset `a3b4d5cc…`, 55 rows).
+
+The report is in `quality-02`. Both channels still fail acceptance:
+
+| Retrieval | nDCG@5 | Packed complete support | New critical failures versus native / lexical |
+| --- | --- | --- | --- |
+| Current lexical K1 | 0.9405 | 53/55 (96.36%) | Baseline |
+| Large 1,536 dense | 0.6547 | 37/55 (67.27%) | 1 / 16 |
+| Native-large dense reference | 0.6448 | 38/55 (69.09%) | Reference |
+| Large 1,536 hybrid | 0.8863 | 53/55 (96.36%) | 0 / 2 |
+| Native-large hybrid reference | 0.8886 | 53/55 (96.36%) | Reference |
+
+The compatible index mainly lifts the lexical baseline: K1 rises from 0.8168 to 0.9405. Hybrid now matches its native control on every native check, with zero new critical failures. It still fails the zero-new-critical-failure rule against K1 on `refresh50-b-training-handover` and `refresh50-eg-input-error`. Dense keeps one new failure versus native (`refresh50-b-quality`) and 16 versus K1. All comparisons had zero wrong-scope candidates and no fallback. The eight paired shortening probes again gave a minimum cosine of 0.99999988 and a maximum absolute difference of 0.00006018. The candidate remains unaccepted and cutover remains blocked. Activating `29f261abafeb1f8c` for serving is a separate decision; it would also clear the live `index_outdated` limitation.
 
 Private receipts are under `.runtime/postgresql-migration/cutover/`: pre-label backup location, original page render/hash inventory, model calls and invalid materializations, frozen development manifest, quality plan, five trace files and `quality-01/quality.json`. The latter includes separate gates, trace hashes, candidate vector-content hash, measured billing and the original estimate. Source text, labels, vector caches, databases and credentials remain outside Git.
 

@@ -99,7 +99,7 @@ def ceiling_guard(conn, request_id, previous, maximum):
     return None
 
 
-def prepare(settings, analyzer=None):
+def prepare(settings, analyzer=None, index_version=None):
     if (settings.embedding_model, settings.embedding_dimensions) != ("text-embedding-3-large", 1536):
         raise ValueError("serving candidate is fixed at text-embedding-3-large/1536")
     frozen = evaluation.frozen_dataset(settings, "dev")
@@ -111,7 +111,7 @@ def prepare(settings, analyzer=None):
     rows, skipped, dataset_sha = evaluation.load_eval_rows(settings, "dev")
     if skipped or len(rows) != frozen["rows"]:
         raise ValueError("every frozen development row must remain eligible")
-    index = KeywordIndex.load(settings)
+    index = KeywordIndex.load(settings, index_version)  # default: the active pointer
     outdated = index_compatibility(index, analyzer)
     if outdated:
         raise ValueError(outdated)
@@ -167,8 +167,9 @@ def prepare(settings, analyzer=None):
     return plan, rows, skipped, index, candidate, reference, covered, batches
 
 
-def run(settings, resources, out, max_cost_micro):
-    plan, rows, skipped, index, candidate, ref_settings, covered, batches = prepare(settings, resources.analyzer)
+def run(settings, resources, out, max_cost_micro, index_version=None):
+    plan, rows, skipped, index, candidate, ref_settings, covered, batches = prepare(settings, resources.analyzer,
+                                                                                   index_version)
     probe = candidate_vectors(settings, candidate, index, list({p["payload_hash"]: p for p in covered}.values())[:8])
     if not plan["fits_envelopes"] or plan["corpus_max_micro_usd"] + plan["query_max_micro_usd"] > max_cost_micro:
         raise ValueError("reference/query estimate exceeds the existing envelopes or explicit ceiling")
@@ -255,6 +256,8 @@ def main():
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--run", action="store_true")
     parser.add_argument("--max-cost-usd", default="0")
+    parser.add_argument("--index-version", help="keyword index to compare on (default: the active one); "
+                        "lets a rebuilt, unactivated index be measured without moving the serving pointer")
     args = parser.parse_args()
     if not args.out.is_absolute():
         parser.error("--out must be an absolute private directory")
@@ -264,11 +267,11 @@ def main():
         parser.error("private comparison artifacts in this checkout must stay inside RFP_DATA_DIR")
     if args.run:
         with closing(service.Resources(settings, recover=True)) as resources:
-            report = run(settings, resources, args.out, int(Decimal(args.max_cost_usd) * 1_000_000))
+            report = run(settings, resources, args.out, int(Decimal(args.max_cost_usd) * 1_000_000), args.index_version)
             print(json.dumps({"passed": report["passed"], "gates": report["gates"], "report": str(args.out / "quality.json")}))
             return 0 if report["passed"] else 1
     with store.database_lifecycle(settings.db_path):
-        plan = prepare(settings)[0]
+        plan = prepare(settings, index_version=args.index_version)[0]
         store.write_text_atomic(args.out / "plan.json", store.dumps(plan))
         print(json.dumps({k: v for k, v in plan.items() if k != "frozen"}))
         return 0
