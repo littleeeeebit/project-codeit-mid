@@ -908,7 +908,7 @@ def _ready_dense_for(settings: Settings, index_version: str) -> str | None:
 
 def _frozen_config(settings: Settings, label: str, dataset: str, dataset_sha: str, index, dense, analyzer,
                    extra: dict | None = None, population: tuple[str, int] | None = None) -> dict:
-    from .retrieval import ROUTE_MAX, ROUTE_RULE, ROUTE_SHARE, RUN_MODES, WhitespaceAnalyzer, analyzer_fingerprint
+    from .retrieval import RUN_MODES, WhitespaceAnalyzer, analyzer_fingerprint, corpus_route_record
 
     return {"eval_version": EVAL_VERSION, "label": label, "mode": RUN_MODES[label], "dataset": dataset,
             "dataset_sha256": dataset_sha, "population_sha256": population[0] if population else None,
@@ -921,7 +921,7 @@ def _frozen_config(settings: Settings, label: str, dataset: str, dataset_sha: st
             "limits": {"channel_top_k": settings.channel_top_k, "fused_top_k": settings.fused_top_k,
                        "rrf_k": settings.rrf_k, "fusion": settings.fusion, "dense_weight": settings.dense_weight,
                        "keyword_head": settings.keyword_head,
-                       "corpus_route": {"share": ROUTE_SHARE, "max": ROUTE_MAX, "rule": ROUTE_RULE},
+                       "corpus_route": corpus_route_record(),
                        "dense_search": settings.dense_search, "hnsw_ef_search": settings.hnsw_ef_search,
                        "evidence_target_tokens": settings.evidence_target_tokens,
                        "evidence_max_tokens": settings.evidence_max_tokens,
@@ -1353,16 +1353,16 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
 def run_errors(settings: Settings, run_id: str) -> list[str]:
     """Why a run cannot serve: incomplete, superseded policy, failed or unmeasured gate, artifacts not ready."""
     from . import dense as dense_mod
-    from .retrieval import ROUTE_MAX, ROUTE_RULE, ROUTE_SHARE, KeywordIndex, RetrievalError
+    from .retrieval import KeywordIndex, RetrievalError, corpus_route_record
 
     config, scores = load_run(settings, run_id)
     errors = []
     if scores.get("status") != "complete":
         errors.append("the run is not complete")
     route = (config.get("limits") or {}).get("corpus_route")
-    if route != {"share": ROUTE_SHARE, "max": ROUTE_MAX, "rule": ROUTE_RULE}:
+    if route != corpus_route_record():
         errors.append(f"the run was measured under corpus-routing rule {(route or {}).get('rule')!r}, not "
-                      f"{ROUTE_RULE!r}; rerun the comparison")
+                      f"{corpus_route_record()['rule']!r}; rerun the comparison")
     if config.get("eval_version") != EVAL_VERSION:
         errors.append(f"the run was scored under evaluation policy {config.get('eval_version')!r}, not "
                       f"{EVAL_VERSION!r}; rerun the comparison (and the reranker trial) — cached vectors are reused")

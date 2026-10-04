@@ -830,6 +830,24 @@ class ServingTest(unittest.TestCase):
                                   (result.request_id,)).fetchone()[0]
         self.assertEqual(status, "completed")
 
+    def test_an_activated_run_from_an_earlier_routing_rule_stops_serving_after_a_restart(self):
+        # A routing deployment without re-measurement: the persisted run's fusion and whole-corpus evidence no longer
+        # describe what retrieval does, so the restarted app serves the unselected default and says why.
+        from rfp_assistant import retrieval
+
+        self.assertEqual(self.res.serving()["mode"], "hybrid")
+        with unittest.mock.patch.object(retrieval, "ROUTE_RULE", "greedy-rare-term-2"):
+            res = service.Resources(self.env.settings, transport=self.transport)
+            try:
+                serving = res.serving()
+                result = service.retrieve(res, self.env.consultant, "하자보수 기간", [], all_documents=True)
+            finally:
+                res.close()
+        self.assertEqual((serving["run_id"], serving["mode"], serving["dense_version"]), (None, "kiwi_bm25", None))
+        self.assertEqual(serving["fallback_reason"], "activated_corpus_route_requires_rerun")
+        self.assertEqual(result.mode, "kiwi_bm25")
+        self.assertIn("activated_run_stale:corpus_route", result.limitations)
+
     def test_generation_from_a_frozen_cache_miss_run_uses_its_fallback_evidence_and_estimate(self):
         """Review finding: the free run fell back to kiwi_bm25 on a query-vector miss, but its paid generation
         embedded the query and re-retrieved with hybrid: other evidence and a reservation above the estimate."""

@@ -406,6 +406,11 @@ ROUTE_MAX = 4  # more matching documents than this: the question names no partic
 ROUTE_RULE = "greedy-rare-term-1"  # recorded in frozen run configurations; change it whenever route_corpus changes
 
 
+def corpus_route_record() -> dict:
+    """What a frozen run records as `limits.corpus_route`; a run recording anything else neither activates nor serves."""
+    return {"share": ROUTE_SHARE, "max": ROUTE_MAX, "rule": ROUTE_RULE}
+
+
 def route_corpus(index: KeywordIndex, analyzer, question: str,
                  scope: list[tuple[DocRef, str]]) -> list[tuple[DocRef, str]]:
     """An all-documents question that names a project keeps the documents whose own title/institution terms it

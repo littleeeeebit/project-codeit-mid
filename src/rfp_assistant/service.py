@@ -173,26 +173,7 @@ class Resources:
             return self._runner
 
     def serving(self) -> dict:
-        """The activated retrieval configuration (`activate-run`), or the keyword default before any selection."""
-        from .store import get_app_setting
-
-        with open_db(self.settings.db_path) as conn:
-            run = get_app_setting(conn, "active_run")
-            active = get_app_setting(conn, "active_index")
-        if run:
-            cfg = json.loads(run)
-            if cfg.get("embedding") and \
-                    (cfg["embedding"].get("model"), cfg["embedding"].get("dims")) != \
-                    (self.settings.embedding_model, self.settings.embedding_dimensions):
-                return {**cfg, "mode": "kiwi_bm25", "dense_version": None, "embedding": None,
-                        "reranker": None, "fallback_reason": "activated_embedding_identity_requires_migration"}
-            if cfg["mode"] == "hybrid_rerank" and cfg.get("eval_version") != EVAL_VERSION:
-                # Promoted under a superseded gate: keep hybrid retrieval, drop the reranker until a current
-                # trial passes and is activated.
-                cfg = {**cfg, "mode": "hybrid", "reranker": None, "stale_policy": cfg.get("eval_version")}
-            return cfg
-        return {"run_id": None, "mode": self.settings.retrieval_mode, "index_version": active,
-                "dense_version": None, "reranker": None, "fallback_mode": "kiwi_bm25"}
+        return active_serving(self.settings)
 
     def run_settings(self, cfg: dict | None = None) -> Settings:
         """Settings the activated run was evaluated with: embedding model/dimensions, depths, RRF constant and
@@ -347,6 +328,36 @@ class RequestRunner:
 
 _shared: Resources | None = None
 _shared_lock = threading.Lock()
+
+
+def active_serving(settings: Settings) -> dict:
+    """The activated retrieval configuration (`activate-run`), or the keyword default before any selection. Every
+    reader of the activation goes through here (requests, latency samples), so none serves a run it would refuse."""
+    from .retrieval import corpus_route_record
+    from .store import get_app_setting
+
+    with open_db(settings.db_path) as conn:
+        run = get_app_setting(conn, "active_run")
+        active = get_app_setting(conn, "active_index")
+    default = {"run_id": None, "mode": settings.retrieval_mode, "index_version": active,
+               "dense_version": None, "reranker": None, "fallback_mode": "kiwi_bm25"}
+    if not run:
+        return default
+    cfg = json.loads(run)
+    if cfg.get("run_id") and (cfg.get("limits") or {}).get("corpus_route") != corpus_route_record():
+        # Routing changed since the run was measured: its gate evidence no longer describes retrieval, so serve the
+        # unselected default (retrieve flags it) until a rerun is activated (run_errors refuses the old run).
+        return {**default, "fallback_reason": "activated_corpus_route_requires_rerun"}
+    if cfg.get("embedding") and \
+            (cfg["embedding"].get("model"), cfg["embedding"].get("dims")) != \
+            (settings.embedding_model, settings.embedding_dimensions):
+        return {**cfg, "mode": "kiwi_bm25", "dense_version": None, "embedding": None,
+                "reranker": None, "fallback_reason": "activated_embedding_identity_requires_migration"}
+    if cfg["mode"] == "hybrid_rerank" and cfg.get("eval_version") != EVAL_VERSION:
+        # Promoted under a superseded gate: keep hybrid retrieval, drop the reranker until a current
+        # trial passes and is activated.
+        cfg = {**cfg, "mode": "hybrid", "reranker": None, "stale_policy": cfg.get("eval_version")}
+    return cfg
 
 
 def get_resources(settings: Settings) -> Resources:
@@ -535,7 +546,9 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
     outdated = index_compatibility(idx, res.analyzer)
     if outdated:  # still served (search must keep working) but never silently: rebuild and re-evaluate
         result.limitations.append(f"index_outdated:{outdated}")
-    wanted = {"dense"} | ({"reranker"} if cfg["mode"] == "hybrid_rerank" else set())
+    if cfg.get("fallback_reason") == "activated_corpus_route_requires_rerun":
+        result.limitations.append("activated_run_stale:corpus_route")
+    wanted ={"dense"} | ({"reranker"} if cfg["mode"] == "hybrid_rerank" else set())
     if cfg["mode"] in DENSE_MODES:
         result.limitations += [f"{stage}_unavailable" for stage in res.stage_errors if stage in wanted]
     return result
