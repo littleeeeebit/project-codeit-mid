@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 from rfp_assistant import auth, budget, generation, service, store
-from rfp_assistant.contracts import AnswerRequest
+from rfp_assistant.contracts import AnswerRequest, EvidenceUnit
 from rfp_assistant.generation import FakeTransport, ProviderError, ProviderResponse
 from tests import fixtures
 
@@ -150,6 +150,29 @@ class SafetyTest(unittest.TestCase):
                                            "conflicts": [], "next_action": None, "url": "x"}), None, "stop", None, None)
         with self.assertRaises(generation.TechnicalError):
             generation.validate_answer(bad, [], set(), {})
+
+    def test_an_uncited_inference_restating_a_listed_absence_is_dropped_and_nothing_else(self):
+        # The owner's comparison: each side's absence was stated twice, as an uncited inference and a missing field.
+        ev = EvidenceUnit("E1", "A", "h", "x", "c", ["e"], "제안서 10부", {}, 5)
+
+        def respond(claims, missing=()):
+            return ProviderResponse(json.dumps({
+                "status": "answered", "summary": "s", "conflicts": [], "next_action": None,
+                "claims": [{"text": t, "kind": k, "doc_id": d, "evidence_ids": ids} for t, k, d, ids in claims],
+                "missing_fields": [{"doc_id": d, "field": "f", "reason": "not_found_in_context"} for d in missing]},
+                ensure_ascii=False), None, "stop", None, None)
+
+        def validate(response):
+            return generation.validate_answer(response, [ev], {"A", "B"}, {"E1": ev.quote}, {"A", "B"})
+
+        fact = ("A는 제안서 10부를 요구한다", "source_fact", "A", ["E1"])
+        absence = ("B에는 비교할 내용이 없다", "inference", "B", [])
+        payload = validate(respond([fact, absence], missing=["B"]))
+        self.assertEqual([c.text for c in payload.claims], [fact[0]])
+        for claims, missing in (([fact, absence], []),  # no listed absence to restate
+                                ([fact, ("B는 5부", "source_fact", "B", [])], ["B"])):  # an uncited source fact
+            with self.assertRaisesRegex(generation.TechnicalError, "claim_without_evidence"):
+                validate(respond(claims, missing))
 
 
 if __name__ == "__main__":

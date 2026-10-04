@@ -159,7 +159,27 @@ A headless browser check against `bidmate_app` (private screenshots in `.runtime
 
 The check found that the Verification fidelity overview still used a SQLite-only ungrouped `GROUP BY`. It is fixed and covered by `tests.test_api`.
 
-New paid work in this PR totals $0.062712 against the $1.00 ceiling, which `--max-cost-usd` and the envelopes enforce:
+### Owner acceptance round 2: comparison claims
+
+The All documents answer was accepted. The owner's comparison, "한영대학교와 을지 대학교의 제안서에서, 어떤 차이가 있어?", failed with `claim_without_evidence`. The model stated each side's absence twice: once as an uncited `inference` claim, and again as a `missing_fields` entry for the same document. The owner chose to fix both the prompt and the validation:
+
+- The prompt is now `grounded-answer-6`. Every claim, including an inference, cites at least one evidence ID of its own document. What the evidence does not show goes only in `missing_fields`.
+- `validate_answer` drops an uncited inference when its document already has a `missing_fields` entry, since the claim only restates that listed absence. An uncited source fact, or an uncited inference with no listed absence, is still rejected (`tests.test_generation`).
+
+The same comparison then answered with 9 cited claims ($0.001541). The 26 paid questions ran again under prompt 6 (private results in `.runtime/postgresql-migration/e2e-prompt6/`):
+
+- 25 of 26 reached their expected status, and 23 of 26 cite the expected passages.
+- All documents: 12/12 answered. Single document: 5/5 answered.
+- Comparison: 6 answered, plus `refresh50-ah-ip` returning `conflicting_evidence` as expected.
+- Listed failures:
+  - `refresh50-ad-migration-design` returned `insufficient_evidence` after retrieving 4 of 13 groups.
+  - `refresh50-eg-input-error` failed with `evidence_scope_mismatch`. Three repeats all answered, so that was model variance.
+  - `cutover-late-06` retrieved both groups and cited neither, as before.
+- All 26 attempts settled. The meter and `budget-status` agreed at revision 1499 with pending and unknown at 0.
+
+`refresh50-ad-migration-design` then hit `output_truncated` in three repeats out of three. To test whether prompt 6 caused this, the same three repeats ran with the prompt-5 text, and all three truncated as well. Its 13 required groups exceed the 2,000-token answer limit whichever prompt is used, so it stays a listed failure. Raising the output limit is outside this PR.
+
+New paid work in this PR totals $0.101600 against the $1.00 ceiling, which `--max-cost-usd` and the envelopes enforce:
 
 | Item | Cost (USD) |
 | --- | --- |
@@ -169,6 +189,11 @@ New paid work in this PR totals $0.062712 against the $1.00 ceiling, which `--ma
 | First paid end-to-end answers | 0.019744 |
 | Browser check and the owner's first acceptance question | 0.002386 |
 | Paid end-to-end rerun on `H-af9967ca81` | 0.026166 |
+| The owner's second acceptance round and the comparison retry | 0.004095 |
+| Paid end-to-end rerun under prompt 6 | 0.025906 |
+| Repeats under prompt 6 and the prompt-5 A/B | 0.008887 |
+
+The ledger after this work reads $1.858977 spent, revision 1535, with 0 open, pending or unknown attempts.
 
 ### Archive and rollback
 
