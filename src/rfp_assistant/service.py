@@ -1975,7 +1975,9 @@ def fidelity_overview(res: Resources, principal: Principal) -> list[dict]:
             "SELECT s.source_hash, s.review_status, MIN(d.filename) AS filename, f.metrics_json, f.findings_json "
             "FROM sources s JOIN documents d ON d.active_source_hash = s.source_hash "
             "LEFT JOIN fidelity_checks f ON f.extraction_id = s.active_extraction_id AND f.method = ? "
-            "WHERE s.format = 'hwp' GROUP BY s.source_hash ORDER BY filename", (fidelity.FIDELITY_VERSION,)).fetchall()
+            # at most one check per (extraction, method), so grouping by its columns is exact; PostgreSQL requires it
+            "WHERE s.format = 'hwp' GROUP BY s.source_hash, s.review_status, f.metrics_json, f.findings_json "
+            "ORDER BY filename", (fidelity.FIDELITY_VERSION,)).fetchall()
     return [{"source_hash": r["source_hash"], "filename": r["filename"], "review_status": r["review_status"],
              "metrics": json.loads(r["metrics_json"]) if r["metrics_json"] else None,
              "findings": json.loads(r["findings_json"]) if r["findings_json"] else []} for r in rows]
