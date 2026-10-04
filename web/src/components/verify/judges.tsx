@@ -77,7 +77,9 @@ function Verdict({ results, running }: { results?: Results; running: boolean }) 
   return (
     <Section title="Jev로 바꿀 수 있나" aside={badge ? <StatusBadge size="md" tone={badge.tone}>{badge.label}</StatusBadge>
       : <StatusBadge size="md" tone="neutral">{running ? "평가 실행 중" : "판정 전"}</StatusBadge>}>
-      {!v ? <Empty>{results ? "평가 실행이 끝나야 판정합니다." : "평가(보고용) 실행이 아직 없습니다. 보정 → 평가 순서로 실행하세요."}</Empty> : (
+      {!v ? <Empty>{running ? "평가 실행 중입니다. 모든 항목을 판정하면 규칙대로 판정합니다."
+        : results ? "평가 실행이 끝나지 않아 판정하지 않았습니다. 다시 추정하고 실행하면 남은 항목만 이어서 합니다."
+          : "평가(보고용) 실행이 아직 없습니다. 보정 → 평가 순서로 실행하세요."}</Empty> : (
         <div className="space-y-4 rounded-2xl border p-5">
           <p className="text-base font-semibold">
             결정한 조건: {v.deciding.map((c) => CONDITION[c.condition] ?? c.condition).join(" · ")}
@@ -228,7 +230,7 @@ function Plan({ fitted, running, onStarted }: { fitted: boolean; running: boolea
     <div className="space-y-4 rounded-2xl bg-secondary/60 p-4">
       <div className="flex flex-wrap items-end gap-3">
         <Field id="judge-part" label="실행할 부분">
-          <select id="judge-part" value={part} onChange={(e) => { setPart(e.target.value as typeof part); setEst(null); }} className={cn(field, "h-11 w-64")}>
+          <select id="judge-part" value={part} onChange={(e) => { setPart(e.target.value as typeof part); setEst(null); }} className={cn(field, "block h-11 sm:w-64")}>
             <option value="calibration">1. 보정 — Jev 임계값 맞춤</option>
             <option value="held_out" disabled={!fitted}>2. 평가 — 화면에 보고{fitted ? "" : " (보정 먼저)"}</option>
           </select>
