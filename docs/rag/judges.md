@@ -20,7 +20,7 @@ Only 24 of the 750 verdicts are negative. Every negative count below is therefor
 
 ## Calibration and held-out parts
 
-The items are split once, with seed 20261004, stratified by item kind and reference verdict. Within each stratum the shuffled IDs are halved, so the calibration part has 373 items and the held-out part 377. A raw-Korean control sample of 120 items is drawn from each part with seed 20261005. The ID lists are persisted in `.runtime/judges/split.json` with their hash, and a different split for the same reference is refused.
+The items are split once, with seed 20261004, stratified by item kind and reference verdict. Within each stratum the shuffled IDs are halved, so the calibration part has 373 items and the held-out part 377. A raw-Korean control sample of 120 items is drawn from each part with seed 20261005. The ID lists are persisted in `.runtime/judges/split.json` with their hash. Every read checks the file against that hash and against the seeded draw from the installed reference. A changed file is refused even if its hash field was left alone or recomputed; it is never redrawn.
 
 The calibration part is used for two things only: fitting Jev's thresholds, and checking the Luna prompt. Every number on the comparison screen comes from the held-out part.
 
@@ -68,7 +68,7 @@ Jev's Korean reading is poor, so Jev never receives Hangul. The bridge is gpt-6-
    - a placeholder is dropped, duplicated or invented (`changed_protected_value`);
    - any digit appears outside a placeholder (`changed_number`);
    - any Hangul remains (`residual_hangul`).
-4. Results are cached by the hash of bridge version, glossary, model and masked text (`.runtime/judges/bridge/`), so a segment is paid for once.
+4. Results are cached by the hash of bridge version, glossary, model and masked text (`.runtime/judges/bridge/`), so a segment is paid for once. A cached record whose stored source, model, version or glossary hash differs from its key counts as a miss, and the segment is translated again. Every read re-runs step 3.
 
 An item with any untranslatable segment is not sent to Jev; it counts as an abstention. `tests/test_judges.py` covers placeholder restoration, residual-Hangul rejection and changed-number rejection.
 
@@ -87,6 +87,15 @@ Probabilities become labels through a band fitted on the calibration part, per a
 - Between the two, the item abstains.
 
 The fit maximises binary Cohen's kappa among bands that keep at least 90% of calibration items judged. Ties go to fewer false accepts, then more coverage, then the narrower band.
+
+Coverage is measured over every calibration item the arm was asked about. Failed calls and untranslatable items count against it; only code-settled items are left out. Each band records `n`, `points` and `meets_floor`.
+
+A held-out run is refused in two cases:
+
+- the stored `thresholds.json` differs from a fresh refit of the calibration judgements;
+- any band missed the 90% floor.
+
+`judge-refit` refits for free from the stored judgements.
 
 An uncertain probability, an API failure and an untranslatable item are all abstentions, never negative verdicts.
 
@@ -145,7 +154,7 @@ False accepts are compared directly because they are the failure that would pass
    - the maximum USD.
 
    A changed configuration, price, token count or cached translation invalidates the estimate, and the run must be planned again.
-4. Start calibration. A complete calibration run writes `thresholds.json`.
+4. Start calibration. A complete calibration run writes `thresholds.json`. After a change to the fitting rule, `judge-refit` rewrites it from the stored judgements, at no cost.
 5. Plan and start the held-out part. Its identity includes the thresholds hash.
 
 Runs resume: finished judgements are kept, and only the remainder runs again under a new estimate. The run stops at the first budget refusal or unknown billing, and a blocked run stays partial, labelled with its status.
@@ -160,34 +169,41 @@ Runs resume: finished judgements are kept, and only the remainder runs again und
 
 ## Result
 
-Recorded 2026-10-04 from held-out run `J-held_out-3e072719113f` (thresholds `b0670027…`, fitted by calibration run `J-calibration-637edadd55aa`). Spend and the run table are in the [release report](../operations/release-report.md#judge-comparison-luna-versus-jev-2026-10-04).
+Recorded 2026-10-04 from held-out run `J-held_out-5b18a0afb471`, with thresholds `d9c0e8ac…` refitted from calibration run `J-calibration-637edadd55aa`. Spend and the run table are in the [release report](../operations/release-report.md#judge-comparison-luna-versus-jev-2026-10-04).
+
+The first held-out run, `J-held_out-3e072719113f`, is superseded. Its thresholds (`b0670027…`) had measured coverage only over answered calibration items. The refit counts failed and untranslatable items too, and gave the same bands under a new hash, so the held-out part was run again under the new identity.
 
 Fitted bands:
 
-- bridged Jev: support 0.51, coverage 0.69, both with `lo = hi`, so no uncertain band survived the coverage floor;
-- raw Jev: support 0.83, coverage 0.60.
+| Arm | Support band (coverage) | Coverage band (coverage) |
+| --- | --- | --- |
+| Jev, bridged | 0.51 (94.8%, 239 of 252) | 0.69 (91.7%, 111 of 121) |
+| Jev, raw | 0.83 (100%) | 0.60 (100%) |
+
+Bridged Jev's bands both have `lo = hi`, so no uncertain band survived the coverage floor.
 
 | Arm | Coverage | Agreement (Wilson 95%) | Kappa | False accepts | p50 latency |
 | --- | --- | --- | --- | --- | --- |
-| Luna | 100% (377) | 89.4% (85.9–92.1) | 0.189 | 7 of 13 | 1.80 s |
-| Jev, bridged | 92.8% (350 of 377) | 88.3% (84.5–91.3) | 0.220 | 6 of 13 | 0.24 s |
-| Jev, raw Korean | 100% (120) | 81.7% (73.8–87.6) | 0.115 | 1 of 3 | 0.23 s |
+| Luna | 100% (377) | 89.1% (85.6–91.9) | 0.240 | 5 of 13 | 2.09 s |
+| Jev, bridged | 92.8% (350 of 377) | 89.1% (85.5–92.0) | 0.238 | 6 of 13 | 0.24 s |
+| Jev, raw Korean | 100% (120) | 80.0% (72.0–86.2) | 0.103 | 1 of 3 | 0.23 s |
 
-**Verdict: replaceable.** All three conditions hold:
+**Verdict: not replaceable.** False accepts decided it:
 
-- kappa 0.220 ≥ 0.189 − 0.05;
-- false accepts 6 ≤ 7;
-- coverage 92.8% ≥ 90%.
+- kappa 0.238 ≥ 0.240 − 0.05: holds;
+- false accepts 6 ≤ 5: fails;
+- coverage 92.8% ≥ 90%: holds.
+
+The superseded run reached **replaceable**, because Luna then had 7 false accepts and kappa 0.189. Jev's labels came out the same both times; Luna, asked the same questions again, passed two fewer reference negatives.
 
 Read the verdict narrowly:
 
 - Neither judge reproduces the reference well on failures. Both kappas are below 0.25.
-  - Luna fails 12 supporting links and 19 supported answer claims.
-  - Bridged Jev fails 4 supporting links and 24 supported answer claims.
-  - Both pass most `missing` facts: Luna 6 of 9, Jev 4 of 9.
-- The false-accept condition was decided by one item.
+  - Luna fails 11 supporting links and 21 supported answer claims, and passes 5 of the 9 `missing` facts.
+  - Bridged Jev fails 5 supporting links and 20 supported answer claims. It passes 4 of the 9 `missing` facts, 1 of the 2 unsupported links and 1 of the 2 incomplete qualifiers.
+- The false-accept condition turns on one or two items, and on Luna's run-to-run variation.
 - All 27 Jev abstentions are bridge rejections; the bridge rejects rather than guesses. Most are `changed_protected_value`, where the translation dropped or reordered a placeholder.
-- The bridge matters. On raw Korean, Jev's kappa is 0.115, and it fails half of the supported answer claims in the sample.
+- The bridge matters. On raw Korean, Jev's kappa is 0.103, and it fails half of the supported answer claims in the sample (18 of 36).
 - No item was settled by the deterministic value checks.
 
-So the rule says Jev is no worse than this Luna judge against this reference. It does not say either judge is a reliable reviewer. A reference with more negatives, especially human-reviewed failures, is needed before either judge replaces independent review.
+So the rule does not show Jev to be as safe as this Luna judge against this reference; across the two runs it is within one or two false accepts of Luna either way. It does not say either judge is a reliable reviewer. A reference with more negatives, especially human-reviewed failures, is needed before either judge replaces independent review.

@@ -104,22 +104,29 @@ Funding: the owner moved $1.00 from `interactive` to the new `judge_eval` envelo
 
 | Run | Part | Estimate (max) | Actual (ledger) | Outcome |
 | --- | --- | --- | --- | --- |
-| `J-calibration-637edadd55aa` | calibration, 373 items | $0.499313 | $0.093721 | complete; thresholds `b0670027…` fitted |
-| `J-held_out-3e072719113f` | held-out, 377 items (raw sample 120) | $0.373294 | $0.061321 | complete; verdict computed |
+| `J-calibration-637edadd55aa` | calibration, 373 items | $0.499313 | $0.093721 | complete; thresholds `b0670027…` fitted, refitted as `d9c0e8ac…` (no new calls) |
+| `J-held_out-3e072719113f` | held-out, 377 items (raw sample 120) | $0.373294 | $0.061321 | complete; superseded, see below |
+| `J-held_out-5b18a0afb471` | held-out, 377 items (raw sample 120) | $0.338342 | $0.053900 | complete; the reported verdict |
 
-The two runs together cost $0.155042, all of it in `judge_eval`: Luna judge calls, plus 83 translation batches. Afterwards the ledger showed $2.072519 spent, $0 pending and $0 unknown of the $10 cap. The 847 Jev calls are unpriced: TypeSafe reports usage but no price.
+Review round 1 found that the threshold fit measured coverage only over Jev's answered calibration items. Failed and untranslatable items were left out, so the fitted bands claimed 100% coverage where the true figure was 94.8% (support) and 91.7% (coverage). The fit now divides by every eligible item, and `judge-refit` refitted it from the stored judgements without any call. The bands came out unchanged and all of them still meet the 90% floor, but the thresholds hash changed. A held-out run's identity includes that hash, so the first held-out run no longer matched the configuration and was run again.
 
-Held-out result under `replacement-rule-1`: **replaceable**, with all three conditions met.
+The second held-out run needed no translation: every segment was cached. It paid for 377 Luna calls only. The three runs together cost $0.208942, all of it in `judge_eval`. Afterwards the ledger showed $2.126419 spent, $0 pending and $0 unknown of the $10 cap, with $0.791058 left in `judge_eval`. The 1,410 Jev calls (470 per run) are unpriced: TypeSafe reports usage but no price. An earlier version of this section gave 847 for the first two runs; the judgement files show 940.
+
+Held-out result under `replacement-rule-1` (run `J-held_out-5b18a0afb471`): **not replaceable**. The false-accept condition decided it.
 
 | Arm | Judged / items | Agreement (Wilson 95%) | Kappa (pass/fail) | False accepts / reference negatives | p50 / p95 latency |
 | --- | --- | --- | --- | --- | --- |
-| Luna | 377 / 377 | 89.4% (85.9–92.1) | 0.189 | 7 / 13 | 1.80 s / 3.10 s |
-| Jev, bridged | 350 / 377 (92.8%) | 88.3% (84.5–91.3) | 0.220 | 6 / 13 | 0.24 s / 0.30 s |
-| Jev, raw Korean | 120 / 120 | 81.7% (73.8–87.6) | 0.115 | 1 / 3 | 0.23 s / 0.31 s |
+| Luna | 377 / 377 | 89.1% (85.6–91.9) | 0.240 | 5 / 13 | 2.09 s / 4.37 s |
+| Jev, bridged | 350 / 377 (92.8%) | 89.1% (85.5–92.0) | 0.238 | 6 / 13 | 0.24 s / 0.30 s |
+| Jev, raw Korean | 120 / 120 | 80.0% (72.0–86.2) | 0.103 | 1 / 3 | 0.23 s / 0.27 s |
 
-The verdict holds only as far as this reference allows. Both kappas are low: each judge fails many items the reference passes. Luna fails 31 of them and bridged Jev 36. The false-accept condition was decided by one item out of 13 negatives.
+- kappa 0.238 ≥ 0.240 − 0.05: passed.
+- false accepts 6 ≤ 5: failed.
+- coverage 92.8% ≥ 90%: passed.
 
-Jev's 27 abstentions are all bridge rejections: 21 `changed_protected_value` and 6 `residual_hangul`. The bridge lifts Jev's kappa from 0.115 to 0.220. The raw-Korean arm has only 3 negatives in its sample.
+The superseded run had reached **replaceable** with Luna at 7 false accepts and kappa 0.189. Between the two runs Jev's coverage and false accepts did not move. Luna, called again on the same items with the same prompt, passed two fewer reference negatives. The verdict therefore turns on one or two of the 13 negatives and on Luna's run-to-run variation. Neither run gives Jev a margin. With this reference Jev is not shown to be a safe replacement, and the rule says so.
+
+Jev's 27 abstentions are all bridge rejections: 21 `changed_protected_value` and 6 `residual_hangul`. The bridge lifts Jev's kappa from 0.103 to 0.238. The raw-Korean arm has only 3 negatives in its sample.
 
 ### The PostgreSQL work these runs ran on (2026-10-03/04)
 
