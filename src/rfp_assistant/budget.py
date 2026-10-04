@@ -22,7 +22,8 @@ from .store import OPERATIONAL_ERRORS, dumps, get_app_setting, open_db, set_app_
 from .postgres import Connection, Row, owner_guard, require_owner, Target
 
 MICRO = 1_000_000
-ENVELOPE_SHARES = {"embedding": 1, "gold_eval": 3, "interactive": 12}  # sixteenths of the operating cap
+# sixteenths of the operating cap; `judge_eval` (judges.py) starts empty and is funded only by an owner reallocation
+ENVELOPE_SHARES = {"embedding": 1, "gold_eval": 3, "interactive": 12, "judge_eval": 0}
 DEFAULT_ENVELOPES = {k: v * MICRO for k, v in ENVELOPE_SHARES.items()}
 OPEN_STATES = ("reserved", "dispatching", "unknown")
 TRACKING_SCOPE = "이 앱의 게이트웨이를 거친 호출과 기록된 조정만 포함합니다. 제공자 잔액이 아닙니다."

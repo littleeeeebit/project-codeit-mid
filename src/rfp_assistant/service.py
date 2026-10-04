@@ -134,7 +134,7 @@ class Resources:
         self._index_lock = threading.Lock()
         self._runner: RequestRunner | None = None
         self._runner_lock = threading.Lock()
-        self._draft_jobs: list[threading.Thread] = []
+        self._jobs: list[threading.Thread] = []  # drafting, answer evaluation, judge runs: joined by close()
         self._closed = False
         closer = weakref.WeakMethod(self.close)  # atexit must not keep every Resources (and its index) alive
 
@@ -251,14 +251,14 @@ class Resources:
                 return
             self._closed = True
             runner = self._runner
-            drafting = list(self._draft_jobs)
+            jobs = list(self._jobs)
         deadline = time.monotonic() + self.settings.shutdown_wait_seconds
         if runner is not None:
             runner.shutdown(self.settings.shutdown_wait_seconds)
-        for thread in drafting:
+        for thread in jobs:
             if thread is not threading.current_thread():
                 thread.join(timeout=max(0, deadline - time.monotonic()))
-        if any(thread.is_alive() for thread in drafting):
+        if any(thread.is_alive() for thread in jobs):
             recover_requests(self.settings.db_path)
             budget.recover(self.settings.db_path)
         try:
@@ -1860,6 +1860,7 @@ def gold_awaiting_second_review(res: Resources, principal: Principal) -> list[di
 # ---------------------------------------------------------------- phase 4: development answer evaluation
 
 _EVAL_JOBS: dict[str, threading.Thread] = {}
+_JUDGE_JOBS: dict[str, threading.Thread] = {}  # judge comparison parts; never alongside an answer evaluation
 _EVAL_LOCK = threading.Lock()
 
 
@@ -1930,28 +1931,115 @@ def start_answer_evaluation(res: Resources, principal: Principal, estimate_id: s
         est = answers.load_estimate(res.settings, estimate_id)
         if est["action"] != "answer-finalists":
             raise ServiceError("검증 화면에서는 개발 질문 평가만 실행할 수 있습니다. 봉인 평가는 소유자 CLI로 실행합니다.")
-        answers.recheck(res.settings, est)
     except answers.AnswerEvalError as exc:
         raise ServiceError(str(exc)) from None
-    if res.transport is None or res._closed:
-        raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
     with _EVAL_LOCK:
-        if any(t.is_alive() for t in _EVAL_JOBS.values()):
-            raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
+        _refuse_closed_or_busy(res)
+        try:  # published before the start returns, so the overview lists the run on its very next read
+            begun = answers.begin_answers(res.settings, estimate_id, principal.member_id)
+        except answers.AnswerEvalError as exc:
+            raise ServiceError(str(exc)) from None
+        run_id = begun["run_id"]
 
         def job() -> None:
             try:
-                answers.run_answers(res.settings, res, estimate_id, principal.member_id)
+                answers.run_answers(res.settings, res, estimate_id, principal.member_id, begun=begun)
             except Exception as exc:  # noqa: BLE001 - recorded for the overview; rows already finished stay
                 from .store import write_text_atomic
 
-                write_text_atomic(answers.run_dir(res.settings, est["run_id"]) / "last-error.txt",
+                write_text_atomic(answers.run_dir(res.settings, run_id) / "last-error.txt",
                                   f"{type(exc).__name__}: {exc}"[:500])
 
-        thread = threading.Thread(target=job, name=f"rfp-eval-{est['run_id']}", daemon=True)
-        _EVAL_JOBS[est["run_id"]] = thread
+        _start_job(res, _EVAL_JOBS, run_id, threading.Thread(target=job, name=f"rfp-eval-{run_id}", daemon=True))
+    return run_id
+
+
+def _refuse_closed_or_busy(res: Resources) -> None:
+    if res.transport is None or res._closed:
+        raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
+    if any(t.is_alive() for t in [*_EVAL_JOBS.values(), *_JUDGE_JOBS.values()]):
+        raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
+
+
+def _start_job(res: Resources, jobs: dict[str, threading.Thread], run_id: str, thread: threading.Thread) -> None:
+    """Registers and starts a paid background job; called under `_EVAL_LOCK` after its run was published."""
+    with res._runner_lock:  # close() must see and join every thread that uses its transport
+        if res.transport is None or res._closed:  # the run stays listed as partial; rerunning resumes it
+            raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
+        jobs[run_id] = thread
+        res._jobs.append(thread)
         thread.start()
-    return est["run_id"]
+
+
+# ---------------------------------------------------------------- judge comparison (judges.py)
+
+def _judge_running() -> set[str]:
+    return {run_id for run_id, t in _JUDGE_JOBS.items() if t.is_alive()}
+
+
+def _judge_call(fn, *args):
+    from . import answers, judges
+
+    try:
+        return fn(*args)
+    except (judges.JudgeError, answers.AnswerEvalError, budget.BudgetError) as exc:
+        raise ServiceError(str(exc)) from None
+
+
+def judge_overview(res: Resources, principal: Principal) -> dict:
+    """The judge reference, its split, the declared replacement rule and every judge run with its progress."""
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    return _judge_call(judges.overview, res.settings, _judge_running())
+
+
+def plan_judges(res: Resources, principal: Principal, part: str) -> dict:
+    """Free: prices every translation and Luna judge call a part still needs, and counts the Jev calls."""
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    return _judge_call(judges.plan, res.settings, part)
+
+
+def start_judges(res: Resources, principal: Principal, estimate_id: str) -> str:
+    """Runs a planned judge comparison part on this process's gateway in one background thread, never above the
+    estimate the verifier consented to. One evaluation or comparison at a time; rerunning resumes."""
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    with _EVAL_LOCK:
+        _refuse_closed_or_busy(res)
+        # published before the start returns, so the overview lists the run on its very next read
+        begun = _judge_call(judges.begin, res.settings, estimate_id, principal.member_id)
+        run_id = begun["run_id"]
+
+        def job() -> None:
+            try:
+                judges.run(res.settings, res.transport, estimate_id, principal.member_id,
+                           closing=lambda: res._closed, begun=begun)
+            except Exception as exc:  # noqa: BLE001 - recorded for the overview; finished judgements stay
+                from .store import write_text_atomic
+
+                write_text_atomic(judges.run_dir(res.settings, run_id) / "last-error.txt",
+                                  f"{type(exc).__name__}: {exc}"[:500])
+
+        _start_job(res, _JUDGE_JOBS, run_id, threading.Thread(target=job, name=f"rfp-judge-{run_id}", daemon=True))
+    return run_id
+
+
+def judge_results(res: Resources, principal: Principal, run_id: str) -> dict:
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    return _judge_call(judges.results, res.settings, run_id)
+
+
+def judge_disagreements(res: Resources, principal: Principal, run_id: str) -> list[dict]:
+    principal = _authorize(res, principal, "verifier")
+    from . import judges
+
+    return _judge_call(judges.disagreements, res.settings, run_id)
 
 
 def fidelity_overview(res: Resources, principal: Principal) -> list[dict]:
@@ -1962,8 +2050,9 @@ def fidelity_overview(res: Resources, principal: Principal) -> list[dict]:
             "SELECT s.source_hash, s.review_status, MIN(d.filename) AS filename, f.metrics_json, f.findings_json "
             "FROM sources s JOIN documents d ON d.active_source_hash = s.source_hash "
             "LEFT JOIN fidelity_checks f ON f.extraction_id = s.active_extraction_id AND f.method = ? "
-            "WHERE s.format = 'hwp' GROUP BY s.source_hash, f.metrics_json, f.findings_json ORDER BY filename",
-            (fidelity.FIDELITY_VERSION,)).fetchall()
+            # at most one check per (extraction, method), so grouping by its columns is exact; PostgreSQL requires it
+            "WHERE s.format = 'hwp' GROUP BY s.source_hash, s.review_status, f.metrics_json, f.findings_json "
+            "ORDER BY filename", (fidelity.FIDELITY_VERSION,)).fetchall()
     return [{"source_hash": r["source_hash"], "filename": r["filename"], "review_status": r["review_status"],
              "metrics": json.loads(r["metrics_json"]) if r["metrics_json"] else None,
              "findings": json.loads(r["findings_json"]) if r["findings_json"] else []} for r in rows]
@@ -2344,7 +2433,7 @@ def start_drafting(res: Resources, principal: Principal, slots: list[dict], cons
 
         thread = threading.Thread(target=job, name=f"rfp-{run_id}", daemon=True)
         _DRAFT_JOBS[run_id] = thread
-        res._draft_jobs.append(thread)
+        res._jobs.append(thread)
         thread.start()
     return run_id
 

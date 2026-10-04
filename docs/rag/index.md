@@ -18,6 +18,7 @@ For the complete implementation sequence, read the [end-to-end overview](../plan
 | Prompt engineering | [Grounded RAG prompts](prompts.md) | How to answer with verifiable citations and handle missing or conflicting evidence |
 | Reranker | [Reranker selection](reranking.md) | Which local multilingual model to trial and when to bypass it |
 | Evaluation | [Evaluation and release criteria](evaluation.md) | How to measure retrieval, answer quality, abstention, and cost separately |
+| Judging | [Luna judge versus Jev judge](judges.md) | Whether a Jev classifier reading a checked English bridge can replace the gpt-6-luna review judge |
 | Frontend | [Consultant and verification interfaces](frontend.md) | How to separate everyday work from controlled experiments |
 
 The [shared budget and usage ledger](budget.md) is a cross-cutting requirement. The [delivery plan](delivery-plan.md) describes dependencies, six workstreams, and completion checks. The [source register](sources.md) records what each external source establishes and where it falls short.

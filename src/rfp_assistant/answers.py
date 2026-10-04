@@ -348,11 +348,9 @@ def _conclusive(states: list[str]) -> bool:
     return not any(s in ("dispatching", "unknown", "reserved") for s in states)
 
 
-def run_answers(settings: Settings, owner: service.Resources, estimate_id: str, actor: str,
-                post_test_reason: str | None = None) -> dict:
-    """Executes a planned answer run (development finalists or the sealed run) with the owner's gateway. Stops on
-    the first budget refusal or unknown billing; rerunning the same command (after reconciliation, or with a new
-    estimate) resumes only unfinished rows."""
+def begin_answers(settings: Settings, estimate_id: str, actor: str, post_test_reason: str | None = None) -> dict:
+    """Free and synchronous: checks the estimate and inputs, then publishes the run (its `config.json`) so the
+    overview lists it from the moment a start returns, before any paid call."""
     est = load_estimate(settings, estimate_id)
     if est["action"] not in ("answer-finalists", "sealed"):
         raise AnswerEvalError("run-answers executes answer-finalists or sealed estimates; latency uses latency-run")
@@ -380,6 +378,18 @@ def run_answers(settings: Settings, owner: service.Resources, estimate_id: str, 
     config["estimates"].append({"estimate_id": estimate_id, "max_micro_usd": est["max_micro_usd"], "actor": actor,
                                 "started_at": utcnow()})
     write_text_atomic(config_path, json.dumps(config, ensure_ascii=False, indent=1))
+    return {"estimate_id": estimate_id, "est": est, "inputs": inputs, "run_id": run_id}
+
+
+def run_answers(settings: Settings, owner: service.Resources, estimate_id: str, actor: str,
+                post_test_reason: str | None = None, begun: dict | None = None) -> dict:
+    """Executes a planned answer run (development finalists or the sealed run) with the owner's gateway. Stops on
+    the first budget refusal or unknown billing; rerunning the same command (after reconciliation, or with a new
+    estimate) resumes only unfinished rows. `begun` is this estimate's `begin_answers`, when the caller already
+    published the run."""
+    if begun is None or begun["estimate_id"] != estimate_id:
+        begun = begin_answers(settings, estimate_id, actor, post_test_reason)
+    inputs, run_id = begun["inputs"], begun["run_id"]
     progress = load_progress(settings, run_id)
     stop_reason = None
     for f in inputs["finalists"]:

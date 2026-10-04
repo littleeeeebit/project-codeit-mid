@@ -1,6 +1,49 @@
 {
  "components": {
   "schemas": {
+   "AgreementRate": {
+    "properties": {
+     "denominator": {
+      "title": "Denominator",
+      "type": "integer"
+     },
+     "numerator": {
+      "title": "Numerator",
+      "type": "integer"
+     },
+     "rate": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rate"
+     },
+     "wilson95": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "number"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Wilson95"
+     }
+    },
+    "required": [
+     "numerator",
+     "denominator"
+    ],
+    "title": "AgreementRate",
+    "type": "object"
+   },
    "Answer": {
     "properties": {
      "billing_state": {
@@ -171,6 +214,180 @@
      "running"
     ],
     "title": "AnswerRun",
+    "type": "object"
+   },
+   "ArmMetrics": {
+    "properties": {
+     "abstentions": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Abstentions",
+      "type": "object"
+     },
+     "agreement": {
+      "$ref": "#/components/schemas/AgreementRate"
+     },
+     "bridge_usd": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Usd"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "code_settled": {
+      "title": "Code Settled",
+      "type": "integer"
+     },
+     "confusion": {
+      "additionalProperties": {
+       "additionalProperties": {
+        "additionalProperties": {
+         "type": "integer"
+        },
+        "type": "object"
+       },
+       "type": "object"
+      },
+      "title": "Confusion",
+      "type": "object"
+     },
+     "coverage": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Coverage"
+     },
+     "false_accepts": {
+      "title": "False Accepts",
+      "type": "integer"
+     },
+     "items": {
+      "title": "Items",
+      "type": "integer"
+     },
+     "judged": {
+      "title": "Judged",
+      "type": "integer"
+     },
+     "kappa": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Kappa"
+     },
+     "latency_ms": {
+      "$ref": "#/components/schemas/JudgeLatency"
+     },
+     "reference_negatives": {
+      "title": "Reference Negatives",
+      "type": "integer"
+     },
+     "usd": {
+      "$ref": "#/components/schemas/Usd"
+     }
+    },
+    "required": [
+     "items",
+     "judged",
+     "agreement",
+     "false_accepts",
+     "reference_negatives",
+     "code_settled",
+     "abstentions",
+     "confusion",
+     "usd",
+     "latency_ms"
+    ],
+    "title": "ArmMetrics",
+    "type": "object"
+   },
+   "ArmProgress": {
+    "properties": {
+     "done": {
+      "title": "Done",
+      "type": "integer"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "done",
+     "total"
+    ],
+    "title": "ArmProgress",
+    "type": "object"
+   },
+   "ArmView": {
+    "properties": {
+     "abstain": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Abstain"
+     },
+     "label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Label"
+     },
+     "probability": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Probability"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     }
+    },
+    "required": [
+     "source"
+    ],
+    "title": "ArmView",
     "type": "object"
    },
    "AskIn": {
@@ -1205,6 +1422,78 @@
      "status"
     ],
     "title": "Decided",
+    "type": "object"
+   },
+   "Disagreement": {
+    "properties": {
+     "arms": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/ArmView"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "title": "Arms",
+      "type": "object"
+     },
+     "blind_id": {
+      "title": "Blind Id",
+      "type": "string"
+     },
+     "english": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "English"
+     },
+     "kind": {
+      "enum": [
+       "link",
+       "answer_claim",
+       "claim"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "korean": {
+      "additionalProperties": true,
+      "title": "Korean",
+      "type": "object"
+     },
+     "reference": {
+      "title": "Reference",
+      "type": "string"
+     },
+     "untranslatable": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Untranslatable"
+     }
+    },
+    "required": [
+     "blind_id",
+     "kind",
+     "reference",
+     "korean",
+     "arms"
+    ],
+    "title": "Disagreement",
     "type": "object"
    },
    "Document": {
@@ -2537,6 +2826,457 @@
     "title": "InventoryItem",
     "type": "object"
    },
+   "JevPlan": {
+    "properties": {
+     "calls": {
+      "title": "Calls",
+      "type": "integer"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "priced": {
+      "title": "Priced",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "calls",
+     "priced",
+     "note"
+    ],
+    "title": "JevPlan",
+    "type": "object"
+   },
+   "JudgeEstimate": {
+    "properties": {
+     "available_micro_usd": {
+      "title": "Available Micro Usd",
+      "type": "integer"
+     },
+     "blocked": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Blocked"
+     },
+     "envelope_remaining_micro_usd": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Envelope Remaining Micro Usd"
+     },
+     "estimate_id": {
+      "title": "Estimate Id",
+      "type": "string"
+     },
+     "expires_at": {
+      "title": "Expires At",
+      "type": "string"
+     },
+     "fits": {
+      "title": "Fits",
+      "type": "boolean"
+     },
+     "items": {
+      "title": "Items",
+      "type": "integer"
+     },
+     "jev": {
+      "$ref": "#/components/schemas/JevPlan"
+     },
+     "jev_model": {
+      "title": "Jev Model",
+      "type": "string"
+     },
+     "judge": {
+      "$ref": "#/components/schemas/PaidPlan"
+     },
+     "max_micro_usd": {
+      "title": "Max Micro Usd",
+      "type": "integer"
+     },
+     "model": {
+      "title": "Model",
+      "type": "string"
+     },
+     "paid_enabled": {
+      "title": "Paid Enabled",
+      "type": "boolean"
+     },
+     "part": {
+      "enum": [
+       "calibration",
+       "held_out"
+      ],
+      "title": "Part",
+      "type": "string"
+     },
+     "raw_sample": {
+      "title": "Raw Sample",
+      "type": "integer"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "translation": {
+      "$ref": "#/components/schemas/PaidPlan"
+     }
+    },
+    "required": [
+     "estimate_id",
+     "part",
+     "run_id",
+     "items",
+     "raw_sample",
+     "model",
+     "jev_model",
+     "translation",
+     "judge",
+     "jev",
+     "max_micro_usd",
+     "paid_enabled",
+     "available_micro_usd",
+     "fits",
+     "expires_at"
+    ],
+    "title": "JudgeEstimate",
+    "type": "object"
+   },
+   "JudgeLatency": {
+    "properties": {
+     "n": {
+      "title": "N",
+      "type": "integer"
+     },
+     "p50": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P50"
+     },
+     "p95": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P95"
+     }
+    },
+    "required": [
+     "n"
+    ],
+    "title": "JudgeLatency",
+    "type": "object"
+   },
+   "JudgeOverview": {
+    "properties": {
+     "reference": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/JudgeReference"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "rule": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rule"
+     },
+     "runs": {
+      "items": {
+       "$ref": "#/components/schemas/JudgeRun"
+      },
+      "title": "Runs",
+      "type": "array"
+     },
+     "split": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/JudgeSplit"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "reference",
+     "split",
+     "runs"
+    ],
+    "title": "JudgeOverview",
+    "type": "object"
+   },
+   "JudgePlanIn": {
+    "properties": {
+     "part": {
+      "enum": [
+       "calibration",
+       "held_out"
+      ],
+      "title": "Part",
+      "type": "string"
+     }
+    },
+    "required": [
+     "part"
+    ],
+    "title": "JudgePlanIn",
+    "type": "object"
+   },
+   "JudgeReference": {
+    "properties": {
+     "items": {
+      "title": "Items",
+      "type": "integer"
+     },
+     "labels": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Labels",
+      "type": "object"
+     },
+     "reference_sha256": {
+      "title": "Reference Sha256",
+      "type": "string"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "run_id",
+     "items",
+     "reference_sha256",
+     "labels"
+    ],
+    "title": "JudgeReference",
+    "type": "object"
+   },
+   "JudgeResults": {
+    "properties": {
+     "arms": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/ArmMetrics"
+      },
+      "default": {},
+      "title": "Arms",
+      "type": "object"
+     },
+     "config_hashes": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "default": {},
+      "title": "Config Hashes",
+      "type": "object"
+     },
+     "part": {
+      "title": "Part",
+      "type": "string"
+     },
+     "progress": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/ArmProgress"
+      },
+      "title": "Progress",
+      "type": "object"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "stop_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stop Reason"
+     },
+     "thresholds_sha256": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Thresholds Sha256"
+     },
+     "verdict": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ReplacementVerdict"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "run_id",
+     "part",
+     "status",
+     "progress"
+    ],
+    "title": "JudgeResults",
+    "type": "object"
+   },
+   "JudgeRun": {
+    "properties": {
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "part": {
+      "enum": [
+       "calibration",
+       "held_out"
+      ],
+      "title": "Part",
+      "type": "string"
+     },
+     "progress": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/ArmProgress"
+      },
+      "title": "Progress",
+      "type": "object"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "running": {
+      "title": "Running",
+      "type": "boolean"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "stop_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stop Reason"
+     },
+     "thresholds_fitted": {
+      "title": "Thresholds Fitted",
+      "type": "boolean"
+     },
+     "translated_batches": {
+      "title": "Translated Batches",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "run_id",
+     "part",
+     "created_at",
+     "running",
+     "status",
+     "progress",
+     "translated_batches",
+     "thresholds_fitted"
+    ],
+    "title": "JudgeRun",
+    "type": "object"
+   },
+   "JudgeSplit": {
+    "properties": {
+     "calibration": {
+      "title": "Calibration",
+      "type": "integer"
+     },
+     "held_out": {
+      "title": "Held Out",
+      "type": "integer"
+     },
+     "raw_sample": {
+      "title": "Raw Sample",
+      "type": "integer"
+     },
+     "seed": {
+      "title": "Seed",
+      "type": "integer"
+     },
+     "split_sha256": {
+      "title": "Split Sha256",
+      "type": "string"
+     }
+    },
+    "required": [
+     "seed",
+     "calibration",
+     "held_out",
+     "raw_sample",
+     "split_sha256"
+    ],
+    "title": "JudgeSplit",
+    "type": "object"
+   },
    "Latency": {
     "properties": {
      "p95": {
@@ -2628,6 +3368,35 @@
      "target"
     ],
     "title": "Owned",
+    "type": "object"
+   },
+   "PaidPlan": {
+    "properties": {
+     "attempts": {
+      "title": "Attempts",
+      "type": "integer"
+     },
+     "max_micro_usd": {
+      "title": "Max Micro Usd",
+      "type": "integer"
+     },
+     "segments": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Segments"
+     }
+    },
+    "required": [
+     "attempts",
+     "max_micro_usd"
+    ],
+    "title": "PaidPlan",
     "type": "object"
    },
    "PdfPages": {
@@ -2796,6 +3565,46 @@
      "status"
     ],
     "title": "Release",
+    "type": "object"
+   },
+   "ReplacementVerdict": {
+    "properties": {
+     "checks": {
+      "items": {
+       "$ref": "#/components/schemas/RuleCheck"
+      },
+      "title": "Checks",
+      "type": "array"
+     },
+     "deciding": {
+      "items": {
+       "$ref": "#/components/schemas/RuleCheck"
+      },
+      "title": "Deciding",
+      "type": "array"
+     },
+     "rule": {
+      "additionalProperties": true,
+      "title": "Rule",
+      "type": "object"
+     },
+     "verdict": {
+      "enum": [
+       "replaceable",
+       "not_replaceable",
+       "inconclusive"
+      ],
+      "title": "Verdict",
+      "type": "string"
+     }
+    },
+    "required": [
+     "verdict",
+     "checks",
+     "deciding",
+     "rule"
+    ],
+    "title": "ReplacementVerdict",
     "type": "object"
    },
    "RequestOut": {
@@ -3017,6 +3826,35 @@
      "timings_ms"
     ],
     "title": "Retrieval",
+    "type": "object"
+   },
+   "RuleCheck": {
+    "properties": {
+     "condition": {
+      "title": "Condition",
+      "type": "string"
+     },
+     "detail": {
+      "title": "Detail",
+      "type": "string"
+     },
+     "passed": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Passed"
+     }
+    },
+    "required": [
+     "condition",
+     "detail"
+    ],
+    "title": "RuleCheck",
     "type": "object"
    },
    "RunConfig": {
@@ -3918,6 +4756,40 @@
      "created_at"
     ],
     "title": "TraceSummary",
+    "type": "object"
+   },
+   "Usd": {
+    "properties": {
+     "calls": {
+      "title": "Calls",
+      "type": "integer"
+     },
+     "priced": {
+      "default": true,
+      "title": "Priced",
+      "type": "boolean"
+     },
+     "settled_micro_usd": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Settled Micro Usd"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     }
+    },
+    "required": [
+     "calls",
+     "source"
+    ],
+    "title": "Usd",
     "type": "object"
    },
    "Validation": {
@@ -5899,6 +6771,250 @@
      }
     },
     "summary": "Ingestion"
+   }
+  },
+  "/api/verify/judges/disagreements/{run_id}": {
+   "get": {
+    "operationId": "judge_disagreements_api_verify_judges_disagreements__run_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "run_id",
+      "required": true,
+      "schema": {
+       "title": "Run Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Disagreement"
+         },
+         "title": "Response Judge Disagreements Api Verify Judges Disagreements  Run Id  Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Judge Disagreements"
+   }
+  },
+  "/api/verify/judges/plan": {
+   "post": {
+    "description": "Free: prices the translations and Luna judge calls a part still needs, and counts its Jev calls.",
+    "operationId": "plan_judges_api_verify_judges_plan_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/JudgePlanIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JudgeEstimate"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Plan Judges"
+   }
+  },
+  "/api/verify/judges/progress": {
+   "get": {
+    "operationId": "judge_progress_api_verify_judges_progress_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JudgeOverview"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Judge Progress"
+   }
+  },
+  "/api/verify/judges/results/{run_id}": {
+   "get": {
+    "operationId": "judge_results_api_verify_judges_results__run_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "run_id",
+      "required": true,
+      "schema": {
+       "title": "Run Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JudgeResults"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Judge Results"
+   }
+  },
+  "/api/verify/judges/start": {
+   "post": {
+    "description": "Paid: runs the planned part through the gateway (`judge_eval`), never above the estimate.",
+    "operationId": "start_judges_api_verify_judges_start_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EstimateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Started"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Start Judges"
    }
   },
   "/api/verify/overview": {
