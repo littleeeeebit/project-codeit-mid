@@ -5,7 +5,8 @@ $taskCompose = Join-Path $taskRepo 'compose.langfuse.yaml'
 $taskAppEnv = Join-Path $taskRepo '.env'
 function New-TaskSecret { [Convert]::ToHexString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLowerInvariant() }
 if (-not (Test-Path -LiteralPath $taskSecrets)) {
-    # New secrets cannot open existing data: a reset needs `docker compose -f compose.langfuse.yaml down -v` first.
+    # New secrets cannot open existing data: a reset needs
+    # `docker compose --env-file .runtime/langfuse.env -f compose.langfuse.yaml down -v` first.
     if (docker volume ls -q --filter 'name=^bidmate-langfuse_postgres_data$') {
         throw 'bidmate-langfuse volumes exist but .runtime/langfuse.env is missing; restore the file or remove the volumes.'
     }
