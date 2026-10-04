@@ -41,6 +41,40 @@ class QualityAcceptanceTests(unittest.TestCase):
                                 has_metadata_snapshot=True, analyzer_fp="earlier-policy")
         self.assertIn("analyzer/query policy", self.prepare_with(index))
 
+    def test_plan_prices_with_the_ledger_rate_not_the_code_default(self):
+        settings = SimpleNamespace(embedding_model="text-embedding-3-large", embedding_dimensions=1536,
+                                   channel_top_k=20, fused_top_k=20, rrf_k=60, evidence_target_tokens=1,
+                                   evidence_max_tokens=1, evidence_max_units=1,
+                                   with_=lambda **k: SimpleNamespace(embedding_model="text-embedding-3-large",
+                                                                     embedding_dimensions=3072))
+        row = {"id": 1, "doc_id": "d", "source_hash": "h", "extraction_id": "x1", "answerable": True,
+               "evidence": [{}], "type": "fact", "question": "q"}
+        index = SimpleNamespace(version="kw", manifest_hash="m", rows_by_extraction={"x1": [0]},
+                                has_metadata_snapshot=True, analyzer_fp=None)
+        payloads = [{"payload_hash": f"p{i}", "extraction_id": "x1", "chunk_id": f"c{i}", "text": f"t{i}"}
+                    for i in range(2)]
+        ledger = {"rates": {"input": "0.26"}, "rate_version": "ledger-2x",
+                  "envelope_remaining_micro_usd": 10**9, "available_micro_usd": 10**9}
+        q = "tools.check_large_quality."
+        with patch(q + "evaluation.frozen_dataset", return_value={"current": True, "rows": 1}), \
+             patch(q + "evaluation.validate_gold", return_value={"ok": True}), \
+             patch(q + "evaluation.load_eval_rows", return_value=([row], [], "sha")), \
+             patch(q + "evaluation.population_identity", return_value="pop"), \
+             patch(q + "KeywordIndex.load", return_value=index), \
+             patch(q + "evaluation._ready_dense_for", return_value="dv"), \
+             patch(q + "dense.DenseIndex.load", return_value=SimpleNamespace(version="dv")), \
+             patch(q + "dense.index_payloads", return_value=(None, payloads)), \
+             patch(q + "dense.cache_get", return_value=None), \
+             patch(q + "dense.count_embedding_tokens", return_value=100_000), \
+             patch(q + "dense.plan_batches", side_effect=lambda s, m: [[p] for p in m]), \
+             patch(q + "dense._ledger_view", return_value=ledger):
+            plan = prepare(settings)[0]
+            self.assertEqual(plan["corpus_max_micro_usd"], 2 * 26000)  # 100k tokens at the ledger's $0.26/M, twice
+            self.assertEqual(plan["rate_version"], "ledger-2x")
+            with patch(q + "dense._ledger_view", return_value={**ledger, "rates": None}), \
+                    self.assertRaisesRegex(ValueError, "ledger rate"):
+                prepare(settings)
+
     def test_paired_probe_reads_the_verified_matrix_not_the_cache(self):
         matrix = np.eye(3, dtype=np.float32)
         index = SimpleNamespace(row_of={"a": 0, "b": 2})

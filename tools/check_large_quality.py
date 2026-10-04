@@ -18,7 +18,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from rfp_assistant import budget, dense, evaluation, service, store
 from rfp_assistant.retrieval import KeywordIndex, RUN_MODES, index_compatibility
-from rfp_assistant.settings import DEFAULT_RATES, load_settings
+from rfp_assistant.settings import load_settings
 
 
 def compare(candidate, reference, baseline):
@@ -137,7 +137,12 @@ def prepare(settings, analyzer=None, index_version=None):
             missing.append({**p, "reference_hash": key,
                             "tokens": dense.count_embedding_tokens(p["text"], reference.embedding_model)})
     batches = dense.plan_batches(reference, missing)
-    rates = DEFAULT_RATES[settings.embedding_model]
+    envelope = dense._ledger_view(settings, "embedding")
+    gold = dense._ledger_view(settings, "gold_eval")
+    # Price with the ledger snapshot that reservations enforce, never the code default.
+    rates = envelope["rates"]
+    if rates is None:
+        raise ValueError(f"no configured ledger rate for {settings.embedding_model}")
     corpus_max = sum(budget.max_cost(rates, sum(p["tokens"] for p in b), 0) for b in batches)
     query_max = 0
     for s in (settings, reference):
@@ -147,8 +152,6 @@ def prepare(settings, analyzer=None, index_version=None):
             key = dense.payload_hash(dense.normalize_payload(r["question"]), s.embedding_model, s.embedding_dimensions)
             if dense.cache_get(s, key) is None:
                 query_max += budget.max_cost(rates, dense.count_embedding_tokens(r["question"], s.embedding_model) + dense.QUERY_MARGIN_TOKENS, 0)
-    envelope = dense._ledger_view(settings, "embedding")
-    gold = dense._ledger_view(settings, "gold_eval")
     plan = {"version": "large-quality-plan-1", "candidate_model": settings.embedding_model,
             "candidate_dimensions": 1536, "reference_dimensions": 3072,
             "reference_serving": False, "dataset_sha256": dataset_sha,
@@ -160,7 +163,7 @@ def prepare(settings, analyzer=None, index_version=None):
                 "evidence_target_tokens", "evidence_max_tokens", "evidence_max_units")},
             "reference_misses": len(missing), "reference_tokens": sum(p["tokens"] for p in missing),
             "reference_batches": len(batches), "corpus_max_micro_usd": corpus_max,
-            "query_max_micro_usd": query_max,
+            "query_max_micro_usd": query_max, "rate_version": envelope["rate_version"], "rates": rates,
             "fits_envelopes": corpus_max <= envelope["envelope_remaining_micro_usd"] and
                 query_max <= gold["envelope_remaining_micro_usd"] and
                 corpus_max + query_max <= envelope["available_micro_usd"]}
