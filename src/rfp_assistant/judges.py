@@ -188,10 +188,9 @@ def load_reference(settings: Settings) -> tuple[list[dict], dict]:
     return [json.loads(line) for line in raw.decode("utf-8").splitlines() if line.strip()], manifest
 
 
-def make_split(settings: Settings) -> dict:
+def _draw_split(items: list[dict], manifest: dict) -> dict:
     """Calibration and held-out parts, seeded and stratified by (kind, reference verdict), plus a seeded raw-Korean
-    control sample of each part. Persisted once; a different split for the same reference is refused."""
-    items, manifest = load_reference(settings)
+    control sample of each part. Deterministic for a given reference."""
     rng = random.Random(SEED)
     strata: dict[tuple, list[str]] = {}
     for i in items:
@@ -208,12 +207,27 @@ def make_split(settings: Settings) -> dict:
              "raw_sample": {"calibration": sorted(sample.sample(sorted(calibration), RAW_SAMPLE)),
                             "held_out": sorted(sample.sample(sorted(held_out), RAW_SAMPLE))}}
     split["split_sha256"] = _sha(dumps(split))
+    return split
+
+
+def _verified_split(stored: dict, drawn: dict) -> dict:
+    """The persisted split only when its contents still hash to its recorded hash and equal the deterministic
+    draw from the installed reference: an edited ID list is refused even when the hash field was left alone."""
+    body = {k: v for k, v in stored.items() if k != "split_sha256"}
+    if _sha(dumps(body)) != stored.get("split_sha256"):
+        raise JudgeError("split.json no longer matches its recorded hash; it was changed after it was persisted")
+    if stored != drawn:
+        raise JudgeError("split.json differs from the seeded split of the installed reference; it is never redrawn")
+    return stored
+
+
+def make_split(settings: Settings) -> dict:
+    """Persisted once; a different split for the same reference is refused."""
+    items, manifest = load_reference(settings)
+    split = _draw_split(items, manifest)
     path = root(settings) / "split.json"
     if path.exists():
-        prior = json.loads(path.read_text(encoding="utf-8"))
-        if prior["split_sha256"] != split["split_sha256"]:
-            raise JudgeError("a different split is already persisted for this reference; it is never redrawn")
-        return prior
+        return _verified_split(json.loads(path.read_text(encoding="utf-8")), split)
     write_text_atomic(path, json.dumps(split, ensure_ascii=False, indent=1))
     return split
 
@@ -222,7 +236,7 @@ def load_split(settings: Settings) -> dict:
     path = root(settings) / "split.json"
     if not path.exists():
         raise JudgeError("no judge split: run `judge-reference` first")
-    return json.loads(path.read_text(encoding="utf-8"))
+    return _verified_split(json.loads(path.read_text(encoding="utf-8")), _draw_split(*load_reference(settings)))
 
 
 # ---------------------------------------------------------------- deterministic value checks
@@ -345,8 +359,14 @@ def _cache_path(settings: Settings, masked: str) -> Path:
 
 
 def cached_translation(settings: Settings, masked: str) -> dict | None:
+    """The cached record for this exact source, or None. A record whose identity does not match the key it sits
+    under (edited or misplaced) is a miss, so the segment is translated again rather than trusted."""
     path = _cache_path(settings, masked)
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+    if not path.exists():
+        return None
+    hit = json.loads(path.read_text(encoding="utf-8"))
+    identity = {"masked": masked, "model": MODEL, "version": BRIDGE_VERSION, "glossary_sha256": glossary_sha()}
+    return hit if all(hit.get(k) == v for k, v in identity.items()) else None
 
 
 def english(settings: Settings, item: dict, orgs: list[str]) -> tuple[dict | None, str | None]:
@@ -587,17 +607,23 @@ def kappa(pairs: list[tuple[bool, bool]]) -> float | None:
     return None if pe >= 1 else (po - pe) / (1 - pe)
 
 
-def fit_band(points: list[tuple[float, bool]], min_coverage: float = MIN_FIT_COVERAGE) -> dict | None:
+def fit_band(points: list[tuple[float, bool]], total: int | None = None,
+             min_coverage: float = MIN_FIT_COVERAGE) -> dict | None:
     """Thresholds lo <= hi over (probability, reference positive): p >= hi accepts, p < lo rejects, between
-    abstains. Maximises binary kappa among bands that keep at least `min_coverage` of the points (the widest
-    coverage when none does); ties prefer fewer false accepts, then more coverage, then the narrower band."""
+    abstains. Coverage is judged items over `total`, every eligible item, so items that already abstained (a failed
+    call, an untranslatable item) count against it. Maximises binary kappa among bands that keep at least
+    `min_coverage` (the widest coverage when none does, flagged `meets_floor: False`); ties prefer fewer false
+    accepts, then more coverage, then the narrower band."""
+    n = len(points) if total is None else total
+    if n < len(points):
+        raise ValueError("total must count every eligible item")
     if not points:
-        return None
+        return None if not n else {"lo": None, "hi": None, "kappa": None, "coverage": 0.0, "false_accepts": 0,
+                                   "n": n, "points": 0, "meets_floor": False}
     import bisect
 
     pos = sorted(p for p, ref in points if ref)
     neg = sorted(p for p, ref in points if not ref)
-    n = len(points)
     cuts = sorted({p for p, _ in points} | {0.0, 1.0 + 1e-9})
     below = [(bisect.bisect_left(pos, c), bisect.bisect_left(neg, c)) for c in cuts]  # counts with p < c
     best = None
@@ -615,7 +641,8 @@ def fit_band(points: list[tuple[float, bool]], min_coverage: float = MIN_FIT_COV
                 k = None if pe >= 1 else (po - pe) / (1 - pe)
             score = (cov >= min_coverage, -1 if k is None else k, -fa, cov, -(cuts[j] - lo))
             if best is None or score > best[0]:
-                best = (score, {"lo": lo, "hi": cuts[j], "kappa": k, "coverage": cov, "false_accepts": fa, "n": n})
+                best = (score, {"lo": lo, "hi": cuts[j], "kappa": k, "coverage": cov, "false_accepts": fa, "n": n,
+                                "points": len(points), "meets_floor": cov >= min_coverage})
     return best[1]
 
 
@@ -710,6 +737,17 @@ def _inputs(settings: Settings, part: str) -> dict:
         if not path.exists():
             raise JudgeError(f"fit the thresholds first: complete the calibration run {calibration}")
         thresholds = json.loads(path.read_text(encoding="utf-8"))
+        # the stored fit must be exactly what the calibration judgements give now, under the declared rule
+        refit = fit_thresholds(settings, calibration, [by_id[b] for b in split["calibration"]],
+                               set(split["raw_sample"]["calibration"]))
+        if thresholds != refit:
+            raise JudgeError(f"thresholds.json of {calibration} does not match a refit of its judgements; refit it "
+                             "with `judge-refit` before any held-out run")
+        missed = [f"{arm}/{family}" for arm, fams in thresholds["bands"].items() for family, band in fams.items()
+                  if not (band or {}).get("meets_floor")]
+        if missed:
+            raise JudgeError(f"the calibration fit missed the {MIN_FIT_COVERAGE:.0%} coverage floor for "
+                             f"{', '.join(missed)}; held-out evaluation is refused")
     config = _config(settings, part, split, orgs, thresholds)
     return {"part": part, "items": [by_id[b] for b in split[part]], "raw": set(split["raw_sample"][part]),
             "orgs": orgs, "thresholds": thresholds, "config": config, "run_id": run_id_for(config)}
@@ -1027,21 +1065,35 @@ def labels(settings: Settings, run_id: str, items: list[dict], thresholds: dict 
     return out
 
 
-def fit_thresholds(settings: Settings, run_id: str, items: list[dict]) -> dict:
-    """Bands per Jev arm and question family from calibration probabilities; the code-settled items are left out
-    because no probability decides them."""
+def fit_thresholds(settings: Settings, run_id: str, items: list[dict], raw: set[str]) -> dict:
+    """Bands per Jev arm and question family from calibration probabilities. Every item the arm was asked about
+    counts toward coverage, failed and untranslatable ones included; only code-settled items are left out, because
+    no probability decides them."""
     done = load_judgements(settings, run_id)
     bands: dict[str, dict] = {}
     for arm in ("jev_bridged", "jev_raw"):
         for family in ("support", "coverage"):
-            points = [(r["answers"]["support"], positive(i["reference"])) for i in items
-                      if FAMILY[i["kind"]] == family and value_check(i) is None
-                      and (r := done.get((arm, i["blind_id"]))) and r.get("status") == "done"]
-            bands.setdefault(arm, {})[family] = fit_band(points)
+            eligible = [i for i in items if FAMILY[i["kind"]] == family and value_check(i) is None
+                        and (arm != "jev_raw" or i["blind_id"] in raw)]
+            points = [(r["answers"]["support"], positive(i["reference"])) for i in eligible
+                      if (r := done.get((arm, i["blind_id"]))) and r.get("status") == "done"]
+            bands.setdefault(arm, {})[family] = fit_band(points, total=len(eligible))
     body = {"run_id": run_id, "bands": bands, "min_fit_coverage": MIN_FIT_COVERAGE,
             "objective": "max binary kappa subject to coverage; then fewer false accepts, more coverage, narrower"}
     body["thresholds_sha256"] = _sha(dumps(body))
     return body
+
+
+def refit(settings: Settings) -> dict:
+    """Free: refits the thresholds of the completed calibration run under the current fitting rule, from its
+    stored judgements. No provider call; a held-out run then gets a new identity through the thresholds hash."""
+    run_id = _inputs(settings, "calibration")["run_id"]
+    if not (run_dir(settings, run_id) / "config.json").exists():
+        raise JudgeError(f"no calibration run {run_id} to refit")
+    result = finalize(settings, run_id)
+    if "thresholds" not in result:
+        raise JudgeError(f"the calibration run {run_id} is not complete; finish it before fitting thresholds")
+    return result["thresholds"]
 
 
 def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) -> dict:
@@ -1061,7 +1113,7 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
               "stop_reason": stop_reason, "progress": progress, "scored_at": utcnow()}
     if config["part"] == "calibration":
         if complete:
-            thresholds = fit_thresholds(settings, run_id, items)
+            thresholds = fit_thresholds(settings, run_id, items, inputs["raw"])
             write_text_atomic(d / "thresholds.json", json.dumps(thresholds, ensure_ascii=False, indent=1))
             result["thresholds"] = thresholds
     else:

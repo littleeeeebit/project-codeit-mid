@@ -118,7 +118,7 @@ class Resources:
         self._index_lock = threading.Lock()
         self._runner: RequestRunner | None = None
         self._runner_lock = threading.Lock()
-        self._draft_jobs: list[threading.Thread] = []
+        self._jobs: list[threading.Thread] = []  # drafting, answer evaluation, judge runs: joined by close()
         self._closed = False
         closer = weakref.WeakMethod(self.close)  # atexit must not keep every Resources (and its index) alive
 
@@ -250,14 +250,14 @@ class Resources:
                 return
             self._closed = True
             runner = self._runner
-            drafting = list(self._draft_jobs)
+            jobs = list(self._jobs)
         deadline = time.monotonic() + self.settings.shutdown_wait_seconds
         if runner is not None:
             runner.shutdown(self.settings.shutdown_wait_seconds)
-        for thread in drafting:
+        for thread in jobs:
             if thread is not threading.current_thread():
                 thread.join(timeout=max(0, deadline - time.monotonic()))
-        if any(thread.is_alive() for thread in drafting):
+        if any(thread.is_alive() for thread in jobs):
             recover_requests(self.settings.db_path)
             budget.recover(self.settings.db_path)
         try:
@@ -1872,9 +1872,9 @@ def start_answer_evaluation(res: Resources, principal: Principal, estimate_id: s
         answers.recheck(res.settings, est)
     except answers.AnswerEvalError as exc:
         raise ServiceError(str(exc)) from None
-    if res.transport is None or res._closed:
-        raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
-    with _EVAL_LOCK:
+    with _EVAL_LOCK, res._runner_lock:  # close() must see and join every thread that uses its transport
+        if res.transport is None or res._closed:
+            raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
         if any(t.is_alive() for t in [*_EVAL_JOBS.values(), *_JUDGE_JOBS.values()]):
             raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
 
@@ -1889,6 +1889,7 @@ def start_answer_evaluation(res: Resources, principal: Principal, estimate_id: s
 
         thread = threading.Thread(target=job, name=f"rfp-eval-{est['run_id']}", daemon=True)
         _EVAL_JOBS[est["run_id"]] = thread
+        res._jobs.append(thread)
         thread.start()
     return est["run_id"]
 
@@ -1932,9 +1933,9 @@ def start_judges(res: Resources, principal: Principal, estimate_id: str) -> str:
 
     est = _judge_call(judges.load_estimate, res.settings, estimate_id)
     _judge_call(judges.recheck, res.settings, est)
-    if res.transport is None or res._closed:
-        raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
-    with _EVAL_LOCK:
+    with _EVAL_LOCK, res._runner_lock:  # close() must see and join every thread that uses its transport
+        if res.transport is None or res._closed:
+            raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
         if any(t.is_alive() for t in [*_EVAL_JOBS.values(), *_JUDGE_JOBS.values()]):
             raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
 
@@ -1949,6 +1950,7 @@ def start_judges(res: Resources, principal: Principal, estimate_id: str) -> str:
 
         thread = threading.Thread(target=job, name=f"rfp-judge-{est['run_id']}", daemon=True)
         _JUDGE_JOBS[est["run_id"]] = thread
+        res._jobs.append(thread)
         thread.start()
     return est["run_id"]
 
@@ -2358,7 +2360,7 @@ def start_drafting(res: Resources, principal: Principal, slots: list[dict], cons
 
         thread = threading.Thread(target=job, name=f"rfp-{run_id}", daemon=True)
         _DRAFT_JOBS[run_id] = thread
-        res._draft_jobs.append(thread)
+        res._jobs.append(thread)
         thread.start()
     return run_id
 

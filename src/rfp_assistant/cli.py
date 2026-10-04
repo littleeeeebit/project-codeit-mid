@@ -468,6 +468,14 @@ def cmd_judge_reference(args, settings):
     return 0
 
 
+def cmd_judge_refit(args, settings):
+    """Free: refits the Jev thresholds from the completed calibration run's stored judgements."""
+    thresholds = judges.refit(settings)
+    _print({"run_id": thresholds["run_id"], "thresholds_sha256": thresholds["thresholds_sha256"],
+            "bands": thresholds["bands"]})
+    return 0
+
+
 def cmd_set_envelopes(args, settings):
     values = json.loads(Path(args.file).read_text(encoding="utf-8"))
     _print(budget.set_envelopes(settings.db_path, args.actor, values, args.reason))
@@ -730,6 +738,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--disagree", action="store_true", help="second-review")
     s = sub.add_parser("judge-reference", help="copy the reviewed development judge reference read-only and split it")
     s.add_argument("--archive", help="archived pilot runtime holding run A-9ef59b566d64 (default: the PR #8 archive)")
+    sub.add_parser("judge-refit", help="free: refit Jev thresholds from the completed calibration run's judgements")
     envelopes = sub.add_parser("set-envelopes", help="owner reallocation in exact micro-USD, retaining the cap")
     envelopes.add_argument("--file", required=True)
     envelopes.add_argument("--actor", required=True)
@@ -745,7 +754,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 COMMANDS = {"init": cmd_init, "set-limit": cmd_set_limit, "register-embedding-rate": cmd_register_embedding_rate,
-            "set-envelopes": cmd_set_envelopes, "judge-reference": cmd_judge_reference, "manifest": cmd_manifest, "ingest": cmd_ingest, "review": cmd_review,
+            "set-envelopes": cmd_set_envelopes, "judge-reference": cmd_judge_reference, "judge-refit": cmd_judge_refit, "manifest": cmd_manifest, "ingest": cmd_ingest, "review": cmd_review,
             "import-reviews": cmd_import_reviews, "recover-source": cmd_recover_source, "identity": cmd_identity,
             "resolve-metadata": cmd_resolve_metadata, "plan-embeddings": cmd_plan_embeddings,
             "build-dense": cmd_build_dense, "evaluate-retrieval": cmd_evaluate_retrieval,

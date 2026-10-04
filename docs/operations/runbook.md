@@ -57,7 +57,7 @@ Paid generation stays disabled until `configure-budget` records the dates, prior
 - Re-submitting the same request (a rerun, a double click) returns the same request. The same key with a different question is refused.
 - Controlled stop: stop the server with Ctrl+C (SIGINT/SIGTERM). The resource owner then:
   1. stops accepting work;
-  2. waits up to `shutdown_wait_seconds` (20 s) for running workers;
+  2. waits up to `shutdown_wait_seconds` (20 s) for running workers and background jobs (gold drafting, development answer evaluation, judge comparison). No new job starts once stop begins;
   3. marks queued and unfinished requests `interrupted`;
   4. closes the SDK client and releases the lock.
 - A worker still inside a provider call keeps its attempt `dispatching`. That attempt becomes `unknown` at the next start.

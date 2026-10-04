@@ -1,8 +1,15 @@
 """The Korean bridge's checks, the threshold fit and the pre-declared replacement rule (judges.py)."""
 
+import json
+import tempfile
+import threading
+import time
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
-from rfp_assistant import judges
+from rfp_assistant import judges, service
 
 ORGS = ["국방과학연구소"]
 
@@ -59,6 +66,111 @@ class RuleTest(unittest.TestCase):
         self.assertIsNone(judges.jev_label(item, {"status": "done", "answers": {"support": 0.5}}, band))
         self.assertIsNone(judges.jev_label(item, {"status": "abstained", "abstain": "api_failure: timeout"}, band))
         self.assertEqual(judges.jev_label(item, {"status": "done", "answers": {"support": 0.2}}, band), "unsupported")
+
+
+def fake_reference(data_dir: Path, n: int = 400) -> SimpleNamespace:
+    """A minimal installed reference: link items, half supported, in the layout `load_reference` checks."""
+    items = [{"blind_id": f"B{i:04d}", "kind": "link", "claim": "c", "passages": ["p"],
+              "reference": "supporting" if i % 2 else "unsupported"} for i in range(n)]
+    body = "".join(json.dumps(i, ensure_ascii=False, sort_keys=True) + "\n" for i in items)
+    out = data_dir / "judges" / "reference"
+    out.mkdir(parents=True)
+    (out / "reference.jsonl").write_text(body, encoding="utf-8", newline="")
+    (out / "manifest.json").write_text(json.dumps({"reference_sha256": judges._sha(body)}), encoding="utf-8")
+    return SimpleNamespace(data_dir=data_dir)
+
+
+class SplitIntegrityTest(unittest.TestCase):
+    """Review round 1, F1: a persisted split is used only when it is still the one that was recorded."""
+
+    def test_an_edited_split_is_refused_even_with_its_hash_left_alone(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = fake_reference(Path(tmp))
+            split = judges.make_split(settings)
+            self.assertEqual(judges.load_split(settings), split)
+            path = Path(tmp) / "judges" / "split.json"
+            moved = dict(split, calibration=sorted([*split["calibration"], split["held_out"][0]]),
+                         held_out=split["held_out"][1:])
+            path.write_text(json.dumps(moved), encoding="utf-8")
+            with self.assertRaisesRegex(judges.JudgeError, "recorded hash"):
+                judges.load_split(settings)
+            with self.assertRaisesRegex(judges.JudgeError, "recorded hash"):
+                judges.make_split(settings)
+            body = {k: v for k, v in moved.items() if k != "split_sha256"}  # re-hashed: still not the seeded draw
+            path.write_text(json.dumps({**body, "split_sha256": judges._sha(judges.dumps(body))}), encoding="utf-8")
+            with self.assertRaisesRegex(judges.JudgeError, "seeded split"):
+                judges.load_split(settings)
+
+    def test_an_edited_bridge_cache_record_is_a_miss(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = SimpleNamespace(data_dir=Path(tmp))
+            masked = "계약기간은 [[V0]]"
+            path = judges._cache_path(settings, masked)
+            path.parent.mkdir(parents=True)
+            record = {"masked": masked, "text": "The contract period is [[V0]]", "model": judges.MODEL,
+                      "version": judges.BRIDGE_VERSION, "glossary_sha256": judges.glossary_sha()}
+            path.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
+            self.assertEqual(judges.cached_translation(settings, masked), record)
+            path.write_text(json.dumps({**record, "masked": "다른 원문 [[V0]]"}, ensure_ascii=False), encoding="utf-8")
+            self.assertIsNone(judges.cached_translation(settings, masked))
+
+
+class CalibrationCoverageTest(unittest.TestCase):
+    """Review round 1, F2: failed and untranslatable Jev items count against calibration coverage."""
+
+    def test_coverage_counts_every_eligible_item(self):
+        points = [(0.95, True)] * 50 + [(0.05, False)] * 50
+        self.assertEqual(judges.fit_band(points)["coverage"], 1.0)
+        band = judges.fit_band(points, total=200)  # 100 more were asked but failed or abstained
+        self.assertEqual((band["coverage"], band["points"], band["meets_floor"]), (0.5, 100, False))
+        self.assertFalse(judges.fit_band([], total=10)["meets_floor"])
+        with self.assertRaises(ValueError):
+            judges.fit_band(points, total=99)
+
+    def test_fit_thresholds_divides_by_all_eligible_items(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = fake_reference(Path(tmp), 40)
+            items, _ = judges.load_reference(settings)
+            run_id = "J-calibration-000000000000"
+            d = judges.run_dir(settings, run_id)
+            d.mkdir(parents=True)
+            records = [{"arm": "jev_bridged", "blind_id": i["blind_id"], "status": "done",
+                        "answers": {"support": 0.9 if i["reference"] == "supporting" else 0.1}} for i in items[:30]]
+            records += [{"arm": "jev_bridged", "blind_id": i["blind_id"], "status": "abstained",
+                         "abstain": "api_failure: timeout"} for i in items[30:]]
+            (d / "judgements.jsonl").write_text("".join(json.dumps(r) + "\n" for r in records), encoding="utf-8")
+            band = judges.fit_thresholds(settings, run_id, items, set())["bands"]["jev_bridged"]["support"]
+            self.assertEqual((band["n"], band["points"], band["coverage"], band["meets_floor"]), (40, 30, 0.75, False))
+
+
+class ShutdownTest(unittest.TestCase):
+    """Review round 1, F3: close() joins a running judge job before it closes the transport the job uses."""
+
+    def test_close_joins_the_judge_thread_before_closing_the_transport(self):
+        events = []
+        res = object.__new__(service.Resources)
+        res.settings = SimpleNamespace(shutdown_wait_seconds=10)
+        res.transport = SimpleNamespace(close=lambda: events.append("transport closed"))
+        res.provider_note, res._runner, res._lock = None, None, None
+        res._runner_lock, res._jobs, res._closed = threading.Lock(), [], False
+        res._database_lifecycle = SimpleNamespace(__exit__=lambda *a: events.append("database released"))
+
+        def run(settings, transport, estimate_id, member, closing):
+            while not closing():
+                time.sleep(0.01)
+            time.sleep(0.2)  # the in-flight call still finishes on the transport
+            events.append("judge job finished")
+
+        est = {"run_id": "J-held_out-000000000000"}
+        verifier = SimpleNamespace(member_id="v1")
+        with mock.patch.object(service, "_authorize", lambda res, p, role: p), \
+                mock.patch.object(judges, "load_estimate", lambda s, e: est), \
+                mock.patch.object(judges, "recheck", lambda s, e: None), mock.patch.object(judges, "run", run):
+            service.start_judges(res, verifier, "E-1")
+            res.close()
+            self.assertEqual(events, ["judge job finished", "transport closed", "database released"])
+            with self.assertRaisesRegex(service.ServiceError, "종료"):  # no new job once closing began
+                service.start_judges(res, verifier, "E-2")
 
 
 if __name__ == "__main__":
