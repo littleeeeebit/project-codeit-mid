@@ -23,6 +23,9 @@ fastapi==0.142.2
 uvicorn==0.54.0
 httpx==0.28.1
 
+# Optional Langfuse tracing of /api/ask and drafting (off unless the LANGFUSE_* settings are present)
+langfuse==4.16.0
+
 # ZoneInfo("Asia/Seoul") on Windows
 tzdata==2026.4; sys_platform == "win32"
 
