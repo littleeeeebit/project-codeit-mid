@@ -179,7 +179,9 @@ The same comparison then answered with 9 cited claims ($0.001541). The 26 paid q
 
 `refresh50-ad-migration-design` then hit `output_truncated` in three repeats out of three. To test whether prompt 6 caused this, the same three repeats ran with the prompt-5 text, and all three truncated as well. Its 13 required groups exceed the 2,000-token answer limit whichever prompt is used, so it stays a listed failure. Raising the output limit is outside this PR.
 
-New paid work in this PR totals $0.101600 against the $1.00 ceiling, which `--max-cost-usd` and the envelopes enforce:
+In the third round, the owner asked one All documents question ($0.001090) and one two-document comparison ($0.001572) in the running app. They confirmed both answers and their costs.
+
+New paid work in this PR totals $0.104262 against the $1.00 ceiling, which `--max-cost-usd` and the envelopes enforce:
 
 | Item | Cost (USD) |
 | --- | --- |
@@ -192,8 +194,9 @@ New paid work in this PR totals $0.101600 against the $1.00 ceiling, which `--ma
 | The owner's second acceptance round and the comparison retry | 0.004095 |
 | Paid end-to-end rerun under prompt 6 | 0.025906 |
 | Repeats under prompt 6 and the prompt-5 A/B | 0.008887 |
+| The owner's third acceptance round | 0.002662 |
 
-The ledger after this work reads $1.858977 spent, revision 1535, with 0 open, pending or unknown attempts.
+The ledger after this work reads $1.861639 spent, revision 1547, with 0 open, pending or unknown attempts.
 
 ### Archive and rollback
 
