@@ -5,6 +5,8 @@
 name: bidmate-langfuse
 x-langfuse-env: &langfuse-env
   NEXTAUTH_URL: http://127.0.0.1:3100
+  # Cookies ignore ports: another local Langfuse on 127.0.0.1 would otherwise overwrite these sessions.
+  NEXTAUTH_COOKIE_NAME_SUFFIX: bidmate
   DATABASE_URL: postgresql://postgres:${LANGFUSE_POSTGRES_PASSWORD:?Run tools/start-langfuse.ps1 first}@postgres:5432/postgres
   SALT: ${LANGFUSE_SALT:?}
   ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?}
