@@ -412,9 +412,9 @@ def _draft(settings: Settings, plan: dict, out: Path, max_cost_micro: int, trans
                              usage=response.usage, raw_output=response.content, finish_reason=response.finish_reason,
                              refusal=response.refusal)
                 store.write_text_atomic(path, store.dumps(trace))
-                gen.update(output=tracing.readable(response.content), metadata={
+                gen.update(lambda: {"output": tracing.readable(response.content), "metadata": {
                     "response_id": response.response_id, "finish_reason": response.finish_reason,
-                    "refusal": response.refusal})
+                    "refusal": response.refusal}})
                 if response.usage is None:
                     budget.mark_unknown(settings.db_path, aid, "drafting response missing usage")
                     raise gold.GoldError("Drafting usage unknown; stop and reconcile before another call")
@@ -423,7 +423,7 @@ def _draft(settings: Settings, plan: dict, out: Path, max_cost_micro: int, trans
                 except Exception as exc:
                     budget.mark_unknown(settings.db_path, aid, f"drafting settlement failed: {type(exc).__name__}")
                     raise gold.GoldError("Drafting settlement failed; stop and reconcile") from None
-                gen.update(**tracing.usage_and_cost(response.usage, settlement))
+                gen.update(lambda: tracing.usage_and_cost(response.usage, settlement))
             cost += settlement["settled_micro_usd"]
             trace["settlement"] = settlement
             store.write_text_atomic(path, store.dumps(trace))

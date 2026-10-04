@@ -5,7 +5,8 @@ reservation and settlement never read anything from here.
 to its workers and closes it (flush, shutdown, unregister). The SDK keeps one resource manager per public key for
 the whole process, so a second owner of the same key is refused instead of silently sharing the first's threads.
 Every SDK call is guarded: a missing, unreachable or failing Langfuse never changes an answer or the ledger.
-`mask_otel_spans` is the single exit gate: every exported string attribute passes `mask` first."""
+`mask_otel_spans` is the single exit gate: every exported string attribute passes `redact` first. Payloads are built
+lazily (`Step.update(lambda: ...)`) so formatting them can never delay or break the accounting around them."""
 
 from __future__ import annotations
 
@@ -20,6 +21,9 @@ from .settings import Settings, tracing_credentials
 
 log = logging.getLogger(__name__)
 
+_NAMES = r"api[_-]?key|secret[_-]?key|client[_-]?secret|password|passwd|access[_-]?token|auth[_-]?token"
+SECRET_NAME = re.compile(rf"(?i:{_NAMES})")
+_GAP = r"(?:[\\\"']|\\[nrt]|\s)*"  # quotes and whitespace, either of which may be JSON-escaped once or more
 SECRET = re.compile(
     r"(?:sk|pk|rk)-[A-Za-z0-9_\-]{16,}"  # OpenAI, Langfuse (pk-lf-/sk-lf-), Anthropic, Stripe-style keys
     r"|AIza[0-9A-Za-z_\-]{30,}"  # Google API keys
@@ -28,8 +32,7 @@ SECRET = re.compile(
     r"|xox[abpors]-[A-Za-z0-9\-]{10,}"
     r"|eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}"  # JWT
     r"|(?i:bearer|basic)\s+[A-Za-z0-9._~+/=\-]{16,}"
-    r"|(?i:api[_-]?key|secret[_-]?key|client[_-]?secret|password|passwd|access[_-]?token|auth[_-]?token)"
-    r"[\\\"']*\s*[:=]\s*[\\\"']*[^\s\\\"',}]{8,}")  # quotes may be JSON-escaped once or more
+    rf"|(?i:{_NAMES}){_GAP}[:=]{_GAP}[^\s\\\"',}}]{{8,}}")
 REDACTED = "[REDACTED]"
 
 
@@ -37,18 +40,53 @@ def mask(value: str) -> str:
     return SECRET.sub(REDACTED, value)
 
 
+def redact(value):
+    """`mask` applied to decoded content: a string holding JSON is decoded, every string and key inside it is masked
+    (recursively, so JSON inside JSON too), the whole value of a secret-named key is redacted, and the result is
+    serialised again. Escaped text therefore reaches the pattern as the plain text it stands for."""
+    if isinstance(value, str):
+        inner = _decoded(value)
+        if inner is None:
+            return mask(value)
+        out = redact(inner)
+        return value if out == inner else json.dumps(out, ensure_ascii=False)
+    if isinstance(value, dict):
+        return {mask(str(k)): REDACTED if SECRET_NAME.search(str(k)) and isinstance(v, (str, int, float))
+                and not isinstance(v, bool) and v != "" else redact(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [redact(v) for v in value]
+    return value
+
+
+def _decoded(text: str):
+    """The JSON container or string `text` encodes, or None for plain text (numbers and literals stay text)."""
+    if text.lstrip()[:1] not in ('{', '[', '"'):
+        return None
+    try:
+        return json.loads(text)
+    except Exception:  # noqa: BLE001 - not JSON (or nested past the parser's depth): treated as plain text
+        return None
+
+
 def mask_otel_spans(*, params):
-    """Langfuse export hook: sparse patches replacing every secret-shaped substring in string attributes."""
+    """Langfuse export hook, the single exit gate: sparse patches redacting every string attribute. A value that
+    cannot be redacted (nested past Python's recursion depth) leaves as `REDACTED` instead of unmasked."""
     from langfuse.types import MaskOtelSpansResult, OtelSpanPatch
+
+    def safe(value: str) -> str:
+        try:
+            return redact(value)
+        except Exception:  # noqa: BLE001 - e.g. RecursionError: fail closed
+            return REDACTED
 
     patches = {}
     for identifier, span in params.spans.items():
         changed = {}
         for key, value in span.attributes.items():
             if isinstance(value, str):
-                masked = mask(value)
+                masked = safe(value)
             elif isinstance(value, (list, tuple)) and value and all(isinstance(v, str) for v in value):
-                masked = [mask(v) for v in value]
+                masked = [safe(v) for v in value]
                 masked = masked if masked != list(value) else value
             else:
                 continue
@@ -120,13 +158,17 @@ class Step:
     def __init__(self, obs) -> None:
         self.obs = obs
 
-    def update(self, **kw) -> None:
+    def update(self, build=None, /, **kw) -> None:
+        """Fields as keywords, or `build` returning them: a builder runs only for a live observation and inside the
+        guard, so formatting a payload neither runs with tracing off nor raises into the traced work."""
         if self.obs is not None:
-            _guard(self.obs.update, **kw)
+            _guard(lambda: self.obs.update(**(build() if build is not None else kw)))
 
-    def score_trace(self, name: str, value: float, data_type: str) -> None:
+    def score_trace(self, name: str, value, data_type: str) -> None:
+        """`value` may be a callable, evaluated like an `update` builder."""
         if self.obs is not None:
-            _guard(self.obs.score_trace, name=name, value=value, data_type=data_type)
+            _guard(lambda: self.obs.score_trace(name=name, value=value() if callable(value) else value,
+                                                data_type=data_type))
 
 
 @contextmanager
@@ -166,7 +208,7 @@ def readable(content: str | None):
     """Structured output shown as the object it is; anything unparsable stays the raw text."""
     try:
         return json.loads(content or "")
-    except ValueError:
+    except Exception:  # noqa: BLE001 - ValueError, or RecursionError for deeply nested provider output
         return content
 
 

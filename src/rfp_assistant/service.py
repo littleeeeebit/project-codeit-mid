@@ -572,11 +572,9 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
         wanted = {"dense"} | ({"reranker"} if cfg["mode"] == "hybrid_rerank" else set())
         if cfg["mode"] in DENSE_MODES:
             result.limitations += [f"{stage}_unavailable" for stage in res.stage_errors if stage in wanted]
-        if found.obs is not None:  # chunk texts are only looked up for a trace that records them
-            found.update(output=_ranked_chunks(idx, result), metadata={
-                "index_version": result.index_version, "fallback": result.fallback,
-                "limitations": result.limitations, "timings_ms": result.timings_ms,
-                "candidates": result.candidates})
+        found.update(lambda: {"output": _ranked_chunks(idx, result), "metadata": {  # chunk texts only for a trace
+            "index_version": result.index_version, "fallback": result.fallback,
+            "limitations": result.limitations, "timings_ms": result.timings_ms, "candidates": result.candidates}})
     return result
 
 
@@ -690,12 +688,12 @@ def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retriev
                                              retrieval.limitations, mode=mode)
         rf = generation.answer_json_schema()
         tokens = generation.count_request_tokens(messages, rf, res.settings.framing_margin_tokens)
-        packed.update(output={
+        packed.update(lambda: {"output": {
             "evidence": [{"evidence_id": e.evidence_id, "doc_id": e.doc_id, "chunk_id": e.chunk_id,
                           "location": e.location, "token_count": e.token_count, "text": e.quote}
                          for e in retrieval.evidence],
             "evidence_tokens": retrieval.evidence_tokens, "prompt_input_tokens": tokens,
-            "limitations": retrieval.limitations, "excluded": retrieval.excluded})
+            "limitations": retrieval.limitations, "excluded": retrieval.excluded}})
     try:  # an unknown rate leaves the estimate empty; admission then refuses with `unknown_rate`
         est = budget.estimate(res.settings.db_path, res.settings.generation_model, tokens,
                               res.settings.generation_max_output_tokens)
@@ -926,12 +924,12 @@ CITATION_ERRORS = ("unknown_evidence_id", "evidence_scope_mismatch", "evidence_q
 
 def _trace_outcome(root: tracing.Step, result: AnswerResult, trace: dict) -> None:
     """The answer as the trace output, and the free deterministic scores known for every exit path."""
-    root.update(output={k: getattr(result, k) for k in ("status", "summary", "claims", "missing_fields",
-                                                         "conflicts", "next_action", "billing_state", "error")},
-                level="ERROR" if result.status == "technical_error" else "DEFAULT")
+    root.update(lambda: {"output": {k: getattr(result, k) for k in (
+        "status", "summary", "claims", "missing_fields", "conflicts", "next_action", "billing_state", "error")},
+        "level": "ERROR" if result.status == "technical_error" else "DEFAULT"})
     root.score_trace("insufficient_evidence", 1.0 if result.status == "insufficient_evidence" else 0.0, "BOOLEAN")
     if "retrieval" in trace:
-        root.score_trace("evidence_tokens", float(trace["retrieval"]["evidence_tokens"]), "NUMERIC")
+        root.score_trace("evidence_tokens", lambda: float(trace["retrieval"]["evidence_tokens"]), "NUMERIC")
 
 
 def _paid_answer(res: Resources, principal: Principal, request_id: str, request: AnswerRequest, question: str,
@@ -1032,9 +1030,9 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
             return done("technical_error", "모델 호출 중 연결이 끊겼습니다. 비용은 확인 전까지 보류로 남습니다.",
                         request_status="failed", evidence=evidence_map, error=f"{type(exc).__name__}: {exc}"[:300],
                         **common)
-        gen.update(output=tracing.readable(response.content), metadata={
+        gen.update(lambda: {"output": tracing.readable(response.content), "metadata": {
             "response_id": response.response_id, "finish_reason": response.finish_reason,
-            "refusal": response.refusal, "reasoning_tokens": (response.usage or {}).get("reasoning_tokens")})
+            "refusal": response.refusal, "reasoning_tokens": (response.usage or {}).get("reasoning_tokens")}})
         if response.usage is None:
             budget.mark_unknown(s.db_path, attempt_id, "provider returned no usage")
         else:
@@ -1047,7 +1045,7 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
                 return done("technical_error", "사용량을 기록하지 못했습니다. 비용은 확인 전까지 보류로 남습니다.",
                             request_status="failed", evidence=evidence_map,
                             error=f"settlement_failed: {type(exc).__name__}"[:300], **common)
-            gen.update(**tracing.usage_and_cost(response.usage, trace["settlement"]))
+            gen.update(lambda: tracing.usage_and_cost(response.usage, trace["settlement"]))
     stored = {e.evidence_id: _stored_quote(res, e) for e in retrieval.evidence}
     represented = {c["doc_id"] for c in coverage if c.get("evidence")}
     try:
@@ -1064,8 +1062,8 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
                 if str(exc).startswith(CITATION_ERRORS):
                     check.score_trace("citation_valid", 0.0, "BOOLEAN")
                 raise
-            check.update(output={"passed": True, "status": payload.status,
-                                 "cited_evidence_ids": sorted({i for c in payload.claims for i in c.evidence_ids})})
+            check.update(lambda: {"output": {"passed": True, "status": payload.status, "cited_evidence_ids": sorted(
+                {i for c in payload.claims for i in c.evidence_ids})}})
             check.score_trace("citation_valid", 1.0, "BOOLEAN")
     except generation.TechnicalError as exc:
         trace["raw_output"] = (response.content or "")[:4000]

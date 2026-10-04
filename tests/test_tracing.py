@@ -119,6 +119,31 @@ class AskTracingTest(unittest.TestCase):
 
         self.assertNotIn("pk-lf-test-ask", LangfuseResourceManager._instances)  # the owner's close freed the key
 
+    def test_a_multiline_secret_in_the_question_never_reaches_the_exported_payload(self):
+        exporter = InMemorySpanExporter()
+        tracer = tracing.Tracing(NOWHERE, "pk-lf-test-multi", "sk-lf-test-multi", span_exporter=exporter)
+        view, _, _ = self.ask(tracer, question="하자보수 기간은 얼마인가요? password:\n    hunter2hunter2")
+        self.assertEqual(view["status"], "completed")
+        raw = "\n".join(str(v) for s in exporter.get_finished_spans() for v in s.attributes.values())
+        self.assertNotIn("hunter2hunter2", raw)
+        self.assertNotIn("hunter2hunter2", exported_text(exporter))
+        self.assertIn("하자보수 기간은 얼마인가요?", exported_text(exporter))
+
+    def test_unformattable_provider_output_is_still_settled(self):
+        def nested(_messages):  # valid usage, content too deeply nested for json.loads
+            return generation.ProviderResponse("[" * 100000 + "0" + "]" * 100000, None, "stop",
+                                               {"prompt_tokens": 10, "completion_tokens": 10}, "deep-output")
+
+        for traced in (False, True):
+            with self.subTest(traced=traced):
+                self.tearDown()
+                self.setUp()
+                tracer = (tracing.Tracing(NOWHERE, "pk-lf-test-deep", "sk-lf-test-deep",
+                                          span_exporter=InMemorySpanExporter()) if traced else None)
+                view, attempts, _ = self.ask(tracer, nested)
+                self.assertEqual(view["result"]["status"], "technical_error")  # validation still refuses it
+                self.assertEqual([a["state"] for a in attempts], ["settled"])
+
     def test_an_invalid_citation_is_scored_false(self):
         def wrong_citation(messages):
             response = generation._echo_first_evidence(messages)
@@ -202,6 +227,35 @@ class TracingLifecycleTest(unittest.TestCase):
             self.assertNotIn(secret.split()[-1].split(":")[-1].strip('" '), tracing.mask(f"앞 {secret} 뒤"))
         rfp = '하자보수 기간은 검수 완료일로부터 12개월이다. "input_tokens": 1234, "evidence_tokens": 900, risk-assessment'
         self.assertEqual(tracing.mask(rfp), rfp)
+        self.assertEqual(tracing.redact(json.dumps({"q": rfp}, ensure_ascii=False)),
+                         json.dumps({"q": rfp}, ensure_ascii=False))  # unchanged values keep their serialisation
+
+    def test_redact_sees_through_json_escaping(self):
+        multiline = json.dumps({"question": "password:\n    hunter2hunter2"})  # escaped \n between name and value
+        nested = json.dumps([{"role": "user", "content": json.dumps({"note": "api_key =\t s3cr3tv4lue99"})}])
+        for exported in (multiline, nested, json.dumps(multiline)):
+            self.assertNotIn("hunter2hunter2", tracing.redact(exported))
+            self.assertNotIn("s3cr3tv4lue99", tracing.redact(exported))
+        self.assertNotIn("hunter2hunter2", tracing.mask(multiline))  # raw text (e.g. truncated JSON) too
+        named = json.loads(tracing.redact(json.dumps({"OPENAI_API_KEY": "short1", "password": 12345678,
+                                                      "evidence_tokens": 900})))
+        self.assertEqual(named, {"OPENAI_API_KEY": tracing.REDACTED, "password": tracing.REDACTED,
+                                 "evidence_tokens": 900})
+
+    def test_an_attribute_too_deep_to_redact_leaves_redacted(self):
+        from types import SimpleNamespace
+
+        def gate(value):
+            span = SimpleNamespace(attributes={"langfuse.observation.input": value, "plain": "하자보수"})
+            patches = tracing.mask_otel_spans(params=SimpleNamespace(spans={"s": span})).span_patches
+            return patches["s"].set_attributes if "s" in patches else {}
+
+        for depth in (500, 2000, 5000, 100000):  # walkable, parsable but too deep to walk, unparsable
+            deep = "[" * depth + json.dumps("password:\n hunter2hunter2") + "]" * depth
+            self.assertNotIn("hunter2hunter2", gate(deep)["langfuse.observation.input"])
+        with mock.patch.object(tracing, "redact", side_effect=RecursionError):
+            self.assertEqual(gate("password: hunter2hunter2"), {"langfuse.observation.input": tracing.REDACTED,
+                                                                "plain": tracing.REDACTED})
 
 
 @unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is required")
@@ -245,14 +299,38 @@ class LangfuseLauncherTest(unittest.TestCase):
             self.assertFalse((root / ".runtime/langfuse.env").exists())
 
 
+def _slot(env) -> dict:
+    ref = fx.scope(env, '기관A')
+    return {'question_id': 'trace-warranty', 'revision': 1, 'question_type': 'direct_fact',
+            'intent': 'Warranty period', 'scope': [ref], 'as_of_date': '2024-06-01',
+            'sources': [{'doc_id': ref['doc_id'], 'element_id': fx.element(env, '기관A', '%하자보수%')}]}
+
+
 class DraftingTracingTest(unittest.TestCase):
+    def test_unformattable_drafting_output_is_still_settled(self):
+        transport = generation.FakeTransport(lambda _: generation.ProviderResponse(
+            "[" * 100000 + "0" + "]" * 100000, None, 'stop', {'prompt_tokens': 10, 'completion_tokens': 10},
+            'deep-draft'))
+        for traced in (False, True):
+            with self.subTest(traced=traced), tempfile.TemporaryDirectory() as folder:
+                env = fx.make_env(Path(folder))
+                tracer = (tracing.Tracing(NOWHERE, "pk-lf-test-deep-draft", "sk-lf-test-deep-draft",
+                                          span_exporter=InMemorySpanExporter()) if traced else None)
+                try:
+                    with fixtures.paid_gateway(env.settings), self.assertRaises(Exception) as raised:
+                        drafting._generate(env.settings, {'slots': [_slot(env)]}, Path(folder) / 'out', 100000,
+                                           transport, 'dev', tracer=tracer)
+                finally:
+                    if tracer is not None:
+                        tracer.close()
+                self.assertNotIsInstance(raised.exception, RecursionError)  # the batch check refused it, after
+                with store.open_db(env.settings.db_path) as conn:  # settlement
+                    self.assertEqual([r["state"] for r in conn.execute("SELECT state FROM attempts")], ["settled"])
+
     def test_a_drafting_run_is_one_trace_with_its_generations_nested(self):
         with tempfile.TemporaryDirectory() as folder:
             env = fx.make_env(Path(folder))
-            ref = fx.scope(env, '기관A')
-            slot = {'question_id': 'trace-warranty', 'revision': 1, 'question_type': 'direct_fact',
-                    'intent': 'Warranty period', 'scope': [ref], 'as_of_date': '2024-06-01',
-                    'sources': [{'doc_id': ref['doc_id'], 'element_id': fx.element(env, '기관A', '%하자보수%')}]}
+            slot = _slot(env)
             draft = {'question_id': slot['question_id'], 'question': 'How long after acceptance?',
                      'answer': '12 months', 'difficulty': 'Reference event',
                      'pins': [{'source': 0, 'quote': fx.WARRANTY}], 'claims': [{'kind': 'number', 'value': 12,
