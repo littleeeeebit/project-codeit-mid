@@ -21,11 +21,18 @@ from .settings import Settings, tracing_credentials
 
 log = logging.getLogger(__name__)
 
-_NAMES = r"api[_-]?key|secret[_-]?key|client[_-]?secret|password|passwd|access[_-]?token|auth[_-]?token"
+_NAMES = (r"api[_-]?key|secret[_-]?key|client[_-]?secret|password|passwd|access[_-]?token|auth[_-]?token"
+          r"|비밀번호|패스워드")
 SECRET_NAME = re.compile(rf"(?i:{_NAMES})")
-# quotes and whitespace, either of which may be JSON-escaped once or more; an escape (\n) is tried before a lone
-# backslash so its letter is never mistaken for the start of the value
+# between a name and its separator: quotes and whitespace, either of which may be JSON-escaped once or more; an escape
+# (\n) is tried before a lone backslash so its letter is never mistaken for anything else
 _GAP = r"(?:\\[nrt]|[\\\"']|\s)*"
+# after the separator only whitespace is skipped: a quote opens the value. Plain text cannot be tokenised safely, so
+# the value is everything a reader would take for it: an opened container to the end of the string (truncated JSON, a
+# Python repr), a quoted value through its closing quote (to the end when unclosed), anything else to the end of line
+_VALUE = (r"(?:\\[nrt]|\s)*(?:[\[{](?s:.*)"
+          r"|(?P<quote>\\*[\"'])(?s:.*?)(?:(?P=quote)|\Z)"
+          r"|[^\n]+)")
 SECRET = re.compile(
     r"(?:sk|pk|rk)-[A-Za-z0-9_\-]{16,}"  # OpenAI, Langfuse (pk-lf-/sk-lf-), Anthropic, Stripe-style keys
     r"|AIza[0-9A-Za-z_\-]{30,}"  # Google API keys
@@ -34,9 +41,7 @@ SECRET = re.compile(
     r"|xox[abpors]-[A-Za-z0-9\-]{10,}"
     r"|eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}"  # JWT
     r"|(?i:bearer|basic)\s+[A-Za-z0-9._~+/=\-]{16,}"
-    # a secret name and a separator protect whatever follows, however short; an opened container (truncated JSON,
-    # a Python repr) cannot be delimited in plain text, so everything from it to the end of the string goes
-    rf"|(?i:{_NAMES}){_GAP}[:=]{_GAP}(?:[\[{{](?s:.*)|[^\s\\\"',}}]+)")
+    rf"|(?i:{_NAMES}){_GAP}[:=]{_VALUE}")  # a secret name and a separator protect the whole value, however short
 REDACTED = "[REDACTED]"
 
 

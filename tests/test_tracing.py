@@ -122,11 +122,13 @@ class AskTracingTest(unittest.TestCase):
     def test_a_multiline_secret_in_the_question_never_reaches_the_exported_payload(self):
         exporter = InMemorySpanExporter()
         tracer = tracing.Tracing(NOWHERE, "pk-lf-test-multi", "sk-lf-test-multi", span_exporter=exporter)
-        view, _, _ = self.ask(tracer, question="하자보수 기간은 얼마인가요? password:\n    hunter2hunter2")
+        view, _, _ = self.ask(tracer, question="하자보수 기간은 얼마인가요? password:\n    hunter2hunter2\n"
+                                               'api_key: ",quoted4quoted4"\npassword: "alpha betabeta"')
         self.assertEqual(view["status"], "completed")
         raw = "\n".join(str(v) for s in exporter.get_finished_spans() for v in s.attributes.values())
-        self.assertNotIn("hunter2hunter2", raw)
-        self.assertNotIn("hunter2hunter2", exported_text(exporter))
+        for secret in ("hunter2hunter2", "quoted4quoted4", "betabeta"):
+            self.assertNotIn(secret, raw)
+            self.assertNotIn(secret, exported_text(exporter))
         self.assertIn("하자보수 기간은 얼마인가요?", exported_text(exporter))
 
     def test_unformattable_provider_output_is_still_settled(self):
@@ -249,6 +251,26 @@ class TracingLifecycleTest(unittest.TestCase):
                     "password: short1"):
             self.assertNotIn("hunter2hunter2", tracing.redact(raw))
             self.assertNotIn("short1", tracing.redact(raw))
+
+    def test_a_free_text_value_is_redacted_whole_through_the_export_gate(self):
+        from types import SimpleNamespace
+
+        def gate(value):
+            span = SimpleNamespace(attributes={"langfuse.observation.input": value})
+            patches = tracing.mask_otel_spans(params=SimpleNamespace(spans={"s": span})).span_patches
+            return patches["s"].set_attributes["langfuse.observation.input"] if "s" in patches else value
+
+        cases = [('password: ",hunter2hunter2"', "hunter2hunter2"), ('password: "alpha beta"', "beta"),
+                 ("password: 'alpha beta'", "beta"), ("password: alpha beta", "beta"), ('api_key = "a,b c"', "b c"),
+                 ('password: "unclosed hunter2hunter2', "hunter2hunter2"), ("비밀번호: hunter2hunter2", "hunter2hunter2"),
+                 ("패스워드 = hunter2hunter2", "hunter2hunter2")]
+        for question, secret in cases:
+            for exported in (json.dumps({"question": question}), question, json.dumps(json.dumps({"q": question}))):
+                with self.subTest(exported=exported):
+                    self.assertNotIn(secret, gate(exported))
+        # the value ends where a reader would end it: after its closing quote, or at the end of its line
+        kept = json.loads(gate(json.dumps({"question": 'x password: "alpha beta" 남는 문장.\n둘째 줄.'})))
+        self.assertEqual(kept["question"], f"x {tracing.REDACTED} 남는 문장.\n둘째 줄.")
 
     def test_an_attribute_too_deep_to_redact_leaves_redacted(self):
         from types import SimpleNamespace
