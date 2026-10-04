@@ -179,6 +179,7 @@
       "enum": [
        "single",
        "compare",
+       "corpus",
        "metadata",
        "inventory"
       ],
@@ -195,7 +196,6 @@
        "$ref": "#/components/schemas/ScopeRef"
       },
       "maxItems": 2,
-      "minItems": 1,
       "title": "Scope",
       "type": "array"
      }
