@@ -16,7 +16,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from . import answers, auth, budget, chunking, drafting, evaluation, fidelity, generation, gold, ingestion, ops, release, sealed, service, store
+from . import answers, auth, budget, chunking, drafting, evaluation, fidelity, gold, ingestion, ops, release, sealed, service, store
 from .contracts import Principal
 from .settings import DEFAULT_RATES, RATE_VERSION, REPO_ROOT, load_settings
 
@@ -278,7 +278,7 @@ def cmd_load_check(args, settings) -> int:
 
 def cmd_reconcile(args, settings) -> int:
     record = json.loads(Path(args.file).read_text(encoding="utf-8"))
-    res = service.Resources(settings)
+    res = service.Resources(settings, dispatch=False)  # ledger only: runs beside the serving app
     try:
         _print(asdict(service.reconcile(res, auth.OWNER_CLI, record)))
     finally:
@@ -287,7 +287,7 @@ def cmd_reconcile(args, settings) -> int:
 
 
 def cmd_unresolved(args, settings) -> int:
-    res = service.Resources(settings)
+    res = service.Resources(settings, dispatch=False)  # ledger only: runs beside the serving app
     try:
         _print(service.unresolved_attempts(res, auth.OWNER_CLI))
     finally:
@@ -298,7 +298,7 @@ def cmd_unresolved(args, settings) -> int:
 def _ledger_owner(args, settings):
     """Ledger-only owner actions never dispatch, so they run beside the serving app without claiming its gateway
     lock; the typed actor is recorded in the audit log as the UI used to record the visitor's name."""
-    res = service.Resources(settings, transport=generation.FakeTransport())
+    res = service.Resources(settings, dispatch=False)
     return res, Principal(args.actor, auth.OWNER_CLI.capabilities)
 
 

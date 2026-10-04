@@ -203,9 +203,21 @@ The ledger after this work reads $1.861639 spent, revision 1547, with 0 open, pe
 Cold archives are kept under `.runtime/archive/` (private, ignored, referenced by no code; see `ARCHIVE.json`):
 
 - `sqlite-final-2026-10-04/`: the final `.sqlite3` snapshot (`ca299be9…`) and the former live file (`ceead767…`).
-- `postgresql-2026-10-04/`: a `python -m rfp_assistant.cli backup` custom-format dump (`database.dump`, `dc71fe72…`) with its manifest. Its ledger: spent 1,791,537 micro-USD, 438 attempts settled, pending and unknown 0.
+- `postgresql-2026-10-04-final/`: the rollback dump. It is a `python -m rfp_assistant.cli backup` custom-format dump (`database.dump`, `f33f74b1…`) with its manifest, taken with the app stopped after the last paid and acceptance write. Its ledger watermark is revision 1547: spent 1,861,639 micro-USD, all 514 attempts settled, 127 requests, pending and unknown 0. That equals the final ledger above.
+- `postgresql-2026-10-04/`: an earlier dump (`dc71fe72…`, revision 1319, spent 1,791,537 micro-USD, 438 attempts). It predates the paid end-to-end reruns and acceptance rounds, so it is history only and must not be restored.
 
-Rollback is a restore of that dump. Create an empty database, set `RFP_RESTORE_DATABASE_DSN` to it and run `python -m rfp_assistant.cli restore-check --backup <abs>/postgresql-2026-10-04/manifest.json`. The restore-check passed 39 of 39 checks with paid admission disabled. After a pass, point `RFP_DATABASE_DSN` at the restored database and re-enable paid admission deliberately with `paid on`.
+Rollback is a restore of the final dump. Create an empty database, set `RFP_RESTORE_DATABASE_DSN` to it and run `python -m rfp_assistant.cli restore-check --backup <abs>/postgresql-2026-10-04-final/manifest.json`. It passed 50 of 50 checks into the empty `bidmate_restore_final`, leaving paid admission disabled and all 514 attempts settled.
+
+Before turning paid admission on, compare the dump's watermark with the ledger being replaced. If that ledger is past revision 1547, every later request, attempt and adjustment must be reconciled into the restored database first (runbook §12). Restoring without that step loses settled spending. Only then point `RFP_DATABASE_DSN` at the restored database and run `paid on`. After any new paid write, take a new dump and restore-check it. The rollback dump is always the newest one that has passed.
+
+### Review rounds 1 and 2 (PR #13)
+
+Each finding was reproduced with a failing test before it was fixed:
+
+- F1: the rollback dump predated the final ledger. It was replaced by `postgresql-2026-10-04-final` as described above. The watermark rule is now in the README, in the runbook's PostgreSQL section and §12, and in `ARCHIVE.json`.
+- F2: an uncited inference was dropped whenever its document had any missing field. Now it is dropped only when it names a missing field listed for its own document. An unrelated inference, an absence listed for another document, or an uncited source fact still fails with `claim_without_evidence` (`tests.test_generation`).
+- F3: ledger-only commands took the gateway lock because they passed a `FakeTransport`. `Resources(dispatch=False)` opens no provider client and takes no owner. It covers `paid`, `settle`, `adjust` and `audit`, plus two more commands under the same documented rule: `unresolved` and `reconcile`. It also covers the estimate-only `PinnedResources` (no transport), which took the lock the same way. `tests.test_service` runs the commands and the estimate beside a foreign gateway owner.
+- F4: a borrowed gateway owner died with its creator. `GatewayOwner` now counts its users (`postgres.borrow_owner`), and the advisory lock is released with the last one. A test closes the first resource and answers through the borrower.
 
 ## Status and requirements
 

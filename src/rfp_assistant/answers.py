@@ -66,9 +66,10 @@ class PinnedResources(service.Resources):
     def __init__(self, settings: Settings, transport, serving: dict, owner: service.Resources | None = None) -> None:
         self._owner = owner  # its controlled stop is this borrower's stop: no new paid stage after it
         self._own_closed = False
-        super().__init__(settings, transport=_Borrowed(transport))
+        # Estimate only (no transport) is ledger-only: it never borrows or takes the gateway owner.
+        super().__init__(settings, transport=None if transport is None else _Borrowed(transport),
+                         dispatch=transport is not None)
         if transport is None:
-            self.transport = None
             self.provider_note = "no provider transport: estimate only"
         self.paid_purpose = "gold_eval"
         self._pinned = dict(serving)

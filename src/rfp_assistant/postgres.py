@@ -273,6 +273,7 @@ class GatewayOwner:
         self.target = target
         self.lock = threading.Lock()
         self.lost = False
+        self.users = 1  # this creator plus every borrow_owner(); the lock is released with the last user
         self.conn = psycopg.connect(target.dsn(), autocommit=True, connect_timeout=int(target.timeout))
         self.conn.execute("SET statement_timeout='5s'")
         try:
@@ -302,12 +303,16 @@ class GatewayOwner:
                 raise RuntimeError("PostgreSQL paid gateway ownership was lost; restart and reconcile unknown billing") from None
 
     def release(self):
+        """Drop one user; the last one closes the session and so releases the advisory lock."""
+        with _mutex:
+            self.users -= 1
+            if self.users > 0:
+                return
+            if _owners.get(self.target) is self:
+                del _owners[self.target]
         with self.lock:
             self.lost = True
             self.conn.close()
-        with _mutex:
-            if _owners.get(self.target) is self:
-                del _owners[self.target]
 
 
 def process_owner(target):
@@ -315,6 +320,16 @@ def process_owner(target):
     with _mutex:
         owner = _owners.get(target)
     return owner if owner is not None and not owner.lost and not owner.conn.closed else None
+
+
+def borrow_owner(target):
+    """Share this process's live owner: the caller becomes one more user and must release() it."""
+    with _mutex:
+        owner = _owners.get(target)
+        if owner is None or owner.lost or owner.conn.closed:
+            return None
+        owner.users += 1
+        return owner
 
 
 def require_owner(target):

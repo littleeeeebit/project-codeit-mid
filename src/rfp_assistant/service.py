@@ -62,9 +62,12 @@ class Resources:
     """Process-wide owner. provider='fake' never builds a real SDK client, whatever keys the host has."""
 
     def __init__(self, settings: Settings, transport: generation.Transport | None = None,
-                 recover: bool = False) -> None:
+                 recover: bool = False, dispatch: bool = True) -> None:
+        """`dispatch=False` is the ledger-only owner (budget administration beside the serving app): no provider
+        client and no gateway ownership, so any paid stage through it is refused at admission."""
         from .store import database_lifecycle
 
+        self._dispatch = dispatch
         self._database_lifecycle = database_lifecycle(settings.db_path)
         self._database_lifecycle.__enter__()
         try:
@@ -75,11 +78,18 @@ class Resources:
                     self.transport.close()
             finally:
                 try:
-                    if getattr(self, "_lock", None) is not None:
-                        self._lock.release()
+                    self._release_owner()
                 finally:
                     self._database_lifecycle.__exit__(None, None, None)
             raise
+
+    def _release_owner(self) -> None:
+        """Owned or borrowed, the gateway owner counts its users and releases the lock with the last one."""
+        for name in ("_lock", "_borrowed_owner"):
+            owner = getattr(self, name, None)
+            if owner is not None:
+                setattr(self, name, None)
+                owner.release()
 
     def _initialize(self, settings, transport, recover):
         """`recover=True` claims exclusive ownership of the data directory (the serving application does; a real
@@ -95,11 +105,15 @@ class Resources:
         self.transport: generation.Transport | None = transport
         self.provider_note = ""
         self.recovered: dict = {}
-        if recover:
+        if not self._dispatch:
+            if recover or transport is not None:
+                raise ValueError("a ledger-only Resources neither recovers nor dispatches")
+            self.provider_note = "ledger-only owner: paid stages are not dispatched here"
+        elif recover:
             self._own(settings)
-        if transport is None and settings.provider == "fake":
+        if self._dispatch and transport is None and settings.provider == "fake":
             self.transport = generation.FakeTransport(delay_seconds=settings.fake_delay_seconds)
-        elif transport is None:
+        elif self._dispatch and transport is None:
             key = read_api_key("OPENAI_API_KEY")
             if key:
                 if self._lock is None and self._borrowed_owner is None:
@@ -138,7 +152,7 @@ class Resources:
         atexit.register(stop)
 
     def _own(self, settings: Settings) -> None:
-        shared = postgres.process_owner(settings.db_path)
+        shared = postgres.borrow_owner(settings.db_path)
         if shared is not None:  # another Resources of this process owns it: its work is live, so no recovery
             self._borrowed_owner = shared
             return
@@ -271,8 +285,7 @@ class Resources:
                 self.transport.close()
         finally:
             try:
-                if self._lock is not None:
-                    self._lock.release()
+                self._release_owner()
             finally:
                 self._database_lifecycle.__exit__(None, None, None)
 

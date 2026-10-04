@@ -366,6 +366,39 @@ class ShutdownRestartTest(Base):
         finally:
             res2.close()
 
+    def test_closing_the_first_owner_keeps_the_gateway_for_a_live_borrower(self):
+        self.res.close()
+        first = service.Resources(self.settings, transport=FakeTransport(), recover=True)
+        second = service.Resources(self.settings, transport=FakeTransport())
+        try:
+            first.close()
+            owner = postgres.process_owner(self.settings.db_path)
+            self.assertIs(owner, second._borrowed_owner)
+            r = service.answer(second, self.env.consultant, req(self.a))  # paid admission through the borrower
+            self.assertEqual((r.status, r.billing_state), ("answered", "settled"), r.error)
+        finally:
+            second.close()
+        self.assertIsNone(postgres.process_owner(self.settings.db_path))  # the last user released it
+
+    def test_ledger_only_owner_commands_run_beside_another_gateway_owner(self):
+        from argparse import Namespace
+
+        from rfp_assistant import cli
+
+        self.res.close()
+        with fixtures.foreign_gateway(self.settings):  # the serving app in another process
+            for command, extra in ((cli.cmd_audit, {"limit": 5}), (cli.cmd_unresolved, {}),
+                                   (cli.cmd_paid, {"state": "off", "reason": "beside the app"})):
+                with self.subTest(command=command.__name__), mock.patch.object(cli, "_print"):
+                    self.assertEqual(command(Namespace(actor="owner", **extra), self.settings), 0)
+            self.assertFalse(budget.snapshot(self.settings.db_path).paid_enabled)
+            from rfp_assistant import answers
+
+            estimate = answers.PinnedResources(self.settings, None, {"run_id": None})  # estimate only
+            self.assertIsNone(estimate.transport)
+            estimate.close()
+            self.assertIsNone(postgres.process_owner(self.settings.db_path))
+
 
 SIGINT_CHILD = """
 import json, signal, sys, threading, time

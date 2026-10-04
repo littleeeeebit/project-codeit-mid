@@ -296,10 +296,14 @@ def validate_answer(response: ProviderResponse, evidence: list[EvidenceUnit], al
             if stored_quotes.get(eid) != ev.quote:
                 raise TechnicalError(f"evidence_quote_mismatch: {eid}")
 
-    # An uncited inference that only restates an absence already listed for its document adds nothing and is
-    # dropped; any other uncited claim still fails the whole answer.
-    missing_docs = {m.doc_id for m in payload.missing_fields}
-    restated = [c for c in payload.claims if not c.evidence_ids and c.kind == "inference" and c.doc_id in missing_docs]
+    # An uncited inference that restates an absence already listed for its document (it names that missing field)
+    # adds nothing and is dropped; any other uncited claim still fails the whole answer.
+    def squash(text: str) -> str:
+        return "".join(text.split()).casefold()
+
+    listed = [(m.doc_id, squash(m.field)) for m in payload.missing_fields if len(squash(m.field)) >= 2]
+    restated = [c for c in payload.claims if not c.evidence_ids and c.kind == "inference"
+                and any(doc == c.doc_id and field in squash(c.text) for doc, field in listed)]
     if restated:
         payload = payload.model_copy(update={"claims": [c for c in payload.claims if c not in restated]})
     for claim in payload.claims:

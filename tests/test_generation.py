@@ -159,19 +159,22 @@ class SafetyTest(unittest.TestCase):
             return ProviderResponse(json.dumps({
                 "status": "answered", "summary": "s", "conflicts": [], "next_action": None,
                 "claims": [{"text": t, "kind": k, "doc_id": d, "evidence_ids": ids} for t, k, d, ids in claims],
-                "missing_fields": [{"doc_id": d, "field": "f", "reason": "not_found_in_context"} for d in missing]},
+                "missing_fields": [{"doc_id": d, "field": f, "reason": "not_found_in_context"} for d, f in missing]},
                 ensure_ascii=False), None, "stop", None, None)
 
         def validate(response):
             return generation.validate_answer(response, [ev], {"A", "B"}, {"E1": ev.quote}, {"A", "B"})
 
         fact = ("A는 제안서 10부를 요구한다", "source_fact", "A", ["E1"])
-        absence = ("B에는 비교할 내용이 없다", "inference", "B", [])
-        payload = validate(respond([fact, absence], missing=["B"]))
+        absence = ("B 문서에서는 제안서 제출 부수를 확인할 수 없다", "inference", "B", [])
+        payload = validate(respond([fact, absence], missing=[("B", "제안서 제출 부수")]))
         self.assertEqual([c.text for c in payload.claims], [fact[0]])
         for claims, missing in (([fact, absence], []),  # no listed absence to restate
-                                ([fact, ("B는 5부", "source_fact", "B", [])], ["B"])):  # an uncited source fact
-            with self.assertRaisesRegex(generation.TechnicalError, "claim_without_evidence"):
+                                ([fact, absence], [("A", "제안서 제출 부수")]),  # listed for another document
+                                ([fact, ("B의 일정은 위험해 보인다", "inference", "B", [])], [("B", "예산")]),  # unrelated
+                                ([fact, ("B는 5부", "source_fact", "B", [])], [("B", "부수")])):  # an uncited fact
+            with self.subTest(claims=claims[1][0], missing=missing), \
+                    self.assertRaisesRegex(generation.TechnicalError, "claim_without_evidence"):
                 validate(respond(claims, missing))
 
 
