@@ -95,3 +95,35 @@ The in-place migration ran on the owner host on 2026-10-02, with the app stopped
 4. The pilot's own spending was recorded as owner adjustment `external:pr8-pilot-ledger`, $0.448818, citing the pilot ledger. The live ledger now shows $0.609441 spent, which matches the pilot ledger, with the $5 cap kept by owner decision ($4.390559 available).
 
 The pilot DB was not copied over the live one; the two histories stay separate. The pilot runtime (181 gold candidates, the frozen sealed set and its first run, answer runs) and its private receipts are archived, gitignored, under `.runtime/live-validation/pr8-review-archive/62015a9-owner-setup/`; its runtime is `runtime/` there. Do not publish their payloads or credentials. Use [runbook sections 10–12](runbook.md) for planning, paid execution, freeze, read-only reporting and paid-disabled recovery.
+
+## Judge comparison: Luna versus Jev (2026-10-04)
+
+Method, rule and limits are in [Luna judge versus Jev judge](../rag/judges.md). The reference is the 750 reviewed blind items of development run `A-9ef59b566d64`, copied read-only from the pilot archive after the receipt's packet and verdict hashes matched (reference `7c71e582…`, split `474cfa60…`). The sealed set and run `S-95b3004bd1a8` were not read.
+
+Funding: the owner moved $1.00 from `interactive` to the new `judge_eval` envelope (`set-envelopes`, actor `owner`), leaving embedding $2.50, gold_eval $2.50, interactive $4.00 and judge_eval $1.00 within the unchanged $10 cap.
+
+| Run | Part | Estimate (max) | Actual (ledger) | Outcome |
+| --- | --- | --- | --- | --- |
+| `J-calibration-637edadd55aa` | calibration, 373 items | $0.499313 | $0.093721 | complete; thresholds `b0670027…` fitted |
+| `J-held_out-3e072719113f` | held-out, 377 items (raw sample 120) | $0.373294 | $0.061321 | complete; verdict computed |
+
+The two runs together cost $0.155042, all of it in `judge_eval`: Luna judge calls, plus 83 translation batches. Afterwards the ledger showed $2.072519 spent, $0 pending and $0 unknown of the $10 cap. The 847 Jev calls are unpriced: TypeSafe reports usage but no price.
+
+Held-out result under `replacement-rule-1`: **replaceable**, with all three conditions met.
+
+| Arm | Judged / items | Agreement (Wilson 95%) | Kappa (pass/fail) | False accepts / reference negatives | p50 / p95 latency |
+| --- | --- | --- | --- | --- | --- |
+| Luna | 377 / 377 | 89.4% (85.9–92.1) | 0.189 | 7 / 13 | 1.80 s / 3.10 s |
+| Jev, bridged | 350 / 377 (92.8%) | 88.3% (84.5–91.3) | 0.220 | 6 / 13 | 0.24 s / 0.30 s |
+| Jev, raw Korean | 120 / 120 | 81.7% (73.8–87.6) | 0.115 | 1 / 3 | 0.23 s / 0.31 s |
+
+The verdict holds only as far as this reference allows. Both kappas are low: each judge fails many items the reference passes. Luna fails 31 of them and bridged Jev 36. The false-accept condition was decided by one item out of 13 negatives.
+
+Jev's 27 abstentions are all bridge rejections: 21 `changed_protected_value` and 6 `residual_hangul`. The bridge lifts Jev's kappa from 0.115 to 0.220. The raw-Korean arm has only 3 negatives in its sample.
+
+### The PostgreSQL work these runs ran on (2026-10-03/04)
+
+- The live app served from PostgreSQL `bidmate_app` as the authoritative database. The authority marker was installed at 2026-10-04 02:06 UTC after the final validated import; the SQLite ledger is a read-only cold archive. Every judge and translation call was admitted and settled on that PostgreSQL ledger.
+- The app had been started with the fake provider. For these runs it was restarted on 8501 with the real provider and the same database. That restart changed no budget settings.
+- Judges never retrieve, so the refused fixed-1,536 dense/hybrid serving switch (PR #12) played no part. It stays refused.
+- `/api/verify/fidelity` failed on PostgreSQL with a `GROUP BY` error, which blanked the whole 검증 page. It was fixed in `7cbe847` and checked live: 94 rows for 94 HWP sources.

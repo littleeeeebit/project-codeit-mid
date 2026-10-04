@@ -155,8 +155,39 @@ Runs resume: finished judgements are kept, and only the remainder runs again und
 - The held-out part holds 13 negative verdicts: 2 unsupported links, 9 missing and 2 incomplete qualifiers. False accepts and kappa rest on those few items. A difference of one false accept decides condition 2, and kappa moves sharply with one item.
 - The reference is itself an independent AI review (round 25), not human gold. Agreement measures consistency with that reviewer, not truth.
 - The bridge hides institution names behind opaque labels. Jev can tell two institutions apart but cannot use the name's meaning.
+- Only names in the corpus's purchasing-institution metadata are masked. A name spelled differently, or an organisation that is not a purchaser, is translated like other text. One held-out item renders 봉화군 as both "Bonghwa-gun" and "Bonghwa County". Such a name is not checked for alteration.
 - Jev is unpriced: TypeSafe returns token usage but no price.
 
 ## Result
 
-To be recorded after the held-out run.
+Recorded 2026-10-04 from held-out run `J-held_out-3e072719113f` (thresholds `b0670027…`, fitted by calibration run `J-calibration-637edadd55aa`). Spend and the run table are in the [release report](../operations/release-report.md#judge-comparison-luna-versus-jev-2026-10-04).
+
+Fitted bands:
+
+- bridged Jev: support 0.51, coverage 0.69, both with `lo = hi`, so no uncertain band survived the coverage floor;
+- raw Jev: support 0.83, coverage 0.60.
+
+| Arm | Coverage | Agreement (Wilson 95%) | Kappa | False accepts | p50 latency |
+| --- | --- | --- | --- | --- | --- |
+| Luna | 100% (377) | 89.4% (85.9–92.1) | 0.189 | 7 of 13 | 1.80 s |
+| Jev, bridged | 92.8% (350 of 377) | 88.3% (84.5–91.3) | 0.220 | 6 of 13 | 0.24 s |
+| Jev, raw Korean | 100% (120) | 81.7% (73.8–87.6) | 0.115 | 1 of 3 | 0.23 s |
+
+**Verdict: replaceable.** All three conditions hold:
+
+- kappa 0.220 ≥ 0.189 − 0.05;
+- false accepts 6 ≤ 7;
+- coverage 92.8% ≥ 90%.
+
+Read the verdict narrowly:
+
+- Neither judge reproduces the reference well on failures. Both kappas are below 0.25.
+  - Luna fails 12 supporting links and 19 supported answer claims.
+  - Bridged Jev fails 4 supporting links and 24 supported answer claims.
+  - Both pass most `missing` facts: Luna 6 of 9, Jev 4 of 9.
+- The false-accept condition was decided by one item.
+- All 27 Jev abstentions are bridge rejections; the bridge rejects rather than guesses. Most are `changed_protected_value`, where the translation dropped or reordered a placeholder.
+- The bridge matters. On raw Korean, Jev's kappa is 0.115, and it fails half of the supported answer claims in the sample.
+- No item was settled by the deterministic value checks.
+
+So the rule says Jev is no worse than this Luna judge against this reference. It does not say either judge is a reliable reviewer. A reference with more negatives, especially human-reviewed failures, is needed before either judge replaces independent review.
