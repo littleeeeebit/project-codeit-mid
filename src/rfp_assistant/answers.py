@@ -189,7 +189,8 @@ def price_row(pinned: PinnedResources, row: dict) -> dict:
     tokens = prep["input_tokens"]
     if qe.get("cache") == "miss":
         s = pinned.run_settings()
-        tokens += max(0, s.evidence_max_tokens - r.evidence_tokens)
+        sides = len(docs) if row.get("mode") == "compare" else 1  # each compared document has its own ceiling
+        tokens += max(0, s.evidence_max_tokens * sides - r.evidence_tokens)
         bound = budget.estimate(pinned.settings.db_path, pinned.settings.generation_model, tokens,
                                 pinned.settings.generation_max_output_tokens)
         bound += prep["estimate_micro_usd"] - budget.estimate(
@@ -670,10 +671,10 @@ def aggregate_answers(scored: list[dict]) -> dict:
         by_type[t] = _wilson_rate(sum(c["verdict"] == "correct" for c in cs), len(cs))
     return {
         "rows": len(scored), "answerable_rows": len(answerable),
-        "rows_passed": _wilson_rate(sum(s["passed"] for s in passage), len(passage)),
-        "rows_failed": [s["question_id"] for s in passage if not s["passed"]],
-        "gold_groups_not_retrieved": {s["question_id"]: s["groups"]["gold"] - s["groups"]["retrieved"]
-                                      for s in passage if s["groups"]["retrieved"] < s["groups"]["gold"]},
+        "rows_passed": _wilson_rate(sum(bool(s.get("passed")) for s in passage), len(passage)),
+        "rows_failed": [s["question_id"] for s in passage if not s.get("passed")],
+        "gold_groups_not_retrieved": {s["question_id"]: g["gold"] - g["retrieved"] for s in passage
+                                      for g in [s.get("groups") or {}] if g and g["retrieved"] < g["gold"]},
         "required_claim_correctness": _wilson_rate(sum(c["verdict"] == "correct" for c in claims), len(claims)),
         "question_completeness": _wilson_rate(len(complete_rows), len(answerable)),
         "claims_needing_review": sum(c["verdict"] == "needs_review" for c in claims),
