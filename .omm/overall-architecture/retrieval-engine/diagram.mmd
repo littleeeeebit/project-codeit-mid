@@ -1,0 +1,16 @@
+graph TD
+  analyzer["Kiwi analyzer\nsrc/rfp_assistant/retrieval.py"]
+  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval.py"]
+  query-policy["Scope query policy\nsrc/rfp_assistant/retrieval.py"]
+  dense-index["Dense matrix or pgvector set\nsrc/rfp_assistant/dense.py"]
+  rank-fusion["Reciprocal rank fusion\nsrc/rfp_assistant/retrieval.py"]
+  reranker["Local reranker\nsrc/rfp_assistant/dense.py"]
+  evidence-packer["Evidence packer\nsrc/rfp_assistant/retrieval.py"]
+  analyzer -->|query tokens| query-policy
+  keyword-index -->|scope doc frequencies| query-policy
+  keyword-index -->|row-aligned chunk ids| dense-index
+  query-policy -->|BM25 ranking| rank-fusion
+  dense-index -->|cosine ranking| rank-fusion
+  rank-fusion -->|fused pool| reranker
+  reranker -->|reordered pool| evidence-packer
+  rank-fusion -->|order without reranker| evidence-packer

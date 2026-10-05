@@ -1,0 +1,1 @@
+There is no login, by owner decision (2026-09-30, reaffirmed for phase 3). `auth.visitor(name)` gives every visitor every capability; the `X-Member` header only attributes work. The capability checks (`_authorize`) stay so each public function states its role, and CLI/tests can still pass narrower principals.

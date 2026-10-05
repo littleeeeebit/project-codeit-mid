@@ -1,0 +1,1 @@
+The durable marker written before the network call (`dispatched_at`). If the process dies here, `budget.recover` turns it into `unknown`, because the call may have executed.

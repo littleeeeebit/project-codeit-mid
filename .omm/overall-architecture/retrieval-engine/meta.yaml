@@ -1,0 +1,15 @@
+created: 2026-10-04T13:34:44.752Z
+updated: 2026-10-04T13:34:44.887Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: retrieval-engine
+children:
+  - analyzer
+  - dense-index
+  - evidence-packer
+  - keyword-index
+  - query-policy
+  - rank-fusion
+  - reranker
+parentPath: []

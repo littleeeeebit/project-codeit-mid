@@ -1,0 +1,1 @@
+Answer-evaluation threads (`_EVAL_JOBS`) are not added to `_draft_jobs`, so `close()` does not join them. They stop through `owner._closed` checks between rows and through transport closure. A call already in flight becomes `unknown` (via `mark_unknown`, or `budget.recover` on the next startup).

@@ -213,6 +213,15 @@ def rate_card(model: str) -> dict[str, Decimal]:
         raise SettingsError(f"no verified rate for model {model!r}") from None
 
 
+TRACING_ENV = ("LANGFUSE_HOST", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY")
+
+
+def tracing_credentials() -> tuple[str, str, str] | None:
+    """Langfuse host and project keys, read like the API key. Any one missing disables tracing."""
+    values = tuple(read_api_key(name) for name in TRACING_ENV)
+    return values if all(values) else None  # type: ignore[return-value]
+
+
 def read_api_key(name: str) -> str | None:
     """Process environment, then the repository's gitignored .env. Never logged."""
     key = os.environ.get(name)

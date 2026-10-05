@@ -1,0 +1,1 @@
+`RequestRunner._run` → `run_queued` claims the row with `UPDATE requests SET status='running' WHERE status='queued' AND cancel_requested=0`. A request cancelled or interrupted in the meantime is not claimed and silently does nothing. The worker rebuilds `AnswerRequest` and `Principal` from `request_json` and calls `_execute`.

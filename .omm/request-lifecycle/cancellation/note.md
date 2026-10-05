@@ -1,0 +1,1 @@
+`abandon_request` reads the status and then calls `cancel_request` in a separate transaction. `cancel_request` re-reads the status in its own transaction, so a request that started running in between receives `cancel_requested` rather than a wrong state.

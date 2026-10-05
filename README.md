@@ -46,8 +46,19 @@ Settings resolve from the repository location, never the working directory. Opti
 | `RFP_CONFIG_FILE` | none | JSON with nonsecret `Settings` fields (unknown keys are rejected) |
 | `RFP_HWP_CONVERTER` | env `Scripts\hwp5proc.exe` | HWP → XML converter |
 | `OPENAI_API_KEY` | none | Process environment, then the repository `.env`; never printed |
+| `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | none | Langfuse tracing; read like the API key. Any one missing turns tracing off |
 
 Without `OPENAI_API_KEY` the app still runs: search, filters, evidence browsing and retrieval traces are free; paid generation reports that the provider is unavailable. `provider: "fake"` in the config file never builds a real SDK client.
+
+### Langfuse tracing
+
+A local Langfuse v4 stack can record every `/api/ask` request and every drafting run. A request trace shows retrieval (chunk IDs, scores and text), the assembled evidence, the `gpt-6-luna` generation with its usage and ledger cost, and the answer validation. It carries three free, deterministic scores from the existing checks: `citation_valid`, `insufficient_evidence` and `evidence_tokens`. Embeddings, ingestion, OCR and evaluation runs are not traced. Tracing is observability only: admission, reservations and settlement never read it, and an absent, stopped or failing Langfuse changes neither answers nor the ledger.
+
+Start Docker Desktop, then run `./tools/start-langfuse.ps1`. The first run generates the stack's secrets into the gitignored `.runtime/langfuse.env`. It creates the organization, the project and its API keys headlessly, and starts `compose.langfuse.yaml` detached (Compose project `bidmate-langfuse`, with its own Postgres, ClickHouse, Redis and MinIO). Later runs reuse the same secrets and volumes. The script also writes the three `LANGFUSE_*` lines into `.env` and removes any `LANGFUSE_BASE_URL` there, which would point SDK tools elsewhere. Tracing starts with the next application start.
+
+The UI is at <http://127.0.0.2:3100> (MinIO media at port 9190). Both listen only on `127.0.0.2`, a loopback address of their own: browsers share cookies across ports, so a second local Langfuse on `127.0.0.1` would otherwise break this one's sign-in. Use that address rather than `localhost`, which a browser may resolve to `::1`. Sign in with `LANGFUSE_INIT_USER_EMAIL` and `LANGFUSE_INIT_USER_PASSWORD` from `.runtime/langfuse.env`. A request's trace ID is derived from its request ID (`Langfuse.create_trace_id(seed=request_id)`). Text is sent in full, except that one mask on the client redacts API keys, tokens and other secret-shaped values on export.
+
+To turn tracing off, remove the three `LANGFUSE_*` lines from `.env` (and from the process environment) and restart the application: no Langfuse client is created. Stop the stack with `docker compose --env-file .runtime/langfuse.env -f compose.langfuse.yaml down`; the secrets live only in that file, so Compose cannot read the stack definition without it. Add `-v` only to delete its data, and then delete `.runtime/langfuse.env` as well.
 
 Answers use `gpt-6-luna` through Chat Completions with strict structured output, `reasoning_effort: low` and a default maximum of 2,000 output tokens, reasoning included. The separately evaluated phase-4 pilot used 4,000; its results and limitations are in the [release report](docs/operations/release-report.md). Rates are in `settings.DEFAULT_RATES`: standard tier, $0.10 input, $0.01 cached, $0.125 cache write and $0.50 output per 1M tokens. Evidence is capped at 5,000 tokens, far below the 272K long-context tier.
 

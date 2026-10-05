@@ -1,0 +1,15 @@
+created: 2026-10-04T13:34:42.724Z
+updated: 2026-10-04T13:34:42.855Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: service-layer
+children:
+  - answer-pipeline
+  - background-jobs
+  - evidence-access
+  - gold-review
+  - request-runner
+  - resources
+  - verifier-runs
+parentPath: []

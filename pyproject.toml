@@ -23,6 +23,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "httpx",
+    "langfuse==4.16.0",
     "tzdata; sys_platform == 'win32'",
 ]
 

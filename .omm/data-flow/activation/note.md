@@ -1,0 +1,1 @@
+Per the README, this repository records no activation of its own. The active mode lives in the owner's runtime database and is printed by `release-report` and `report --phase 2`.

@@ -1,0 +1,1 @@
+`rrf_fuse` sums `1/(rrf_k + rank)` over the lexical and dense ID lists (each ID votes once per list, ties broken by chunk ID) and keeps `fused_top_k`. The serving `rrf_k` and depths come from the activated run via `Resources.run_settings`.

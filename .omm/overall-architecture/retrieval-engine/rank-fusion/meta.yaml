@@ -1,0 +1,9 @@
+created: 2026-10-04T13:34:45.665Z
+updated: 2026-10-04T13:34:45.666Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: rank-fusion
+children: []
+parentPath:
+  - retrieval-engine

@@ -1,0 +1,9 @@
+created: 2026-10-04T13:34:45.864Z
+updated: 2026-10-04T13:34:46.000Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: reranker
+children: []
+parentPath:
+  - retrieval-engine

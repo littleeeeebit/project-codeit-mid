@@ -1,0 +1,1 @@
+`_finish` stored a domain outcome: `answered`, `insufficient_evidence`, `ingestion_unavailable`, `budget_blocked`, or the free-mode results. The stored result is returned for repeated idempotency keys.

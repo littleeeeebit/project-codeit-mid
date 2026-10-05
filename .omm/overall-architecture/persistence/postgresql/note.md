@@ -1,0 +1,1 @@
+I found no code path in `src/` that sets `database_control.paid_admission` to true. Import and failed validation only set it false. Enabling it is presumably a separate cutover step outside the package (unverified).

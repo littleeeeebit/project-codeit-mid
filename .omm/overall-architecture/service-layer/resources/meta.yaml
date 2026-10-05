@@ -1,0 +1,9 @@
+created: 2026-10-04T13:34:42.988Z
+updated: 2026-10-04T13:34:43.119Z
+update_count: 2
+last_field: concern
+kind: nested-class
+title: resources
+children: []
+parentPath:
+  - service-layer

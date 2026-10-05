@@ -1,0 +1,1 @@
+A request whose billing is unknown is never re-sent, even by `answers._answer_row` resume logic, until it is reconciled.

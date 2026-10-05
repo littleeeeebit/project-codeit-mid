@@ -15,7 +15,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from . import auth, budget, dense, evaluation, generation, gold, store
+from . import auth, budget, dense, evaluation, generation, gold, store, tracing
 from .contracts import Principal
 from .settings import Settings, read_api_key
 
@@ -316,7 +316,28 @@ def generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, tra
 
 
 def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, transport, split: str, *, guard=None,
-              owner_check=None) -> dict:
+              owner_check=None, tracer: tracing.Tracing | None = None) -> dict:
+    """One Langfuse trace per drafting run. A lent transport comes with its owner's `tracer`; a run that creates
+    its own transport also creates and closes its own tracer."""
+    owns_tracer = transport is None and tracer is None
+    if owns_tracer:
+        tracer = tracing.Tracing.from_settings(settings)
+    try:
+        with tracing.run(tracer, "draft-gold-questions", seed=str(out), user_id=DRAFTER,
+                         input={"split": split, "plan": plan, "max_cost_usd": max_cost_micro / 1_000_000},
+                         metadata={"out": str(out), "split": split, "model": MODEL, "prompt_version": PROMPT_VERSION},
+                         tags=["drafting", split]) as root:
+            receipt = _draft(settings, plan, out, max_cost_micro, transport, split, guard=guard,
+                             owner_check=owner_check)
+            root.update(output=receipt)
+        return receipt
+    finally:
+        if owns_tracer and tracer is not None:
+            tracer.close()
+
+
+def _draft(settings: Settings, plan: dict, out: Path, max_cost_micro: int, transport, split: str, *, guard=None,
+           owner_check=None) -> dict:
     """Five slots per billed request. Cache and settle before validation; never retry or approve automatically."""
     if settings.generation_model != MODEL or max_cost_micro <= 0:
         raise gold.GoldError("Generation requires gpt-6-luna and a positive consented cost ceiling")
@@ -374,27 +395,35 @@ def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, tr
             aid = admission["attempt_id"]
             budget.mark_dispatching(settings.db_path, aid, guard)
             began = time.monotonic()
-            try:
-                response = transport.chat(model=MODEL, messages=payload, response_format=fmt,
-                                          max_completion_tokens=max_output, reasoning_effort="none")
-            except Exception as exc:
-                if isinstance(exc, generation.ProviderError) and exc.pre_execution:
-                    budget.release(settings.db_path, aid, type(exc).__name__, confirmed_pre_execution=True)
-                else:
-                    budget.mark_unknown(settings.db_path, aid, type(exc).__name__)
-                raise gold.GoldError(f"Drafting call failed: {type(exc).__name__}; no automatic retry") from None
-            trace.update(seconds=round(time.monotonic()-began, 3), response_id=response.response_id,
-                         usage=response.usage, raw_output=response.content, finish_reason=response.finish_reason,
-                         refusal=response.refusal)
-            store.write_text_atomic(path, store.dumps(trace))
-            if response.usage is None:
-                budget.mark_unknown(settings.db_path, aid, "drafting response missing usage")
-                raise gold.GoldError("Drafting usage unknown; stop and reconcile before another call")
-            try:
-                settlement = budget.settle(settings.db_path, aid, response.usage, response.response_id)
-            except Exception as exc:
-                budget.mark_unknown(settings.db_path, aid, f"drafting settlement failed: {type(exc).__name__}")
-                raise gold.GoldError("Drafting settlement failed; stop and reconcile") from None
+            with tracing.step("draft-question-batch", "generation", model=MODEL, input=payload,
+                              model_parameters={"reasoning_effort": "none", "max_completion_tokens": max_output},
+                              metadata={"batch": batch, "attempt_id": aid,
+                                        "question_ids": [s["question_id"] for s in subset]}) as gen:
+                try:
+                    response = transport.chat(model=MODEL, messages=payload, response_format=fmt,
+                                              max_completion_tokens=max_output, reasoning_effort="none")
+                except Exception as exc:
+                    if isinstance(exc, generation.ProviderError) and exc.pre_execution:
+                        budget.release(settings.db_path, aid, type(exc).__name__, confirmed_pre_execution=True)
+                    else:
+                        budget.mark_unknown(settings.db_path, aid, type(exc).__name__)
+                    raise gold.GoldError(f"Drafting call failed: {type(exc).__name__}; no automatic retry") from None
+                trace.update(seconds=round(time.monotonic()-began, 3), response_id=response.response_id,
+                             usage=response.usage, raw_output=response.content, finish_reason=response.finish_reason,
+                             refusal=response.refusal)
+                store.write_text_atomic(path, store.dumps(trace))
+                gen.update(lambda: {"output": tracing.readable(response.content), "metadata": {
+                    "response_id": response.response_id, "finish_reason": response.finish_reason,
+                    "refusal": response.refusal}})
+                if response.usage is None:
+                    budget.mark_unknown(settings.db_path, aid, "drafting response missing usage")
+                    raise gold.GoldError("Drafting usage unknown; stop and reconcile before another call")
+                try:
+                    settlement = budget.settle(settings.db_path, aid, response.usage, response.response_id)
+                except Exception as exc:
+                    budget.mark_unknown(settings.db_path, aid, f"drafting settlement failed: {type(exc).__name__}")
+                    raise gold.GoldError("Drafting settlement failed; stop and reconcile") from None
+                gen.update(lambda: tracing.usage_and_cost(response.usage, settlement))
             cost += settlement["settled_micro_usd"]
             trace["settlement"] = settlement
             store.write_text_atomic(path, store.dumps(trace))

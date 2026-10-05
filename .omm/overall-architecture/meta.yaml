@@ -1,0 +1,15 @@
+created: 2026-10-04T13:34:40.746Z
+updated: 2026-10-04T13:34:41.988Z
+update_count: 6
+last_field: note
+git_commit: 95e8dc5
+git_branch: main
+children:
+  - budget-ledger
+  - http-api
+  - owner-cli
+  - persistence
+  - provider-gateway
+  - retrieval-engine
+  - service-layer
+  - web-screens

@@ -1,7 +1,7 @@
 """Authenticated public functions, shared resource ownership and request orchestration.
 
-Resources (Kiwi analyzer, loaded index, SDK transport, process-owner lock) are created once per process
-by `Resources` and closed by `Resources.close()`. Sessions only supply the principal and the scope.
+Resources (Kiwi analyzer, loaded index, SDK transport and its Langfuse tracing, process-owner lock) are created
+once per process by `Resources` and closed by `Resources.close()`. Sessions only supply the principal and the scope.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
-from . import auth, budget, fidelity, generation, gold, postgres
+from . import auth, budget, fidelity, generation, gold, postgres, tracing
 from . import dense as dense_mod
 from .auth import require_any
 from .contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, EvidenceUnit, EvidenceView,
@@ -62,12 +62,13 @@ class Resources:
     """Process-wide owner. provider='fake' never builds a real SDK client, whatever keys the host has."""
 
     def __init__(self, settings: Settings, transport: generation.Transport | None = None,
-                 recover: bool = False, dispatch: bool = True) -> None:
+                 recover: bool = False, dispatch: bool = True, tracer: tracing.Tracing | None = None) -> None:
         """`dispatch=False` is the ledger-only owner (budget administration beside the serving app): no provider
         client and no gateway ownership, so any paid stage through it is refused at admission."""
         from .store import database_lifecycle
 
         self._dispatch = dispatch
+        self.tracing: tracing.Tracing | None = tracer
         self._database_lifecycle = database_lifecycle(settings.db_path)
         self._database_lifecycle.__enter__()
         try:
@@ -76,6 +77,8 @@ class Resources:
             try:
                 if getattr(self, "transport", None) is not None:
                     self.transport.close()
+                if self.tracing is not None:
+                    self.tracing.close()
             finally:
                 try:
                     self._release_owner()
@@ -120,6 +123,8 @@ class Resources:
                     self._own(settings)
                 self.transport = generation.OpenAITransport(key, settings.request_timeout_seconds,
                     owner_check=(self._lock or self._borrowed_owner).check)
+                if self.tracing is None:  # traced with the transport it observes; an injected transport is not
+                    self.tracing = tracing.Tracing.from_settings(settings)
             else:
                 self.provider_note = "OPENAI_API_KEY is not configured; paid generation is unavailable"
         if self.transport is not None and self._lock is None and self._borrowed_owner is None:
@@ -262,8 +267,12 @@ class Resources:
             recover_requests(self.settings.db_path)
             budget.recover(self.settings.db_path)
         try:
-            if self.transport is not None:
-                self.transport.close()
+            try:
+                if self.transport is not None:
+                    self.transport.close()
+            finally:
+                if self.tracing is not None:  # after the workers: flushes every trace they finished
+                    self.tracing.close()
         finally:
             try:
                 self._release_owner()
@@ -547,21 +556,37 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
             qvec, qinfo = dense_mod.query_vector(s, res.transport, question, request_id=request_id,
                                                  member_id=principal.member_id, purpose=res.paid_purpose,
                                                  allow_paid=allow_paid, guard=_dispatch_guard(res, request_id))
-    result = _retrieve(s, idx, res.analyzer, question, pairs, mode=cfg["mode"], dense=dense,
-                       query_vector=qvec, reranker=res.reranker() if cfg["mode"] == "hybrid_rerank" else None,
-                       rerank_depth=(cfg.get("reranker") or {}).get("depth"))
-    result.query_embedding = qinfo
-    from .retrieval import index_compatibility
+    with tracing.step("retrieve-evidence", "retriever", input={
+            "question": question, "scope": [asdict(r) for r, _ in pairs], "mode": cfg["mode"]}) as found:
+        result = _retrieve(s, idx, res.analyzer, question, pairs, mode=cfg["mode"], dense=dense,
+                           query_vector=qvec, reranker=res.reranker() if cfg["mode"] == "hybrid_rerank" else None,
+                           rerank_depth=(cfg.get("reranker") or {}).get("depth"))
+        result.query_embedding = qinfo
+        from .retrieval import index_compatibility
 
-    outdated = index_compatibility(idx, res.analyzer)
-    if outdated:  # still served (search must keep working) but never silently: rebuild and re-evaluate
-        result.limitations.append(f"index_outdated:{outdated}")
-    if cfg.get("fallback_reason") == "activated_corpus_route_requires_rerun":
-        result.limitations.append("activated_run_stale:corpus_route")
-    wanted ={"dense"} | ({"reranker"} if cfg["mode"] == "hybrid_rerank" else set())
-    if cfg["mode"] in DENSE_MODES:
-        result.limitations += [f"{stage}_unavailable" for stage in res.stage_errors if stage in wanted]
+        outdated = index_compatibility(idx, res.analyzer)
+        if outdated:  # still served (search must keep working) but never silently: rebuild and re-evaluate
+            result.limitations.append(f"index_outdated:{outdated}")
+        if cfg.get("fallback_reason") == "activated_corpus_route_requires_rerun":
+            result.limitations.append("activated_run_stale:corpus_route")
+        wanted = {"dense"} | ({"reranker"} if cfg["mode"] == "hybrid_rerank" else set())
+        if cfg["mode"] in DENSE_MODES:
+            result.limitations += [f"{stage}_unavailable" for stage in res.stage_errors if stage in wanted]
+        found.update(lambda: {"output": _ranked_chunks(idx, result), "metadata": {  # chunk texts only for a trace
+            "index_version": result.index_version, "fallback": result.fallback,
+            "limitations": result.limitations, "timings_ms": result.timings_ms, "candidates": result.candidates}})
     return result
+
+
+def _ranked_chunks(idx: KeywordIndex, result: RetrievalResult) -> list[dict]:
+    """Pre-pack ranking with each chunk's best score per channel and its indexed text."""
+    scores: dict[str, dict] = {}
+    for c in result.candidates:
+        scores.setdefault(c["chunk_id"], {})[c["channel"]] = c["score"]
+    packed = {e.chunk_id for e in result.evidence}
+    return [{"rank": r + 1, "chunk_id": cid, "scores": scores.get(cid, {}), "packed": cid in packed,
+             "text": idx.chunks[idx.row_of[cid]].get("payload") if cid in idx.row_of else None}
+            for r, cid in enumerate(result.ranking)]
 
 
 # ---------------------------------------------------------------- answers
@@ -657,10 +682,18 @@ def prepare_answer(res: Resources, principal: Principal, question: str, scope: l
 
 def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retrieval: RetrievalResult,
             mode: str, price_query_embedding: bool = True) -> dict:
-    messages = generation.build_messages(question, as_of, [_doc_brief(d) for d in docs], retrieval.evidence,
-                                         retrieval.limitations, mode=mode)
-    rf = generation.answer_json_schema()
-    tokens = generation.count_request_tokens(messages, rf, res.settings.framing_margin_tokens)
+    with tracing.step("assemble-evidence", input={"question": question, "as_of": as_of, "mode": mode,
+                                                  "doc_ids": [d["doc_id"] for d in docs]}) as packed:
+        messages = generation.build_messages(question, as_of, [_doc_brief(d) for d in docs], retrieval.evidence,
+                                             retrieval.limitations, mode=mode)
+        rf = generation.answer_json_schema()
+        tokens = generation.count_request_tokens(messages, rf, res.settings.framing_margin_tokens)
+        packed.update(lambda: {"output": {
+            "evidence": [{"evidence_id": e.evidence_id, "doc_id": e.doc_id, "chunk_id": e.chunk_id,
+                          "location": e.location, "token_count": e.token_count, "text": e.quote}
+                         for e in retrieval.evidence],
+            "evidence_tokens": retrieval.evidence_tokens, "prompt_input_tokens": tokens,
+            "limitations": retrieval.limitations, "excluded": retrieval.excluded}})
     try:  # an unknown rate leaves the estimate empty; admission then refuses with `unknown_rate`
         est = budget.estimate(res.settings.db_path, res.settings.generation_model, tokens,
                               res.settings.generation_max_output_tokens)
@@ -847,13 +880,28 @@ def _checkpoint(res: Resources, request_id: str, principal: Principal) -> Princi
 
 def _execute(res: Resources, principal: Principal, request_id: str, request: AnswerRequest,
              question: str) -> AnswerResult:
+    """One Langfuse trace per executed request (none when tracing is off); scores come from existing checks."""
+    scope = [asdict(s) for s in request.scope]
+    with tracing.run(res.tracing, "answer-question", seed=request_id, user_id=principal.member_id,
+                     input={"question": question, "scope": scope, "mode": request.mode, "as_of": request.as_of},
+                     metadata={"request_id": request_id, "member_id": principal.member_id, "as_of": request.as_of,
+                               "mode": request.mode, "scope": dumps(scope)[:200]},
+                     tags=["ask", request.mode]) as root:
+        result = _execute_traced(res, principal, request_id, request, question, root)
+    return result
+
+
+def _execute_traced(res: Resources, principal: Principal, request_id: str, request: AnswerRequest, question: str,
+                    root: tracing.Step) -> AnswerResult:
     trace: dict = {"config": _config_snapshot(res, request), "question": question, "as_of": request.as_of,
                    "mode": request.mode}
 
     def done(status: str, summary: str, request_status: str = "completed", **kw) -> AnswerResult:
         result = AnswerResult(request_id, status, summary, generation_id=request.generation_id, mode=request.mode,
                               **kw)
-        return _finish(res, request_id, result, trace, request_status)
+        result = _finish(res, request_id, result, trace, request_status)
+        _trace_outcome(root, result, trace)
+        return result
 
     try:
         if request.mode == "metadata":
@@ -868,6 +916,20 @@ def _execute(res: Resources, principal: Principal, request_id: str, request: Ans
     except Exception as exc:  # noqa: BLE001 - any failure ends the request instead of leaving it running
         return done("technical_error", "요청을 처리하지 못했습니다.", request_status="failed",
                     error=f"{type(exc).__name__}: {exc}"[:300])
+
+
+CITATION_ERRORS = ("unknown_evidence_id", "evidence_scope_mismatch", "evidence_quote_mismatch",
+                   "claim_without_evidence", "conflict_without_evidence")
+
+
+def _trace_outcome(root: tracing.Step, result: AnswerResult, trace: dict) -> None:
+    """The answer as the trace output, and the free deterministic scores known for every exit path."""
+    root.update(lambda: {"output": {k: getattr(result, k) for k in (
+        "status", "summary", "claims", "missing_fields", "conflicts", "next_action", "billing_state", "error")},
+        "level": "ERROR" if result.status == "technical_error" else "DEFAULT"})
+    root.score_trace("insufficient_evidence", 1.0 if result.status == "insufficient_evidence" else 0.0, "BOOLEAN")
+    if "retrieval" in trace:
+        root.score_trace("evidence_tokens", lambda: float(trace["retrieval"]["evidence_tokens"]), "NUMERIC")
 
 
 def _paid_answer(res: Resources, principal: Principal, request_id: str, request: AnswerRequest, question: str,
@@ -945,40 +1007,64 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
     except budget.DispatchRefused as refused:
         reason = str(refused)
         raise _Stop(reason, reason, STOPS[reason]) from None
-    try:
-        response = res.transport.chat(model=s.generation_model, messages=prep["messages"],
-                                      response_format=prep["response_format"],
-                                      max_completion_tokens=s.generation_max_output_tokens,
-                                      reasoning_effort=s.generation_reasoning_effort)
-    except generation.ProviderError as exc:
-        if exc.pre_execution:
-            budget.release(s.db_path, attempt_id, str(exc)[:300], confirmed_pre_execution=True)
-        else:
-            budget.mark_unknown(s.db_path, attempt_id, str(exc))
-        return done("technical_error", "모델 호출에 실패했습니다. 자동으로 다시 시도하지 않습니다.",
-                    request_status="failed", evidence=evidence_map, error=str(exc)[:300], **common)
-    except Exception as exc:  # noqa: BLE001 - e.g. a transport closed by shutdown: execution may have happened
-        budget.mark_unknown(s.db_path, attempt_id, f"{type(exc).__name__}: {exc}")
-        return done("technical_error", "모델 호출 중 연결이 끊겼습니다. 비용은 확인 전까지 보류로 남습니다.",
-                    request_status="failed", evidence=evidence_map, error=f"{type(exc).__name__}: {exc}"[:300],
-                    **common)
-    if response.usage is None:
-        budget.mark_unknown(s.db_path, attempt_id, "provider returned no usage")
-    else:
-        trace["usage"] = response.usage
+    with tracing.step("generate-answer", "generation", model=s.generation_model, input=prep["messages"],
+                      model_parameters={"reasoning_effort": s.generation_reasoning_effort,
+                                        "max_completion_tokens": s.generation_max_output_tokens},
+                      metadata={"attempt_id": attempt_id, "prompt_version": generation.PROMPT_VERSION}) as gen:
         try:
-            trace["settlement"] = budget.settle(s.db_path, attempt_id, response.usage, response.response_id)
-        except Exception as exc:  # noqa: BLE001 - e.g. a reused response ID or a locked ledger
-            # The call was billed but could not be recorded: keep it conservatively pending for the recovery view.
-            budget.mark_unknown(s.db_path, attempt_id, f"settlement_failed: {type(exc).__name__}: {exc}")
-            return done("technical_error", "사용량을 기록하지 못했습니다. 비용은 확인 전까지 보류로 남습니다.",
-                        request_status="failed", evidence=evidence_map,
-                        error=f"settlement_failed: {type(exc).__name__}"[:300], **common)
+            response = res.transport.chat(model=s.generation_model, messages=prep["messages"],
+                                          response_format=prep["response_format"],
+                                          max_completion_tokens=s.generation_max_output_tokens,
+                                          reasoning_effort=s.generation_reasoning_effort)
+        except generation.ProviderError as exc:
+            gen.update(level="ERROR", status_message=str(exc)[:300])
+            if exc.pre_execution:
+                budget.release(s.db_path, attempt_id, str(exc)[:300], confirmed_pre_execution=True)
+            else:
+                budget.mark_unknown(s.db_path, attempt_id, str(exc))
+            return done("technical_error", "모델 호출에 실패했습니다. 자동으로 다시 시도하지 않습니다.",
+                        request_status="failed", evidence=evidence_map, error=str(exc)[:300], **common)
+        except Exception as exc:  # noqa: BLE001 - e.g. a transport closed by shutdown: execution may have happened
+            gen.update(level="ERROR", status_message=type(exc).__name__)
+            budget.mark_unknown(s.db_path, attempt_id, f"{type(exc).__name__}: {exc}")
+            return done("technical_error", "모델 호출 중 연결이 끊겼습니다. 비용은 확인 전까지 보류로 남습니다.",
+                        request_status="failed", evidence=evidence_map, error=f"{type(exc).__name__}: {exc}"[:300],
+                        **common)
+        gen.update(lambda: {"output": tracing.readable(response.content), "metadata": {
+            "response_id": response.response_id, "finish_reason": response.finish_reason,
+            "refusal": response.refusal, "reasoning_tokens": (response.usage or {}).get("reasoning_tokens")}})
+        if response.usage is None:
+            budget.mark_unknown(s.db_path, attempt_id, "provider returned no usage")
+        else:
+            trace["usage"] = response.usage
+            try:
+                trace["settlement"] = budget.settle(s.db_path, attempt_id, response.usage, response.response_id)
+            except Exception as exc:  # noqa: BLE001 - e.g. a reused response ID or a locked ledger
+                # The call was billed but could not be recorded: keep it conservatively pending for the recovery view.
+                budget.mark_unknown(s.db_path, attempt_id, f"settlement_failed: {type(exc).__name__}: {exc}")
+                return done("technical_error", "사용량을 기록하지 못했습니다. 비용은 확인 전까지 보류로 남습니다.",
+                            request_status="failed", evidence=evidence_map,
+                            error=f"settlement_failed: {type(exc).__name__}"[:300], **common)
+            gen.update(lambda: tracing.usage_and_cost(response.usage, trace["settlement"]))
     stored = {e.evidence_id: _stored_quote(res, e) for e in retrieval.evidence}
     represented = {c["doc_id"] for c in coverage if c.get("evidence")}
     try:
-        payload = generation.validate_answer(response, retrieval.evidence, {d["doc_id"] for d in docs}, stored,
-                                             required_doc_ids=represented if request.mode == "compare" else None)
+        with tracing.step("validate-answer", "guardrail", input={
+                "allowed_evidence_ids": [e.evidence_id for e in retrieval.evidence],
+                "allowed_doc_ids": sorted(d["doc_id"] for d in docs)}) as check:
+            try:
+                payload = generation.validate_answer(response, retrieval.evidence, {d["doc_id"] for d in docs},
+                                                     stored, required_doc_ids=represented
+                                                     if request.mode == "compare" else None)
+            except generation.TechnicalError as exc:
+                check.update(output={"passed": False, "error": str(exc)[:300]}, level="ERROR",
+                             status_message=str(exc)[:300])
+                if str(exc).startswith(CITATION_ERRORS):
+                    check.score_trace("citation_valid", 0.0, "BOOLEAN")
+                raise
+            check.update(lambda: {"output": {"passed": True, "status": payload.status, "cited_evidence_ids": sorted(
+                {i for c in payload.claims for i in c.evidence_ids})}})
+            check.score_trace("citation_valid", 1.0, "BOOLEAN")
     except generation.TechnicalError as exc:
         trace["raw_output"] = (response.content or "")[:4000]
         return done("technical_error", "모델 응답을 검증하지 못했습니다. 비용은 기록되었으며 자동 재시도는 하지 않습니다.",
@@ -2426,7 +2512,8 @@ def start_drafting(res: Resources, principal: Principal, slots: list[dict], cons
         def job() -> None:
             try:  # this process already owns the gateway lock that drafting.generate would take
                 drafting._generate(res.settings, est["plan"], run_dir / "output", consented_max_micro,
-                                   res.transport, "dev", guard=lambda conn: "interrupted" if res._closed else None)
+                                   res.transport, "dev", guard=lambda conn: "interrupted" if res._closed else None,
+                                   tracer=res.tracing)
             except Exception as exc:  # noqa: BLE001 - recorded for the run list; settled calls stay settled
                 name = "interrupted.txt" if res._closed else "error.txt"
                 write_text_atomic(run_dir / name, f"{type(exc).__name__}: {exc}"[:500])

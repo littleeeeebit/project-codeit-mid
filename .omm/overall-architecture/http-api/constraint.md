@@ -1,0 +1,1 @@
+`api.py` imports nothing from the package except `service` (checked by `tests/test_api.py`). Each route calls one service function.

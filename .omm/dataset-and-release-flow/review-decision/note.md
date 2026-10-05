@@ -1,0 +1,1 @@
+The README states a note is required for both outcomes; in `gold.decide` itself, an empty note is refused only for 'other' rejections and for self-withdrawal.

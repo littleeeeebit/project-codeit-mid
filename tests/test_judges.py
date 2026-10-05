@@ -154,7 +154,7 @@ class ShutdownTest(unittest.TestCase):
         res = object.__new__(service.Resources)
         res.settings = settings
         res.transport = SimpleNamespace(close=lambda: events.append("transport closed"))
-        res.provider_note, res._runner, res._lock = None, None, None
+        res.provider_note, res._runner, res._lock, res.tracing = None, None, None, None
         res._runner_lock, res._jobs, res._closed = threading.Lock(), [], False
         res._database_lifecycle = SimpleNamespace(__exit__=lambda *a: events.append("database released"))
         return res

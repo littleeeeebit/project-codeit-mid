@@ -1,0 +1,1 @@
+Never copy the budget database to create a second independently spendable ledger (README).

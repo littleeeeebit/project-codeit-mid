@@ -1,0 +1,1 @@
+Printing takes 20–30 s per document and opens viewer windows. Do not print anything else while it runs (README).
