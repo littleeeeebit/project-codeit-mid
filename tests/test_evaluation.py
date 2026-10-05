@@ -10,6 +10,7 @@ from unittest import mock
 from rfp_assistant import answers, auth, budget, evaluation, generation, gold, sealed, service, store
 from rfp_assistant.contracts import Principal
 from rfp_assistant.generation import FakeTransport, ProviderError
+from rfp_assistant.retrieval import KeywordIndex
 from tests import fixtures
 from tests import phase4_fixtures as p4
 
@@ -305,6 +306,33 @@ class MetricFixtureTest(unittest.TestCase):
         # a coordinate-free (older) alternative keeps the first occurrence
         free = {k: v for k, v in pinned["alternatives"][0].items() if k != "offsets"}
         self.assertEqual(evaluation.grade(at(first), free, els[("x", "p")]), 2)
+
+    def test_answer_coverage_is_graded_on_the_approved_occurrence_not_the_element(self):
+        """Review round 1 (F1): both occurrences packed, gold pinned to the second, only the first cited."""
+        raw = "이전 계약 하자보수: 12개월. 현재 계약 하자보수: 12개월."
+        q = "12개월"
+        first, second = raw.index(q), raw.rindex(q)
+        chunk = lambda cid, p: {"chunk_id": cid, "extraction_id": "x",  # noqa: E731
+                                "spans": [{"element_id": "p", "start": p, "end": p + len(q)}]}
+        index = mock.Mock(chunks=[chunk("c1", first), chunk("c2", second)],
+                          elements={("x", "p"): {"raw_text": raw, "table": None}})
+        pinned = {"group_id": "g1", "doc_id": "d", "alternatives": [
+            {"element_id": "p", "quote": q, "extraction_id": "x", "offsets": [second, second + len(q)]}]}
+        row = {**gold_row([pinned]), "question_type": "t", "answerability": "answerable",
+               "expected_status": "answered", "scope": [{"doc_id": "d"}]}
+        ev = lambda cid: {"doc_id": "d", "chunk_id": cid, "element_ids": ["p"], "quote": q}  # noqa: E731
+        cite = lambda *ids: {"finalist": "K", "outcome": "answered", "evidence": {"E1": ev("c1"), "E2": ev("c2")},  # noqa: E731
+                             "answer": {"claims": [{"text": q, "kind": "source_fact", "doc_id": "d",
+                                                    "evidence_ids": list(ids)}]}}
+        wrong = answers.score_record(row, cite("E1"), index, {})
+        self.assertEqual((wrong["groups"], wrong["passed"]), ({"gold": 1, "retrieved": 1, "cited": 0}, False))
+        right = answers.score_record(row, cite("E2"), index, {})
+        self.assertEqual((right["groups"], right["passed"]), ({"gold": 1, "retrieved": 1, "cited": 1}, True))
+        # only the first occurrence packed: retrieval never reached the approved one
+        reached = answers.score_record(row, {**cite("E1"), "evidence": {"E1": ev("c1")}}, index, {})
+        self.assertEqual((reached["groups"], reached["passed"]), ({"gold": 1, "retrieved": 0, "cited": 0}, False))
+        # without the index nothing can be graded, so nothing passes
+        self.assertEqual(answers.score_record(row, cite("E2"), None, {})["passed"], False)
 
     def test_named_cells_pick_the_approved_row(self):
         cells = [{"row": 0, "col": 0, "text": "이전 계약"}, {"row": 0, "col": 1, "text": "12개월"},
@@ -909,10 +937,12 @@ class AnswerRunTest(GoldRetrievalTest):
         # the same answer without the claim that cites a reached group fails: retrieval reached it, the answer didn't
         (row,) = [r for r in evaluation.load_eval_rows(self.s, "dev")[0] if r["question_id"] == "dev-compare"]
         record = answers.load_progress(self.s, out["run_id"])[(self.k1, "dev-compare")]
-        scored = answers.score_record(row, record, None, {})
+        config = json.loads((answers.run_dir(self.s, out["run_id"]) / "config.json").read_text(encoding="utf-8"))
+        index = KeywordIndex.load(self.s, config["finalists"][0]["index_version"])
+        scored = answers.score_record(row, record, index, {})
         self.assertEqual(scored["groups"], {"gold": 2, "retrieved": 2, "cited": 2})
         dropped = {**record, "answer": {**record["answer"], "claims": record["answer"]["claims"][1:]}}
-        self.assertFalse(answers.score_record(row, dropped, None, {})["passed"])
+        self.assertFalse(answers.score_record(row, dropped, index, {})["passed"])
 
     def test_changed_prices_or_prompts_need_a_new_plan(self):
         est = answers.plan_run(self.s, "answer-finalists", "dev", [self.k1])

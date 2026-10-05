@@ -560,15 +560,22 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
         out["metadata_correct"] = bool(states) and all(states.get((doc, f)) == s for f, s in wanted.items())
         return out
     # Row pass: the expected status and every gold group the packed evidence reached is cited. A group retrieval
-    # never delivered is a retrieval limit, reported beside it, not something the answer could have cited.
+    # never delivered is a retrieval limit, reported beside it, not something the answer could have cited. A group
+    # counts only where a chunk's source spans carry its whole approved occurrence (`evaluation.group_grade` 2), never
+    # for sharing an element; without the index nothing can be graded and no answerable row passes.
     evidence = record.get("evidence") or {}
-    elements = lambda ids: {el for eid in ids for el in (evidence.get(eid) or {}).get("element_ids") or []}  # noqa: E731
-    packed, cited = elements(evidence), elements(e for c in answer.get("claims") or [] for e in c.get("evidence_ids") or [])
-    alts = [{a["element_id"] for a in g["alternatives"]} for g in groups]
-    out["groups"] = {"gold": len(alts), "retrieved": sum(bool(a & packed) for a in alts),
-                     "cited": sum(bool(a & cited) for a in alts if a & packed)}
+    chunks = {c["chunk_id"]: c for c in index.chunks} if index is not None else {}
+    cited_ids = {e for c in answer.get("claims") or [] for e in c.get("evidence_ids") or []}
+
+    def carried(g, ids) -> bool:
+        return any(chunk is not None and evaluation.group_grade(chunk, g, index.elements) == 2
+                   for chunk in (chunks.get((evidence.get(eid) or {}).get("chunk_id")) for eid in ids))
+    reached = [g for g in groups if carried(g, evidence)]
+    out["groups"] = {"gold": len(groups), "retrieved": len(reached),
+                     "cited": sum(carried(g, cited_ids) for g in reached)} if index is not None else None
     out["passed"] = out["status_ok"] and not out["technical"] and (
-        row["answerability"] != "answerable" or 0 < out["groups"]["retrieved"] == out["groups"]["cited"])
+        row["answerability"] != "answerable"
+        or (out["groups"] is not None and 0 < out["groups"]["retrieved"] == out["groups"]["cited"]))
     answered = outcome == "answered"
     single = len(scope_docs) == 1
     for c in row.get("required_claims") or []:
@@ -579,7 +586,6 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
         out["claims"].append({"claim_id": c["claim_id"], "item": item, "verdict": (reviewed or {}).get("verdict", verdict),
                               "deterministic": verdict, "reviewed_by": (reviewed or {}).get("reviewer"),
                               "critical_kind": c.get("critical_kind")})
-    chunks = {c["chunk_id"]: c for c in index.chunks} if index is not None else {}
     validity = record.get("link_validity") or {}
     for i, ac in enumerate(answer.get("claims") or []):
         supports = []
