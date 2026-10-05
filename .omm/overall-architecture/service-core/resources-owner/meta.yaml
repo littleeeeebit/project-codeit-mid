@@ -1,7 +1,7 @@
 created: 2026-10-05T03:34:18.176Z
-updated: 2026-10-05T03:34:18.319Z
-update_count: 2
-last_field: constraint
+updated: 2026-10-05T21:23:48.314Z
+update_count: 4
+last_field: note
 kind: nested-class
 title: resources-owner
 children: []

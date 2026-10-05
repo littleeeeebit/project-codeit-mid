@@ -1,0 +1,1 @@
+The durable marker written just before the network call, in the same transaction as the stop guard. A process that dies here leaves the outcome unknowable, so `recover()` turns it into `unknown`.

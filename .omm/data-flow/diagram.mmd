@@ -1,8 +1,10 @@
 graph TD
-  original-files["Original files\n원본 데이터/files"] -->|"ingest parses"| extraction-artifacts["Extraction artifacts\nsrc/rfp_assistant/ingestion.py"]
-  extraction-artifacts -->|"build-keyword chunks"| keyword-index-files["Keyword index files\nsrc/rfp_assistant/retrieval.py"]
-  keyword-index-files -->|"payload hashes embedded"| embedding-sets["Embedding sets\nsrc/rfp_assistant/vector_store.py"]
-  embedding-sets -->|"measured by compare"| retrieval-runs["Retrieval runs\nsrc/rfp_assistant/evaluation.py"]
-  gold-datasets["Gold datasets\nsrc/rfp_assistant/gold.py"] -->|"pinned spans scored"| retrieval-runs
-  retrieval-runs -->|"activate writes pointer"| serving-pointer["Serving pointer\nsrc/rfp_assistant/store.py"]
-  serving-pointer -->|"per-request config"| request-records["Request records\nsrc/rfp_assistant/service.py"]
+  originals["Originals and CSV manifest\nsrc/rfp_assistant/ingestion.py"] -->|parse changed inputs| extraction["Extractions and elements\nsrc/rfp_assistant/ingestion.py"]
+  extraction -->|Hancom print comparison| fidelity-check["Fidelity verdicts\nsrc/rfp_assistant/fidelity.py"]
+  fidelity-check -->|review_status filter| keyword-index["Keyword index build\nsrc/rfp_assistant/retrieval.py"]
+  extraction -->|elements chunked by profile| keyword-index
+  keyword-index -->|chunk payloads| embedding-sets["Embedding sets\nsrc/rfp_assistant/vector_store.py"]
+  gold-datasets["Gold datasets\nsrc/rfp_assistant/gold.py"] -->|graded questions| run-selection["Runs and activation\nsrc/rfp_assistant/compare.py"]
+  keyword-index -->|frozen index version| run-selection
+  embedding-sets -->|dense_version| run-selection
+  run-selection -->|active_run setting| served-answers["Served answers\nsrc/rfp_assistant/service.py"]

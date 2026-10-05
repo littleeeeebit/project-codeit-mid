@@ -1,1 +1,0 @@
-`sample_checked` (from `confirm_fidelity` or `review record`) or `reviewed` (from `import-reviews`). Automatic verdicts never overwrite a human status (`HUMAN_STATUSES` guard in `verify_source`).

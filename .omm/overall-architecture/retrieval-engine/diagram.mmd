@@ -1,7 +1,8 @@
 graph TD
-  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval.py"] -->|"scope rows, scope terms"| corpus-routing["Corpus routing\nsrc/rfp_assistant/retrieval.py"]
-  corpus-routing -->|"allowed rows"| lexical-channel["Lexical channel\nsrc/rfp_assistant/retrieval.py"]
-  corpus-routing -->|"allowed rows"| dense-channel["Dense channel\nsrc/rfp_assistant/vector_store.py"]
-  lexical-channel -->|"BM25 ids"| fusion-and-rerank["Fusion and rerank\nsrc/rfp_assistant/retrieval.py"]
-  dense-channel -->|"cosine ids"| fusion-and-rerank
-  fusion-and-rerank -->|"ordered rows"| evidence-packing["Evidence packing\nsrc/rfp_assistant/retrieval.py"]
+  query-policy["Analyzer and query policy\nsrc/rfp_assistant/retrieval.py"] -->|kept query tokens| keyword-index["Kiwi BM25 index\nsrc/rfp_assistant/retrieval.py"]
+  query-policy -->|routed scope rows| dense-search["pgvector search\nsrc/rfp_assistant/vector_store.py"]
+  keyword-index -->|lexical ranking| fusion["Keyword-first RRF\nsrc/rfp_assistant/retrieval.py"]
+  dense-search -->|cosine ranking| fusion
+  fusion -->|pool below protected head| reranker["Local reranker\nsrc/rfp_assistant/dense.py"]
+  fusion -->|fused order| evidence-packing["Evidence packing\nsrc/rfp_assistant/retrieval.py"]
+  reranker -->|reordered pool| evidence-packing

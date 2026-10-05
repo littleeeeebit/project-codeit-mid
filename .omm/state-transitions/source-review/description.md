@@ -1,1 +1,0 @@
-`sources.parse_status` and `review_status` decide which sources enter which keyword index and which warnings citations carry (`SOURCE_WARNINGS`: `source_unreviewed`, `source_auto_flagged`).

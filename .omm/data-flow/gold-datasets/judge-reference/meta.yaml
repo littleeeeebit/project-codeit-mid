@@ -1,0 +1,9 @@
+created: 2026-10-05T21:24:04.434Z
+updated: 2026-10-05T21:24:04.434Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: judge-reference
+children: []
+parentPath:
+  - gold-datasets

@@ -1,20 +1,20 @@
 created: 2026-10-05 03:34:25.621000+00:00
-updated: 2026-10-05 09:51:30.916000+00:00
-update_count: 5
-last_field: diagram
+updated: 2026-10-05 21:23:59.930000+00:00
+update_count: 8
+last_field: context
 kind: nested-class
 title: serving-activation
 children:
 - activated-run
-- hybrid-without-reranker
 - keyword-default
-- stale-fallback
+- request-fallback
+- reranker-dropped
+- route-stale
 parentPath: []
-prev_diagram: "graph TD\r\n  keyword_default[\"Keyword default kiwi_bm25\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  activated_run[\"Activated run config\\nsrc/rfp_assistant/evaluation.py\"\
-  ]\r\n  keyword_fallback[\"Keyword fallback\\nsrc/rfp_assistant/retrieval.py\"]\r\
-  \n  hybrid_without_reranker[\"Hybrid without reranker\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  keyword_default -->|\"activate-run decision\"| activated_run\r\n  activated_run\
-  \ -->|\"corpus route rule changed\"| keyword_default\r\n  activated_run -->|\"embedding\
-  \ identity mismatch\"| keyword_fallback\r\n  activated_run -->|\"dense stage unavailable\"\
-  | keyword_fallback\r\n  activated_run -->|\"stale HR eval policy\"| hybrid_without_reranker"
+prev_diagram: "graph TD\r\n  keyword-default[\"Keyword default\\nsrc/rfp_assistant/service.py\"\
+  ] -->|\"activate_decision\"| activated-run[\"Activated run\\nsrc/rfp_assistant/evaluation.py\"\
+  ]\r\n  activated-run -->|\"corpus route changed\"| stale-fallback[\"Stale fallback\\\
+  nsrc/rfp_assistant/service.py\"]\r\n  activated-run -->|\"HR under old policy\"\
+  | hybrid-without-reranker[\"Hybrid without reranker\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  stale-fallback -->|\"rerun then activate\"| activated-run\r\n  hybrid-without-reranker\
+  \ -->|\"current trial activated\"| activated-run"

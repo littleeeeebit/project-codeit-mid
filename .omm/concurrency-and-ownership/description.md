@@ -1,0 +1,1 @@
+Ownership rules that keep one shared ledger correct with concurrent users, background jobs and an owner CLI: exactly one process may dispatch paid calls, every ledger and idempotency write is serialized, and a controlled stop drains workers before giving ownership up.

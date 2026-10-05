@@ -1,0 +1,1 @@
+`step_keyword` requires an activated index. It rebuilds with the served index's profile and review scope and `activate=False`, and records `rebuilt_index` and whether it equals the served version.

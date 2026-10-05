@@ -1,0 +1,1 @@
+README §13 / runbook: maintenance is never scheduled. A rebuilt index serves only after a person activates its regression row.

@@ -1,0 +1,9 @@
+graph TD
+  drafting-run["Drafting run\nsrc/rfp_assistant/drafting.py"] -->|submit valid drafts| review-queue["Review queue\nsrc/rfp_assistant/gold.py"]
+  review-queue -->|pending candidate| gold-decision["Approve or reject\nsrc/rfp_assistant/gold.py"]
+  gold-decision -->|approved rows rewritten| dataset-files["Dataset projections\nsrc/rfp_assistant/gold.py"]
+  gold-decision -->|rejection page| rejection-wiki["Rejection wiki\nsrc/rfp_assistant/gold.py"]
+  rejection-wiki -->|inferred lessons| drafting-run
+  judge-reference["Judge reference\nsrc/rfp_assistant/judges.py"] -->|held-out positives mutated| judge-set["Judge golden set\nsrc/rfp_assistant/judge_set.py"]
+  judge-set -->|judge_set part| judge-comparison["Judge comparison\nsrc/rfp_assistant/judges.py"]
+  judge-reference -->|calibration and held-out| judge-comparison

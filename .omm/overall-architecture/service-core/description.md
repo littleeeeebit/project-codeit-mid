@@ -1,0 +1,1 @@
+`service.py` holds the process-wide resource owner, the bounded request executor, answer orchestration, verifier runs, the background-job entry points the API exposes, and the activated serving configuration. In-process callers (CLI, `answers.PinnedResources`, tests) use the same functions, so evaluation answers go through the exact same paid path as interactive ones.

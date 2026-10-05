@@ -1,0 +1,9 @@
+created: 2026-10-05T21:24:04.706Z
+updated: 2026-10-05T21:24:04.707Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: judge-comparison
+children: []
+parentPath:
+  - gold-datasets

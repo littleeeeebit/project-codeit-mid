@@ -1,38 +1,33 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-05 09:51:33.946000+00:00
-update_count: 8
+updated: 2026-10-05 21:24:01.789000+00:00
+update_count: 10
 last_field: diagram
-git_commit: 3de2dee
-git_branch: automated-comparison-pipeline
+git_commit: 797b897
+git_branch: judge-set-and-maintenance
 children:
 - activation
 - corpus-ingestion
 - embedding-sets
 - extraction
-- extraction-artifacts
 - fidelity-check
 - gold-datasets
 - index-build
-- keyword-index-files
+- keyword-index
+- keyword-indexing
 - ocr-merge
 - original-corpus
-- original-files
-- request-records
-- retrieval-runs
+- originals
 - retrieval-selection
-- serving-pointer
-prev_diagram: "graph TD\r\n  original_corpus[\"Original RFP files\\n원본 데이터/files\"\
-  ]\r\n  corpus_ingestion[\"Manifest, parse, OCR merge\\nsrc/rfp_assistant/ingestion.py\"\
-  ]\r\n  fidelity_check[\"Fidelity check\\nsrc/rfp_assistant/fidelity.py\"]\r\n  index_build[\"\
-  Keyword index build\\nsrc/rfp_assistant/retrieval.py\"]\r\n  dense_build[\"Embedding\
-  \ set build\\nsrc/rfp_assistant/dense.py\"]\r\n  gold_evaluation[\"Gold and release\
-  \ evaluation\\nsrc/rfp_assistant/gold.py\"]\r\n  retrieval_selection[\"Run evaluation\
-  \ and activation\\nsrc/rfp_assistant/evaluation.py\"]\r\n  serving_resources[\"\
-  Serving resources\\nsrc/rfp_assistant/service.py\"]\r\n  original_corpus -->|\"\
-  CSV rows, original bytes\"| corpus_ingestion\r\n  corpus_ingestion -->|\"HWP extraction\
-  \ elements\"| fidelity_check\r\n  fidelity_check -->|\"review_status admits source\"\
-  | index_build\r\n  corpus_ingestion -->|\"elements.jsonl artifacts\"| index_build\r\
-  \n  index_build -->|\"chunk payloads\"| dense_build\r\n  index_build -->|\"frozen\
-  \ index version\"| retrieval_selection\r\n  dense_build -->|\"dense set version\"\
-  | retrieval_selection\r\n  gold_evaluation -->|\"reviewed dataset rows\"| retrieval_selection\r\
-  \n  retrieval_selection -->|\"active_run, active_index\"| serving_resources"
+- run-selection
+- served-answers
+prev_diagram: "graph TD\r\n  original-files[\"Original files\\n원본 데이터/files\"] -->|\"\
+  ingest parses\"| extraction-artifacts[\"Extraction artifacts\\nsrc/rfp_assistant/ingestion.py\"\
+  ]\r\n  extraction-artifacts -->|\"build-keyword chunks\"| keyword-index-files[\"\
+  Keyword index files\\nsrc/rfp_assistant/retrieval.py\"]\r\n  keyword-index-files\
+  \ -->|\"payload hashes embedded\"| embedding-sets[\"Embedding sets\\nsrc/rfp_assistant/vector_store.py\"\
+  ]\r\n  embedding-sets -->|\"measured by compare\"| retrieval-runs[\"Retrieval runs\\\
+  nsrc/rfp_assistant/evaluation.py\"]\r\n  gold-datasets[\"Gold datasets\\nsrc/rfp_assistant/gold.py\"\
+  ] -->|\"pinned spans scored\"| retrieval-runs\r\n  retrieval-runs -->|\"activate\
+  \ writes pointer\"| serving-pointer[\"Serving pointer\\nsrc/rfp_assistant/store.py\"\
+  ]\r\n  serving-pointer -->|\"per-request config\"| request-records[\"Request records\\\
+  nsrc/rfp_assistant/service.py\"]"

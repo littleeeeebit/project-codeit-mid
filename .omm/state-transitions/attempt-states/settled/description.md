@@ -1,0 +1,1 @@
+Cost computed from usage (uncached, cached and cache-write input plus output) using the rates captured at reservation (`price_json`). A cost above the reservation sets `budget_settings.frozen_reason`, which blocks all admission until the owner inspects it.

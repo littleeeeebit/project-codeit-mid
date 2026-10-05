@@ -1,1 +1,0 @@
-Persisted with `request_json` and holding an admission slot. No ledger row exists yet, so cancelling here is conclusive and free.

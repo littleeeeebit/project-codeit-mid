@@ -1,7 +1,0 @@
-graph TD
-  gateway-owner["Gateway owner\nsrc/rfp_assistant/postgres.py"] -->|"owner_guard in tx"| budget-ledger["Budget ledger\nsrc/rfp_assistant/budget.py"]
-  budget-ledger -->|"dispatching marker"| openai-transport["OpenAI transport\nsrc/rfp_assistant/generation.py"]
-  gateway-owner -->|"owner_check before call"| openai-transport
-  openai-transport -->|"usage, response id"| budget-ledger
-  openai-transport -->|"structured content"| answer-validation["Answer validation\nsrc/rfp_assistant/generation.py"]
-  langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/tracing.py"] -.->|"observes steps"| openai-transport

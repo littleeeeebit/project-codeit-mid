@@ -1,0 +1,1 @@
+One markdown page per rejected candidate (`gold.render_rejection`) with categories and note. `gold infer` adds the inferred reason, and `drafting.lessons` feeds those reasons into the next drafting prompt. Sealed rejections are never exposed to drafting.

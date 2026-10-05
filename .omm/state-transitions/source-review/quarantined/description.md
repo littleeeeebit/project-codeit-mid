@@ -1,1 +1,0 @@
-Parsing failed (`reason_code`; `review_status='needs_recovery'`). The source is excluded from indexes, and asking about it returns `ingestion_unavailable` with `QUARANTINE_TEXT`. Only `recover-source` with an approved PDF conversion and a passed comparison lifts it.

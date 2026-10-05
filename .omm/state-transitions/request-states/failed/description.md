@@ -1,0 +1,1 @@
+`clarification_required` from a `ServiceError`, `technical_error` from a provider failure, validation failure, settlement failure or any exception, or `_fail_unscheduled`. Its billing state may still be `unknown` and then needs owner reconciliation.

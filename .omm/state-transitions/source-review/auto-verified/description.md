@@ -1,1 +1,0 @@
-The bidirectional fidelity comparison against the Hancom print passed (`verify_source`). Allowed in the reviewed-only index.

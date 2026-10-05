@@ -1,1 +1,0 @@
-Inserted by `reserve` at `max_cost`; it counts as pending against the cap and envelope. Released on a refused dispatch guard, a missing transport, or a restart (`recover`).

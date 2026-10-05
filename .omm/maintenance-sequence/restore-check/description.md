@@ -1,0 +1,1 @@
+`step_restore_check` is skipped when this backup already passed on the same artifact digest. Otherwise it creates a fresh `rfp_mrestore_<uuid>` database on the same server, points `RFP_RESTORE_DATABASE_DSN` at it for `release.restore_check` (paid admission off), and drops it afterwards. A failed check stops the sequence.

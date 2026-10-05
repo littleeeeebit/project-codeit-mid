@@ -1,0 +1,1 @@
+The activated run recorded a different `corpus_route` than the current `ROUTE_RULE`, so its gate evidence no longer describes retrieval. The keyword default serves with `fallback_reason=activated_corpus_route_requires_rerun`, retrieval appends `activated_run_stale:corpus_route`, and `describe_serving` names the stale run. `run_errors` refuses to reactivate it until it is rerun.

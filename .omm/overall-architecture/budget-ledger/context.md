@@ -1,0 +1,1 @@
+Envelopes: the default sixteenths of the cap are embedding 1, gold_eval 3, interactive 12 and judge_eval 0. `judge_eval` is funded only by an owner reallocation. README: the owner set a dedicated $5 allowance with a $5 hard cap, and the external PR #8 pilot spend is recorded as an adjustment.

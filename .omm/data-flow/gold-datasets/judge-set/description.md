@@ -1,0 +1,1 @@
+`judge_set` (CLI `judge-set`, free) builds known-wrong mutants (amount, unit, qualifier, date, negation, dropped_condition, wrong_evidence) of held-out positives next to their unmutated sources. `differs` checks deterministically that each mutant really differs. It is stored under `judges/judge-set/` and counted apart from the RAG development set (`compare.golden_counts`).

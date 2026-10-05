@@ -1,0 +1,9 @@
+created: 2026-10-05T21:24:05.768Z
+updated: 2026-10-05T21:24:05.769Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: activation
+children: []
+parentPath:
+  - run-selection

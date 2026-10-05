@@ -1,1 +1,1 @@
-No `active_run`: `settings.retrieval_mode` (README: `kiwi_bm25`) on `active_index`, with no dense or reranker stage. `build-keyword` with `activate` moves `active_index`.
+No `active_run`: `settings.retrieval_mode` over the `active_index` pointer (moved by a structural `build-keyword` only before any selection), with no dense or reranker stage.

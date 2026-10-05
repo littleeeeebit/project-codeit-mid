@@ -1,0 +1,1 @@
+Set by the owner's `reconcile`, which imports a closed provider interval and records provider total minus local settled cost as an adjustment. Late usage can still settle it, with a compensating negative adjustment.

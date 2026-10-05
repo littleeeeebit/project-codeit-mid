@@ -1,0 +1,7 @@
+graph TD
+  uvicorn-process["Single uvicorn worker\nsrc/rfp_assistant/api.py"] -->|lifespan get_resources| gateway-lock["Gateway advisory lock\nsrc/rfp_assistant/postgres.py"]
+  gateway-lock -->|checked inside mutex tx| application-mutex["Application write mutex\nsrc/rfp_assistant/postgres.py"]
+  uvicorn-process -->|module-level registries| job-registry["Job registry\nsrc/rfp_assistant/service.py"]
+  job-registry -->|threads joined| controlled-shutdown["Controlled shutdown\nsrc/rfp_assistant/service.py"]
+  controlled-shutdown -->|releases lock last| gateway-lock
+  cli-paid-commands["CLI paid commands\nsrc/rfp_assistant/cli.py"] -->|try lock refused if held| gateway-lock

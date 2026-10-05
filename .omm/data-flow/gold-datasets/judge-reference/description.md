@@ -1,0 +1,1 @@
+`judges.import_reference` copies the blind review sheet and verdicts of development run `A-9ef59b566d64` (750 items) read-only from the archived pilot runtime, after checking hashes against the receipt. `make_split` draws a seeded, stratified calibration/held-out split. The sealed set is never read.

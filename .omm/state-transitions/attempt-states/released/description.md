@@ -1,0 +1,1 @@
+The reservation is returned: refused at dispatch (stop guard or ownership), confirmed pre-execution rejection, no transport, or never dispatched before a restart.

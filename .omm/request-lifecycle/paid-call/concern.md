@@ -1,0 +1,1 @@
+See the budget-ledger concern: `DispatchRefused` reasons other than cancelled or interrupted hit `STOPS[reason]` and surface as a `KeyError` technical error.

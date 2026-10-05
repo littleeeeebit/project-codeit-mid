@@ -1,1 +1,0 @@
-`load_matrix` and `matrix_rows(spec, base)` expand the declared axes (chunk profile, analyzer, embedding, retrieval, fusion, reranker and mode, evidence units, depth) over the fixed values and the serving base. Reranker matrices fix the serving hybrid (`SERVING_HYBRID`) and sort rows so one model is loaded at a time. `--only` reuses the recorded cells of the other rows.

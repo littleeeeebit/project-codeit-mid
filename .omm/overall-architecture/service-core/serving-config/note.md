@@ -1,0 +1,1 @@
+Every call opens a pooled connection, and `res.serving()` is called several times per request (index, dense, reranker, retrieve). This is cheap at the current scale but not cached.

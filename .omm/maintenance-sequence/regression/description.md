@@ -1,0 +1,1 @@
+`compare.regression` measures K1 and the serving configuration on the served and the rebuilt index (cached cells reused). `new_critical_vs_k1` and `lost_to_reparse` list questions whose pinned evidence extraction a re-parse replaced. Any `needs_approval` row stops the run; any incomplete row fails it.

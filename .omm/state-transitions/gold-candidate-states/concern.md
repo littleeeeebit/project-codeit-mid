@@ -1,0 +1,1 @@
+Observed: `gold.decide` writes the projection file inside the open database transaction. If the commit fails after the write, the file runs ahead of the database until `gold check` (which compares projections with their database rendering) reports it.

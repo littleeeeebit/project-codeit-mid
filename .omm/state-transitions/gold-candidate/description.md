@@ -1,1 +1,0 @@
-`gold_candidates.status`; approved rows define the evaluated population that frozen runs hash (`population_sha256`).

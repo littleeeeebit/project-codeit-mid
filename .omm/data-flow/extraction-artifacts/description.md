@@ -1,1 +1,0 @@
-`.runtime/extracted/<source_hash>/<fingerprint>/[content_id/]elements.jsonl`, plus `extractions`, `elements` and `extraction_inputs` rows and ingest reports in `.runtime/reports/ingest-*.json`. Old revisions stay for pinned citations and gold rows. OCR region caches live in `.runtime/ocr/<hash>/`.

@@ -1,33 +1,30 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-05 09:51:25.973000+00:00
-update_count: 8
+updated: 2026-10-05 21:23:53.168000+00:00
+update_count: 10
 last_field: diagram
-git_commit: 3de2dee
-git_branch: automated-comparison-pipeline
+git_commit: 797b897
+git_branch: judge-set-and-maintenance
 children:
+- admission
 - answer-validation
-- ask-route
-- ask-screen
+- ask-page
 - cancellation
+- finish
 - finish-record
-- ledger-dispatch
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
-- request-runner
+- paid-call
+- retrieval-stage
 - status-poll
-- submit-answer
-prev_diagram: "graph TD\r\n  ask_screen[\"Ask screen submit\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  ask_route[\"POST /api/ask\\nsrc/rfp_assistant/api.py\"]\r\n  submit_answer[\"\
-  Validate and persist\\nsrc/rfp_assistant/service.py\"]\r\n  worker_claim[\"Worker\
-  \ claims queued\\nsrc/rfp_assistant/service.py\"]\r\n  paid_answer[\"Retrieve, price,\
-  \ reserve\\nsrc/rfp_assistant/service.py\"]\r\n  model_call[\"gpt-6-luna call\\\
-  nsrc/rfp_assistant/generation.py\"]\r\n  answer_validation[\"Citation validation\\\
-  nsrc/rfp_assistant/generation.py\"]\r\n  status_poll[\"Status polling\\nsrc/rfp_assistant/api.py\"\
-  ]\r\n  ask_screen -->|\"scope, question, mode\"| ask_route\r\n  ask_route -->|\"\
-  fresh generation_id key\"| submit_answer\r\n  submit_answer -->|\"request_id on\
-  \ executor\"| worker_claim\r\n  worker_claim -->|\"snapshot, rebuilt principal\"\
-  | paid_answer\r\n  paid_answer -->|\"dispatching attempt\"| model_call\r\n  model_call\
-  \ -->|\"structured JSON, usage\"| answer_validation\r\n  answer_validation -->|\"\
-  result_json persisted\"| status_poll\r\n  ask_screen -->|\"poll every second\"|\
-  \ status_poll"
+- validation
+- worker
+prev_diagram: "graph TD\r\n  ask-screen[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
+  ] -->|\"POST /api/ask\"| ask-route[\"Ask route\\nsrc/rfp_assistant/api.py\"]\r\n\
+  \  ask-route -->|\"service.ask\"| submit-answer[\"Submit answer\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  submit-answer -->|\"persisted request_id\"| request-runner[\"Request runner\\\
+  nsrc/rfp_assistant/service.py\"]\r\n  request-runner -->|\"claim queued to running\"\
+  | paid-answer[\"Paid answer\\nsrc/rfp_assistant/service.py\"]\r\n  paid-answer -->|\"\
+  reserve, dispatch, settle\"| ledger-dispatch[\"Ledger dispatch\\nsrc/rfp_assistant/budget.py\"\
+  ]\r\n  paid-answer -->|\"_finish result_json\"| status-poll[\"Status poll\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  ask-screen -->|\"GET every second\"| status-poll"

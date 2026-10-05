@@ -1,0 +1,1 @@
+`close()` is registered both as a threading exit hook and with atexit. Under uvicorn's SIGINT/SIGTERM it therefore runs while the workers are still alive, so their next paid stage sees the stop.

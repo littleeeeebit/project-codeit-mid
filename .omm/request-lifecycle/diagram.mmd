@@ -1,8 +1,8 @@
 graph TD
-  ask-screen["Ask screen\nweb/src/components/ask/ask-page.tsx"] -->|"POST /api/ask"| ask-route["Ask route\nsrc/rfp_assistant/api.py"]
-  ask-route -->|"service.ask"| submit-answer["Submit answer\nsrc/rfp_assistant/service.py"]
-  submit-answer -->|"persisted request_id"| request-runner["Request runner\nsrc/rfp_assistant/service.py"]
-  request-runner -->|"claim queued to running"| paid-answer["Paid answer\nsrc/rfp_assistant/service.py"]
-  paid-answer -->|"reserve, dispatch, settle"| ledger-dispatch["Ledger dispatch\nsrc/rfp_assistant/budget.py"]
-  paid-answer -->|"_finish result_json"| status-poll["Status poll\nsrc/rfp_assistant/service.py"]
-  ask-screen -->|"GET every second"| status-poll
+  ask-page["Ask screen\nweb/src/components/ask/ask-page.tsx"] -->|POST /api/ask| admission["Validate and persist\nsrc/rfp_assistant/service.py"]
+  admission -->|request_id to executor| worker["Worker claim\nsrc/rfp_assistant/service.py"]
+  worker -->|checkpoint then retrieve| retrieval-stage["Retrieve and price\nsrc/rfp_assistant/service.py"]
+  retrieval-stage -->|input token estimate| paid-call["Reserve dispatch settle\nsrc/rfp_assistant/budget.py"]
+  paid-call -->|provider response| validation["Citation validation\nsrc/rfp_assistant/generation.py"]
+  validation -->|AnswerResult| finish["Finish request row\nsrc/rfp_assistant/service.py"]
+  ask-page -->|poll GET request| finish

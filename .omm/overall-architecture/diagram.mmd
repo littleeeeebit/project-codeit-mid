@@ -1,11 +1,10 @@
 graph TD
-  web-screens["Web screens\nweb/src"] -->|"typed fetch + X-Member"| http-api["HTTP API\nsrc/rfp_assistant/api.py"]
-  http-api -->|"one service call per route"| service-layer["Service layer\nsrc/rfp_assistant/service.py"]
-  service-layer -->|"scoped question"| retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval.py"]
-  service-layer -->|"reserve, dispatch, settle"| paid-gateway["Paid gateway\nsrc/rfp_assistant/budget.py"]
-  retrieval-engine -->|"vector search, chunk rows"| postgresql-store["PostgreSQL store\nsrc/rfp_assistant/postgres.py"]
-  service-layer -->|"requests, audit, gold rows"| postgresql-store
-  paid-gateway -->|"attempts, advisory lock"| postgresql-store
-  offline-pipelines["Offline pipelines\nsrc/rfp_assistant/compare.py"] -->|"extractions, indexes, runs"| postgresql-store
-  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"] -->|"runs pipelines"| offline-pipelines
-  owner-cli -->|"ledger-only admin"| service-layer
+  web-screens["Next.js screens\nweb/src/app/page.tsx"] -->|typed fetch with X-Member| http-api["FastAPI routes\nsrc/rfp_assistant/api.py"]
+  http-api -->|one service call per route| service-core["Service core\nsrc/rfp_assistant/service.py"]
+  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"] -->|own or ledger-only Resources| service-core
+  service-core -->|scoped question| retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval.py"]
+  service-core -->|reserve dispatch settle| budget-ledger["Budget ledger\nsrc/rfp_assistant/budget.py"]
+  service-core -->|chat and embed| provider-transport["Provider transport\nsrc/rfp_assistant/generation.py"]
+  retrieval-engine -->|chunks and vectors| postgresql-store["PostgreSQL and pgvector\nsrc/rfp_assistant/postgres.py"]
+  budget-ledger -->|attempts rows| postgresql-store
+  retrieval-engine -->|index manifests and files| runtime-artifacts["Runtime artifacts\nsrc/rfp_assistant/store.py"]

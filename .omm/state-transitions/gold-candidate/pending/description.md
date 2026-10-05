@@ -1,1 +1,0 @@
-Submitted by `gold.submit` (a drafting run or the CLI `gold submit`). `gold repin` moves pending rows to a new extraction by element path; `pending_invalid` rows that no longer pass the shared checks are listed by `gold status`.

@@ -1,13 +1,12 @@
-created: 2026-10-05T09:51:21.480Z
-updated: 2026-10-05T09:51:21.635Z
+created: 2026-10-05 09:51:21.480000+00:00
+updated: 2026-10-05 09:51:21.635000+00:00
 update_count: 2
 last_field: diagram
 kind: nested-class
 title: offline-pipelines
 children:
-  - comparison-runner
-  - corpus-pipeline
-  - embedding-builds
-  - evaluation-release
-  - serving-config
+- comparison-runner
+- corpus-pipeline
+- embedding-builds
+- evaluation-release
 parentPath: []

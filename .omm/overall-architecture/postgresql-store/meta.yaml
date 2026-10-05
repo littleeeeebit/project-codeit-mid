@@ -1,7 +1,7 @@
 created: 2026-10-05T03:34:21.317Z
-updated: 2026-10-05T09:51:21.349Z
-update_count: 6
-last_field: todo
+updated: 2026-10-05T21:23:52.360Z
+update_count: 7
+last_field: description
 kind: nested-class
 title: postgresql-store
 children: []
