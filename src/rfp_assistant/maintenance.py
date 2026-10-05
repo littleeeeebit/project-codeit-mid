@@ -77,28 +77,39 @@ def _stable(tables: dict) -> dict:
 # ---------------------------------------------------------------- steps
 
 
-def artifacts_digest(manifest_path: Path) -> str | None:
-    """One digest over a backup's dump and copied files, after checking each against its manifest; None when the
-    manifest is unreadable or any artifact is missing or changed. A restore check is bound to this digest."""
-    from .postgres import file_hash
+def artifact_problem(manifest_path: Path) -> str | None:
+    """The first file a restore of this backup depends on that no longer matches its manifest, else None: the
+    dump, a copied runtime file, or an original, extraction or index file it references (the restore check's
+    immutable-artifact check, `references_valid`, one reference at a time so the answer names it)."""
+    from .postgres import file_hash, references_valid
 
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        parts = [file_hash(manifest_path.parent / "database.dump")]
-        if parts[0] != manifest["dump_sha256"]:
-            return None
+        if file_hash(manifest_path.parent / "database.dump") != manifest["dump_sha256"]:
+            return "database.dump"
         for rel, expected in sorted(manifest["copied"].items()):
             if file_hash(manifest_path.parent / "files" / rel) != expected:
-                return None
-            parts.append(f"{rel}:{expected}")
-    except (OSError, ValueError, KeyError):
+                return f"copied file {rel}"
+        return next((f"{r.get('kind')} {r.get('path')}" for r in manifest["references"]
+                     if not references_valid([r])), None)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return f"{manifest_path.name}: {type(exc).__name__}"
+
+
+def artifacts_digest(manifest_path: Path) -> str | None:
+    """One digest over everything a restore of this backup depends on, after checking each against its manifest
+    (`artifact_problem`); None when anything is missing or changed. A restore check is bound to this digest."""
+    if artifact_problem(manifest_path) is not None:
         return None
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    parts = [manifest["dump_sha256"], *(f"{rel}:{h}" for rel, h in sorted(manifest["copied"].items())),
+             *(f"{r['kind']}:{r['path']}:{r['expected_sha256']}" for r in manifest["references"])]
     return hashlib.sha256("\n".join(parts).encode()).hexdigest()
 
 
 def step_backup(settings: Settings, ctx: dict, actor: str, **_) -> dict:
-    """Reuses the newest backup whose table digests still equal the database's and whose dump and copied files
-    still match its manifest; otherwise takes a new one."""
+    """Reuses the newest backup whose table digests still equal the database's and whose dump, copied files and
+    referenced originals, extractions and index files still match its manifest; otherwise takes a new one."""
     from . import postgres_backup, release
     from .store import open_db as db
 
@@ -116,8 +127,9 @@ def step_backup(settings: Settings, ctx: dict, actor: str, **_) -> dict:
            "ledger": result["ledger"], "restore_check": None}
     _save_backups(settings, history + [rec])
     ctx["backup"], ctx["backup_artifacts"] = rec, artifacts_digest(Path(result["manifest"]))
-    if ctx["backup_artifacts"] is None:
-        raise StepFailed(f"the new backup's files do not match its manifest: {result['manifest']}")
+    if ctx["backup_artifacts"] is None:  # a restore of it would fail its artifact check: nothing to trust
+        raise StepFailed(f"the new backup would not restore: {artifact_problem(Path(result['manifest']))} is "
+                         f"missing or changed ({result['manifest']})")
     return {"manifest": rec["manifest"], "tables": result["tables"], "spent_micro_usd": result["ledger"].get(
         "spent_micro_usd")}
 
@@ -302,7 +314,8 @@ def step_regression(settings: Settings, ctx: dict, analyzer, transport, started:
     if failed:
         raise StepFailed("; ".join(f"{r['name']}: {r.get('reason')}" for r in failed)[:400])
     reused = all((r.get("measured_at") or "") < started for r in table["rows"])
-    return {"status": "reused" if reused else "done", "table": "regression", "rows": rows}
+    return {"status": "reused" if reused else "done", "table": "regression", "rows": rows,
+            "needs_evidence_review": table["needs_evidence_review"]}
 
 
 STEP_FUNCTIONS = {"backup": step_backup, "restore_check": step_restore_check, "ingest": step_ingest,
@@ -380,6 +393,11 @@ def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: 
         if state["status"] != "running":
             break
     serving_after = _serving(settings)
+    lost = next((s["detail"].get("needs_evidence_review") for s in state["steps"] if s["name"] == "regression"), None)
+    if state["status"] == "running" and lost:  # every step ran, but the comparison is not a verified one
+        state.update(status="unverified", reason=f"{len(lost)} question(s) left out of the rebuilt rows: a re-parse "
+                     f"replaced the extraction their evidence is pinned to; review it again ({', '.join(lost[:10])}"
+                     f"{' …' if len(lost) > 10 else ''})")
     state.update(finished_at=utcnow(), status="complete" if state["status"] == "running" else state["status"],
                  serving={"before": serving_before, "after": serving_after,
                           "unchanged": serving_before == serving_after},
@@ -401,7 +419,7 @@ def report_md(state: dict) -> str:
     lines = [f"# Maintenance {state['run_id']}", "",
              f"Started {state['started_at']} by {state['actor']}; finished {state['finished_at']}. Status: "
              f"**{state['status']}**" + (f" at `{state['stopped_at']}`: {state['reason']}" if state["stopped_at"]
-                                          else "") + ".", "",
+                                          else f": {state['reason']}" if state.get("reason") else "") + ".", "",
              f"Serving unchanged: {state.get('serving', {}).get('unchanged')} "
              f"(`{(state.get('serving') or {}).get('after', {}).get('run_id')}`). Provider calls during the run: "
              f"{state.get('provider_calls')}. Everything reused: {state.get('reused')}.", "",

@@ -610,7 +610,7 @@ class MaintenanceRun(_Read):
     actor: str
     started_at: str
     finished_at: str | None = None
-    status: Literal["running", "complete", "failed", "needs_approval", "interrupted"]
+    status: Literal["running", "complete", "unverified", "failed", "needs_approval", "interrupted"]
     stopped_at: str | None = None
     reason: str | None = None
     steps: list[MaintenanceStep]
@@ -923,6 +923,7 @@ class ExperimentTable(_Read):
     columns: list[ExperimentColumn]
     fixed: dict[str, Any]
     populations: dict[str, str]
+    needs_evidence_review: list[str] = []
     rows: list[ExperimentRow]
 
 

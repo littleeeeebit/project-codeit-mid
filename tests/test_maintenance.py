@@ -11,7 +11,7 @@ from unittest import mock
 
 import psycopg
 
-from rfp_assistant import ingestion, maintenance, service
+from rfp_assistant import ingestion, maintenance, service, store
 from rfp_assistant.generation import FakeTransport
 from rfp_assistant.retrieval import KeywordIndex, build_keyword_index
 from tests import fixtures
@@ -94,6 +94,63 @@ class SequenceTest(unittest.TestCase):
         self.assertTrue(again["reused"])
         self.assertEqual(again["provider_calls"], 0)
 
+    def reparse(self, ref, **steps):
+        """Runs maintenance while a parser change alters one original's output (its last element)."""
+        key, parse = ingestion.input_key, ingestion.parse_pdf
+
+        def next_parser(path):
+            raw, warnings, reason = parse(path)
+            if ingestion.sha256_file(path) == ref.source_hash:
+                raw = [{**e, "raw_text": e["raw_text"] + " (개정)"} if i == len(raw) - 1 else e for i, e in enumerate(raw)]
+            return raw, warnings, reason
+
+        with mock.patch.object(ingestion, "input_key", lambda s, src: key(s, src) + "-next"), \
+                mock.patch.object(ingestion, "parse_pdf", next_parser):
+            return self.run_with(**{"backup": reused, "restore_check": reused, "regression": reused, **steps})
+
+    def test_the_served_extraction_reports_its_own_review_not_the_candidates(self):
+        # review round 2, F5: a positive review of the reparsed candidate must not certify the served older text
+        ref = self.env.refs["기관A"]
+        with store.open_db(self.s.db_path) as conn:
+            served = conn.execute("SELECT active_extraction_id FROM sources WHERE source_hash = ?",
+                                  (ref.source_hash,)).fetchone()[0]
+        ingestion.record_review(self.s, ref.source_hash, "reviewer", "unreviewed", [], {"withdrawn": True})
+        self.assertEqual(self.reparse(ref)["status"], "complete")
+        ingestion.record_review(self.s, ref.source_hash, "reviewer", "reviewed", ["p1/i0"], {})
+        with store.open_db(self.s.db_path) as conn:
+            src = conn.execute("SELECT active_extraction_id, review_status FROM sources WHERE source_hash = ?",
+                               (ref.source_hash,)).fetchone()
+        self.assertNotEqual(src["active_extraction_id"], served)
+        self.assertEqual(src["review_status"], "reviewed")  # the candidate's own review
+        res = service.Resources(self.s, transport=FakeTransport())
+        try:
+            (doc,) = service._doc_rows(res, [ref.doc_id])
+        finally:
+            res.close()
+        self.assertEqual((doc["active_extraction_id"], doc["review_status"]), (served, "unreviewed"))
+
+    def test_a_reparse_keeps_the_served_questions_and_reports_the_ones_it_cost(self):
+        # review round 2, F6: the served rows keep the question pinned to the served extraction; the rebuilt rows
+        # cannot grade it, and the run says so instead of reporting a verified comparison
+        from rfp_assistant import compare
+        from tests import phase4_fixtures as p4
+
+        with mock.patch.object(p4, "family_of", lambda env, key: "family-a"):
+            p4.write(self.env, "dev", [p4.warranty_row(self.env)])
+        p4.write(self.env, "corpus", [])
+        state = self.reparse(self.env.refs["기관A"], regression=maintenance.step_regression)
+        self.assertEqual(state["status"], "unverified", state["reason"])
+        self.assertIn("dev-warranty", state["reason"])
+        steps = {s["name"]: s for s in state["steps"]}
+        self.assertEqual(steps["regression"]["status"], "done")
+        self.assertEqual(steps["regression"]["detail"]["needs_evidence_review"], ["dev-warranty"])
+        (table,) = [t for t in compare.load_tables(self.s) if t["matrix"] == "regression"]
+        self.assertEqual(table["needs_evidence_review"], ["dev-warranty"])
+        graded = {r["axes"]["index"]: {q["id"] for q in r["questions"] if q["population"] == "dev"}
+                  for r in table["rows"]}
+        self.assertEqual(graded, {"served": {"dev-warranty"}, "rebuilt": set()})
+        self.assertIn("unverified", maintenance.report_md(state))
+
     def test_a_reparse_does_not_change_what_serving_searches_before_activation(self):
         ref = self.env.refs["기관A"]
         res = service.Resources(self.s, transport=FakeTransport())
@@ -103,17 +160,7 @@ class SequenceTest(unittest.TestCase):
         finally:
             res.close()
         self.assertTrue(before.evidence)
-        key, parse = ingestion.input_key, ingestion.parse_pdf
-
-        def next_parser(path):  # a parser change that alters one original's output
-            raw, warnings, reason = parse(path)
-            if ingestion.sha256_file(path) == ref.source_hash:
-                raw = [{**e, "raw_text": e["raw_text"] + " (개정)"} if i == len(raw) - 1 else e for i, e in enumerate(raw)]
-            return raw, warnings, reason
-
-        with mock.patch.object(ingestion, "input_key", lambda s, src: key(s, src) + "-next"), \
-                mock.patch.object(ingestion, "parse_pdf", next_parser):
-            state = self.run_with(backup=reused, restore_check=reused, regression=reused)
+        state = self.reparse(ref)
         self.assertEqual(state["status"], "complete", state["reason"])
         steps = {s["name"]: s for s in state["steps"]}
         self.assertIn("기관A_통합 정보시스템.pdf", [c["filename"] for c in steps["ingest"]["detail"]["changed"]])
@@ -207,6 +254,28 @@ class SequenceTest(unittest.TestCase):
         copied[0].write_bytes(copied[0].read_bytes() + b"x")  # a copied runtime file changed after the check
         third = self.run_with(**rest)
         self.assertEqual((self.statuses(third)["backup"], self.statuses(third)["restore_check"]), ("done", "done"))
+
+    def test_a_missing_referenced_artifact_voids_the_cached_restore_check(self):
+        # review round 2, F3: a historical extraction the backup references but nothing serves
+        rest = dict(ingest=reused, fidelity=reused, keyword=reused, embedding=reused, regression=reused)
+        ref = self.env.refs["기관A"]
+        with store.open_db(self.s.db_path) as conn:
+            artifact = Path(conn.execute("SELECT artifact_path FROM extractions WHERE source_hash = ?",
+                                         (ref.source_hash,)).fetchone()[0])
+        old = artifact.with_name("historical-elements.jsonl")
+        old.write_bytes(artifact.read_bytes())
+        with store.open_db(self.s.db_path) as conn, store.tx(conn, immediate=True):
+            conn.execute("INSERT INTO extractions(extraction_id, source_hash, parser_fingerprint, artifact_path, "
+                         "created_at) VALUES ('historical0001', ?, 'old-parser', ?, ?)",
+                         (ref.source_hash, str(old), store.utcnow()))
+        first = self.run_with(**rest)
+        self.assertEqual(first["status"], "complete", first["reason"])
+        self.assertEqual(self.statuses(first)["restore_check"], "done")
+        old.unlink()  # tables, dump and copied files stay as they were
+        second = self.run_with(**rest)
+        self.assertEqual((second["status"], second["stopped_at"]), ("failed", "backup"))
+        self.assertIn(str(old), second["reason"])
+        self.assertEqual(self.statuses(second)["restore_check"], "pending")
 
     def test_the_button_runs_the_same_sequence_in_the_serving_process(self):
         res = service.Resources(self.s, transport=FakeTransport())

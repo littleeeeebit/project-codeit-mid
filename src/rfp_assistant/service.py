@@ -27,8 +27,8 @@ from . import dense as dense_mod
 from .auth import require_any
 from .contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, EvidenceUnit, EvidenceView,
                         ManagedDownload, Principal, RequestView, RetrievalResult)
-from .ingestion import (CODE_RE, QUARANTINE_TEXT, load_elements, nfc, printed_pdf_path, record_review,
-                        resolutions_by_doc)
+from .ingestion import (CODE_RE, QUARANTINE_TEXT, extraction_review_status, load_elements, nfc, printed_pdf_path,
+                        record_review, resolutions_by_doc)
 from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extraction, corpus_scope, scope_rows
 from .retrieval import retrieve as _retrieve
 from .evaluation import EVAL_VERSION
@@ -419,21 +419,26 @@ def _authorize(res: Resources, principal: Principal | None, *capabilities: str) 
 
 
 def _doc_rows(res: Resources, doc_ids: list[str] | None = None) -> list[dict]:
+    idx = res.index()
     with open_db(res.settings.db_path) as conn:
         rows = conn.execute(
             "SELECT d.*, s.format, s.parse_status, s.review_status, s.reason_code, s.active_extraction_id "
             "FROM documents d JOIN sources s ON s.source_hash = d.active_source_hash ORDER BY d.csv_row_id").fetchall()
         resolutions = resolutions_by_doc(conn)
-    idx = res.index()
-    out = []
-    for r in rows:
-        if doc_ids is not None and r["doc_id"] not in doc_ids:
-            continue
-        d = dict(r)
-        # Serving reads an original through the extraction its activated index holds: a re-parse moves
-        # `active_extraction_id` before the person activates the index built over the new extraction.
-        if idx is not None:
-            d["active_extraction_id"] = idx.served_extraction(d["active_source_hash"], d["active_extraction_id"])
+        out = []
+        for r in rows:
+            if doc_ids is not None and r["doc_id"] not in doc_ids:
+                continue
+            d = dict(r)
+            # Serving reads an original through the extraction its activated index holds: a re-parse moves
+            # `active_extraction_id` before the person activates the index built over the new extraction. The
+            # source's statuses then describe the newer revision, so the served one reports its own review.
+            served = idx.served_extraction(d["active_source_hash"], d["active_extraction_id"]) if idx else None
+            if served is not None and served != d["active_extraction_id"]:
+                d.update(active_extraction_id=served, parse_status="parsed", reason_code=None,
+                         review_status=extraction_review_status(conn, served))
+            out.append(d)
+    for d in out:
         d["meta"] = json.loads(d.pop("normalized_metadata_json"))
         d["quality"] = json.loads(d.pop("quality_json"))
         d["resolutions"] = resolutions.get(d["doc_id"], {})
@@ -441,7 +446,6 @@ def _doc_rows(res: Resources, doc_ids: list[str] | None = None) -> list[dict]:
         # display; d["meta"] keeps the CSV values and d["resolutions"] the provenance.
         d["effective"] = {**d["meta"], **{f: r["value"] for f, r in d["resolutions"].items()}}
         d.pop("raw_metadata_json")
-        out.append(d)
     return out
 
 

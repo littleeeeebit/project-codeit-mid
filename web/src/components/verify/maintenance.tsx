@@ -30,6 +30,7 @@ const STATE: Record<Step["status"], { label: string; tone: Tone }> = {
 };
 const HEAD: Record<Run["status"], { label: string; text: string }> = {
   running: { label: "실행 중", text: "text-info" }, complete: { label: "완료", text: "text-ok" },
+  unverified: { label: "끝났지만 비교가 검증되지 않음", text: "text-warn" },
   failed: { label: "실패", text: "text-bad" }, needs_approval: { label: "비용 승인 대기", text: "text-warn" },
   interrupted: { label: "중단됨", text: "text-warn" },
 };
@@ -40,7 +41,8 @@ type Regression = { name: string; dev_ndcg?: number | null; dev_support?: number
 type Detail = Partial<{
   taken_at: string; tables: number; checks: number; checked_at: string; documents: number; reparsed: number; changed: { filename: string }[];
   checked: number; same_as_served: boolean; index_version: string; served_index_version: string; model: string;
-  embedded: number; cost_usd: number; rows: Regression[]; judge_set: { negatives: number; positives: number };
+  embedded: number; cost_usd: number; rows: Regression[]; needs_evidence_review: string[];
+  judge_set: { negatives: number; positives: number };
   development_rows: number; estimate: { estimate_id: string; total_micro_usd: number };
 }>;
 const n = (v: unknown) => (typeof v === "number" ? v.toLocaleString("ko-KR") : String(v ?? "-"));
@@ -60,7 +62,8 @@ function summary(s: Step): string {
     case "keyword": return d.same_as_served ? `서비스 중인 색인 ${short(d.index_version)} 그대로` : `새 색인 ${short(d.index_version)} · 서비스 중 ${short(d.served_index_version)} (활성화 전)`;
     case "embedding": return s.status === "skipped" ? "키워드 검색만 서비스 중"
       : s.status === "reused" ? `${d.model} · 새 청크 없음` : `${d.model} · 새로 임베딩 ${n(d.embedded ?? 0)}개 · ${d.cost_usd ? `$${d.cost_usd}` : "무료"}`;
-    case "regression": return `${d.rows?.length ?? 0}행 · 실험 비교의 '회귀 (유지보수)' 표`;
+    case "regression": return `${d.rows?.length ?? 0}행 · 실험 비교의 '회귀 (유지보수)' 표${d.needs_evidence_review?.length
+      ? ` · 다시 읽은 원문 때문에 새 색인 행에서 빠진 질문 ${d.needs_evidence_review.length}개 (근거 재검토 필요)` : ""}`;
     case "report": return d.judge_set ? `개발 세트 ${n(d.development_rows)}행 · 판정 골든 세트 오답 ${n(d.judge_set.negatives)} / 정답 ${n(d.judge_set.positives)}` : `개발 세트 ${n(d.development_rows)}행`;
   }
 }

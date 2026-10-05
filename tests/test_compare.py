@@ -227,7 +227,7 @@ class LedgerAndCacheTest(unittest.TestCase):
         index = types.SimpleNamespace(manifest_hash="m")
 
         def key(**limits):
-            runner = types.SimpleNamespace(settings=self.env.settings.with_(**limits), pops={},
+            runner = types.SimpleNamespace(settings=self.env.settings.with_(**limits), pops_for=lambda index: {},
                                            index=lambda profile, serving=None: index)
             return compare.Runner.row_key(runner, row)[0]
 

@@ -2525,6 +2525,14 @@
       "title": "Matrix",
       "type": "string"
      },
+     "needs_evidence_review": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Needs Evidence Review",
+      "type": "array"
+     },
      "populations": {
       "additionalProperties": {
        "type": "string"
@@ -3863,6 +3871,7 @@
       "enum": [
        "running",
        "complete",
+       "unverified",
        "failed",
        "needs_approval",
        "interrupted"
