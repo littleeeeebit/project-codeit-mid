@@ -29,9 +29,10 @@ langfuse==4.16.0
 # ZoneInfo("Asia/Seoul") on Windows
 tzdata==2026.4; sys_platform == "win32"
 
-# Local reranker on GPU (BAAI/bge-reranker-v2-m3)
+# Local embedding models and rerankers on GPU (models.EMBEDDINGS, models.RERANKERS); einops for jina-embeddings-v3's remote code
 torch==2.14.0+cu130
 sentence-transformers==6.1.0
+einops==0.8.2
 
 # Local OCR of image regions (PaddlePaddle/PaddleOCR-VL-1.6 via transformers; its image processor needs torchvision)
 torchvision==0.29.0+cu130

@@ -1,6 +1,52 @@
 {
  "components": {
   "schemas": {
+   "ActivateIn": {
+    "properties": {
+     "decided_by": {
+      "title": "Decided By",
+      "type": "string"
+     },
+     "note": {
+      "default": "",
+      "title": "Note",
+      "type": "string"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "run_id",
+     "decided_by"
+    ],
+    "title": "ActivateIn",
+    "type": "object"
+   },
+   "Activated": {
+    "properties": {
+     "activated_at": {
+      "title": "Activated At",
+      "type": "string"
+     },
+     "mode": {
+      "title": "Mode",
+      "type": "string"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "run_id",
+     "mode",
+     "activated_at"
+    ],
+    "title": "Activated",
+    "type": "object"
+   },
    "AgreementRate": {
     "properties": {
      "denominator": {
@@ -2195,6 +2241,359 @@
     "title": "Excluded",
     "type": "object"
    },
+   "ExperimentColumn": {
+    "properties": {
+     "better": {
+      "anyOf": [
+       {
+        "enum": [
+         "high",
+         "low"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Better"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "label",
+     "better"
+    ],
+    "title": "ExperimentColumn",
+    "type": "object"
+   },
+   "ExperimentQuestion": {
+    "properties": {
+     "complete": {
+      "title": "Complete",
+      "type": "boolean"
+     },
+     "critical": {
+      "title": "Critical",
+      "type": "boolean"
+     },
+     "fallback": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fallback"
+     },
+     "hit5": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hit5"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "missing": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Missing",
+      "type": "array"
+     },
+     "ndcg": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ndcg"
+     },
+     "population": {
+      "title": "Population",
+      "type": "string"
+     },
+     "qualifier_loss": {
+      "title": "Qualifier Loss",
+      "type": "integer"
+     },
+     "question": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Question"
+     },
+     "type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Type"
+     }
+    },
+    "required": [
+     "population",
+     "id",
+     "question",
+     "type",
+     "ndcg",
+     "complete",
+     "hit5",
+     "qualifier_loss",
+     "missing",
+     "critical",
+     "fallback"
+    ],
+    "title": "ExperimentQuestion",
+    "type": "object"
+   },
+   "ExperimentRow": {
+    "properties": {
+     "active": {
+      "title": "Active",
+      "type": "boolean"
+     },
+     "axes": {
+      "additionalProperties": true,
+      "title": "Axes",
+      "type": "object"
+     },
+     "estimate": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Estimate"
+     },
+     "facts": {
+      "additionalProperties": true,
+      "title": "Facts",
+      "type": "object"
+     },
+     "failures": {
+      "title": "Failures",
+      "type": "integer"
+     },
+     "index": {
+      "title": "Index",
+      "type": "integer"
+     },
+     "label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Label"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "run_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Run Id"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "values": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "integer"
+        },
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "title": "Values",
+      "type": "object"
+     }
+    },
+    "required": [
+     "index",
+     "name",
+     "axes",
+     "status",
+     "reason",
+     "run_id",
+     "label",
+     "values",
+     "facts",
+     "estimate",
+     "failures",
+     "active"
+    ],
+    "title": "ExperimentRow",
+    "type": "object"
+   },
+   "ExperimentTable": {
+    "properties": {
+     "columns": {
+      "items": {
+       "$ref": "#/components/schemas/ExperimentColumn"
+      },
+      "title": "Columns",
+      "type": "array"
+     },
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "fixed": {
+      "additionalProperties": true,
+      "title": "Fixed",
+      "type": "object"
+     },
+     "matrix": {
+      "title": "Matrix",
+      "type": "string"
+     },
+     "populations": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Populations",
+      "type": "object"
+     },
+     "rows": {
+      "items": {
+       "$ref": "#/components/schemas/ExperimentRow"
+      },
+      "title": "Rows",
+      "type": "array"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "matrix",
+     "title",
+     "created_at",
+     "columns",
+     "fixed",
+     "populations",
+     "rows"
+    ],
+    "title": "ExperimentTable",
+    "type": "object"
+   },
+   "Experiments": {
+    "properties": {
+     "active_run_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Active Run Id"
+     },
+     "golden_counts": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Golden Counts"
+     },
+     "serving": {
+      "title": "Serving",
+      "type": "string"
+     },
+     "serving_detail": {
+      "$ref": "#/components/schemas/ServingDetail"
+     },
+     "tables": {
+      "items": {
+       "$ref": "#/components/schemas/ExperimentTable"
+      },
+      "title": "Tables",
+      "type": "array"
+     }
+    },
+    "required": [
+     "tables",
+     "active_run_id",
+     "serving",
+     "serving_detail",
+     "golden_counts"
+    ],
+    "title": "Experiments",
+    "type": "object"
+   },
    "Fact": {
     "properties": {
      "doc_id": {
@@ -4042,6 +4441,67 @@
      "cited"
     ],
     "title": "Segment",
+    "type": "object"
+   },
+   "ServingDetail": {
+    "properties": {
+     "embedding": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Embedding"
+     },
+     "fallback": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fallback"
+     },
+     "mode": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mode"
+     },
+     "protect": {
+      "title": "Protect",
+      "type": "integer"
+     },
+     "reranker": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reranker"
+     }
+    },
+    "required": [
+     "mode",
+     "embedding",
+     "reranker",
+     "protect",
+     "fallback"
+    ],
+    "title": "ServingDetail",
     "type": "object"
    },
    "Slot": {
@@ -6517,6 +6977,160 @@
      }
     },
     "summary": "Start Evaluation"
+   }
+  },
+  "/api/verify/experiments": {
+   "get": {
+    "description": "Free: every comparison table the runner wrote, and which row serves.",
+    "operationId": "experiments_api_verify_experiments_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Experiments"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Experiments"
+   }
+  },
+  "/api/verify/experiments/activate": {
+   "post": {
+    "description": "Switches what serves to the picked row's run (`activate-run`), recorded with the person's name.",
+    "operationId": "activate_experiment_api_verify_experiments_activate_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ActivateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Activated"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Activate Experiment"
+   }
+  },
+  "/api/verify/experiments/{matrix}/{index}/questions": {
+   "get": {
+    "operationId": "experiment_questions_api_verify_experiments__matrix___index__questions_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "matrix",
+      "required": true,
+      "schema": {
+       "title": "Matrix",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "index",
+      "required": true,
+      "schema": {
+       "title": "Index",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ExperimentQuestion"
+         },
+         "title": "Response Experiment Questions Api Verify Experiments  Matrix   Index  Questions Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Experiment Questions"
    }
   },
   "/api/verify/fidelity": {

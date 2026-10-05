@@ -29,6 +29,18 @@ The initial release includes complete source ingestion where supported, an expli
 
 This corpus supports historical discovery and document Q&A. Fresh opportunity collection, automatic company eligibility decisions, autonomous agents, fine-tuning, GraphRAG, a hosted vector database, and a separate frontend deployment are outside the first release. Add a component when a recorded limitation requires it.
 
+## Operating rule: pipelines run, reviewers approve, a person picks
+
+Decided by the owner on 2026-10-05; every phase document and the [runbook](../../operations/runbook.md) follow it.
+
+| Who | Does | Never does |
+| --- | --- | --- |
+| Pipelines | Run every declared variant of a comparison (chunk profile, analyzer, embedding model, fusion, reranker and mode, evidence units) over the development, needle and whole-corpus sets. Write one table per matrix with its JSON and Markdown | Pick a winner, activate a run, or start a paid step without an estimate the person approved |
+| AI reviewers | Approve or reject gold rows against the original, both development and sealed. The reviewer's identity differs from the drafter's; a drafter, or the model that drafted, never approves its own row | Review a row they drafted |
+| The person | Reads the comparison tables side by side and activates one row (`activate-run`, or the activate action on 검증 › 실험 비교) with their name and an optional note | Approve gold row by row, or wait for a schedule |
+
+Gates (nDCG@5 gain, new critical failures, added latency) are table columns. They inform the choice; they no longer block an activation the person makes. Maintenance is one command or one button (`compare --matrix <name>`, a rebuild, a backup, a reconciliation). Nothing runs on a schedule, and nothing changes what serves without the person's activation.
+
 ## Requirements already established
 
 | Date | Requirement | Consequence for the plan |
@@ -100,9 +112,9 @@ Metadata lookup, keyword search, requirement inventory browsing, and citation op
 | Original parsing | Structured `pyhwp` XML and PyMuPDF; approved/native conversion fallback | Original checks expose missing or malformed content |
 | Metadata, elements, traces, and allowance | PostgreSQL 18.6 only (`bidmate_app`); short atomic write transactions, database-wide advisory lock for the paid gateway. The previous database was retired on 2026-10-04 after a validated final import, and its files were deleted on 2026-10-05; rollback is a verified `pg_dump` restore. The Phase 4 pilot runtime is the separate database `bidmate_pilot_archive` | A measured failure of the single PostgreSQL server |
 | Korean keyword retrieval | Kiwi plus `rank_bm25`, typed filters, scoped exact identifiers | Development failures show a concrete tokenizer/query limitation |
-| Dense retrieval | `text-embedding-3-large` at a fixed 1,536 dimensions in pgvector 0.8.6; exact cosine search serves (HNSW recall@20 stayed below 0.99 for scoped queries even at `ef_search` 400) | HNSW, or a successor, reaches recall@20 ≥ 0.99 against exact search in every scope group |
+| Dense retrieval | The activated run's embedding model in pgvector 0.8.6, exact cosine search (HNSW recall@20 stayed below 0.99 for scoped queries even at `ef_search` 400). `text-embedding-3-large` at 1,536 dimensions serves today and stays activatable for rollback. The embedding table compares 13 models, each embedding every active chunk into its own set. Local models run on the GPU in the server process; API models go through their ledger | The person activates another row of the embedding table |
 | Fusion | `keyword_first`: the BM25 top 6 keep their order, then weighted RRF (`1 / (60 + rank)`, dense weight 1.0) fills the rest. 50 candidates per channel and after fusion; 10 evidence units (4,000/4,800 tokens). Zero new critical failures against keyword-only K1 at the same limits on the 55-question pilot (55/55 complete) and the 88-question whole-corpus set (73/88 against 71/88); 20–30 units failed. All-documents routing needs a restated title term found in fewer than four titles, so generic words such as 대학교 or 사업 route nothing (run `H-0fffb2a6ec`) | A frozen comparison passes the same gate with better nDCG@5 or complete support |
-| Reranker | Local `BAAI/bge-reranker-v2-m3` (CUDA) measured on 2026-10-04 at 10–30 evidence units; not served, every setting failed the fusion gate (new critical failures or nDCG@5 0.8948 against 0.9405) | A reranker setting passes the fusion gate and the warm latency gate |
+| Reranker | None served. Local `BAAI/bge-reranker-v2-m3` (CUDA) measured on 2026-10-04 at 10–30 evidence units failed the fusion gate (new critical failures or nDCG@5 0.8948 against 0.9405). The reranker table measures eight local rerankers, each in whole-list mode and in below-the-BM25-head mode (top 6 protected), on the serving hybrid's frozen pool | The person activates a reranker row; its gate result is a column, not a block |
 | Answer generation | `gpt-4o-mini`, one Chat Completions call with strict structured output | A controlled `gpt-4.1-mini` comparison repairs measured errors affordably |
 | Frontends | One Next.js app in `web/` (질문하기, 검증, 데이터셋 만들기) over a FastAPI wrapper of `service`, served by one process, no login. Replaced the Streamlit pages on 2026-10-02 | Browser-tested requirements exceed the shared application's capabilities |
 | Observation | Persisted traces and ledger exports | Trace volume warrants Langfuse; existing proxy infrastructure makes LiteLLM practical |
@@ -145,7 +157,7 @@ Filters and exact identifier lookup precede free-form matching. A code such as `
 
 The [prompt contract](../../rag/prompts.md) separates trusted instructions from untrusted document text, supplies explicit scope and an evidence-ID allowlist, and requires Korean answers supported by the supplied evidence. Instructions inside RFP text are data. Validate output shape and citation ownership before marking an answer complete; a valid citation link alone does not prove its claim is supported.
 
-Promote the [reranker](../../rag/reranking.md) only with development `nDCG@5` improvement of at least 0.03, no critical regression, and at most one second of added warm p95 latency under six users. Failure to meet the gate keeps the bypass active. These thresholds and hardware feasibility must be measured.
+The [reranker](../../rag/reranking.md) gate stays a column of its table: a development `nDCG@5` improvement of at least 0.03, no new critical failure, and at most one second of added warm p95 latency under six users. Until the person activates a reranker row, the bypass serves.
 
 ## Shared allowance and real-time status
 
@@ -173,7 +185,7 @@ Direct academy-key use outside the gateway is invisible until reconciliation. Ve
 | Interface | Working increment | Completion evidence |
 | --- | --- | --- |
 | Consultant | Search/filters, readable project list, explicit selected scope, grounded answer, conditions/unknowns, clickable evidence and original download, persistent budget status | A consultant finds a late-document requirement and verifies its answer in the correct original without interpreting retrieval scores |
-| Verification | Retrieval-only default, stage trace, frozen configuration/run comparison, reviewed labels/corrections and exports; separate estimated paid actions | A reviewer reproduces a failure, distinguishes ingestion from retrieval/generation, and compares runs without accidental paid calls |
+| Verification | Retrieval-only default, stage trace, frozen configuration/run comparison, 실험 비교 (one table per comparison matrix, any row activatable), reviewed labels/corrections and exports; separate estimated paid actions | A reviewer reproduces a failure, distinguishes ingestion from retrieval/generation, and compares runs without accidental paid calls; the person activates a table row |
 
 Both entry points exist in the first slice; expand their workflows in phase 3. There is no login; sealed labels are never served to the verifier page, and owner actions require a reason and an audit event. Use Korean UI labels and answers, readable long titles, accessible controls, and explicit loading, insufficient-evidence, clarification, conflict, budget-blocked, and error states.
 
@@ -203,7 +215,7 @@ Early demonstration scope may be a reviewed subset, labeled explicitly. A 100-fi
 
 Expand parsing and original fidelity checks across supported files; prioritize requirements, monetary/date conditions, tables, and document tails. Recover failed HWP through verified conversion if available; otherwise keep their unavailable status visible. Retain metadata conflicts while sharing hash-identical artifacts.
 
-Run whitespace BM25, Kiwi BM25, dense-only, and hybrid retrieval on frozen development questions without generation. Reuse query embeddings and one persisted corpus index. Compare chunking and reranking as separate changes. Adopt an added stage only for a measured benefit; mark the active mode and fallback in traces.
+Run whitespace BM25, Kiwi BM25, dense-only, and hybrid retrieval on frozen development questions without generation. Reuse query embeddings and one persisted corpus index. Compare chunking and reranking as separate changes. The comparison runner runs every variant and writes the table. The person activates a row; traces mark the active mode and fallback.
 
 ### Phase 3: everyday usability and operational correctness
 
@@ -213,7 +225,7 @@ Exercise changed scope during a response, six concurrent near-cap reservations, 
 
 ### Phase 4: difficult evidence and a reviewable release
 
-Grow the reviewed gold target to 120 questions: 60 development and 60 sealed test, grouped by original document family. Include paraphrases, repeated codes, table/numeric facts, same- and cross-document multi-evidence, genuine missing facts/false premises, and revision/duplicate conflicts. LLMs draft candidates; a person independently verifies the full original, quoted evidence, numbers, units, conditions, and answerability. Converter failures are recovery cases, not proof a fact is absent.
+Grow the reviewed gold target to 120 questions: 60 development and 60 sealed test, grouped by original document family. Include paraphrases, repeated codes, table/numeric facts, same- and cross-document multi-evidence, genuine missing facts/false premises, and revision/duplicate conflicts. LLMs draft candidates. An AI reviewer whose identity differs from the drafter's verifies the full original, quoted evidence, numbers, units, conditions and answerability, for development and sealed rows alike. Converter failures are recovery cases, not proof a fact is absent.
 
 Select two development answer finalists at most, holding model/prompt/token limits constant for retrieval comparisons. Keep test questions and labels out of retrieval content and prompts, while all source documents remain searchable. Evaluate the sealed set only after selection. Review disputed critical facts independently and limit paid judge calls to a calibrated sample.
 
@@ -230,7 +242,7 @@ If only two days are available or review remains unfinished, release the support
 | Verification frontend | Traces, frozen run controls, explicitly estimated paid actions, exports | Same pipeline and versions; no independent spending counter |
 | Gold and evaluation | Source-family split, reviewed labels, metric definitions, release report | Stable original evidence labels, sealed access, recorded costs |
 
-These are proposed team responsibilities, not work already assigned. Source identity and gateway contracts are the first coordination task. Split review of 120 target questions as 20 per member, with an independent second check for disputed deadlines, amounts, institutions, and mandatory conditions.
+These are proposed team responsibilities, not work already assigned. Source identity and gateway contracts are the first coordination task. AI reviewers review the 120 target questions. A second AI reviewer, differing from both the drafter and the first reviewer, checks disputed deadlines, amounts, institutions and mandatory conditions. Members spend their time reading comparison tables and choosing.
 
 ## Verification and release gates
 
@@ -264,6 +276,6 @@ The release handoff contains a run/configuration manifest, ingestion coverage/re
 | Gold review time and sealed-test sample size | Phase 4 | Deliver accurately labeled pilot evidence and continue independent review |
 | Billing reconciliation access and external-key spending | Phases 1 and 3, then ongoing | Dated owner exports/manual adjustments; visibly stale or incomplete provider reconciliation |
 
-During the remaining weeks, fix extraction/provenance, scope/identifier errors, missing evidence, context packing, and unsupported claims before changing models. Reindex changed unique sources only, share cached artifacts, add hard regression cases from consultant use, and schedule affordable retrieval-first comparisons. Review pacing and reconciliation regularly without rerunning every paid metric daily.
+During the remaining weeks, fix extraction/provenance, scope/identifier errors, missing evidence, context packing, and unsupported claims before changing models. Reindex changed unique sources only, share cached artifacts and add hard regression cases from consultant use. When something changes, rerun the affected comparison matrix with one command; it reuses cached indexes, vectors and scores. Check pacing and reconciliation when the owner chooses to; nothing runs on a schedule.
 
 The reference structure follows `docs/plans/comic/0-overview.md` and `docs/plans/studio/0-overview.md` in `C:/Users/dasdk/PycharmProjects/ai-generation`: goal, structure, shared contracts, established decisions, phased working increments, and outstanding measurements. Their unrelated product decisions are not adopted here. Detailed technical evidence remains in the [research source register](../../rag/sources.md).

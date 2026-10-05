@@ -33,13 +33,15 @@ Pilot with 24 reviewed development questions to diagnose the pipeline. Expand be
 
 ## Comparison procedure
 
+Pipelines run every variant and AI reviewers approve gold rows, development and sealed. A person chooses from the comparison tables and activates. Maintenance is one command or button with no schedule (see the [operating rule](../plan/end-to-end/0-overview.md#operating-rule-pipelines-run-reviewers-approve-a-person-picks)).
+
 1. Freeze source versions, parsed evidence labels, development queries, scope, and token limits.
-2. Run whitespace BM25, Kiwi BM25, dense-only, and hybrid retrieval without generation. Use one set of cached query embeddings for applicable runs.
-3. Compare chunk settings and then reranking as separate changes. Keep the candidate pool fixed when attributing a gain to reranking.
+2. Run whitespace BM25, Kiwi BM25, dense-only, and hybrid retrieval without generation. Use one set of cached query embeddings for applicable runs. `compare --matrix <name>` runs every variant of a declared matrix over the development, needle and whole-corpus sets and writes one table.
+3. Compare chunk settings, embedding models and then reranking as separate changes. Only one thing changes per row: fusion, chunking and limits stay fixed while a model changes, and rerankers score the serving hybrid's frozen pool.
 4. Generate answers only for the two development finalists. Keep generation model, prompt, context-token ceiling, and output cap fixed.
-5. Review critical facts deterministically where possible and manually where context matters. Inspect amount units, VAT, date type, and negation; string similarity alone is inadequate.
-6. Use LLM judges only for a bounded sample of qualitative errors, blind to run names. Check their agreement with independent human labels and keep disputed cases visible. Do not judge every configuration with many paid metrics by default.
-7. Select the candidate from development evidence. Evaluate the sealed set once, report failures and limitations, and create new regression cases after release without retuning on the sealed answers.
+5. Review critical facts deterministically where possible and with an AI reviewer where context matters. Inspect amount units, VAT, date type, and negation; string similarity alone is inadequate.
+6. Use LLM judges only for a bounded sample of qualitative errors, blind to run names. Check their agreement with the reviewed reference verdicts and keep disputed cases visible. Do not judge every configuration with many paid metrics by default.
+7. The person reads the tables and activates a row. Gates are columns, not automatic decisions. Evaluate the sealed set once after that choice, report failures and limitations, and create new regression cases after release without retuning on the sealed answers.
 
 The test corpus remains searchable. Holding out questions and labels prevents benchmark tuning; omitting the documents would test a different task. Test questions/answers must not appear as retrievable content or few-shot prompt examples.
 
@@ -53,4 +55,4 @@ Aim for at least 90% correct handling of negative/ambiguous cases and inspect ev
 
 Set hardware-dependent targets of warmed retrieval p95 below two seconds and full-answer p95 below fifteen seconds at six concurrent users. Measure and revise them before promising an SLA. Prefer the cheaper/faster baseline if a more complex pipeline has no demonstrated quality gain.
 
-Budget gate: all paid paths use the shared ledger, reservations cannot exceed the operational cap, and the UI displays settled estimates versus pending/unknown costs correctly. Preserve a table of run versions, scores, latency, costs, and failure examples for the mentor presentation; there are no measured model scores to report yet.
+Budget gate: all paid paths use the shared ledger, reservations cannot exceed the operational cap, and the UI displays settled estimates versus pending/unknown costs correctly. A paid comparison step (an API embedding of the corpus or its queries) runs only under a priced estimate the person approved. The comparison tables on 검증 › 실험 비교 keep run versions, scores, latency, costs and per-question failures side by side for the mentor presentation.

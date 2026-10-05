@@ -894,6 +894,24 @@ def _run_dir(settings: Settings, run_id: str) -> Path:
     return settings.data_dir / "runs" / run_id
 
 
+def dense_policy(model: str) -> str:
+    from .dense import embed_policy
+
+    return embed_policy(model)
+
+
+def embedding_identity(settings: Settings) -> dict:
+    """What a run records of its embedding model. The OpenAI identity stays {model, dims} so runs measured before
+    other models existed keep their IDs; a local or Gemini model adds its pinned revision and prefix policy."""
+    from .models import EMBEDDINGS
+
+    spec = EMBEDDINGS[settings.embedding_model]
+    out = {"model": settings.embedding_model, "dims": settings.embedding_dimensions}
+    if spec.backend != "openai":
+        out.update(revision=spec.revision, policy=spec.policy, backend=spec.backend)
+    return out
+
+
 def _ready_dense_for(settings: Settings, index_version: str) -> str | None:
     with open_db(settings.db_path) as conn:
         for r in conn.execute("SELECT index_version, config_json FROM indexes WHERE state = 'ready' "
@@ -901,7 +919,8 @@ def _ready_dense_for(settings: Settings, index_version: str) -> str | None:
             cfg = json.loads(r["config_json"])
             if (cfg.get("kind") == "dense" and cfg.get("base_index_version") == index_version
                     and cfg.get("model") == settings.embedding_model
-                    and cfg.get("dimensions") == settings.embedding_dimensions):
+                    and cfg.get("dimensions") == settings.embedding_dimensions
+                    and cfg.get("policy") == dense_policy(settings.embedding_model)):
                 return r["index_version"]
     return None
 
@@ -916,8 +935,7 @@ def _frozen_config(settings: Settings, label: str, dataset: str, dataset_sha: st
             "profile": index.profile, "analyzer": WhitespaceAnalyzer.version if label == "K0"
             else analyzer_fingerprint(analyzer),
             "dense_version": dense.version if dense is not None and label in ("D", "H", "HR") else None,
-            "embedding": {"model": settings.embedding_model, "dims": settings.embedding_dimensions}
-            if label in ("D", "H", "HR") else None,
+            "embedding": embedding_identity(settings) if label in ("D", "H", "HR") else None,
             "limits": {"channel_top_k": settings.channel_top_k, "fused_top_k": settings.fused_top_k,
                        "rrf_k": settings.rrf_k, "fusion": settings.fusion, "dense_weight": settings.dense_weight,
                        "keyword_head": settings.keyword_head,
@@ -929,7 +947,7 @@ def _frozen_config(settings: Settings, label: str, dataset: str, dataset_sha: st
 
 
 def _execute(settings: Settings, index, analyzer, rows: list[dict], mode: str, dense=None, vectors=None,
-             reranker=None, rerank_depth=None, unscoped: bool = False) -> list[dict]:
+             reranker=None, rerank_depth=None, unscoped: bool = False, rerank_protect: int = 0) -> list[dict]:
     """`unscoped` asks every question once over the whole corpus (the all-documents scope) instead of its row's
     selected documents; every evidence group is then scored on that single ranking."""
     from .retrieval import corpus_scope, retrieve
@@ -948,7 +966,7 @@ def _execute(settings: Settings, index, analyzer, rows: list[dict], mode: str, d
         for ref, x in ([(None, None)] if len(scope) == 1 or corpus else scope):
             r = retrieve(settings, index, analyzer, row["question"], scope if ref is None else [(ref, x)], mode=mode,
                          dense=dense, query_vector=(vectors or {}).get(row_id(row)), reranker=reranker,
-                         rerank_depth=rerank_depth)
+                         rerank_depth=rerank_depth, rerank_protect=rerank_protect)
             ranking = [index.chunks[index.row_of[c]] for c in r.ranking]
             packed = [index.chunks[index.row_of[e.chunk_id]] for e in r.evidence]
             mine = groups if ref is None else [g for g in groups if g["doc_id"] == ref.doc_id]
@@ -1373,8 +1391,7 @@ def run_errors(settings: Settings, run_id: str) -> list[str]:
                               "edit); repin or rerun on the current dataset")
         except EvaluationError as exc:
             errors.append(f"cannot recheck the evaluated population: {exc}")
-    if config["mode"] == "hybrid_rerank" and not (scores.get("gate") or {}).get("passed"):
-        errors.append("the reranker did not pass its promotion gate; keep the bypass")
+    # A failed reranker gate is a column the person reads, not a refusal (operating rule, 0-overview.md).
     if config["mode"] == "hybrid_rerank" and not (config.get("reranker") or {}).get("max_concurrency"):
         errors.append("the trial recorded no reranker concurrency bound; rerun trial-reranker")
     try:
@@ -1403,15 +1420,17 @@ def decision_errors(settings: Settings, run_id: str, decision: dict) -> list[str
         errors.append("decision run_id does not match --run-id")
     if decision.get("mode") != config["mode"]:
         errors.append(f"decision mode must be the run's mode ({config['mode']})")
-    for key in ("decided_by", "rationale"):
-        if not str(decision.get(key) or "").strip():
-            errors.append(f"decision requires {key!r}")
+    if not str(decision.get("decided_by") or "").strip():
+        errors.append("decision requires 'decided_by' (the person who picks the row); the note is optional")
     embedding = config.get("embedding")
-    if embedding and (embedding.get("model"), embedding.get("dims")) != (settings.embedding_model,
-                                                                         settings.embedding_dimensions):
-        # Serving would fall back to keyword-only (Resources.serving); startup fixes the identity at large/1536.
-        errors.append(f"the run's embedding identity {embedding.get('model')}/{embedding.get('dims')} is not the "
-                      f"configured {settings.embedding_model}/{settings.embedding_dimensions}")
+    if embedding:
+        from .models import EMBEDDINGS
+
+        spec = EMBEDDINGS.get(embedding.get("model"))
+        if spec is None:
+            errors.append(f"the run's embedding model {embedding.get('model')} is not a compared model")
+        elif spec.backend != "openai" and embedding.get("policy") != spec.policy:
+            errors.append(f"the run's {spec.key} revision or prefixes differ from the pinned registry entry; rerun")
     finalist = decision.get("finalist_run_id")
     if finalist:
         try:
@@ -1422,10 +1441,7 @@ def decision_errors(settings: Settings, run_id: str, decision: dict) -> list[str
             if (f_scores.get("status") != "complete" or f_config.get("eval_version") != EVAL_VERSION
                     or f_config.get("population_sha256") != config.get("population_sha256")):
                 errors.append("the finalist must be a complete current-policy run on the same evaluated population")
-    if config.get("label") != "K1" or finalist:
-        # the claim compares against the K1 baseline, so its pool needs the review as much as the named runs
-        named = [run_id] + ([finalist] if finalist else [])
-        errors += pool_review_errors(settings, list(dict.fromkeys(named + _k1_baselines(settings, config))), decision)
+    # Unlabelled top-5 passages are shown beside the row's nDCG; the person reads them there, so none is required here.
     return errors + run_errors(settings, run_id)
 
 
@@ -1444,32 +1460,13 @@ def _k1_baselines(settings: Settings, config: dict) -> list[str]:
     return [max(found)[1]] if found else []
 
 
-def pool_review_errors(settings: Settings, run_ids: list[str], decision: dict) -> list[str]:
-    """Promoting a run, or naming a finalist, claims a measured benefit over K1: the unlabelled top-5 passages of
-    every named run and of the K1 baseline must have a recorded review (`pool_review`: reviewer and, per run, the count reviewed, which must
-    match the run). K1 alone, the provisional default, needs none. The review is attested, not blind."""
-    review = decision.get("pool_review") or {}
-    errors = []
-    for rid in run_ids:
-        try:
-            n = pool_pending({"ndcg_pool": (load_run(settings, rid)[1].get("aggregate") or {}).get("ndcg_pool")})
-        except EvaluationError:
-            continue
-        if not n:
-            continue
-        if not str(review.get("reviewed_by") or "").strip() or (review.get("runs") or {}).get(rid) != n:
-            errors.append(f"run {rid}: {n} returned top-5 passages lie outside the gold labels and have no recorded "
-                          "pool review; review them, then add missing support as new alternatives and rescore, or "
-                          "record pool_review {reviewed_by, runs: {run_id: count}} in the decision")
-    return errors
-
-
 def serving_config(run_id: str, config: dict) -> dict:
     """The serving configuration a recorded retrieval run describes (what `activate-run` stores and what the
     phase-4 answer evaluation pins)."""
     return {"run_id": run_id, "label": config["label"], "mode": config["mode"],
             "index_version": config["index_version"], "dense_version": config.get("dense_version"),
-            "reranker": {**config["reranker"], "depth": config["rerank_depth"]} if config.get("reranker") else None,
+            "reranker": {**config["reranker"], "depth": config["rerank_depth"],
+                         "protect": config.get("rerank_protect", 0)} if config.get("reranker") else None,
             "embedding": config.get("embedding"), "limits": config.get("limits"),
             "eval_version": config["eval_version"], "fallback_mode": "kiwi_bm25"}
 
@@ -1477,11 +1474,15 @@ def serving_config(run_id: str, config: dict) -> dict:
 def activate_run(settings: Settings, run_id: str, decision_path: Path, actor: str = "owner-cli") -> dict:
     """Validates a reviewed selection and its ready artifacts, then switches the serving configuration in one
     transaction. The previous configuration is kept in the append-only activation history."""
-    from .store import get_app_setting, set_app_setting, tx
-
     if not decision_path.is_absolute():
         raise EvaluationError("--decision-file must be an absolute path")
-    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    return activate_decision(settings, run_id, json.loads(decision_path.read_text(encoding="utf-8")), actor)
+
+
+def activate_decision(settings: Settings, run_id: str, decision: dict, actor: str) -> dict:
+    """`activate-run` with the decision given directly: the 실험 비교 view sends the person's name and note."""
+    from .store import get_app_setting, set_app_setting, tx
+
     config, scores = load_run(settings, run_id)
     errors = decision_errors(settings, run_id, decision)
     if errors:

@@ -1,15 +1,19 @@
 # Selecting and validating a Korean RFP reranker
 
-Proposed first candidate: run `BAAI/bge-reranker-v2-m3` locally on the top 20 fused candidates, with an explicit no-reranker fallback. Deploy it only after it improves the RFP development results within the latency and memory budget. This is a candidate selection, not a claim of Korean procurement superiority.
+The reranker table compares eight local rerankers on the serving hybrid's frozen pool (50 candidates), each in two modes. Whole-list mode reorders every candidate and repeats the failure measured on 2026-10-04. Below-the-head mode keeps the BM25 head (top 6) in place and reorders only what follows. The no-reranker bypass serves until the person activates a reranker row. Nothing here claims Korean procurement superiority.
 
 ## Candidates and constraints
 
 | Option | Established capabilities | Project choice |
 | --- | --- | --- |
-| No reranker | Retains BM25/RRF ranking, no reranking model cost | Mandatory baseline and fallback |
-| `BAAI/bge-reranker-v2-m3` | Publisher describes a multilingual cross-encoder; Apache-2.0 model license | First local trial |
-| `jinaai/jina-reranker-v2-base-multilingual` | Publisher describes multilingual reranking, sliding windows, and CC-BY-NC-4.0 licensing | Research comparison only after checking applicable use terms |
-| Paid hosted reranker or LLM judging passages | Extra calls, credentials, and spend | Defer while the $20 allowance is shared |
+| No reranker | Retains BM25/RRF ranking, no reranking model cost | Baseline row and fallback |
+| `BAAI/bge-reranker-v2-m3`, `dragonkue/bge-reranker-v2-m3-ko` | Multilingual cross-encoder and its Korean fine-tune; Apache-2.0 | Compared |
+| `BAAI/bge-reranker-v2-gemma`, `BAAI/bge-reranker-v2-minicpm-layerwise` | LLM-based rerankers scoring a Yes token; the layerwise model's layer cutoff is recorded | Compared |
+| `Qwen/Qwen3-Reranker-0.6B`, `mixedbread-ai/mxbai-rerank-base-v2`, `mixedbread-ai/mxbai-rerank-large-v2` | Causal-LM rerankers with a yes/no or relevance-token score | Compared |
+| `Alibaba-NLP/gte-multilingual-reranker-base` | Multilingual cross-encoder | Compared |
+| Paid hosted reranker or LLM judging passages | Extra calls, credentials, and spend | Not compared: the owner selected local rerankers only |
+
+Each row records the pinned revision, licence, precision, input length, size, cold load and peak VRAM. A model that fails to load, runs out of memory or crashes stays in the table with its reason.
 
 The [BGE reranker model card](https://huggingface.co/BAAI/bge-reranker-v2-m3) documents query-passage scoring and a sigmoid option. Sigmoid-normalized scores are not calibrated probabilities of a correct answer. It also describes FP16 as a speed/precision tradeoff; do not assume FP16 is appropriate for every CPU environment.
 
@@ -29,10 +33,8 @@ Local inference removes API charges for this stage, not runtime, download, memor
 
 ## The acceptance experiment
 
-Compare hybrid retrieval with and without the reranker on the same candidate pool, development labels, and final evidence-token budget. Record evidence recall@20 before reranking, hit rate/nDCG@5 after it, complete evidence coverage for multi-hop cases, and end-to-end grounded answer correctness for the finalists.
+`compare --matrix reranker` reranks the serving hybrid's frozen pool, with the same candidates, development labels and evidence-token budget for every row. Columns: nDCG@5, complete support, recall@20 before and after, critical failures against the serving hybrid and against K1, truncated pairs, warm p95 alone and under six users, and the existing gate result. Scores are cached per model, query and passage, so a rerun reuses them.
 
-Proposed promotion condition: improve development nDCG@5 by at least 0.03, cause no new critical exact-ID or wrong-document regressions, and add no more than one second to warmed p95 latency at the planned six-user load. These are product targets to revise with actual hardware measurements, not published performance numbers. Report uncertainty if a small sample makes the gain unstable.
+The gate column applies the existing condition: development nDCG@5 at least 0.03 above the serving hybrid, no new critical exact-ID or wrong-document regression, and no more than one second of added warm p95 latency at six users. It informs the person's choice and blocks nothing. Candidate depth stays at the serving 50; depth sweeps are not part of this comparison.
 
-Measure candidate counts of 10 and 20 before testing larger pools. Increasing candidate depth may improve recall but raises runtime and can erase a context-token saving. The release decision must consider quality, latency, and actual answer cost together.
-
-If the model fails to load or misses the latency gate, serve the validated RRF/BM25 path and record the fallback in the trace. Do not replace it with paid LLM reranking automatically. Revisit optimization or a different local model only when there is a measured failure worth fixing.
+A model that fails to load or crashes serves nothing: the validated RRF/BM25 path keeps serving and the trace records the fallback. No paid LLM reranking replaces it.

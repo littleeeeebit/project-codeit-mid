@@ -842,6 +842,79 @@ class SecondReviewIn(BaseModel):
     note: str
 
 
+class ExperimentColumn(_Read):
+    key: str
+    label: str
+    better: Literal["high", "low"] | None
+
+
+class ExperimentRow(_Read):
+    index: int
+    name: str
+    axes: dict[str, Any]
+    status: str
+    reason: str | None
+    run_id: str | None
+    label: str | None
+    values: dict[str, float | int | str | None]
+    facts: dict[str, Any]
+    estimate: dict[str, Any] | None
+    failures: int
+    active: bool
+
+
+class ExperimentTable(_Read):
+    matrix: str
+    title: str
+    created_at: str
+    columns: list[ExperimentColumn]
+    fixed: dict[str, Any]
+    populations: dict[str, str]
+    rows: list[ExperimentRow]
+
+
+class ServingDetail(_Read):
+    mode: str | None
+    embedding: str | None
+    reranker: str | None
+    protect: int
+    fallback: str | None
+
+
+class Experiments(_Read):
+    tables: list[ExperimentTable]
+    active_run_id: str | None
+    serving: str
+    serving_detail: ServingDetail
+    golden_counts: dict[str, Any] | None
+
+
+class ExperimentQuestion(_Read):
+    population: str
+    id: str
+    question: str | None
+    type: str | None
+    ndcg: float | None
+    complete: bool
+    hit5: int | None
+    qualifier_loss: int
+    missing: list[str]
+    critical: bool
+    fallback: str | None
+
+
+class ActivateIn(BaseModel):
+    run_id: str
+    decided_by: str
+    note: str = ""
+
+
+class Activated(_Read):
+    run_id: str
+    mode: str
+    activated_at: str
+
+
 # ---------------------------------------------------------------- 검증: routes
 
 
@@ -915,6 +988,20 @@ def _verify_routes(app: FastAPI) -> None:
     @app.get("/api/verify/judges/disagreements/{run_id}", response_model=list[Disagreement])
     def judge_disagreements(run_id: str, res: Res, member: Member):
         return service.judge_disagreements(res, member, run_id)
+
+    @app.get("/api/verify/experiments", response_model=Experiments)
+    def experiments(res: Res, member: Member):
+        """Free: every comparison table the runner wrote, and which row serves."""
+        return service.experiments(res, member)
+
+    @app.get("/api/verify/experiments/{matrix}/{index}/questions", response_model=list[ExperimentQuestion])
+    def experiment_questions(matrix: str, index: int, res: Res, member: Member):
+        return service.experiment_questions(res, member, matrix, index)
+
+    @app.post("/api/verify/experiments/activate", response_model=Activated)
+    def activate_experiment(body: ActivateIn, res: Res, member: Member):
+        """Switches what serves to the picked row's run (`activate-run`), recorded with the person's name."""
+        return service.activate_experiment(res, member, body.run_id, body.decided_by, body.note)
 
     @app.get("/api/verify/fidelity", response_model=list[FidelitySource])
     def fidelity(res: Res, member: Member):

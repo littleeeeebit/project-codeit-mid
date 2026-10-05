@@ -326,6 +326,34 @@ class EvaluationRunTest(unittest.TestCase):
             config["eval_version"] = eval_version
             (d / "config.json").write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
 
+    def test_below_the_head_reranking_keeps_the_bm25_head_and_reorders_only_the_rest(self):
+        from rfp_assistant import retrieval
+
+        s = self.env.settings.with_(fusion="keyword_first", keyword_head=2)
+        idx = KeywordIndex.load(s)
+        d = dense.DenseIndex.load(s, evaluation._ready_dense_for(s, idx.version), base=idx)
+        question = "검수 후 하자 보수 기간은 얼마인가?"
+        request = dense.ensure_job_request(s, "owner-cli", "protect-test", {"job": "test"})
+        vec, _ = dense.query_vector(s, self.transport, question, request_id=request, member_id="owner-cli",
+                                    purpose="gold_eval", allow_paid=True)
+        scope = retrieval.corpus_scope(s, idx)
+        hybrid = retrieval.retrieve(s, idx, fixtures.analyzer(), question, scope, mode="hybrid", dense=d,
+                                    query_vector=vec)
+        class Reversing(IdentityReranker):
+            def rerank(self, q, chunks):
+                return [(i, float(i)) for i in reversed(range(len(chunks)))], {"truncated": 0}
+
+        kw = dict(mode="hybrid_rerank", dense=d, query_vector=vec, reranker=Reversing())
+        whole = retrieval.retrieve(s, idx, fixtures.analyzer(), question, scope, **kw)
+        below = retrieval.retrieve(s, idx, fixtures.analyzer(), question, scope, rerank_protect=2, **kw)
+        lexical = {c["chunk_id"] for c in hybrid.candidates if c["channel"] == "bm25"}
+        n = len(hybrid.ranking)
+        head = next((i for i, c in enumerate(hybrid.ranking[:2]) if c not in lexical), 2)  # leading BM25 rows
+        self.assertGreater(n, 3)
+        self.assertGreater(head, 0)
+        self.assertEqual(whole.ranking[:n], list(reversed(hybrid.ranking)))
+        self.assertEqual(below.ranking[:n], hybrid.ranking[:head] + list(reversed(hybrid.ranking[head:])))
+
     def test_a_gate_recorded_under_an_older_policy_cannot_be_activated_or_served(self):
         s = self.env.settings
         evaluation.evaluate_retrieval(s, fixtures.analyzer(), self.transport, "dev-pilot", ["H"],
@@ -545,16 +573,13 @@ class EvaluationRunTest(unittest.TestCase):
         self.assertEqual(bypass["gate"]["decision"], "bypass")  # unpinned revision: the bypass stays
 
         decision = Path(self.tmp.name) / "decision.json"
-        if not hr["passed"]:
-            decision.write_text(json.dumps({"run_id": hr["run_id"], "mode": "hybrid_rerank", "decided_by": "owner",
-                                            "rationale": "try"}), encoding="utf-8")
-            with self.assertRaises(evaluation.EvaluationError):
-                evaluation.activate_run(s, hr["run_id"], decision)
+        # The gate is a column the person reads: a reranked row is activatable whether or not it passed.
+        hr_decision = {"run_id": hr["run_id"], "mode": "hybrid_rerank", "decided_by": "owner"}
+        self.assertFalse(any("gate" in e for e in evaluation.decision_errors(s, hr["run_id"], hr_decision)))
+        self.assertTrue(any("decided_by" in e for e in evaluation.decision_errors(
+            s, hr["run_id"], {**hr_decision, "decided_by": " "})))
         decision.write_text(json.dumps({"run_id": runs["H"], "mode": "hybrid", "decided_by": "owner",
-                                        "rationale": "dev hit@20 and nDCG@5 improved over K1",
-                                        "finalist_run_id": runs["K1"]}), encoding="utf-8")
-        with self.assertRaisesRegex(evaluation.EvaluationError, "embedding identity"):  # it would serve keyword-only
-            evaluation.activate_run(s.with_(embedding_dimensions=256), runs["H"], decision)
+                                        "finalist_run_id": runs["K1"]}), encoding="utf-8")  # the note is optional
         from rfp_assistant import retrieval
 
         with unittest.mock.patch.object(retrieval, "ROUTE_RULE", "greedy-rare-term-2"), \

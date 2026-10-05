@@ -706,6 +706,28 @@ class GoldQueueTest(Phase4Case):
         self.assertTrue(evaluation.validate_gold(self.s, "test")["ok"])
         self.assertEqual(gold.check(self.s), [])
 
+    def test_ai_reviewers_approve_sealed_rows_but_the_drafter_never_does(self):
+        """Operating rule: AI reviewers approve development and sealed rows; only self-approval is refused."""
+        row = p4.row(self.env, "test-ai", "도서관에서 무엇을 만드나요?", "기관D", split="test",
+                     groups=[p4.group(self.env, "g1", "기관D", ("%좌석%", p4.SEATS))],
+                     claims=[p4.claim("c1", ["g1"], {"type": "text", "patterns": ["좌석 예약"]})],
+                     generation_provenance={"method": "llm", "model": "gpt-6-luna", "prompt_version": "p",
+                                            "source_set_hash": "x"})
+        self.submit("t-ai", [row], "test")
+        c = gold.candidate(self.s, "test-ai-r1", include_sealed=True)
+        for refused in ("agent-a", "gpt-6-luna"):  # the drafter and the drafting model
+            with self.assertRaises(gold.GoldError):
+                gold.decide(self.s, "test-ai-r1", "approve", refused, c["row_sha256"], original_inspected=True,
+                            disputed=True, include_sealed=True)
+        gold.decide(self.s, "test-ai-r1", "approve", "ai-review:codex", c["row_sha256"], original_inspected=True,
+                    disputed=True, include_sealed=True)
+        with self.assertRaises(gold.GoldError):  # the second reviewer differs from the first
+            gold.second_review(self.s, "test-ai-r1", "ai-review:codex", True, "같은 검토자", include_sealed=True)
+        gold.second_review(self.s, "test-ai-r1", "ai-review:claude", True, "원문 3쪽 좌석 예약 확인",
+                           include_sealed=True)
+        rows, skipped, _ = evaluation.load_eval_rows(self.s, "test", sealed=True)
+        self.assertEqual(([evaluation.row_id(r) for r in rows], skipped), (["test-ai"], []))
+
     def test_a_correction_appends_a_revision(self):
         rows = self.dev_rows()[:1]
         self.submit("g1", rows, "dev")
@@ -747,29 +769,14 @@ class GoldRetrievalTest(Phase4Case):
         self.assertTrue(traces["dev-compare"]["metrics"]["per_document"])
         self.assertEqual(traces["dev-compare"]["wrong_scope"], 0)
         self.assertIn("git_revision", scores["provenance"]["code"])
-        # F9: one returned passage lies outside the labels; naming a finalist needs its recorded review
+        # F9: one returned passage lies outside the labels
         pending = evaluation.pool_pending({"ndcg_pool": scores["aggregate"]["ndcg_pool"]})
         self.assertGreater(pending, 0)
-        decision = {"run_id": k1["run_id"], "mode": config["mode"], "decided_by": "owner", "rationale": "r",
+        # Unlabelled top-5 passages are shown beside the row; the person activates without a recorded pool review.
+        decision = {"run_id": k1["run_id"], "mode": config["mode"], "decided_by": "owner",
                     "finalist_run_id": k1["run_id"]}
-        self.assertTrue(any("pool review" in e for e in evaluation.decision_errors(self.s, k1["run_id"], decision)))
-        decision["pool_review"] = {"reviewed_by": "reviewer", "runs": {k1["run_id"]: pending - 1 or 99}}
-        self.assertTrue(any("pool review" in e for e in evaluation.decision_errors(self.s, k1["run_id"], decision)))
-        decision["pool_review"]["runs"] = {k1["run_id"]: pending}
         self.assertFalse(any("pool review" in e for e in evaluation.decision_errors(self.s, k1["run_id"], decision)))
-        del decision["finalist_run_id"], decision["pool_review"]  # K1 alone is the provisional default
-        self.assertFalse(any("pool review" in e for e in evaluation.decision_errors(self.s, k1["run_id"], decision)))
-        # promoting another run also needs the K1 baseline's review, not only the promoted run's
-        (k0,) = evaluation.evaluate_retrieval(self.s, fixtures.analyzer(), None, "dev", ["K0"])
-        k0_config, k0_scores = evaluation.load_run(self.s, k0["run_id"])
-        k0_pending = evaluation.pool_pending({"ndcg_pool": k0_scores["aggregate"]["ndcg_pool"]})
-        promote = {"run_id": k0["run_id"], "mode": k0_config["mode"], "decided_by": "owner", "rationale": "r",
-                   "pool_review": {"reviewed_by": "reviewer", "runs": {k0["run_id"]: k0_pending}}}
-        errors = [e for e in evaluation.decision_errors(self.s, k0["run_id"], promote) if "pool review" in e]
-        self.assertEqual(len(errors), 1)
-        self.assertIn(k1["run_id"], errors[0])
-        promote["pool_review"]["runs"][k1["run_id"]] = pending
-        self.assertFalse(any("pool review" in e for e in evaluation.decision_errors(self.s, k0["run_id"], promote)))
+        self.assertEqual(evaluation.pool_pending(evaluation.run_summary(self.s, k1["run_id"])), pending)
         with self.assertRaisesRegex(evaluation.EvaluationError, "sealed"):
             evaluation.evaluate_retrieval(self.s, fixtures.analyzer(), None, "test", ["K1"])
 

@@ -245,7 +245,7 @@ class PostgreSQLTests(unittest.TestCase):
                 load_settings()
         self.assertNotIn("backend", " ".join(Settings.__dataclass_fields__))
 
-    def test_startup_refuses_any_embedding_identity_but_large_1536(self):
+    def test_startup_accepts_every_compared_embedding_model_and_refuses_unknown_ones(self):
         from rfp_assistant.settings import SettingsError, load_settings
 
         environment = {k: v for k, v in os.environ.items() if k != "RFP_CONFIG_FILE"}
@@ -253,10 +253,12 @@ class PostgreSQLTests(unittest.TestCase):
         with mock.patch.dict("os.environ", environment, clear=True):
             settings = load_settings()
             self.assertEqual((settings.embedding_model, settings.embedding_dimensions), ("text-embedding-3-large", 1536))
-            for model, dims in (("text-embedding-3-small", 1536), ("text-embedding-3-large", 768),
-                                ("text-embedding-3-large", 3072)):
-                with self.subTest(model=model, dims=dims), \
-                        self.assertRaisesRegex(SettingsError, "text-embedding-3-large at 1536"):
+            for model, dims in (("text-embedding-3-small", 1536), ("nlpai-lab/KURE-v1", 1024),
+                                ("gemini-embedding-001", 3072)):
+                self.assertEqual(load_settings(embedding_model=model, embedding_dimensions=dims).embedding_model, model)
+            for model, dims, message in (("text-embedding-ada-002", 1536, "not a compared model"),
+                                         ("nlpai-lab/KURE-v1", 768, "produces 1024 dimensions")):
+                with self.subTest(model=model, dims=dims), self.assertRaisesRegex(SettingsError, message):
                     load_settings(embedding_model=model, embedding_dimensions=dims)
 
     def test_every_connection_path_refuses_a_server_other_than_postgresql_18_6(self):
@@ -356,20 +358,24 @@ class PostgreSQLTests(unittest.TestCase):
         self.assertEqual((after.spent_micro_usd, after.pending_micro_usd, after.cap_micro_usd),
                          (before.spent_micro_usd, before.pending_micro_usd, before.cap_micro_usd))
 
-    def test_historical_activation_cannot_override_selected_large_dimensions(self):
+    def test_serving_follows_the_activated_embedding_model_and_refuses_an_unknown_one(self):
         settings = self.settings.with_(embedding_model="text-embedding-3-large", embedding_dimensions=1536)
         res = service.Resources(settings)
         try:
-            for model, dimensions in (("text-embedding-3-small", 1536), ("text-embedding-3-large", 768)):
+            for model, dimensions in (("text-embedding-3-small", 1536), ("nlpai-lab/KURE-v1", 1024)):
                 with store.open_db(self.target) as conn, store.tx(conn, immediate=True):
-                    store.set_app_setting(conn, "active_run", store.dumps({"mode": "hybrid", "dense_version": "historical",
+                    store.set_app_setting(conn, "active_run", store.dumps({"mode": "hybrid", "dense_version": "v",
                         "embedding": {"model": model, "dims": dimensions}}))
-                serving = res.serving()
-                self.assertEqual(serving["mode"], "kiwi_bm25")
-                self.assertEqual(serving["fallback_reason"], "activated_embedding_identity_requires_migration")
+                self.assertEqual(res.serving()["mode"], "hybrid")
                 self.assertEqual((res.run_settings().embedding_model, res.run_settings().embedding_dimensions),
-                                 ("text-embedding-3-large", 1536))
-                self.assertFalse(res.transport.embed_calls)
+                                 (model, dimensions))
+            with store.open_db(self.target) as conn, store.tx(conn, immediate=True):
+                store.set_app_setting(conn, "active_run", store.dumps({"mode": "hybrid", "dense_version": "v",
+                    "embedding": {"model": "text-embedding-ada-002", "dims": 1536}}))
+            serving = res.serving()
+            self.assertEqual((serving["mode"], serving["fallback_reason"]),
+                             ("kiwi_bm25", "activated_embedding_model_unknown"))
+            self.assertFalse(res.transport.embed_calls)
         finally:
             res.close()
 

@@ -60,11 +60,32 @@ def normalize_payload(text: str) -> str:
     return nfc(text).strip()
 
 
-def payload_hash(text: str, model: str, dims: int) -> str:
+def embed_policy(model: str) -> str:
+    """The cache policy of a model's vectors: the OpenAI vectors keep EMBED_POLICY; a local or Gemini model adds
+    its pinned revision, prefixes and task types (models.EmbeddingSpec.policy)."""
+    from .models import EMBEDDINGS
+
+    spec = EMBEDDINGS.get(model)
+    return spec.policy if spec is not None else EMBED_POLICY
+
+
+def payload_hash(text: str, model: str, dims: int, kind: str = "document") -> str:
     """Identity of one vector: normalized text, model, dimensions and normalization policy. Chunk payloads come
-    from the original only (no CSV metadata), so byte-identical sources share every vector."""
-    return hashlib.sha256(dumps({"text": normalize_payload(text), "model": model, "dims": dims,
-                                 "policy": EMBED_POLICY}).encode()).hexdigest()
+    from the original only (no CSV metadata), so byte-identical sources share every vector. A model whose query
+    and document vectors differ (a prefix or task type) also keys on the kind."""
+    from .models import EMBEDDINGS
+
+    identity = {"text": normalize_payload(text), "model": model, "dims": dims, "policy": embed_policy(model)}
+    spec = EMBEDDINGS.get(model)
+    if spec is not None and spec.kinds_differ:
+        identity["kind"] = kind
+    return hashlib.sha256(dumps(identity).encode()).hexdigest()
+
+
+def embedding_backend(settings: Settings) -> str:
+    from .models import embedding_spec
+
+    return embedding_spec(settings.embedding_model).backend
 
 
 def unit_vector(values, dims: int) -> np.ndarray:
@@ -195,14 +216,46 @@ def metered_embed(settings: Settings, transport: Transport | None, texts: list[s
 
 def query_vector(settings: Settings, transport: Transport | None, question: str, *, request_id: str | None,
                  member_id: str, purpose: str, allow_paid: bool, guard=None) -> tuple[np.ndarray | None, dict]:
-    """Cached by normalized query, model and dimensions. A miss is paid only when `allow_paid`."""
+    """Cached by normalized query, model and dimensions. A local model embeds a miss on the GPU (free); an API miss
+    is paid only when `allow_paid`: OpenAI through the shared ledger, Gemini under its own cap."""
     text = normalize_payload(question)
-    h = payload_hash(text, settings.embedding_model, settings.embedding_dimensions)
+    h = payload_hash(text, settings.embedding_model, settings.embedding_dimensions, "query")
     vec = cache_get(settings, h)
     if vec is not None:
         return vec, {"cache": "hit", "payload_hash": h}
+    backend = embedding_backend(settings)
+    sha = hashlib.sha256(text.encode()).hexdigest()
+    if backend == "local":
+        from .models import local_embedder
+
+        t0 = time.perf_counter()
+        try:
+            vec = local_embedder(settings.embedding_model).embed([text], "query")[0]
+        except Exception as exc:  # noqa: BLE001 - the dense stage falls back visibly
+            return None, {"cache": "miss", "payload_hash": h, "reason": f"local_embedding_failed:{exc}"[:300]}
+        ms = round((time.perf_counter() - t0) * 1000, 1)
+        cache_put(settings, h, vec, {"kind": "query", "normalized_payload_sha256": sha, "construction": "local"})
+        return vec, {"cache": "miss", "payload_hash": h, "backend": "local", "embed_ms": ms}
     if not allow_paid or request_id is None:
         return None, {"cache": "miss", "payload_hash": h, "reason": "paid_query_embedding_not_allowed"}
+    if backend == "gemini":
+        from .models import GeminiClient, ModelError, gemini_embed
+        from .settings import read_api_key
+
+        key = read_api_key("GEMINI_API_KEY")
+        if not key:
+            return None, {"cache": "miss", "payload_hash": h, "reason": "gemini_key_missing"}
+        client = GeminiClient(key, settings.request_timeout_seconds)
+        try:
+            t0 = time.perf_counter()
+            vec = gemini_embed(settings.db_path, client, [text], "query", purpose, client.count_tokens([text]))[0]
+        except ModelError as exc:
+            return None, {"cache": "miss", "payload_hash": h, "reason": str(exc)[:300]}
+        finally:
+            client.close()
+        cache_put(settings, h, vec, {"kind": "query", "normalized_payload_sha256": sha, "construction": "gemini"})
+        return vec, {"cache": "miss", "payload_hash": h, "backend": "gemini",
+                     "embed_ms": round((time.perf_counter() - t0) * 1000, 1)}
     tokens = count_embedding_tokens(text, settings.embedding_model) + QUERY_MARGIN_TOKENS
     result = metered_embed(settings, transport, [text], tokens, request_id=request_id, member_id=member_id,
                            purpose=purpose, guard=guard)
@@ -251,7 +304,10 @@ def _unique_missing(settings: Settings, payloads: list[dict]) -> tuple[dict[str,
     unique: dict[str, dict] = {}
     for p in payloads:
         unique.setdefault(p["payload_hash"], p)
-    missing = {h: p for h, p in unique.items() if cache_get(settings, h) is None}
+    from .vector_store import cached_hashes
+
+    have = cached_hashes(settings, unique)
+    missing = {h: p for h, p in unique.items() if h not in have}
     return unique, missing
 
 
@@ -340,7 +396,7 @@ def dense_version_for(settings: Settings, row: dict) -> str:
     return "p" + hashlib.sha256(dumps({"store": "pgvector-exact-1", "v": DENSE_VERSION,
                                         "index": row["index_version"], "manifest": row["manifest_hash"],
                                         "model": settings.embedding_model, "dims": settings.embedding_dimensions,
-                                        "policy": EMBED_POLICY}).encode()).hexdigest()[:15]
+                                        "policy": embed_policy(settings.embedding_model)}).encode()).hexdigest()[:15]
 
 
 def build_dense(settings: Settings, transport: Transport | None, index_version: str, estimate_id: str,
@@ -400,6 +456,107 @@ def build_dense(settings: Settings, transport: Transport | None, index_version: 
     return out
 
 
+LOCAL_WRITE_BATCH = 1024  # vectors per cache transaction: an interrupted build keeps every finished batch
+
+
+def build_local_dense(settings: Settings, index_version: str, batch_size: int = 32) -> dict:
+    """Free maintenance job for a local model: embed every uncached unique chunk payload on the GPU with the
+    model's documented document prefix, then publish the set. Reports truncated chunks, time and peak memory."""
+    from .models import embedding_spec, local_embedder
+
+    if embedding_spec(settings.embedding_model).backend != "local":
+        raise DenseError(f"{settings.embedding_model} is not a local model")
+    row, payloads = index_payloads(settings, index_version)
+    unique, missing = _unique_missing(settings, payloads)
+    t0 = time.perf_counter()
+    embedder = local_embedder(settings.embedding_model)
+    load_seconds = round(time.perf_counter() - t0, 2)
+    truncated = embedder.truncated([p["text"] for p in unique.values()], "document")
+    todo = sorted(missing.values(), key=lambda p: len(p["text"]))  # similar lengths batch with little padding
+    t1 = time.perf_counter()
+    for start in range(0, len(todo), LOCAL_WRITE_BATCH):
+        part = todo[start:start + LOCAL_WRITE_BATCH]
+        vecs = embedder.embed([p["text"] for p in part], "document", batch_size)
+        cache_put_many(settings, [(p["payload_hash"], v, {
+            "kind": "chunk", "construction": "local", "normalized_payload_sha256":
+                hashlib.sha256(p["text"].encode()).hexdigest()}) for p, v in zip(part, vecs)])
+    seconds = round(time.perf_counter() - t1, 1)
+    out = publish_dense(settings, row, payloads)
+    out.update(embedded=len(todo), unique_payloads=len(unique), truncated_chunks=truncated,
+               max_length=embedder.max_length, embed_seconds=seconds if todo else None,
+               model_load_seconds=load_seconds, peak_vram_mb=embedder.peak_vram_mb(), cost_micro_usd=0)
+    return out
+
+
+def cache_put_many(settings: Settings, entries) -> None:
+    from .vector_store import cache_put_many as pg_put_many
+    pg_put_many(settings, entries)
+
+
+def _gemini_batches(missing: dict[str, dict]) -> list[list[dict]]:
+    from .models import GEMINI_BATCH
+
+    todo = sorted(missing.values(), key=lambda p: p["payload_hash"])
+    return [todo[i:i + GEMINI_BATCH] for i in range(0, len(todo), GEMINI_BATCH)]
+
+
+def _gemini_client(settings: Settings):
+    from .models import GeminiClient
+    from .settings import read_api_key
+
+    key = read_api_key("GEMINI_API_KEY")
+    if not key:
+        raise DenseError("GEMINI_API_KEY is not set")
+    return GeminiClient(key, settings.request_timeout_seconds)
+
+
+def plan_gemini(settings: Settings, index_version: str) -> dict:
+    """Exact input tokens of every uncached payload (countTokens is free) and the maximum cost under the Gemini
+    price. No embedding call."""
+    from .models import GEMINI_PRICE_PER_MTOK, external_status, gemini_cost_micro
+
+    row, payloads = index_payloads(settings, index_version)
+    unique, missing = _unique_missing(settings, payloads)
+    client = _gemini_client(settings)
+    try:
+        tokens = sum(client.count_tokens([p["text"] for p in b]) for b in _gemini_batches(missing))
+    finally:
+        client.close()
+    return {"model": settings.embedding_model, "index_version": index_version, "unique_payloads": len(unique),
+            "payloads_to_embed": len(missing), "tokens_to_embed": tokens,
+            "max_cost_micro_usd": gemini_cost_micro(tokens), "price_usd_per_mtok": GEMINI_PRICE_PER_MTOK,
+            "ledger": external_status(settings.db_path),
+            "fingerprint": hashlib.sha256(dumps([row["manifest_hash"], sorted(missing)]).encode()).hexdigest()}
+
+
+def build_gemini_dense(settings: Settings, index_version: str, max_micro_usd: int) -> dict:
+    """Paid maintenance job under the Gemini cap: every batch is counted, reserved, embedded and settled before
+    the next; it stops at `max_micro_usd` (the approved estimate) or at the first uncertain outcome."""
+    from .models import gemini_cost_micro, gemini_embed
+
+    row, payloads = index_payloads(settings, index_version)
+    unique, missing = _unique_missing(settings, payloads)
+    client = _gemini_client(settings)
+    spent, t0 = 0, time.perf_counter()
+    try:
+        for batch in _gemini_batches(missing):
+            texts = [p["text"] for p in batch]
+            tokens = client.count_tokens(texts)
+            if spent + gemini_cost_micro(tokens) > max_micro_usd:
+                return {"status": "blocked", "reason": "the approved estimate would be exceeded", "spent": spent}
+            vecs = gemini_embed(settings.db_path, client, texts, "document", "embedding", tokens)
+            spent += gemini_cost_micro(tokens)
+            cache_put_many(settings, [(p["payload_hash"], v, {
+                "kind": "chunk", "construction": "gemini", "normalized_payload_sha256":
+                    hashlib.sha256(p["text"].encode()).hexdigest()}) for p, v in zip(batch, vecs)])
+    finally:
+        client.close()
+    out = publish_dense(settings, row, payloads)
+    out.update(embedded=len(missing), unique_payloads=len(unique), cost_micro_usd=spent, truncated_chunks=None,
+               embed_seconds=round(time.perf_counter() - t0, 1) if missing else None)
+    return out
+
+
 def publish_dense(settings: Settings, row: dict, payloads: list[dict]) -> dict:
     """Register the row-to-chunk mapping of verified pgvector cache entries as an embedding set (manifest and row
     list in a temporary sibling, verified back), then mark it `ready`. Never overwrites a published version."""
@@ -410,9 +567,12 @@ def publish_dense(settings: Settings, row: dict, payloads: list[dict]) -> dict:
     if existing and existing["state"] == "ready" and final_dir.exists():
         DenseIndex.load(settings, version)  # verify before reporting reuse
         return {"status": "ready", "dense_version": version, "reused": True, "published": False}
+    from .vector_store import cached_hashes
+
+    have = cached_hashes(settings, {p["payload_hash"] for p in payloads})
     for i, p in enumerate(payloads):
-        if cache_get(settings, p["payload_hash"]) is None:
-            raise DenseError(f"row {i} has no verified cached vector; the set is not published")
+        if p["payload_hash"] not in have:
+            raise DenseError(f"row {i} has no cached vector; the set is not published")  # the load verifies each
     tmp = settings.data_dir / "indexes" / f".tmp-{uuid.uuid4().hex}"
     try:
         write_jsonl_atomic(tmp / "rows.jsonl", [{"row": i, "chunk_id": p["chunk_id"],
@@ -420,7 +580,8 @@ def publish_dense(settings: Settings, row: dict, payloads: list[dict]) -> dict:
         files = {"rows.jsonl": hashlib.sha256((tmp / "rows.jsonl").read_bytes()).hexdigest()}
         config = {"kind": "dense", "dense_version": DENSE_VERSION, "base_index_version": row["index_version"],
                   "base_manifest_hash": row["manifest_hash"], "model": settings.embedding_model,
-                  "dimensions": settings.embedding_dimensions, "policy": EMBED_POLICY, "rows": len(payloads),
+                  "dimensions": settings.embedding_dimensions, "policy": embed_policy(settings.embedding_model),
+                  "rows": len(payloads),
                   "unique_payloads": len({p["payload_hash"] for p in payloads}), "vector_store": "pgvector-exact"}
         manifest = {"index_version": version, "created_at": utcnow(), "config": config, "files": files,
                     "row_order": "keyword index chunks.jsonl line order"}
@@ -549,9 +710,22 @@ def _model_license(settings: Settings) -> str | None:
 
 def load_reranker(settings: Settings) -> tuple[LocalReranker | None, dict]:
     """(reranker, info) or (None, failure info): a missing optional dependency, an unpinned revision, a download
-    or memory failure all mean the bypass stays active."""
+    or memory failure all mean the bypass stays active. A compared model runs through its registry backend
+    (models.py) at the run's input length and precision, exactly as the comparison measured it."""
+    from dataclasses import replace
+
+    from .models import RERANKERS, LocalRerankerModel
+
+    spec = RERANKERS.get(settings.reranker_model)
     try:
-        r = LocalReranker(settings)
+        if not settings.reranker_revision:
+            raise DenseError("reranker_revision is not pinned; the activated run or the comparison names it")
+        if spec is not None:
+            r = LocalRerankerModel(replace(spec, revision=settings.reranker_revision,
+                                           max_length=settings.reranker_max_length,
+                                           precision=settings.reranker_precision))
+        else:
+            r = LocalReranker(settings)
         return r, r.info
     except Exception as exc:  # noqa: BLE001 - any load failure keeps the bypass
         return None, {"error": f"{type(exc).__name__}: {exc}"[:500], "model": settings.reranker_model,

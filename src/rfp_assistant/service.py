@@ -33,7 +33,7 @@ from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extra
 from .retrieval import retrieve as _retrieve
 from .evaluation import EVAL_VERSION
 from .postgres import Row
-from .settings import Settings, read_api_key
+from .settings import ALLOWED_EMBEDDING_MODELS, Settings, read_api_key
 from .store import DATABASE_ERRORS, LockHeld, dumps, init_schema, open_db, tx, utcnow
 
 
@@ -357,11 +357,10 @@ def active_serving(settings: Settings) -> dict:
         # Routing changed since the run was measured: its gate evidence no longer describes retrieval, so serve the
         # unselected default (retrieve flags it) until a rerun is activated (run_errors refuses the old run).
         return {**default, "fallback_reason": "activated_corpus_route_requires_rerun", "stale_run_id": cfg["run_id"]}
-    if cfg.get("embedding") and \
-            (cfg["embedding"].get("model"), cfg["embedding"].get("dims")) != \
-            (settings.embedding_model, settings.embedding_dimensions):
+    if cfg.get("embedding") and cfg["embedding"].get("model") not in ALLOWED_EMBEDDING_MODELS:
+        # Serving follows the activated run's embedding model; only a model this code cannot run is refused.
         return {**cfg, "mode": "kiwi_bm25", "dense_version": None, "embedding": None,
-                "reranker": None, "fallback_reason": "activated_embedding_identity_requires_migration"}
+                "reranker": None, "fallback_reason": "activated_embedding_model_unknown"}
     if cfg["mode"] == "hybrid_rerank" and cfg.get("eval_version") != EVAL_VERSION:
         # Promoted under a superseded gate: keep hybrid retrieval, drop the reranker until a current
         # trial passes and is activated.
@@ -560,7 +559,8 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
             "question": question, "scope": [asdict(r) for r, _ in pairs], "mode": cfg["mode"]}) as found:
         result = _retrieve(s, idx, res.analyzer, question, pairs, mode=cfg["mode"], dense=dense,
                            query_vector=qvec, reranker=res.reranker() if cfg["mode"] == "hybrid_rerank" else None,
-                           rerank_depth=(cfg.get("reranker") or {}).get("depth"))
+                           rerank_depth=(cfg.get("reranker") or {}).get("depth"),
+                           rerank_protect=(cfg.get("reranker") or {}).get("protect") or 0)
         result.query_embedding = qinfo
         from .retrieval import index_compatibility
 
@@ -700,8 +700,10 @@ def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retriev
         qe = retrieval.query_embedding or {}
         if price_query_embedding and qe.get("cache") == "miss" and not qe.get("attempt_id"):
             # a paid answer that retrieves again would embed the query first
-            est += budget.estimate(res.settings.db_path, res.settings.embedding_model,
-                                   dense_mod.count_embedding_tokens(question) + dense_mod.QUERY_MARGIN_TOKENS, 0)
+            query_est = _embedding_estimate(res, question)
+            if query_est is None:
+                raise budget.BudgetError("unknown_rate")
+            est += query_est
     except budget.BudgetError:
         est = None
     return {"retrieval": retrieval, "messages": messages, "response_format": rf, "input_tokens": tokens,
@@ -1490,8 +1492,13 @@ def _frozen_prep(res: Resources, question: str, request: AnswerRequest, docs: li
 
 
 def _embedding_estimate(res: Resources, question: str) -> int | None:
+    """The shared-allowance price of the activated model's query embedding: a local model is free and Gemini is
+    charged to its own cap, so neither adds to the OpenAI estimate."""
+    model = res.run_settings().embedding_model
+    if dense_mod.embedding_backend(res.run_settings()) != "openai":
+        return 0
     try:
-        return budget.estimate(res.settings.db_path, res.settings.embedding_model,
+        return budget.estimate(res.settings.db_path, model,
                                dense_mod.count_embedding_tokens(question) + dense_mod.QUERY_MARGIN_TOKENS, 0)
     except budget.BudgetError:
         return None
@@ -2091,6 +2098,73 @@ def judge_results(res: Resources, principal: Principal, run_id: str) -> dict:
     from . import judges
 
     return _judge_call(judges.results, res.settings, run_id)
+
+
+EXPERIMENT_FACTS = ("licence", "revision", "dims", "context", "backend", "size_bytes", "peak_vram_mb", "precision",
+                    "max_length", "layer", "cold_load_seconds", "chunks", "duplicated_tokens", "dense_version")
+
+
+def _failed(q: dict) -> bool:
+    return (not q["complete"] or q["critical"] or q.get("hit5") == 0
+            or (q.get("ndcg") is not None and q["ndcg"] < 1))
+
+
+def experiments(res: Resources, principal: Principal) -> dict:
+    """Every comparison table (`compare --matrix`), each row's column values, which row serves, and the gold
+    counts. Per-question outcomes stay out of this listing (`experiment_questions`)."""
+    principal = _authorize(res, principal, "verifier")
+    from . import compare
+
+    active = active_serving(res.settings)
+    tables = []
+    for t in compare.load_tables(res.settings):
+        rows = []
+        for i, r in enumerate(t["rows"]):
+            questions = r.get("questions") or []
+            rows.append({"index": i, "name": r["name"], "axes": r.get("axes") or {}, "status": r["status"],
+                         "reason": r.get("reason"), "run_id": r.get("run_id"), "label": r.get("label"),
+                         "values": {c["key"]: compare.value(r, c["key"]) for c in t["columns"]},
+                         "facts": {k: r[k] for k in EXPERIMENT_FACTS if r.get(k) is not None},
+                         "estimate": r.get("estimate"), "failures": sum(map(_failed, questions)),
+                         "active": bool(r.get("run_id")) and r.get("run_id") == active.get("run_id")})
+        tables.append({"matrix": t["matrix"], "title": t["title"], "created_at": t["created_at"],
+                       "columns": t["columns"], "fixed": t.get("fixed") or {}, "populations": t["populations"],
+                       "rows": rows})
+    golden = compare.compare_dir(res.settings) / "golden-counts.json"
+    reranker = active.get("reranker") or {}
+    serving_detail = {"mode": active.get("mode"), "embedding": (active.get("embedding") or {}).get("model"),
+                      "reranker": reranker.get("model"), "protect": reranker.get("protect") or 0,
+                      "fallback": active.get("fallback_reason")}
+    return {"tables": tables, "active_run_id": active.get("run_id"), "serving": describe_serving(active),
+            "serving_detail": serving_detail, "golden_counts": json.loads(golden.read_text(encoding="utf-8")) if golden.exists() else None}
+
+
+def experiment_questions(res: Resources, principal: Principal, matrix: str, index: int) -> list[dict]:
+    """The questions one row failed: incomplete support, a critical failure, a missed top 5 or nDCG@5 below 1."""
+    principal = _authorize(res, principal, "verifier")
+    from . import compare
+
+    table = next((t for t in compare.load_tables(res.settings) if t["matrix"] == matrix), None)
+    if table is None or not 0 <= index < len(table["rows"]):
+        raise ServiceError("비교표나 행을 찾을 수 없습니다.")
+    return [q for q in table["rows"][index].get("questions") or [] if _failed(q)]
+
+
+def activate_experiment(res: Resources, principal: Principal, run_id: str, decided_by: str, note: str) -> dict:
+    """The person's pick from a comparison table, through the same validation as `activate-run`."""
+    principal = _authorize(res, principal, "verifier")
+    from . import evaluation
+
+    if not decided_by.strip():
+        raise ServiceError("활성화하려면 고른 사람의 이름이 필요합니다.")
+    try:
+        config, _ = evaluation.load_run(res.settings, run_id)
+        decision = {"run_id": run_id, "mode": config["mode"], "decided_by": decided_by.strip(),
+                    "rationale": note.strip(), "source": "실험 비교"}
+        active = evaluation.activate_decision(res.settings, run_id, decision, f"verify:{principal.member_id}")
+    except evaluation.EvaluationError as exc:
+        raise ServiceError(f"활성화할 수 없습니다: {exc}") from None
+    return {"run_id": active["run_id"], "mode": active["mode"], "activated_at": active["activated_at"]}
 
 
 def judge_disagreements(res: Resources, principal: Principal, run_id: str) -> list[dict]:

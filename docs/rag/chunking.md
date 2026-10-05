@@ -31,7 +31,7 @@ Start with a 3,000-token evidence budget and a 5,000-token hard evidence ceiling
 
 ## The comparison
 
-Freeze parser output and the evaluation queries. Compare fixed token windows at `256/32`, `512/64`, and `800/96` size/overlap with the proposed structural splitter. First run retrieval without paid generation and measure evidence recall, nDCG, number of chunks, duplicated tokens, and contexts that lose a required qualifier. Keep the generator and evidence token budget identical when evaluating the finalists.
+Freeze parser output and the evaluation queries. `compare --matrix chunking` builds the structural splitter and fixed token windows at `256/32`, `512/64` and `800/96` size/overlap as non-serving indexes, scores each with K1 on one population, and writes one table: chunk count, duplicated tokens, nDCG@5, complete support, qualifier losses, critical failures and latency. No paid generation runs. The person reads the table; activating a row's run is what switches the serving index. Keep the generator and evidence token budget identical when evaluating the finalists.
 
 Store gold evidence as document version plus source spans, not only current chunk IDs. Rechunking otherwise changes the target being measured. Include long requirements, cross-page tables, summary/detail duplicates, and questions needing an exception found beside the retrieved clause.
 
