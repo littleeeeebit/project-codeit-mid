@@ -229,6 +229,22 @@ class Resources:
                 self.stage_errors["dense"] = str(exc)[:300]
             return self._dense
 
+    def retire_inactive(self, cfg: dict) -> None:
+        """A serving transition (to another embedding, an API or keyword row, or away from reranking) retires the
+        GPU models the activated configuration no longer uses, whichever process activated it; requests still
+        using one keep their own reference until they finish."""
+        from .models import EMBEDDINGS, _EMBEDDERS, free_gpu, unload_embedders
+
+        model = (cfg.get("embedding") or {}).get("model") if cfg["mode"] in DENSE_MODES else None
+        keep = model if model in EMBEDDINGS and EMBEDDINGS[model].backend == "local" else None
+        if any(k != keep for k in list(_EMBEDDERS)):
+            unload_embedders(keep)
+        if cfg["mode"] != "hybrid_rerank" or not cfg.get("reranker"):
+            with self._index_lock:
+                if self._reranker is not None:
+                    self._reranker, self._reranker_key = None, None
+                    free_gpu()
+
     def reranker(self):
         cfg = self.serving().get("reranker")
         if not cfg:
@@ -540,6 +556,7 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
     if idx is None:
         raise ServiceError("검색 색인이 아직 없습니다.")
     cfg = res.serving()
+    res.retire_inactive(cfg)
     if mode is not None and mode != cfg["mode"]:
         if mode not in ("whitespace_bm25", "kiwi_bm25") + tuple(DENSE_MODES):
             raise ServiceError("알 수 없는 검색 방식입니다.")

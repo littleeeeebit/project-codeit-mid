@@ -3,6 +3,8 @@
 import hashlib
 import sys
 import tempfile
+import threading
+import types
 import unittest
 from dataclasses import replace
 from pathlib import Path
@@ -192,6 +194,57 @@ class LedgerAndCacheTest(unittest.TestCase):
         with mock.patch.dict(sys.modules, {"torch": None}):
             models.free_gpu()
             models.unload_embedders()
+
+    def test_reranker_rows_keep_the_serving_index_and_its_recorded_limits(self):
+        from rfp_assistant import retrieval, service
+
+        built = retrieval.build_keyword_index(self.env.settings, fixtures.analyzer(), include_unreviewed=True,
+                                              profile="fixed-512-64", activate=False)
+        limits = {"fusion": "keyword_first", "rrf_k": 60, "dense_weight": 1.0, "keyword_head": 6, "channel_top_k": 40,
+                  "fused_top_k": 50, "evidence_max_units": 10, "evidence_target_tokens": 3500,
+                  "evidence_max_tokens": 5000, "dense_search": "exact", "hnsw_ef_search": 100}
+        cfg = {"mode": "hybrid", "run_id": "H-x", "index_version": built["index_version"],
+               "embedding": {"model": "nlpai-lab/KURE-v1", "dims": 1024}, "limits": limits}
+        with mock.patch.object(service, "active_serving", return_value=cfg):
+            base = compare.serving_base(self.env.settings)
+        rows = compare.matrix_rows(compare.MATRICES["reranker"], base)
+        self.assertEqual({(r["profile"], r["embedding"]) for r in rows}, {("fixed-512-64", "nlpai-lab/KURE-v1")})
+        runner = types.SimpleNamespace(settings=self.env.settings, analyzer=fixtures.analyzer(), _indexes={})
+        index = compare.Runner.index(runner, rows[0]["profile"], rows[0]["serving"])
+        self.assertEqual((index.version, index.profile), (built["index_version"], "fixed-512-64"))
+        s = compare.row_settings(self.env.settings, rows[0])
+        self.assertEqual((s.channel_top_k, s.evidence_target_tokens, s.evidence_max_tokens), (40, 3500, 5000))
+        varied = compare.row_settings(self.env.settings, {**rows[0], "units": 6})  # a varied axis derives its own
+        self.assertEqual((varied.channel_top_k, varied.evidence_max_tokens), (50, 3200))
+        # Cell keys hash the axes only, so a row's key is the same with or without the serving record beside them.
+        self.assertEqual(compare._cell_key(rows[0], index, {}, {}),
+                         compare._cell_key({**rows[0], "serving": None}, index, {}, {}))
+
+    def test_serving_retires_gpu_models_the_activated_configuration_no_longer_uses(self):
+        from rfp_assistant import service
+
+        def res():
+            return types.SimpleNamespace(_index_lock=threading.Lock(), _reranker=object(), _reranker_key=("k",))
+
+        self.addCleanup(models._EMBEDDERS.clear)
+        for cfg, kept, reranker_kept in [
+                ({"mode": "hybrid", "embedding": {"model": "text-embedding-3-large"}}, [], False),  # local -> API
+                ({"mode": "kiwi_bm25", "embedding": None}, [], False),  # local -> keyword
+                ({"mode": "hybrid_rerank", "embedding": {"model": "nlpai-lab/KURE-v1"},
+                  "reranker": {"model": "BAAI/bge-reranker-v2-m3"}}, ["nlpai-lab/KURE-v1"], True)]:
+            models._EMBEDDERS.clear()
+            models._EMBEDDERS["nlpai-lab/KURE-v1"] = object()
+            r = res()
+            with mock.patch.object(models, "free_gpu"):
+                service.Resources.retire_inactive(r, cfg)
+            self.assertEqual((list(models._EMBEDDERS), r._reranker is not None), (kept, reranker_kept), cfg["mode"])
+
+    def test_a_paid_embedding_held_fixed_or_served_opens_the_paid_gateway(self):
+        custom = {"axes": {"units": [6, 10]}, "fixed": {"retrieval": "hybrid", "embedding": "text-embedding-3-small"}}
+        self.assertEqual(compare.paid_models(self.env.settings, custom), {"text-embedding-3-small"})
+        gemini = {"axes": {"units": [6, 10]}, "fixed": {"retrieval": "dense", "embedding": "gemini-embedding-001"}}
+        self.assertEqual(compare.paid_models(self.env.settings, gemini), {"gemini-embedding-001"})
+        self.assertEqual(compare.paid_models(self.env.settings, compare.MATRICES["lexical"]), set())
 
     def test_reranker_scores_are_computed_once_per_pair(self):
         calls = []

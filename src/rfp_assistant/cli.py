@@ -218,9 +218,8 @@ def cmd_compare(args, settings) -> int:
         _print(compare.approve_estimate(settings, args.approve, args.approved_by or ""))
         return 0
     name, spec = compare.load_matrix(args.matrix)
-    paid = [m for m in spec["axes"].get("embedding", []) if compare.EMBEDDINGS[m].backend != "local"]
     approved = {a["model"] for a in compare.approvals(settings).values()}
-    res = _paid_resources(settings) if set(paid) & approved else None
+    res = _paid_resources(settings) if compare.paid_models(settings, spec) & approved else None
     try:
         table = compare.Runner(settings, res.analyzer if res else Analyzer(),
                                res.transport if res else None).run(name, spec, args.only)

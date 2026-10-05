@@ -47,6 +47,11 @@ MATRICES: dict[str, dict] = {
                  "fixed": {"retrieval": "hybrid_rerank"}},
 }
 SERVING_HYBRID = ("embedding", "fusion", "depth", "units")
+# The activated run's recorded limits a row keeps while its fusion, depth and units are the serving ones; a row that
+# varies one of them derives its limits from the row instead.
+SERVING_LIMITS = ("fusion", "rrf_k", "dense_weight", "keyword_head", "channel_top_k", "fused_top_k",
+                  "evidence_max_units", "evidence_target_tokens", "evidence_max_tokens", "dense_search",
+                  "hnsw_ef_search")
 AXES = ("profile", "analyzer", "retrieval", "embedding", "fusion", "reranker", "rerank_mode", "units", "depth")
 COLUMNS = {  # (key, label, better: "high" | "low" | None) in display order
     "lexical": [("dev.ndcg", "nDCG@5 (dev)", "high"), ("dev.support", "complete support (dev)", "high"),
@@ -108,12 +113,25 @@ def serving_base(settings: Settings) -> dict:
     fusion = (f"{limits.get('fusion', settings.fusion)}:{limits.get('rrf_k', settings.rrf_k)}:"
               f"{float(limits.get('dense_weight', settings.dense_weight))}:{limits.get('keyword_head', settings.keyword_head)}")
     rr = cfg.get("reranker") or {}
-    return {"profile": "structural", "analyzer": "kiwi", "retrieval": {"kiwi_bm25": "keyword", "dense": "dense",
+    profile = "structural"
+    if cfg.get("index_version"):
+        with open_db(settings.db_path) as conn:
+            row = conn.execute("SELECT config_json FROM indexes WHERE index_version = ?",
+                               (cfg["index_version"],)).fetchone()
+        if row is not None:
+            profile = json.loads(row[0]).get("profile") or profile
+    base = {"profile": profile, "analyzer": "kiwi", "retrieval": {"kiwi_bm25": "keyword", "dense": "dense",
             "hybrid": "hybrid", "hybrid_rerank": "hybrid_rerank"}.get(cfg["mode"], "keyword"),
             "embedding": (cfg.get("embedding") or {}).get("model") or "text-embedding-3-large",
             "fusion": fusion, "reranker": rr.get("model"), "rerank_mode": "below_head" if rr.get("protect") else "whole",
             "units": limits.get("evidence_max_units", settings.evidence_max_units),
             "depth": limits.get("fused_top_k", settings.fused_top_k)}
+    # Not an axis: the serving run's own keyword index and recorded limits. A row on the serving profile, fusion,
+    # depth and units keeps them (`Runner.index`, `row_settings`), so the serving hybrid's pool is the one served.
+    base["serving"] = {"index_version": cfg.get("index_version"), "profile": profile,
+                       **{a: base[a] for a in ("fusion", "depth", "units")},
+                       "limits": {k: limits[k] for k in SERVING_LIMITS if k in limits}}
+    return base
 
 
 def matrix_rows(spec: dict, base: dict) -> list[dict]:
@@ -153,6 +171,9 @@ def row_settings(settings: Settings, row: dict) -> Settings:
         r = reranker_spec(row["reranker"])
         changes.update(reranker_model=r.key, reranker_revision=r.revision, reranker_max_length=r.max_length,
                        reranker_precision=r.precision)
+    served = row.get("serving") or {}
+    if served.get("limits") and all(row[a] == served.get(a) for a in ("fusion", "depth", "units")):
+        changes.update(served["limits"])
     return settings.with_(**changes)
 
 
@@ -527,6 +548,7 @@ def failure_reason(exc: BaseException) -> str:
 
 
 def _cell_key(row: dict, index, pops: dict, extra: dict) -> str:
+    row = {a: row.get(a) for a in AXES}  # what the serving base adds besides axes enters through index and extra
     return hashlib.sha256(dumps({"v": COMPARE_VERSION, "eval": ev.EVAL_VERSION, "row": row,
                                  "index": index.manifest_hash,
                                  "pops": {k: p["population_sha256"] for k, p in pops.items()}, **extra}
@@ -544,7 +566,15 @@ class Runner:
         self._indexes: dict[str, object] = {}
         self._baselines: dict[str, dict] = {}
 
-    def index(self, profile: str):
+    def index(self, profile: str, serving: dict | None = None):
+        """The profile's keyword index; on the serving profile, the activated run's own index."""
+        version = (serving or {}).get("index_version")
+        if version and (serving or {}).get("profile") == profile:
+            if version not in self._indexes:
+                from .retrieval import KeywordIndex
+
+                self._indexes[version] = KeywordIndex.load(self.settings, version)
+            return self._indexes[version]
         if profile not in self._indexes:
             self._indexes[profile] = keyword_index(self.settings, self.analyzer, profile)
         return self._indexes[profile]
@@ -580,8 +610,11 @@ class Runner:
 
     def row_key(self, row: dict) -> tuple[str, Settings, object]:
         s = row_settings(self.settings, row)
-        index = self.index(row["profile"])
-        extra_key = {"embedding": ev.embedding_identity(s) if row.get("embedding") else None,
+        index = self.index(row["profile"], row.get("serving"))
+        derived = row_settings(self.settings, {**row, "serving": None})
+        extra_key = {"limits": {k: getattr(s, k) for k in SERVING_LIMITS}} if any(
+            getattr(s, k) != getattr(derived, k) for k in SERVING_LIMITS) else {}
+        extra_key |= {"embedding": ev.embedding_identity(s) if row.get("embedding") else None,
                      "reranker": [s.reranker_model, s.reranker_revision, s.reranker_max_length, s.reranker_precision]
                      if row.get("reranker") else None}
         return _cell_key(row, index, self.pops, extra_key), s, index
@@ -759,6 +792,13 @@ class Runner:
                                                          - set(k1["dev"]["critical_ids"]))}
             out.append({"name": row_name(row, matrix), "axes": {a: row[a] for a in AXES}, **cell})
         return write_table(self.settings, name, matrix, out, base, k1)
+
+
+def paid_models(settings: Settings, spec: dict) -> set[str]:
+    """API embedding models any row of this matrix uses, whether an axis varies them, its fixed values hold them,
+    or the serving base supplies them: the command opens the paid gateway for these."""
+    return {r["embedding"] for r in matrix_rows(spec, serving_base(settings))
+            if r.get("embedding") and embedding_spec(r["embedding"]).backend != "local"}
 
 
 def _raise_on_bypass(results) -> None:

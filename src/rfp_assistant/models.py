@@ -379,11 +379,15 @@ def local_embedder(key: str) -> LocalEmbedder:
         return _EMBEDDERS[key]
 
 
-def unload_embedders(keep: str | None = None) -> None:
+def unload_embedders(keep: str | None = None) -> bool:
+    """Retire every loaded embedding model but `keep`; True when one was retired. A request still embedding with
+    a retired model holds its own reference, so its memory returns when that request finishes."""
     with _EMBEDDERS_LOCK:
-        for key in [k for k in _EMBEDDERS if k != keep]:
+        gone = [k for k in _EMBEDDERS if k != keep]
+        for key in gone:
             del _EMBEDDERS[key]
     free_gpu()
+    return bool(gone)
 
 
 # ---------------------------------------------------------------- Gemini embeddings and their own ledger
