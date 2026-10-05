@@ -490,6 +490,17 @@ def _storage_mb(s: Settings) -> float | None:
     return round(size / 2 ** 20, 1)
 
 
+def failure_reason(exc: BaseException) -> str:
+    """The reason a failed row shows: what to do for a gated model, otherwise the error's first line."""
+    name = type(exc).__name__
+    if name == "GatedRepoError":
+        return ("gated model: accept its licence on its Hugging Face page and set HF_TOKEN in .env, then rerun "
+                "the matrix")
+    if name == "OutOfMemoryError":
+        return "out of GPU memory"
+    return f"{name}: {(str(exc).splitlines() or [''])[0]}"[:300]
+
+
 def _cell_key(row: dict, index, pops: dict, extra: dict) -> str:
     return hashlib.sha256(dumps({"v": COMPARE_VERSION, "eval": ev.EVAL_VERSION, "row": row,
                                  "index": index.manifest_hash,
@@ -558,7 +569,7 @@ class Runner:
         try:
             key, _, _ = self.row_key(row)
         except Exception as exc:  # noqa: BLE001
-            return {"status": "failed", "reason": f"{type(exc).__name__}: {exc}"[:500]}
+            return {"status": "failed", "reason": failure_reason(exc)}
         cell, path = self.cached(key), self._cell_path(key)
         if cell is None and path.exists():  # cached() hides failures so a run retries them; the table shows them
             cell = json.loads(path.read_text(encoding="utf-8"))
@@ -569,7 +580,7 @@ class Runner:
         try:
             key, s, index = self.row_key(row)
         except Exception as exc:  # noqa: BLE001 - a row that cannot be set up is a row with its reason
-            return {"status": "failed", "reason": f"{type(exc).__name__}: {exc}"[:500]}
+            return {"status": "failed", "reason": failure_reason(exc)}
         hit = self.cached(key)
         if hit is not None:
             return hit
@@ -617,7 +628,7 @@ class Runner:
         except Exception as exc:  # noqa: BLE001 - load failure, out of memory or a crash is a row with its reason
             free_gpu()
             return self.store(key, {"status": "failed", "label": label,
-                                    "reason": f"{type(exc).__name__}: {exc}"[:500]})
+                                    "reason": failure_reason(exc)})
 
     def _rerank_row(self, key: str, row: dict, base: dict, s: Settings, index) -> dict:
         from .models import LocalRerankerModel
@@ -665,7 +676,7 @@ class Runner:
             return self.store(key, cell)
         except Exception as exc:  # noqa: BLE001 - load failure, out of memory or a crash is a row with its reason
             return self.store(key, {"status": "failed", "label": "HR", "licence": spec.licence,
-                                    "revision": spec.revision, "reason": f"{type(exc).__name__}: {exc}"[:500]})
+                                    "revision": spec.revision, "reason": failure_reason(exc)})
         finally:
             del model
             free_gpu()
