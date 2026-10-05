@@ -1,7 +1,0 @@
-graph TD
-  scope-check["Scope and ingestion check\nsrc/rfp_assistant/service.py"] -->|"parsed, indexed documents"| retrieval-prep["Retrieve and price prompt\nsrc/rfp_assistant/service.py"]
-  retrieval-prep -->|"evidence and input tokens"| admission["Reserve maximum cost\nsrc/rfp_assistant/budget.py"]
-  admission -->|"reserved attempt"| dispatch-guard["Dispatch marker and guard\nsrc/rfp_assistant/budget.py"]
-  dispatch-guard -->|"dispatching attempt"| model-call["gpt-6-luna chat call\nsrc/rfp_assistant/generation.py"]
-  model-call -->|"usage and response id"| settlement["Settle from usage\nsrc/rfp_assistant/budget.py"]
-  settlement -->|"then check citations"| answer-validation["Citation validation\nsrc/rfp_assistant/generation.py"]

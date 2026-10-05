@@ -1,1 +1,0 @@
-_paid_answer, in order. Each stage either continues or ends through done() with a typed status. Before each new paid stage, _checkpoint raises _Stop when the request is cancel_requested, no longer running, or the resources are closing. The query embedding (inside retrieval) and the generation are the two paid stages, and each reserves and dispatches separately.

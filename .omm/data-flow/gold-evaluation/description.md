@@ -1,0 +1,1 @@
+Difficult gold questions are drafted, reviewed by people, frozen, and used to compare finalists and to make the one sealed release measurement. Development rows (`dev`, `dev-pilot`) are reachable from the UI. The sealed `test` split is CLI-only and never served to screens.

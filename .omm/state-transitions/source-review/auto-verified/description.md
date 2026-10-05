@@ -1,1 +1,1 @@
-fidelity.compare found every extracted unit in the Hancom print text layer and every rendered line in the extraction (6-character shingles, exact digit runs). Recorded in fidelity_checks keyed by (extraction_id, FIDELITY_VERSION).
+Set by `fidelity.verify_source` when the comparison against the Hancom-printed PDF finds no unmatched extraction or rendering text (6-character shingles, exact runs of 3+ digits). It never overwrites a human status (`HUMAN_STATUSES`).

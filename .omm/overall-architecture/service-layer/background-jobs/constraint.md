@@ -1,0 +1,1 @@
+`_EVAL_LOCK` and `_refuse_closed_or_busy` let only one answer evaluation or judge part run at a time. Drafting has its own `_DRAFT_LOCK`: one drafting run at a time.

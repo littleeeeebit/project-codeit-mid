@@ -1,0 +1,1 @@
+A single unknown attempt anywhere in the database blocks every new paid dispatch until it is settled or reconciled. This is deliberate PostgreSQL behaviour in `mark_dispatching`.

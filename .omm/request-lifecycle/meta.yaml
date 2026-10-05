@@ -1,29 +1,29 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-05 03:34:22.412000+00:00
-update_count: 4
+updated: 2026-10-05 04:06:22.696000+00:00
+update_count: 6
 last_field: diagram
-git_commit: 21da642
+git_commit: 4d8c212
 git_branch: close-answer-failures-phase5-runner-lint
 children:
-- ask-page
+- answer-validation
+- ask-route
+- ask-screen
 - cancellation
 - finish-record
-- free-modes
+- model-call
 - ownership-and-polling
+- paid-answer
 - paid-answer-pipeline
-- request-runner
-- requests-table
 - status-poll
 - submit-answer
-prev_diagram: "graph TD\r\n  ask-page[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  admission[\"Validate, persist, admit\\nsrc/rfp_assistant/service.py\"]\r\n\
-  \  executor[\"Bounded executor\\nsrc/rfp_assistant/service.py\"]\r\n  paid-stages[\"\
-  Paid answer stages\\nsrc/rfp_assistant/service.py\"]\r\n  finish-record[\"Request\
-  \ record\\nsrc/rfp_assistant/service.py\"]\r\n  status-poll[\"Status polling\\nweb/src/lib/use-poll.ts\"\
-  ]\r\n  cancellation[\"Cancel and abandon\\nsrc/rfp_assistant/service.py\"]\r\n \
-  \ ask-page -->|POST ask with scope| admission\r\n  admission -->|free modes inline|\
-  \ finish-record\r\n  admission -->|request id queued| executor\r\n  executor -->|claims\
-  \ queued to running| paid-stages\r\n  paid-stages -->|result and billing| finish-record\r\
-  \n  ask-page -->|poll every second| status-poll\r\n  status-poll -->|reads view\
-  \ and attachable| finish-record\r\n  ask-page -->|cancel or context change| cancellation\r\
-  \n  cancellation -->|cancel flag checked| paid-stages"
+- worker-claim
+prev_diagram: "graph TD\r\n  ask-page[\"Ask page\\nweb/src/components/ask/ask-page.tsx\"\
+  ] -->|\"POST /api/ask\"| submit-answer[\"Validate and persist\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  submit-answer -->|\"metadata, inventory inline\"| free-modes[\"Free answers\\\
+  nsrc/rfp_assistant/service.py\"]\r\n  submit-answer -->|\"queued request ID\"| request-runner[\"\
+  Bounded executor\\nsrc/rfp_assistant/service.py\"]\r\n  request-runner -->|\"claim\
+  \ queued to running\"| paid-answer-pipeline[\"Paid answer pipeline\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  paid-answer-pipeline -->|\"result_json and trace_json\"| requests-table[\"\
+  requests and attempts\\nsrc/rfp_assistant/store.py\"]\r\n  ask-page -->|\"GET status\
+  \ every 1s\"| ownership-and-polling[\"Status and attach check\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  ownership-and-polling -->|\"reads view\"| requests-table"

@@ -1,7 +1,14 @@
 graph TD
-  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval.py"] -->|"chunks, BM25, scope terms"| corpus-router["Scope and corpus routing\nsrc/rfp_assistant/retrieval.py"]
-  corpus-router -->|"admitted rows"| lexical-ranker["Kiwi BM25 ranking\nsrc/rfp_assistant/retrieval.py"]
-  corpus-router -->|"admitted row orders"| dense-search["Exact pgvector search\nsrc/rfp_assistant/vector_store.py"]
-  lexical-ranker -->|"top 50 BM25 ids"| fusion["Keyword-first RRF fusion\nsrc/rfp_assistant/retrieval.py"]
-  dense-search -->|"top 50 cosine ids"| fusion
-  fusion -->|"ranked chunk ids"| evidence-packer["Evidence packing\nsrc/rfp_assistant/retrieval.py"]
+  corpus_router["Corpus routing\nsrc/rfp_assistant/retrieval.py"]
+  exact_codes["Requirement code match\nsrc/rfp_assistant/retrieval.py"]
+  lexical_bm25["Kiwi BM25 channel\nsrc/rfp_assistant/retrieval.py"]
+  dense_search["pgvector dense channel\nsrc/rfp_assistant/vector_store.py"]
+  fusion["Keyword-first RRF fusion\nsrc/rfp_assistant/retrieval.py"]
+  evidence_packer["Evidence packing\nsrc/rfp_assistant/retrieval.py"]
+  corpus_router -->|"narrowed scope rows"| exact_codes
+  corpus_router -->|"allowed rows"| lexical_bm25
+  corpus_router -->|"allowed rows"| dense_search
+  lexical_bm25 -->|"top channel_top_k"| fusion
+  dense_search -->|"top channel_top_k"| fusion
+  exact_codes -->|"pinned ahead of ranking"| evidence_packer
+  fusion -->|"fused order"| evidence_packer

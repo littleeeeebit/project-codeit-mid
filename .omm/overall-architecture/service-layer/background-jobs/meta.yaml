@@ -1,0 +1,9 @@
+created: 2026-10-05T04:06:14.936Z
+updated: 2026-10-05T04:06:15.260Z
+update_count: 3
+last_field: note
+kind: nested-class
+title: background-jobs
+children: []
+parentPath:
+  - service-layer

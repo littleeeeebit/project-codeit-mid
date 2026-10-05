@@ -1,9 +1,18 @@
 graph TD
-  csv-manifest["CSV manifest and originals\nsrc/rfp_assistant/ingestion.py"] -->|"documents and sources rows"| extraction["Parse HWP/PDF, merge OCR\nsrc/rfp_assistant/ingestion.py"]
-  extraction -->|"printed PDF comparison"| fidelity-check["Fidelity check\nsrc/rfp_assistant/fidelity.py"]
-  extraction -->|"active extractions"| keyword-build["Chunk and BM25 index\nsrc/rfp_assistant/retrieval.py"]
-  fidelity-check -->|"review status filter"| keyword-build
-  keyword-build -->|"chunk payloads"| dense-build["Embeddings into pgvector\nsrc/rfp_assistant/dense.py"]
-  keyword-build -->|"index version"| retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation.py"]
-  dense-build -->|"dense set version"| retrieval-runs
-  retrieval-runs -->|"owner decision file"| serving-config["Serving configuration\nsrc/rfp_assistant/service.py"]
+  original_corpus["Original RFP files\n원본 데이터/files"]
+  corpus_ingestion["Manifest, parse, OCR merge\nsrc/rfp_assistant/ingestion.py"]
+  fidelity_check["Fidelity check\nsrc/rfp_assistant/fidelity.py"]
+  index_build["Keyword index build\nsrc/rfp_assistant/retrieval.py"]
+  dense_build["Embedding set build\nsrc/rfp_assistant/dense.py"]
+  gold_evaluation["Gold and release evaluation\nsrc/rfp_assistant/gold.py"]
+  retrieval_selection["Run evaluation and activation\nsrc/rfp_assistant/evaluation.py"]
+  serving_resources["Serving resources\nsrc/rfp_assistant/service.py"]
+  original_corpus -->|"CSV rows, original bytes"| corpus_ingestion
+  corpus_ingestion -->|"HWP extraction elements"| fidelity_check
+  fidelity_check -->|"review_status admits source"| index_build
+  corpus_ingestion -->|"elements.jsonl artifacts"| index_build
+  index_build -->|"chunk payloads"| dense_build
+  index_build -->|"frozen index version"| retrieval_selection
+  dense_build -->|"dense set version"| retrieval_selection
+  gold_evaluation -->|"reviewed dataset rows"| retrieval_selection
+  retrieval_selection -->|"active_run, active_index"| serving_resources

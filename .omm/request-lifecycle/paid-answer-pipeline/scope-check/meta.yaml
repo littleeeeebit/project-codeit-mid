@@ -1,9 +1,0 @@
-created: 2026-10-05T03:34:23.470Z
-updated: 2026-10-05T03:34:23.471Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: scope-check
-children: []
-parentPath:
-  - paid-answer-pipeline

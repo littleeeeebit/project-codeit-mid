@@ -1,7 +1,0 @@
-graph TD
-  resources-owner["Process resources\nsrc/rfp_assistant/service.py"] -->|"creates lazily, drains on close"| request-runner["Bounded request executor\nsrc/rfp_assistant/service.py"]
-  request-runner -->|"run_queued per request ID"| answer-pipeline["Answer execution\nsrc/rfp_assistant/service.py"]
-  answer-pipeline -->|"index, dense set, transport"| resources-owner
-  verifier-traces["Frozen verifier runs\nsrc/rfp_assistant/service.py"] -->|"generate via submit_answer"| answer-pipeline
-  resources-owner -->|"transport for job threads"| background-jobs["Evaluation and judge jobs\nsrc/rfp_assistant/answers.py"]
-  resources-owner -->|"transport for drafting thread"| gold-and-drafting["Drafting and gold review\nsrc/rfp_assistant/gold.py"]

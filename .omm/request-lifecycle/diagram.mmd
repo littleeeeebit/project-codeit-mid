@@ -1,8 +1,17 @@
 graph TD
-  ask-page["Ask page\nweb/src/components/ask/ask-page.tsx"] -->|"POST /api/ask"| submit-answer["Validate and persist\nsrc/rfp_assistant/service.py"]
-  submit-answer -->|"metadata, inventory inline"| free-modes["Free answers\nsrc/rfp_assistant/service.py"]
-  submit-answer -->|"queued request ID"| request-runner["Bounded executor\nsrc/rfp_assistant/service.py"]
-  request-runner -->|"claim queued to running"| paid-answer-pipeline["Paid answer pipeline\nsrc/rfp_assistant/service.py"]
-  paid-answer-pipeline -->|"result_json and trace_json"| requests-table["requests and attempts\nsrc/rfp_assistant/store.py"]
-  ask-page -->|"GET status every 1s"| ownership-and-polling["Status and attach check\nsrc/rfp_assistant/service.py"]
-  ownership-and-polling -->|"reads view"| requests-table
+  ask_screen["Ask screen submit\nweb/src/components/ask/ask-page.tsx"]
+  ask_route["POST /api/ask\nsrc/rfp_assistant/api.py"]
+  submit_answer["Validate and persist\nsrc/rfp_assistant/service.py"]
+  worker_claim["Worker claims queued\nsrc/rfp_assistant/service.py"]
+  paid_answer["Retrieve, price, reserve\nsrc/rfp_assistant/service.py"]
+  model_call["gpt-6-luna call\nsrc/rfp_assistant/generation.py"]
+  answer_validation["Citation validation\nsrc/rfp_assistant/generation.py"]
+  status_poll["Status polling\nsrc/rfp_assistant/api.py"]
+  ask_screen -->|"scope, question, mode"| ask_route
+  ask_route -->|"fresh generation_id key"| submit_answer
+  submit_answer -->|"request_id on executor"| worker_claim
+  worker_claim -->|"snapshot, rebuilt principal"| paid_answer
+  paid_answer -->|"dispatching attempt"| model_call
+  model_call -->|"structured JSON, usage"| answer_validation
+  answer_validation -->|"result_json persisted"| status_poll
+  ask_screen -->|"poll every second"| status_poll

@@ -1,0 +1,1 @@
+How the serving process claims its resources at startup and gives them up at stop. This is what makes 'exactly one worker' and 'no replay after restart' hold.

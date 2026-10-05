@@ -1,13 +1,18 @@
-created: 2026-10-05T03:34:30.121Z
-updated: 2026-10-05T03:34:30.375Z
-update_count: 2
+created: 2026-10-05 03:34:30.121000+00:00
+updated: 2026-10-05 04:06:31.829000+00:00
+update_count: 4
 last_field: diagram
 kind: nested-class
 title: gold-candidate
 children:
-  - approved
-  - dataset-file
-  - pending
-  - rejected
-  - second-review
+- approved
+- awaiting-second-review
+- pending
+- rejected
 parentPath: []
+prev_diagram: "graph TD\r\n  pending[\"pending\\nsrc/rfp_assistant/gold.py\"] -->|\"\
+  decide approve with note\"| approved[\"approved\\nsrc/rfp_assistant/gold.py\"]\r\
+  \n  pending -->|\"decide reject with category\"| rejected[\"rejected\\nsrc/rfp_assistant/gold.py\"\
+  ]\r\n  approved -->|\"disputed rows\"| second-review[\"Second review log\\nsrc/rfp_assistant/gold.py\"\
+  ]\r\n  approved -->|\"rewrite dataset JSONL\"| dataset-file[\"Dataset file\\nsrc/rfp_assistant/gold.py\"\
+  ]\r\n  second-review -->|\"disagree removes from valid gold\"| dataset-file"

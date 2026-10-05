@@ -1,0 +1,1 @@
+An HR run activated under a superseded `eval_version` serves `hybrid` with `reranker=None` and `stale_policy` recorded, until a current reranker trial passes and is activated. Per request, a missing reranker or an inference error also serves the H order (`hybrid_rerank->hybrid:…`).

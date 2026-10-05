@@ -1,1 +1,1 @@
-Exactly-once pricing from provider usage. A duplicate settle returns duplicate=True. An overrun (cost above reservation) freezes the ledger through frozen_reason. A late settle of a reconciled attempt inserts a negative 'late-settlement:<id>' adjustment, because the provider total already counted it.
+Set exactly once by `budget.settle` from reported usage at the attempt's frozen rates. A cost above the reservation freezes paid admission (`frozen_reason`). Settling from reconciled adds a compensating negative adjustment, so the provider total is not counted twice.

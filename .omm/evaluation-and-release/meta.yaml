@@ -1,14 +1,9 @@
-created: 2026-10-05T03:34:33.590Z
-updated: 2026-10-05T03:34:33.884Z
+created: 2026-10-05 03:34:33.590000+00:00
+updated: 2026-10-05 03:34:33.884000+00:00
 update_count: 2
 last_field: diagram
 git_commit: 21da642
 git_branch: close-answer-failures-phase5-runner-lint
 children:
-  - answer-runs
-  - drafting
-  - gold-queue
-  - judge-comparison
-  - release-freeze
-  - release-report
-  - retrieval-eval
+- drafting
+- judge-comparison

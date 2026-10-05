@@ -1,0 +1,1 @@
+Runs over different evaluated populations are never compared. A run whose population changed (a source revision, review or dataset edit) is blocked until rerun. Only runs scored under the current `EVAL_VERSION` activate.

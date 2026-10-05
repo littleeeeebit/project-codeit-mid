@@ -1,15 +1,9 @@
-created: 2026-10-05T03:34:23.179Z
-updated: 2026-10-05T03:34:23.318Z
+created: 2026-10-05 03:34:23.179000+00:00
+updated: 2026-10-05 03:34:23.318000+00:00
 update_count: 2
 last_field: diagram
 kind: nested-class
 title: paid-answer-pipeline
 children:
-  - admission
-  - answer-validation
-  - dispatch-guard
-  - model-call
-  - retrieval-prep
-  - scope-check
-  - settlement
+- answer-validation
 parentPath: []

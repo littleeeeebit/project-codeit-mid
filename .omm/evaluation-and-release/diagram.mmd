@@ -1,7 +1,0 @@
-graph TD
-  drafting["LLM question drafting\nsrc/rfp_assistant/drafting.py"] -->|"candidates.jsonl batch"| gold-queue["Gold review queue\nsrc/rfp_assistant/gold.py"]
-  gold-queue -->|"approved dev rows"| retrieval-eval["Retrieval runs and activation\nsrc/rfp_assistant/evaluation.py"]
-  retrieval-eval -->|"finalist run configs"| answer-runs["Answer evaluation runs\nsrc/rfp_assistant/answers.py"]
-  answer-runs -->|"blind-reviewed items"| judge-comparison["Judge comparison\nsrc/rfp_assistant/judges.py"]
-  answer-runs -->|"dev answer run"| release-freeze["Release freeze and sealed run\nsrc/rfp_assistant/sealed.py"]
-  release-freeze -->|"sealed scores, hard checks"| release-report["Backup and release report\nsrc/rfp_assistant/release.py"]

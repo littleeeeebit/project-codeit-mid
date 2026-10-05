@@ -1,1 +1,1 @@
-Requires at least one REJECT_CATEGORIES entry, plus a note for 'other'. _write_rejection renders a rejection wiki page. Later drafting runs read these via drafting.lessons(), so the model learns from earlier rejections.
+Set by `gold.decide` with at least one category from `REJECT_CATEGORIES` ('other' requires a note). `_write_rejection` renders a rejection wiki page. `gold infer` can later attach an inferred reason, and drafting reads these lessons (`drafting.lessons`).

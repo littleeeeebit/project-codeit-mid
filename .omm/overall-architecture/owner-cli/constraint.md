@@ -1,0 +1,1 @@
+`build-keyword` moves `active_index` only for the structural profile and only while no `active_run` exists. After an activation, only `activate-run` changes what serves.

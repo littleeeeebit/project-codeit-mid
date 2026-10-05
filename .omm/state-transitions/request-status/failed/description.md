@@ -1,1 +1,1 @@
-Set for technical_error, clarification_required from a ServiceError, and unschedulable submissions. The billing of any dispatched attempt is still reported from the ledger.
+Written by `_finish` for `technical_error` (preparation, provider, settlement or validation failure), for `clarification_required` raised from `ServiceError` or a frozen-estimate mismatch, and by `_fail_unscheduled` when executor submission fails. The billing state still reflects any settled or unknown attempt.

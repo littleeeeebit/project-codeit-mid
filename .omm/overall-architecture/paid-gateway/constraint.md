@@ -1,0 +1,1 @@
+A timeout or missing usage is never re-sent. It stays unknown, and its reservation keeps counting against the cap until the owner settles or reconciles it. `set_paid_enabled(True)` requires recorded project dates and prior use, a validated import, no recovery fence and no unknown attempts.

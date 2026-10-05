@@ -1,0 +1,1 @@
+The `ponytail:` comment in `tx` marks one global write mutex serializing admission and idempotency. It suits six concurrent users; per-account locks would be the upgrade if measured throughput requires it.

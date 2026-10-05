@@ -1,1 +1,1 @@
-First decision wins and the expected row sha must match. The reviewer must differ from drafted_by, from the drafting model (LLM provenance) and, at the service layer, from the person who requested the drafting run. Gold approvals require original_inspected.
+Set by `gold.decide` (first decision wins, `expected_sha` must match, note required, reviewer must differ from the drafter, the drafting model and the drafting-run requester, and gold-2 rows need `original_inspected`). It records the source context and rewrites `datasets/<dataset>.jsonl` from the database.

@@ -1,0 +1,9 @@
+created: 2026-10-05T04:06:33.341Z
+updated: 2026-10-05T04:06:33.492Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: activated-run
+children: []
+parentPath:
+  - serving-activation

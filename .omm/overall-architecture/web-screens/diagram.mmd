@@ -1,8 +1,15 @@
 graph TD
-  app-header["Header and budget meter\nweb/src/components/app-header.tsx"] -->|"GET /api/budget every 2s"| api-client["Typed API client\nweb/src/lib/api.ts"]
-  ask-page["Ask page\nweb/src/components/ask/ask-page.tsx"] -->|"ask, poll, cancel, abandon"| api-client
-  ask-page -->|"picks one or two docs"| document-search["Document picker\nweb/src/components/ask/document-search.tsx"]
-  ask-page -->|"renders attachable result"| answer-view["Answer and evidence pane\nweb/src/components/ask/answer-view.tsx"]
-  verify-page["Verification page\nweb/src/components/verify/verify-page.tsx"] -->|"traces, evaluation, judges, fidelity"| api-client
-  dataset-page["Dataset page\nweb/src/components/dataset/dataset-page.tsx"] -->|"drafting and gold decisions"| api-client
-  document-search -->|"GET /api/documents"| api-client
+  ask_page["Ask page\nweb/src/components/ask/ask-page.tsx"]
+  verify_page["Verification page\nweb/src/components/verify/verify-page.tsx"]
+  dataset_page["Dataset page\nweb/src/components/dataset/dataset-page.tsx"]
+  settings_page["Settings page\nweb/src/app/settings/page.tsx"]
+  use_poll["Keyed polling hook\nweb/src/lib/use-poll.ts"]
+  api_client["Typed API client\nweb/src/lib/api.ts"]
+  ask_page -->|"poll request each second"| use_poll
+  verify_page -->|"poll overview, history"| use_poll
+  dataset_page -->|"poll runs, pending"| use_poll
+  use_poll -->|"read-only GETs"| api_client
+  ask_page -->|"ask, cancel, abandon"| api_client
+  verify_page -->|"traces, plans, starts"| api_client
+  dataset_page -->|"plan, start, decide"| api_client
+  settings_page -->|"PUT budget limit"| api_client

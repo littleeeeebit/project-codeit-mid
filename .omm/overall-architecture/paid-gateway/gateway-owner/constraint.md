@@ -1,0 +1,1 @@
+Exactly one gateway owner per database. CLI paid maintenance (`build-dense`, `run-answers`, `evaluate-retrieval --allow-paid-queries`) refuses while the UI holds the lock, so stop the UI first. Never copy the database to create a second, independently spendable ledger.

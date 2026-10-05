@@ -1,1 +1,1 @@
-Differences found, with per-element, cell and page findings that the 검증 inbox lists for a person to inspect next to the printed page (rendered_page_png).
+Set by `fidelity.verify_source` when differences exist. The findings (side, page, element, cell) are stored in `fidelity_checks` and listed on the verification screen's 원문 대조 section.

@@ -1,1 +1,0 @@
-How a process is allowed to touch the database and spend. Ownership is explicit and checked at every boundary that could lead to a provider call: pool entry, startup validation, the advisory lock, the ledger transaction and the transport itself. Restart and shutdown both resolve in-flight work conservatively and never replay it.

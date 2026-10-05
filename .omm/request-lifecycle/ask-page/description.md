@@ -1,1 +1,0 @@
-Trigger side. It sends {scope, question, mode} with the X-Member captured at submit and keeps the returned Owned record. It disables input while the POST or the owned request is unfinished. Navigation or context changes call abandon (only a queued request is cancelled). Explicit 요청 취소 calls POST /cancel.

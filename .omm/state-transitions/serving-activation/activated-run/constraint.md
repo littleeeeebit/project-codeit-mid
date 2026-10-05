@@ -1,0 +1,1 @@
+`compare-runs` keeps K1 unless another current-policy mode on the same evaluated population has no new critical failure and at least +0.03 nDCG@5. Unjudged top-5 passages keep the decision provisional.

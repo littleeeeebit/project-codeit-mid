@@ -1,0 +1,1 @@
+In corpus mode the prompt names only the documents whose passages were retrieved, and coverage counts evidence per document.

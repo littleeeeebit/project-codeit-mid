@@ -1,1 +1,0 @@
-CLI budget administration builds service.Resources(settings, dispatch=False): pool and schema only, with no transport and no lock, so it can run beside the serving app. Its provider_note states that paid stages are not dispatched there, and reserve() would refuse anyway because require_owner finds no owner in that process.

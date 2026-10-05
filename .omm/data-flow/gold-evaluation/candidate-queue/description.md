@@ -1,0 +1,1 @@
+`gold.submit(settings, file, batch_id, dataset, drafted_by)` validates the batch and inserts `gold_candidates` rows (row JSON, row sha256, question key, drafted_by) as pending. The UI lists development candidates through `gold_queue` (`GET /api/gold/pending`).

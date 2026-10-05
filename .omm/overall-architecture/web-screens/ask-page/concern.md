@@ -1,0 +1,1 @@
+The server's `may_attach` compares `owned.target` against the `target` query parameter, but the page sends both from the same `Owned` record, so the target check is always true. Keeping a changed question from attaching is actually enforced by `release()` dropping ownership on the client. If a screen ever kept ownership across context changes, the server would not catch it.

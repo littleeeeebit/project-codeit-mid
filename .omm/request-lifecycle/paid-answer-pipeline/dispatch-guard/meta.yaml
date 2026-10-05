@@ -1,9 +1,0 @@
-created: 2026-10-05T03:34:23.864Z
-updated: 2026-10-05T03:34:23.865Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: dispatch-guard
-children: []
-parentPath:
-  - paid-answer-pipeline

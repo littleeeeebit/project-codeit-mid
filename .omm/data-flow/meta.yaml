@@ -1,30 +1,29 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-05 03:34:31.993000+00:00
-update_count: 4
+updated: 2026-10-05 04:06:34.698000+00:00
+update_count: 6
 last_field: diagram
-git_commit: 21da642
+git_commit: 4d8c212
 git_branch: close-answer-failures-phase5-runner-lint
 children:
 - activation
-- csv-manifest
+- corpus-ingestion
 - dense-build
 - extraction
 - fidelity-check
-- keyword-build
+- gold-evaluation
+- index-build
 - ocr-merge
-- retrieval-runs
-- serving-config
-prev_diagram: "graph TD\r\n  csv-manifest[\"CSV manifest\\nsrc/rfp_assistant/ingestion.py\"\
-  ]\r\n  ingestion[\"HWP and PDF parsing\\nsrc/rfp_assistant/ingestion.py\"]\r\n \
-  \ fidelity-check[\"Original print comparison\\nsrc/rfp_assistant/fidelity.py\"]\r\
-  \n  ocr-merge[\"Image OCR\\nsrc/rfp_assistant/ocr.py\"]\r\n  keyword-build[\"Keyword\
-  \ index build\\nsrc/rfp_assistant/retrieval.py\"]\r\n  dense-build[\"Embedding build\\\
-  nsrc/rfp_assistant/dense.py\"]\r\n  retrieval-evaluation[\"Frozen retrieval runs\\\
-  nsrc/rfp_assistant/evaluation.py\"]\r\n  activation[\"Serving activation\\nsrc/rfp_assistant/evaluation.py\"\
-  ]\r\n  csv-manifest -->|documents and sources rows| ingestion\r\n  fidelity-check\
-  \ -->|Hancom print PDF| ocr-merge\r\n  ocr-merge -->|image_text elements| ingestion\r\
-  \n  ingestion -->|extraction elements| fidelity-check\r\n  fidelity-check -->|review\
-  \ status| keyword-build\r\n  ingestion -->|active extraction| keyword-build\r\n\
-  \  keyword-build -->|unique chunk payloads| dense-build\r\n  keyword-build -->|index\
-  \ manifest| retrieval-evaluation\r\n  dense-build -->|verified vectors| retrieval-evaluation\r\
-  \n  retrieval-evaluation -->|scored run and decision| activation"
+- original-corpus
+- retrieval-selection
+- serving-resources
+prev_diagram: "graph TD\r\n  csv-manifest[\"CSV manifest and originals\\nsrc/rfp_assistant/ingestion.py\"\
+  ] -->|\"documents and sources rows\"| extraction[\"Parse HWP/PDF, merge OCR\\nsrc/rfp_assistant/ingestion.py\"\
+  ]\r\n  extraction -->|\"printed PDF comparison\"| fidelity-check[\"Fidelity check\\\
+  nsrc/rfp_assistant/fidelity.py\"]\r\n  extraction -->|\"active extractions\"| keyword-build[\"\
+  Chunk and BM25 index\\nsrc/rfp_assistant/retrieval.py\"]\r\n  fidelity-check -->|\"\
+  review status filter\"| keyword-build\r\n  keyword-build -->|\"chunk payloads\"\
+  | dense-build[\"Embeddings into pgvector\\nsrc/rfp_assistant/dense.py\"]\r\n  keyword-build\
+  \ -->|\"index version\"| retrieval-runs[\"Frozen retrieval runs\\nsrc/rfp_assistant/evaluation.py\"\
+  ]\r\n  dense-build -->|\"dense set version\"| retrieval-runs\r\n  retrieval-runs\
+  \ -->|\"owner decision file\"| serving-config[\"Serving configuration\\nsrc/rfp_assistant/service.py\"\
+  ]"

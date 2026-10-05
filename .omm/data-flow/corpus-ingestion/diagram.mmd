@@ -1,0 +1,14 @@
+graph TD
+  manifest_import["CSV manifest import\nsrc/rfp_assistant/ingestion.py"]
+  hwp_parser["HWP via hwp5proc\nsrc/rfp_assistant/ingestion.py"]
+  pdf_parser["PDF via PyMuPDF\nsrc/rfp_assistant/ingestion.py"]
+  ocr_merge["OCR image text merge\nsrc/rfp_assistant/ocr.py"]
+  revision_assignment["Content-bound revision\nsrc/rfp_assistant/ingestion.py"]
+  quarantine["Quarantine record\nsrc/rfp_assistant/ingestion.py"]
+  manifest_import -->|"hwp sources"| hwp_parser
+  manifest_import -->|"pdf sources"| pdf_parser
+  hwp_parser -->|"unreadable, use Hancom print"| pdf_parser
+  hwp_parser -->|"raw elements"| ocr_merge
+  pdf_parser -->|"raw elements"| ocr_merge
+  ocr_merge -->|"elements with image_text"| revision_assignment
+  hwp_parser -->|"converter failure reason"| quarantine

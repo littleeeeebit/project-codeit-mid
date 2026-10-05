@@ -1,1 +1,1 @@
-Set by reconcile() for explicitly covered unknown attempts dispatched inside a closed, non-overlapping interval. The difference between provider total and local settled cost is recorded as an adjustment.
+Set by `budget.reconcile` for explicitly covered unknown attempts dispatched inside an imported, non-overlapping provider interval. The interval's provider total minus local settled cost becomes one adjustment, and the attempt stops holding a reservation.

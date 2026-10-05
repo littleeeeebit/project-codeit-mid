@@ -1,1 +1,0 @@
-budget.reserve and budget.mark_dispatching call require_owner (check()) before checkout and owner_guard(conn) inside the mutex transaction, which confirms the owner's backend PID still holds the lock. OpenAITransport._check_owner repeats the check immediately before the SDK call. A loss at any point refuses or releases the attempt instead of sending.

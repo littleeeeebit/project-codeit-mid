@@ -1,6 +1,9 @@
 graph TD
-  pending["pending\nsrc/rfp_assistant/gold.py"] -->|"decide approve with note"| approved["approved\nsrc/rfp_assistant/gold.py"]
-  pending -->|"decide reject with category"| rejected["rejected\nsrc/rfp_assistant/gold.py"]
-  approved -->|"disputed rows"| second-review["Second review log\nsrc/rfp_assistant/gold.py"]
-  approved -->|"rewrite dataset JSONL"| dataset-file["Dataset file\nsrc/rfp_assistant/gold.py"]
-  second-review -->|"disagree removes from valid gold"| dataset-file
+  pending["pending\nsrc/rfp_assistant/gold.py"]
+  approved["approved\nsrc/rfp_assistant/gold.py"]
+  rejected["rejected\nsrc/rfp_assistant/gold.py"]
+  awaiting_second_review["approved, disputed\nsrc/rfp_assistant/gold.py"]
+  pending -->|"approve with note"| approved
+  pending -->|"reject with categories"| rejected
+  pending -->|"approve marked disputed"| awaiting_second_review
+  awaiting_second_review -->|"independent reviewer agrees"| approved

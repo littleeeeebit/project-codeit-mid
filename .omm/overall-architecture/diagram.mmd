@@ -1,11 +1,21 @@
 graph TD
-  web-screens["Web screens\nweb/src/components"] -->|"JSON over /api/*"| api-shell["HTTP shell\nsrc/rfp_assistant/api.py"]
-  api-shell -->|"one service call per route"| service-core["Service core\nsrc/rfp_assistant/service.py"]
-  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"] -->|"same service and modules"| service-core
-  service-core -->|"scoped evidence search"| retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval.py"]
-  service-core -->|"reserve, mark, settle"| budget-ledger["Budget ledger\nsrc/rfp_assistant/budget.py"]
-  service-core -->|"chat and embed calls"| provider-gateway["Provider gateway\nsrc/rfp_assistant/generation.py"]
-  retrieval-engine -->|"chunks and vectors"| postgresql-store["PostgreSQL store\nsrc/rfp_assistant/postgres.py"]
-  budget-ledger -->|"attempt rows in mutex tx"| postgresql-store
-  retrieval-engine -->|"hash-checked index files"| runtime-artifacts["Runtime artifacts\n.runtime"]
-  service-core -.->|"optional request traces"| langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/tracing.py"]
+  web_screens["Next.js screens\nweb/src/app"]
+  http_api["FastAPI routes\nsrc/rfp_assistant/api.py"]
+  service_layer["Service orchestration\nsrc/rfp_assistant/service.py"]
+  retrieval_engine["Retrieval engine\nsrc/rfp_assistant/retrieval.py"]
+  paid_gateway["Budget ledger and paid gateway\nsrc/rfp_assistant/budget.py"]
+  postgresql_store["PostgreSQL 18.6 + pgvector\nsrc/rfp_assistant/postgres.py"]
+  runtime_artifacts["Runtime artifact trees\n.runtime/"]
+  owner_cli["Owner CLI\nsrc/rfp_assistant/cli.py"]
+  langfuse_tracing["Langfuse tracing\nsrc/rfp_assistant/tracing.py"]
+  web_screens -->|"JSON over /api/*"| http_api
+  http_api -->|"one service call per route"| service_layer
+  service_layer -->|"scoped question"| retrieval_engine
+  service_layer -->|"reserve, dispatch, settle"| paid_gateway
+  retrieval_engine -->|"exact vector search"| postgresql_store
+  retrieval_engine -->|"verified index files"| runtime_artifacts
+  paid_gateway -->|"ledger rows, advisory lock"| postgresql_store
+  service_layer -->|"requests, traces, reviews"| postgresql_store
+  owner_cli -->|"pipeline and admin"| service_layer
+  owner_cli -->|"writes extractions, indexes"| runtime_artifacts
+  service_layer -.->|"optional trace export"| langfuse_tracing

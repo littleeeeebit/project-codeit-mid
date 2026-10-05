@@ -1,0 +1,1 @@
+After changing a route or its shapes, regenerate the schema with `python tools/openapi.py`. `tests/test_api.py` fails while it is stale. `npm run lint` and `npm run typecheck` check `web/`. `web/AGENTS.md` warns that this Next.js version has breaking changes; read `node_modules/next/dist/docs/` before writing screen code.

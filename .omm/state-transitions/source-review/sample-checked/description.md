@@ -1,1 +1,0 @@
-service.confirm_fidelity calls ingestion.record_review with the reported locations and the reviewer's note. This is a human status that later automatic checks will not overwrite.

@@ -1,1 +1,1 @@
-Set by ingest_source whenever the extraction revision changes (assign_revision binds the revision to the actual output), because parsed does not mean faithful. Also the state of a newly recovered source.
+Set by `ingest_source` whenever the active extraction ID changes (a new parser fingerprint, or different output under the same fingerprint, via `assign_revision`). Parsed does not mean faithful. Identical output keeps its previous status. `recover_source` also leaves a new revision unreviewed until `import-reviews` checks it.

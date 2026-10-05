@@ -1,0 +1,1 @@
+`parse_pdf` uses PyMuPDF to extract page-located text and tables from PDF originals, and from Hancom prints in the fallback case. It returns raw elements, warnings and a failure reason.

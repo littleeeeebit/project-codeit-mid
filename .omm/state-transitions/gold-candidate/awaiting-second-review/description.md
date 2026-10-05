@@ -1,0 +1,1 @@
+An approval recorded as `approve:disputed`, meant for disputed deadlines, amounts, institutions, mandatory conditions or conflicts. `gold_awaiting_second_review` lists these from `dev.jsonl`. `gold.second_review` (UI `POST /api/gold/{id}/second-review`) appends an agree or disagree verdict. A disagreement keeps the row out of valid gold until a corrected revision is approved.

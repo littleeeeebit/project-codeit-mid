@@ -1,0 +1,1 @@
+Sealed `test` candidates are refused on every UI path (`_sealed_refusal`, `SEALED_DATASETS`). Only the owner's CLI (`gold show/decide/second-review`) reviews them.
