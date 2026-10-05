@@ -52,9 +52,9 @@ Ambiguous document names should trigger a choice in the UI. Do not silently scop
 
 ## Minimal components to reuse
 
-Use Python standard CSV, Unicode, hashing, XML and SQLite tools; pyhwp for the structured HWP trial; PyMuPDF for PDF; Kiwi and `rank_bm25` for lexical retrieval; OpenAI SDK for embeddings and one answer call; NumPy for cosine scoring; and FastAPI with a Next.js app for the interfaces (Streamlit until 2026-10-02). There is no existing application dependency stack to preserve.
+Use Python standard CSV, Unicode, hashing and XML tools; PostgreSQL 18.6 with pgvector 0.8.6 through psycopg for every record, the ledger and the vectors; pyhwp for the structured HWP trial; PyMuPDF for PDF; Kiwi and `rank_bm25` for lexical retrieval; OpenAI SDK for embeddings and one answer call; and FastAPI with a Next.js app for the interfaces (Streamlit until 2026-10-02). There is no existing application dependency stack to preserve.
 
-For this corpus, exact vector scoring over a normalized, persisted matrix is a reasonable first measurement. Store document/chunk metadata in SQLite and the array with a matching version manifest. Benchmark actual chunk count and memory before adding FAISS or a database server. Do not load arbitrary user-supplied pickle files.
+For this corpus, exact vector scoring is a reasonable first measurement. Store document/chunk metadata and normalized vectors in PostgreSQL, with pgvector exact cosine search over the scoped rows and a matching version manifest. Measure recall and latency before adding an approximate index such as HNSW; at cutover, HNSW recall@20 stayed below 0.99 on scoped questions, so exact search serves. Do not load arbitrary user-supplied pickle files.
 
 Persist artifacts keyed by source hash, parser/chunker settings, embedding model/dimensions, and index version. All six members reuse one generated corpus and index. Ship one shared spending gateway for ingestion, experiments, and user requests; six disconnected apps cannot truthfully present a real-time shared allowance.
 

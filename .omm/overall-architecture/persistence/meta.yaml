@@ -6,10 +6,8 @@ kind: nested-class
 title: persistence
 children:
   - gateway-owner
-  - migration-tool
   - pgvector-store
   - postgresql
   - runtime-artifacts
-  - sqlite-ledger
   - store-adapter
 parentPath: []

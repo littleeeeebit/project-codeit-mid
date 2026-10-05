@@ -1,16 +1,10 @@
 graph TD
   store-adapter["Store adapter\nsrc/rfp_assistant/store.py"]
-  sqlite-ledger["SQLite database\nsrc/rfp_assistant/store.py"]
-  postgresql["PostgreSQL target\nsrc/rfp_assistant/postgres.py"]
+  postgresql["PostgreSQL bidmate_app\nsrc/rfp_assistant/postgres.py"]
   pgvector-store["pgvector store\nsrc/rfp_assistant/vector_store.py"]
   gateway-owner["Gateway owner lock\nsrc/rfp_assistant/postgres.py"]
-  migration-tool["Migration tool\nsrc/rfp_assistant/migration.py"]
   runtime-artifacts["Runtime artifacts\n.runtime"]
-  store-adapter -->|Path target| sqlite-ledger
   store-adapter -->|Target pool| postgresql
   postgresql -->|vector tables| pgvector-store
   gateway-owner -->|advisory lock session| postgresql
-  migration-tool -->|frozen snapshot from| sqlite-ledger
-  migration-tool -->|import and validate| postgresql
-  sqlite-ledger -->|paths and hashes of| runtime-artifacts
-  migration-tool -->|artifact hash checks| runtime-artifacts
+  postgresql -->|paths and hashes of| runtime-artifacts

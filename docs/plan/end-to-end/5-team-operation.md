@@ -6,9 +6,9 @@ Enter with the actual [phase-4 release](4-evaluation-and-release.md), runbook, a
 
 ## Ownership and durable deployment
 
-Assign one operational owner and a backup owner from the team; record their roles in the runbook. There is no login: all six users connect to one application deployment whose network reach the owner decides. Keep the SQLite ledger and immutable artifacts on the owner's persistent local disk. Ephemeral hosting that can lose or reset the ledger is outside this baseline.
+Assign one operational owner and a backup owner from the team; record their roles in the runbook. There is no login: all six users connect to one application deployment whose network reach the owner decides. The ledger and every application record live in the PostgreSQL database `bidmate_app` (PostgreSQL 18.6 + pgvector 0.8.6, started by `tools/start-postgresql.ps1` on a persistent Docker volume). Immutable artifacts stay on the owner's persistent local disk. Ephemeral hosting that can lose or reset the database or the artifacts is outside this baseline.
 
-Hold a process-owner lock while the real paid service is active. Refuse a second UI/gateway owner against the same data directory. Maintenance CLI jobs acquire the same lock after the UI has stopped; fake checks use a separate temporary directory. Use the host's standard-library file locking and explicit handle cleanup rather than a new coordination service. Confirm lock recovery after process death; do not delete a live lock to bypass it.
+Hold the database-wide paid-gateway advisory lock while the real paid service is active. A second UI or gateway owner against the same database is refused, from any host. Maintenance CLI jobs acquire the same lock after the UI has stopped. Fake checks and tests use their own isolated PostgreSQL databases, never `bidmate_app`. The lock belongs to its database session, so a dead process releases it. Confirm that recovery after process death; never terminate a live owner's session to bypass it.
 
 Document the real interpreter, absolute application/data/source paths, who can reach the host and how, port and controlled shutdown. The developer's localhost command alone does not prove shared deployment. Verify the first owner/backup-owner restart before declaring the runbook complete.
 
@@ -37,9 +37,9 @@ This is a manual operating cadence. Do not create scheduled automations, contact
 
 ### 2. Back up and restore consistent state
 
-Use `sqlite3.Connection.backup()` for a consistent database snapshot rather than copying a live main file while ignoring WAL. Store backups outside the active runtime directory under owner-controlled access. Include a manifest of referenced extraction/index/dataset/report hashes and the budget reconciliation watermark. Private secret configuration is backed up separately by the owner, never in shareable reports.
+`backup --destination <absolute-directory>` takes the gateway lock and the application write mutex, then writes a native PostgreSQL custom-format dump of `bidmate_app` (extension definitions included) with copies of the mutable runtime trees. Never copy the database's data files instead. Store backups outside the active runtime directory under owner-controlled access. Include a manifest of referenced extraction/index/dataset/report hashes and the budget reconciliation watermark. Private secret configuration is backed up separately by the owner, never in shareable reports.
 
-Define `backup --destination <absolute-directory>` and `restore-check --backup <absolute-manifest>` in the maintenance CLI. Backup refuses unsafe or overlapping active destinations. Restore checks operate only in a fresh staging directory and keep fake transport/paid-disabled regardless of copied settings.
+`restore-check --backup <absolute-manifest>` restores into a distinct empty database named by `RFP_RESTORE_DATABASE_DSN`; the primary database may be unreachable or its DSN unset. It fences that target before the restore, verifies it, and publishes its receipt in `bidmate_recovery.receipt`. Paid admission stays disabled and the transport stays fake, whatever the copied settings say. Backup refuses unsafe or overlapping active destinations.
 
 Verify restored prior spending, pending/unknown attempts, settled costs, active index row mappings and source evidence. A restore cannot reset the allowance or resume uncertain paid calls. Before real recovery, stop the old owner; stage and inspect the backup, reconcile spending after its watermark, then activate it with an auditable reason. Never let old and restored owners dispatch concurrently.
 
@@ -77,7 +77,7 @@ For each accepted correction, add a independently reviewed regression row with o
 5. Activate the candidate transactionally with a decision record. Existing in-flight/saved requests retain their snapshot; future requests use the new version. Cache keys change with index/config/prompt/auth scope as appropriate.
 6. If regression is found, reactivate the retained known-good version. Rollback does not roll back charged usage or erase traces. Record the failing version and cause.
 
-Keep changes small and measured. Add FAISS, a database server, Langfuse or an existing LiteLLM deployment only when current volume/runtime/operational failures justify it. Migration must retain allowance history, source identity, idempotency and role boundaries; a new dashboard cannot initialize spending to zero.
+Keep changes small and measured. Add an approximate vector index (pgvector HNSW) or an existing LiteLLM deployment only when current volume/runtime/operational failures justify it. Migration must retain allowance history, source identity, idempotency and role boundaries; a new dashboard cannot initialize spending to zero.
 
 ### 6. Close the project with reusable evidence
 
@@ -93,8 +93,8 @@ Implement these as existing-CLI extensions, using temporary/fake state for fault
 | --- | --- |
 | `check --phase 5 --provider fake` | Owner-lock lifecycle, backup/restore, allowance persistence, incremental activation/rollback and reconciliation invariants pass |
 | `budget-report` | Read-only total/pending/available/category/member report with watermark; no key/provider inference call |
-| `backup --destination <absolute-directory>` | Consistent snapshot and referenced-artifact manifest written; original state unchanged |
-| `restore-check --backup <absolute-manifest>` | Fresh staging copy verifies source/index/ledger hashes; paid mode remains disabled |
+| `backup --destination <absolute-directory>` | Gateway-locked PostgreSQL custom-format dump of `bidmate_app` and referenced-artifact manifest written; original state unchanged |
+| `restore-check --backup <absolute-manifest>` | Restore into the distinct empty database at `RFP_RESTORE_DATABASE_DSN` verifies source/index/ledger hashes and publishes its receipt; paid admission remains disabled |
 | `reconcile --file <absolute-path>` | Owner-only unique closed-interval import; duplicate is harmless; unknown/late-usage behavior audited |
 | `activate-run --run-id <id> --decision-file <absolute-path>` | Only a ready verified config becomes active; same action supports explicit known-good rollback |
 

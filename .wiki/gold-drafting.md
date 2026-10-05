@@ -45,7 +45,7 @@ Every rejection page has the same structure:
 
 ## Consistency
 
-The `gold_candidates` table in `.runtime/rfp.sqlite3` is the only authority. The dataset file, the rejection pages and the index are rendered from it in the same transaction as each decision. Never edit them by hand: `gold check` compares every file byte for byte with its rendering and fails on any difference, and `gold sync` rewrites them from the database. Reviewers approve or reject on the `질문 검토` screen. A drafter cannot approve its own rows; it can withdraw one through rejection with a concrete note.
+The `gold_candidates` table in the PostgreSQL application database (`bidmate_app`) is the only authority. The Phase 4 pilot's 181 candidates are kept apart, read-only, in `bidmate_pilot_archive`. The dataset file, the rejection pages and the index are rendered from it in the same transaction as each decision. Never edit them by hand: `gold check` compares every file byte for byte with its rendering and fails on any difference, and `gold sync` rewrites them from the database. Reviewers approve or reject on the `질문 검토` screen. A drafter cannot approve its own rows; it can withdraw one through rejection with a concrete note.
 
 ## Phase 4 gold rows (`dev` and the sealed `test`)
 

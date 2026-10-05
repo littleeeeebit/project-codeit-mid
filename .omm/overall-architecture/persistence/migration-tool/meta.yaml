@@ -1,9 +1,0 @@
-created: 2026-10-04T13:34:48.337Z
-updated: 2026-10-04T13:34:48.338Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: migration-tool
-children: []
-parentPath:
-  - persistence

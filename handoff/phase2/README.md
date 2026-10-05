@@ -76,7 +76,7 @@ $fixedIndex = '<actual fixed-512-64 index version>'
 
 ## Collect and share the next snapshot
 
-The collector uses standard-library SQLite in `mode=ro`, starts a read transaction, and never calls application initialization. It refuses an existing output directory so earlier snapshots survive. Both paths must be outside each other. Supply `--run-id` once for every real retrieval run Cloud should analyze; default collection exports no runs.
+The collector connects to the PostgreSQL application database named by `--dsn-env` (default `RFP_DATABASE_DSN`), reads in one repeatable-read, read-only transaction, and never calls application initialization. It refuses an existing output directory so earlier snapshots survive. Both paths must be outside each other. Supply `--run-id` once for every real retrieval run Cloud should analyze; default collection exports no runs.
 
 ```powershell
 python tools/phase2_handoff.py --runtime $env:RFP_DATA_DIR --out handoff/phase2/results/2026-10-01-post-lexical --run-id '<actual-run-id>'

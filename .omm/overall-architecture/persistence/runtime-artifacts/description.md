@@ -1,7 +1,6 @@
 `RFP_DATA_DIR` (default `<repo>/.runtime`) holds:
 - `extracted/<source_hash>/<fingerprint>/elements.jsonl` (extraction revisions)
-- `indexes/<version>/` (keyword and dense manifests)
-- `embedding-cache/`
+- `indexes/<version>/` (keyword manifests; vectors live in pgvector)
 - `runs/<run_id>/` (retrieval and answer runs)
 - `drafts/<run_id>/`
 - `datasets/*.jsonl` and `sealed/test.jsonl`
