@@ -304,9 +304,15 @@ class LocalEmbedder:
         self.batch = 32  # lowered for good after an out-of-memory error
         if spec.trust_remote_code:
             prepare_remote_class(spec.key, spec.revision)
-        self.model = SentenceTransformer(spec.key, revision=spec.revision, device=device,
-                                         trust_remote_code=spec.trust_remote_code,
-                                         model_kwargs={"dtype": _dtype(spec.precision)})
+        def load(local_only: bool):
+            return SentenceTransformer(spec.key, revision=spec.revision, device=device, local_files_only=local_only,
+                                       trust_remote_code=spec.trust_remote_code,
+                                       model_kwargs={"dtype": _dtype(spec.precision)})
+
+        try:  # the pinned revision is exact in the local cache; a gated model then loads without a token
+            self.model = load(True)
+        except OSError:  # not downloaded yet
+            self.model = load(False)
         self.restored_buffers = restore_buffers(self.model) if spec.trust_remote_code else 0
         self.cold_load_seconds = round(time.perf_counter() - t0, 2)
         prompts = getattr(self.model, "prompts", None) or {}
