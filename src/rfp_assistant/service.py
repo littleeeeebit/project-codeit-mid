@@ -241,6 +241,12 @@ class Resources:
         with self._index_lock:
             if self._reranker_key != key:
                 self._reranker_key = key
+                # Retire the previous model before loading the next, so both never need the GPU at once; a request
+                # still reranking with it keeps its own reference until it finishes.
+                self._reranker = None
+                from .models import free_gpu
+
+                free_gpu()
                 self._reranker, info = dense_mod.load_reranker(s)
                 if self._reranker is None:
                     self.stage_errors["reranker"] = info.get("error", "unavailable")

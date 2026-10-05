@@ -1,14 +1,17 @@
 """Comparison runner pieces that need no GPU: matrix expansion, cache identity, the Gemini cap and score cache."""
 
 import hashlib
+import sys
 import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 
-from rfp_assistant import compare, dense, models, store
+from rfp_assistant import budget, compare, dense, models, store
+from rfp_assistant import postgres
 from rfp_assistant.store import dumps
 from tests import fixtures
 
@@ -26,6 +29,10 @@ class MatrixTest(unittest.TestCase):
         rr = compare.matrix_rows(compare.MATRICES["reranker"], BASE)
         self.assertEqual(len(rr), 8 * 2)
         self.assertEqual({r["embedding"] for r in rr}, {"text-embedding-3-large"})  # the serving hybrid's pool
+        kure = {**BASE, "embedding": "nlpai-lab/KURE-v1", "fusion": "rrf:60:1.0:0", "depth": 30, "units": 8}
+        self.assertEqual({tuple(r[a] for a in compare.SERVING_HYBRID)
+                          for r in compare.matrix_rows(compare.MATRICES["reranker"], kure)},
+                         {("nlpai-lab/KURE-v1", "rrf:60:1.0:0", 30, 8)})  # an activated hybrid is the one reranked
         self.assertEqual({r["rerank_mode"] for r in rr}, {"whole", "below_head"})
         chunks = compare.matrix_rows(compare.MATRICES["chunking"], BASE)
         self.assertEqual([(r["profile"], compare.row_label(r), r["embedding"]) for r in chunks],
@@ -81,6 +88,8 @@ class LedgerAndCacheTest(unittest.TestCase):
                          ("nlpai-lab/KURE-v1", 1024, "keyword_first", 6, 50, 10, 4800))
 
     def test_gemini_spends_only_under_the_persons_cap_and_an_unknown_outcome_blocks(self):
+        owner = postgres.GatewayOwner(self.db)
+        self.addCleanup(owner.release)
         self.assertFalse(models.external_reserve(self.db, 1000, "embedding")["admitted"])  # no cap set
         with self.assertRaisesRegex(models.ModelError, "name and a reason"):
             models.set_external_cap(self.db, 1000, "", "x")
@@ -88,6 +97,7 @@ class LedgerAndCacheTest(unittest.TestCase):
         first = models.external_reserve(self.db, 600_000, "embedding")
         self.assertTrue(first["admitted"])
         self.assertEqual(models.external_reserve(self.db, 600_000, "embedding")["reason"], "gemini_cap_exhausted")
+        models.external_mark_dispatching(self.db, first["attempt_id"])
         models.external_finish(self.db, first["attempt_id"], "unknown", None, "timeout")
         blocked = models.external_reserve(self.db, 1, "embedding")
         self.assertIn("unknown billing", blocked["reason"])
@@ -102,11 +112,86 @@ class LedgerAndCacheTest(unittest.TestCase):
         with self.assertRaisesRegex(models.ModelError, "not an attempt with unknown billing"):
             models.external_resolve(self.db, first["attempt_id"], False, "owner", "again")
         question = models.external_reserve(self.db, 40, "gold_eval")
+        models.external_mark_dispatching(self.db, question["attempt_id"])
         models.external_finish(self.db, question["attempt_id"], "settled", 1)
         gemini = replace(self.env.settings, embedding_model="gemini-embedding-001", embedding_dimensions=3072)
         latency = compare.ledger_query_ms(gemini)  # question calls only, never the corpus batches
         self.assertEqual(len(latency), 1)
         self.assertGreaterEqual(latency[0], 0)
+
+    def test_a_cancelled_request_never_dispatches_gemini_and_a_crash_mid_dispatch_stays_unknown(self):
+        owner = postgres.GatewayOwner(self.db)
+        self.addCleanup(owner.release)
+        models.set_external_cap(self.db, 10_000, "owner", "test")
+        sent = []
+
+        class Client:
+            def __init__(self, *a):
+                pass
+
+            def count_tokens(self, texts):
+                return 10
+
+            def embed(self, texts, task, dims):
+                sent.append(texts)
+                return [[1.0] * dims for _ in texts]
+
+            def close(self):
+                pass
+
+        gemini = replace(self.env.settings, embedding_model="gemini-embedding-001", embedding_dimensions=3072)
+        with mock.patch.object(models, "GeminiClient", Client),                 mock.patch("rfp_assistant.settings.read_api_key", return_value="k"):
+            vec, info = dense.query_vector(gemini, None, "취소된 질문", request_id="r", member_id="m",
+                                           purpose="interactive", allow_paid=True, guard=lambda conn: "cancelled")
+        self.assertEqual((vec, sent), (None, []))
+        self.assertIn("stopped_before_dispatch:cancelled", info["reason"])
+        self.assertEqual(models.external_status(self.db)["used_micro_usd"], 0)  # the reservation was released
+        # The process ends after dispatch and before the outcome: restart recovery keeps it unknown, which blocks
+        # the next Gemini call until the person resolves it; a reservation never dispatched is released.
+        sent_once = models.external_reserve(self.db, 10, "gold_eval")
+        models.external_mark_dispatching(self.db, sent_once["attempt_id"])
+        models.external_reserve(self.db, 10, "gold_eval")
+        self.assertEqual(budget.recover(self.db), {"unknown": 1, "released": 1})
+        self.assertIn("unknown billing", models.external_reserve(self.db, 10, "gold_eval")["reason"])
+        models.external_resolve(self.db, sent_once["attempt_id"], True, "owner", "sent before the crash")
+        self.assertTrue(models.external_reserve(self.db, 10, "gold_eval")["admitted"])
+
+    def test_paid_questions_are_sent_only_when_the_approved_estimate_priced_them(self):
+        rows = [{"id": i, "question": q, "answerable": True, "evidence": [{"doc": "d"}], "type": "fact"}
+                for i, q in enumerate(["승인된 질문", "나중에 추가된 질문"])]
+        asked = {}
+
+        def fake(s, transport, question, **kw):
+            asked[question] = kw["allow_paid"]
+            return None, {"reason": "test"}
+
+        with mock.patch.object(dense, "query_vector", fake):
+            compare.query_vectors(self.env.settings, self.env.settings, {"dev": {"rows": rows}}, None,
+                                  {dense.normalize_payload("승인된 질문")})
+        self.assertEqual(asked, {"승인된 질문": True, "나중에 추가된 질문": False})
+
+    def test_a_reranker_bypass_in_any_population_fails_the_row(self):
+        compare._raise_on_bypass([{"fallback": None}, {"fallback": "hybrid->kiwi_bm25"}])
+        with self.assertRaisesRegex(models.ModelError, "inference failed"):
+            compare._raise_on_bypass([{"fallback": None}, {"fallback": "hybrid_rerank->hybrid:RuntimeError"}])
+
+    def test_switching_local_embedding_models_retires_the_previous_one(self):
+        class Fake:
+            def __init__(self, spec):
+                self.spec = spec
+
+        self.addCleanup(models._EMBEDDERS.clear)
+        with mock.patch.object(models, "LocalEmbedder", Fake), mock.patch.object(models, "free_gpu") as freed:
+            a = models.local_embedder("nlpai-lab/KURE-v1")
+            self.assertIs(models.local_embedder("nlpai-lab/KURE-v1"), a)
+            models.local_embedder("BAAI/bge-m3")
+        self.assertEqual(list(models._EMBEDDERS), ["BAAI/bge-m3"])
+        self.assertEqual(freed.call_count, 1)
+
+    def test_gpu_cleanup_needs_no_torch_for_keyword_comparisons(self):
+        with mock.patch.dict(sys.modules, {"torch": None}):
+            models.free_gpu()
+            models.unload_embedders()
 
     def test_reranker_scores_are_computed_once_per_pair(self):
         calls = []

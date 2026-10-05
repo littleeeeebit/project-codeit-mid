@@ -248,7 +248,8 @@ def query_vector(settings: Settings, transport: Transport | None, question: str,
         client = GeminiClient(key, settings.request_timeout_seconds)
         try:
             t0 = time.perf_counter()
-            vec = gemini_embed(settings.db_path, client, [text], "query", purpose, client.count_tokens([text]))[0]
+            vec = gemini_embed(settings.db_path, client, [text], "query", purpose, client.count_tokens([text]),
+                               guard=guard)[0]
         except ModelError as exc:
             return None, {"cache": "miss", "payload_hash": h, "reason": str(exc)[:300]}
         finally:

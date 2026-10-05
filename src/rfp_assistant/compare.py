@@ -41,10 +41,12 @@ MATRICES: dict[str, dict] = {
                  "fixed": {"retrieval": "keyword", "analyzer": "kiwi"}},
     "embedding": {"title": "임베딩", "axes": {"embedding": list(EMBEDDINGS), "retrieval": ["dense", "hybrid"]},
                   "fixed": {"fusion": SERVING_FUSION, "depth": 50, "units": 10}},
+    # Rerankers score the serving hybrid's frozen pool: its embedding, fusion, depth and units come from the
+    # activated run (`serving_base`), never from a fixed model, and `Runner.run` records them as the fixed values.
     "reranker": {"title": "리랭커", "axes": {"reranker": list(RERANKERS), "rerank_mode": ["whole", "below_head"]},
-                 "fixed": {"retrieval": "hybrid_rerank", "embedding": "text-embedding-3-large",
-                           "fusion": SERVING_FUSION, "depth": 50, "units": 10}},
+                 "fixed": {"retrieval": "hybrid_rerank"}},
 }
+SERVING_HYBRID = ("embedding", "fusion", "depth", "units")
 AXES = ("profile", "analyzer", "retrieval", "embedding", "fusion", "reranker", "rerank_mode", "units", "depth")
 COLUMNS = {  # (key, label, better: "high" | "low" | None) in display order
     "lexical": [("dev.ndcg", "nDCG@5 (dev)", "high"), ("dev.support", "complete support (dev)", "high"),
@@ -264,7 +266,7 @@ def paid_estimate(settings: Settings, s: Settings, index, pops: dict | None = No
                 "payloads_to_embed": corpus["payloads_to_embed"], "fingerprint": corpus["fingerprint"],
                 "cap": external_status(s.db_path)}
     plan.update(model=s.embedding_model, dims=s.embedding_dimensions, index_version=index.version,
-                queries_to_embed=len(queries),
+                queries_to_embed=len(queries), queries=[dense_mod.normalize_payload(q) for q in queries],
                 total_micro_usd=(plan["corpus_micro_usd"] or 0) + (plan["query_micro_usd"] or 0))
     plan["estimate_id"] = "est-" + hashlib.sha256(dumps([plan["model"], plan["index_version"], plan["fingerprint"],
                                                           sorted(queries)]).encode()).hexdigest()[:12]
@@ -451,11 +453,12 @@ def write_dev_run(settings: Settings, s: Settings, label: str, index, dense, ana
     return run_id
 
 
-def query_vectors(settings: Settings, s: Settings, pops: dict, transport, allow_paid: bool) -> tuple[dict, dict]:
-    """Every passage question's vector (cached, local or paid within the approved estimate) and, for a local
-    model, the uncached embedding latency of each development question."""
+def query_vectors(settings: Settings, s: Settings, pops: dict, transport,
+                  approved_queries: set[str]) -> tuple[dict, dict]:
+    """Every passage question's vector (cached, local, or paid only for a question the approved estimate priced)
+    and, for a local model, the uncached embedding latency of each development question."""
     request_id = None
-    if allow_paid:
+    if approved_queries:
         request_id = dense_mod.ensure_job_request(settings, MEMBER, f"compare:{s.embedding_model}:{utcnow()[:10]}",
                                                   {"job": "compare", "model": s.embedding_model})
     vectors, info = {}, {"embed_ms": [], "unavailable": []}
@@ -464,7 +467,8 @@ def query_vectors(settings: Settings, s: Settings, pops: dict, transport, allow_
             if not ev.is_passage_row(row):
                 continue
             vec, qi = dense_mod.query_vector(s, transport, row["question"], request_id=request_id, member_id=MEMBER,
-                                             purpose="gold_eval", allow_paid=allow_paid)
+                                             purpose="gold_eval",
+                                             allow_paid=dense_mod.normalize_payload(row["question"]) in approved_queries)
             if vec is None:
                 info["unavailable"].append(qi.get("reason"))
                 continue
@@ -570,9 +574,7 @@ class Runner:
         if which not in self._baselines:
             row = {**base, "retrieval": "keyword", "analyzer": "kiwi", "embedding": None, "reranker": None,
                    "rerank_mode": None} if which == "K1" else {**base, "retrieval": "hybrid", "reranker": None,
-                                                               "rerank_mode": None,
-                                                               "embedding": "text-embedding-3-large",
-                                                               "fusion": SERVING_FUSION}
+                                                               "rerank_mode": None}  # the serving hybrid
             self._baselines[which] = self.run_row(row, base)
         return self._baselines[which]
 
@@ -618,14 +620,18 @@ class Runner:
                                 "reason": "paid embedding waits for the person's approval of this estimate"}
                     return self.store(key, {"status": "failed", "reason": facts.get("error")})
                 paid = embedding_spec(s.embedding_model).backend != "local"
-                approved_paid = paid and any(a["model"] == s.embedding_model for a in self.approved.values())
-                vectors, qinfo = query_vectors(self.settings, s, self.pops, self.transport, approved_paid)
+                approved_queries: set[str] = set()
+                if paid and _missing_queries(s, self.pops):
+                    # Only an approval of the estimate that priced exactly these missing questions lets them be
+                    # sent; an earlier approval for the same model covered other payloads and does not carry over.
+                    estimate = paid_estimate(self.settings, s, index, self.pops)
+                    if not estimate.get("approved_by"):
+                        return {"status": "needs_approval", "estimate": estimate,
+                                "reason": f"{estimate['queries_to_embed']} query vectors need a paid call"}
+                    approved_queries = set(estimate["queries"])
+                vectors, qinfo = query_vectors(self.settings, s, self.pops, self.transport, approved_queries)
                 if qinfo["unavailable"]:
                     reasons = sorted({r for r in qinfo["unavailable"] if r})
-                    if paid and not approved_paid:
-                        estimate = paid_estimate(self.settings, s, index, self.pops)
-                        return {"status": "needs_approval", "estimate": estimate,
-                                "reason": f"{len(qinfo['unavailable'])} query vectors need a paid call"}
                     return self.store(key, {"status": "failed", "reason": f"query vectors unavailable: {reasons}"})
             measured = measure(self.settings, s, label, index, self.analyzer, self.pops, dense, vectors)
             run_id = write_dev_run(self.settings, s, label, index, dense, self.analyzer, self.pops, measured)
@@ -663,16 +669,13 @@ class Runner:
         try:
             hs = row_settings(self.settings, {**row, "retrieval": "hybrid", "reranker": None})
             dense, _ = ensure_dense(self.settings, hs, index, self.approved, self.transport)
-            vectors, _ = query_vectors(self.settings, hs, self.pops, self.transport, False)
+            vectors, _ = query_vectors(self.settings, hs, self.pops, self.transport, set())
             model = LocalRerankerModel(spec)
             load = {**model.info, "license": spec.licence, "size_bytes": model_size_bytes(spec.key, spec.revision)}
             cached = CachedReranker(self.settings, model)
             measured = measure(self.settings, s, "HR", index, self.analyzer, self.pops, dense, vectors, cached,
                                protect)
-            fails = [r["fallback"] for r in measured["results"]["dev"] if (r.get("fallback") or "").startswith(
-                "hybrid_rerank->")]
-            if fails:
-                raise ModelError(f"inference failed: {fails[0]}")
+            _raise_on_bypass(r for rs in measured["results"].values() for r in rs)  # every population
             latency = self._latency(s, index, dense, vectors, model, protect)
             summary = _summary(measured)
             gain = round((summary["dev"]["ndcg"] or 0) - (h["dev"]["ndcg"] or 0), 4)
@@ -708,17 +711,22 @@ class Runner:
         rows = [r for r in self.pops["dev"]["rows"] if ev.is_passage_row(r)]
         if not rows:
             return {"p95_alone_ms": None, "p95_loaded_ms": None, "added_p95_ms": 0}
-        ev._execute(s, index, self.analyzer, rows[:1], "hybrid_rerank", dense, vectors, model, s.fused_top_k,
-                    rerank_protect=protect)  # warm
-        alone = [r["timings_ms"]["rerank"] for r in ev._execute(
-            s, index, self.analyzer, rows, "hybrid_rerank", dense, vectors, model, s.fused_top_k,
-            rerank_protect=protect) if r.get("timings_ms")]
+        _raise_on_bypass(ev._execute(s, index, self.analyzer, rows[:1], "hybrid_rerank", dense, vectors, model,
+                                     s.fused_top_k, rerank_protect=protect))  # warm
+        trial = ev._execute(s, index, self.analyzer, rows, "hybrid_rerank", dense, vectors, model, s.fused_top_k,
+                            rerank_protect=protect)
+        _raise_on_bypass(trial)
+        alone = [r["timings_ms"]["rerank"] for r in trial if r.get("timings_ms")]
 
         def one(row, rerank=True):
             t0 = time.perf_counter()
-            ev._execute(s, index, self.analyzer, [row], "hybrid_rerank" if rerank else "hybrid", dense, vectors,
-                        model if rerank else None, s.fused_top_k if rerank else None, rerank_protect=protect)
-            return (time.perf_counter() - t0) * 1000
+            out = ev._execute(s, index, self.analyzer, [row], "hybrid_rerank" if rerank else "hybrid", dense,
+                              vectors, model if rerank else None, s.fused_top_k if rerank else None,
+                              rerank_protect=protect)
+            ms = (time.perf_counter() - t0) * 1000
+            if rerank:
+                _raise_on_bypass(out)  # a request that fell back under load timed the bypass, not the reranker
+            return ms
 
         with ThreadPoolExecutor(max_workers=LOAD_USERS) as pool:
             loaded = list(pool.map(one, rows))
@@ -731,6 +739,8 @@ class Runner:
     def run(self, name: str, matrix: dict, only: list[str] | None = None) -> dict:
         base = serving_base(self.settings)
         k1 = self.baseline("K1", base)
+        if matrix.get("axes", {}).get("reranker"):
+            matrix = {**matrix, "fixed": {**(matrix.get("fixed") or {}), **{a: base[a] for a in SERVING_HYBRID}}}
         rows = matrix_rows(matrix, base)
         if matrix.get("axes", {}).get("reranker"):  # one model loaded at a time, both modes back to back
             rows.sort(key=lambda r: list(matrix["axes"]["reranker"]).index(r["reranker"]))
@@ -749,6 +759,14 @@ class Runner:
                                                          - set(k1["dev"]["critical_ids"]))}
             out.append({"name": row_name(row, matrix), "axes": {a: row[a] for a in AXES}, **cell})
         return write_table(self.settings, name, matrix, out, base, k1)
+
+
+def _raise_on_bypass(results) -> None:
+    """`retrieve` answers a reranker crash with the hybrid order; a comparison row must fail with that reason instead
+    of publishing the bypass's numbers as the reranker's."""
+    for r in results:
+        if (r.get("fallback") or "").startswith("hybrid_rerank->"):
+            raise ModelError(f"inference failed: {r['fallback']}")
 
 
 # ---------------------------------------------------------------- tables

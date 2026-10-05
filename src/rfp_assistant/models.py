@@ -196,8 +196,10 @@ def free_gpu() -> None:
     import gc
 
     gc.collect()
-    import torch
-
+    try:
+        import torch
+    except ImportError:  # the optional `reranker` extra is absent: nothing was ever on the GPU
+        return
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
@@ -365,9 +367,14 @@ _EMBEDDERS_LOCK = threading.Lock()
 
 
 def local_embedder(key: str) -> LocalEmbedder:
-    """The process's one loaded copy of a local embedding model (serving loads the activated one on first use)."""
+    """The process's one loaded local embedding model (serving loads the activated one on first use). Switching
+    models retires the previous one before loading: the registry drops it and frees the GPU cache, while a request
+    still embedding with it holds its own reference, so the memory returns when that request finishes."""
     with _EMBEDDERS_LOCK:
         if key not in _EMBEDDERS:
+            if _EMBEDDERS:
+                _EMBEDDERS.clear()
+                free_gpu()
             _EMBEDDERS[key] = LocalEmbedder(embedding_spec(key))
         return _EMBEDDERS[key]
 
@@ -447,10 +454,18 @@ CREATE TABLE IF NOT EXISTS external_ledger (
 );
 CREATE TABLE IF NOT EXISTS external_attempts (
     attempt_id text PRIMARY KEY, provider text NOT NULL REFERENCES external_ledger(provider), purpose text NOT NULL,
-    state text NOT NULL CHECK(state IN ('reserved','settled','released','unknown')),
+    state text NOT NULL CHECK(state IN ('reserved','dispatching','settled','released','unknown')),
     input_tokens bigint NOT NULL, reserved_micro_usd bigint NOT NULL, settled_micro_usd bigint,
     detail text, created_at text NOT NULL, finished_at text
 );
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'external_attempts_state_check'
+               AND pg_get_constraintdef(oid) NOT LIKE '%dispatching%') THEN
+        ALTER TABLE external_attempts DROP CONSTRAINT external_attempts_state_check;
+        ALTER TABLE external_attempts ADD CONSTRAINT external_attempts_state_check
+            CHECK(state IN ('reserved','dispatching','settled','released','unknown'));
+    END IF;
+END $$;
 CREATE TABLE IF NOT EXISTS rerank_scores (
     model_key text NOT NULL, pair_hash text NOT NULL, score double precision NOT NULL,
     truncated boolean NOT NULL, PRIMARY KEY(model_key, pair_hash)
@@ -464,7 +479,7 @@ def external_status(db, provider: str = GEMINI_PROVIDER) -> dict:
     with open_db(db) as conn:
         row = conn.execute("SELECT * FROM external_ledger WHERE provider = ?", (provider,)).fetchone()
         used = conn.execute(
-            "SELECT COALESCE(SUM(CASE WHEN state='settled' THEN settled_micro_usd WHEN state IN ('reserved','unknown') "
+            "SELECT COALESCE(SUM(CASE WHEN state='settled' THEN settled_micro_usd WHEN state IN ('reserved','dispatching','unknown') "
             "THEN reserved_micro_usd ELSE 0 END),0), COALESCE(SUM(CASE WHEN state='unknown' THEN 1 ELSE 0 END),0) "
             "FROM external_attempts WHERE provider = ?", (provider,)).fetchone()
     if row is None:
@@ -482,7 +497,7 @@ def set_external_cap(db, cap_micro: int, actor: str, reason: str, provider: str 
         raise ModelError("setting a cap needs the person's name and a reason")
     with open_db(db) as conn, tx(conn, immediate=True):
         used = conn.execute("SELECT COALESCE(SUM(CASE WHEN state='settled' THEN settled_micro_usd WHEN state IN "
-                            "('reserved','unknown') THEN reserved_micro_usd ELSE 0 END),0) FROM external_attempts "
+                            "('reserved','dispatching','unknown') THEN reserved_micro_usd ELSE 0 END),0) FROM external_attempts "
                             "WHERE provider = ?", (provider,)).fetchone()[0]
         if cap_micro < used:
             raise ModelError(f"the cap would fall below the {used} micro-USD already committed")
@@ -503,7 +518,7 @@ def external_reserve(db, tokens: int, purpose: str, provider: str = GEMINI_PROVI
         if row is None:
             return {"admitted": False, "reason": f"no {provider} cap set; the person sets it first"}
         used = conn.execute("SELECT COALESCE(SUM(CASE WHEN state='settled' THEN settled_micro_usd WHEN state IN "
-                            "('reserved','unknown') THEN reserved_micro_usd ELSE 0 END),0), "
+                            "('reserved','dispatching','unknown') THEN reserved_micro_usd ELSE 0 END),0), "
                             "COALESCE(SUM(CASE WHEN state='unknown' THEN 1 ELSE 0 END),0) FROM external_attempts "
                             "WHERE provider = ?", (provider,)).fetchone()
         if used[1]:
@@ -517,13 +532,34 @@ def external_reserve(db, tokens: int, purpose: str, provider: str = GEMINI_PROVI
     return {"admitted": True, "attempt_id": attempt_id, "reserved_micro_usd": amount}
 
 
+def external_mark_dispatching(db, attempt_id: str, guard=None) -> None:
+    """Durable marker before the network call, as `budget.mark_dispatching` does for OpenAI: `guard(conn)` (the
+    owning request's stop check) and the gateway-owner check run in the same transaction, and a refusal releases the
+    reservation before anything is sent. A process that ends after this point leaves `dispatching`, which startup
+    recovery turns into `unknown`."""
+    from .postgres import owner_guard
+    from .store import open_db, tx, utcnow
+
+    with open_db(db) as conn, tx(conn, immediate=True):
+        reason = (guard(conn) if guard is not None else None) or owner_guard(conn)
+        if reason:
+            conn.execute("UPDATE external_attempts SET state = 'released', detail = ?, finished_at = ? "
+                         "WHERE attempt_id = ? AND state = 'reserved'",
+                         (f"stopped_before_dispatch:{reason}"[:300], utcnow(), attempt_id))
+        else:
+            conn.execute("UPDATE external_attempts SET state = 'dispatching' WHERE attempt_id = ? "
+                         "AND state = 'reserved'", (attempt_id,))
+    if reason:
+        raise ModelError(f"stopped_before_dispatch:{reason}")
+
+
 def external_finish(db, attempt_id: str, state: str, settled_micro: int | None = None, detail: str = "") -> None:
     from .store import open_db, tx, utcnow
 
     with open_db(db) as conn, tx(conn, immediate=True):
         conn.execute("UPDATE external_attempts SET state = ?, settled_micro_usd = ?, detail = ?, finished_at = ? "
-                     "WHERE attempt_id = ? AND state = 'reserved'", (state, settled_micro, detail[:300], utcnow(),
-                                                                     attempt_id))
+                     "WHERE attempt_id = ? AND state = 'dispatching'", (state, settled_micro, detail[:300], utcnow(),
+                                                                        attempt_id))
 
 
 def external_resolve(db, attempt_id: str, charged: bool, actor: str, reason: str) -> dict:
@@ -545,13 +581,16 @@ def external_resolve(db, attempt_id: str, charged: bool, actor: str, reason: str
             "settled_micro_usd": row[1] if charged else 0}
 
 
-def gemini_embed(db, client: GeminiClient, texts: list[str], kind: str, purpose: str, tokens: int) -> np.ndarray:
+def gemini_embed(db, client: GeminiClient, texts: list[str], kind: str, purpose: str, tokens: int,
+                 guard=None) -> np.ndarray:
     """One metered batch under the Gemini cap. Gemini reports no usage for embeddings, so settlement uses the
-    counted input tokens (countTokens, free). An uncertain outcome stays `unknown` and blocks further calls."""
+    counted input tokens (countTokens, free). An uncertain outcome stays `unknown` and blocks further calls.
+    `guard` is the owning request's dispatch check (see external_mark_dispatching)."""
     spec = EMBEDDINGS["gemini-embedding-001"]
     admission = external_reserve(db, tokens, purpose)
     if not admission["admitted"]:
         raise ModelError(admission["reason"])
+    external_mark_dispatching(db, admission["attempt_id"], guard)
     try:
         values = client.embed(texts, spec.task[0 if kind == "query" else 1], spec.dims)
     except GeminiError as exc:
