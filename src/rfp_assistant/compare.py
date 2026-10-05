@@ -494,6 +494,8 @@ class Runner:
         if not path.exists():
             return None
         cell = json.loads(path.read_text(encoding="utf-8"))
+        if cell.get("status") == "failed":
+            return None  # a failure is retried on the next run: its cause (access, a timeout) may be fixed
         run_id = cell.get("run_id")
         if run_id and not (ev._run_dir(self.settings, run_id) / "scores.json").exists():
             return None  # the activatable run was removed: measure again

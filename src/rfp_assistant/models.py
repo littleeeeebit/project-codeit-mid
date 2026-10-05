@@ -520,6 +520,25 @@ def external_finish(db, attempt_id: str, state: str, settled_micro: int | None =
                                                                      attempt_id))
 
 
+def external_resolve(db, attempt_id: str, charged: bool, actor: str, reason: str) -> dict:
+    """The person's resolution of an attempt with unknown billing (a timeout after dispatch): charged settles it at
+    its reserved amount, not charged releases it. Its vectors were never cached, so a later run asks for them again."""
+    from .store import open_db, tx, utcnow
+
+    if not actor.strip() or not reason.strip():
+        raise ModelError("resolving an attempt needs the person's name and a reason")
+    with open_db(db) as conn, tx(conn, immediate=True):
+        row = conn.execute("SELECT state, reserved_micro_usd FROM external_attempts WHERE attempt_id = ?",
+                           (attempt_id,)).fetchone()
+        if row is None or row[0] != "unknown":
+            raise ModelError(f"attempt {attempt_id} is not an attempt with unknown billing")
+        conn.execute("UPDATE external_attempts SET state = ?, settled_micro_usd = ?, detail = ?, finished_at = ? "
+                     "WHERE attempt_id = ?", ("settled" if charged else "released", row[1] if charged else None,
+                                              f"resolved by {actor}: {reason}"[:300], utcnow(), attempt_id))
+    return {"attempt_id": attempt_id, "state": "settled" if charged else "released",
+            "settled_micro_usd": row[1] if charged else 0}
+
+
 def gemini_embed(db, client: GeminiClient, texts: list[str], kind: str, purpose: str, tokens: int) -> np.ndarray:
     """One metered batch under the Gemini cap. Gemini reports no usage for embeddings, so settlement uses the
     counted input tokens (countTokens, free). An uncertain outcome stays `unknown` and blocks further calls."""

@@ -252,6 +252,15 @@ def cmd_compare_cap(args, settings) -> int:
     return 0
 
 
+def cmd_compare_resolve(args, settings) -> int:
+    from . import models
+
+    _print(models.external_resolve(settings.db_path, args.attempt_id, args.charged == "yes", args.actor, args.reason))
+    evaluation.record_audit(settings, args.actor, "resolve-external-attempt", args.attempt_id, args.reason,
+                            {"charged": args.charged == "yes"})
+    return 0
+
+
 def cmd_golden_counts(args, settings) -> int:
     from . import compare
 
@@ -695,6 +704,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--usd", required=True)
     s.add_argument("--actor", required=True)
     s.add_argument("--reason", required=True)
+    s = sub.add_parser("compare-resolve", help="resolve a Gemini attempt with unknown billing (charged or not)")
+    s.add_argument("--attempt-id", required=True)
+    s.add_argument("--charged", required=True, choices=("yes", "no"))
+    s.add_argument("--actor", required=True)
+    s.add_argument("--reason", required=True)
     sub.add_parser("golden-counts", help="rows of every gold set by status, from the databases")
     s = sub.add_parser("compare-runs", help="comparison table and K1-default recommendation from recorded runs")
     s.add_argument("--run-id", action="append", required=True)
@@ -848,7 +862,8 @@ COMMANDS = {"init": cmd_init, "set-limit": cmd_set_limit, "register-embedding-ra
             "resolve-metadata": cmd_resolve_metadata, "plan-embeddings": cmd_plan_embeddings,
             "build-dense": cmd_build_dense, "evaluate-retrieval": cmd_evaluate_retrieval,
             "trial-reranker": cmd_trial_reranker, "activate-run": cmd_activate_run, "report": cmd_report,
-            "compare": cmd_compare, "compare-cap": cmd_compare_cap, "golden-counts": cmd_golden_counts,
+            "compare": cmd_compare, "compare-cap": cmd_compare_cap, "compare-resolve": cmd_compare_resolve,
+            "golden-counts": cmd_golden_counts,
             "compare-runs": cmd_compare_runs, "draft-activation": cmd_draft_activation,
             "fidelity": cmd_fidelity, "ocr": cmd_ocr, "build-keyword": cmd_build_keyword, "check": cmd_check, "validate-gold": cmd_validate_gold,
             "configure-budget": cmd_configure_budget, "budget-status": cmd_budget_status,

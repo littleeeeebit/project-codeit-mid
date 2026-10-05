@@ -94,6 +94,13 @@ class LedgerAndCacheTest(unittest.TestCase):
         with self.assertRaisesRegex(models.ModelError, "below"):
             models.set_external_cap(self.db, 1, "owner", "lower")
         self.assertEqual(models.external_status(self.db)["unknown"], 1)
+        with self.assertRaisesRegex(models.ModelError, "name and a reason"):
+            models.external_resolve(self.db, first["attempt_id"], True, "owner", " ")
+        resolved = models.external_resolve(self.db, first["attempt_id"], True, "owner", "timeout counted as charged")
+        self.assertEqual(resolved["settled_micro_usd"], first["reserved_micro_usd"])
+        self.assertTrue(models.external_reserve(self.db, 1, "embedding")["admitted"])  # unblocked, still under the cap
+        with self.assertRaisesRegex(models.ModelError, "not an attempt with unknown billing"):
+            models.external_resolve(self.db, first["attempt_id"], False, "owner", "again")
 
     def test_reranker_scores_are_computed_once_per_pair(self):
         calls = []
