@@ -18,12 +18,13 @@ import hashlib
 import itertools
 import json
 import time
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from . import dense as dense_mod
 from . import evaluation as ev
-from .models import EMBEDDINGS, RERANKERS, ModelError, embedding_spec, free_gpu, model_size_bytes, reranker_spec
+from .models import EMBEDDINGS, GEMINI_PROVIDER, RERANKERS, ModelError, embedding_spec, free_gpu, model_size_bytes, reranker_spec
 from .settings import Settings
 from .store import dumps, open_db, tx, utcnow, write_text_atomic
 
@@ -304,7 +305,10 @@ def approvals(settings: Settings) -> dict:
 
 def _build_paid(settings: Settings, s: Settings, index, estimate: dict, transport) -> dict:
     if estimate["backend"] == "openai":
-        return dense_mod.build_dense(s, transport, index.version, estimate["corpus_estimate_id"], MEMBER)
+        facts = dense_mod.build_dense(s, transport, index.version, estimate["corpus_estimate_id"], MEMBER)
+        if facts.get("status") == "ready":
+            facts.update(openai_corpus_seconds(s, estimate["corpus_estimate_id"]))
+        return facts
     facts = dense_mod.build_gemini_dense(s, index.version, estimate["corpus_micro_usd"])
     if facts.get("status") == "ready":
         facts.update(gemini_corpus_totals(s))
@@ -315,14 +319,22 @@ def gemini_corpus_totals(settings: Settings) -> dict:
     """A Gemini build resumed after a stop reports only its last part; its ledger, used only by this comparison,
     holds every corpus batch: the settled cost and the summed batch time.
     ponytail: one Gemini model and one index; key the sum by dense version if a second one is compared."""
-    from datetime import datetime
-
     with open_db(settings.db_path) as conn:
         rows = conn.execute("SELECT settled_micro_usd, created_at, finished_at FROM external_attempts "
                             "WHERE provider = 'gemini' AND purpose = 'embedding' AND state = 'settled'").fetchall()
     seconds = sum((datetime.fromisoformat(f) - datetime.fromisoformat(c)).total_seconds() for _, c, f in rows if f)
     return {"cost_micro_usd": sum(int(r[0] or 0) for r in rows), "embed_seconds": round(seconds, 1),
             "corpus_batches": len(rows)}
+
+
+def openai_corpus_seconds(settings: Settings, corpus_estimate_id: str) -> dict:
+    """The OpenAI build does not time itself; its ledger keeps every batch call of the build's job request."""
+    with open_db(settings.db_path) as conn:
+        rows = conn.execute("SELECT a.dispatched_at, a.finished_at FROM attempts a JOIN requests r USING (request_id) "
+                            "WHERE r.idempotency_key = ? AND a.state = 'settled' AND a.dispatched_at IS NOT NULL "
+                            "AND a.finished_at IS NOT NULL", (f"build-dense:{corpus_estimate_id}",)).fetchall()
+    seconds = sum((datetime.fromisoformat(f) - datetime.fromisoformat(d)).total_seconds() for d, f in rows)
+    return {"embed_seconds": round(seconds, 1)}
 
 
 # ---------------------------------------------------------------- reranker score cache
@@ -470,15 +482,24 @@ def query_vectors(settings: Settings, s: Settings, pops: dict, transport, allow_
                 model.embed([dense_mod.normalize_payload(row["question"])], "query")
                 info["embed_ms"].append(round((time.perf_counter() - t0) * 1000, 1))
     else:
-        # An API model's latency is seen only on its first (paid) query embedding; later runs read the cache, so the
-        # observed values are kept per model and reused.
-        name = hashlib.sha256(s.embedding_model.encode()).hexdigest()[:16]
-        seen = compare_dir(settings) / "query-latency" / f"{name}.json"
-        if info["embed_ms"]:
-            write_text_atomic(seen, dumps({"model": s.embedding_model, "embed_ms": info["embed_ms"], "at": utcnow()}))
-        elif seen.exists():
-            info["embed_ms"] = json.loads(seen.read_text(encoding="utf-8"))["embed_ms"]
+        # An API model is timed only when a question is not cached yet, so every paid question call it ever made is
+        # read back from its ledger instead.
+        info["embed_ms"] = ledger_query_ms(s)
     return vectors, info
+
+
+def ledger_query_ms(s: Settings) -> list[float]:
+    """Round trip of every settled paid question embedding for this API model, from the ledger timestamps."""
+    with open_db(s.db_path) as conn:
+        if embedding_spec(s.embedding_model).backend == "openai":
+            rows = conn.execute("SELECT dispatched_at, finished_at FROM attempts WHERE model = ? AND purpose = 'gold_eval' "
+                                "AND state = 'settled' AND dispatched_at IS NOT NULL AND finished_at IS NOT NULL",
+                                (s.embedding_model,)).fetchall()
+        else:
+            rows = conn.execute("SELECT created_at, finished_at FROM external_attempts WHERE provider = ? "
+                                "AND purpose = 'gold_eval' AND state = 'settled' AND finished_at IS NOT NULL",
+                                (GEMINI_PROVIDER,)).fetchall()
+    return [round((datetime.fromisoformat(b) - datetime.fromisoformat(a)).total_seconds() * 1000, 1) for a, b in rows]
 
 
 def _storage_mb(s: Settings) -> float | None:

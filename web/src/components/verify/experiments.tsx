@@ -206,7 +206,7 @@ function MatrixView({ t, onActivated }: { t: Table; onActivated: () => void }) {
         </table>
       </div>
       <p className="text-[13px] text-muted-foreground">굵은 파란 값이 열마다 가장 좋은 값입니다. 절반이 넘는 행이 같은 값이면 표시하지 않습니다. 개발 질문은 자기 문서 안에서, 전체 문서 열은 개발 질문과 바늘 질문을 모든 문서에서 검색한 결과입니다. 고정값: {Object.entries(t.fixed).map(([k, v]) => `${FIXED[k] ?? k} ${AXIS[k]?.[String(v)] ?? MODE[String(v)] ?? String(v)}`).join(", ") || "서비스 설정"}.
-        {t.matrix === "embedding" && " API 모델의 질의 임베딩 시간은 캐시되지 않은 유료 호출에서만 잴 수 있어, 비어 있으면 아직 재지 않은 것입니다."}
+        {t.matrix === "embedding" && " API 모델의 질의 임베딩 시간은 비용 장부에 남은 질문 호출의 왕복 시간입니다."}
         {String(t.fixed.fusion ?? "").startsWith("keyword_first") && " 융합이 BM25 상위 6개를 제자리에 두므로 하이브리드와 상위 고정 행의 nDCG@5는 K1과 같습니다. 차이는 그 뒤 근거에서 나며, 근거 완전과 치명 실패 열에 보입니다."}</p>
       {cur && <RowDetail key={cur.index} t={t} r={cur} onActivated={onActivated} />}
     </section>

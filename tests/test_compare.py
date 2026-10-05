@@ -101,6 +101,12 @@ class LedgerAndCacheTest(unittest.TestCase):
         self.assertTrue(models.external_reserve(self.db, 1, "embedding")["admitted"])  # unblocked, still under the cap
         with self.assertRaisesRegex(models.ModelError, "not an attempt with unknown billing"):
             models.external_resolve(self.db, first["attempt_id"], False, "owner", "again")
+        question = models.external_reserve(self.db, 40, "gold_eval")
+        models.external_finish(self.db, question["attempt_id"], "settled", 1)
+        gemini = replace(self.env.settings, embedding_model="gemini-embedding-001", embedding_dimensions=3072)
+        latency = compare.ledger_query_ms(gemini)  # question calls only, never the corpus batches
+        self.assertEqual(len(latency), 1)
+        self.assertGreaterEqual(latency[0], 0)
 
     def test_reranker_scores_are_computed_once_per_pair(self):
         calls = []
