@@ -7,7 +7,7 @@ import unittest
 from datetime import date
 from argparse import Namespace
 from contextlib import redirect_stdout
-from io import StringIO
+from io import BytesIO, StringIO, TextIOWrapper
 from pathlib import Path
 from unittest import mock
 
@@ -108,6 +108,42 @@ class BackupRestoreTest(unittest.TestCase):
         with self.assertRaises(ValueError):  # the restored database is no longer empty
             release.restore_check(self.s, Path(out["manifest"]))
 
+    def test_backup_waits_for_the_serving_owner_to_stop(self):
+        live = postgres.GatewayOwner(self.s.db_path)  # the serving app's own session holds the paid gateway
+        try:
+            with self.assertRaises(store.LockHeld):
+                release.backup(self.s, self.root / "locked", "owner")
+        finally:
+            live.release()
+        out = release.backup(self.s, self.root / "locked", "owner")  # the refused attempt left nothing behind
+        self.assertTrue(Path(out["manifest"]).exists())
+
+    def test_budget_report_reads_the_ledger_without_a_key_gateway_or_provider(self):
+        before = release.ledger_summary(self.s.db_path)
+        out = TextIOWrapper(BytesIO(), encoding="utf-8")  # main() reconfigures stdout
+        keyless = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY"}
+        refuse = AssertionError("budget-report must not open a gateway or a provider client")
+        with mock.patch.dict(os.environ, keyless, clear=True), redirect_stdout(out), \
+                mock.patch.object(cli, "load_settings", return_value=self.s.with_(provider="openai")), \
+                mock.patch.object(service, "Resources", side_effect=refuse), \
+                mock.patch.object(generation.OpenAITransport, "__init__", side_effect=refuse):
+            self.assertEqual(cli.main(["budget-report"]), 0)
+        out.flush()
+        report = json.loads(out.buffer.getvalue().decode("utf-8"))
+        self.assertEqual(release.ledger_summary(self.s.db_path), before)  # nothing written, revision unchanged
+        total = report["total"]
+        self.assertEqual((total["spent_micro_usd"], total["pending_micro_usd"], total["available_micro_usd"]),
+                         (before["spent_micro_usd"], before["pending_micro_usd"], before["available_micro_usd"]))
+        self.assertGreater(total["unknown_micro_usd"], 0)
+        self.assertEqual(sum(m["settled_micro_usd"] for m in report["members"].values()) + total["adjustments_micro_usd"],
+                         total["spent_micro_usd"])  # prior use is an adjustment, not a member's spending
+        self.assertEqual(sum(m["pending_micro_usd"] for m in report["members"].values()), total["pending_micro_usd"])
+        self.assertEqual(sum(c["used_micro_usd"] for c in report["categories"].values()),
+                         total["spent_micro_usd"] - total["adjustments_micro_usd"] + total["pending_micro_usd"])
+        self.assertEqual(report["watermark"], {"ledger_revision": before["ledger_revision"], "reconciled_through": None,
+                                               "reconciliation_id": None, "scope": None,
+                                               "unresolved_micro_usd": total["unknown_micro_usd"]})
+
     def test_a_tampered_backup_fails_its_check(self):
         evaluation.assign_families(self.s)
         out = release.backup(self.s, self.root / "backup-2", "owner")
@@ -137,6 +173,14 @@ class ReconciliationFixtureTest(unittest.TestCase):
             budget.settle(db, attempt, {"prompt_tokens": 600, "completion_tokens": 0}, None)  # duplicate completion
             snap = budget.snapshot(db)
             self.assertEqual((snap.spent_micro_usd, snap.pending_micro_usd), (60, 0))
+            with store.open_db(db) as conn:  # the late usage is on record as its own compensating adjustment
+                late = conn.execute("SELECT amount_micro_usd, actor FROM adjustments WHERE correction_key = ?",
+                                    (f"late-settlement:{attempt}",)).fetchall()
+            self.assertEqual([tuple(r) for r in late], [(-60, "system")])
+            watermark = budget.report(db)["watermark"]
+            self.assertEqual((watermark["reconciliation_id"], watermark["reconciled_through"], watermark["scope"],
+                              watermark["unresolved_micro_usd"]),
+                             ("day-1", "2099-01-01T00:00:00+00:00", "academy-project", 0))
 
 
 class ReleaseReportTest(unittest.TestCase):

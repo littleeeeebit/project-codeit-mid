@@ -229,7 +229,16 @@ def cmd_report(args, settings) -> int:
 
 PHASE3_MODULES = ("tests.test_service", "tests.test_budget", "tests.test_generation")
 PHASE4_MODULES = ("tests.test_evaluation", "tests.test_gold", "tests.test_release")
-PHASE5_MODULES = ("tests.test_release",)
+PHASE5_MODULES = (  # docs/plan/end-to-end/5-team-operation.md, runnable operating checks
+    "tests.test_release",  # backup/restore fixture, reconciliation fixture, budget-report, release report
+    "tests.test_postgresql_recovery",  # restore fencing, receipt publication, process loss
+    "tests.test_service.ShutdownRestartTest",  # owner lock: second owner refused, borrowing, controlled restart
+    "tests.test_postgres.PostgreSQLTests.test_owner_exclusion_loss_and_restart_preserve_unknown_billing",
+    "tests.test_budget",  # allowance, cap and envelopes persist; unknown cost stays pending across restarts
+    "tests.test_service.ReconciliationTest",  # owner-only, idempotent, interval-bound reconciliation
+    "tests.test_dense.ServingTest",  # activation, known-good rollback, stale activation after a restart
+    "tests.test_dense.IndexUpgradeTest",  # an outdated index is rebuilt; the old one stays for citations
+)
 
 
 def cmd_check(args, settings) -> int:
@@ -458,6 +467,11 @@ def cmd_budget_status(args, settings) -> int:
     return 0
 
 
+def cmd_budget_report(args, settings) -> int:
+    _print(budget.report(settings.db_path))
+    return 0
+
+
 def cmd_judge_reference(args, settings):
     """Copies the reviewed development reference read-only into the live runtime and persists its split."""
     manifest = judges.import_reference(settings, Path(args.archive) if args.archive else judges.ARCHIVE)
@@ -682,6 +696,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--confirm-rates", action="store_true")
     s.add_argument("--enable-paid", action="store_true")
     sub.add_parser("budget-status")
+    sub.add_parser("budget-report", help="read-only totals, envelopes, members and reconciliation watermark")
     s = sub.add_parser("load-check", help="concurrent members against a temporary ledger with a fake provider")
     s.add_argument("--users", type=int, default=6)
     s.add_argument("--provider", required=True)
@@ -764,6 +779,7 @@ COMMANDS = {"init": cmd_init, "set-limit": cmd_set_limit, "register-embedding-ra
             "compare-runs": cmd_compare_runs, "draft-activation": cmd_draft_activation,
             "fidelity": cmd_fidelity, "ocr": cmd_ocr, "build-keyword": cmd_build_keyword, "check": cmd_check, "validate-gold": cmd_validate_gold,
             "configure-budget": cmd_configure_budget, "budget-status": cmd_budget_status,
+            "budget-report": cmd_budget_report,
             "gold": cmd_gold, "load-check": cmd_load_check, "reconcile": cmd_reconcile,
             "unresolved": cmd_unresolved, "settle": cmd_settle, "adjust": cmd_adjust, "paid": cmd_paid,
             "audit": cmd_audit, "freeze-dataset": cmd_freeze_dataset, "plan-run": cmd_plan_run,
@@ -793,7 +809,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.command != "init":
                 from .postgres import require_imported_database
                 require_imported_database(settings.db_path)
-                store.init_schema(settings.db_path)
+                if args.command != "budget-report":  # read-only: not even idempotent schema statements
+                    store.init_schema(settings.db_path)
             return COMMANDS[args.command](args, settings)
     except store.DATABASE_ERRORS as exc:
         print(f"error: database unavailable ({type(exc).__name__})", file=sys.stderr)

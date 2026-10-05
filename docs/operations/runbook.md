@@ -76,11 +76,14 @@ Budget administration is owner CLI only. These commands, and `settle` and `recon
 
 ```powershell
 python -m rfp_assistant.cli budget-status
+python -m rfp_assistant.cli budget-report
 python -m rfp_assistant.cli unresolved
 python -m rfp_assistant.cli audit --actor <owner>
 python -m rfp_assistant.cli adjust --key <unique key> --amount-usd 0.12 --evidence "<where>" --reason "<why>" --actor <owner>
 python -m rfp_assistant.cli paid off --reason "<why>" --actor <owner>
 ```
+
+`budget-report` is the daily owner check. It prints the totals (cap, spent, pending, unknown, available, adjustments), each purpose envelope with its used and remaining amount, each member's settled and pending amount, and the reconciliation watermark: the ledger revision, the latest reconciled interval end with its ID and scope, and the unresolved amount. It reads the ledger only. It needs no API key, opens no provider client or gateway, and writes nothing, not even schema statements.
 
 An `unknown` attempt holds its full reservation until evidence arrives. There is no bulk release, and age alone never releases anything. Resolve one attempt with exactly one of these, each with a reason and an audit event:
 
@@ -119,6 +122,7 @@ python -m rfp_assistant.cli load-check --users 6 --provider fake --save   # six 
 python -m rfp_assistant.cli load-check --users 6 --provider fake --fail-every 3   # injected post-dispatch timeouts
 python -m rfp_assistant.cli report --phase 3                          # .runtime/releases/phase-3/report.md
 python -m rfp_assistant.cli check --phase 4 --provider fake          # gold, evaluation, sealed run, backup, report
+python -m rfp_assistant.cli check --phase 5 --provider fake          # owner lock, backup/restore, allowance, activation/rollback, reconciliation
 python -m rfp_assistant.cli check --phase all --provider fake --save # every test; --save records it for release-report
 ```
 
@@ -190,6 +194,8 @@ python -m rfp_assistant.cli import-review --run-id <A-run> --file C:\abs\reviewe
 ```
 
 - `plan-run` prices every remaining answer exactly as the answer path will (no provider call) and stores an estimate bound to the finalists, dataset population, prompt, model, output cap, rates and every row's token count. It refuses more than two finalists or finalists with different evidence ceilings. The 검증 › 평가·릴리스 section offers the same plan and a consented run on the application's own gateway.
+- `--question-id <id>` (repeatable) plans only those development rows, e.g. a rerun of earlier failures. The finalists are still checked against the whole population, and the subset is part of the run identity.
+- Each scored row records a pass: the expected status, no technical outcome, and every gold group the packed evidence reached cited. Groups retrieval never reached are reported beside it (`gold groups retrieval did not reach`).
 - `run-answers` refuses a changed configuration or price ("plan again") and a maximum that no longer fits the envelope or cap. It stops at the first budget refusal or the first new unknown billing.
 - Resume by planning and running again: finished rows are kept and never re-sent; a row whose call has unknown billing is skipped until it is settled or reconciled (§5), then runs once more as a recorded new attempt.
 - Deterministic scoring covers typed numbers and dates (with qualifiers such as VAT), negatives and link validity. Text claims, partially supporting citations and unlabelled citations are "needs review" or "unjudged" until the blind sheet is imported. Citation precision is reported twice: over judged links and as a lower bound that counts unjudged links as unsupported.
@@ -247,6 +253,6 @@ python -m rfp_assistant.cli backup --destination D:\rfp-backups\2026-10-02 --act
 python -m rfp_assistant.cli restore-check --backup D:\rfp-backups\2026-10-02\manifest.json
 ```
 
-- `backup` takes the gateway lock/write mutex and uses a complete native custom-format dump. `restore-check` requires only the backup and `RFP_RESTORE_DATABASE_DSN` for a distinct empty target; the primary database may be lost or its DSN unset. Recovery commits a durable target fence before the atomic native restore and holds gateway/import locks through verification. Any failure keeps startup and paid admission blocked; successful recovery also leaves paid admission disabled. Referenced immutable files currently stay at their managed paths. See the handover for limitations and commands. The backup refuses a relative, non-empty or overlapping destination. Keys and `.env` are not included; the owner backs them up separately.
+- `backup` takes the gateway lock/write mutex and uses a complete native custom-format dump. It refuses while the serving app owns the gateway, so stop the app first. `restore-check` requires only the backup and `RFP_RESTORE_DATABASE_DSN` for a distinct empty target; the primary database may be lost or its DSN unset. Recovery commits a durable target fence before the atomic native restore and holds gateway/import locks through verification. Any failure keeps startup and paid admission blocked; successful recovery also leaves paid admission disabled. Referenced immutable files currently stay at their managed paths. See the handover for limitations and commands. The backup refuses a relative, non-empty or overlapping destination. Keys and `.env` are not included; the owner backs them up separately.
 - `restore-check` verifies schema, settled/pending/unknown/available amounts, attempt states, copied files, extraction artifacts and the active index; unknown reserves stay pending and nothing is replayed. It publishes its authoritative report in `bidmate_recovery.receipt` in the same durable transaction as validation and readiness. Read `SELECT report_json FROM bidmate_recovery.receipt WHERE id=1` on the isolated target; the CLI reports this receipt location. No filesystem success receipt is written. Startup and paid admission reject verified recovery fences lacking a committed successful receipt; earlier restored targets require a fresh isolated restore.
 - Real recovery (phase 5): stop the old owner, restore-check the backup, reconcile spending after its watermark, then copy the database into place and start one owner. Never let the old and the restored owner dispatch concurrently, and never reset the allowance.
