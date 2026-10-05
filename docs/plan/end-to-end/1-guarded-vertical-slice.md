@@ -16,7 +16,7 @@ In scope: package/install path, validated settings, server identity, source mani
 
 Create the phase-1 modules listed in the [package contract](implementation-contracts.md), root `pyproject.toml`, `app.py`, a dependency lock file generated from the working environment, and root `README.md` with exact setup/launch commands. The converter may use its own environment and requirements file because its old compatibility must not force application dependencies. Record parser licenses, including pyhwp and the chosen PDF parser, before distribution.
 
-Keep meaningful regression checks in `tests/test_ingestion.py`, `tests/test_retrieval.py`, `tests/test_budget.py`, and `tests/test_generation.py`. Use standard `unittest`, temporary directories, real SQLite transactions and a fake provider transport. Do not add UI snapshot tests or a new test framework solely for this phase.
+Keep meaningful regression checks in `tests/test_ingestion.py`, `tests/test_retrieval.py`, `tests/test_budget.py`, and `tests/test_generation.py`. Use standard `unittest`, temporary directories, real PostgreSQL transactions and a fake provider transport. Tests run on isolated PostgreSQL databases that `tests/fixtures.py` creates per test environment on the server started by `tools/start-postgresql.ps1`, or on the server named by `RFP_POSTGRES_TEST_DSN`; they never touch the application database. Do not add UI snapshot tests or a new test framework solely for this phase.
 
 CLI commands introduced here:
 
@@ -86,7 +86,7 @@ Implement the contract's atomic reservation/settlement and recovery states first
 
 1. Store verified model/rate snapshots, actual start/end dates, purpose envelopes, the $20 denominator and $16 operating cap. Unknown rates fail closed. Paid enablement requires an owner-recorded prior-use baseline; absence of billing information keeps paid mode disabled.
 2. Count the complete outbound request conservatively, including strict schema and framing. Reserve uncached input plus maximum output; reserve embedding input separately when that stage arrives. Record the count method and margin.
-3. Atomically check remainder and insert each attempt under `BEGIN IMMEDIATE`. Persist before dispatch; no database lock spans provider execution. Bound lock waits and fail paid dispatch if the database is unavailable.
+3. Atomically check remainder and insert each attempt while holding the PostgreSQL write mutex (`SELECT … FROM application_mutex … FOR UPDATE`). Persist before dispatch; no database lock spans provider execution. Bound lock waits and fail paid dispatch if the database is unavailable.
 4. Create the SDK only in `generation.py`, with hidden retries disabled and a finite timeout. Settle raw reported usage once, including invalid/refused output. No answer-repair call or model escalation happens automatically.
 5. Classify confirmed pre-execution failure separately from unknown timeout/cancellation. Recover dispatching rows as unknown on restart; never refund them through a timer. Validate duplicate settlement and adjustment idempotency.
 6. Return a budget snapshot with spent, pending, available, percentage, token totals and tracking freshness. Add an immediate snapshot after reservation/settlement and a read-only periodic UI update. A row with no final usage remains visibly pending.
@@ -111,7 +111,7 @@ Prepare 24 independent-reviewed development examples from source families assign
 
 ## Verification
 
-Implement `check --phase 1 --provider fake` to run these invariants using temporary SQLite and fixtures without a key:
+Implement `check --phase 1 --provider fake` to run these invariants on a temporary isolated PostgreSQL database and fixtures without a key:
 
 | Case | Pass condition |
 | --- | --- |

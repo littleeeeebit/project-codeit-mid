@@ -25,7 +25,7 @@ The [shared budget and usage ledger](budget.md) is a cross-cutting requirement. 
 
 ## Proposed first version
 
-Use a single shared Python service, SQLite for documents and the spending ledger, Korean BM25 with Kiwi, and a persisted normalized embedding matrix for dense search. Test `text-embedding-3-small` against the keyword baseline; start answer generation with `gpt-4o-mini`. Trial `BAAI/bge-reranker-v2-m3` locally and keep an explicit bypass when it misses the quality or latency gate. These choices remain subject to the domain evaluation; no model is claimed to be best for this dataset.
+Use a single shared Python service, PostgreSQL for documents and the spending ledger, Korean BM25 with Kiwi, and normalized embeddings in pgvector for dense search. Test `text-embedding-3-small` against the keyword baseline; start answer generation with `gpt-4o-mini`. Trial `BAAI/bge-reranker-v2-m3` locally and keep an explicit bypass when it misses the quality or latency gate. These choices remain subject to the domain evaluation; no model is claimed to be best for this dataset.
 
 Use separate pages of one web app with different purposes and access controls: consultant search and grounded answers, and team verification with frozen experiments. Both call the same pipeline and spending gateway. Metadata-only answers and ordinary document search should incur no generation charges.
 

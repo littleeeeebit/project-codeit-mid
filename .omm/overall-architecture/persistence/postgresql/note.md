@@ -1,1 +1,1 @@
-I found no code path in `src/` that sets `database_control.paid_admission` to true. Import and failed validation only set it false. Enabling it is presumably a separate cutover step outside the package (unverified).
+`budget.set_paid_enabled` (the `paid on`/`paid off` command) is the only code path that sets `database_control.paid_admission`; it sets it together with the ledger's paid switch. Failed validation and recovery only set it false.

@@ -10,7 +10,7 @@ Use an editable Python package named `rfp_assistant`, installed from a root `pyp
 | --- | --- | --- |
 | `settings.py` | Absolute paths, validated limits, model/rate configuration, configuration fingerprint | Phase 1 |
 | `contracts.py` | Request/result records and strict answer schema | Phase 1 |
-| `store.py` | PostgreSQL dispatch/lifecycle and explicit legacy SQLite operations | Phase 1 |
+| `store.py` | PostgreSQL connection lifecycle, schema initialization and transactions | Phase 1 |
 | `auth.py` | Principal and capability checks; the no-login visitor principal | Phase 1 |
 | `ingestion.py` | CSV manifest, converter invocation, HWP/PDF element extraction and review records | Phase 1 |
 | `chunking.py` | Structural chunks, exact requirement inventory, source-span mappings | Phase 1 |
@@ -45,14 +45,12 @@ Resolve defaults from the installed package/repository location, never the proce
 | `question_max_characters` | `2000`; comparison initially limited to two selected documents |
 | `retrieval_mode`, `reranker_enabled` | `kiwi_bm25`, false until phase 2 selection |
 
-Runtime layout:
+Runtime layout (records and the ledger are in the PostgreSQL database `bidmate_app`, reached through `RFP_DATABASE_DSN`; the runtime directory holds files only):
 
 ```text
 .runtime/
-  rfp.sqlite3
   extracted/<source_hash>/<parser_fingerprint>/elements.jsonl
-  indexes/<index_version>/manifest.json, chunks.jsonl, tokens.jsonl, embeddings.npy
-  embedding-cache/<model_fingerprint>/<payload_hash>.npy, <payload_hash>.json
+  indexes/<index_version>/manifest.json, chunks.jsonl, tokens.jsonl   (vectors live in pgvector)
   datasets/dev-pilot.jsonl, dev.jsonl, families.json, review-log.jsonl
   sealed/test.jsonl, test-manifest.json
   runs/<run_id>/config.json, traces.jsonl, scores.json, review.jsonl, report.md
@@ -85,17 +83,19 @@ Locations use PDF one-based physical page, optional printed label, bounding box,
 
 ## PostgreSQL persistence contract (2026-10-03)
 
-PostgreSQL is the default authoritative backend; paid-disabled rehearsal and production cutover are separate. `postgres.py` owns pinned extension/schema initialization, a refcounted bounded psycopg pool, qmark parameter translation and a session gateway advisory lock. Each operation owns its connection/transaction; inference holds neither. Allowance admission and mutable writes serialize on the application mutex row. Never silently redirect failed PostgreSQL writes to SQLite. Preserve every actual source table, including retired authentication records, through the generic consistent-snapshot importer.
+PostgreSQL 18.6 + pgvector 0.8.6 is the only backend; the application database is `bidmate_app`. `postgres.py` owns pinned extension/schema initialization, a refcounted bounded psycopg pool, qmark parameter translation and a session gateway advisory lock. Each operation owns its connection/transaction; inference holds neither. Allowance admission and mutable writes serialize on the application mutex row. A failed PostgreSQL write fails; there is no fallback store. The 2026-10-04 cutover import from the previous database preserved every source table, including retired authentication records.
 
-BIGINT micro-USD retains exact money. Immutable serialized JSON remains TEXT; C-collated text retains deterministic identity ordering. Foreign keys, original values, canonical digests, nullable zero distinctions and historical attempt price snapshots remain checked. Schema versions are in `schema_migrations`, not PRAGMA. Typed pgvector values have dimension checks; homogeneous embedding sets include source/payload/checksum/model/policy/provenance identities. Scoped exact cosine search precedes ranking and never silently selects NumPy when PostgreSQL is configured.
+Tests run on isolated PostgreSQL databases that `tests/fixtures.py` creates per test environment from a per-run template (pgvector installed) on the server started by `tools/start-postgresql.ps1`, or on the server named by `RFP_POSTGRES_TEST_DSN`. They drop their databases afterwards and never touch `bidmate_app`.
+
+BIGINT micro-USD retains exact money. Immutable serialized JSON remains TEXT; C-collated text retains deterministic identity ordering. Foreign keys, original values, canonical digests, nullable zero distinctions and historical attempt price snapshots remain checked. Schema versions are in `schema_migrations`, not PRAGMA. Typed pgvector values have dimension checks; homogeneous embedding sets include source/payload/checksum/model/policy/provenance identities. Scoped exact cosine search in pgvector precedes ranking.
 
 The owner approved a $10 cumulative operating cap and paid migration work. The Settings control may change that cap through the existing budget-admin capability and visitor attribution, without resetting spending/reservations or enabling paid admission. It scales current envelopes and refuses any reduction below committed costs. This supersedes the earlier CLI-only limit-edit contract, while rate registration and unknown billing reconciliation remain maintenance actions.
 
 See the [PostgreSQL handover](../../../handoff/postgresql-pgvector/README.md) for real-database receipts, pinned versions, tested commands, production cutover prerequisites and unfinished quality/recovery acceptance.
 
-## Historical SQLite records and constraints
+## Records and constraints
 
-The original phase implementation used `sqlite3`; JSON payloads keep nonindexed structured details compact. Use schema versioning through `PRAGMA user_version`. Enable foreign keys on every connection; use WAL on a local disk, a bounded busy timeout, and explicit connection closing. SQLite files on network shares are outside the initial deployment contract.
+The tables below live in PostgreSQL; JSON payloads keep nonindexed structured details compact as TEXT. Schema versions are recorded in `schema_migrations`. Foreign keys are enforced. Every connection comes from the bounded pool with lock and statement timeouts and is returned when its transaction ends.
 
 | Table | Key and essential columns/constraints |
 | --- | --- |
@@ -177,7 +177,7 @@ available = operational_cap - spent - pending
 admit iff paid_enabled and available >= proposed_reservation
 ```
 
-Inside `BEGIN IMMEDIATE`, check idempotency, configured model/rates, global/category remainder, and insert the reservation. Commit before dispatch. Settle in another short transaction, replacing the reservation and incrementing a ledger revision. Negative external adjustments require owner evidence and cannot erase unresolved attempts casually. Preserve original token counts and correction history.
+Inside one transaction holding the application mutex row (`SELECT … FROM application_mutex … FOR UPDATE`), check idempotency, configured model/rates, global/category remainder, and insert the reservation. Commit before dispatch. Settle in another short transaction, replacing the reservation and incrementing a ledger revision. Negative external adjustments require owner evidence and cannot erase unresolved attempts casually. Preserve original token counts and correction history.
 
 Count all serialized generation content, including schema and message framing, with the model tokenizer. Start with an explicit conservative framing margin, record it, and compare local counts with reported usage in the first bounded call; it is an estimate, not a provider guarantee. Reserve uncached input plus the output cap; if reported cost exceeds the reservation, record the true cost, freeze new paid work, and inspect counting/rates before resuming. The $4 reserve and verified provider controls absorb uncertainty; do not claim exact prevention of all external billing overruns.
 
@@ -193,7 +193,7 @@ There is no login (owner decision 2026-09-30, reaffirmed 2026-10-01). No account
 
 `Principal` still carries `consultant`, `verifier`, `budget_admin` and `sealed_evaluator` capabilities, and every service entry point checks one, including cached reads and file access. Those checks declare each function's role; in-process callers (CLI jobs, tests) may pass narrower principals, and a later login could reuse them. Protections that do not depend on identity stay mandatory: managed `(doc_id, source_hash)` downloads, sealed rows never served to the verifier page, a reason and an audit event for every owner action, and no bulk release of unknown billing. Labels and cost estimates are not client-controlled authority.
 
-Maintenance CLI commands run on the owner-controlled host. Paid CLI work is exclusive maintenance mode: stop the UI, validate the configuration, and reuse the same database, rates and gateway. PostgreSQL holds a dedicated session advisory lock until resource cleanup and refuses a second paid owner across all hosts sharing the database. Lost ownership is terminal and checked again immediately before SDK dispatch; legacy SQLite retains its process-owner file lock. Ordinary team members use verifier actions; no raw-key notebooks or second billing store. CLI fake checks use a temporary data directory and never write production state.
+Maintenance CLI commands run on the owner-controlled host. Paid CLI work is exclusive maintenance mode: stop the UI, validate the configuration, and reuse the same database, rates and gateway. PostgreSQL holds a dedicated session advisory lock until resource cleanup and refuses a second paid owner across all hosts sharing the database. Lost ownership is terminal and checked again immediately before SDK dispatch. Ordinary team members use verifier actions; no raw-key notebooks or second billing store. CLI fake checks use a temporary data directory and an isolated test database, and never write production state.
 
 ## Handoff format
 

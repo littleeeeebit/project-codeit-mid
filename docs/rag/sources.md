@@ -55,7 +55,7 @@ Sources were opened and checked on 2026-09-30. This register describes the reusa
 | [OpenAI Batch](https://developers.openai.com/api/docs/guides/batch) | Discounted asynchronous offline jobs | Completion may take 24 hours |
 | [LiteLLM budgets](https://docs.litellm.ai/docs/proxy/users) | Existing team/member budget gateway | Database required; deployment adds operational work |
 | [Langfuse costs](https://langfuse.com/docs/observability/features/token-and-cost-tracking) | Existing per-call generation/embedding observability | Observability alone is not atomic budget enforcement |
-| [SQLite transactions](https://www.sqlite.org/lang_transaction.html) | Short atomic write transaction for reservations | Single shared database; do not hold locks over network calls |
+| [PostgreSQL explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html) | Short atomic write transaction for reservations under a row lock | Single shared database; do not hold locks over network calls |
 | [Streamlit navigation](https://docs.streamlit.io/develop/api-reference/navigation/st.navigation) | Separate workflow pages | Navigation visibility does not replace role authorization |
 | [Streamlit login](https://docs.streamlit.io/develop/api-reference/user/st.login) | Native login when an identity provider is already configured | Requires provider secrets and does not supply this project's role/allowance policy |
 | [Streamlit fragments](https://docs.streamlit.io/develop/api-reference/execution-flow/st.fragment) | Timed partial rerun for a usage widget | Verify polling during long requests and across sessions |

@@ -94,7 +94,7 @@ The in-place migration ran on the owner host on 2026-10-02, with the app stopped
 3. `backup` again (`C:\Users\dasdk\rfp-backups\2026-10-02-schema6`) and `restore-check` on it: passed.
 4. The pilot's own spending was recorded as owner adjustment `external:pr8-pilot-ledger`, $0.448818, citing the pilot ledger. The live ledger now shows $0.609441 spent, which matches the pilot ledger, with the $5 cap kept by owner decision ($4.390559 available).
 
-The pilot DB was not copied over the live one; the two histories stay separate. The pilot runtime (181 gold candidates, the frozen sealed set and its first run, answer runs) and its private receipts are archived, gitignored, under `.runtime/live-validation/pr8-review-archive/62015a9-owner-setup/`; its runtime is `runtime/` there. Do not publish their payloads or credentials. Use [runbook sections 10–12](runbook.md) for planning, paid execution, freeze, read-only reporting and paid-disabled recovery.
+The pilot database was not copied over the live one; the two histories stay separate. On 2026-10-05 the pilot database (schema 6: 181 gold candidates, the frozen sealed set and its first run `S-95b3004bd1a8`, answer runs including `A-9ef59b566d64`) was imported into its own PostgreSQL database, `bidmate_pilot_archive`, with paid admission disabled, and validated table by table against the source (see the [handover](../../handoff/postgresql-pgvector/README.md#pilot-archive-2026-10-05)). Its run, review and receipt files stay archived, gitignored, under `.runtime/live-validation/pr8-review-archive/62015a9-owner-setup/`. Do not publish their payloads or credentials. Use [runbook sections 10–12](runbook.md) for planning, paid execution, freeze, read-only reporting and paid-disabled recovery.
 
 ## Judge comparison: Luna versus Jev (2026-10-04)
 
@@ -130,7 +130,7 @@ Jev's 27 abstentions are all bridge rejections: 21 `changed_protected_value` and
 
 ### The PostgreSQL work these runs ran on (2026-10-03/04)
 
-- The live app served from PostgreSQL `bidmate_app` as the authoritative database. The authority marker was installed at 2026-10-04 02:06 UTC after the final validated import; the SQLite ledger is a read-only cold archive. Every judge and translation call was admitted and settled on that PostgreSQL ledger.
+- The live app served from PostgreSQL `bidmate_app` as the authoritative database. The authority marker was installed at 2026-10-04 02:06 UTC after the final validated import; the previous database's ledger stayed a read-only cold archive until its files were deleted on 2026-10-05. Every judge and translation call was admitted and settled on that PostgreSQL ledger.
 - The app had been started with the fake provider. For these runs it was restarted on 8501 with the real provider and the same database. That restart changed no budget settings.
-- Judges never retrieve, so the refused fixed-1,536 dense/hybrid serving switch (PR #12) played no part. It stays refused.
+- Judges never retrieve, so serving configuration played no part. The PR #12 fixed-1,536 dense/hybrid configuration stays refused. Since PR #13 the app serves hybrid run `H-0fffb2a6ec` with fusion `keyword_first:60:1.0:6`, which passed its gate against K1.
 - `/api/verify/fidelity` failed on PostgreSQL with a `GROUP BY` error, which blanked the whole 검증 page. It was fixed in `7cbe847` and checked live: 94 rows for 94 HWP sources.

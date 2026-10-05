@@ -8,7 +8,7 @@ Expected window: day 2–3. Gold preparation starts in phase 1 and continues dur
 
 Read [shared contracts](implementation-contracts.md), [gold research](../../rag/golden-dataset.md), [evaluation research](../../rag/evaluation.md), [delivery research](../../rag/delivery-plan.md) and the actual phase-1/2/3 reports. Inputs are immutable source/index/config manifests, reviewed coverage, development pilot, family assignments, retrieval finalists and available evaluation allowance.
 
-Expand `evaluation.py`, `cli.py`, the verifier actions and focused `tests/test_evaluation.py`. Reuse existing trace/gateway records. Write `docs/operations/runbook.md` and `docs/operations/release-report.md` with actual outcomes; sanitized runtime manifests/reports may be copied or linked as appropriate. Do not put private tokens, the academy key, sealed labels or an entire mutable runtime database into Git.
+Expand `evaluation.py`, `cli.py`, the verifier actions and focused `tests/test_evaluation.py`. Tests run on isolated PostgreSQL databases that `tests/fixtures.py` creates per test environment on the server started by `tools/start-postgresql.ps1`, or on the server named by `RFP_POSTGRES_TEST_DSN`; they never touch the application database. Reuse existing trace/gateway records. Write `docs/operations/runbook.md` and `docs/operations/release-report.md` with actual outcomes; sanitized runtime manifests/reports may be copied or linked as appropriate. Do not put private tokens, the academy key, sealed labels or an entire mutable runtime database into Git.
 
 ## Dataset contract and split
 
@@ -113,11 +113,11 @@ Run `check --phase all --provider fake` across the focused invariants. Reuse alr
 
 Repeat the phase-3 live consultant/verifier walkthrough on that candidate. Measure warm full-answer latency under six users with an explicit bounded real test if budget permits: at least five waves of six requests gives 30 samples; record n, failures, cold-load observations and per-wave timing. This is a preliminary latency sample, not an SLA. If only fake load or fewer real calls were run, label their limits and do not present them as real model latency.
 
-Use real original facts beyond introductory pages, the duplicated/conflicting records, missing metadata, one unsupported source, two-document comparison, budget cap and changed scope. Fake transport handles destructive/race/exhaustion testing in a temporary ledger; never drain the shared academy balance to demonstrate a cap.
+Use real original facts beyond introductory pages, the duplicated/conflicting records, missing metadata, one unsupported source, two-document comparison, budget cap and changed scope. Fake transport handles destructive/race/exhaustion testing in a temporary ledger on an isolated test database; never drain the shared academy balance to demonstrate a cap.
 
 ### 7. Publish the release evidence and operator handoff
 
-Before handoff, implement the minimal owner `backup` and paid-disabled staging `restore-check` commands described in [phase 5](5-team-operation.md), using a consistent SQLite snapshot and immutable-artifact manifest. Demonstrate one restore preserving settled, prior-use and pending amounts. Phase 5 rehearses and extends ongoing operation; the release runbook must not point to nonexistent recovery commands.
+Before handoff, implement the minimal owner `backup` and paid-disabled staging `restore-check` commands described in [phase 5](5-team-operation.md), using a gateway-locked PostgreSQL custom-format dump and immutable-artifact manifest, restored into a distinct empty database named by `RFP_RESTORE_DATABASE_DSN`. Demonstrate one restore preserving settled, prior-use and pending amounts. Phase 5 rehearses and extends ongoing operation; the release runbook must not point to nonexistent recovery commands.
 
 | Artifact | Required contents |
 | --- | --- |

@@ -1,1 +1,1 @@
-Observed: the `Settings.database_backend` default is `postgresql`. The README states the live application must still run with the SQLite configuration file `handoff/postgresql-pgvector/config.corpus-before-cutover.example.json` until cutover. I did not read that file.
+Observed: PostgreSQL is the only backend; there is no `database_backend` setting. Since the 2026-10-04 cutover the application runs on `bidmate_app` with `handoff/postgresql-pgvector/config.example.json`.
