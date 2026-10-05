@@ -3,8 +3,9 @@
 // 판정 모델 비교. Who comes here: a verifier deciding whether the Jev judge can replace the gpt-6-luna judge.
 // Reading order, picked by the owner on 2026-10-04 (결론 먼저 + 두 칸 검토): the rule's answer and its three
 // conditions as value against threshold, then the three arms in one table, then the disagreements as a list beside
-// one opened item (the same two-pane shape as 할 일), and last, folded, the runs with plan and start. Every number
-// shown comes from the held-out half; calibration only fits thresholds.
+// one opened item (the same two-pane shape as 할 일), and last, folded, the runs with plan and start. The verdict
+// comes from the held-out half; calibration only fits thresholds. The judge golden set (mutated correct answers)
+// is a second scored set: its view leads with each judge's false-accept rate, then the rate per mutation type.
 
 import { useMemo, useState } from "react";
 import { cn } from "cn";
@@ -31,7 +32,7 @@ const ARM_NOTE: Record<string, string> = {
   luna: "gpt-6-luna, 한국어를 그대로 읽음", jev_bridged: "검사한 영어 번역만 읽음", jev_raw: "대조군 · 고정 표본",
 };
 const SHORT: Record<string, string> = { luna: "Luna", jev_bridged: "Jev", jev_raw: "Jev 원문" };
-const PART: Record<string, string> = { calibration: "보정", held_out: "평가" };
+const PART: Record<string, string> = { calibration: "보정", held_out: "평가", judge_set: "골든 세트" };
 const KIND: Record<string, string> = { link: "인용 하나", answer_claim: "답변 주장", claim: "필수 사실" };
 const LABEL: Record<string, string> = {
   supporting: "지지", supported: "근거 있음", correct: "정확", unsupported: "근거 없음",
@@ -47,29 +48,129 @@ const pct = (x: number | null | undefined) => (x == null ? "-" : `${(x * 100).to
 const sec = (x: number | null | undefined) => (x == null ? "-" : `${(x / 1000).toFixed(2)}초`);
 const k3 = (x: number | null | undefined) => (x == null ? "-" : x.toFixed(3));
 
+type Scored = "held_out" | "judge_set";
+
 export function JudgeSection() {
   const [running, setRunning] = useState(false);
+  const [set, setSet] = useState<Scored>("held_out");
   const ov = usePoll("judge-progress", () => must(api.GET("/api/verify/judges/progress"), errorText), running ? 3000 : null);
   const runs = ov.data?.runs ?? [];
   const isRunning = runs.some((r) => r.running);
   if (isRunning !== running) setRunning(isRunning);
-  // the newest held-out run; its results reload as it progresses and when it finishes
-  const heldOut = [...runs].filter((r) => r.part === "held_out").sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-  const key = heldOut ? `${heldOut.run_id}:${heldOut.status}:${heldOut.progress.luna?.done}` : null;
+  // the newest run on the chosen set; its results reload as it progresses and when it finishes
+  const run = [...runs].filter((r) => r.part === set).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  const key = run ? `${run.run_id}:${run.status}:${run.progress.luna?.done}` : null;
   const res = usePoll(key && `judge-results:${key}`, () => must(api.GET("/api/verify/judges/results/{run_id}",
-    { params: { path: { run_id: heldOut!.run_id } } }), errorText), null);
+    { params: { path: { run_id: run!.run_id } } }), errorText), null);
   if (ov.error) return <Notice tone="bad">{ov.error}</Notice>;
   if (!ov.data) return <Skeleton className="h-96 w-full" />;
   if (!ov.data.reference) return <Empty>판정 기준 세트가 없습니다. 소유자가 CLI로 judge-reference를 실행해야 합니다.</Empty>;
   const r = res.data;
   const scored = !!r && Object.keys(r.arms).length > 0;
+  const js = ov.data.judge_set;
   return (
     <div className="space-y-16">
-      <Verdict ov={ov.data} results={r} run={heldOut} />
-      {scored && <Comparison r={r} />}
-      {scored && <Review runId={heldOut!.run_id} stamp={key!} />}
-      <Operations ov={ov.data} runs={runs} open={!r?.verdict} onChanged={ov.reload} />
+      <div className="space-y-10">
+        <div role="group" aria-label="판정 세트" className="flex flex-wrap gap-2">
+          {([["held_out", `평가용 기준 · ${ov.data.split?.held_out ?? "-"}개`],
+            ["judge_set", js ? `판정 골든 세트 · 오답 ${js.negatives} · 정답 ${js.positives}` : "판정 골든 세트 · 생성 전"]] as const).map(([k, label]) => (
+            <button key={k} type="button" aria-pressed={set === k} onClick={() => setSet(k)}
+                    className={cn("min-h-11 rounded-full px-4 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                      set === k ? "bg-foreground font-semibold text-background" : "bg-secondary text-foreground hover:bg-secondary/70")}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {set === "held_out" ? <Verdict ov={ov.data} results={r} run={run} /> : <Mutations ov={ov.data} results={scored ? r : undefined} run={run} />}
+      </div>
+      {scored && set === "held_out" && <Comparison r={r} />}
+      {scored && <Review key={set} runId={run!.run_id} stamp={key!} />}
+      <Operations ov={ov.data} runs={runs} open={set === "held_out" ? !r?.verdict : !scored} onChanged={ov.reload} />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- the judge golden set: false accepts per mutation
+
+const MUTATION: Record<string, string> = {
+  amount: "금액을 바꿈", unit: "단위를 바꿈", qualifier: "부가세·조건어를 뒤집음", date: "날짜·기간을 옮김",
+  negation: "부정을 넣음", dropped_condition: "조건을 뺌", wrong_evidence: "다른 근거를 인용", unmutated: "변형 안 한 정답",
+};
+const JUDGES = ["luna", "jev_bridged"] as const;
+type Rate = Schemas["MutationRate"];
+
+function sumRates(cells: Rate[]) {
+  const passed = cells.reduce((n, c) => n + c.passed, 0), judged = cells.reduce((n, c) => n + c.judged, 0);
+  return { passed, judged, rate: judged ? passed / judged : null };
+}
+
+function RateCell({ c, bad }: { c?: Rate; bad: boolean }) {
+  if (!c) return <span className="text-muted-foreground">-</span>;
+  const [lo, hi] = c.wilson95 ?? [null, null];
+  return (
+    <>
+      <span className={cn("font-semibold", c.rate != null && c.rate > 0 && bad && "text-bad")}>{pct(c.rate)}</span>
+      <span className="block text-xs text-muted-foreground">{c.passed}/{c.judged}{lo != null ? ` · ${pct(lo)}–${pct(hi)}` : ""}</span>
+    </>
+  );
+}
+
+function Mutations({ ov, results, run }: { ov: Overview; results?: Results; run?: Run }) {
+  const js = ov.judge_set;
+  const question = <p className="text-sm font-medium text-muted-foreground">정답을 일부러 틀리게 바꾸면 판정 모델이 알아채나</p>;
+  if (!js) return <Empty>판정 골든 세트가 없습니다. 소유자가 CLI로 judge-set을 실행해야 합니다.</Empty>;
+  const m = results?.mutations ?? {};
+  if (!results || !Object.keys(m).length) {
+    return (
+      <section aria-labelledby="judge-set-answer" className="space-y-6">
+        <div className="space-y-2">
+          {question}
+          <h3 id="judge-set-answer" className="text-4xl font-bold tracking-tight">{run?.running ? "골든 세트 실행 중" : "아직 실행 전"}</h3>
+          <p className="text-lg">{run?.running ? "모든 항목을 판정하면 변형 종류별 잘못 통과율을 보여 줍니다."
+            : "아래 실행 관리에서 '판정 골든 세트'를 추정하고, 비용을 승인한 뒤 실행하세요."}</p>
+        </div>
+        {run?.running && <div className="max-w-3xl"><ArmProgress r={run} /></div>}
+        <p className="text-sm text-muted-foreground">
+          평가용 기준의 정답 {js.positives}개를 {Object.keys(js.by_type).length}가지 방식으로 바꿔 오답 {js.negatives}개를 만들었습니다. 개발용 RAG 세트와 따로 셉니다.
+        </p>
+      </section>
+    );
+  }
+  const types = [...new Set(JUDGES.flatMap((k) => Object.keys(m[k] ?? {})))].sort((a, b) =>
+    Number(a === "unmutated") - Number(b === "unmutated") || (js.by_type[b] ?? 0) - (js.by_type[a] ?? 0));
+  const overall = Object.fromEntries(JUDGES.map((k) => [k, sumRates(Object.entries(m[k] ?? {}).filter(([t]) => t !== "unmutated").map(([, c]) => c))]));
+  return (
+    <section aria-labelledby="judge-set-answer" className="space-y-10">
+      <div className="space-y-3">
+        {question}
+        <h3 id="judge-set-answer" className="sr-only">변형 종류별 잘못 통과율</h3>
+        <dl className="grid gap-8 sm:grid-cols-2">
+          {JUDGES.map((k) => (
+            <div key={k} className="space-y-1">
+              <dt className="text-sm text-muted-foreground">{ARM[k]} · 틀린 답을 통과시킨 비율</dt>
+              <dd className="text-5xl font-bold tabular-nums">{pct(overall[k].rate)}</dd>
+              <dd className="text-sm tabular-nums text-muted-foreground">
+                판정한 오답 {overall[k].judged}개 중 {overall[k].passed}개 · 정답 통과 {pct(m[k]?.unmutated?.rate)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+      <Table caption="변형 종류별로 두 판정 모델이 틀린 답을 통과시킨 비율" head={["변형", "항목", ...JUDGES.map((k) => `${ARM[k]} 통과율`), "코드가 값으로 판정"]}>
+        {types.map((t) => (
+          <tr key={t} className={cn(t === "unmutated" && "border-t-2")}>
+            <th scope="row" className={cn(td, "text-left font-medium")}>{MUTATION[t] ?? t}</th>
+            <td className={cn(td, "tabular-nums")}>{m.luna?.[t]?.items ?? m.jev_bridged?.[t]?.items}</td>
+            {JUDGES.map((k) => <td key={k} className={cn(td, "tabular-nums")}><RateCell c={m[k]?.[t]} bad={t !== "unmutated"} /></td>)}
+            <td className={cn(td, "tabular-nums")}>{m.luna?.[t]?.code_settled ?? 0}</td>
+          </tr>
+        ))}
+      </Table>
+      <p className="max-w-3xl text-sm text-muted-foreground">
+        오답 행은 판정 모델 스스로 통과로 판정한 비율(낮을수록 좋음)이고, 마지막 행은 변형 안 한 정답을 통과시킨 비율(높을수록 좋음)입니다.
+        보류는 분모에서 뺍니다. 코드가 값으로 판정한 항목은 판정 모델 자신의 답을 따로 셉니다. 세트 {results.judge_set_sha256?.slice(0, 8) ?? "-"}.
+      </p>
+    </section>
   );
 }
 
@@ -324,7 +425,7 @@ function RunRow({ r }: { r: Run }) {
 }
 
 function Plan({ fitted, running, onStarted }: { fitted: boolean; running: boolean; onStarted: () => void }) {
-  const [part, setPart] = useState<"calibration" | "held_out">(fitted ? "held_out" : "calibration");
+  const [part, setPart] = useState<"calibration" | "held_out" | "judge_set">(fitted ? "held_out" : "calibration");
   const [est, setEst] = useState<Estimate | null>(null);
   const [agree, setAgree] = useState(false);
   const [state, setState] = useState<{ busy?: boolean; error?: string }>({});
@@ -351,6 +452,7 @@ function Plan({ fitted, running, onStarted }: { fitted: boolean; running: boolea
           <select id="judge-part" value={part} onChange={(e) => { setPart(e.target.value as typeof part); setEst(null); }} className={cn(field, "block h-11 sm:w-64")}>
             <option value="calibration">1. 보정 — Jev 임계값 맞춤</option>
             <option value="held_out" disabled={!fitted}>2. 평가 — 화면에 보고{fitted ? "" : " (보정 먼저)"}</option>
+            <option value="judge_set" disabled={!fitted}>3. 판정 골든 세트 — 변형 오답{fitted ? "" : " (보정 먼저)"}</option>
           </select>
         </Field>
         <Button variant="outline" size="lg" onClick={plan} disabled={state.busy || running}>비용 추정 <span className="text-ok">무료</span></Button>
@@ -469,6 +571,7 @@ function ItemRow({ r, active, onOpen }: { r: Row; active: boolean; onOpen: () =>
         </>
       ) : <span className="line-clamp-2 text-sm [overflow-wrap:anywhere]">{sentence(r)}</span>}
       <span className="block text-xs text-muted-foreground">
+        {r.mutation && <>{MUTATION[String(r.mutation.type)] ?? String(r.mutation.type)} · </>}
         기준 <span className={cn("font-semibold", labelText(r.reference))}>{LABEL[r.reference] ?? r.reference}</span>
         {ARMS.filter((k) => r.arms[k] && r.arms[k]!.label !== r.reference).map((k) => {
           const l = r.arms[k]!.label;
@@ -496,6 +599,12 @@ function ItemDetail({ r }: { r: Row }) {
         </p>
         <p className="text-lg font-semibold leading-snug [overflow-wrap:anywhere]">{sentence(r)}</p>
         {r.kind === "claim" && r.korean.required ? <p className="text-sm">필수 사실 · {String(r.korean.required)}</p> : null}
+        {r.mutation && (
+          <p className="text-sm">
+            <span className="font-semibold">{MUTATION[String(r.mutation.type)] ?? String(r.mutation.type)}</span>
+            {r.mutation.from != null && <> · <span className="line-through">{String(r.mutation.from)}</span> → {String(r.mutation.to ?? "")}</>}
+          </p>
+        )}
       </header>
       <ul className="grid gap-6 sm:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]">
         {ARMS.filter((k) => r.arms[k]).map((k) => {

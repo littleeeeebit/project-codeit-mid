@@ -24,6 +24,7 @@ from pathlib import Path
 
 from . import dense as dense_mod
 from . import evaluation as ev
+from . import judge_set
 from .models import EMBEDDINGS, GEMINI_PROVIDER, RERANKERS, ModelError, embedding_spec, free_gpu, model_size_bytes, reranker_spec
 from .settings import Settings
 from .store import dumps, open_db, tx, utcnow, write_text_atomic
@@ -80,6 +81,9 @@ COLUMNS = {  # (key, label, better: "high" | "low" | None) in display order
                  ("p95_loaded_ms", f"warm p95 {LOAD_USERS} users ms", "low"), ("gate", "gate", None),
                  ("needle.top5", "needle top-5", "high"), ("whole.ndcg", "nDCG@5 (whole)", "high")],
 }
+
+
+COLUMNS["regression"] = COLUMNS["lexical"] + [("new_critical_vs_k1", "critical vs K1", "low")]
 
 
 class CompareError(RuntimeError):
@@ -922,6 +926,7 @@ def golden_counts(settings: Settings) -> dict:
         "live": live, "live_dev_by_family": dev_batches, "pilot_archive": archive, "pilot_archive_error": archive_error,
         "judge_reference": {"items": judge.get("items"), "run_id": judge.get("run_id"),
                             "path": str(manifest.parent) if judge else None},
+        "judge_set": judge_set.counts(settings),
         "development_count": {"live_approved": live_dev, "release_report": 50, "pilot_archive_approved": pilot_dev,
                               "pilot_archive_questions": pilot_questions, "live_sealed_approved": sealed},
         "explanation": (
@@ -958,9 +963,41 @@ def golden_counts_md(r: dict) -> str:
     lines += table(r["pilot_archive"]) if r["pilot_archive"] else [f"Unavailable: {r['pilot_archive_error']}"]
     j = r["judge_reference"]
     lines += ["", "## Judge reference", "", f"{j['items']} reviewed reference verdicts (run `{j['run_id']}`), files "
-              f"under `{j['path']}`." if j["items"] else "No judge reference set.", "",
-              f"## 50 versus {r['development_count']['live_approved']} development rows", "", r["explanation"], ""]
+              f"under `{j['path']}`." if j["items"] else "No judge reference set.", ""]
+    s = r.get("judge_set")
+    lines += ["## Judge set (apart from the development set)", ""]
+    lines += [f"{s['negatives']} mutated negatives and {s['positives']} unmutated positives ({s['items']} items, "
+              f"`{s['version']}`), under `judges/judge-set/`; none of them is a development row.", "",
+              "| mutation | negatives |", "| --- | --- |",
+              *[f"| {k} | {n} |" for k, n in s["by_type"].items()], ""] if s else ["No judge set yet: `judge-set`.", ""]
+    lines += [f"## 50 versus {r['development_count']['live_approved']} development rows", "", r["explanation"], ""]
     return "\n".join(lines)
+
+
+REGRESSION = {"title": "회귀 (유지보수)", "axes": {"index": ["served", "rebuilt"]}, "fixed": {}}
+
+
+def regression(settings: Settings, analyzer, transport, rebuilt: str) -> dict:
+    """The maintenance regression table: K1 and the serving configuration on the served keyword index and on the
+    index maintenance just rebuilt, so drift after new or changed originals shows as rows of one table. Cached
+    cells are reused; when the rebuilt index is the served one, only the served rows exist. Activates nothing."""
+    runner = Runner(settings, analyzer, transport)
+    base = serving_base(settings)
+    k1 = runner.baseline("K1", base)
+    served = base["serving"]["index_version"]
+    rows = []
+    for where, version in [("served", served)] + ([("rebuilt", rebuilt)] if rebuilt != served else []):
+        at = {**base, "serving": {**base["serving"], "index_version": version}}
+        keyword = {**at, "retrieval": "keyword", "analyzer": "kiwi", "embedding": None, "reranker": None,
+                   "rerank_mode": None}
+        for row in [keyword] + ([at] if at["retrieval"] != "keyword" else []):
+            cell = runner.run_row(row, base)
+            if cell.get("status") == "complete" and k1.get("status") == "complete":
+                cell = {**cell, "new_critical_vs_k1": len(set(cell["dev"]["critical_ids"])
+                                                         - set(k1["dev"]["critical_ids"]))}
+            rows.append({"name": f"{where} · {row_label(row)} · {version[:8]}",
+                         "axes": {**{a: row[a] for a in AXES}, "index": where}, "index_version": version, **cell})
+    return write_table(settings, "regression", REGRESSION, rows, base, k1)
 
 
 def run_matrix(settings: Settings, analyzer, transport, matrix: str, only: list[str] | None = None) -> dict:

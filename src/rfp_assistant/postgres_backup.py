@@ -108,7 +108,7 @@ def _table_manifest(raw):
     return tables
 
 
-def backup(settings, destination, actor):
+def backup(settings, destination, actor, share_owner=False):
     from . import evaluation, release
 
     destination = Path(destination)
@@ -119,7 +119,9 @@ def backup(settings, destination, actor):
             raise ValueError("backup destination must not overlap live runtime or originals")
     destination.mkdir(parents=True, exist_ok=True)
     target = settings.db_path
-    lock = postgres.GatewayOwner(target)
+    # The maintenance sequence shares its own process's gateway owner (the serving app's button, or the `maintain`
+    # command's); everything else, and any other process's owner, is refused.
+    lock = (share_owner and postgres.borrow_owner(target)) or postgres.GatewayOwner(target)
     try:
         with store.open_db(target) as conn, store.tx(conn, immediate=True):
             if conn.execute("SELECT current_schema()").fetchone()[0] != "public":

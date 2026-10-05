@@ -21,7 +21,7 @@ type Column = Schemas["ExperimentColumn"];
 type Question = Schemas["ExperimentQuestion"];
 type Value = Row["values"][string];
 
-const MATRIX: Record<string, string> = { lexical: "K0 · K1", chunking: "청킹", embedding: "임베딩", reranker: "리랭커" };
+const MATRIX: Record<string, string> = { lexical: "K0 · K1", chunking: "청킹", embedding: "임베딩", reranker: "리랭커", regression: "회귀 (유지보수)" };
 const COLUMN: Record<string, string> = {
   "dev.ndcg": "nDCG@5", "dev.support": "근거 완전", "whole.ndcg": "nDCG@5 전체 문서", "whole.support": "근거 완전 전체 문서",
   "needle.top5": "바늘 상위 5", "dev.critical": "치명 실패", "whole.critical": "치명 실패 전체 문서",

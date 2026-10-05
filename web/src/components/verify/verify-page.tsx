@@ -16,11 +16,12 @@ import { EvaluationSection, ReleaseBadge } from "./evaluation";
 import { FidelityDetail, FidelityRow, flagged, type Source } from "./fidelity";
 import { ExperimentsSection } from "./experiments";
 import { JudgeSection } from "./judges";
+import { MaintenanceSection } from "./maintenance";
 import { CorrectionsSection, IngestionSection, RequestExports } from "./records";
 import { CompareRuns, RunList, RunView, TraceForm } from "./trace";
 import { Empty, Field, field, Notice, PageTitle } from "./parts";
 
-type Key = "todo" | "experiments" | "trace" | "compare" | "evaluation" | "judges" | "dataset" | "ingestion" | "corrections" | "exports";
+type Key = "todo" | "experiments" | "maintenance" | "trace" | "compare" | "evaluation" | "judges" | "dataset" | "ingestion" | "corrections" | "exports";
 
 function useVerifyData() {
   const [running, setRunning] = useState(false);
@@ -57,7 +58,7 @@ function todoCount(d: Data) {
 }
 
 const TITLES: Record<Key, string> = {
-  todo: "할 일", experiments: "실험 비교", trace: "검색 추적", compare: "실행 비교", evaluation: "평가·릴리스", judges: "판정 모델 비교", dataset: "데이터셋",
+  todo: "할 일", experiments: "실험 비교", maintenance: "유지보수", trace: "검색 추적", compare: "실행 비교", evaluation: "평가·릴리스", judges: "판정 모델 비교", dataset: "데이터셋",
   ingestion: "수집 상태", corrections: "수정 기록", exports: "요청 기록",
 };
 
@@ -70,6 +71,7 @@ function Body({ k, d }: { k: Key; d: Data }) {
     case "compare": return d.runs.error ? <Notice tone="bad">{d.runs.error}</Notice> : d.runs.loading ? <Skeleton className="h-64 w-full" /> : <CompareRuns runs={runs} />;
     case "evaluation": return <EvaluationSection ov={ov} onChanged={d.ov.reload} />;
     case "experiments": return <ExperimentsSection />;
+    case "maintenance": return <MaintenanceSection />;
     case "judges": return <JudgeSection />;
     case "dataset": return <DatasetState ov={ov} />;
     case "ingestion": return d.ing.error ? <Notice tone="bad">{d.ing.error}</Notice> : d.ing.data ? <IngestionSection rows={d.ing.data} /> : <Skeleton className="h-64 w-full" />;
@@ -158,7 +160,7 @@ function TracePane({ runs, onRun }: { runs: Schemas["TraceSummary"][]; onRun: ()
 function SidebarLayout({ d, section, onSection }: { d: Data; section: Key; onSection: (k: Key) => void }) {
   const ov = d.ov.data!;
   const groups: MenuGroup<Key>[] = [
-    { title: "사람이 볼 차례", items: [{ k: "todo", count: todoCount(d), urgent: todoCount(d) > 0 }, { k: "experiments" }] },
+    { title: "사람이 볼 차례", items: [{ k: "todo", count: todoCount(d), urgent: todoCount(d) > 0 }, { k: "experiments" }, { k: "maintenance" }] },
     { title: "재현", items: [{ k: "trace", count: d.runs.data?.length }, { k: "compare" }] },
     { title: "현황", items: [
       { k: "evaluation", count: <ReleaseBadge release={ov.evaluation.release} /> },

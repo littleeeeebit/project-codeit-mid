@@ -21,6 +21,10 @@ between them. An uncertain probability, a failed call and an untranslatable item
 verdicts. Value correctness is decided by deterministic code for every arm (`value_check`), not by a judge.
 
 `replacement_verdict` is the rule declared before any held-out run (docs/rag/judges.md).
+
+A third part, `judge_set`, runs Luna and bridged Jev on the judge golden set (`judge_set`): known-wrong mutants of
+held-out positives beside their unmutated sources. It reports each judge's false-accept rate per mutation type
+under the same calibration thresholds; the replacement rule stays the held-out reference's.
 """
 
 from __future__ import annotations
@@ -37,7 +41,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import budget, dense, evaluation, generation
+from . import budget, dense, evaluation, generation, judge_set
 from .settings import REPO_ROOT, Settings, read_api_key
 from .store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
 
@@ -49,7 +53,8 @@ VERDICTS = "phase4-prompt4-dev-verdicts.jsonl"
 PACKET = "phase4-prompt4-dev-blind-groups.jsonl"
 SEED = 20261004
 RAW_SAMPLE = 120  # per part; the held-out control needs at least 100
-PARTS = ("calibration", "held_out")
+PARTS = ("calibration", "held_out", "judge_set")
+SCORED = ("held_out", "judge_set")  # parts whose numbers are reported; both use the calibration thresholds
 ARMS = ("luna", "jev_bridged", "jev_raw")
 PURPOSE = "judge_eval"
 MEMBER = "judge-comparison"
@@ -272,7 +277,8 @@ def glossary() -> dict:
 
 
 def glossary_sha() -> str:
-    return _sha(GLOSSARY_PATH.read_bytes())
+    """Over the committed bytes: a checkout that writes CRLF (core.autocrlf) must not change run identities."""
+    return _sha(GLOSSARY_PATH.read_bytes().replace(b"\r\n", b"\n"))
 
 
 def organisations(settings: Settings) -> list[str]:
@@ -712,11 +718,15 @@ def prompt_hashes() -> dict:
             "rule": _sha(dumps(RULE))}
 
 
-def _config(settings: Settings, part: str, split: dict, orgs: list[str], thresholds: dict | None) -> dict:
-    return {"part": part, "reference_sha256": split["reference_sha256"], "split_sha256": split["split_sha256"],
-            "model": MODEL, "reasoning_effort": settings.generation_reasoning_effort, "jev_model": settings.jev_model,
-            "hashes": prompt_hashes(), "organisations_sha256": _sha(dumps(orgs)),
-            "thresholds_sha256": (thresholds or {}).get("thresholds_sha256"), "rule": RULE}
+def _config(settings: Settings, part: str, split: dict, orgs: list[str], thresholds: dict | None,
+            set_sha256: str | None = None) -> dict:
+    config = {"part": part, "reference_sha256": split["reference_sha256"], "split_sha256": split["split_sha256"],
+              "model": MODEL, "reasoning_effort": settings.generation_reasoning_effort, "jev_model": settings.jev_model,
+              "hashes": prompt_hashes(), "organisations_sha256": _sha(dumps(orgs)),
+              "thresholds_sha256": (thresholds or {}).get("thresholds_sha256"), "rule": RULE}
+    if set_sha256:  # only the judge-set part has one, so earlier runs keep their identities
+        config["judge_set_sha256"] = set_sha256
+    return config
 
 
 def run_id_for(config: dict) -> str:
@@ -730,8 +740,20 @@ def _inputs(settings: Settings, part: str) -> dict:
     split = load_split(settings)
     by_id = {i["blind_id"]: i for i in items}
     orgs = organisations(settings)
-    thresholds = None
-    if part == "held_out":
+    thresholds, set_sha = None, None
+    if part == "judge_set":
+        try:
+            rows, set_manifest = judge_set.load(settings)
+        except ValueError as exc:
+            raise JudgeError(str(exc)) from None
+        if (set_manifest["reference_sha256"], set_manifest["split_sha256"]) != (split["reference_sha256"],
+                                                                              split["split_sha256"]):
+            raise JudgeError("the judge set was generated from another reference or split; run `judge-set` again")
+        # built from held-out sources only, so the calibration items the refit below reads are untouched
+        by_id, set_sha = {**by_id, **{r["blind_id"]: r for r in rows}}, set_manifest["set_sha256"]
+        split = {**split, "judge_set": [r["blind_id"] for r in rows],
+                 "raw_sample": {**split["raw_sample"], "judge_set": []}}
+    if part in SCORED:
         calibration = run_id_for(_config(settings, "calibration", split, orgs, None))
         path = run_dir(settings, calibration) / "thresholds.json"
         if not path.exists():
@@ -747,8 +769,8 @@ def _inputs(settings: Settings, part: str) -> dict:
                   if not (band or {}).get("meets_floor")]
         if missed:
             raise JudgeError(f"the calibration fit missed the {MIN_FIT_COVERAGE:.0%} coverage floor for "
-                             f"{', '.join(missed)}; held-out evaluation is refused")
-    config = _config(settings, part, split, orgs, thresholds)
+                             f"{', '.join(missed)}; {part} evaluation is refused")
+    config = _config(settings, part, split, orgs, thresholds, set_sha)
     return {"part": part, "items": [by_id[b] for b in split[part]], "raw": set(split["raw_sample"][part]),
             "orgs": orgs, "thresholds": thresholds, "config": config, "run_id": run_id_for(config)}
 
@@ -1073,7 +1095,8 @@ def labels(settings: Settings, run_id: str, items: list[dict], thresholds: dict 
                 judged = jev_label(item, record, band)
             label, source = final_label(item, judged)
             abstain = None if label is not None else (record.get("abstain") or record.get("error") or "uncertain")
-            out[arm][item["blind_id"]] = {"label": label, "source": source, "abstain": abstain, "record": record}
+            out[arm][item["blind_id"]] = {"label": label, "source": source, "abstain": abstain, "judged": judged,
+                                          "record": record}
     return out
 
 
@@ -1118,8 +1141,9 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
     items = inputs["items"]
     done = load_judgements(settings, run_id)
     expected = {"luna": len(items), "jev_bridged": len(items), "jev_raw": len(inputs["raw"])}
+    arms_run = [arm for arm in ARMS if expected[arm]]
     progress = {arm: {"done": sum((arm, i["blind_id"]) in done for i in items), "total": expected[arm]}
-                for arm in ARMS}
+                for arm in arms_run}
     complete = stop_reason is None and all(p["done"] == p["total"] for p in progress.values())
     result = {"run_id": run_id, "part": config["part"], "status": "complete" if complete else "partial",
               "stop_reason": stop_reason, "progress": progress, "scored_at": utcnow()}
@@ -1132,11 +1156,15 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
         per = labels(settings, run_id, items, inputs["thresholds"])
         by_id = {i["blind_id"]: i for i in items}
         cost = _ledger_cost(settings, run_id)
-        arms = {}
-        for arm in ARMS:
+        arms, mutations = {}, {}
+        for arm in arms_run:
             rows = [{"kind": by_id[b]["kind"], "reference": by_id[b]["reference"], **{k: v for k, v in x.items()
                                                                                     if k != "record"}}
                     for b, x in per[arm].items()]
+            if config["part"] == "judge_set":  # the judge's own label: a code check would hide what the judge does
+                mutations[arm] = judge_set.mutation_rates(
+                    [{"type": (by_id[b].get("mutation") or {}).get("type"), "judged": x["judged"],
+                      "code": x["source"] == "code"} for b, x in per[arm].items()])
             records = [x["record"] for x in per[arm].values()]
             m = arm_metrics(rows)
             if arm == "luna":
@@ -1157,7 +1185,10 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
             arms[arm] = m
         result.update(arms=arms, thresholds_sha256=inputs["config"]["thresholds_sha256"],
                       config_hashes=inputs["config"]["hashes"],
-                      verdict=replacement_verdict(arms["luna"], arms["jev_bridged"]) if complete else None)
+                      verdict=replacement_verdict(arms["luna"], arms["jev_bridged"])
+                      if complete and config["part"] == "held_out" else None)
+        if config["part"] == "judge_set":
+            result.update(mutations=mutations, judge_set_sha256=inputs["config"]["judge_set_sha256"])
     write_text_atomic(d / "results.json", json.dumps(result, ensure_ascii=False, indent=1))
     return result
 
@@ -1182,7 +1213,8 @@ def overview(settings: Settings, running: set[str]) -> dict:
         except (OSError, json.JSONDecodeError):
             continue
         done = load_judgements(settings, d.name)
-        totals = {"luna": config["items"], "jev_bridged": config["items"], "jev_raw": config["raw_sample"]}
+        totals = {arm: n for arm, n in (("luna", config["items"]), ("jev_bridged", config["items"]),
+                                        ("jev_raw", config["raw_sample"])) if n}
         runs.append({"run_id": d.name, "part": config["part"], "created_at": config["created_at"],
                      "running": d.name in running,
                      "status": "running" if d.name in running else (result or {}).get("status", "partial"),
@@ -1190,14 +1222,14 @@ def overview(settings: Settings, running: set[str]) -> dict:
                      "error": (d / "last-error.txt").read_text(encoding="utf-8")
                      if (d / "last-error.txt").exists() else None,
                      "progress": {arm: {"done": sum(1 for (a, _) in done if a == arm), "total": totals[arm]}
-                                  for arm in ARMS},
+                                  for arm in totals},
                      "translated_batches": sum(1 for (a, _) in done if a == "bridge"),
                      "thresholds_fitted": (d / "thresholds.json").exists()})
     return {"reference": {k: manifest[k] for k in ("run_id", "items", "reference_sha256", "labels")},
             "split": None if split is None else {
                 "seed": split["seed"], "calibration": len(split["calibration"]), "held_out": len(split["held_out"]),
                 "raw_sample": len(split["raw_sample"]["held_out"]), "split_sha256": split["split_sha256"]},
-            "rule": RULE, "runs": runs}
+            "judge_set": judge_set.counts(settings), "rule": RULE, "runs": runs}
 
 
 def results(settings: Settings, run_id: str) -> dict:
@@ -1205,7 +1237,7 @@ def results(settings: Settings, run_id: str) -> dict:
     if not path.exists():
         raise JudgeError("no results for this run yet")
     result = json.loads(path.read_text(encoding="utf-8"))
-    if result["part"] != "held_out":
+    if result["part"] not in SCORED:
         raise JudgeError("calibration runs fit thresholds only; their numbers are not reported")
     return result
 
@@ -1214,9 +1246,9 @@ def disagreements(settings: Settings, run_id: str) -> list[dict]:
     """Held-out items where any arm differs from the reference or Luna and bridged Jev differ: the Korean
     original, its English bridge, every arm's label with Luna's reason and Jev's probability, and the reference."""
     config = json.loads((run_dir(settings, run_id) / "config.json").read_text(encoding="utf-8"))
-    if config["part"] != "held_out":
-        raise JudgeError("only held-out runs are compared")
-    inputs = _inputs(settings, "held_out")
+    if config["part"] not in SCORED:
+        raise JudgeError("only held-out and judge-set runs are compared")
+    inputs = _inputs(settings, config["part"])
     if inputs["run_id"] != run_id:
         raise JudgeError("the configuration changed since this run")
     per = labels(settings, run_id, inputs["items"], inputs["thresholds"])
@@ -1233,5 +1265,5 @@ def disagreements(settings: Settings, run_id: str) -> list[dict]:
             "probability": (x["record"].get("answers") or {}).get("support"),
             "reason": x["record"].get("reason")} for a, x in arm.items()}
         out.append({"blind_id": b, "kind": item["kind"], "reference": item["reference"], "korean": segments(item),
-                    "english": bridged, "untranslatable": reason, "arms": view})
+                    "english": bridged, "untranslatable": reason, "arms": view, "mutation": item.get("mutation")})
     return out

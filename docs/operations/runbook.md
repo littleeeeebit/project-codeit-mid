@@ -250,7 +250,7 @@ python -m rfp_assistant.cli compare --matrix lexical|chunking|embedding|reranker
 python -m rfp_assistant.cli compare --approve <estimate id> --approved-by <name>     # a paid row, then rerun
 python -m rfp_assistant.cli compare-cap --usd <amount> --actor <name> --reason "..."   # Gemini's own cap
 python -m rfp_assistant.cli compare-resolve --attempt-id <id> --charged yes|no --actor <name> --reason "..."   # a Gemini timeout
-python -m rfp_assistant.cli golden-counts
+python -m rfp_assistant.cli golden-counts      # development, sealed and judge-set rows, counted apart
 ```
 
 - `compare` runs the declared matrix over the development set (own document and whole corpus) and the needle set, reusing cached indexes, vectors, reranker scores and finished rows, and writes `.runtime/compare/tables/<matrix>.json` and `.md`. Run it with the UI stopped when a local model builds a corpus vector set: it holds the GPU for minutes, while the server's own reranker or embedding needs it too.
@@ -272,3 +272,22 @@ python -m rfp_assistant.cli restore-check --backup D:\rfp-backups\2026-10-02\man
 - `backup` takes the gateway lock/write mutex and uses a complete native custom-format dump. It refuses while the serving app owns the gateway, so stop the app first. `restore-check` requires only the backup and `RFP_RESTORE_DATABASE_DSN` for a distinct empty target; the primary database may be lost or its DSN unset. Recovery commits a durable target fence before the atomic native restore and holds gateway/import locks through verification. Any failure keeps startup and paid admission blocked; successful recovery also leaves paid admission disabled. Referenced immutable files currently stay at their managed paths. See the handover for limitations and commands. The backup refuses a relative, non-empty or overlapping destination. Keys and `.env` are not included; the owner backs them up separately.
 - `restore-check` verifies schema, settled/pending/unknown/available amounts, attempt states, copied files, extraction artifacts and the active index; unknown reserves stay pending and nothing is replayed. It publishes its authoritative report in `bidmate_recovery.receipt` in the same durable transaction as validation and readiness. Read `SELECT report_json FROM bidmate_recovery.receipt WHERE id=1` on the isolated target; the CLI reports this receipt location. No filesystem success receipt is written. Startup and paid admission reject verified recovery fences lacking a committed successful receipt; earlier restored targets require a fresh isolated restore.
 - Real recovery (phase 5): stop the old owner, restore-check the backup, reconcile spending after its watermark, then copy the database into place and start one owner. Never let the old and the restored owner dispatch concurrently, and never reset the allowance.
+
+## 13. Maintenance: one command or the 검증 button
+
+```powershell
+python -m rfp_assistant.cli maintain --actor <owner>
+```
+
+Or press 유지보수 실행 on 검증 › 유지보수, which runs the same sequence inside the serving process. Nothing schedules it. In order:
+
+1. **Backup.** Reuses the newest backup whose table digests still equal the database's, ignoring `audit_events`, which the backup itself writes. Otherwise it writes a new one under `RFP_BACKUP_DIR`, or by default under the `.runtime-backups` sibling of the data directory (ignored by Git). From the button, the backup shares the serving process's gateway lock. The command takes the lock itself, so stop the UI first, as for `backup`.
+2. **Restore check.** Restores that backup into the scratch database `<application database>_mrestore` on the same server with paid admission off, checks it, then drops the scratch database. A backup whose check already passed is not checked again.
+3. **Manifest and ingest.** Imports `data_list.csv` and parses only originals whose bytes, parser or inputs changed.
+4. **HWP fidelity.** Checks only HWP extractions that have no verdict at the current fidelity version, which means the ones ingest just created or changed.
+5. **Keyword index.** Builds, or reuses, the served index's profile and review scope over the current extractions. It does not activate it.
+6. **Embedding.** Embeds the rebuilt index's uncached chunks with the activated embedding model. A paid model stops the run as `needs_approval` with its priced estimate. Approve it with `compare --approve <estimate id> --approved-by <name>`, then rerun; every earlier step is reused. A keyword-only serving run skips this step.
+7. **Regression.** Writes the `regression` table (검증 › 실험 비교 › 회귀 (유지보수)): K1 and the serving configuration on the served index and, if it changed, on the rebuilt one. To serve the rebuilt index, activate its row there.
+8. **Report.** Refreshes `golden-counts`, which shows both the development set and the judge set, and writes `.runtime/maintenance/reports/<run id>.md` and `.json`.
+
+A failed step stops the sequence. The report and the screen name the step and its reason, and later steps stay `pending`. Every run records the serving run, index and vectors before and after, and reports `Serving unchanged`. Maintenance never activates anything. A rerun with no changed input reuses every step and reports `Provider calls during the run: 0` and `Everything reused: True`.

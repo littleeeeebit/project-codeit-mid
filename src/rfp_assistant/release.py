@@ -57,9 +57,10 @@ def ledger_summary(db: Path) -> dict:
             "frozen_reason": snap.frozen_reason}
 
 
-def backup(settings: Settings, destination: Path, actor: str) -> dict:
+def backup(settings: Settings, destination: Path, actor: str, share_owner: bool = False) -> dict:
     """Owner backup (pg_dump custom format plus the mutable trees) to an absolute directory outside the runtime
-    and sources. Original state is not modified."""
+    and sources. Original state is not modified. `share_owner`: the maintenance sequence runs it under its own
+    process's gateway owner instead of refusing it."""
     from .postgres_backup import backup as pg_backup
 
     if not destination.is_absolute():
@@ -69,7 +70,7 @@ def backup(settings: Settings, destination: Path, actor: str) -> dict:
     if copy_bytes > MAX_COPY_BYTES:
         raise ReleaseError(f"the mutable trees hold {copy_bytes} bytes, more than expected; inspect them first")
     try:
-        result = pg_backup(settings, destination, actor)
+        result = pg_backup(settings, destination, actor, share_owner)
     except ValueError as exc:  # an unsafe destination (overlap, non-empty) or a non-dedicated schema
         raise ReleaseError(str(exc)) from None
     evaluation.record_audit(settings, actor, "backup", str(destination.name), "owner backup",

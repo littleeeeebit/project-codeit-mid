@@ -2116,6 +2116,49 @@ def start_judges(res: Resources, principal: Principal, estimate_id: str) -> str:
     return run_id
 
 
+_MAINTENANCE_JOB: list[threading.Thread] = []  # at most one maintenance sequence per process
+
+
+def maintenance_status(res: Resources, principal: Principal) -> dict:
+    """The running or last maintenance run. A run recorded as running with no live thread was cut off by a stop."""
+    principal = _authorize(res, principal, "verifier")
+    from . import maintenance
+
+    running = any(t.is_alive() for t in _MAINTENANCE_JOB)
+    state = maintenance.last(res.settings)
+    if state and state["status"] == "running" and not running:
+        state = {**state, "status": "interrupted", "reason": state.get("reason") or "the process stopped mid-run"}
+    return {"running": running, "run": state, "backup_root": str(maintenance.backup_root(res.settings))}
+
+
+def start_maintenance(res: Resources, principal: Principal) -> str:
+    """Starts the maintenance sequence on this process's gateway in one background thread; the run is published
+    before the start returns. A paid embedding stops it at its estimate; nothing is activated."""
+    principal = _authorize(res, principal, "verifier")
+    from . import maintenance
+
+    with _EVAL_LOCK:
+        if res._closed:
+            raise ServiceError("서비스가 종료 중입니다.")
+        if any(t.is_alive() for t in _MAINTENANCE_JOB):
+            raise ServiceError("유지보수가 이미 실행 중입니다. 끝난 뒤 다시 시도하세요.")
+        state = maintenance.start_state(principal.member_id)
+        maintenance._write(res.settings, state)
+
+        def job() -> None:
+            maintenance.run(res.settings, res.analyzer, res.transport, principal.member_id,
+                            closing=lambda: res._closed, state=state)
+
+        thread = threading.Thread(target=job, name=f"rfp-maintenance-{state['run_id']}", daemon=True)
+        with res._runner_lock:  # close() joins it like every other job that may use the transport
+            if res._closed:
+                raise ServiceError("서비스가 종료 중입니다.")
+            _MAINTENANCE_JOB[:] = [thread]
+            res._jobs.append(thread)
+            thread.start()
+    return state["run_id"]
+
+
 def judge_results(res: Resources, principal: Principal, run_id: str) -> dict:
     principal = _authorize(res, principal, "verifier")
     from . import judges
