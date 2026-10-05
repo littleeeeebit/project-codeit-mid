@@ -257,9 +257,11 @@ def query_vector(settings: Settings, transport: Transport | None, question: str,
         return vec, {"cache": "miss", "payload_hash": h, "backend": "gemini",
                      "embed_ms": round((time.perf_counter() - t0) * 1000, 1)}
     tokens = count_embedding_tokens(text, settings.embedding_model) + QUERY_MARGIN_TOKENS
+    t0 = time.perf_counter()
     result = metered_embed(settings, transport, [text], tokens, request_id=request_id, member_id=member_id,
                            purpose=purpose, guard=guard)
-    info = {"cache": "miss", "payload_hash": h, **{k: v for k, v in result.items() if k != "vectors"}}
+    info = {"cache": "miss", "payload_hash": h, "embed_ms": round((time.perf_counter() - t0) * 1000, 1),
+            **{k: v for k, v in result.items() if k != "vectors"}}
     if result["status"] != "ok":
         return None, info
     cache_put(settings, h, result["vectors"][0], {"kind": "query", "attempt_id": result["attempt_id"],
@@ -519,12 +521,14 @@ def plan_gemini(settings: Settings, index_version: str) -> dict:
     unique, missing = _unique_missing(settings, payloads)
     client = _gemini_client(settings)
     try:
-        tokens = sum(client.count_tokens([p["text"] for p in b]) for b in _gemini_batches(missing))
+        per_batch = [client.count_tokens([p["text"] for p in b]) for b in _gemini_batches(missing)]
     finally:
         client.close()
+    # Priced per batch, rounded up exactly as build_gemini_dense reserves each one: pricing the total once came out
+    # a few micro-USD under the build's sum and stopped it one batch before the end.
     return {"model": settings.embedding_model, "index_version": index_version, "unique_payloads": len(unique),
-            "payloads_to_embed": len(missing), "tokens_to_embed": tokens,
-            "max_cost_micro_usd": gemini_cost_micro(tokens), "price_usd_per_mtok": GEMINI_PRICE_PER_MTOK,
+            "payloads_to_embed": len(missing), "tokens_to_embed": sum(per_batch),
+            "max_cost_micro_usd": sum(map(gemini_cost_micro, per_batch)), "price_usd_per_mtok": GEMINI_PRICE_PER_MTOK,
             "ledger": external_status(settings.db_path),
             "fingerprint": hashlib.sha256(dumps([row["manifest_hash"], sorted(missing)]).encode()).hexdigest()}
 

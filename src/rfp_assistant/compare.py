@@ -253,12 +253,13 @@ def paid_estimate(settings: Settings, s: Settings, index, pops: dict | None = No
         corpus = dense_mod.plan_gemini(s, index.version)
         client = dense_mod._gemini_client(s)
         try:
-            q_tokens = sum(client.count_tokens([q]) for q in queries)
+            q_each = [client.count_tokens([q]) for q in queries]  # one call per query, each rounded up
         finally:
             client.close()
+        q_tokens = sum(q_each)
         plan = {"backend": "gemini", "ledger": "Gemini cap set by the person (compare-cap)",
                 "corpus_tokens": corpus["tokens_to_embed"], "corpus_micro_usd": corpus["max_cost_micro_usd"],
-                "query_tokens": q_tokens, "query_micro_usd": gemini_cost_micro(q_tokens),
+                "query_tokens": q_tokens, "query_micro_usd": sum(map(gemini_cost_micro, q_each)),
                 "payloads_to_embed": corpus["payloads_to_embed"], "fingerprint": corpus["fingerprint"],
                 "cap": external_status(s.db_path)}
     plan.update(model=s.embedding_model, dims=s.embedding_dimensions, index_version=index.version,
@@ -304,7 +305,24 @@ def approvals(settings: Settings) -> dict:
 def _build_paid(settings: Settings, s: Settings, index, estimate: dict, transport) -> dict:
     if estimate["backend"] == "openai":
         return dense_mod.build_dense(s, transport, index.version, estimate["corpus_estimate_id"], MEMBER)
-    return dense_mod.build_gemini_dense(s, index.version, estimate["corpus_micro_usd"])
+    facts = dense_mod.build_gemini_dense(s, index.version, estimate["corpus_micro_usd"])
+    if facts.get("status") == "ready":
+        facts.update(gemini_corpus_totals(s))
+    return facts
+
+
+def gemini_corpus_totals(settings: Settings) -> dict:
+    """A Gemini build resumed after a stop reports only its last part; its ledger, used only by this comparison,
+    holds every corpus batch: the settled cost and the summed batch time.
+    ponytail: one Gemini model and one index; key the sum by dense version if a second one is compared."""
+    from datetime import datetime
+
+    with open_db(settings.db_path) as conn:
+        rows = conn.execute("SELECT settled_micro_usd, created_at, finished_at FROM external_attempts "
+                            "WHERE provider = 'gemini' AND purpose = 'embedding' AND state = 'settled'").fetchall()
+    seconds = sum((datetime.fromisoformat(f) - datetime.fromisoformat(c)).total_seconds() for _, c, f in rows if f)
+    return {"cost_micro_usd": sum(int(r[0] or 0) for r in rows), "embed_seconds": round(seconds, 1),
+            "corpus_batches": len(rows)}
 
 
 # ---------------------------------------------------------------- reranker score cache
@@ -451,6 +469,15 @@ def query_vectors(settings: Settings, s: Settings, pops: dict, transport, allow_
                 t0 = time.perf_counter()
                 model.embed([dense_mod.normalize_payload(row["question"])], "query")
                 info["embed_ms"].append(round((time.perf_counter() - t0) * 1000, 1))
+    else:
+        # An API model's latency is seen only on its first (paid) query embedding; later runs read the cache, so the
+        # observed values are kept per model and reused.
+        name = hashlib.sha256(s.embedding_model.encode()).hexdigest()[:16]
+        seen = compare_dir(settings) / "query-latency" / f"{name}.json"
+        if info["embed_ms"]:
+            write_text_atomic(seen, dumps({"model": s.embedding_model, "embed_ms": info["embed_ms"], "at": utcnow()}))
+        elif seen.exists():
+            info["embed_ms"] = json.loads(seen.read_text(encoding="utf-8"))["embed_ms"]
     return vectors, info
 
 
