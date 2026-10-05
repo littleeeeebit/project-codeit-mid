@@ -467,4 +467,3 @@ def mutation_rates(rows: list[dict]) -> dict:
         cell["wilson95"] = evaluation.wilson(cell["passed"], cell["judged"])
         cell["measure"] = "pass rate" if name == "unmutated" else "false-accept rate"
     return dict(sorted(out.items(), key=lambda kv: (kv[0] == "unmutated", kv[0])))
-
