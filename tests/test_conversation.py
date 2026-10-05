@@ -120,6 +120,25 @@ class FollowUpTest(Base):
                          [e["evidence_id"] for e in sent["evidence"] if e["text"] in cited])
         self.assertNotIn("conversation", self.asked(self.transport.calls[0]))  # a first turn has none
 
+    def test_follow_ups_see_the_values_and_rows_a_free_turn_showed(self):
+        idx = self.res.index()
+        with store.open_db(self.env.settings.db_path) as conn:
+            x = conn.execute("SELECT active_extraction_id FROM documents d JOIN sources s ON s.source_hash = "
+                             "d.active_source_hash WHERE d.doc_id = ?", (self.a.doc_id,)).fetchone()[0]
+            els = sorted((e for (xx, _), e in idx.elements.items() if xx == x), key=lambda e: e["source_order"])
+            for code, el in (("SFR-001", els[0]), ("SFR-002", els[1]), ("SFR-003", els[2])):
+                conn.execute("INSERT INTO requirements VALUES (?, ?, ?, ?, ?, ?, ?)",
+                             (idx.version, x, code, code, "detail", el["element_id"], code + " 이름"))
+        for mode, follow, shown in (("metadata", "방금 나온 사업 금액을 한글로 풀어 주세요.", "amount_krw: 130000000"),
+                                    ("inventory", "세 번째 요구사항을 쉽게 설명해 주세요", "3. SFR-003 SFR-003 이름")):
+            with self.subTest(mode=mode):
+                first = self.turn("", mode=mode)  # 기관A's metadata is a CSV conflict; it still shows its values
+                self.assertIn(first.status, ("answered", "conflicting_evidence"), first.error)
+                self.turn(follow, previous=first.request_id)
+                rewrite, answer = self.transport.calls[-2:]
+                self.assertIn(shown, self.asked(rewrite)["conversation"][0]["answer"])
+                self.assertIn(shown, self.asked(answer)["conversation"][0]["answer"])
+
     def test_carried_evidence_follows_the_fresh_evidence_once_and_only_while_it_is_indexed(self):
         chunks = self.res.index().chunks
         unit = lambda i, chunk: EvidenceUnit(f"E{i}", "doc", "h", chunk["extraction_id"], chunk["chunk_id"],
@@ -306,6 +325,30 @@ class StreamingTest(Base):
 
 
 class StreamRouteTest(Base):
+    def test_cancelling_withdraws_the_streamed_text_before_the_held_call_returns(self):
+        client = TestClient(api.create_app(self.res))
+        headers = {"X-Member": quote("c1")}
+        with client:
+            self.transport.release.clear()
+            owned = client.post("/api/ask", headers=headers, json={
+                "scope": [{"doc_id": self.a.doc_id, "source_hash": self.a.source_hash}], "question": FIRST,
+                "mode": "single"}).json()
+            self.assertTrue(self.transport.streamed.wait(10))
+            rid = owned["request_id"]
+            body = []  # the test client hands over a streamed body only once it ends: read it on a thread
+            reader = threading.Thread(target=lambda: body.append(client.get(
+                f"/api/requests/{rid}/stream", headers=headers, params={"generation_id": owned["generation_id"]}).text))
+            reader.start()
+            time.sleep(0.5)  # the stream has sent the partial
+            client.post(f"/api/requests/{rid}/cancel", headers=headers)
+            time.sleep(0.5)  # and withdrawn it while the provider still holds
+            self.assertEqual(client.get(f"/api/requests/{rid}", headers=headers).json()["view"]["status"], "running")
+            self.transport.release.set()
+            reader.join(10)
+            events = body[0].split("\n\n")
+            self.assertIn('"summary"', events[0])
+            self.assertEqual(events[1:], ["data: null", "event: done\ndata: {}", ""])
+
     def test_the_stream_route_sends_the_partial_answer_then_done(self):
         client = TestClient(api.create_app(self.res))
         headers = {"X-Member": quote("c1")}

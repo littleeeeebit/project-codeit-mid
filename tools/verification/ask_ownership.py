@@ -51,6 +51,19 @@ class AskOwnershipTest(unittest.TestCase):
             return echo(messages)
 
         cls.transport.responder = reply
+        cls.hold, cls.streamed = threading.Event(), threading.Event()
+        cls.hold.set()
+        chat = cls.transport.chat
+
+        def held_chat(**kw):  # streams the whole answer, then holds the call open while `hold` is clear
+            response = chat(**kw)
+            if kw.get("on_delta"):
+                cls.streamed.set()
+                if not cls.hold.wait(30):
+                    raise AssertionError("held provider was not released")
+            return response
+
+        cls.transport.chat = held_chat
         cls.res = service.Resources(cls.env.settings.with_(request_workers=1, request_admission=16),
                                     transport=cls.transport)
         app = api.create_app(cls.res)
@@ -81,6 +94,7 @@ class AskOwnershipTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.gate.set()
+        cls.hold.set()
         cls.browser.close()
         cls.playwright.stop()
         cls.server.should_exit = True
@@ -91,6 +105,8 @@ class AskOwnershipTest(unittest.TestCase):
 
     def setUp(self):
         self.gate.set()
+        self.hold.set()
+        self.streamed.clear()
         self.entered.clear()
         self.__class__.post_delay = 0
         self.member = f"alice-{uuid.uuid4().hex[:8]}"
@@ -102,6 +118,7 @@ class AskOwnershipTest(unittest.TestCase):
 
     def tearDown(self):
         self.gate.set()
+        self.hold.set()
         self.context.close()
         if self.res._runner is not None:
             for future in list(self.res._runner._futures.values()):
@@ -156,6 +173,20 @@ class AskOwnershipTest(unittest.TestCase):
         self.wait_for(lambda: any(method == "GET" for method, _ in headers), "ownership was not polled")
         self.page.remove_listener("request", observe)
         self.assertTrue(headers and all(name == self.member for _, name in headers), headers)
+
+    def test_cancelling_a_streaming_answer_hides_its_provisional_text_while_the_provider_still_runs(self):
+        self.hold.clear()
+        self.page.locator("main button[type=submit]").click()
+        provisional = self.page.get_by_text("검증 전 임시 답변입니다", exact=False)
+        expect(provisional).to_be_visible(timeout=15000)
+        self.page.get_by_role("button", name="요청 취소", exact=True).click()
+        self.wait_for(lambda: self.rows()[0]["cancel_requested"] == 1, "cancel was not recorded")
+        expect(provisional).to_have_count(0, timeout=5000)  # the provider is still held
+        expect(self.page.get_by_text("작성 중 · 검증 전")).to_have_count(0)
+        self.assertEqual(self.rows()[0]["status"], "running")
+        self.hold.set()
+        self.wait_for(lambda: self.rows()[0]["status"] == "cancelled", "the held call did not finish as cancelled")
+        expect(provisional).to_have_count(0)
 
     def test_navigation_abandons_queued_work(self):
         self.occupy_worker()

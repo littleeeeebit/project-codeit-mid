@@ -315,7 +315,10 @@ function TurnView({ turn, index, latest, opened, onCite, onStatus }: {
     }), errorText), 1000, (d) => !UNFINISHED.includes(d.view.status));
   const v = status.data?.view;
   const live = !v || UNFINISHED.includes(v.status);
-  const streamed = useAnswerStream(live && !FREE_QUESTION[turn.mode] ? turn : null, status.reload);
+  // A cancellation (or a lost generation) revokes attachment while the provider may still run: the stream and its
+  // provisional text stop at once, and the poll keeps following execution and billing until the request finishes.
+  const revoked = !!status.data && !status.data.attachable;
+  const streamed = useAnswerStream(live && !revoked && !FREE_QUESTION[turn.mode] ? turn : null, status.reload);
   const answer = v && !live && status.data!.attachable ? v.result : null;
   const order = answer ? citedInOrder(answer) : [];
   const numbers = citationNumbers(order);
@@ -360,11 +363,14 @@ function TurnView({ turn, index, latest, opened, onCite, onStatus }: {
           : live ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-3" aria-live="polite">
-                <StatusBadge tone="neutral" size="md">{streamed ? "작성 중 · 검증 전" : v ? REQUEST[v.status] : "요청 중"}</StatusBadge>
+                <StatusBadge tone="neutral" size="md">
+                  {revoked && v?.cancel_requested ? "취소 요청됨" : streamed ? "작성 중 · 검증 전" : v ? REQUEST[v.status] : "요청 중"}
+                </StatusBadge>
                 <span className="text-sm text-muted-foreground">
-                  {v?.reserved_micro_usd ? `이 요청의 예약 최대 비용 ${usd(v.reserved_micro_usd, 4)}` : "근거를 찾고 있습니다."}
+                  {revoked ? "이 요청의 결과는 답변으로 표시하지 않습니다. 진행 중인 호출이 끝나면 비용을 정산합니다."
+                    : v?.reserved_micro_usd ? `이 요청의 예약 최대 비용 ${usd(v.reserved_micro_usd, 4)}` : "근거를 찾고 있습니다."}
                 </span>
-                {v && (
+                {v && !revoked && (
                   <button type="button" onClick={cancel}
                           className="ml-auto h-8 rounded-lg border px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50">
                     요청 취소
@@ -372,7 +378,7 @@ function TurnView({ turn, index, latest, opened, onCite, onStatus }: {
                 )}
               </div>
               {cancelError && <p role="alert" className="text-sm text-bad">{cancelError}</p>}
-              {streamed ? <Provisional streamed={streamed} docs={turn.docs} />
+              {revoked ? null : streamed ? <Provisional streamed={streamed} docs={turn.docs} />
                 : <div className="space-y-2"><Skeleton className="h-5 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6" /></div>}
             </div>
           ) : !status.data!.attachable ? (

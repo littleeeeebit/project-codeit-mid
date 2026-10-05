@@ -7139,7 +7139,7 @@
   },
   "/api/requests/{request_id}/stream": {
    "get": {
-    "description": "Server-sent events: `data:` carries the unvalidated answer written so far whenever it grows, then one\n`done` event when the request finished. Read-only; the validated outcome still comes from the request.",
+    "description": "Server-sent events: `data:` carries the unvalidated answer written so far whenever it grows, `data: null`\nwithdraws it once cancellation or a lost generation revokes it, then one `done` event when the request\nfinished. Read-only; the validated outcome still comes from the request.",
     "operationId": "stream_api_requests__request_id__stream_get",
     "parameters": [
      {

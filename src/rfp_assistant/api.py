@@ -317,16 +317,17 @@ def _routes(app: FastAPI) -> None:
 
     @app.get("/api/requests/{request_id}/stream")
     def stream(request_id: str, res: Res, member: Member, generation_id: str = ""):
-        """Server-sent events: `data:` carries the unvalidated answer written so far whenever it grows, then one
-        `done` event when the request finished. Read-only; the validated outcome still comes from the request."""
+        """Server-sent events: `data:` carries the unvalidated answer written so far whenever it grows, `data: null`
+        withdraws it once cancellation or a lost generation revokes it, then one `done` event when the request
+        finished. Read-only; the validated outcome still comes from the request."""
         service.answer_progress(res, member, request_id, generation_id)  # refuse before the stream opens
 
         def events():
             last = None
             while True:
                 progress = service.answer_progress(res, member, request_id, generation_id)
-                if progress["partial"] is not None and progress["partial"] != last:
-                    last = progress["partial"]
+                if progress["partial"] != last and (progress["partial"] is not None or not progress["finished"]):
+                    last = progress["partial"]  # a finished request keeps its last text until the outcome replaces it
                     yield f"data: {json.dumps(last, ensure_ascii=False)}\n\n"
                 if progress["finished"]:
                     yield "event: done\ndata: {}\n\n"

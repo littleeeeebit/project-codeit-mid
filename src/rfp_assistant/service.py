@@ -802,6 +802,10 @@ def _validate_request(res: Resources, request: AnswerRequest) -> str:
 
 CONVERSATION_TURNS = 6  # earlier turns a follow-up is rewritten from, newest kept
 CONVERSATION_ANSWER_CHARACTERS = 1200  # of each earlier answer: its sentences, so a restatement can keep them all
+# ponytail: the latest answer gets more room, so its value tables and requirement rows (about 60 at 90 characters)
+# can be referred to ("세 번째 요구사항"); a longer inventory is cut, and older turns keep 1200 characters
+LATEST_ANSWER_CHARACTERS = 6000
+INVENTORY_ROW_CHARACTERS = 80
 CARRIED_EVIDENCE = 8  # of the previous answer's cited units, supplied again to the follow-up's answer
 FREE_TURNS = {"metadata": "기본 정보 조회", "inventory": "요구사항 목록 조회"}
 
@@ -811,6 +815,32 @@ def _cited_ids(result: dict) -> list[str]:
                                *(i for c in result.get("claims") or [] for i in c["evidence_ids"]),
                                *(i for c in result.get("conflicts") or [] for a in c["alternatives"]
                                  for i in a["evidence_ids"])]))
+
+
+def _answer_text(result: dict) -> str:
+    """An earlier answer as the screen showed it, for the conversation context: the summary and sentences, then the
+    metadata values, conflicting values, requirement rows in their displayed order, and what was not found. A
+    follow-up may refer to any of these ("방금 나온 금액", "세 번째 요구사항")."""
+    docs = list(dict.fromkeys(x["doc_id"] for k in ("facts", "conflicts", "missing_fields")
+                              for x in result.get(k) or [] if x.get("doc_id")))
+    side = (lambda d: f"문서 {docs.index(d) + 1} ") if len(docs) > 1 else (lambda d: "")
+    lines = [result.get("summary") or "", *(c["text"] for c in result.get("claims") or [])]
+    def shown(v) -> str:  # dates are stored as {precision, value}
+        return "-" if v is None else str(v["value"] if isinstance(v, dict) and "value" in v else v)
+
+    def others(alts) -> str:  # metadata conflicts: the competing CSV values by notice row
+        return " / ".join(dict.fromkeys(shown(v) for v in (alts.values() if isinstance(alts, dict) else alts)))
+
+    lines += [f"{side(f['doc_id'])}{f['field']}: {shown(f['value'])}"
+              + ("" if f["state"] in ("known", "resolved") else f" ({f['state']})")
+              + (f" 다른 값: {others(f['alternatives'])}" if f.get("alternatives") else "")
+              for f in result.get("facts") or []]
+    lines += [f"{c['field']}: " + " / ".join(f"{side(a['doc_id'])}{a['value']}" for a in c["alternatives"])
+              for c in result.get("conflicts") or []]
+    lines += [f"{n}. {i['code']} {i.get('name') or ''} {' '.join(i['text'].split())}".strip()[:INVENTORY_ROW_CHARACTERS]
+              for n, i in enumerate((result.get("inventory") or {}).get("items") or [], 1)]
+    lines += [f"{side(m['doc_id'])}{m['field']}: 확인되지 않음({m['reason']})" for m in result.get("missing_fields") or []]
+    return "\n".join(x for x in lines if x).strip()
 
 
 def _conversation(res: Resources, principal: Principal,
@@ -837,10 +867,10 @@ def _conversation(res: Resources, principal: Principal,
             if not turns:
                 units = result.get("evidence") or {}
                 carried = [EvidenceUnit(**units[i]) for i in _cited_ids(result) if i in units][:CARRIED_EVIDENCE]
-            answer = " ".join([result.get("summary") or ""] + [c["text"] for c in result.get("claims") or []])
+            limit = LATEST_ANSWER_CHARACTERS if not turns else CONVERSATION_ANSWER_CHARACTERS
             turns.append({"question": result.get("standalone_question") or snap.get("question")
                           or FREE_TURNS.get(snap.get("mode"), ""),
-                          "answer": answer.strip()[:CONVERSATION_ANSWER_CHARACTERS] or "(답변 없음)"})
+                          "answer": _answer_text(result)[:limit] or "(답변 없음)"})
             previous = snap.get("previous_request_id", "")
     return turns[::-1], carried
 

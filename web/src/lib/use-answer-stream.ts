@@ -18,7 +18,7 @@ export type Streamed = {
  */
 export function useAnswerStream(owned: { request_id: string; generation_id: string; member: string } | null,
                                 onDone: () => void): Streamed | null {
-  const [state, setState] = useState<{ key: string; data: Streamed } | null>(null);
+  const [state, setState] = useState<{ key: string; data: Streamed | null } | null>(null);
   const done = useRef(onDone);
   useEffect(() => {
     done.current = onDone;
@@ -46,7 +46,8 @@ export function useAnswerStream(owned: { request_id: string; generation_id: stri
             done.current();
             return;
           }
-          if (event.startsWith("data: ")) setState({ key, data: JSON.parse(event.slice(6)) as Streamed });
+          // `null` withdraws the text: cancellation or a lost generation revoked it while the call still runs
+          if (event.startsWith("data: ")) setState({ key, data: JSON.parse(event.slice(6)) as Streamed | null });
         }
       }
     })().catch(() => {});  // the status poll still delivers the outcome when the stream drops
