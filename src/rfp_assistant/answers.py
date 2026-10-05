@@ -568,8 +568,10 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
     cited_ids = {e for c in answer.get("claims") or [] for e in c.get("evidence_ids") or []}
 
     def carried(g, ids) -> bool:
+        # Documents sharing an original share chunks: only evidence attributed to the group's document counts.
         return any(chunk is not None and evaluation.group_grade(chunk, g, index.elements) == 2
-                   for chunk in (chunks.get((evidence.get(eid) or {}).get("chunk_id")) for eid in ids))
+                   for chunk in (chunks.get(ev.get("chunk_id")) for ev in (evidence.get(eid) or {} for eid in ids)
+                                 if ev.get("doc_id") == g["doc_id"]))
     reached = [g for g in groups if carried(g, evidence)]
     out["groups"] = {"gold": len(groups), "retrieved": len(reached),
                      "cited": sum(carried(g, cited_ids) for g in reached)} if index is not None else None
@@ -629,14 +631,20 @@ def served_retrieval(settings: Settings, index, row: dict, record: dict) -> dict
         return None
     chunk = lambda cid: index.chunks[index.row_of[cid]] if cid in index.row_of else None  # noqa: E731
     ranking = [c for c in map(chunk, r.get("ranking") or []) if c]
-    packed = [c for c in (chunk(e["chunk_id"]) for e in r.get("evidence") or []) if c]
+    evidence = r.get("evidence") or []
+    packed = [c for c in (chunk(e["chunk_id"]) for e in evidence) if c]
     scope, groups = evaluation.row_scope(row), evaluation.row_groups(row)
     if len(scope) == 1:
         metrics = evaluation.score_row(row, ranking, packed, index.elements, groups)
     else:
-        metrics = evaluation.combine_sides([evaluation.score_row(
-            row, [c for c in ranking if c["extraction_id"] == x], [c for c in packed if c["extraction_id"] == x],
-            index.elements, [g for g in groups if g["doc_id"] == ref.doc_id]) for ref, x in scope])
+        # Packed evidence is attributed by its document: two documents sharing an original share chunks. The merged
+        # ranking keeps no side boundary, but such sides rank the same original identically, so one copy is the side's.
+        def side(ref, x):
+            ranked = list({c["chunk_id"]: c for c in ranking if c["extraction_id"] == x}.values())
+            mine = [c for c in (chunk(e["chunk_id"]) for e in evidence if e.get("doc_id") == ref.doc_id) if c]
+            return evaluation.score_row(row, ranked, mine, index.elements,
+                                        [g for g in groups if g["doc_id"] == ref.doc_id])
+        metrics = evaluation.combine_sides([side(ref, x) for ref, x in scope])
     allowed = {x for _, x in scope}
     return {"id": row["question_id"], "type": row["question_type"], "critical": evaluation.row_critical(row),
             "families": evaluation.row_families(row), "metrics": metrics,

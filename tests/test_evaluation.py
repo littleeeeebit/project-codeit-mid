@@ -334,6 +334,40 @@ class MetricFixtureTest(unittest.TestCase):
         # without the index nothing can be graded, so nothing passes
         self.assertEqual(answers.score_record(row, cite("E2"), None, {})["passed"], False)
 
+    def test_a_shared_original_credits_only_the_document_the_evidence_is_attributed_to(self):
+        """Review round 3 (F1): byte-identical originals of A and C share one chunk; only A's evidence is cited."""
+        raw = "하자보수 기간: 12개월."
+        q = "12개월"
+        start = raw.index(q)
+        index = mock.Mock(chunks=[{"chunk_id": "c1", "extraction_id": "x",
+                                   "spans": [{"element_id": "p", "start": start, "end": start + len(q)}]}],
+                          elements={("x", "p"): {"raw_text": raw, "table": None}})
+        group = lambda doc: {"group_id": f"g-{doc}", "doc_id": doc, "alternatives": [  # noqa: E731
+            {"element_id": "p", "quote": q, "extraction_id": "x", "offsets": [start, start + len(q)]}]}
+        row = {**gold_row([group("A"), group("C")]), "question_type": "t", "answerability": "answerable",
+               "expected_status": "answered", "mode": "compare", "scope": [{"doc_id": "A"}, {"doc_id": "C"}]}
+        ev = lambda doc: {"doc_id": doc, "chunk_id": "c1", "element_ids": ["p"], "quote": q}  # noqa: E731
+        record = {"finalist": "K", "outcome": "answered", "evidence": {"E1": ev("A"), "E2": ev("C")},
+                  "answer": {"claims": [{"text": q, "kind": "source_fact", "doc_id": "A", "evidence_ids": ["E1"]}],
+                             "missing_fields": [{"doc_id": "C", "field": "하자보수 기간"}]}}
+        one_side = answers.score_record(row, record, index, {})
+        self.assertEqual((one_side["groups"], one_side["passed"]), ({"gold": 2, "retrieved": 2, "cited": 1}, False))
+        both = {**record, "answer": {**record["answer"], "missing_fields": [], "claims": [
+            *record["answer"]["claims"], {"text": q, "kind": "source_fact", "doc_id": "C", "evidence_ids": ["E2"]}]}}
+        self.assertEqual(answers.score_record(row, both, index, {})["groups"], {"gold": 2, "retrieved": 2, "cited": 2})
+        # evidence packed only for A never reaches C's group either
+        only_a = {**record, "evidence": {"E1": ev("A")}}
+        self.assertEqual(answers.score_record(row, only_a, index, {})["groups"], {"gold": 2, "retrieved": 1, "cited": 1})
+        # the served-retrieval report splits a comparison the same way: by the evidence's document, not its extraction
+        index.row_of = {"c1": 0}
+        row["scope"] = [{"doc_id": d, "source_hash": "h", "extraction_id": "x"} for d in ("A", "C")]
+        trace = {"retrieval": {"ranking": ["c1", "c1"], "evidence": [{"doc_id": "A", "chunk_id": "c1"}]}}
+        conn = mock.MagicMock()
+        conn.__enter__.return_value.execute.return_value.fetchone.return_value = (json.dumps(trace),)
+        with mock.patch.object(answers, "open_db", return_value=conn):
+            served = answers.served_retrieval(mock.Mock(), index, row, {**only_a, "request_id": "r"})
+        self.assertEqual((served["metrics"]["packed_grades"], served["metrics"]["unit_grades@20"]), ([2, 0], [2, 2]))
+
     def test_named_cells_pick_the_approved_row(self):
         cells = [{"row": 0, "col": 0, "text": "이전 계약"}, {"row": 0, "col": 1, "text": "12개월"},
                  {"row": 1, "col": 0, "text": "현재 계약"}, {"row": 1, "col": 1, "text": "12개월"}]
