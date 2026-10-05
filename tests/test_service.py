@@ -737,6 +737,35 @@ class ModesTest(Base):
         self.assertEqual(r.status, "technical_error")
         self.assertIn("comparison_side_missing", r.error)
 
+    def test_a_comparison_inference_cites_both_sides_but_a_fact_only_its_own(self):
+        # refresh50-eg-input-error / dh-linked-data (PR #13): every fact cited its own side, and the one inference
+        # comparing the sides cited both, e.g. {"kind": "inference", "doc_id": B, "evidence_ids": ["E1", "E6"]}.
+        def answer(kind, own, other):
+            def respond(messages):
+                by_doc = json.loads(messages[-1]["content"])["evidence_ids_by_doc"]
+                (a, ea), (b, eb) = by_doc.items()
+                facts = [{"text": f"{d} 사실", "kind": "source_fact", "doc_id": d, "evidence_ids": [e[0]]}
+                         for d, e in ((a, ea), (b, eb))]
+                ids = ([eb[0]] if own else []) + ([ea[0]] if other else [])
+                return ProviderResponse(json.dumps({"status": "answered", "summary": "비교", "missing_fields": [],
+                    "conflicts": [], "next_action": None, "claims": facts + [
+                        {"text": "B가 A보다 짧다", "kind": kind, "doc_id": b, "evidence_ids": ids}]}),
+                    None, "stop", {"prompt_tokens": 100, "completion_tokens": 10}, str(uuid.uuid4()))
+            return respond
+
+        for kind, own, other, error in (("inference", True, True, None),
+                                        ("source_fact", True, True, "evidence_scope_mismatch"),
+                                        ("inference", False, True, "evidence_scope_mismatch")):
+            with self.subTest(kind=kind, own=own):
+                self.transport.responder = answer(kind, own, other)
+                r = self.run_req(req(self.a, mode="compare", question="시스템 구축 내용은?", scope=[self.a, self.d]))
+                if error is None:
+                    self.assertEqual(r.status, "answered", r.error)
+                    self.assertEqual(len(r.claims[-1]["evidence_ids"]), 2)
+                else:
+                    self.assertEqual(r.status, "technical_error")
+                    self.assertIn(error, r.error)
+
     def test_an_unavailable_side_is_an_explicit_limitation(self):
         r = self.run_req(req(self.a, mode="compare", question="하자보수 기간은?", scope=[self.a, self.e]))
         self.assertEqual(r.status, "answered", r.error)

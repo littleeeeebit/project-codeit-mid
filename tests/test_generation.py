@@ -103,6 +103,24 @@ class AnswerFlowTest(unittest.TestCase):
         self.transport.responder = lambda m: ProviderResponse("{}", None, "length", _usage(), "r4")
         self.assertIn("output_truncated", self.ask().error)
 
+    def test_reasoning_that_fills_the_old_cap_still_leaves_room_for_the_answer(self):
+        # refresh50-ad-migration-design (PR #13): reasoning took all 2,000 completion tokens and nothing was written.
+        reasoning, caps, chat = 2000, [], self.transport.chat
+        self.transport.chat = lambda **kw: caps.append(kw["max_completion_tokens"]) or chat(**kw)
+
+        def reasoning_heavy(messages):
+            cap = caps[-1]
+            body = generation._echo_first_evidence(messages).content
+            used = reasoning + generation.count_tokens(body)
+            usage = {**_usage(), "completion_tokens": min(cap, used), "reasoning_tokens": min(cap, reasoning)}
+            if used > cap:
+                return ProviderResponse(None, None, "length", usage, "long-1")
+            return ProviderResponse(body, None, "stop", usage, "long-2")
+
+        self.transport.responder = reasoning_heavy
+        r = self.ask()
+        self.assertEqual(r.status, "answered", r.error)
+
     def test_quarantined_source_and_disabled_budget_do_not_dispatch(self):
         r = self.ask(ref=self.env.refs["기관E"])
         self.assertEqual(r.status, "ingestion_unavailable")

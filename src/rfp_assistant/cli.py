@@ -368,7 +368,7 @@ def cmd_plan_run(args, settings) -> int:
         est = answers.plan_latency(settings, waves=args.waves, users=args.users)
     else:
         est = answers.plan_run(settings, args.action, args.dataset, _ids(args.runs), args.freeze_id,
-                               post_test=args.post_test_regression)
+                               post_test=args.post_test_regression, question_ids=args.question_id)
     _print({k: v for k, v in est.items() if k != "per_row" or args.verbose})
     return 0 if est["fits"] else 1
 
@@ -634,6 +634,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="judge-comparison: calibration fits Jev thresholds; held_out is the reported part")
     s.add_argument("--dataset", default="dev", help="answer-finalists: the reviewed development split")
     s.add_argument("--runs", help="answer-finalists: one or two retrieval run IDs (default: active + its finalist)")
+    s.add_argument("--question-id", action="append",
+                   help="answer-finalists: only these development rows (repeat); part of the run identity")
     s.add_argument("--freeze-id", help="sealed: the release freeze")
     s.add_argument("--post-test-regression", action="store_true",
                    help="sealed: a further run after the untouched sealed result (needs --reason at run time)")

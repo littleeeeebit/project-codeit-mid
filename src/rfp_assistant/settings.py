@@ -55,7 +55,7 @@ class Settings:
     evidence_target_tokens: int = 3000
     evidence_max_tokens: int = 5000  # keeps every prompt far below the 272K long-context price tier
     evidence_max_units: int = 6
-    generation_max_output_tokens: int = 2000  # includes reasoning tokens
+    generation_max_output_tokens: int = 4000  # includes reasoning tokens; the released candidate's cap
     question_max_characters: int = 2000
     retrieval_mode: str = "kiwi_bm25"  # default until `activate-run` records a measured selection
     reranker_enabled: bool = False

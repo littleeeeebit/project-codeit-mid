@@ -880,6 +880,40 @@ class AnswerRunTest(GoldRetrievalTest):
         blocked = [r for r in answers.load_progress(self.s, out["run_id"]).values() if r["attempt_no"] == 2]
         self.assertEqual(len(blocked), 1)
 
+    def test_a_question_subset_runs_only_its_rows_and_scores_each_row(self):
+        # The PR #13 failures are rerun alone: the subset is part of the identity and the only rows planned or sent.
+        whole = answers.plan_run(self.s, "answer-finalists", "dev", [self.k1], store=False)
+        with self.assertRaisesRegex(answers.AnswerEvalError, "not reviewed dev rows: nope"):
+            answers.plan_run(self.s, "answer-finalists", "dev", [self.k1], question_ids=["nope"])
+        est = answers.plan_run(self.s, "answer-finalists", "dev", [self.k1], question_ids=["dev-compare"])
+        self.assertEqual((est["rows"], est["question_ids"]), (1, ["dev-compare"]))
+        self.assertNotEqual(est["run_id"], whole["run_id"])
+
+        def cite_all(messages):
+            by_doc = json.loads(messages[-1]["content"])["evidence_ids_by_doc"]
+            return generation.ProviderResponse(json.dumps({
+                "status": "answered", "summary": "s", "missing_fields": [], "conflicts": [], "next_action": None,
+                "claims": [{"text": "t", "kind": "source_fact", "doc_id": d, "evidence_ids": ids}
+                           for d, ids in by_doc.items() if ids]}), None, "stop",
+                {"prompt_tokens": 100, "completion_tokens": 10}, f"r-{len(transport.calls)}")
+
+        transport = FakeTransport(cite_all)
+        res = service.Resources(self.s, transport=transport, recover=True)
+        try:
+            out = answers.run_answers(self.s, res, est["estimate_id"], "tester")
+        finally:
+            res.close()
+        self.assertEqual((len(transport.calls), out["status"]), (1, "complete"))
+        passed = out["finalists"][self.k1]["rows_passed"]
+        self.assertEqual((passed["numerator"], passed["denominator"]), (1, 1))
+        # the same answer without the claim that cites a reached group fails: retrieval reached it, the answer didn't
+        (row,) = [r for r in evaluation.load_eval_rows(self.s, "dev")[0] if r["question_id"] == "dev-compare"]
+        record = answers.load_progress(self.s, out["run_id"])[(self.k1, "dev-compare")]
+        scored = answers.score_record(row, record, None, {})
+        self.assertEqual(scored["groups"], {"gold": 2, "retrieved": 2, "cited": 2})
+        dropped = {**record, "answer": {**record["answer"], "claims": record["answer"]["claims"][1:]}}
+        self.assertFalse(answers.score_record(row, dropped, None, {})["passed"])
+
     def test_changed_prices_or_prompts_need_a_new_plan(self):
         est = answers.plan_run(self.s, "answer-finalists", "dev", [self.k1])
         with mock.patch.object(generation, "PROMPT_VERSION", "grounded-answer-x"):
