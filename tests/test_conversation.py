@@ -126,11 +126,12 @@ class FollowUpTest(Base):
             x = conn.execute("SELECT active_extraction_id FROM documents d JOIN sources s ON s.source_hash = "
                              "d.active_source_hash WHERE d.doc_id = ?", (self.a.doc_id,)).fetchone()[0]
             els = sorted((e for (xx, _), e in idx.elements.items() if xx == x), key=lambda e: e["source_order"])
-            for code, el in (("SFR-001", els[0]), ("SFR-002", els[1]), ("SFR-003", els[2])):
+            # source order SFR-001, PER-001, SFR-002; the table groups by prefix: SFR-001, SFR-002, PER-001
+            for code, el in (("SFR-001", els[0]), ("PER-001", els[1]), ("SFR-002", els[2])):
                 conn.execute("INSERT INTO requirements VALUES (?, ?, ?, ?, ?, ?, ?)",
                              (idx.version, x, code, code, "detail", el["element_id"], code + " 이름"))
         for mode, follow, shown in (("metadata", "방금 나온 사업 금액을 한글로 풀어 주세요.", "amount_krw: 130000000"),
-                                    ("inventory", "세 번째 요구사항을 쉽게 설명해 주세요", "3. SFR-003 SFR-003 이름")):
+                                    ("inventory", "세 번째 요구사항을 쉽게 설명해 주세요", "3. PER-001 PER-001 이름")):
             with self.subTest(mode=mode):
                 first = self.turn("", mode=mode)  # 기관A's metadata is a CSV conflict; it still shows its values
                 self.assertIn(first.status, ("answered", "conflicting_evidence"), first.error)

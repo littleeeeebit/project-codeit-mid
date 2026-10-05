@@ -214,15 +214,26 @@ export function FactsTable({ answer }: { answer: Answer }) {
   );
 }
 
-export function InventoryTable({ answer, onCite }: { answer: Answer; onCite: (id: string) => void }) {
-  const inv = answer.inventory;
-  if (!inv) return null;
-  const byPrefix = new Map<string, typeof inv.items>();  // SFR, PER, ...: source order kept within a group
-  for (const item of inv.items) {
+type InventoryItem = NonNullable<Answer["inventory"]>["items"][number];
+
+/** Requirement rows grouped as the table shows them: by source-form prefix (SFR, PER, ...; 기타 when none) in
+ *  first-seen order, source order within a group. Citation numbers and the conversation (service.
+ *  inventory_display_order) count rows in this order, so "세 번째 요구사항" is the third row on screen. */
+function inventoryGroups(items: InventoryItem[]): [string, InventoryItem[]][] {
+  const byPrefix = new Map<string, InventoryItem[]>();
+  for (const item of items) {
     const prefix = item.source_form.split(/[-_]/)[0] || "기타";
     byPrefix.set(prefix, [...(byPrefix.get(prefix) ?? []), item]);
   }
-  const groups = [...byPrefix.entries()];
+  return [...byPrefix.entries()];
+}
+
+const inventoryRows = (items: InventoryItem[]) => inventoryGroups(items).flatMap(([, rows]) => rows);
+
+export function InventoryTable({ answer, onCite }: { answer: Answer; onCite: (id: string) => void }) {
+  const inv = answer.inventory;
+  if (!inv) return null;
+  const groups = inventoryGroups(inv.items);
   return (
     <Section title={`요구사항 ${inv.counts.codes ?? inv.items.length}개`}
              aside={<span className="text-[13px] text-muted-foreground">상세 {inv.counts.detail ?? 0} · 요약만 {inv.counts.summary ?? 0}</span>}>
@@ -365,5 +376,6 @@ export function firstCited(lists: string[][], keep: (id: string) => boolean = ()
 export function citedInOrder(a: Answer): string[] {
   return firstCited([a.summary_evidence_ids, ...a.claims.map((c) => c.evidence_ids),
     ...a.conflicts.flatMap((c) => c.alternatives.map((alt) => alt.evidence_ids)),
-    ...(a.inventory?.items ?? []).map((i) => (i.evidence_id ? [i.evidence_id] : []))], (id) => id in a.evidence);
+    ...inventoryRows(a.inventory?.items ?? []).map((i) => (i.evidence_id ? [i.evidence_id] : []))],
+  (id) => id in a.evidence);
 }

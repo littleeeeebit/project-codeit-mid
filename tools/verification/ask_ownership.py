@@ -188,6 +188,26 @@ class AskOwnershipTest(unittest.TestCase):
         self.wait_for(lambda: self.rows()[0]["status"] == "cancelled", "the held call did not finish as cancelled")
         expect(provisional).to_have_count(0)
 
+    def test_requirement_rows_and_their_citation_numbers_follow_the_grouped_table(self):
+        idx = self.res.index()
+        with open_db(self.env.settings.db_path) as conn:
+            for x in {xx for (xx, _) in idx.elements}:  # whichever document the screen picks first
+                els = sorted((e for (xx, _), e in idx.elements.items() if xx == x), key=lambda e: e["source_order"])
+                if len(els) < 3 or conn.execute("SELECT 1 FROM requirements WHERE extraction_id = ?", (x,)).fetchone():
+                    continue
+                for code, el in (("SFR-001", els[0]), ("PER-001", els[1]), ("SFR-002", els[2])):  # source order
+                    conn.execute("INSERT INTO requirements VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                 (idx.version, x, code, code, "detail", el["element_id"], code + " 이름"))
+        self.page.get_by_role("radio", name="요구사항 목록").click()
+        self.page.get_by_role("button", name="요구사항 목록 보기").click()
+        table = self.page.get_by_role("table", name="요구사항 목록")
+        expect(table).to_be_visible(timeout=15000)
+        codes = table.get_by_role("button", name=re.compile(r" 원문 보기$"))
+        self.assertEqual([c.inner_text() for c in codes.all()], ["SFR-001", "SFR-002", "PER-001"])
+        codes.nth(2).click()
+        pane = self.page.get_by_role("complementary", name="대화 근거", exact=True)
+        expect(pane.get_by_role("heading", name="근거 3 원문 인용")).to_be_visible()
+
     def test_navigation_abandons_queued_work(self):
         self.occupy_worker()
         self.page.locator("main button[type=submit]").click()

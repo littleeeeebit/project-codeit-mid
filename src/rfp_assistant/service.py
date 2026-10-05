@@ -817,6 +817,16 @@ def _cited_ids(result: dict) -> list[str]:
                                  for i in a["evidence_ids"])]))
 
 
+def inventory_display_order(items: list[dict]) -> list[dict]:
+    """Requirement rows as the 요구사항 table shows them (`inventoryRows` in answer-parts.tsx): grouped by the
+    prefix of their source form (SFR, PER, ...; 기타 when none), groups in first-seen order, source order within a
+    group. "세 번째 요구사항" means the third row there."""
+    groups: dict[str, list[dict]] = {}
+    for item in items:
+        groups.setdefault(re.split(r"[-_]", item.get("source_form") or "")[0] or "기타", []).append(item)
+    return [item for group in groups.values() for item in group]
+
+
 def _answer_text(result: dict) -> str:
     """An earlier answer as the screen showed it, for the conversation context: the summary and sentences, then the
     metadata values, conflicting values, requirement rows in their displayed order, and what was not found. A
@@ -842,8 +852,9 @@ def _answer_text(result: dict) -> str:
               for f in result.get("facts") or []]
     lines += [f"{c['field']}: " + " / ".join(f"{side(a['doc_id'])}{a['value']}" for a in c["alternatives"])
               for c in result.get("conflicts") or []]
-    lines += [f"{n}. {i['code']} {i.get('name') or ''} {' '.join(i['text'].split())}".strip()[:INVENTORY_ROW_CHARACTERS]
-              for n, i in enumerate((result.get("inventory") or {}).get("items") or [], 1)]
+    lines += [f"{n}. {i.get('source_form') or i['code']} {i.get('name') or ''} {' '.join(i['text'].split())}"
+              .strip()[:INVENTORY_ROW_CHARACTERS]
+              for n, i in enumerate(inventory_display_order((result.get("inventory") or {}).get("items") or []), 1)]
     lines += [f"{side(m['doc_id'])}{m['field']}: 확인되지 않음({m['reason']})" for m in result.get("missing_fields") or []]
     return "\n".join(x for x in lines if x).strip()
 
