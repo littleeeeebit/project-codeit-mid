@@ -83,7 +83,7 @@ python -m rfp_assistant.cli adjust --key <unique key> --amount-usd 0.12 --eviden
 python -m rfp_assistant.cli paid off --reason "<why>" --actor <owner>
 ```
 
-`budget-report` is the daily owner check. It prints the totals (cap, spent, pending, unknown, available, adjustments), each purpose envelope with its used and remaining amount, each member's settled and pending amount, and the reconciliation watermark: the ledger revision, the latest reconciled interval end with its ID and scope, and the unresolved amount. It reads the ledger only. It needs no API key, opens no provider client or gateway, and writes nothing, not even schema statements.
+`budget-report` is the daily owner check. It prints the totals (cap, spent, pending, unknown, available, adjustments), each purpose envelope with its used and remaining amount, each member's settled and pending amount, and the reconciliation watermark: the ledger revision, the latest reconciled interval end with its ID and scope, and the unresolved amount. Every field comes from one read-only snapshot, so it can run while the app serves: a settlement or reconciliation committed meanwhile is wholly in the report or wholly absent. It reads the ledger only. It needs no API key, opens no provider client or gateway, and writes nothing, not even schema statements.
 
 An `unknown` attempt holds its full reservation until evidence arrives. There is no bulk release, and age alone never releases anything. Resolve one attempt with exactly one of these, each with a reason and an audit event:
 

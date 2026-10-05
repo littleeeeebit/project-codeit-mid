@@ -16,6 +16,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from . import budget, evaluation, generation, ingestion
+from .postgres import read_snapshot
 from .settings import REPO_ROOT, Settings
 from .store import get_app_setting, open_db, utcnow, write_text_atomic
 
@@ -36,9 +37,9 @@ def _sha_file(path: Path) -> str:
 
 
 def ledger_summary(db: Path) -> dict:
-    """The amounts a restore must reproduce exactly."""
-    snap = budget.snapshot(db)
-    with open_db(db) as conn:
+    """The amounts a restore must reproduce exactly, all from one read snapshot."""
+    with open_db(db) as conn, read_snapshot(conn):
+        snap = budget._snapshot(conn)
         by_state = {r[0]: {"attempts": r[1], "reserved_micro_usd": r[2], "settled_micro_usd": r[3]} for r in conn.execute(
             "SELECT state, COUNT(*), COALESCE(SUM(reserved_micro_usd), 0), COALESCE(SUM(settled_micro_usd), 0) "
             "FROM attempts GROUP BY state")}

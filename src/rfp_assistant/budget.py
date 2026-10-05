@@ -19,7 +19,7 @@ from pathlib import Path
 from .contracts import BudgetSnapshot
 from .settings import DEFAULT_RATES, RATE_VERSION, LARGE_RATE_VERSION, LARGE_RATE_CHECKED_AT
 from .store import OPERATIONAL_ERRORS, dumps, get_app_setting, open_db, set_app_setting, tx, utcnow
-from .postgres import Connection, Row, owner_guard, require_owner, Target
+from .postgres import Connection, Row, owner_guard, read_snapshot, require_owner, Target
 
 MICRO = 1_000_000
 # sixteenths of the operating cap; `judge_eval` (judges.py) starts empty and is funded only by an owner reallocation
@@ -485,9 +485,10 @@ def pacing(cap_micro: int, committed_micro: int, start: str | None, end: str | N
 
 def report(db: Path) -> dict:
     """The owner's read-only budget report: totals, each purpose envelope, each member and the reconciliation
-    watermark. It reads the ledger only; no provider, key or gateway is involved."""
-    snap = snapshot(db)
-    with open_db(db) as conn:
+    watermark. It reads the ledger only; no provider, key or gateway is involved. Every field comes from one
+    read-only snapshot, so a settlement or reconciliation committed meanwhile is either wholly in it or wholly not."""
+    with open_db(db) as conn, read_snapshot(conn):
+        snap = _snapshot(conn)
         envelopes = json.loads(_settings_row(conn)["envelopes_json"])
         categories = {p: {"envelope_micro_usd": cap, "used_micro_usd": (used := _purpose_used(conn, p)),
                           "remaining_micro_usd": cap - used} for p, cap in sorted(envelopes.items())}
@@ -514,28 +515,33 @@ def report(db: Path) -> dict:
 
 
 def snapshot(db: Path, today: date | None = None) -> BudgetSnapshot:
+    with open_db(db) as conn, read_snapshot(conn):
+        return _snapshot(conn, today)
+
+
+def _snapshot(conn: Connection, today: date | None = None) -> BudgetSnapshot:
+    """Every figure from the caller's one read snapshot, so totals, members and the revision agree."""
     from zoneinfo import ZoneInfo
     from datetime import datetime
 
     today = today or datetime.now(ZoneInfo("Asia/Seoul")).date()
-    with open_db(db) as conn:
-        row = _settings_row(conn)
-        totals = _totals(conn)
-        tokens = {"prompt": 0, "completion": 0, "cached": 0}
-        per_member: dict[str, int] = {}
-        for a in conn.execute("SELECT member_id, state, settled_micro_usd, raw_usage_json FROM attempts "
-                              "WHERE state = 'settled'"):
-            usage = json.loads(a["raw_usage_json"] or "{}")
-            tokens["prompt"] += int(usage.get("prompt_tokens", 0))
-            tokens["completion"] += int(usage.get("completion_tokens", 0))
-            tokens["cached"] += int(usage.get("cached_tokens", 0))
-            per_member[a["member_id"]] = per_member.get(a["member_id"], 0) + a["settled_micro_usd"]
-        open_attempts = conn.execute(f"SELECT COUNT(*) FROM attempts WHERE state IN {OPEN_STATES}").fetchone()[0]
-        last = conn.execute("SELECT MAX(created_at) FROM adjustments WHERE correction_key LIKE 'reconcile:%'"
-                            ).fetchone()[0]
-        revision = get_app_setting(conn, "ledger_revision") or "0"
-        unknown = conn.execute("SELECT COALESCE(SUM(reserved_micro_usd), 0) FROM attempts WHERE state = 'unknown'"
-                               ).fetchone()[0]
+    row = _settings_row(conn)
+    totals = _totals(conn)
+    tokens = {"prompt": 0, "completion": 0, "cached": 0}
+    per_member: dict[str, int] = {}
+    for a in conn.execute("SELECT member_id, state, settled_micro_usd, raw_usage_json FROM attempts "
+                          "WHERE state = 'settled'"):
+        usage = json.loads(a["raw_usage_json"] or "{}")
+        tokens["prompt"] += int(usage.get("prompt_tokens", 0))
+        tokens["completion"] += int(usage.get("completion_tokens", 0))
+        tokens["cached"] += int(usage.get("cached_tokens", 0))
+        per_member[a["member_id"]] = per_member.get(a["member_id"], 0) + a["settled_micro_usd"]
+    open_attempts = conn.execute(f"SELECT COUNT(*) FROM attempts WHERE state IN {OPEN_STATES}").fetchone()[0]
+    last = conn.execute("SELECT MAX(created_at) FROM adjustments WHERE correction_key LIKE 'reconcile:%'"
+                        ).fetchone()[0]
+    revision = get_app_setting(conn, "ledger_revision") or "0"
+    unknown = conn.execute("SELECT COALESCE(SUM(reserved_micro_usd), 0) FROM attempts WHERE state = 'unknown'"
+                           ).fetchone()[0]
     allowance = row["allowance_micro_usd"]
     committed = totals["spent"] + totals["pending"]
     cap_percent = 100 * committed / row["cap_micro_usd"] if row["cap_micro_usd"] else 100.0

@@ -144,6 +144,33 @@ class BackupRestoreTest(unittest.TestCase):
                                                "reconciliation_id": None, "scope": None,
                                                "unresolved_micro_usd": total["unknown_micro_usd"]})
 
+    def test_budget_report_reads_one_ledger_state_while_an_attempt_settles(self):
+        """Review round 1 (F2): an attempt settles on another connection in the middle of the report."""
+        before = release.ledger_summary(self.s.db_path)
+        used, settled = budget._purpose_used, []
+
+        def settle_midway(conn, purpose):
+            if not settled:
+                settled.append(budget.settle(self.s.db_path, self.unknown, {"prompt_tokens": 10}, "late"))
+            return used(conn, purpose)
+        with store.database_lifecycle(self.s.db_path), mock.patch.object(budget, "_purpose_used", settle_midway):
+            report = budget.report(self.s.db_path)
+        self.assertEqual(len(settled), 1)
+        total = report["total"]
+        self.assertEqual(report["watermark"]["ledger_revision"], before["ledger_revision"])
+        self.assertEqual((total["spent_micro_usd"], total["pending_micro_usd"]),
+                         (before["spent_micro_usd"], before["pending_micro_usd"]))
+        self.assertEqual(sum(m["settled_micro_usd"] for m in report["members"].values()) + total["adjustments_micro_usd"],
+                         total["spent_micro_usd"])
+        self.assertEqual(sum(m["pending_micro_usd"] for m in report["members"].values()), total["pending_micro_usd"])
+        self.assertEqual(sum(c["used_micro_usd"] for c in report["categories"].values()),
+                         total["spent_micro_usd"] - total["adjustments_micro_usd"] + total["pending_micro_usd"])
+        with store.database_lifecycle(self.s.db_path):  # the next report sees the settlement whole
+            after = budget.report(self.s.db_path)
+        self.assertNotEqual(after["watermark"]["ledger_revision"], before["ledger_revision"])
+        self.assertEqual(sum(m["settled_micro_usd"] for m in after["members"].values())
+                         + after["total"]["adjustments_micro_usd"], after["total"]["spent_micro_usd"])
+
     def test_a_tampered_backup_fails_its_check(self):
         evaluation.assign_families(self.s)
         out = release.backup(self.s, self.root / "backup-2", "owner")
