@@ -1,9 +1,9 @@
 created: 2026-10-05 09:51:23.444000+00:00
-updated: 2026-10-05 09:51:23.745000+00:00
-update_count: 3
-last_field: constraint
+updated: 2026-10-05T23:55:23.105Z
+update_count: 4
+last_field: description
 kind: nested-class
 title: comparison-runner
 children: []
 parentPath:
-- offline-pipelines
+  - offline-pipelines

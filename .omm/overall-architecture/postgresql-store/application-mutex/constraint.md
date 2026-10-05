@@ -1,0 +1,1 @@
+The source carries a `ponytail:` comment: one write mutex serializes admission and idempotency, and per-account locks would replace it only if measured throughput required them.

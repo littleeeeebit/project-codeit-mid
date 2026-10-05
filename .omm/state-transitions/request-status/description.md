@@ -1,0 +1,1 @@
+Statuses: `queued`, `running`, `completed`, `failed`, `cancelled`, `interrupted` (CHECK constraint in store.SCHEMA). `TERMINAL_STATUSES` gate follow-ups. `cancel_requested` is a separate flag: it stops further paid stages and attachment while the current call finishes and settles.

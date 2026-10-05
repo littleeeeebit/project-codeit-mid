@@ -1,1 +1,0 @@
-`step_embedding` is skipped for keyword-only serving. Otherwise `compare.ensure_dense` embeds the rebuilt index's uncached chunks with the activated embedding model: free locally, or `NeedsApproval` with the priced estimate for a paid API model.

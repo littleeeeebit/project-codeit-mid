@@ -1,1 +1,0 @@
-`usePoll(key, load, everyMs, done)` is read-only polling keyed by what it watches. When the key changes, results still in flight are dropped so that a late answer never lands on a screen that has moved on. Polling stops once `done(data)` is true; for the ask page that means the status is no longer queued or running. Passing `everyMs = null` loads once.

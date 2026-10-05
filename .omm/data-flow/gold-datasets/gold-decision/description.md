@@ -1,1 +1,0 @@
-Covered at `state-transitions/gold-candidate-states`: first decision wins, the reviewer must differ from the drafter, drafting model and drafting requester, a note is required, and a gold-2 approval requires `original_inspected`.

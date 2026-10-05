@@ -1,20 +1,23 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-05 21:23:55.830000+00:00
-update_count: 10
+updated: 2026-10-05 23:55:29.277000+00:00
+update_count: 12
 last_field: diagram
-git_commit: 797b897
-git_branch: judge-set-and-maintenance
+git_commit: 467d0b9
+git_branch: chat-multiturn-streaming
 children:
-- attempt-states
+- attempt-billing
+- gateway-ownership
 - gold-candidate-states
-- maintenance-run-states
-- request-states
-- restart-recovery
+- paid-admission-switches
+- request-status
 - serving-activation
-prev_diagram: "graph TD\r\n  request-status[\"Request status\\nsrc/rfp_assistant/service.py\"\
-  ] -->|\"attempts per request\"| billing-attempt[\"Billing attempt\\nsrc/rfp_assistant/budget.py\"\
-  ]\r\n  serving-activation[\"Serving activation\\nsrc/rfp_assistant/evaluation.py\"\
-  ] -->|\"mode for retrieval\"| request-status\r\n  source-review[\"Source review\\\
-  nsrc/rfp_assistant/fidelity.py\"] -->|\"index admission\"| serving-activation\r\n\
-  \  gold-candidate[\"Gold candidate\\nsrc/rfp_assistant/gold.py\"] -->|\"dataset\
-  \ population\"| serving-activation"
+prev_diagram: "graph TD\r\n  request-states[\"Request status\\nsrc/rfp_assistant/service.py\"\
+  ] -->|each paid stage reserves| attempt-states[\"Attempt billing state\\nsrc/rfp_assistant/budget.py\"\
+  ]\r\n  attempt-states -->|billing_state precedence| request-states\r\n  serving-activation[\"\
+  Serving activation\\nsrc/rfp_assistant/evaluation.py\"] -->|config snapshot per\
+  \ request| request-states\r\n  gold-candidate-states[\"Gold candidate status\\nsrc/rfp_assistant/gold.py\"\
+  ] -->|approved rows grade runs| serving-activation\r\n  maintenance-run-states[\"\
+  Maintenance run status\\nsrc/rfp_assistant/maintenance.py\"] -->|regression rows\
+  \ only| serving-activation\r\n  restart-recovery[\"Restart recovery\\nsrc/rfp_assistant/service.py\"\
+  ] -->|queued and running interrupted| request-states\r\n  restart-recovery -->|dispatching\
+  \ becomes unknown| attempt-states"

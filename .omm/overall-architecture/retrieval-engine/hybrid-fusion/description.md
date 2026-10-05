@@ -1,0 +1,1 @@
+`fuse` computes weighted RRF (`rrf_fuse`, `1/(k+rank)`, a repeated ID votes once). With `fusion == keyword_first`, the first `keyword_head` BM25 rows keep BM25 order and cannot be displaced by dense rows. The list is cut to `fused_top_k`.

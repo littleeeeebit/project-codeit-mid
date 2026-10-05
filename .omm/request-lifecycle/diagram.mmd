@@ -1,8 +1,18 @@
 graph TD
-  ask-page["Ask screen\nweb/src/components/ask/ask-page.tsx"] -->|POST /api/ask| admission["Validate and persist\nsrc/rfp_assistant/service.py"]
-  admission -->|request_id to executor| worker["Worker claim\nsrc/rfp_assistant/service.py"]
-  worker -->|checkpoint then retrieve| retrieval-stage["Retrieve and price\nsrc/rfp_assistant/service.py"]
-  retrieval-stage -->|input token estimate| paid-call["Reserve dispatch settle\nsrc/rfp_assistant/budget.py"]
-  paid-call -->|provider response| validation["Citation validation\nsrc/rfp_assistant/generation.py"]
-  validation -->|AnswerResult| finish["Finish request row\nsrc/rfp_assistant/service.py"]
-  ask-page -->|poll GET request| finish
+  ask-route["Ask route\nsrc/rfp_assistant/api.py"]
+  request-admission["Validate, persist, admit\nsrc/rfp_assistant/service.py"]
+  runner-claim["Runner claims request\nsrc/rfp_assistant/service.py"]
+  follow-up-rewrite["Follow-up rewrite stage\nsrc/rfp_assistant/generation.py"]
+  retrieval-stage["Retrieval and pricing\nsrc/rfp_assistant/service.py"]
+  generation-stage["Streaming generation stage\nsrc/rfp_assistant/generation.py"]
+  answer-validation["Answer validation\nsrc/rfp_assistant/generation.py"]
+  outcome-store["Outcome and attachment\nsrc/rfp_assistant/service.py"]
+  ask-route -->|AnswerRequest with fresh ids| request-admission
+  request-admission -->|queued row, request id| runner-claim
+  runner-claim -->|follow-up with history| follow-up-rewrite
+  runner-claim -->|first turn| retrieval-stage
+  follow-up-rewrite -->|standalone question| retrieval-stage
+  retrieval-stage -->|messages and estimate| generation-stage
+  retrieval-stage -->|no evidence found| outcome-store
+  generation-stage -->|provider response| answer-validation
+  answer-validation -->|AnswerResult| outcome-store

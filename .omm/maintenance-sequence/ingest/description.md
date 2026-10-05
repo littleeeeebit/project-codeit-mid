@@ -1,1 +1,0 @@
-`step_ingest` runs `init_schema`, `import_manifest`, `ingest` and `write_ingest_report`. Any `error` result fails the step. `ctx['changed_sources']` holds the sources whose active extraction or parse status actually changed; an identical re-parse counts as unchanged.

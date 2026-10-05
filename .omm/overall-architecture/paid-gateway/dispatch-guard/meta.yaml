@@ -1,0 +1,9 @@
+created: 2026-10-05T23:55:18.341Z
+updated: 2026-10-05T23:55:18.497Z
+update_count: 2
+last_field: concern
+kind: nested-class
+title: dispatch-guard
+children: []
+parentPath:
+  - paid-gateway

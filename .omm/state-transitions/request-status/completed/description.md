@@ -1,0 +1,1 @@
+Written by `_finish` for any domain outcome stored with request status completed: answered, `insufficient_evidence`, `ingestion_unavailable`, `budget_blocked` and similar result statuses. The result status (`AnswerResult.status`) is distinct from the execution status.

@@ -1,9 +1,0 @@
-created: 2026-10-05T21:23:50.846Z
-updated: 2026-10-05T21:23:50.847Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: query-policy
-children: []
-parentPath:
-  - retrieval-engine

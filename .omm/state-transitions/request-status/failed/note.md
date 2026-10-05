@@ -1,0 +1,1 @@
+Observed: `_finish` converts only a would-be `completed` into `cancelled` when `cancel_requested` is set. A cancelled request whose in-flight stage then fails is stored as `failed`. Either way it is not attachable, because `may_attach` also checks `cancel_requested`.

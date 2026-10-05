@@ -1,14 +1,27 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-05T21:23:47.684Z
-update_count: 4
+updated: 2026-10-05 23:55:11.621000+00:00
+update_count: 6
 last_field: diagram
 kind: nested-class
 title: service-core
 children:
-  - answer-orchestration
-  - background-jobs
-  - request-runner
-  - resources-owner
-  - serving-config
-  - verifier-runs
+- answer-execution
+- ask-submission
+- background-jobs
+- conversation-context
+- evidence-views
+- progress-partials
+- request-runner
+- resources-owner
+- serving-config
 parentPath: []
+prev_diagram: "graph TD\r\n  resources-owner[\"Resources owner\\nsrc/rfp_assistant/service.py\"\
+  ] -->|lazily creates| request-runner[\"RequestRunner executor\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  request-runner -->|run_queued request_id| answer-orchestration[\"Answer orchestration\\\
+  nsrc/rfp_assistant/service.py\"]\r\n  answer-orchestration -->|run settings and\
+  \ index| serving-config[\"Serving configuration\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  verifier-runs[\"Verifier runs\\nsrc/rfp_assistant/service.py\"] -->|frozen\
+  \ evidence generation| answer-orchestration\r\n  verifier-runs -->|config_id snapshot|\
+  \ serving-config\r\n  background-jobs[\"Background jobs\\nsrc/rfp_assistant/service.py\"\
+  ] -->|borrow transport and join on close| resources-owner\r\n  resources-owner -->|loads\
+  \ index dense reranker| serving-config"

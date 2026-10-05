@@ -1,0 +1,1 @@
+Calls `GET /api/documents` (`service.find_documents` → `search_projects`) with query, institution, amount and closing-date filters. The results list indexed (askable) documents first. Toggling a document calls `AskPage.toggle`, which releases the current conversation, because a conversation is bound to one scope.

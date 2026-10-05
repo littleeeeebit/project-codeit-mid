@@ -1,0 +1,1 @@
+Set when `done(..., request_status='failed')` is used: `technical_error`, `clarification_required` from a `ServiceError`, a rewrite or validation failure, a provider error or a settlement failure.

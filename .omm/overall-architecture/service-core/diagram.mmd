@@ -1,8 +1,16 @@
 graph TD
-  resources-owner["Resources owner\nsrc/rfp_assistant/service.py"] -->|lazily creates| request-runner["RequestRunner executor\nsrc/rfp_assistant/service.py"]
-  request-runner -->|run_queued request_id| answer-orchestration["Answer orchestration\nsrc/rfp_assistant/service.py"]
-  answer-orchestration -->|run settings and index| serving-config["Serving configuration\nsrc/rfp_assistant/service.py"]
-  verifier-runs["Verifier runs\nsrc/rfp_assistant/service.py"] -->|frozen evidence generation| answer-orchestration
-  verifier-runs -->|config_id snapshot| serving-config
-  background-jobs["Background jobs\nsrc/rfp_assistant/service.py"] -->|borrow transport and join on close| resources-owner
-  resources-owner -->|loads index dense reranker| serving-config
+  resources-owner["Process resources\nsrc/rfp_assistant/service.py"]
+  ask-submission["Ask and submit_answer\nsrc/rfp_assistant/service.py"]
+  request-runner["Bounded request runner\nsrc/rfp_assistant/service.py"]
+  answer-execution["Answer execution\nsrc/rfp_assistant/service.py"]
+  conversation-context["Conversation context\nsrc/rfp_assistant/service.py"]
+  progress-partials["Streaming partials\nsrc/rfp_assistant/generation.py"]
+  evidence-views["Request views and evidence\nsrc/rfp_assistant/service.py"]
+  background-jobs["Verifier background jobs\nsrc/rfp_assistant/service.py"]
+  ask-submission -->|persist then submit id| request-runner
+  request-runner -->|run_queued claims row| answer-execution
+  answer-execution -->|earlier turns, carried units| conversation-context
+  answer-execution -->|on_delta content| progress-partials
+  resources-owner -->|index, transport, tracing| answer-execution
+  resources-owner -->|loaded index elements| evidence-views
+  background-jobs -->|shared transport, joined on close| resources-owner

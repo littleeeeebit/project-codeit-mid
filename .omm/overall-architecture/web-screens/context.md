@@ -1,0 +1,1 @@
+web/AGENTS.md warns that the installed Next.js version has breaking changes compared with older conventions, and asks maintainers to read node_modules/next/dist/docs before changing screen code.

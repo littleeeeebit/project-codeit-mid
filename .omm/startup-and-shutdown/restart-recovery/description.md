@@ -1,0 +1,1 @@
+Runs only on a fresh claim. `recover_requests` marks queued and running requests `interrupted` and never replays them. `budget.recover` marks dispatching attempts unknown and releases reserved ones, applying the same rule to the Gemini `external_attempts` ledger. The counts are kept in `Resources.recovered`.

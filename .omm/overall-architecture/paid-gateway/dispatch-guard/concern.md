@@ -1,0 +1,1 @@
+Observed: a single unknown attempt from any member blocks every PostgreSQL paid dispatch until the owner reconciles it (`reconcile`/`settle` CLI). This is deliberate conservatism, but one timeout stops paid answers for everyone.

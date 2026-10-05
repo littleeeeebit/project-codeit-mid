@@ -1,0 +1,1 @@
+`provider == 'fake'` builds `FakeTransport` (with `fake_delay_seconds`). Otherwise, with a key, it builds `OpenAITransport(key, request_timeout_seconds, owner_check=owner.check)` and `Tracing.from_settings`. Without a key, `transport` stays None, free features work, and paid stages release with `provider_unavailable`. The shared Kiwi analyzer is created once per process.

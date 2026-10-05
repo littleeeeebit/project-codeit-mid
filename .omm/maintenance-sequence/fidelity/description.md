@@ -1,1 +1,0 @@
-`step_fidelity` checks every parsed HWP whose active extraction has no verdict under the current `FIDELITY_VERSION`, skipping print-recovered sources. Hancom printing takes 20–30 s per document and shows viewer windows (README).

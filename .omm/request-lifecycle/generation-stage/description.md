@@ -1,0 +1,1 @@
+After a last `_checkpoint`, `_metered_chat(stage='generation', on_delta=streamed)` reserves the maximum, marks dispatch and streams the answer from the provider. Each delta stores the cumulative content in `res.partials[request_id]`. The SSE route turns that into provisional text for the owning screen. Settlement happens after the stream drains.

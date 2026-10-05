@@ -1,0 +1,1 @@
+`inventory_display_order` must match `inventoryRows` in answer-parts.tsx, so that references such as '세 번째 요구사항' resolve to the row the person saw.

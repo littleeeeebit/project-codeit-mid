@@ -1,0 +1,1 @@
+`submit_drafts` (only for a completed, not yet submitted run) calls `evaluation.assign_families`, then `gold.submit(... 'dev', drafting.DRAFTER)` into `gold_candidates` as `pending`. `candidate_review` shows the draft with its original passages. Candidates that fail the shared checks later show as `pending_invalid`.

@@ -1,0 +1,1 @@
+Runs are retrieval-only. Each is frozen by dataset hash, evaluated population (`population_sha256`), index manifest, analyzer, dense version, limits and `EVAL_VERSION`, and stored under `.runtime/runs/<run_id>/`. Runs over different populations are never compared, and a run whose population changed is blocked until rerun.

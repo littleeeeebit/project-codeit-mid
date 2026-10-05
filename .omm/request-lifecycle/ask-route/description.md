@@ -1,0 +1,1 @@
+Trigger: the composer's submit in ask-page.tsx. The body carries scope pairs (max 2; empty only for corpus), question, mode and `previous_request_id`. The route sets `as_of = date.today()`; the 기준일 control was removed. `service.ask` creates a fresh `generation_id` used as both the idempotency key and the generation ID. The response `Owned` is what the screen keeps for that turn.

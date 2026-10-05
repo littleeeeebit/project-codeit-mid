@@ -1,0 +1,1 @@
+Covered by a provider reconciliation adjustment, so it stops holding a reservation. If usage arrives later, `settle` records it and adds a negative `late-settlement:` adjustment so it is not counted twice.

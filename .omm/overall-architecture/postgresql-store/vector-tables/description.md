@@ -1,0 +1,1 @@
+`embedding_payloads`, `embedding_sets` and `embedding_set_rows` hold the serving vector set and each compared model's own set, tagged with model, dimensions and prefix policy (README). The query-vector cache is read and written through `vector_store.cache_get`/`cache_put`. HNSW indexes exist only when `build_hnsw` was run, and serve only through a run that measured them.

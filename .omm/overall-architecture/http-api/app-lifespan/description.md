@@ -1,0 +1,1 @@
+On start it calls `service.app_resources()` → `get_resources(load_settings())`, a module-level singleton `Resources(settings, recover=True)`. On exit it calls `Resources.close()`. Tests inject their own `resources` and keep ownership. See startup-and-shutdown for what construction and close do.

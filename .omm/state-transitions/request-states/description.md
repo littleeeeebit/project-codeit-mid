@@ -1,1 +1,0 @@
-`requests.status` CHECK: queued, running, completed, failed, cancelled, interrupted. Only `run_queued`, `cancel_request`, `_finish`, `_fail_unscheduled`, `RequestRunner.shutdown` and `recover_requests` write it. Free modes are inserted directly as `running`.
