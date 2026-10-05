@@ -1,0 +1,1 @@
+An ownership POST that returns after the context changed (`attempt.valid` false) is abandoned immediately, never attached.

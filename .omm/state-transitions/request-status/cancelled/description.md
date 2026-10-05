@@ -1,1 +1,1 @@
-Set by `cancel_request` on a queued request (a result is written: 'cancelled before running, no paid call'). Also reached from running when a checkpoint or dispatch guard raises `_Stop('cancelled')`, or when `_finish` sees `cancel_requested` on a completed outcome. `may_attach` never attaches a cancelled request.
+Terminal. Before dispatch it is free. After dispatch, the call's attempt still settles and the outcome is stored as history, never attached.

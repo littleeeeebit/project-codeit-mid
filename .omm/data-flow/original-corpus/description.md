@@ -1,1 +1,0 @@
-`RFP_SOURCE_DIR` (default `<repo>/원본 데이터`) holds `data_list.csv` (100 associations: institution, title, notice, amount, dates) and `files/` (HWP and PDF originals). Originals are read-only. Byte-identical associations share one source, one extraction and one vector per payload but keep their own metadata and scope. The corpus is digital; scans are not a test target.

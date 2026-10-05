@@ -1,0 +1,1 @@
+Serving never pays for a query vector the matrix cannot score: a model or dimension mismatch disables dense with a `stage_errors` reason before any call.

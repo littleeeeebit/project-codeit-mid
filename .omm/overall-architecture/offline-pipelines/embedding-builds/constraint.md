@@ -1,0 +1,1 @@
+The UI must be stopped for the paid `build-dense` (README). Every serving vector set is homogeneous in model, dims and policy; a mix is refused at load and search.

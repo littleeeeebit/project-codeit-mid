@@ -1,1 +1,0 @@
-`Resources._own` borrows this process's live `GatewayOwner` or creates one (`pg_try_advisory_lock`). A second process gets `GatewayLockError`. Only a new owner runs recovery: `recover_requests` (queued and running → interrupted, nothing replayed) and `budget.recover` (dispatching → unknown, reserved → released). The counts are kept in `res.recovered`.

@@ -1,0 +1,1 @@
+An index built under another analyzer or query policy is refused for evaluation and activation (`index_compatibility`) and served with an `index_outdated:` limitation.

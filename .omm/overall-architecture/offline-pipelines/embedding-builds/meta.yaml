@@ -1,0 +1,9 @@
+created: 2026-10-05T09:51:23.134Z
+updated: 2026-10-05T09:51:23.295Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: embedding-builds
+children: []
+parentPath:
+  - offline-pipelines

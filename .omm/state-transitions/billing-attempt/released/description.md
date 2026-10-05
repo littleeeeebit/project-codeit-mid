@@ -1,0 +1,1 @@
+No cost: never dispatched, or confirmed rejected before execution (4xx). The reason is in `error_json`.

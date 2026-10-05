@@ -1,1 +1,0 @@
-`gold.decide` and `gold.second_review` (see state-transitions/gold-candidate). Labels are evidence groups of alternative source spans (hash, extraction, element, offsets or cells, exact quote), never chunk IDs. Required claims are typed (number with unit, date with time, text patterns) with qualifiers and criticality.

@@ -1,1 +1,1 @@
-Set by `ingest_source` whenever the active extraction ID changes (a new parser fingerprint, or different output under the same fingerprint, via `assign_revision`). Parsed does not mean faithful. Identical output keeps its previous status. `recover_source` also leaves a new revision unreviewed until `import-reviews` checks it.
+Parsed, but not yet compared with the original. Included only in `--include-unreviewed` indexes and labeled in traces and citations. Any new extraction revision returns a source here.

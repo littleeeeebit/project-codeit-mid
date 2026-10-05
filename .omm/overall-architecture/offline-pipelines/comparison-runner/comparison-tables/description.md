@@ -1,0 +1,1 @@
+`write_table` writes `.runtime/compare/tables/<matrix>.json` and `.md`, with `new_critical_vs_k1` measured against the K1 baseline. `service.experiments` reads them through `compare.load_tables`, marks the serving row (`run_id == active_serving().run_id`), and adds `golden-counts.json`. `experiment_questions` lists the failed questions of a row.

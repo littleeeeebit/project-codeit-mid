@@ -1,0 +1,1 @@
+Workers never touch UI state. They rebuild the principal and request from the persisted `request_json` snapshot.

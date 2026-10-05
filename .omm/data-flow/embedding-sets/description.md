@@ -1,0 +1,1 @@
+pgvector `embedding_payloads` (one vector per payload hash with model, dims, policy, checksum and provenance; corpus and query vectors share the table), `embedding_sets` (`building` -> `ready`, tied to a keyword index) and `embedding_set_rows` (row order to chunk to payload). The serving set and every compared model's set coexist.

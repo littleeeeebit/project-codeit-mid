@@ -1,1 +1,0 @@
-`attempts.state` is the billing lifecycle of every paid call, whether generation, embedding, drafting, evaluation or judge. Open states (reserved, dispatching, unknown) hold their `reserved_micro_usd` against the cap and the purpose envelope. Settled attempts count `settled_micro_usd`, plus adjustments.

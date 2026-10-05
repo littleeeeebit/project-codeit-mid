@@ -1,0 +1,9 @@
+created: 2026-10-05T09:51:18.177Z
+updated: 2026-10-05T09:51:18.392Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: keyword-index
+children: []
+parentPath:
+  - retrieval-engine

@@ -1,0 +1,10 @@
+created: 2026-10-05T09:51:22.282Z
+updated: 2026-10-05T09:51:22.423Z
+update_count: 2
+last_field: note
+kind: nested-class
+title: ocr-merge
+children: []
+parentPath:
+  - offline-pipelines
+  - corpus-pipeline

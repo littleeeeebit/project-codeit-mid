@@ -1,0 +1,9 @@
+created: 2026-10-05T09:51:19.842Z
+updated: 2026-10-05T09:51:20.104Z
+update_count: 3
+last_field: note
+kind: nested-class
+title: budget-ledger
+children: []
+parentPath:
+  - paid-gateway

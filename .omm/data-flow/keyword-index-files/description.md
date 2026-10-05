@@ -1,0 +1,1 @@
+`.runtime/indexes/<version>/` holds `manifest.json`, `chunks.jsonl`, `tokens.jsonl`, `requirements.jsonl` and `scope-terms.json`, mirrored by the `indexes`, `chunks` and `requirements` rows. Immutable per version; older versions stay for rollback and issued citations. README records the active keyword index as `29f261abafeb1f8c`.

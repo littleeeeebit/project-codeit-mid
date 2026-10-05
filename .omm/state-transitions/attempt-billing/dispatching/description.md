@@ -1,1 +1,0 @@
-Set by `mark_dispatching` in the same transaction as the request's stop guard and the ownership, paid-admission and no-unknown checks. It is the durable marker before the network call. `budget.recover` at startup turns any dispatching attempt into unknown ('process ended during dispatch').

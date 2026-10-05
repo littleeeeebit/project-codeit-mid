@@ -1,0 +1,1 @@
+An executor thread calls `run_queued(res, request_id)`: `UPDATE requests SET status='running' WHERE status='queued' AND cancel_requested=0`. Only a successful claim proceeds, so a request cancelled while queued never runs. The principal and `AnswerRequest` are rebuilt from the snapshot, then `_execute`.

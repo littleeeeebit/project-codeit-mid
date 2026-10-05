@@ -1,1 +1,1 @@
-Set by `gold.decide` with at least one category from `REJECT_CATEGORIES` ('other' requires a note). `_write_rejection` renders a rejection wiki page. `gold infer` can later attach an inferred reason, and drafting reads these lessons (`drafting.lessons`).
+Needs categories, and a note for `other`. The rejection-wiki page is rendered in the same transaction. A drafter may withdraw their own row only by rejecting it with a note.

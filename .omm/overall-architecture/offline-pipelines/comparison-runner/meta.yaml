@@ -1,0 +1,15 @@
+created: 2026-10-05T09:51:23.444Z
+updated: 2026-10-05T09:51:23.745Z
+update_count: 3
+last_field: constraint
+kind: nested-class
+title: comparison-runner
+children:
+  - activation-gate
+  - comparison-tables
+  - matrix-spec
+  - measure-populations
+  - paid-approval
+  - row-cache
+parentPath:
+  - offline-pipelines

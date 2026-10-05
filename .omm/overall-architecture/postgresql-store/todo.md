@@ -1,0 +1,1 @@
+The ponytail note on `tx` names the upgrade: per-account locks if measured throughput requires them.

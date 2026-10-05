@@ -1,1 +1,1 @@
-Set by `fidelity.verify_source` when differences exist. The findings (side, page, element, cell) are stored in `fidelity_checks` and listed on the verification screen's 원문 대조 section.
+The comparison found differences, recorded with their exact elements, cells and pages in `fidelity_checks.findings_json`. Kept in the operating index, labeled.

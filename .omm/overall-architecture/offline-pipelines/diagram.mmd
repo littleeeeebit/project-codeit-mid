@@ -1,0 +1,6 @@
+graph TD
+  corpus-pipeline["Corpus pipeline\nsrc/rfp_assistant/ingestion.py"] -->|"active extractions"| embedding-builds["Embedding builds\nsrc/rfp_assistant/dense.py"]
+  corpus-pipeline -->|"keyword index"| comparison-runner["Comparison runner\nsrc/rfp_assistant/compare.py"]
+  embedding-builds -->|"verified vector sets"| comparison-runner
+  comparison-runner -->|"activatable runs"| evaluation-release["Evaluation and release\nsrc/rfp_assistant/evaluation.py"]
+  evaluation-release -->|"active_run pointer"| serving-config["Serving pointer\nsrc/rfp_assistant/service.py"]

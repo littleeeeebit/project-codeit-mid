@@ -1,0 +1,1 @@
+Observability only: admission, reservation and settlement never read it, and a down or failing Langfuse changes neither answers nor the ledger. The local stack is at 127.0.0.2:3100, never `localhost`.

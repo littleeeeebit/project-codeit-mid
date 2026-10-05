@@ -1,10 +1,6 @@
 graph TD
-  keyword_default["Keyword default kiwi_bm25\nsrc/rfp_assistant/service.py"]
-  activated_run["Activated run config\nsrc/rfp_assistant/evaluation.py"]
-  keyword_fallback["Keyword fallback\nsrc/rfp_assistant/retrieval.py"]
-  hybrid_without_reranker["Hybrid without reranker\nsrc/rfp_assistant/service.py"]
-  keyword_default -->|"activate-run decision"| activated_run
-  activated_run -->|"corpus route rule changed"| keyword_default
-  activated_run -->|"embedding identity mismatch"| keyword_fallback
-  activated_run -->|"dense stage unavailable"| keyword_fallback
-  activated_run -->|"stale HR eval policy"| hybrid_without_reranker
+  keyword-default["Keyword default\nsrc/rfp_assistant/service.py"] -->|"activate_decision"| activated-run["Activated run\nsrc/rfp_assistant/evaluation.py"]
+  activated-run -->|"corpus route changed"| stale-fallback["Stale fallback\nsrc/rfp_assistant/service.py"]
+  activated-run -->|"HR under old policy"| hybrid-without-reranker["Hybrid without reranker\nsrc/rfp_assistant/service.py"]
+  stale-fallback -->|"rerun then activate"| activated-run
+  hybrid-without-reranker -->|"current trial activated"| activated-run

@@ -1,0 +1,1 @@
+The durable marker written just before the network call, with `dispatched_at`. If the process ends here, `recover` turns it into unknown, because the call may have executed.

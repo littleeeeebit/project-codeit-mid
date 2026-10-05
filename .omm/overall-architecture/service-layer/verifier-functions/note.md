@@ -1,0 +1,1 @@
+The `verifier_trace` body was not read in full. Schema version 5 in store.py names the verifier-runs and corrections tables.

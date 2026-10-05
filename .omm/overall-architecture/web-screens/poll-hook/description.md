@@ -1,0 +1,1 @@
+`usePoll(key, load, everyMs, done)` is read-only polling keyed by what is being watched. A key change drops results still in flight for the old key, so a late answer never lands on a screen that has moved on. Returning true from `done` stops polling. `must()` turns an openapi-fetch error into an Error carrying the service message.
