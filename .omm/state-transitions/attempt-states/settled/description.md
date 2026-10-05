@@ -1,1 +1,0 @@
-Final cost from reported usage; exactly once (a duplicate settle returns `duplicate: True`). A cost above the reservation sets `budget_settings.frozen_reason`, which blocks all new admission.

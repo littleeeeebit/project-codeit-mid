@@ -1,0 +1,1 @@
+Differences found, with per-element, cell and page findings that the 검증 inbox lists for a person to inspect next to the printed page (rendered_page_png).

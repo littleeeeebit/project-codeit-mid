@@ -1,14 +1,29 @@
-created: 2026-10-04T13:34:48.815Z
-updated: 2026-10-04T13:34:49.161Z
-update_count: 2
+created: 2026-10-04 13:34:48.815000+00:00
+updated: 2026-10-05 03:34:22.412000+00:00
+update_count: 4
 last_field: diagram
-git_commit: 95e8dc5
-git_branch: main
+git_commit: 21da642
+git_branch: close-answer-failures-phase5-runner-lint
 children:
-  - admission
-  - ask-page
-  - cancellation
-  - executor
-  - finish-record
-  - paid-stages
-  - status-poll
+- ask-page
+- cancellation
+- finish-record
+- free-modes
+- ownership-and-polling
+- paid-answer-pipeline
+- request-runner
+- requests-table
+- status-poll
+- submit-answer
+prev_diagram: "graph TD\r\n  ask-page[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
+  ]\r\n  admission[\"Validate, persist, admit\\nsrc/rfp_assistant/service.py\"]\r\n\
+  \  executor[\"Bounded executor\\nsrc/rfp_assistant/service.py\"]\r\n  paid-stages[\"\
+  Paid answer stages\\nsrc/rfp_assistant/service.py\"]\r\n  finish-record[\"Request\
+  \ record\\nsrc/rfp_assistant/service.py\"]\r\n  status-poll[\"Status polling\\nweb/src/lib/use-poll.ts\"\
+  ]\r\n  cancellation[\"Cancel and abandon\\nsrc/rfp_assistant/service.py\"]\r\n \
+  \ ask-page -->|POST ask with scope| admission\r\n  admission -->|free modes inline|\
+  \ finish-record\r\n  admission -->|request id queued| executor\r\n  executor -->|claims\
+  \ queued to running| paid-stages\r\n  paid-stages -->|result and billing| finish-record\r\
+  \n  ask-page -->|poll every second| status-poll\r\n  status-poll -->|reads view\
+  \ and attachable| finish-record\r\n  ask-page -->|cancel or context change| cancellation\r\
+  \n  cancellation -->|cancel flag checked| paid-stages"

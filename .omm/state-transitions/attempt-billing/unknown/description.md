@@ -1,0 +1,1 @@
+The attempt holds its reservation as pending cost. While any exist, mark_dispatching refuses all PostgreSQL dispatch, set_paid_enabled refuses to turn paid on, build-dense refuses, and answer runs stop. Resolved only by owner CLI settle (evidence of usage) or reconcile.

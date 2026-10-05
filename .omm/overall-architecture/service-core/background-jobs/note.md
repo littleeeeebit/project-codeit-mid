@@ -1,0 +1,1 @@
+Sealed runs are refused from the UI ('봉인 평가는 소유자 CLI로 실행합니다'). Only answer-finalists estimates start here.

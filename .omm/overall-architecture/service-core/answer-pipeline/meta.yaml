@@ -1,0 +1,9 @@
+created: 2026-10-05T03:34:18.591Z
+updated: 2026-10-05T03:34:18.592Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: answer-pipeline
+children: []
+parentPath:
+  - service-core

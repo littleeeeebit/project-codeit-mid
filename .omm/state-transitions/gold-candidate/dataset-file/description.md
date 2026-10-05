@@ -1,0 +1,1 @@
+dataset_path(settings, dataset) under .runtime/datasets (dev, dev-pilot) or .runtime/sealed (test), written atomically from dataset_rows(conn, dataset). Retrieval runs and answer runs read these files, freeze-dataset pins their hashes, and sealed rows never reach the web pages.

@@ -1,0 +1,1 @@
+attempts.state lifecycle in budget.py. Reserved and dispatching attempts count as pending against the cap, and unknown attempts keep their reservation until reconciled. _billing maps the per-request set to one overall state with precedence unknown > pending > reconciled > settled > released.

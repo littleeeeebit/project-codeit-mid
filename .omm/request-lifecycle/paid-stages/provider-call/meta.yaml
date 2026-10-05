@@ -1,9 +1,0 @@
-created: 2026-10-04T13:34:50.668Z
-updated: 2026-10-04T13:34:50.669Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: provider-call
-children: []
-parentPath:
-  - paid-stages

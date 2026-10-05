@@ -1,8 +1,15 @@
 created: 2026-10-04T13:34:42.331Z
-updated: 2026-10-04T13:34:42.331Z
-update_count: 1
-last_field: description
+updated: 2026-10-05T03:34:16.047Z
+update_count: 3
+last_field: diagram
 kind: nested-class
 title: web-screens
-children: []
+children:
+  - answer-view
+  - api-client
+  - app-header
+  - ask-page
+  - dataset-page
+  - document-search
+  - verify-page
 parentPath: []

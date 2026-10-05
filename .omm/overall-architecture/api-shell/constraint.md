@@ -1,0 +1,1 @@
+api.py imports only `service` from the package. tests/test_api.py enforces this boundary.

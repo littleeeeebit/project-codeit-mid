@@ -1,1 +1,0 @@
-Only an exclusive owner runs it (`Resources._own`, after the gateway lock is acquired). `recover_requests` sets `queued`/`running` → `interrupted`, and `budget.recover` sets `dispatching` → `unknown` and `reserved` → `released`. The counts are kept in `Resources.recovered`. `Resources.close` also re-runs both if a drafting thread outlived the shutdown wait. Nothing is replayed.

@@ -1,0 +1,1 @@
+A second submit is blocked while the initial POST is pending (pending ref) or the owned request is unfinished.

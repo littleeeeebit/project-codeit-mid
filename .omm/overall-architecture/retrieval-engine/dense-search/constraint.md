@@ -1,0 +1,1 @@
+PgDenseIndex.load verifies the set: ready state, base manifest hash, row count and order, single model/dims/policy, per-vector checksum and unit norm, and chunk IDs identical to the keyword index. A mismatch raises DenseError and the service serves keyword fallback.

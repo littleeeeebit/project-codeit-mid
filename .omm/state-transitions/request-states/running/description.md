@@ -1,1 +1,0 @@
-Claimed by one worker, or set directly for free modes and synchronous `service.answer` callers (CLI and evaluation). `cancel_requested` may be set; `_checkpoint` and the dispatch guard consult it before every new paid stage.

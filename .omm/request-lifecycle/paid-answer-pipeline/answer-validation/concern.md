@@ -1,0 +1,1 @@
+_stored_quote scans every chunk of the loaded index for each evidence unit. That is linear in corpus size per unit. It is cheap at about 19k chunks, but idx.row_of could make it a lookup.

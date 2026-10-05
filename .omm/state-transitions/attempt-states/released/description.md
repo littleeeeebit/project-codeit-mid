@@ -1,1 +1,0 @@
-No cost. The reservation was returned before dispatch, or the provider confirmed it never executed (4xx classes in `OpenAITransport`). `answers._answer_row` treats a released-only failure as safe to retry under a new attempt number.

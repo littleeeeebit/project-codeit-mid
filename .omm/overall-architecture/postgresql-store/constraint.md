@@ -1,0 +1,1 @@
+No other database and no fallback. The importer and previous-database paths were deleted after the 2026-10-04 cutover. Do not run psql inside the container (user memory: an orphaned psql crashes the server); use psycopg from the host.

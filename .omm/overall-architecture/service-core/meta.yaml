@@ -1,0 +1,14 @@
+created: 2026-10-05T03:34:17.912Z
+updated: 2026-10-05T03:34:18.042Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: service-core
+children:
+  - answer-pipeline
+  - background-jobs
+  - gold-and-drafting
+  - request-runner
+  - resources-owner
+  - verifier-traces
+parentPath: []

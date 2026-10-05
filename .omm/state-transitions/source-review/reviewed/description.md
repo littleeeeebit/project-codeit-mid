@@ -1,0 +1,1 @@
+Full human review imported by ingestion.import_reviews. Records must name the active extraction and element IDs from it, and one invalid record imports nothing (README).

@@ -1,0 +1,1 @@
+store.tx's ponytail comment notes that one global write mutex serializes admission, idempotency and every ledger write. Per-account locks would be the upgrade if throughput matters.

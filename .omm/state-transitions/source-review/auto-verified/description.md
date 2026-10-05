@@ -1,0 +1,1 @@
+fidelity.compare found every extracted unit in the Hancom print text layer and every rendered line in the extraction (6-character shingles, exact digit runs). Recorded in fidelity_checks keyed by (extraction_id, FIDELITY_VERSION).

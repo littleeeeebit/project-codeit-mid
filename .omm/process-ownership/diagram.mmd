@@ -1,0 +1,7 @@
+graph TD
+  pool-lifecycle["Connection pool owner\nsrc/rfp_assistant/postgres.py"] -->|"probe server and pgvector"| startup-validation["Validated import gate\nsrc/rfp_assistant/postgres.py"]
+  startup-validation -->|"artifacts unchanged"| gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/postgres.py"]
+  gateway-owner -->|"lock acquired"| startup-recovery["Restart recovery\nsrc/rfp_assistant/service.py"]
+  gateway-owner -->|"owner_guard in ledger tx"| dispatch-boundary["Admission and dispatch\nsrc/rfp_assistant/budget.py"]
+  controlled-shutdown["Controlled shutdown\nsrc/rfp_assistant/service.py"] -->|"releases lock last"| gateway-owner
+  ledger-only-owner["Ledger-only CLI owner\nsrc/rfp_assistant/cli.py"] -->|"pool without lock"| pool-lifecycle

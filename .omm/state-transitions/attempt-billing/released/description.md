@@ -1,0 +1,1 @@
+Never billed: refused at the dispatch guard, rejected by the provider before execution, provider unavailable, or a never-dispatched reservation released at restart.

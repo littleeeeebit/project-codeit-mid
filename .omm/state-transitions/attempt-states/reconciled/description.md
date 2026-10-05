@@ -1,1 +1,0 @@
-`budget.reconcile` records a closed-interval adjustment (provider total minus locally settled cost) and moves the explicitly covered unknown attempts, which must have been dispatched inside the interval, to `reconciled`. Overlapping intervals and a reused ID with different values are refused.

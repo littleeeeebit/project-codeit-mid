@@ -1,3 +1,0 @@
-`open_db` takes a `postgres.Target` and yields a pooled `postgres.Connection`. The pool exists only inside `database_lifecycle`, and a changed DSN is refused.
-
-`tx(immediate=True)` runs `SELECT id FROM application_mutex WHERE id=1 FOR UPDATE` first: one global write mutex that serializes admission and idempotency (marked with a `ponytail:` comment naming per-account locks as the upgrade). `init_schema` is idempotent and never resets ledger rows.

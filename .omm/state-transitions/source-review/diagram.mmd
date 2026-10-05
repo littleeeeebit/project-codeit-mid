@@ -1,0 +1,6 @@
+graph TD
+  unreviewed["unreviewed\nsrc/rfp_assistant/ingestion.py"] -->|"fidelity run passes"| auto-verified["auto_verified\nsrc/rfp_assistant/fidelity.py"]
+  unreviewed -->|"fidelity finds differences"| auto-flagged["auto_flagged\nsrc/rfp_assistant/fidelity.py"]
+  auto-flagged -->|"confirm_fidelity on 검증"| sample-checked["sample_checked\nsrc/rfp_assistant/service.py"]
+  unreviewed -->|"import-reviews"| reviewed["reviewed\nsrc/rfp_assistant/ingestion.py"]
+  needs-recovery["needs_recovery\nsrc/rfp_assistant/ingestion.py"] -->|"recover-source passes"| unreviewed

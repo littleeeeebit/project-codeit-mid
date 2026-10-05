@@ -1,0 +1,9 @@
+created: 2026-10-05T03:34:23.736Z
+updated: 2026-10-05T03:34:23.736Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: admission
+children: []
+parentPath:
+  - paid-answer-pipeline

@@ -1,0 +1,9 @@
+created: 2026-10-05T03:34:18.176Z
+updated: 2026-10-05T03:34:18.319Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: resources-owner
+children: []
+parentPath:
+  - service-core

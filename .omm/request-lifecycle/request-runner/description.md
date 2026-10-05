@@ -1,0 +1,1 @@
+RequestRunner._run calls run_queued. That function atomically claims the request with UPDATE … SET status='running' WHERE status='queued' AND cancel_requested=0 and returns silently if the claim fails (cancelled or interrupted first). It rebuilds AnswerRequest and Principal from request_json, so the worker never sees UI state, and calls _execute. The slot is released in finally.

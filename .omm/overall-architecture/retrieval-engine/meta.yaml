@@ -1,15 +1,26 @@
-created: 2026-10-04T13:34:44.752Z
-updated: 2026-10-04T13:34:44.887Z
-update_count: 2
-last_field: diagram
+created: 2026-10-04 13:34:44.752000+00:00
+updated: 2026-10-05 03:34:19.700000+00:00
+update_count: 5
+last_field: context
 kind: nested-class
 title: retrieval-engine
 children:
-  - analyzer
-  - dense-index
-  - evidence-packer
-  - keyword-index
-  - query-policy
-  - rank-fusion
-  - reranker
+- corpus-router
+- dense-search
+- evidence-packer
+- fusion
+- keyword-index
+- lexical-ranker
+- reranker
 parentPath: []
+prev_diagram: "graph TD\r\n  analyzer[\"Kiwi analyzer\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval.py\"]\r\n  query-policy[\"\
+  Scope query policy\\nsrc/rfp_assistant/retrieval.py\"]\r\n  dense-index[\"Dense\
+  \ matrix or pgvector set\\nsrc/rfp_assistant/dense.py\"]\r\n  rank-fusion[\"Reciprocal\
+  \ rank fusion\\nsrc/rfp_assistant/retrieval.py\"]\r\n  reranker[\"Local reranker\\\
+  nsrc/rfp_assistant/dense.py\"]\r\n  evidence-packer[\"Evidence packer\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  analyzer -->|query tokens| query-policy\r\n  keyword-index -->|scope doc\
+  \ frequencies| query-policy\r\n  keyword-index -->|row-aligned chunk ids| dense-index\r\
+  \n  query-policy -->|BM25 ranking| rank-fusion\r\n  dense-index -->|cosine ranking|\
+  \ rank-fusion\r\n  rank-fusion -->|fused pool| reranker\r\n  reranker -->|reordered\
+  \ pool| evidence-packer\r\n  rank-fusion -->|order without reranker| evidence-packer"

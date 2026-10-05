@@ -1,1 +1,0 @@
-`service._billing` reduces a request's attempt states into one `billing_state` (`unknown`, `pending`, `reconciled`, `settled`, `released` or `none`). `_finish` stores it in `result_json`, and `_view` recomputes it on every poll, so the screen shows a pending or unknown cost for its own request even after the answer arrives.

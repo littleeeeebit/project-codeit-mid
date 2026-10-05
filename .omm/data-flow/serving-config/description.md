@@ -1,0 +1,1 @@
+The activated run (app_settings active_run JSON with mode, index_version, dense_version, limits, embedding, reranker, eval_version, finalist_run_id). Resources.run_settings applies it over the process Settings for every request, so serving reproduces what was measured. See state-transitions/serving-activation for the refusal and fallback rules.

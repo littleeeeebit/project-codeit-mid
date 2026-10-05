@@ -1,1 +1,0 @@
-Set by a controlled stop or by startup recovery under exclusive ownership. `_finish` and `_stop_reason` respect it: a worker that returns later stores its outcome for history only, and no new paid stage starts.

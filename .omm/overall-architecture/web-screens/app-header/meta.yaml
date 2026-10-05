@@ -1,0 +1,9 @@
+created: 2026-10-05T03:34:16.184Z
+updated: 2026-10-05T03:34:16.185Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: app-header
+children: []
+parentPath:
+  - web-screens

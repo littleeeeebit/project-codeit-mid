@@ -1,12 +1,22 @@
-created: 2026-10-04T13:34:51.920Z
-updated: 2026-10-04T13:34:52.274Z
-update_count: 2
+created: 2026-10-04 13:34:51.920000+00:00
+updated: 2026-10-05 03:34:25.360000+00:00
+update_count: 4
 last_field: diagram
-git_commit: 95e8dc5
-git_branch: main
+git_commit: 21da642
+git_branch: close-answer-failures-phase5-runner-lint
 children:
-  - attempt-states
-  - billing-rollup
-  - owner-reconciliation
-  - request-states
-  - startup-recovery
+- attempt-billing
+- gold-candidate
+- request-status
+- serving-activation
+- source-review
+prev_diagram: "graph TD\r\n  request-states[\"Request status\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  attempt-states[\"Attempt billing state\\nsrc/rfp_assistant/budget.py\"]\r\
+  \n  startup-recovery[\"Startup recovery\\nsrc/rfp_assistant/service.py\"]\r\n  owner-reconciliation[\"\
+  Owner reconciliation\\nsrc/rfp_assistant/cli.py\"]\r\n  billing-rollup[\"Billing\
+  \ roll-up\\nsrc/rfp_assistant/service.py\"]\r\n  request-states -->|each paid stage\
+  \ reserves| attempt-states\r\n  startup-recovery -->|queued and running interrupted|\
+  \ request-states\r\n  startup-recovery -->|dispatching becomes unknown| attempt-states\r\
+  \n  owner-reconciliation -->|unknown settled or reconciled| attempt-states\r\n \
+  \ attempt-states -->|unknown wins precedence| billing-rollup\r\n  billing-rollup\
+  \ -->|billing state on view| request-states"

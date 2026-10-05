@@ -1,0 +1,1 @@
+Set by run_queued's conditional UPDATE, or directly by _create for free modes and the synchronous service.answer path (CLI and evaluation). _stop_reason treats any non-running status as interrupted before a new paid stage.

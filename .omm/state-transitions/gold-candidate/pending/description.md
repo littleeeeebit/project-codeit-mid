@@ -1,0 +1,1 @@
+Inserted by gold.submit from a drafting run or a CLI batch, keyed by candidate_id with row_sha256. `gold repin` can move pending rows to a new extraction by element path after a parser revision. The review screen shows pending_invalid candidates whose shared checks no longer pass.

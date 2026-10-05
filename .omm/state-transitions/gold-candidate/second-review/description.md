@@ -1,0 +1,1 @@
+gold.second_review requires a note and a reviewer distinct from the drafter, the first reviewer and the drafting model. Disagreement keeps the row out of valid gold until a corrected revision is approved. Sealed rows are refused unless include_sealed (owner CLI).

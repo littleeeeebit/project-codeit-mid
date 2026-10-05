@@ -1,0 +1,1 @@
+The normal terminal state for domain outcomes, including answered, insufficient_evidence, conflict, ingestion_unavailable and budget_blocked. The domain outcome lives in result_json.status, not in requests.status.

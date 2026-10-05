@@ -1,0 +1,1 @@
+Immediate for queued requests. For running ones it takes effect at the next checkpoint or dispatch guard, or at _finish. The result stays as history and is never attachable (may_attach).

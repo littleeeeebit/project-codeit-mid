@@ -1,1 +1,0 @@
-Inserted by `budget.reserve` at `max_cost`, with the rate card frozen in `price_json`. Released if the dispatch guard refuses, if the provider is unavailable, or by `budget.recover` at startup ('never dispatched before restart').

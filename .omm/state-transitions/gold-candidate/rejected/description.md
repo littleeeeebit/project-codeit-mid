@@ -1,0 +1,1 @@
+Requires at least one REJECT_CATEGORIES entry, plus a note for 'other'. _write_rejection renders a rejection wiki page. Later drafting runs read these via drafting.lessons(), so the model learns from earlier rejections.

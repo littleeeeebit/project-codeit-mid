@@ -1,0 +1,1 @@
+res.transport.chat inside a generate-answer trace step. A ProviderError with pre_execution=True releases the attempt. Otherwise, and for any other exception such as a transport closed by shutdown, the attempt is marked unknown. Either way the request ends technical_error with '자동으로 다시 시도하지 않습니다'.

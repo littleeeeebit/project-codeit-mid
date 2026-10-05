@@ -1,0 +1,1 @@
+Exactly-once pricing from provider usage. A duplicate settle returns duplicate=True. An overrun (cost above reservation) freezes the ledger through frozen_reason. A late settle of a reconciled attempt inserts a negative 'late-settlement:<id>' adjustment, because the provider total already counted it.

@@ -1,0 +1,1 @@
+Set by ingest_source whenever the extraction revision changes (assign_revision binds the revision to the actual output), because parsed does not mean faithful. Also the state of a newly recovered source.

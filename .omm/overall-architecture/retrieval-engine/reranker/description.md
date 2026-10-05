@@ -1,1 +1,0 @@
-This optional local cross-encoder is loaded by `dense.load_reranker`, keyed on model, revision, max length, concurrency and precision. It is used only in `hybrid_rerank` over the first `depth` fused rows. An inference exception serves the H order with `fallback=hybrid_rerank->hybrid:reranker_error:...`. Queue and inference milliseconds are added to the timings.

@@ -1,0 +1,1 @@
+The durable marker written before the network call, with dispatched_at. If the process dies here the outcome is unknowable, so recovery converts it to unknown, never to released.

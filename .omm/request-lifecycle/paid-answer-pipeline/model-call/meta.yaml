@@ -1,0 +1,9 @@
+created: 2026-10-05T03:34:23.999Z
+updated: 2026-10-05T03:34:24.000Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: model-call
+children: []
+parentPath:
+  - paid-answer-pipeline

@@ -1,1 +1,0 @@
-The request ended with `technical_error` or `clarification_required` (validation, provider, settlement or output-validation failures, frozen-run mismatches). Its attempts may still be `unknown` and need owner recovery.

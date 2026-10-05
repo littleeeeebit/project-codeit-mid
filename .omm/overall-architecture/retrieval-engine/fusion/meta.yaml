@@ -1,0 +1,9 @@
+created: 2026-10-05T03:34:20.677Z
+updated: 2026-10-05T03:34:20.678Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: fusion
+children: []
+parentPath:
+  - retrieval-engine

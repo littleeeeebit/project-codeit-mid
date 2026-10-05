@@ -1,16 +1,7 @@
 graph TD
-  analyzer["Kiwi analyzer\nsrc/rfp_assistant/retrieval.py"]
-  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval.py"]
-  query-policy["Scope query policy\nsrc/rfp_assistant/retrieval.py"]
-  dense-index["Dense matrix or pgvector set\nsrc/rfp_assistant/dense.py"]
-  rank-fusion["Reciprocal rank fusion\nsrc/rfp_assistant/retrieval.py"]
-  reranker["Local reranker\nsrc/rfp_assistant/dense.py"]
-  evidence-packer["Evidence packer\nsrc/rfp_assistant/retrieval.py"]
-  analyzer -->|query tokens| query-policy
-  keyword-index -->|scope doc frequencies| query-policy
-  keyword-index -->|row-aligned chunk ids| dense-index
-  query-policy -->|BM25 ranking| rank-fusion
-  dense-index -->|cosine ranking| rank-fusion
-  rank-fusion -->|fused pool| reranker
-  reranker -->|reordered pool| evidence-packer
-  rank-fusion -->|order without reranker| evidence-packer
+  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval.py"] -->|"chunks, BM25, scope terms"| corpus-router["Scope and corpus routing\nsrc/rfp_assistant/retrieval.py"]
+  corpus-router -->|"admitted rows"| lexical-ranker["Kiwi BM25 ranking\nsrc/rfp_assistant/retrieval.py"]
+  corpus-router -->|"admitted row orders"| dense-search["Exact pgvector search\nsrc/rfp_assistant/vector_store.py"]
+  lexical-ranker -->|"top 50 BM25 ids"| fusion["Keyword-first RRF fusion\nsrc/rfp_assistant/retrieval.py"]
+  dense-search -->|"top 50 cosine ids"| fusion
+  fusion -->|"ranked chunk ids"| evidence-packer["Evidence packing\nsrc/rfp_assistant/retrieval.py"]

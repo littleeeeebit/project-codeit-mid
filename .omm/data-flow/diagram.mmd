@@ -1,19 +1,9 @@
 graph TD
-  csv-manifest["CSV manifest\nsrc/rfp_assistant/ingestion.py"]
-  ingestion["HWP and PDF parsing\nsrc/rfp_assistant/ingestion.py"]
-  fidelity-check["Original print comparison\nsrc/rfp_assistant/fidelity.py"]
-  ocr-merge["Image OCR\nsrc/rfp_assistant/ocr.py"]
-  keyword-build["Keyword index build\nsrc/rfp_assistant/retrieval.py"]
-  dense-build["Embedding build\nsrc/rfp_assistant/dense.py"]
-  retrieval-evaluation["Frozen retrieval runs\nsrc/rfp_assistant/evaluation.py"]
-  activation["Serving activation\nsrc/rfp_assistant/evaluation.py"]
-  csv-manifest -->|documents and sources rows| ingestion
-  fidelity-check -->|Hancom print PDF| ocr-merge
-  ocr-merge -->|image_text elements| ingestion
-  ingestion -->|extraction elements| fidelity-check
-  fidelity-check -->|review status| keyword-build
-  ingestion -->|active extraction| keyword-build
-  keyword-build -->|unique chunk payloads| dense-build
-  keyword-build -->|index manifest| retrieval-evaluation
-  dense-build -->|verified vectors| retrieval-evaluation
-  retrieval-evaluation -->|scored run and decision| activation
+  csv-manifest["CSV manifest and originals\nsrc/rfp_assistant/ingestion.py"] -->|"documents and sources rows"| extraction["Parse HWP/PDF, merge OCR\nsrc/rfp_assistant/ingestion.py"]
+  extraction -->|"printed PDF comparison"| fidelity-check["Fidelity check\nsrc/rfp_assistant/fidelity.py"]
+  extraction -->|"active extractions"| keyword-build["Chunk and BM25 index\nsrc/rfp_assistant/retrieval.py"]
+  fidelity-check -->|"review status filter"| keyword-build
+  keyword-build -->|"chunk payloads"| dense-build["Embeddings into pgvector\nsrc/rfp_assistant/dense.py"]
+  keyword-build -->|"index version"| retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation.py"]
+  dense-build -->|"dense set version"| retrieval-runs
+  retrieval-runs -->|"owner decision file"| serving-config["Serving configuration\nsrc/rfp_assistant/service.py"]

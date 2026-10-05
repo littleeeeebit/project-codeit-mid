@@ -1,0 +1,14 @@
+created: 2026-10-05T03:34:28.764Z
+updated: 2026-10-05T03:34:28.909Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: source-review
+children:
+  - auto-flagged
+  - auto-verified
+  - needs-recovery
+  - reviewed
+  - sample-checked
+  - unreviewed
+parentPath: []

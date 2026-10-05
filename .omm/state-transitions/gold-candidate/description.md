@@ -1,0 +1,1 @@
+gold_candidates.status plus the append-only gold_reviews log. Dataset JSONL files and rejection wiki pages are re-rendered from the database inside the deciding transaction, and `gold check` verifies they equal that rendering.

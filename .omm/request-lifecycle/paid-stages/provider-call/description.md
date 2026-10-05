@@ -1,1 +1,0 @@
-`res.transport.chat(...)` makes the call. `ProviderError(pre_execution=True)` → `budget.release(confirmed_pre_execution=True)`. `ProviderError(pre_execution=False)` or any other exception (for example a transport closed by shutdown) → `budget.mark_unknown`, and the request ends `technical_error` with 'not retried automatically' or 'cost stays pending until confirmed'.

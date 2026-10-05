@@ -1,0 +1,1 @@
+Run by Resources._own only after the lock is newly acquired, when no older worker can still dispatch. recover_requests marks queued and running requests interrupted, and budget.recover turns dispatching attempts into unknown and reserved ones into released. The counts are kept in res.recovered. Nothing is retried.

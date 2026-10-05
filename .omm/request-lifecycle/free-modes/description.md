@@ -1,0 +1,1 @@
+metadata and inventory create a running row and execute synchronously on the request thread. _metadata_answer returns typed CSV and resolved values with unknown/zero/conflict states (metadata_facts). _inventory_answer returns the structured requirement list from the index's requirements inventory (requirement_inventory). No ledger attempt is created, so billing_state stays none.

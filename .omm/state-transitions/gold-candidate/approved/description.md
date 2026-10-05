@@ -1,0 +1,1 @@
+First decision wins and the expected row sha must match. The reviewer must differ from drafted_by, from the drafting model (LLM provenance) and, at the service layer, from the person who requested the drafting run. Gold approvals require original_inspected.

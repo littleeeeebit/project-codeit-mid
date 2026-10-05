@@ -1,0 +1,1 @@
+Set for technical_error, clarification_required from a ServiceError, and unschedulable submissions. The billing of any dispatched attempt is still reported from the ledger.

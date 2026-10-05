@@ -1,0 +1,1 @@
+_resolve_scope requires each (doc_id, source_hash) to equal the document's current active_source_hash ('선택한 문서 버전이 현재 원문과 일치하지 않습니다'). Corpus mode skips this. If every selected document is unparsed or absent from the loaded index, the request ends ingestion_unavailable with the quarantine reason. Partially unavailable documents become missing_fields entries.

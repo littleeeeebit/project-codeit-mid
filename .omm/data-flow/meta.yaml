@@ -1,15 +1,30 @@
-created: 2026-10-04T13:34:55.112Z
-updated: 2026-10-04T13:34:55.367Z
-update_count: 2
+created: 2026-10-04 13:34:55.112000+00:00
+updated: 2026-10-05 03:34:31.993000+00:00
+update_count: 4
 last_field: diagram
-git_commit: 95e8dc5
-git_branch: main
+git_commit: 21da642
+git_branch: close-answer-failures-phase5-runner-lint
 children:
-  - activation
-  - csv-manifest
-  - dense-build
-  - fidelity-check
-  - ingestion
-  - keyword-build
-  - ocr-merge
-  - retrieval-evaluation
+- activation
+- csv-manifest
+- dense-build
+- extraction
+- fidelity-check
+- keyword-build
+- ocr-merge
+- retrieval-runs
+- serving-config
+prev_diagram: "graph TD\r\n  csv-manifest[\"CSV manifest\\nsrc/rfp_assistant/ingestion.py\"\
+  ]\r\n  ingestion[\"HWP and PDF parsing\\nsrc/rfp_assistant/ingestion.py\"]\r\n \
+  \ fidelity-check[\"Original print comparison\\nsrc/rfp_assistant/fidelity.py\"]\r\
+  \n  ocr-merge[\"Image OCR\\nsrc/rfp_assistant/ocr.py\"]\r\n  keyword-build[\"Keyword\
+  \ index build\\nsrc/rfp_assistant/retrieval.py\"]\r\n  dense-build[\"Embedding build\\\
+  nsrc/rfp_assistant/dense.py\"]\r\n  retrieval-evaluation[\"Frozen retrieval runs\\\
+  nsrc/rfp_assistant/evaluation.py\"]\r\n  activation[\"Serving activation\\nsrc/rfp_assistant/evaluation.py\"\
+  ]\r\n  csv-manifest -->|documents and sources rows| ingestion\r\n  fidelity-check\
+  \ -->|Hancom print PDF| ocr-merge\r\n  ocr-merge -->|image_text elements| ingestion\r\
+  \n  ingestion -->|extraction elements| fidelity-check\r\n  fidelity-check -->|review\
+  \ status| keyword-build\r\n  ingestion -->|active extraction| keyword-build\r\n\
+  \  keyword-build -->|unique chunk payloads| dense-build\r\n  keyword-build -->|index\
+  \ manifest| retrieval-evaluation\r\n  dense-build -->|verified vectors| retrieval-evaluation\r\
+  \n  retrieval-evaluation -->|scored run and decision| activation"

@@ -1,0 +1,1 @@
+Inserted by reserve() at max_cost after all admission checks, inside the application mutex transaction.

@@ -1,0 +1,1 @@
+Shared header. It polls GET /api/budget every 2 s through usePoll (read-only) and shows the typed member name field, which web/src/lib/member.ts keeps in browser storage. The Settings page (web/src/app/settings/page.tsx) reads the same route and changes the shared cap through PUT /api/budget/limit, which maps to service.set_budget_limit and then budget.set_limit.

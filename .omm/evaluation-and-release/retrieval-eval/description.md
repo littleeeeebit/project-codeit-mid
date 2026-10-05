@@ -1,0 +1,1 @@
+The same frozen-run machinery as data-flow/retrieval-runs. The sealed split is refused by evaluate-retrieval. freeze-dataset pins dev and test manifests for the release freeze.

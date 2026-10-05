@@ -1,0 +1,1 @@
+Inserted by _create for paid modes after an admission slot was taken. It has never dispatched, so cancelling or interrupting it costs nothing.

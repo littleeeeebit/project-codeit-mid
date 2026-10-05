@@ -1,0 +1,8 @@
+graph TD
+  app-header["Header and budget meter\nweb/src/components/app-header.tsx"] -->|"GET /api/budget every 2s"| api-client["Typed API client\nweb/src/lib/api.ts"]
+  ask-page["Ask page\nweb/src/components/ask/ask-page.tsx"] -->|"ask, poll, cancel, abandon"| api-client
+  ask-page -->|"picks one or two docs"| document-search["Document picker\nweb/src/components/ask/document-search.tsx"]
+  ask-page -->|"renders attachable result"| answer-view["Answer and evidence pane\nweb/src/components/ask/answer-view.tsx"]
+  verify-page["Verification page\nweb/src/components/verify/verify-page.tsx"] -->|"traces, evaluation, judges, fidelity"| api-client
+  dataset-page["Dataset page\nweb/src/components/dataset/dataset-page.tsx"] -->|"drafting and gold decisions"| api-client
+  document-search -->|"GET /api/documents"| api-client

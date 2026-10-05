@@ -1,0 +1,1 @@
+Written by a controlled shutdown (RequestRunner.shutdown, Resources.close when job threads outlive the deadline) or by recover_requests when a new owner starts. Running work interrupted mid-dispatch leaves its attempt dispatching, which budget.recover turns into unknown.

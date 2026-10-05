@@ -1,15 +1,59 @@
 created: 2026-10-04T13:34:40.746Z
-updated: 2026-10-04T13:34:41.988Z
-update_count: 6
-last_field: note
-git_commit: 95e8dc5
-git_branch: main
+updated: 2026-10-05T03:34:15.571Z
+update_count: 8
+last_field: diagram
+git_commit: 21da642
+git_branch: close-answer-failures-phase5-runner-lint
 children:
+  - api-shell
   - budget-ledger
   - http-api
+  - langfuse-tracing
   - owner-cli
   - persistence
+  - postgresql-store
   - provider-gateway
   - retrieval-engine
+  - runtime-artifacts
+  - service-core
   - service-layer
   - web-screens
+prev_diagram: "graph TD\r
+
+  \  web-screens[\"Web screens\\nweb/src/components\"]\r
+
+  \  http-api[\"HTTP API\\nsrc/rfp_assistant/api.py\"]\r
+
+  \  service-layer[\"Service layer\\nsrc/rfp_assistant/service.py\"]\r
+
+  \  retrieval-engine[\"Retrieval engine\\nsrc/rfp_assistant/retrieval.py\"]\r
+
+  \  budget-ledger[\"Budget ledger\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  provider-gateway[\"Provider gateway\\nsrc/rfp_assistant/generation.py\"]\r
+
+  \  persistence[\"Persistence\\nsrc/rfp_assistant/store.py\"]\r
+
+  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"]\r
+
+  \  web-screens -->|JSON routes, 1s polling| http-api\r
+
+  \  http-api -->|one service call per route| service-layer\r
+
+  \  owner-cli -->|same service and ledger| service-layer\r
+
+  \  owner-cli -->|ingest, index, evaluate| persistence\r
+
+  \  service-layer -->|scoped retrieval| retrieval-engine\r
+
+  \  service-layer -->|reserve, dispatch, settle| budget-ledger\r
+
+  \  service-layer -->|strict-schema chat| provider-gateway\r
+
+  \  retrieval-engine -->|metered query embedding| provider-gateway\r
+
+  \  retrieval-engine -->|indexes and vectors| persistence\r
+
+  \  budget-ledger -->|attempts and adjustments| persistence\r
+
+  \  service-layer -->|requests, runs, gold rows| persistence"

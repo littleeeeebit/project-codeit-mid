@@ -1,0 +1,1 @@
+Sidebar search over GET /api/documents (service.find_documents, which calls search_projects). Applies metadata filters plus best-BM25-chunk snippets per extraction. Free, and never calls a model. Documents whose amount or closing date cannot be judged stay listed with filter_undecided notes. Askable (indexed) documents sort first.
