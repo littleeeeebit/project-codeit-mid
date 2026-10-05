@@ -94,13 +94,16 @@ class SequenceTest(unittest.TestCase):
         self.assertTrue(again["reused"])
         self.assertEqual(again["provider_calls"], 0)
 
-    def reparse(self, ref, **steps):
-        """Runs maintenance while a parser change alters one original's output (its last element)."""
+    def reparse(self, ref, fail: str | None = None, **steps):
+        """Runs maintenance while a parser change alters one original's output (its last element), or, with
+        `fail`, makes reading it fail with that quarantine reason."""
         key, parse = ingestion.input_key, ingestion.parse_pdf
 
         def next_parser(path):
             raw, warnings, reason = parse(path)
             if ingestion.sha256_file(path) == ref.source_hash:
+                if fail:
+                    return [], warnings, fail
                 raw = [{**e, "raw_text": e["raw_text"] + " (개정)"} if i == len(raw) - 1 else e for i, e in enumerate(raw)]
             return raw, warnings, reason
 
@@ -129,6 +132,30 @@ class SequenceTest(unittest.TestCase):
             res.close()
         self.assertEqual((doc["active_extraction_id"], doc["review_status"]), (served, "unreviewed"))
 
+    def test_a_failed_reparse_leaves_the_served_extraction_available(self):
+        # review round 3, F5: a failed attempt quarantines the source without moving its pointer; the served
+        # extraction it leaves in place is still intact, reviewed and searchable
+        ref = self.env.refs["기관A"]
+        with store.open_db(self.s.db_path) as conn:
+            served, before = conn.execute("SELECT active_extraction_id, review_status FROM sources WHERE "
+                                          "source_hash = ?", (ref.source_hash,)).fetchone()
+        self.reparse(ref, fail="pdf_parse_failed", keyword=reused)
+        with store.open_db(self.s.db_path) as conn:
+            src = conn.execute("SELECT active_extraction_id, parse_status, review_status FROM sources WHERE "
+                               "source_hash = ?", (ref.source_hash,)).fetchone()
+        self.assertEqual(tuple(src), (served, "quarantined", "needs_recovery"))  # the failed attempt's record
+        res = service.Resources(self.s, transport=FakeTransport())
+        try:
+            (doc,) = service._doc_rows(res, [ref.doc_id])
+            request = service.AnswerRequest(idempotency_key="k", generation_id="g", question="", scope=[ref],
+                                            mode="inventory", as_of="2026-09-30")
+            status = service._inventory_answer(res, request, lambda status, *_, **__: status)
+        finally:
+            res.close()
+        self.assertEqual((doc["active_extraction_id"], doc["parse_status"], doc["review_status"],
+                          doc["reason_code"]), (served, "parsed", before, None))
+        self.assertNotEqual(status, "ingestion_unavailable")
+
     def test_a_reparse_keeps_the_served_questions_and_reports_the_ones_it_cost(self):
         # review round 2, F6: the served rows keep the question pinned to the served extraction; the rebuilt rows
         # cannot grade it, and the run says so instead of reporting a verified comparison
@@ -150,6 +177,19 @@ class SequenceTest(unittest.TestCase):
                   for r in table["rows"]}
         self.assertEqual(graded, {"served": {"dev-warranty"}, "rebuilt": set()})
         self.assertIn("unverified", maintenance.report_md(state))
+        # review round 3, F6: the screen where rows are chosen and activated receives the warning too
+        from rfp_assistant import api
+
+        res = service.Resources(self.s, transport=FakeTransport())
+        try:
+            listing = api.Experiments.model_validate(service.experiments(res, self.env.verifier))
+            status = api.MaintenanceStatus.model_validate(service.maintenance_status(res, self.env.verifier))
+        finally:
+            res.close()
+        (shown,) = [t for t in listing.tables if t.matrix == "regression"]
+        self.assertEqual(shown.needs_evidence_review, ["dev-warranty"])
+        (step,) = [s for s in status.run.steps if s.name == "regression"]
+        self.assertEqual((status.run.status, step.detail["needs_evidence_review"]), ("unverified", ["dev-warranty"]))
 
     def test_a_reparse_does_not_change_what_serving_searches_before_activation(self):
         ref = self.env.refs["기관A"]

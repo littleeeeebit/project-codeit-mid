@@ -431,10 +431,11 @@ def _doc_rows(res: Resources, doc_ids: list[str] | None = None) -> list[dict]:
                 continue
             d = dict(r)
             # Serving reads an original through the extraction its activated index holds: a re-parse moves
-            # `active_extraction_id` before the person activates the index built over the new extraction. The
-            # source's statuses then describe the newer revision, so the served one reports its own review.
-            served = idx.served_extraction(d["active_source_hash"], d["active_extraction_id"]) if idx else None
-            if served is not None and served != d["active_extraction_id"]:
+            # `active_extraction_id` before the person activates the index built over the new extraction, and a
+            # failed re-parse quarantines the source without moving it. Either way the source's statuses describe
+            # the latest attempt, not the extraction the index serves, which then reports its own review.
+            served = idx.source_extraction.get(d["active_source_hash"]) if idx else None
+            if served is not None and (served != d["active_extraction_id"] or d["parse_status"] != "parsed"):
                 d.update(active_extraction_id=served, parse_status="parsed", reason_code=None,
                          review_status=extraction_review_status(conn, served))
             out.append(d)
@@ -2204,7 +2205,7 @@ def experiments(res: Resources, principal: Principal) -> dict:
                          "active": bool(r.get("run_id")) and r.get("run_id") == active.get("run_id")})
         tables.append({"matrix": t["matrix"], "title": t["title"], "created_at": t["created_at"],
                        "columns": t["columns"], "fixed": t.get("fixed") or {}, "populations": t["populations"],
-                       "rows": rows})
+                       "needs_evidence_review": t.get("needs_evidence_review") or [], "rows": rows})
     golden = compare.compare_dir(res.settings) / "golden-counts.json"
     reranker = active.get("reranker") or {}
     serving_detail = {"mode": active.get("mode"), "embedding": (active.get("embedding") or {}).get("model"),
