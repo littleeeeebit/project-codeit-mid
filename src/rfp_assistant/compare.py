@@ -544,17 +544,32 @@ class Runner:
             self._baselines[which] = self.run_row(row, base)
         return self._baselines[which]
 
-    def run_row(self, row: dict, base: dict) -> dict:
-        label = row_label(row)
-        try:
-            s = row_settings(self.settings, row)
-            index = self.index(row["profile"])
-        except Exception as exc:  # noqa: BLE001 - a row that cannot be set up is a row with its reason
-            return {"status": "failed", "reason": f"{type(exc).__name__}: {exc}"[:500]}
+    def row_key(self, row: dict) -> tuple[str, Settings, object]:
+        s = row_settings(self.settings, row)
+        index = self.index(row["profile"])
         extra_key = {"embedding": ev.embedding_identity(s) if row.get("embedding") else None,
                      "reranker": [s.reranker_model, s.reranker_revision, s.reranker_max_length, s.reranker_precision]
                      if row.get("reranker") else None}
-        key = _cell_key(row, index, self.pops, extra_key)
+        return _cell_key(row, index, self.pops, extra_key), s, index
+
+    def recorded(self, row: dict) -> dict:
+        """What the last run recorded for a row this run skips (`--only`), failures included, so the table keeps
+        every row of its matrix."""
+        try:
+            key, _, _ = self.row_key(row)
+        except Exception as exc:  # noqa: BLE001
+            return {"status": "failed", "reason": f"{type(exc).__name__}: {exc}"[:500]}
+        cell, path = self.cached(key), self._cell_path(key)
+        if cell is None and path.exists():  # cached() hides failures so a run retries them; the table shows them
+            cell = json.loads(path.read_text(encoding="utf-8"))
+        return cell or {"status": "not_run", "reason": "not measured yet: run this matrix without --only"}
+
+    def run_row(self, row: dict, base: dict) -> dict:
+        label = row_label(row)
+        try:
+            key, s, index = self.row_key(row)
+        except Exception as exc:  # noqa: BLE001 - a row that cannot be set up is a row with its reason
+            return {"status": "failed", "reason": f"{type(exc).__name__}: {exc}"[:500]}
         hit = self.cached(key)
         if hit is not None:
             return hit
@@ -691,11 +706,12 @@ class Runner:
         for row in rows:
             if only and not any(o == row.get("embedding") or o == row.get("reranker") or o == row.get("profile")
                                 for o in only):
-                continue
-            from .models import unload_embedders
+                cell = self.recorded(row)
+            else:
+                from .models import unload_embedders
 
-            unload_embedders(keep=row.get("embedding"))  # one local model on the GPU at a time
-            cell = self.run_row(row, base)
+                unload_embedders(keep=row.get("embedding"))  # one local model on the GPU at a time
+                cell = self.run_row(row, base)
             if cell.get("status") == "complete" and k1.get("status") == "complete":
                 cell = {**cell, "new_critical_vs_k1": len(set(cell["dev"]["critical_ids"])
                                                          - set(k1["dev"]["critical_ids"]))}

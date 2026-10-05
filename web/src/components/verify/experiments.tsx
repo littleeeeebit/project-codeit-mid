@@ -40,7 +40,7 @@ const AXIS: Record<string, Record<string, string>> = {
   rerank_mode: { whole: "전체 재정렬", below_head: "BM25 상위 6 고정" },
   analyzer: { whitespace: "K0 공백 분리", kiwi: "K1 Kiwi 형태소" },
 };
-const STATUS: Record<string, string> = { failed: "실행 실패", needs_approval: "비용 승인 대기" };
+const STATUS: Record<string, string> = { failed: "실행 실패", needs_approval: "비용 승인 대기", not_run: "아직 측정 안 함" };
 const MODE: Record<string, string> = {
   kiwi_bm25: "키워드 Kiwi BM25", keyword: "키워드", dense: "밀집만", hybrid: "하이브리드", hybrid_rerank: "하이브리드 + 재정렬",
 };
