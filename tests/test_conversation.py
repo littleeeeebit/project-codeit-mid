@@ -8,13 +8,14 @@ import threading
 import time
 import unittest
 import uuid
+from dataclasses import asdict, replace
 from pathlib import Path
 from urllib.parse import quote
 
 from fastapi.testclient import TestClient
 
 from rfp_assistant import api, budget, generation, service, store
-from rfp_assistant.contracts import AnswerRequest, EvidenceUnit, Principal
+from rfp_assistant.contracts import AnswerRequest, EvidenceUnit, Principal, RetrievalResult
 from rfp_assistant.generation import FakeTransport, ProviderError, ProviderResponse
 from tests import fixtures
 
@@ -103,6 +104,35 @@ class FollowUpTest(Base):
         self.assertEqual([t["question"] for t in self.asked(self.transport.calls[3])["conversation"]],
                          [FIRST, STANDALONE])
         self.assertEqual(third.status, "answered", third.error)
+
+    def test_the_answer_sees_the_conversation_and_the_evidence_the_previous_answer_cited(self):
+        first = self.turn(FIRST)
+        cited = {first.evidence[i]["quote"] for i in service._cited_ids(asdict(first))}
+        self.assertTrue(cited)
+        self.transport.rewriter = rewritten("기관A 사업을 쉽게 설명해 주세요")
+        second = self.turn("쉽게 다시 말해 주세요", previous=first.request_id)
+        sent = self.asked(self.transport.calls[-1])
+        self.assertEqual([t["question"] for t in sent["conversation"]], [FIRST])
+        self.assertIn(first.summary, sent["conversation"][0]["answer"])
+        self.assertLessEqual(cited, {e["text"] for e in sent["evidence"]})  # every cited fact can be cited again
+        self.assertEqual(second.status, "answered", second.error)
+        self.assertEqual(self.trace(second.request_id)["carried_evidence_ids"],
+                         [e["evidence_id"] for e in sent["evidence"] if e["text"] in cited])
+        self.assertNotIn("conversation", self.asked(self.transport.calls[0]))  # a first turn has none
+
+    def test_carried_evidence_follows_the_fresh_evidence_once_and_only_while_it_is_indexed(self):
+        chunks = self.res.index().chunks
+        unit = lambda i, chunk: EvidenceUnit(f"E{i}", "doc", "h", chunk["extraction_id"], chunk["chunk_id"],
+                                             [], chunk["body"], {}, 5)
+        fresh = unit(1, chunks[0])
+        retrieval = RetrievalResult("keyword", [], [], [], [fresh], [], [], 5, {}, "t", None)
+        gone = replace(unit(1, chunks[2]), chunk_id="no-longer-indexed")
+        merged = service._with_carried(self.res, retrieval, [unit(4, chunks[0]), unit(7, chunks[1]), gone])
+        self.assertEqual([(e.evidence_id, e.chunk_id) for e in merged.evidence],
+                         [("E1", chunks[0]["chunk_id"]), ("E2", chunks[1]["chunk_id"])])
+        self.assertEqual(merged.evidence_tokens, 10)
+        self.assertIs(service._with_carried(self.res, retrieval, []), retrieval)
+        self.assertEqual(service._with_carried(self.res, retrieval, [unit(7, chunks[1])], {"other"}).evidence, [fresh])
 
     def test_a_turn_is_idempotent_and_its_target_names_its_place_in_the_conversation(self):
         first = self.turn(FIRST)
@@ -262,6 +292,17 @@ class StreamingTest(Base):
             '"evidence_ids":[]},{"text":"12개월로 한')
         self.assertEqual([(c["text"], c["evidence_ids"]) for c in partial["claims"]], [("12개월로 한", [])])
         self.assertIsNone(generation.partial_answer(""))
+
+    def test_evidence_ids_written_into_the_text_are_removed_because_the_markers_show_them(self):
+        ev = EvidenceUnit("E1", "A", "h", "x", "c", ["e"], "하자보수 12개월", {}, 5)
+        body = {"status": "answered", "summary": "기간은 12개월입니다. [E1][E2]", "summary_evidence_ids": ["E1"],
+                "missing_fields": [], "conflicts": [], "next_action": None,
+                "claims": [{"text": "하자보수는 12개월입니다 (E1, E3).", "kind": "source_fact", "doc_id": "A",
+                            "evidence_ids": ["E1"]}]}
+        payload = generation.validate_answer(ProviderResponse(json.dumps(body), None, "stop", None, None),
+                                             [ev], {"A"}, {"E1": ev.quote})
+        self.assertEqual((payload.summary, payload.claims[0].text), ("기간은 12개월입니다.", "하자보수는 12개월입니다."))
+        self.assertEqual(generation.partial_answer('{"summary":"기간은 [E1] 12개월')["summary"], "기간은 12개월")
 
 
 class StreamRouteTest(Base):

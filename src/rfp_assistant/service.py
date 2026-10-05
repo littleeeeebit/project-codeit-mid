@@ -697,32 +697,52 @@ def _evidence_map(evidence: list[EvidenceUnit]) -> dict[str, dict]:
 
 def prepare_answer(res: Resources, principal: Principal, question: str, scope: list[DocRef], as_of: str, *,
                    request_id: str | None = None, allow_paid: bool = False, mode: str | None = None,
-                   limits: dict | None = None, all_documents: bool = False) -> dict:
+                   limits: dict | None = None, all_documents: bool = False, conversation: list[dict] | None = None,
+                   carried: list[EvidenceUnit] = ()) -> dict:
     """Retrieval plus exact prompt counting and the maximum reservation estimate. Free unless `allow_paid`
     lets a dense mode pay for an uncached query embedding. `mode`/`limits` come from a frozen verifier
-    configuration. With `all_documents` the prompt names only the documents whose passages were retrieved."""
+    configuration. With `all_documents` the prompt names only the documents whose passages were retrieved.
+    A follow-up passes its `conversation` and the previous answer's `carried` evidence (`_with_carried`)."""
     principal = _authorize(res, principal, "consultant", "verifier")
     if all_documents:
         retrieval = retrieve(res, principal, question, [], request_id=request_id, allow_paid=allow_paid, mode=mode,
                              limits=limits, all_documents=True)
+        retrieval = _with_carried(res, retrieval, carried)
         cited = [e.doc_id for e in retrieval.evidence]
         order = list(dict.fromkeys(cited))
         docs = sorted(_doc_rows(res, order), key=lambda d: order.index(d["doc_id"]))
-        prep = _priced(res, question, as_of, docs, retrieval, "corpus")
+        prep = _priced(res, question, as_of, docs, retrieval, "corpus", conversation=conversation)
         prep["coverage"] = [{"doc_id": d, "evidence": cited.count(d)} for d in order]
         return prep
     docs = _resolve_scope(res, scope)
     retrieval = retrieve(res, principal, question, scope, request_id=request_id, allow_paid=allow_paid, mode=mode,
                          limits=limits)
-    return _priced(res, question, as_of, docs, retrieval, "single")
+    retrieval = _with_carried(res, retrieval, carried, {d["doc_id"] for d in docs})
+    return _priced(res, question, as_of, docs, retrieval, "single", conversation=conversation)
+
+
+def _with_carried(res: Resources, retrieval: RetrievalResult, carried: list[EvidenceUnit],
+                  doc_ids: set[str] | None = None) -> RetrievalResult:
+    """A follow-up's evidence: the fresh retrieval first, then the previous answer's cited units it lacks, renumbered
+    after it, so restating that answer can cite every fact again. A unit whose chunk left the serving index is
+    dropped: its quote could no longer be checked."""
+    have = {e.chunk_id for e in retrieval.evidence}
+    extra = [e for e in carried if e.chunk_id not in have and (doc_ids is None or e.doc_id in doc_ids)
+             and _stored_quote(res, e) is not None]
+    if not extra:
+        return retrieval
+    n = len(retrieval.evidence)
+    extra = [dataclasses.replace(e, evidence_id=f"E{n + i + 1}") for i, e in enumerate(extra)]
+    return dataclasses.replace(retrieval, evidence=[*retrieval.evidence, *extra],
+                               evidence_tokens=retrieval.evidence_tokens + sum(e.token_count for e in extra))
 
 
 def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retrieval: RetrievalResult,
-            mode: str, price_query_embedding: bool = True) -> dict:
+            mode: str, price_query_embedding: bool = True, conversation: list[dict] | None = None) -> dict:
     with tracing.step("assemble-evidence", input={"question": question, "as_of": as_of, "mode": mode,
                                                   "doc_ids": [d["doc_id"] for d in docs]}) as packed:
         messages = generation.build_messages(question, as_of, [_doc_brief(d) for d in docs], retrieval.evidence,
-                                             retrieval.limitations, mode=mode)
+                                             retrieval.limitations, mode=mode, conversation=conversation)
         rf = generation.answer_json_schema()
         tokens = generation.count_request_tokens(messages, rf, res.settings.framing_margin_tokens)
         packed.update(lambda: {"output": {
@@ -781,18 +801,28 @@ def _validate_request(res: Resources, request: AnswerRequest) -> str:
 
 
 CONVERSATION_TURNS = 6  # earlier turns a follow-up is rewritten from, newest kept
-CONVERSATION_ANSWER_CHARACTERS = 600  # of each earlier answer: enough to name what it was about
+CONVERSATION_ANSWER_CHARACTERS = 1200  # of each earlier answer: its sentences, so a restatement can keep them all
+CARRIED_EVIDENCE = 8  # of the previous answer's cited units, supplied again to the follow-up's answer
 FREE_TURNS = {"metadata": "기본 정보 조회", "inventory": "요구사항 목록 조회"}
 
 
-def _conversation(res: Resources, principal: Principal, request: AnswerRequest) -> list[dict]:
-    """The earlier turns of the conversation `request` continues, oldest first, as {question, answer}. Every earlier
-    turn must be this member's, finished and asked of the same scope; otherwise the request is refused before it
-    is queued. A rewritten turn contributes its standalone question, so references stay resolved."""
+def _cited_ids(result: dict) -> list[str]:
+    return list(dict.fromkeys([*(result.get("summary_evidence_ids") or []),
+                               *(i for c in result.get("claims") or [] for i in c["evidence_ids"]),
+                               *(i for c in result.get("conflicts") or [] for a in c["alternatives"]
+                                 for i in a["evidence_ids"])]))
+
+
+def _conversation(res: Resources, principal: Principal,
+                  request: AnswerRequest) -> tuple[list[dict], list[EvidenceUnit]]:
+    """The earlier turns of the conversation `request` continues, oldest first, as {question, answer}, and the
+    evidence units the previous answer cited. Every earlier turn must be this member's, finished and asked of the
+    same scope; otherwise the request is refused before it is queued. A rewritten turn contributes its standalone
+    question, so references stay resolved."""
     if request.previous_request_id and request.verifier_run_id:
         raise ServiceError("검증 실행에서 만드는 답변은 대화를 이어 갈 수 없습니다.")
     scope = [asdict(r) for r in request.scope]
-    turns, previous = [], request.previous_request_id
+    turns, carried, previous = [], [], request.previous_request_id
     with open_db(res.settings.db_path) as conn:
         while previous and len(turns) < CONVERSATION_TURNS:
             row = conn.execute("SELECT member_id, status, scope_json, request_json, result_json FROM requests "
@@ -804,12 +834,15 @@ def _conversation(res: Resources, principal: Principal, request: AnswerRequest) 
             if json.loads(row["scope_json"]) != scope:
                 raise ServiceError("대화 중에는 질문 범위를 바꿀 수 없습니다. 새 대화로 질문하세요.")
             snap, result = json.loads(row["request_json"]), json.loads(row["result_json"] or "{}")
+            if not turns:
+                units = result.get("evidence") or {}
+                carried = [EvidenceUnit(**units[i]) for i in _cited_ids(result) if i in units][:CARRIED_EVIDENCE]
             answer = " ".join([result.get("summary") or ""] + [c["text"] for c in result.get("claims") or []])
             turns.append({"question": result.get("standalone_question") or snap.get("question")
                           or FREE_TURNS.get(snap.get("mode"), ""),
                           "answer": answer.strip()[:CONVERSATION_ANSWER_CHARACTERS] or "(답변 없음)"})
             previous = snap.get("previous_request_id", "")
-    return turns[::-1]
+    return turns[::-1], carried
 
 
 def _request_snapshot(principal: Principal, request: AnswerRequest, question: str) -> dict:
@@ -1024,7 +1057,7 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
     # embedding is paid and a cache miss cannot switch it to another mode (refused when serving changed since).
     frozen = _frozen_run_for(res, request, question)
     principal = _checkpoint(res, request_id, principal)  # the rewrite or the query embedding may be the first paid stage
-    history = [] if frozen is not None else _conversation(res, principal, request)
+    history, carried = ([], []) if frozen is not None else _conversation(res, principal, request)
     if history:  # a follow-up: retrieval and the answer use the standalone question rewritten from the conversation
         question = _rewrite(res, principal, request_id, question, history, docs, trace, done)
         if isinstance(question, AnswerResult):
@@ -1035,14 +1068,15 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
         if frozen is not None:
             prep = _frozen_prep(res, question, request, docs, frozen)
         elif request.mode == "compare":
-            prep = _prepare_compare(res, principal, question, docs, request.as_of, request_id)
+            prep = _prepare_compare(res, principal, question, docs, request.as_of, request_id,
+                                    conversation=history, carried=carried)
         elif request.mode == "corpus":
             prep = prepare_answer(res, principal, question, [], request.as_of, request_id=request_id,
-                                  allow_paid=True, all_documents=True)
+                                  allow_paid=True, all_documents=True, conversation=history, carried=carried)
             docs = prep["docs"]
         else:
             prep = prepare_answer(res, principal, question, request.scope, request.as_of, request_id=request_id,
-                                  allow_paid=True)
+                                  allow_paid=True, conversation=history, carried=carried)
     except _Stop:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -1055,6 +1089,9 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
                     "새 검증 실행을 만든 뒤 다시 생성하세요. (유료 호출 없음)", request_status="failed")
     retrieval: RetrievalResult = prep["retrieval"]
     trace["retrieval"] = asdict(retrieval)
+    if carried:
+        chunks = {e.chunk_id for e in carried}
+        trace["carried_evidence_ids"] = [e.evidence_id for e in retrieval.evidence if e.chunk_id in chunks]
     trace["input_tokens_estimate"] = prep["input_tokens"]
     coverage = prep.get("coverage") or [{"doc_id": d["doc_id"], "evidence": len(retrieval.evidence)} for d in docs]
     server_missing = missing_unavailable + [
@@ -1217,7 +1254,8 @@ def _metered_chat(res: Resources, principal: Principal, request_id: str, *, stag
 
 def _prepare_compare(res: Resources, principal: Principal, question: str, docs: list[dict], as_of: str,
                      request_id: str | None, allow_paid: bool = True, mode: str | None = None,
-                     limits: dict | None = None, price_query_embedding: bool = True) -> dict:
+                     limits: dict | None = None, price_query_embedding: bool = True,
+                     conversation: list[dict] | None = None, carried: list[EvidenceUnit] = ()) -> dict:
     """One scoped subquery per selected document (the same question; no paid rewriting), each with the limits a
     single-document question gets, exactly as `evaluation._execute` measures a comparison row. Halving them per side
     served less than the retrieval gate measured (refresh50-ad-migration-design packed 4 of 13 groups while the gate
@@ -1260,7 +1298,10 @@ def _prepare_compare(res: Resources, principal: Principal, question: str, docs: 
         timings_ms=timings, trace_id=str(uuid.uuid4()), index_version=first_r.index_version if first_r else None,
         ranking=ranking, fallback=first_r.fallback if first_r else None,
         dense_version=first_r.dense_version if first_r else None, query_embedding=query_embedding)
-    prep = _priced(res, question, as_of, docs, merged, "compare", price_query_embedding)
+    merged = _with_carried(res, merged, carried, {d["doc_id"] for d in docs})
+    for c in coverage:  # carried units count for their side
+        c["evidence"] = sum(e.doc_id == c["doc_id"] for e in merged.evidence)
+    prep = _priced(res, question, as_of, docs, merged, "compare", price_query_embedding, conversation=conversation)
     prep["coverage"] = coverage
     return prep
 

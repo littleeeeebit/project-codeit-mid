@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 import uuid
@@ -14,11 +15,13 @@ from pydantic import ValidationError
 from .chunking import count_tokens
 from .contracts import AnswerPayload, EvidenceUnit
 
-PROMPT_VERSION = "grounded-answer-11"  # 4: atomic obligations, per-document citations, conflict action; 5: corpus mode
+PROMPT_VERSION = "grounded-answer-12"  # 4: atomic obligations, per-document citations, conflict action; 5: corpus mode
 # 6: every claim cites evidence; absence goes to missing_fields only; 7: a restated absence is declared kind "absence"
 # 8: an "absence" claim's text is exactly its missing field; 9: absences go only to missing_fields
 # 10: a comparison inference may also cite the other compared document's evidence
 # 11: the summary cites its evidence and each claim is one sentence (sentence-level citations in the chat)
+# 12: a follow-up sees the earlier conversation; restating an earlier answer keeps all of its facts;
+#     an actor owns a function only where the evidence names it; no evidence IDs inside the text
 COUNT_METHOD = "tiktoken:o200k_base+per_message_4+schema+margin"
 PER_MESSAGE_TOKENS = 4
 
@@ -66,6 +69,18 @@ These examples are instructions, not source facts or IDs to copy into an answer.
 
 The summary is one sentence. List in summary_evidence_ids the supplied evidence IDs it rests on;
 an answered summary always cites at least one. Write each claim as one sentence.
+Evidence IDs go only in the ID fields, never inside the summary or claim text.
+
+A function or duty belongs to an actor only where the evidence names that actor as its user or holder.
+Hypothetical example: if one requirement says "학생이 WEB에서 신청" and another lists only "승인, 대상자 조회",
+a question about what students use answers with the first and lists the second's user under missing_fields.
+
+A follow-up comes with the earlier conversation, oldest first, as data; the question is already standalone,
+and the evidence the previous answer cited is supplied again under new IDs.
+When the question asks to restate, simplify or explain an earlier answer, restate every claim of that answer
+as a claim of your own in plainer words, none dropped or merged away, keeping each number, condition, method
+and actor and citing the supplied evidence; then add only what the evidence supports.
+Plain wording may explain a term only as the evidence describes it.
 
 Return a short conclusion, supported claims, missing information,
 conflicts, and the suggested next verification step."""
@@ -314,10 +329,12 @@ def _join_last_question(messages: list[dict]) -> ProviderResponse:
 
 
 def build_messages(question: str, as_of: str, docs: list[dict], evidence: list[EvidenceUnit],
-                   limitations: list[str], mode: str = "single") -> list[dict]:
-    """Trusted instructions stay in the system message; question, metadata and evidence are JSON data."""
+                   limitations: list[str], mode: str = "single", conversation: list[dict] | None = None) -> list[dict]:
+    """Trusted instructions stay in the system message; question, metadata and evidence are JSON data.
+    `conversation`: a follow-up's earlier turns, oldest first, as {question, answer}."""
     request = {
         "mode": mode,
+        **({"conversation": conversation} if conversation else {}),
         "question": question,
         "as_of_date": as_of,
         "selected_documents": docs,
@@ -384,11 +401,12 @@ def partial_answer(content: str) -> dict | None:
         if not isinstance(c, dict) or c.get("kind") == "absence" or not isinstance(c.get("text"), str):
             continue  # an absence restates a missing field and is never shown
         done = finished[i] if i < len(finished) and isinstance(finished[i], dict) else {}
-        claims.append({"text": c["text"], "kind": "inference" if c.get("kind") == "inference" else "source_fact",
+        claims.append({"text": _without_ids(c["text"]),
+                       "kind": "inference" if c.get("kind") == "inference" else "source_fact",
                        "doc_id": done.get("doc_id") if isinstance(done.get("doc_id"), str) else "",
                        "evidence_ids": ids(done, "evidence_ids")})
     summary = texts.get("summary")
-    return {"summary": summary if isinstance(summary, str) else "",
+    return {"summary": _without_ids(summary) if isinstance(summary, str) else "",
             "summary_evidence_ids": ids(whole, "summary_evidence_ids"), "claims": claims}
 
 
@@ -474,4 +492,13 @@ def validate_answer(response: ProviderResponse, evidence: list[EvidenceUnit], al
             raise TechnicalError(f"comparison_side_missing: {','.join(d[:8] for d in absent)}")
     if payload.status == "answered" and not payload.summary_evidence_ids:
         raise TechnicalError("summary_without_evidence")
-    return payload
+    # IDs written into the text would repeat the numbered markers the screen draws from the ID fields
+    return payload.model_copy(update={"summary": _without_ids(payload.summary), "claims": [
+        c.model_copy(update={"text": _without_ids(c.text)}) for c in payload.claims]})
+
+
+INLINE_IDS = re.compile(r"\s*[\[(]E\d+(?:\s*,\s*E\d+)*[\])]")
+
+
+def _without_ids(text: str) -> str:
+    return INLINE_IDS.sub("", text).strip()

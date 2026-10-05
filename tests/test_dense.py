@@ -1013,9 +1013,10 @@ class ServingTest(unittest.TestCase):
         with store.open_db(self.env.settings.db_path) as conn:
             stages = {a["stage"]: a["state"] for a in conn.execute(
                 "SELECT stage, state FROM attempts WHERE request_id = ?", (r.request_id,))}
-        # An embedding with no usage stays unknown, and unknown billing blocks every later dispatch.
+        # An embedding with no usage stays unknown, and unknown billing blocks every later dispatch: the answer
+        # reports the block, not a technical failure.
         self.assertEqual(stages, {"embedding": "unknown", "generation": "released"})
-        self.assertEqual((r.status, r.billing_state, len(r.attempt_ids)), ("technical_error", "unknown", 2))
+        self.assertEqual((r.status, r.billing_state, len(r.attempt_ids)), ("budget_blocked", "unknown", 2))
         real = budget.reserve
 
         def no_generation(*args, **kw):

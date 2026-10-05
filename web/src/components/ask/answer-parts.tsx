@@ -34,21 +34,23 @@ export function citationNumbers(ids: string[]): Map<string, number> {
 export function Markers({ ids, cite }: { ids: string[]; cite: Cite }) {
   const shown = [...new Set(ids.filter((id) => cite.numbers.has(id)))];
   if (!shown.length) return null;
+  // An inline wrapper and zero-size brackets: copied text reads "문장.[1][2]" on the sentence's own line
+  const bracket = (c: string) => <span className="text-[0px]">{c}</span>;
   return (
-    <span className="ml-1 inline-flex gap-0.5 align-[0.1em]">
+    <span className="ml-1 whitespace-nowrap [&>*+*]:ml-0.5">
       {shown.map((id) => {
         const n = cite.numbers.get(id);
         return cite.onCite ? (
           <button key={id} type="button" onClick={() => cite.onCite!(id)} aria-pressed={cite.active === id}
                   aria-label={`근거 ${n} 원문 보기`}
-                  className={cn("inline-flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-[13px] leading-none font-bold tabular-nums outline-none",
+                  className={cn("inline-block h-6 min-w-6 rounded-md px-1 text-center align-[0.1em] text-[13px] leading-6 font-bold tabular-nums outline-none",
                     "focus-visible:ring-3 focus-visible:ring-ring/50",
                     cite.active === id ? "bg-primary text-primary-foreground" : "bg-accent text-primary hover:bg-primary/15")}>
-            {n}
+            {bracket("[")}{n}{bracket("]")}
           </button>
         ) : (
-          <span key={id} className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-secondary px-1 text-[13px] leading-none font-semibold text-muted-foreground tabular-nums">
-            {n}
+          <span key={id} className="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums">
+            {bracket("[")}{n}{bracket("]")}
           </span>
         );
       })}
