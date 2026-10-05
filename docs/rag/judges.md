@@ -233,3 +233,32 @@ Read the verdict narrowly:
 - No item was settled by the deterministic value checks.
 
 So the rule does not show Jev to be as safe as this Luna judge against this reference; across the two runs it is within one or two false accepts of Luna either way. It does not say either judge is a reliable reviewer. A reference with more negatives, especially human-reviewed failures, is needed before either judge replaces independent review.
+
+## Judge golden set result
+
+Recorded 2026-10-05 from run `J-judge_set-1561349ff3d0`: set `937c075f…`, 919 items, thresholds `d9c0e8ac…`. The run went ahead only after the owner approved the priced estimate `3437659e8e37` (maximum $0.892478). They first moved $0.20 from `gold_eval` to `judge_eval`, because the maximum exceeded the $0.791058 left there. Actual spend was $0.156263: $0.141270 for 919 Luna calls and $0.014993 for 26 bridge translation calls. The 837 Jev calls are unpriced.
+
+False-accept rate per mutation type: the share of judged mutants the judge itself passed. The last row is the pass rate on the unmutated sources, where higher is better.
+
+| Mutation | Items | Luna (Wilson 95%) | Jev, bridged (Wilson 95%) |
+| --- | --- | --- | --- |
+| amount | 19 | 10.5% (2/19; 2.9–31.4) | 10.5% (2/19; 2.9–31.4) |
+| unit | 27 | 14.8% (4/27; 5.9–32.5) | 42.3% (11/26; 25.5–61.1) |
+| qualifier | 85 | 27.1% (23/85; 18.8–37.3) | 55.0% (44/80; 44.1–65.4) |
+| date or period | 18 | 0.0% (0/18; 0–17.6) | 26.7% (4/15; 10.9–52.0) |
+| negation | 206 | 2.4% (5/206; 1.0–5.6) | 28.3% (54/191; 22.4–35.0) |
+| dropped condition | 28 | 35.7% (10/28; 20.7–54.2) | 88.5% (23/26; 71.0–96.0) |
+| wrong evidence | 250 | 8.4% (21/250; 5.6–12.5) | 7.0% (15/213; 4.3–11.3) |
+| **all mutants** | 633 | **10.3% (65/633)** | **26.8% (153/570)** |
+| unmutated (pass rate) | 286 | 88.8% (254/286) | 88.8% (237/267) |
+
+Jev judged 837 of the 919 items. All 82 abstentions are bridge rejections: 64 `changed_protected_value` and 18 `residual_hangul`.
+
+What it shows:
+
+- Both judges pass about 89% of the correct answers, so the gap is not a stricter or looser overall threshold. Jev misses changed meaning.
+- Jev passes most answers that drop a required condition (88.5%), more than half of the flipped comparison and obligation words, and more than a quarter of the negated claims. Luna catches nearly every negation and shifted period.
+- Neither judge reliably catches a dropped condition or a flipped qualifier. Luna still passes about a third and a quarter of them, so a deterministic qualifier check stays worth more than either judge there.
+- Wrong evidence and changed amounts are the only types where Jev matches Luna.
+
+This set does not change the held-out verdict, which remains under `replacement-rule-1`. It does show where the held-out reference's 13 negatives could not look: on 633 known failures, bridged Jev's false-accept rate is 2.6 times Luna's.

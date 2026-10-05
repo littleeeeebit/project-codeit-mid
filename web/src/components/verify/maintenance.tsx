@@ -54,7 +54,7 @@ function summary(s: Step): string {
   switch (s.name) {
     case "backup": return s.status === "reused" ? `데이터가 그대로라 ${stamp(d.taken_at)} 백업을 씀` : `새 백업 · 표 ${n(d.tables)}개`;
     case "restore_check": return `검사 ${n(d.checks)}개 통과${s.status === "reused" ? ` · ${stamp(d.checked_at)}에 확인함` : ""}`;
-    case "ingest": return d.changed?.length ? `원문 ${n(d.documents)}개 중 ${d.changed.length}개 추출이 바뀜: ${d.changed.map((c) => c.filename).join(", ")}`
+    case "ingest": return d.changed?.length ? `원문 ${n(d.documents)}개 중 ${d.changed.length}개 추출이 바뀜: ${d.changed.slice(0, 3).map((c) => c.filename).join(", ")}${d.changed.length > 3 ? ` 외 ${d.changed.length - 3}개` : ""}`
       : `원문 ${n(d.documents)}개 추출 모두 그대로${d.reparsed ? ` (${d.reparsed}개는 입력 설정이 달라 다시 읽었지만 결과가 같음)` : ""}`;
     case "fidelity": return d.checked ? `HWP ${d.checked}개 대조` : "바뀐 HWP 없음";
     case "keyword": return d.same_as_served ? `서비스 중인 색인 ${short(d.index_version)} 그대로` : `새 색인 ${short(d.index_version)} · 서비스 중 ${short(d.served_index_version)} (활성화 전)`;
@@ -88,7 +88,7 @@ export function MaintenanceSection() {
     <div className="space-y-12">
       <section aria-labelledby="maint-answer" className="space-y-6">
         <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">{run ? `마지막 실행 ${run.run_id} · ${run.actor} · ${stamp(run.started_at)}` : "아직 실행한 적 없음"}</p>
+          <p className="text-sm font-medium text-muted-foreground">{run ? `${run.status === "running" ? "지금 실행" : "마지막 실행"} ${run.run_id} · ${run.actor} · ${stamp(run.started_at)}` : "아직 실행한 적 없음"}</p>
           <h3 id="maint-answer" className={cn("text-4xl font-bold tracking-tight", head?.text)}>
             {!run ? "유지보수 전" : run.status === "failed" || run.status === "needs_approval"
               ? `${STEP[run.stopped_at as Step["name"]] ?? run.stopped_at}에서 멈춤` : head!.label}

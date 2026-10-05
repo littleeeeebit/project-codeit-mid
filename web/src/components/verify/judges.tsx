@@ -110,7 +110,9 @@ function RateCell({ c, bad }: { c?: Rate; bad: boolean }) {
   return (
     <>
       <span className={cn("font-semibold", c.rate != null && c.rate > 0 && bad && "text-bad")}>{pct(c.rate)}</span>
-      <span className="block text-xs text-muted-foreground">{c.passed}/{c.judged}{lo != null ? ` · ${pct(lo)}–${pct(hi)}` : ""}</span>
+      <span className="block text-xs text-muted-foreground">
+        {c.passed}/{c.judged}{lo != null && <span className="hidden sm:inline"> · {pct(lo)}–{pct(hi)}</span>}
+      </span>
     </>
   );
 }
@@ -156,19 +158,19 @@ function Mutations({ ov, results, run }: { ov: Overview; results?: Results; run?
           ))}
         </dl>
       </div>
-      <Table caption="변형 종류별로 두 판정 모델이 틀린 답을 통과시킨 비율" head={["변형", "항목", ...JUDGES.map((k) => `${ARM[k]} 통과율`), "코드가 값으로 판정"]}>
+      <Table caption="변형 종류별로 두 판정 모델이 틀린 답을 통과시킨 비율" head={["변형", "항목", ...JUDGES.map((k) => `${SHORT[k]} 통과율`)]}>
         {types.map((t) => (
           <tr key={t} className={cn(t === "unmutated" && "border-t-2")}>
-            <th scope="row" className={cn(td, "text-left font-medium")}>{MUTATION[t] ?? t}</th>
+            <th scope="row" className={cn(td, "min-w-24 text-left font-medium")}>{MUTATION[t] ?? t}</th>
             <td className={cn(td, "tabular-nums")}>{m.luna?.[t]?.items ?? m.jev_bridged?.[t]?.items}</td>
             {JUDGES.map((k) => <td key={k} className={cn(td, "tabular-nums")}><RateCell c={m[k]?.[t]} bad={t !== "unmutated"} /></td>)}
-            <td className={cn(td, "tabular-nums")}>{m.luna?.[t]?.code_settled ?? 0}</td>
           </tr>
         ))}
       </Table>
       <p className="max-w-3xl text-sm text-muted-foreground">
         오답 행은 판정 모델 스스로 통과로 판정한 비율(낮을수록 좋음)이고, 마지막 행은 변형 안 한 정답을 통과시킨 비율(높을수록 좋음)입니다.
-        보류는 분모에서 뺍니다. 코드가 값으로 판정한 항목은 판정 모델 자신의 답을 따로 셉니다. 세트 {results.judge_set_sha256?.slice(0, 8) ?? "-"}.
+        보류는 분모에서 뺍니다. 코드가 값으로 판정할 수 있는 항목({types.reduce((n, t) => n + (m.luna?.[t]?.code_settled ?? 0), 0)}건)도 판정 모델 자신의 답으로 셉니다.
+        Jev는 영어 다리를 거친 판정입니다. 세트 {results.judge_set_sha256?.slice(0, 8) ?? "-"}.
       </p>
     </section>
   );
@@ -602,7 +604,7 @@ function ItemDetail({ r }: { r: Row }) {
         {r.mutation && (
           <p className="text-sm">
             <span className="font-semibold">{MUTATION[String(r.mutation.type)] ?? String(r.mutation.type)}</span>
-            {r.mutation.from != null && <> · <span className="line-through">{String(r.mutation.from)}</span> → {String(r.mutation.to ?? "")}</>}
+            {r.mutation.from != null && <> · <span className="line-through">{String(r.mutation.from)}</span>{r.mutation.to ? <> → {String(r.mutation.to)}</> : " (뺌)"}</>}
           </p>
         )}
       </header>

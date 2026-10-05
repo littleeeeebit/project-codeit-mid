@@ -96,6 +96,10 @@ The in-place migration ran on the owner host on 2026-10-02, with the app stopped
 
 The pilot database was not copied over the live one; the two histories stay separate. On 2026-10-05 the pilot database (schema 6: 181 gold candidates, the frozen sealed set and its first run `S-95b3004bd1a8`, answer runs including `A-9ef59b566d64`) was imported into its own PostgreSQL database, `bidmate_pilot_archive`, with paid admission disabled, and validated table by table against the source (see the [handover](../../handoff/postgresql-pgvector/README.md#pilot-archive-2026-10-05)). Its run, review and receipt files stay archived, gitignored, under `.runtime/live-validation/pr8-review-archive/62015a9-owner-setup/`. Do not publish their payloads or credentials. Use [runbook sections 10–12](runbook.md) for planning, paid execution, freeze, read-only reporting and paid-disabled recovery.
 
+## Judge golden set (2026-10-05)
+
+The owner approved estimate `3437659e8e37` (maximum $0.892478) and moved $0.20 from `gold_eval` to `judge_eval` (`set-envelopes`, actor `owner`). The envelopes became embedding $2.50, gold_eval $2.30, interactive $4.00 and judge_eval $1.20, within the unchanged $10 cap. Run `J-judge_set-1561349ff3d0` judged the 919-item judge golden set (633 mutated negatives, 286 unmutated positives) and cost $0.156263 in `judge_eval`. Afterwards the ledger showed $2.449414 spent, $0 pending and $0 unknown, with $0.834795 left in `judge_eval`. False accepts over all mutants: Luna 65 of 633 (10.3%), bridged Jev 153 of 570 judged (26.8%). The per-type table is in [judges.md](../rag/judges.md#judge-golden-set-result).
+
 ## Judge comparison: Luna versus Jev (2026-10-04)
 
 Method, rule and limits are in [Luna judge versus Jev judge](../rag/judges.md). The reference is the 750 reviewed blind items of development run `A-9ef59b566d64`, copied read-only from the pilot archive after the receipt's packet and verdict hashes matched (reference `7c71e582…`, split `474cfa60…`). The sealed set and run `S-95b3004bd1a8` were not read.
