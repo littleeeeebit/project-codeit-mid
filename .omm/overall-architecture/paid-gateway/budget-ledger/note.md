@@ -1,0 +1,1 @@
+How `envelopes_for(cap)` scales the shares into micro-USD was not read.

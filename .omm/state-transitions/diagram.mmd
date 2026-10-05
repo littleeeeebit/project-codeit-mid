@@ -1,11 +1,5 @@
 graph TD
-  request_status["Request status\nsrc/rfp_assistant/service.py"]
-  attempt_billing["Attempt billing state\nsrc/rfp_assistant/budget.py"]
-  source_review["Source review status\nsrc/rfp_assistant/ingestion.py"]
-  gold_candidate["Gold candidate status\nsrc/rfp_assistant/gold.py"]
-  serving_activation["Serving activation\nsrc/rfp_assistant/evaluation.py"]
-  request_status -->|"each paid stage opens"| attempt_billing
-  attempt_billing -->|"billing_state on view"| request_status
-  source_review -->|"admits sources to index"| serving_activation
-  gold_candidate -->|"approved rows score runs"| serving_activation
-  serving_activation -->|"mode for new requests"| request_status
+  request-status["Request status\nsrc/rfp_assistant/service.py"] -->|"attempts per request"| billing-attempt["Billing attempt\nsrc/rfp_assistant/budget.py"]
+  serving-activation["Serving activation\nsrc/rfp_assistant/evaluation.py"] -->|"mode for retrieval"| request-status
+  source-review["Source review\nsrc/rfp_assistant/fidelity.py"] -->|"index admission"| serving-activation
+  gold-candidate["Gold candidate\nsrc/rfp_assistant/gold.py"] -->|"dataset population"| serving-activation

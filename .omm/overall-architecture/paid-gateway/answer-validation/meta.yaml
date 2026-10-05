@@ -1,0 +1,9 @@
+created: 2026-10-05T09:51:20.521Z
+updated: 2026-10-05T09:51:20.665Z
+update_count: 2
+last_field: concern
+kind: nested-class
+title: answer-validation
+children: []
+parentPath:
+  - paid-gateway

@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass, field, replace
 from decimal import Decimal
 from pathlib import Path
 
+from .models import EMBEDDINGS, RERANKERS
 from .postgres import Target
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -28,8 +29,9 @@ DEFAULT_RATES: dict[str, dict[str, str]] = {
 }
 ALLOWED_GENERATION_MODELS = ("gpt-6-luna",)
 REASONING_EFFORTS = ("none", "low", "medium", "high", "xhigh", "max")
-ALLOWED_EMBEDDING_MODELS = ("text-embedding-3-small", "text-embedding-3-large")  # small: test fixtures only
-SERVING_EMBEDDING = ("text-embedding-3-large", 1536)  # the only identity load_settings (every startup) accepts
+# Every compared embedding model (models.EMBEDDINGS). What serves is the activated run's model, never this setting:
+# the process value only names the model a maintenance build embeds with.
+ALLOWED_EMBEDDING_MODELS = tuple(EMBEDDINGS)
 # Embedding endpoint limits as documented in the pinned SDK (openai 3.22.1, embedding_create_params.py):
 # 8192 tokens per input, at most 2048 inputs per array, 300,000 tokens summed across one request.
 EMBEDDING_MAX_TOKENS_PER_INPUT = 8192
@@ -77,7 +79,7 @@ class Settings:
     reranker_revision: str = ""  # commit hash from the model card; the trial refuses to load an unpinned model
     reranker_max_length: int = 512
     reranker_max_concurrency: int = 1
-    reranker_precision: str = "fp32"  # "fp16" halves weights on a CUDA device; part of the trial/serving identity
+    reranker_precision: str = "fp32"  # "fp16"/"bf16" halve weights on a CUDA device; part of the trial/serving identity
     request_timeout_seconds: float = 60.0
     converter_timeout_seconds: float = 300.0
     framing_margin_tokens: int = 200
@@ -150,10 +152,6 @@ def load_settings(**overrides) -> Settings:
     values.update(overrides)
     settings = Settings(**values)
     validate(settings)
-    if (settings.embedding_model, settings.embedding_dimensions) != SERVING_EMBEDDING:
-        # The corpus vectors and the activated run are this identity; any other would serve keyword-only silently.
-        raise SettingsError(f"the embedding identity is fixed: {SERVING_EMBEDDING[0]} at {SERVING_EMBEDDING[1]} "
-                            f"dimensions, not {settings.embedding_model} at {settings.embedding_dimensions}")
     return settings
 
 
@@ -168,7 +166,11 @@ def validate(s: Settings) -> None:
     if s.generation_model not in ALLOWED_GENERATION_MODELS or s.generation_model not in DEFAULT_RATES:
         raise SettingsError(f"generation model {s.generation_model!r} is not allowlisted with a known rate")
     if s.embedding_model not in ALLOWED_EMBEDDING_MODELS:
-        raise SettingsError(f"embedding model {s.embedding_model!r} is not allowlisted")
+        raise SettingsError(f"embedding model {s.embedding_model!r} is not a compared model")
+    if EMBEDDINGS[s.embedding_model].backend != "openai" and s.embedding_dimensions != EMBEDDINGS[s.embedding_model].dims:
+        raise SettingsError(f"{s.embedding_model} produces {EMBEDDINGS[s.embedding_model].dims} dimensions")
+    if s.reranker_model not in RERANKERS:
+        raise SettingsError(f"reranker {s.reranker_model!r} is not a compared model")
     if not 0 < s.evidence_target_tokens <= s.evidence_max_tokens:
         raise SettingsError("evidence target must be positive and not exceed the evidence maximum")
     if s.generation_reasoning_effort not in REASONING_EFFORTS:
@@ -179,7 +181,8 @@ def validate(s: Settings) -> None:
         raise SettingsError("the reranker is enabled only through `activate-run` after its measured gate")
     if s.retrieval_mode not in ("kiwi_bm25",):
         raise SettingsError("retrieval_mode is the keyword default; other modes are activated with `activate-run`")
-    if not 1 <= s.embedding_dimensions <= EMBEDDING_MAX_DIMENSIONS.get(s.embedding_model, 0):
+    if not 1 <= s.embedding_dimensions <= EMBEDDING_MAX_DIMENSIONS.get(s.embedding_model,
+                                                                        EMBEDDINGS[s.embedding_model].dims):
         raise SettingsError("embedding_dimensions exceeds the model's native size")
     if not 1 <= s.embedding_batch_inputs <= EMBEDDING_MAX_INPUTS_PER_REQUEST:
         raise SettingsError(f"embedding_batch_inputs must be within 1..{EMBEDDING_MAX_INPUTS_PER_REQUEST}")
@@ -187,8 +190,8 @@ def validate(s: Settings) -> None:
         raise SettingsError(f"embedding_batch_tokens must be within 1..{EMBEDDING_MAX_TOKENS_PER_REQUEST}")
     if s.reranker_max_concurrency != 1:
         raise SettingsError("reranker_max_concurrency must be 1 until per-worker tokenizer isolation exists")
-    if s.reranker_precision not in ("fp32", "fp16"):
-        raise SettingsError("reranker_precision must be 'fp32' or 'fp16'")
+    if s.reranker_precision not in ("fp32", "fp16", "bf16"):
+        raise SettingsError("reranker_precision must be 'fp32', 'fp16' or 'bf16'")
     if s.fusion not in ("rrf", "keyword_first") or not 0 < s.dense_weight <= 2 or not 0 <= s.keyword_head <= 100:
         raise SettingsError("fusion must be 'rrf' or 'keyword_first', dense_weight within (0, 2], keyword_head 0..100")
     if s.dense_search not in ("exact", "hnsw") or not 1 <= s.hnsw_ef_search <= 1000:

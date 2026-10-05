@@ -1,1 +1,0 @@
-Set by `ingestion.record_review` with a named reviewer and inspected locations: through `service.confirm_fidelity` (UI, `sample_checked` with every reported finding as a location), `review record` or `import-reviews` (CLI, validated against the active extraction's element IDs). It requires a parsed source.

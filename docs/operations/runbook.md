@@ -6,7 +6,7 @@ Run the commands with the project environment's interpreter from any directory. 
 
 ## PostgreSQL only and Settings limit
 
-Since the 2026-10-04 cutover the application, billing ledger and retrieval sets live only in PostgreSQL 18.6 + pgvector 0.8.6 (the `bidmate_app` database). There is no other backend and no fallback. Start infrastructure with `./tools/start-postgresql.ps1`, then set `RFP_DATABASE_DSN` to the application database. A missing DSN, an unreachable database, a database without a validated import, or an embedding identity other than `text-embedding-3-large` at 1,536 dimensions stops startup with a clear message. `activate-run` likewise refuses a run of another identity, which would otherwise serve keyword-only. After a change to corpus routing (`ROUTE_RULE`), the activated run is no longer served. Requests fall back to the keyword default, and every retrieval lists `activated_run_stale:corpus_route` until `evaluate-retrieval` and `activate-run` record a run under the new rule. The cutover evidence (final import, vector parity, HNSW, fusion gate, needle set, paid end-to-end check) is in the [handover](../../handoff/postgresql-pgvector/README.md#postgresql-only-operation-2026-10-04).
+Since the 2026-10-04 cutover the application, billing ledger and retrieval sets live only in PostgreSQL 18.6 + pgvector 0.8.6 (the `bidmate_app` database). There is no other backend and no fallback. Start infrastructure with `./tools/start-postgresql.ps1`, then set `RFP_DATABASE_DSN` to the application database. A missing DSN, an unreachable database, a database without a validated import, or an embedding model outside the compared registry (`models.EMBEDDINGS`, at the dimensions it produces) stops startup with a clear message. Serving follows the activated run's embedding: an OpenAI or Gemini model through its API, a local model on the GPU inside the server process. `activate-run` refuses a run whose model is unregistered or whose local revision or prefixes no longer match the registry, which would otherwise serve keyword-only. After a change to corpus routing (`ROUTE_RULE`), the activated run is no longer served. Requests fall back to the keyword default, and every retrieval lists `activated_run_stale:corpus_route` until `evaluate-retrieval` and `activate-run` record a run under the new rule. The cutover evidence (final import, vector parity, HNSW, fusion gate, needle set, paid end-to-end check) is in the [handover](../../handoff/postgresql-pgvector/README.md#postgresql-only-operation-2026-10-04).
 
 Application startup requires the persisted import validation and rechecks artifact hashes. A failed or interrupted validation disables paid admission and blocks startup until validation passes.
 
@@ -167,8 +167,9 @@ python -m rfp_assistant.cli freeze-dataset --dataset test --actor <owner> --reas
 ```
 
 - Row shape, evidence groups, typed claims and negatives: `.wiki/gold-drafting.md`, section "Phase 4 gold rows".
-- Development rows are drafted and reviewed on `데이터셋 만들기`. The reviewer differs from the drafter and from whoever started the drafting run, writes a note, ticks "원문 파일에서 … 직접 확인했습니다", and marks disputed deadlines, amounts, institutions and mandatory conditions; a third person records the second review on 검증 › 골드·봉인 검토.
-- Sealed rows are reviewed only in the owner's terminal: `gold show --candidate-id <id>`, `gold decide ... --original-inspected`, `gold second-review ...`. They live under `.runtime/sealed/`; the 검증 and 데이터셋 만들기 pages never show them, and `evaluate-retrieval`/`plan-run --action answer-finalists` refuse the `test` split.
+- AI reviewers approve gold rows, development and sealed; no person approves rows one by one (operating rule in the [overview](../plan/end-to-end/0-overview.md#operating-rule-pipelines-run-reviewers-approve-a-person-picks)). The reviewer's identity, for example `ai-review:codex-gpt-6.1`, must differ from the drafter's (`api-gpt-6-luna`), from the drafting model's and from whoever started the drafting run. The drafter's own approval is refused; the drafter can only withdraw a row by rejecting it with a note.
+- Development rows are drafted on `데이터셋 만들기` and reviewed there or with `gold decide --reviewer <identity> --original-inspected`. The reviewer writes a note, confirms the original was inspected, and marks disputed deadlines, amounts, institutions and mandatory conditions. A second reviewer, differing from the drafter and the first reviewer, records the second review (`gold second-review`, or 검증 › 할 일).
+- Sealed rows are reviewed through the owner CLI only, by the same kind of AI reviewer: `gold show --candidate-id <id>`, `gold decide --candidate-id <id> --decision approve --reviewer <identity> --original-inspected`, `gold second-review ...`. They live under `.runtime/sealed/`; the 검증 and 데이터셋 만들기 pages never show them, and `evaluate-retrieval`/`plan-run --action answer-finalists` refuse the `test` split.
 - A set below the per-type targets (60 + 60) validates as `pilot`. Report it as a pilot; never call it gold.
 
 ### 10.2 Retrieval-first development comparison (free)
@@ -177,12 +178,12 @@ python -m rfp_assistant.cli freeze-dataset --dataset test --actor <owner> --reas
 python -m rfp_assistant.cli evaluate-retrieval --dataset dev --runs K0,K1      # D,H reuse cached query vectors
 python -m rfp_assistant.cli compare-runs --run-id <K1 run> --run-id <other run>
 python -m rfp_assistant.cli draft-activation --runs <run>,<run> --out C:\abs\decision.json
-python -m rfp_assistant.cli activate-run --run-id <run> --decision-file C:\abs\decision.json
+python -m rfp_assistant.cli activate-run --run-id <run> --decided-by <name> --note "..."   # note optional
 ```
 
 Each run records the Git revision (or says none was available), whether tracked files differed from it, the package-source and metric-code hashes, and the hardware. Two-document rows are scored per document (recall and complete coverage only); gold-2 nDCG@5 uses `(2^grade−1)/log2(rank+1)` counted in required evidence groups, the unit of its ideal (one complete unit per group), with family-grouped bootstrap intervals (seed 20261001, 1000 resamples).
 
-Returned top-5 passages outside every gold label are counted (`ndcg_pool`) and listed per row (`unlabelled_chunks@5` in the run's `traces.jsonl`). While any remain unreviewed, the recommendation is `pending_pool_review`: K1 stays provisionally and no finalist is named. Open each listed passage in its original. If it holds a required fact, add it as a new alternative (a new gold revision), validate, freeze and rerun. Otherwise record the review in the decision file before promoting a run or naming a finalist: `"pool_review": {"reviewed_by": "<name>", "runs": {"<run id>": <reviewed count>}}`, listing the promoted run, the finalist and the K1 baseline. K1 alone needs no review.
+Returned top-5 passages outside every gold label are counted (`ndcg_pool`) and listed per row (`unlabelled_chunks@5` in the run's `traces.jsonl`). They are shown beside the row's nDCG@5 and no longer block activation: the person reads the count in the table when choosing. `compare-runs` still keeps its advisory recommendation provisional (K1, no finalist) while they are unreviewed. When an AI reviewer finds a required fact in one, it is added as a new alternative (a new gold revision), validated, frozen and the matrix rerun.
 
 ### 10.3 Answer finalists (paid)
 
@@ -240,10 +241,25 @@ Mentor walkthrough on the frozen candidate (record the outcome as `.runtime/rele
 6. 검증: the trace of the same question, a comparison of two frozen runs, and the 평가·릴리스 section (development scores, the sealed set as a count only, the release decision).
 7. A budget cap and failure-state example: use a temporary fake-provider runtime (`load-check`, or a config with `{"provider": "fake"}` and its own `RFP_DATA_DIR`). Never drain the shared academy balance to demonstrate the cap.
 
-## 11. Index activation and rollback
+## 11. Comparison runs, activation and rollback
 
-- `activate-run --run-id <id> --decision-file <abs>` switches serving in one transaction and appends the previous configuration to `activations`. Every earlier index directory stays on disk, so issued citations keep resolving.
-- Rollback: activate the last known-good run again with a new decision file whose rationale names the failing version and why. Charged usage and traces are not rolled back. `report --phase 2` lists earlier activations.
+Pipelines run every variant; a person picks from the tables and activates. Nothing below runs on a schedule, and nothing changes what serves until the person activates a row.
+
+```powershell
+python -m rfp_assistant.cli compare --matrix lexical|chunking|embedding|reranker [--only <model or profile>]
+python -m rfp_assistant.cli compare --approve <estimate id> --approved-by <name>     # a paid row, then rerun
+python -m rfp_assistant.cli compare-cap --usd <amount> --actor <name> --reason "..."   # Gemini's own cap
+python -m rfp_assistant.cli compare-resolve --attempt-id <id> --charged yes|no --actor <name> --reason "..."   # a Gemini timeout
+python -m rfp_assistant.cli golden-counts
+```
+
+- `compare` runs the declared matrix over the development set (own document and whole corpus) and the needle set, reusing cached indexes, vectors, reranker scores and finished rows, and writes `.runtime/compare/tables/<matrix>.json` and `.md`. Run it with the UI stopped when a local model builds a corpus vector set: it holds the GPU for minutes, while the server's own reranker or embedding needs it too.
+- A paid corpus build (an uncached OpenAI model, or Gemini) stops as a `needs_approval` row with its priced estimate. So do question vectors not cached yet, such as a development question added after an earlier approval. An approval covers only the payloads its estimate priced, so a new question needs a new estimate. Approve it only after reading the price; OpenAI spending goes through the shared ledger, Gemini through its own cap and ledger. A Gemini call that times out after dispatch, or whose process ended mid-dispatch (startup recovery marks it), leaves an attempt with unknown billing. Gemini stays blocked until `compare-resolve` records whether it was charged (if unsure, say yes). A model that fails to load, runs out of memory or crashes stays a row with its reason; fix the cause and rerun the matrix, which retries every failed row.
+- The reranker matrix reranks the pool of whatever hybrid serves now: its keyword index (chunk profile), embedding model, fusion, depth, units and recorded evidence limits. After activating a different row, rerun it. A custom matrix may hold a paid embedding fixed; once its estimate is approved, `compare` opens the paid gateway for it just as for a varied one.
+- Serving retires a GPU model as soon as the activated row no longer uses it, at the next question after the switch, including a switch to an API or keyword row.
+- 검증 → 실험 비교 shows the tables. Open a row, read its missed questions, then activate it with your name and an optional note; the CLI equivalent is `activate-run --run-id <id> --decided-by <name> [--note ...]` (a decision file still works). Activation switches serving in one transaction and appends the previous configuration to `activations`. Every earlier index directory and vector set stays, so issued citations keep resolving.
+- A local embedding model or reranker loads on the server's GPU with the first question that needs it (the first answer after the switch waits for the load); one copy serves every user under a lock. Switching to another local model retires the previous one first; requests still using it finish with it before its memory returns. It loads from the local Hugging Face cache at its pinned revision, so a gated model such as `google/embeddinggemma-300m` serves without `HF_TOKEN` once the comparison has downloaded it. Watch the first answers' latency after the switch.
+- Rollback: activate the last known-good row again (the `text-embedding-3-large` hybrid run stays activatable), with a note naming what failed. Charged usage and traces are not rolled back. `report --phase 2` lists earlier activations.
 - An activation changes what the sealed freeze recorded; do it before `freeze-release`, never between the freeze and the sealed run.
 
 ## 12. Backup and restore

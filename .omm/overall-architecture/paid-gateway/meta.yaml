@@ -1,14 +1,24 @@
-created: 2026-10-05T04:06:18.173Z
-updated: 2026-10-05T04:06:18.674Z
-update_count: 3
-last_field: constraint
+created: 2026-10-05 04:06:18.173000+00:00
+updated: 2026-10-05 09:51:19.493000+00:00
+update_count: 5
+last_field: diagram
 kind: nested-class
 title: paid-gateway
 children:
-  - dispatch-marker
-  - gateway-owner
-  - owner-admin
-  - provider-transport
-  - reserve
-  - settlement
+- answer-validation
+- budget-ledger
+- dispatch-marker
+- gateway-owner
+- langfuse-tracing
+- openai-transport
 parentPath: []
+prev_diagram: "graph TD\r\n  reserve[\"Atomic admission\\nsrc/rfp_assistant/budget.py\"\
+  ]\r\n  dispatch_marker[\"Dispatch marker\\nsrc/rfp_assistant/budget.py\"]\r\n  provider_transport[\"\
+  Provider transport\\nsrc/rfp_assistant/generation.py\"]\r\n  settlement[\"Settlement\
+  \ or unknown\\nsrc/rfp_assistant/budget.py\"]\r\n  gateway_owner[\"Gateway advisory\
+  \ lock\\nsrc/rfp_assistant/postgres.py\"]\r\n  owner_admin[\"Owner reconciliation\\\
+  nsrc/rfp_assistant/budget.py\"]\r\n  reserve -->|\"attempt reserved\"| dispatch_marker\r\
+  \n  dispatch_marker -->|\"stop guard passed\"| provider_transport\r\n  provider_transport\
+  \ -->|\"usage or error\"| settlement\r\n  gateway_owner -->|\"owner_guard in transaction\"\
+  | reserve\r\n  gateway_owner -->|\"owner check per call\"| provider_transport\r\n\
+  \  owner_admin -->|\"resolves unknown attempts\"| settlement"

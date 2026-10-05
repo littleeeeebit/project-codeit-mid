@@ -1,0 +1,1 @@
+`cli build-keyword` -> `retrieval.build_keyword_index` (see retrieval-engine/keyword-index). `--include-unreviewed` builds the operating index labeled `includes_unreviewed`; `--reviewed-only` builds the strict one. Rebuilding with an identical config reuses the ready version.

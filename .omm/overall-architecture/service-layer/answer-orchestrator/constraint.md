@@ -1,0 +1,1 @@
+Nothing retries automatically. A provider error flagged `pre_execution` releases the reservation; any other failure marks the attempt `unknown` and leaves it pending until reconciled. A billed call whose settlement fails is kept unknown rather than lost.

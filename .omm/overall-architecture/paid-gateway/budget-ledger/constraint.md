@@ -1,0 +1,1 @@
+A single `unknown` attempt blocks every PostgreSQL dispatch until the owner reconciles it (`unresolved` / `settle` / `reconcile` CLI).

@@ -1,0 +1,9 @@
+created: 2026-10-05T09:51:20.231Z
+updated: 2026-10-05T09:51:20.379Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: openai-transport
+children: []
+parentPath:
+  - paid-gateway

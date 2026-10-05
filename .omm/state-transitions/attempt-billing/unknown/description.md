@@ -1,1 +1,0 @@
-Set by `mark_unknown` (timeout or 5xx, no usage, an unexpected exception, settlement failure) or by startup recovery. It keeps holding its reservation. While any unknown attempt exists, `mark_dispatching` refuses every new dispatch, `set_paid_enabled(True)` refuses, and `build-dense` and paid evaluation queries stop. Never re-sent.

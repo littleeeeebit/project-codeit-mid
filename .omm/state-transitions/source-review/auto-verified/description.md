@@ -1,1 +1,1 @@
-Set by `fidelity.verify_source` when the comparison against the Hancom-printed PDF finds no unmatched extraction or rendering text (6-character shingles, exact runs of 3+ digits). It never overwrites a human status (`HUMAN_STATUSES`).
+The bidirectional fidelity comparison against the Hancom print passed (`verify_source`). Allowed in the reviewed-only index.

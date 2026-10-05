@@ -1,0 +1,1 @@
+Some routes have no `api.GET`/`api.POST` caller in `web/src`: `/api/info`, `/api/verify/corrections` (GET and POST), `/api/verify/traces/{run_id}/export`, `/api/requests/{id}/export` and `/api/verify/fidelity/{hash}/pages/{page}`. They may be reached through plain links or `<img>` URLs. This was not verified.

@@ -1,1 +1,0 @@
-Set by `mark_dispatching` when the stop guard refuses (`stopped_before_dispatch:<reason>`), by `release` when no transport is configured or a provider confirms a pre-execution (4xx) rejection, and by startup recovery for never-dispatched reservations. It costs nothing.

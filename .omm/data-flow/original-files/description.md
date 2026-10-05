@@ -1,0 +1,1 @@
+`RFP_SOURCE_DIR` (default `<repo>/원본 데이터`) holds `data_list.csv` and `files/` (HWP and PDF). It is ignored by Git and never modified. Downloads are served only for managed (`doc_id`, `source_hash`) pairs (`service.original_download`). Hancom prints are kept in `.runtime/reviews/printed/<hash16>.pdf`.

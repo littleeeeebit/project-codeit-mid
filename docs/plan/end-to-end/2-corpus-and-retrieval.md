@@ -1,6 +1,6 @@
 # Phase 2 — corpus coverage and controlled retrieval selection
 
-Goal: extend the phase-1 workflow to accurately declared supported coverage, retain metadata conflicts and failed originals, and choose keyword/dense/hybrid retrieval from reproducible development evidence. Optional local reranking has a measured promotion gate and a working bypass.
+Goal: extend the phase-1 workflow to accurately declared supported coverage, retain metadata conflicts and failed originals, and let the person choose keyword/dense/hybrid retrieval from reproducible comparison tables ([operating rule](0-overview.md#operating-rule-pipelines-run-reviewers-approve-a-person-picks)). Local reranking reports its gate as a column and keeps a working bypass.
 
 Expected window: day 1–2. Enter after the [phase-1 handoff](1-guarded-vertical-slice.md) exposes working source/evidence contracts, the gateway and reviewed pilot. Continue gold review and interface work against those contracts; do not wait for every retrieval experiment to finish.
 
@@ -22,7 +22,8 @@ Primary files: extend `ingestion.py`, `chunking.py`, `retrieval.py`, `evaluation
 | `build-dense --index <version> --estimate-id <id>` | Owner-controlled, metered maintenance job; refuse a stale estimate/config/input hash |
 | `evaluate-retrieval --dataset dev-pilot --runs K0,K1,D,H` | Freeze snapshots, reuse query vectors, write rank/evidence metrics without answer generation |
 | `trial-reranker --dataset dev-pilot --candidate-counts 10,20` | Local load/inference only, frozen H candidates, time/memory and gate report |
-| `activate-run --run-id <id> --decision-file <absolute-path>` | Validate reviewed selection and ready artifacts; atomically change default config |
+| `compare --matrix <name>` | Run every variant of a declared axis matrix over the development, needle and whole-corpus sets, reusing cached indexes, vectors and scores; write one comparison table (JSON and Markdown). A paid step runs only under an estimate the person approved |
+| `activate-run --run-id <id> --decision-file <absolute-path>` | The person's pick from a table: validate ready artifacts and atomically change the serving config |
 | `check --phase 2 --provider fake` | Incremental-index, ranking, scope and budget regression gate |
 
 Angle-bracket values are supplied from real manifests/review files during implementation, not shell-ready literal arguments. Runtime indexes/reports follow the common layout. Retain old versions referenced by gold, citations or active requests.
@@ -50,7 +51,7 @@ For conflicting deadline/amount/institution, show each value and source. Owner/r
 1. Keep extraction revisions and source-span labels constant. Structural units preserve requirement detail/summary distinctions, table header-value relations, exceptions and annexes.
 2. For oversized prose/cells, split with token-aware raw-span mappings and repeat the necessary heading/header context. Every resulting search payload obeys its configured token ceiling. If a condition cannot fit with its fact, record linked evidence and pack them together later; do not drop it silently.
 3. Implement fixed windows `256/32`, `512/64`, `800/96` as separate versioned profiles using the same element order and source maps. Do not merge across originals or revisions.
-4. Run lexical-only comparisons first: hit/coverage, nDCG, duplicated tokens, qualifier losses, chunk count and memory. Select two useful chunk profiles at most for any paid dense comparison. Do not embed all profiles merely to fill a matrix of experiments.
+4. The chunking matrix builds every profile as a non-serving index and scores it with K1 on one population: chunk count, duplicated tokens, nDCG@5, complete support, qualifier losses, critical failures and latency. Embedding a profile costs money only for API models, and only under an estimate the person approved.
 5. Persist config/hash and row mappings for each ready index. Validate every mapped raw span/cell; same source evidence repeated by overlap counts once in metrics and context.
 
 ### 4. Make the lexical baseline reproducible
@@ -87,13 +88,13 @@ Pack at most six evidence units after expansion/deduplication, with target 3,000
 2. Load `BAAI/bge-reranker-v2-m3` once. It is distinct from `BAAI/bge-m3`. Measure cold load and warm query-passage scoring with the model's tokenizer; OpenAI token counts do not define its input length.
 3. Score the same frozen H candidate pool at depths 10 and 20 before parent expansion. Protect scoped exact detail matches. Deduplicate source overlap, preserve headers and report any tokenizer truncation/windowing; never assume a sigmoid score is a confidence percentage.
 4. Bound concurrent inference and measure queue time under six users. If CPU loading, memory, OOM or latency is unacceptable, record the failure and bypass. No paid LLM reranking fallback.
-5. Promote only if dev nDCG@5 improves at least 0.03, no new critical code/scope/numeric regression appears, and added warm p95 is at most one second under six-user load. Treat pilot uncertainty explicitly; review a marginal improvement on the larger dev set before final release.
+5. Report the gate as a column: dev nDCG@5 gain of at least 0.03, no new critical code/scope/numeric regression, added warm p95 of at most one second under six-user load. The person reads it next to the other rows and decides; pilot uncertainty stays visible in the Wilson and bootstrap intervals.
 
 ### 8. Select and record the active mode
 
 Evaluate K0, K1, D, H and eligible HR on identical source/scope/query versions. First comparisons are retrieval-only; only query embeddings are paid on uncached dense runs. Cache them across runs and report that cost distinctly. Record pre-rerank recall, post-ranking metrics, packed-context evidence coverage, wrong-document/version cases and latency.
 
-Choose by development evidence, critical regression checks, runtime and total cost. If no useful dense/reranker improvement is demonstrated, activate K1. Freeze the selected run/config and keep another retrieval finalist for phase 4 answer comparison. Update consultant-visible mode/limitations without exposing internal scores.
+The runner places development evidence, critical regression checks, runtime and total cost side by side; the person picks a row and activates it. Until then the current activation (or K1) keeps serving. Freeze the selected run/config and keep another retrieval finalist for phase 4 answer comparison. Update consultant-visible mode/limitations without exposing internal scores.
 
 ## Verification matrix
 

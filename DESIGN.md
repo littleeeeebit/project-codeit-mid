@@ -389,3 +389,27 @@ The existing GPT-5.6-Sol cell reviewed PR #10 in this worktree and found that dr
 Chat now blocks a second submission while its initial POST is pending. Polling, cancellation and abandonment use the member captured at submission. Navigation releases screen ownership, including an initial POST whose ownership record arrives after navigation; editing a completed question detaches the previous answer while retaining it in request history. Cancellation errors are displayed rather than discarded. Five browser regressions use temporary fixture data and a fake provider. They do not establish actual-corpus answer quality or dataset acceptance.
 
 The standalone TypeScript command now generates Next.js route types before checking them, so it works without an earlier production build. The fresh type check, ESLint and production build pass. Chat and verification acceptance remain recorded; dataset acceptance remains pending. The review verdict and final broad checks will be recorded in the PR after the repair round is reviewed.
+
+## 11. 실험 비교: picking from comparison tables
+
+### Purpose and layout
+
+The person who decides what serves comes here. Pipelines have already run every variant (`compare --matrix`). The person decides from numbers placed side by side and then activates; nothing else switches serving. The page reads in one order: what serves now, the matrix tabs, the best value of the matrix's first quality column, the table, then the opened row.
+
+- What serves now is the largest text on the page (30 px bold): retrieval mode, embedding model, and the reranker with its protected head. The run ID sits under it at 13 px. A stored activation that is not served shows its reason in the warning colour.
+- The matrix tabs (K0 · K1, 청킹, 임베딩, 리랭커) are text tabs with a row count. They are not boxed cards; the selected one carries the navy underline.
+- The headline number (36 px bold) is the best value of the first higher-is-better column, followed by the rows that reach it and how the serving row compares.
+- The table carries everything else. Every column header is a 44 px sort button, and the first click sorts the better direction first. In each column the best value among complete rows is bold navy, and screen readers hear "(최고)". The serving row has a 4 px navy left edge and the label 서비스 중. Rows without numbers (실행 실패, 비용 승인 대기) stay below the complete rows, with their reason and, for a priced row, its maximum cost and tokens in one muted line. The row name column is sticky, so a wide table scrolls under it inside its own container.
+- Opening a row scrolls its detail into view below the table. 놓친 질문 lists the questions the row missed, filtered by population (own document or whole corpus). It shows the first 10, then a "show the rest" button. Each item gives the question at 16 px and its flags at 13 px; only 치명 is red. The activation form sits beside the list on wide screens and below it on narrow ones. Its name is prefilled from the header's member name, and the note is optional.
+- Model identities (licence, revision, dimensions, size, peak GPU memory, cold load, layer cutoff) and the golden-set counts are folded.
+
+### Browser measurements
+
+Walked in Chrome 154, viewport by viewport with 100 px of overlap, at 1440×900 and 390×844, against the live 26-row embedding and 16-row reranker tables.
+
+- 1440×900: the 임베딩 tab is 3649 px tall (5 frames). The 리랭커 tab with a row open is 3229 px (4 frames). The serving headline, the tabs, the headline number and the first three table rows fit the first frame. scrollWidth equals the viewport; the wider columns scroll inside the table frame under the sticky row names.
+- 390×844: the 임베딩 tab with a row open is 5026 px (7 frames) and the 리랭커 tab is 4471 px (6 frames). scrollWidth is 390. The section is picked from the 검증 영역 선택 menu. The row names wrap to two or three lines next to the first metric, and the activation form stacks below the missed questions.
+- Fixed during the walk:
+  - Visually hidden "(최고)" spans escaped the table frame and widened the narrow page. The table frame is now `relative`.
+  - Every hybrid row ties at nDCG@5 0.941, because keyword_first keeps the BM25 head, so the marking said nothing. A column now marks its best value only when at most half of the complete rows share it. The headline says "13개 행이 같은 값" instead of listing 13 names.
+  - On hover, the sticky row name stayed white while the rest of the row turned grey. Both now take the same opaque hover colour.

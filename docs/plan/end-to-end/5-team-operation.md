@@ -12,19 +12,19 @@ Hold the database-wide paid-gateway advisory lock while the real paid service is
 
 Document the real interpreter, absolute application/data/source paths, who can reach the host and how, port and controlled shutdown. The developer's localhost command alone does not prove shared deployment. Verify the first owner/backup-owner restart before declaring the runbook complete.
 
-## Operating cadence
+## Operating events (no schedule)
 
 | When | Action | Paid behavior |
 | --- | --- | --- |
 | Startup | Verify database/schema, owner lock, rate/config fingerprint, active index hashes and pending-attempt recovery | None until paid configuration and recovery checks pass |
 | Every request | Record the visitor name, snapshot scope/config, reserve/dispatch/settle, record trace and display freshness | One bounded generation plus uncached embedding only when its route needs it |
-| Daily owner check | Inspect settled/pending totals, pacing, unusual retries, failed source states and ledger backup | Read-only; no evaluation rerun |
+| The owner checks the budget (`budget-report`, whenever they choose) | Inspect settled/pending totals, pacing, unusual retries, failed source states and ledger backup | Read-only; no evaluation rerun |
 | Provider data becomes available | Reconcile one closed matching interval; audit external usage and unknown attempts | Read-only billing import; no raw-key experiment |
-| A source/config changes | Review change, build an immutable candidate, retrieval-first regression, estimate any needed embeddings | Only uncached approved payloads; no full-corpus re-embedding by default |
-| Weekly review | Pick recurring failure categories, compare one justified change, inspect account/rate/dependency drift | Paid finalists/judges only within an explicit estimate |
+| A source/config changes | Build an immutable candidate and rerun the affected comparison matrix (`compare --matrix <name>`); the person reads the table and activates a row | Only uncached payloads under an estimate the person approved |
+| The person wants a comparison | One command or one button runs every variant of the matrix and writes its table to 검증 › 실험 비교 | Paid steps only under an approved estimate |
 | Project close | Final reconciliation, unresolved-attempt report, reproducible handoff and access/key return according to owner policy | No new batch/interactive paid work |
 
-This is a manual operating cadence. Do not create scheduled automations, contact members or change account settings merely because the plan names a cadence.
+Maintenance is one command or one button. Pipelines run every variant and AI reviewers approve gold rows, development and sealed. A person chooses from the comparison tables and activates ([operating rule](0-overview.md#operating-rule-pipelines-run-reviewers-approve-a-person-picks)). Nothing runs on a schedule: no timer, cron job or recurring automation starts a comparison, a review or an activation. A row in the table cannot change what serves until the person activates it. Contacting members or changing account settings is never part of maintenance.
 
 ## Ordered work
 
@@ -66,15 +66,15 @@ Record new consultant failures with question/scope/as-of, pinned source/index/pr
 5. Unsupported claims, prompt boundaries and output validation.
 6. Model/reranker changes only after the preceding cause is ruled out.
 
-For each accepted correction, add a independently reviewed regression row with original source spans. Keep it separate from the sealed release test. Run keyword/retrieval checks first; use paid generation only for the affected behavior or a bounded justified sample. Do not optimize against the original sealed answers and continue calling their score independent.
+For each accepted correction, add a regression row with original source spans, approved by an AI reviewer whose identity differs from the drafter's. Keep it separate from the sealed release test. Run keyword/retrieval checks first; use paid generation only for the affected behavior or a bounded justified sample. Do not optimize against the original sealed answers and continue calling their score independent.
 
 ### 5. Change an index/config safely
 
 1. Freeze changed source bytes and review relevant original evidence. Preserve previous association/version mappings and record provenance corrections.
 2. Plan changed unique payloads and cached vectors. Owner approves the concrete estimate through the existing action; the global/category caps remain authoritative.
 3. In maintenance mode, build the candidate in a new immutable directory through the gateway. Validate artifacts, dimensions/order and source-span mappings before readiness.
-4. Run focused retrieval regression and critical identity/qualifier checks. Compare against the last active version with the same labels and budget. Optional dense/reranker gains must still meet their original gates.
-5. Activate the candidate transactionally with a decision record. Existing in-flight/saved requests retain their snapshot; future requests use the new version. Cache keys change with index/config/prompt/auth scope as appropriate.
+4. Run the affected comparison matrix, which includes the focused retrieval regression and critical identity/qualifier checks, against the last active version with the same labels and budget. Gate results are columns of the table.
+5. The person activates the chosen row transactionally (`activate-run` or 검증 › 실험 비교) with their name and an optional note. Existing in-flight/saved requests retain their snapshot; future requests use the new version. Cache keys change with index/config/prompt/auth scope as appropriate.
 6. If regression is found, reactivate the retained known-good version. Rollback does not roll back charged usage or erase traces. Record the failing version and cause.
 
 Keep changes small and measured. Add an approximate vector index (pgvector HNSW) or an existing LiteLLM deployment only when current volume/runtime/operational failures justify it. Migration must retain allowance history, source identity, idempotency and role boundaries; a new dashboard cannot initialize spending to zero.
@@ -104,4 +104,4 @@ Use a restore fixture with a settled charge, prior-use adjustment and unresolved
 
 This phase is operationally ready when both owner and backup owner can launch, stop, inspect usage, recover unknown attempts, restore a staged backup and activate/roll back an index from the runbook. Paid routes remain within verified tracking scope and conservative admission; free discovery survives budget exhaustion. Ongoing real usage and weekly improvements produce actual logs rather than a claim that three weeks have already elapsed.
 
-Write `docs/operations/operating-handoff.md` with real host/setup details safe to share, ownership, backup/recovery results, cadence, final known limitations and links to actual release evidence. A successor can operate the system without undocumented machine state. This completes the plan's handoff path; it does not authorize scheduled jobs, external messages or account changes during this documentation task.
+Write `docs/operations/operating-handoff.md` with real host/setup details safe to share, ownership, backup/recovery results, the maintenance commands, final known limitations and links to actual release evidence. A successor can operate the system without undocumented machine state. This completes the plan's handoff path. Maintenance stays one command or button with no schedule, and it never sends external messages or changes accounts.

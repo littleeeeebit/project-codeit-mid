@@ -51,12 +51,12 @@ Metadata-only direct questions have their own stratum and are excluded from pass
 1. Validate family assignments and available review coverage. Use late sections, hard table headers/units, exceptions, repeated codes and misleading metadata, not just introduction paragraphs.
 2. Have team members write realistic consultant information needs first. Optional LLM drafting receives a small curated source group with stable evidence IDs and asks for candidate question, minimal required claims, exact quotes and difficulty rationale. It may return no candidate.
 3. Batch several candidates per source group and cache by source/prompt/model hash. Use the shared gateway and combined $3 gold/evaluation envelope. A rejected candidate does not automatically trigger another call.
-4. Locally validate schema, quote existence, scope/version identity and numeric/qualifier consistency. Candidate status stays pending until independent original review. The LLM cannot approve its own answer.
-5. Do not transmit the full RFP or create a separate knowledge graph just to generate questions. Manual drafting/review is the zero-cost fallback and often the better source of natural questions.
+4. Locally validate schema, quote existence, scope/version identity and numeric/qualifier consistency. Candidate status stays pending until an AI reviewer, whose identity differs from the drafter's, checks it against the original. The drafter and the drafting model cannot approve their own rows.
+5. Do not transmit the full RFP or create a separate knowledge graph just to generate questions. Manual drafting is the zero-cost fallback and often the better source of natural questions.
 
 ### 2. Independently review and freeze labels
 
-Each of six members can review 20 accepted rows, with drafter and reviewer differing. Reviewers see the original, question and proposed claims; they do not use the selected retriever's top-k as the authority. For disputed deadlines, institutions, amounts, mandatory conditions and conflicts, obtain a second independent check.
+AI reviewers approve or reject every row, development and sealed, under the [operating rule](0-overview.md#operating-rule-pipelines-run-reviewers-approve-a-person-picks). Each review records the reviewer's identity, which must differ from the drafter's and from the drafting model's. Reviewers see the original, question and proposed claims; they do not use the selected retriever's top-k as the authority. For disputed deadlines, institutions, amounts, mandatory conditions and conflicts, a second AI reviewer, differing from the drafter and the first reviewer, records the second check. Sealed rows are reviewed through the owner CLI (`gold show`, `gold decide`, `gold second-review`), so their text never reaches the verifier pages. No person approves rows one by one.
 
 Check that the question does not supply its answer, borrow an unnatural unique heading, or depend on outside knowledge. Validate amount units/VAT, date type/timezone, mandatory/optional language, scope and every required condition. Rewrite unrealistic questions while preserving source provenance.
 
@@ -91,11 +91,11 @@ An empty eligible denominator is reported as not applicable, not 100%. Report mi
 
 ### 4. Run retrieval-first comparisons and at most two answer finalists
 
-Reuse phase-2 frozen K0/K1/D/H/HR ranks where their dataset/source/config hashes match. On expanded development rows, rerun retrieval-only using cached query embeddings. Compare chunking and reranking as isolated changes; candidate recall and exact-code/scope failures remain visible.
+Reuse phase-2 frozen K0/K1/D/H/HR ranks where their dataset/source/config hashes match. On expanded development rows, rerun retrieval-only using cached query embeddings: `compare --matrix <name>` reruns a whole matrix in one command and reuses every cached index, vector and score. Compare chunking and reranking as isolated changes; candidate recall and exact-code/scope failures remain visible.
 
-Select at most two development finalists. Keep generation model, maintained prompt, output cap and evidence ceiling fixed for the retrieval-to-answer comparison. `plan-run` estimates all uncached embedding, generation and optional judge attempts before executing. An estimate/config mismatch requires replanning; a budget-blocked run remains partial with status, not secretly reallocated.
+The person selects at most two development finalists from the comparison tables. Keep generation model, maintained prompt, output cap and evidence ceiling fixed for the retrieval-to-answer comparison. `plan-run` estimates all uncached embedding, generation and optional judge attempts before executing. An estimate/config mismatch requires replanning; a budget-blocked run remains partial with status, not secretly reallocated.
 
-Review numbers/critical facts deterministically where trustworthy typed labels permit it and independently where context matters. Do not use string similarity as the sole answer score. Optional LLM judging is blind to run names, sampled and calibrated against human judgments; record agreement/disputes and its own USD. No paid judge fan-out across every configuration by default.
+Review numbers/critical facts deterministically where trustworthy typed labels permit it and independently where context matters. Do not use string similarity as the sole answer score. Optional LLM judging is blind to run names, sampled and calibrated against the reviewed reference verdicts; record agreement/disputes and its own USD. No paid judge fan-out across every configuration by default.
 
 Model or prompt comparisons are separate development experiments. If testing `gpt-4.1-mini` or a prompt variant, hold retrieval/evidence fixed and label that factor. No silent automatic escalation. Finalist selection records benefit, critical regressions, latency and cost before sealed access.
 

@@ -1,0 +1,1 @@
+Nothing runs on a schedule, and nothing changes what serves until a person activates a row. AI reviewers approve gold rows; a person chooses from the tables (0-overview.md operating rule).

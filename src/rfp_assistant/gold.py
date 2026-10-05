@@ -7,7 +7,10 @@ write and the commit.
 
 Two row schemas share the queue: the phase-2 pilot rows (`dev-pilot`) and the phase-4 gold rows (`gold-2`, datasets
 `dev` and the sealed `test`). Sealed candidates, their batch files and rejection pages live under `sealed/`; the
-review screen never lists them, so only the owner's CLI (the sealed evaluator) can review them.
+review screen never lists them, so they are reviewed only through the owner's CLI (the sealed evaluator).
+
+Reviewers are identities, not people: an AI reviewer approves development and sealed rows alike, provided its identity
+differs from the drafter's and from the drafting model's. Only self-approval is refused.
 
 Loop for the drafting agent (.wiki/gold-drafting.md): read the rejection wiki, record an inferred reason for
 every rejection with `infer`, then `submit` a new batch. `submit` refuses while any rejection lacks an
@@ -840,7 +843,8 @@ def excerpts(settings: Settings, per_category: int = 2, max_chars: int = 800) ->
                "omitted": omitted,
                "queue": status(settings)["counts"], "rejections": rejected, "existing_question_keys": keys,
                "rules": "Read .wiki/gold-drafting.md. Quote exactly from `text`; keep reviewed_by null; never pick "
-                        "a family or split yourself; a different person approves against the original."}
+                        "a family or split yourself; a reviewer whose identity differs from yours (an AI reviewer) approves "
+               "against the original."}
     return {"excerpts": out, "context": context}
 
 

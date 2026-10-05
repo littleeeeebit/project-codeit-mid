@@ -131,7 +131,8 @@ def snapshot(dsn: str, runtime: Path, out: Path):
         "active": active, "steps": [],
         "not_run": [{"step": step, "reason": reason} for step, reason in (
             ("phase2_ingest_and_fidelity", "inventory collection does not reparse or print originals"),
-            ("human_source_review_and_gold_approval", "requires an independent person's actual inspection"),
+            ("human_source_review_and_gold_approval", "requires a reviewer, person or AI, other than the drafter to "
+                                                      "inspect the original"),
             ("K0_K1_comparisons", "requires a validated reviewed dataset and frozen Phase 2 indexes"),
             ("dense_and_reranker", "no owner authorization or real measurement recorded by this collector"),
             ("activation_and_phase2_report", "requires completed comparisons and an owner selection"))]})

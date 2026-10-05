@@ -1,9 +1,5 @@
 graph TD
-  pending["pending\nsrc/rfp_assistant/gold.py"]
-  approved["approved\nsrc/rfp_assistant/gold.py"]
-  rejected["rejected\nsrc/rfp_assistant/gold.py"]
-  awaiting_second_review["approved, disputed\nsrc/rfp_assistant/gold.py"]
-  pending -->|"approve with note"| approved
-  pending -->|"reject with categories"| rejected
-  pending -->|"approve marked disputed"| awaiting_second_review
-  awaiting_second_review -->|"independent reviewer agrees"| approved
+  pending["Pending\nsrc/rfp_assistant/gold.py"] -->|"decide approve"| approved["Approved\nsrc/rfp_assistant/gold.py"]
+  pending -->|"decide reject"| rejected["Rejected\nsrc/rfp_assistant/gold.py"]
+  approved -->|"second_review"| second-reviewed["Second reviewed\nsrc/rfp_assistant/gold.py"]
+  rejected -->|"gold infer reason"| rejection-wiki["Rejection wiki\nsrc/rfp_assistant/gold.py"]

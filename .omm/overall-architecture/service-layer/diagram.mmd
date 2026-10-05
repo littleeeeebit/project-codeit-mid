@@ -1,13 +1,7 @@
 graph TD
-  resources["Process resource owner\nsrc/rfp_assistant/service.py"]
-  request_runner["Bounded request executor\nsrc/rfp_assistant/service.py"]
-  answer_orchestrator["Answer orchestration\nsrc/rfp_assistant/service.py"]
-  verifier_runs["Frozen verifier runs\nsrc/rfp_assistant/service.py"]
-  background_jobs["Paid background jobs\nsrc/rfp_assistant/drafting.py"]
-  gold_review["Gold review queue\nsrc/rfp_assistant/gold.py"]
-  resources -->|"lazily creates"| request_runner
-  request_runner -->|"run_queued(request_id)"| answer_orchestrator
-  answer_orchestrator -->|"index, dense, transport"| resources
-  verifier_runs -->|"idempotent generate request"| request_runner
-  background_jobs -->|"borrow transport, joined on close"| resources
-  background_jobs -->|"submit valid drafts"| gold_review
+  resources["Process resources\nsrc/rfp_assistant/service.py"] -->|"owns executor"| request-runner["Request runner\nsrc/rfp_assistant/service.py"]
+  request-runner -->|"run_queued(request_id)"| answer-orchestrator["Answer orchestrator\nsrc/rfp_assistant/service.py"]
+  verifier-functions["Verifier functions\nsrc/rfp_assistant/service.py"] -->|"vgen idempotent submit"| answer-orchestrator
+  resources -->|"registers threads"| background-jobs["Background jobs\nsrc/rfp_assistant/drafting.py"]
+  background-jobs -->|"submit_drafts batch"| gold-review["Gold review\nsrc/rfp_assistant/gold.py"]
+  verifier-functions -->|"activate_decision"| resources

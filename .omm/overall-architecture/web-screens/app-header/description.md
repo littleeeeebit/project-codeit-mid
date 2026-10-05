@@ -1,0 +1,1 @@
+Holds the 이름 field (stored in the browser by `web/src/lib/member.ts`, default `owner`) and shows the budget snapshot from `GET /api/budget`. Warnings are reduced by `service.visible_warnings` to the highest cap level, then the other warnings.

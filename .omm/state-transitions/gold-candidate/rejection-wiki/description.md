@@ -1,0 +1,1 @@
+Rendered from the database: the index plus one page per rejection. The drafting agent records an inferred reason (`gold infer`), and `gold check` verifies that files equal their database rendering.

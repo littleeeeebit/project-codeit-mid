@@ -1,0 +1,1 @@
+`attempts.state`. The request's overall `billing_state` takes precedence in this order: unknown > pending (reserved or dispatching) > reconciled > settled > released.

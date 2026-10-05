@@ -1,14 +1,9 @@
-created: 2026-10-05T04:06:35.944Z
-updated: 2026-10-05T04:06:36.412Z
+created: 2026-10-05 04:06:35.944000+00:00
+updated: 2026-10-05 04:06:36.412000+00:00
 update_count: 2
 last_field: diagram
 kind: nested-class
 title: corpus-ingestion
 children:
-  - hwp-parser
-  - manifest-import
-  - ocr-merge
-  - pdf-parser
-  - quarantine
-  - revision-assignment
+- ocr-merge
 parentPath: []

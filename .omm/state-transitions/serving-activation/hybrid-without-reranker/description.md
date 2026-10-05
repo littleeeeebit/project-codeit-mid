@@ -1,1 +1,1 @@
-An HR run activated under a superseded `eval_version` serves `hybrid` with `reranker=None` and `stale_policy` recorded, until a current reranker trial passes and is activated. Per request, a missing reranker or an inference error also serves the H order (`hybrid_rerank->hybrid:…`).
+An HR run activated under a superseded `EVAL_VERSION` keeps hybrid retrieval with the reranker dropped (`stale_policy`) until a current trial is activated. `activated_embedding_model_unknown` similarly degrades to `kiwi_bm25`.

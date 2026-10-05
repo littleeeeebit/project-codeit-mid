@@ -1,0 +1,10 @@
+created: 2026-10-05T09:51:24.489Z
+updated: 2026-10-05T09:51:24.490Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: measure-populations
+children: []
+parentPath:
+  - offline-pipelines
+  - comparison-runner

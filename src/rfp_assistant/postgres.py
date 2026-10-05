@@ -266,6 +266,8 @@ def init_schema(target: Target, schema: str, version: int):
         conn.raw.execute(schema.replace("INTEGER", "BIGINT").replace("TEXT", 'TEXT COLLATE "C"'))
         from .vector_store import SCHEMA as vector_schema
         conn.raw.execute(vector_schema)
+        from .models import EXTERNAL_SCHEMA
+        conn.raw.execute(EXTERNAL_SCHEMA)
         conn.raw.execute("CREATE TABLE IF NOT EXISTS application_mutex (id bigint PRIMARY KEY CHECK(id=1))")
         conn.raw.execute("INSERT INTO application_mutex VALUES (1) ON CONFLICT DO NOTHING")
         conn.raw.execute("INSERT INTO schema_migrations VALUES (%s) ON CONFLICT DO NOTHING", (version,))

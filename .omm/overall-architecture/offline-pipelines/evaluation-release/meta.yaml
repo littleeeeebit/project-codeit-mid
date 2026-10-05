@@ -1,0 +1,9 @@
+created: 2026-10-05T09:51:24.930Z
+updated: 2026-10-05T09:51:25.078Z
+update_count: 2
+last_field: note
+kind: nested-class
+title: evaluation-release
+children: []
+parentPath:
+  - offline-pipelines

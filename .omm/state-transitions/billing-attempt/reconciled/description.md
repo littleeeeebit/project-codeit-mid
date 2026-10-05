@@ -1,0 +1,1 @@
+Covered by an owner reconciliation adjustment (provider total minus local settled cost over a closed, non-overlapping interval). A later settlement inserts a negative `late-settlement:` adjustment so the cost is not counted twice.

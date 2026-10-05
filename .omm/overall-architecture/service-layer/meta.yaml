@@ -1,14 +1,25 @@
 created: 2026-10-04 13:34:42.724000+00:00
-updated: 2026-10-05T04:06:13.621Z
-update_count: 4
+updated: 2026-10-05 09:51:15.431000+00:00
+update_count: 6
 last_field: diagram
 kind: nested-class
 title: service-layer
 children:
-  - answer-orchestrator
-  - background-jobs
-  - gold-review
-  - request-runner
-  - resources
-  - verifier-runs
+- answer-orchestrator
+- background-jobs
+- gold-review
+- request-runner
+- resources
+- verifier-functions
 parentPath: []
+prev_diagram: "graph TD\r\n  resources[\"Process resource owner\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  request_runner[\"Bounded request executor\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  answer_orchestrator[\"Answer orchestration\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  verifier_runs[\"Frozen verifier runs\\nsrc/rfp_assistant/service.py\"]\r\n\
+  \  background_jobs[\"Paid background jobs\\nsrc/rfp_assistant/drafting.py\"]\r\n\
+  \  gold_review[\"Gold review queue\\nsrc/rfp_assistant/gold.py\"]\r\n  resources\
+  \ -->|\"lazily creates\"| request_runner\r\n  request_runner -->|\"run_queued(request_id)\"\
+  | answer_orchestrator\r\n  answer_orchestrator -->|\"index, dense, transport\"|\
+  \ resources\r\n  verifier_runs -->|\"idempotent generate request\"| request_runner\r\
+  \n  background_jobs -->|\"borrow transport, joined on close\"| resources\r\n  background_jobs\
+  \ -->|\"submit valid drafts\"| gold_review"

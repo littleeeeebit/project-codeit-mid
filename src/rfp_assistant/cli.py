@@ -196,7 +196,75 @@ def cmd_trial_reranker(args, settings) -> int:
 
 
 def cmd_activate_run(args, settings) -> int:
-    _print(evaluation.activate_run(settings, args.run_id, Path(args.decision_file)))
+    if args.decision_file:
+        _print(evaluation.activate_run(settings, args.run_id, Path(args.decision_file)))
+        return 0
+    if not args.decided_by:
+        print("activate-run needs --decided-by (the person picking the row) or --decision-file", file=sys.stderr)
+        return 2
+    config, _ = evaluation.load_run(settings, args.run_id)
+    decision = {"run_id": args.run_id, "mode": config["mode"], "decided_by": args.decided_by,
+                "rationale": args.note or ""}
+    _print(evaluation.activate_decision(settings, args.run_id, decision, f"owner-cli:{args.decided_by}"))
+    return 0
+
+
+def cmd_compare(args, settings) -> int:
+    """Run one declared matrix (or price its paid steps) and write its table."""
+    from . import compare
+    from .retrieval import Analyzer
+
+    if args.approve:
+        _print(compare.approve_estimate(settings, args.approve, args.approved_by or ""))
+        return 0
+    name, spec = compare.load_matrix(args.matrix)
+    approved = {a["model"] for a in compare.approvals(settings).values()}
+    res = _paid_resources(settings) if compare.paid_models(settings, spec) & approved else None
+    try:
+        table = compare.Runner(settings, res.analyzer if res else Analyzer(),
+                               res.transport if res else None).run(name, spec, args.only)
+    finally:
+        if res:
+            res.close()
+    for row in table["rows"]:
+        line = {"row": row["name"], "status": row["status"], "run_id": row.get("run_id")}
+        if row["status"] == "needs_approval":
+            est = row["estimate"]
+            line.update(estimate_id=est["estimate_id"], usd=round(est["total_micro_usd"] / 1e6, 4),
+                        tokens=est["corpus_tokens"] + est["query_tokens"], ledger=est["ledger"])
+        elif row["status"] != "complete":
+            line["reason"] = row.get("reason")
+        _print(line)
+    print(f"table: {compare.compare_dir(settings) / 'tables' / (name + '.md')}")
+    return 0
+
+
+def cmd_compare_cap(args, settings) -> int:
+    from decimal import Decimal
+
+    from . import models
+
+    cap = int(Decimal(args.usd) * 1_000_000)
+    _print(models.set_external_cap(settings.db_path, cap, args.actor, args.reason))
+    evaluation.record_audit(settings, args.actor, "set-external-cap", models.GEMINI_PROVIDER, args.reason,
+                            {"cap_micro_usd": cap})
+    return 0
+
+
+def cmd_compare_resolve(args, settings) -> int:
+    from . import models
+
+    _print(models.external_resolve(settings.db_path, args.attempt_id, args.charged == "yes", args.actor, args.reason))
+    evaluation.record_audit(settings, args.actor, "resolve-external-attempt", args.attempt_id, args.reason,
+                            {"charged": args.charged == "yes"})
+    return 0
+
+
+def cmd_golden_counts(args, settings) -> int:
+    from . import compare
+
+    report = compare.golden_counts(settings)
+    print(compare.golden_counts_md(report))
     return 0
 
 
@@ -621,9 +689,26 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--dataset", required=True)
     s.add_argument("--candidate-counts", default="10,20")
     s.add_argument("--index")
-    s = sub.add_parser("activate-run", help="validate a reviewed selection and switch the serving configuration")
+    s = sub.add_parser("activate-run", help="switch serving to the run the person picked from a comparison table")
     s.add_argument("--run-id", required=True)
-    s.add_argument("--decision-file", required=True)
+    s.add_argument("--decision-file", help="absolute path of a decision JSON (alternative to --decided-by)")
+    s.add_argument("--decided-by", help="the person who picked the row")
+    s.add_argument("--note", help="optional note recorded with the activation")
+    s = sub.add_parser("compare", help="run a declared axis matrix and write its comparison table (JSON and Markdown)")
+    s.add_argument("--matrix", default="lexical", help="lexical, chunking, embedding, reranker, or an absolute JSON path")
+    s.add_argument("--only", action="append", help="run only rows naming this model or profile (repeatable)")
+    s.add_argument("--approve", help="approve a priced estimate ID printed by an earlier run (no matrix runs)")
+    s.add_argument("--approved-by", help="with --approve: the person approving the estimate")
+    s = sub.add_parser("compare-cap", help="set the Gemini embedding cap, outside the shared OpenAI allowance")
+    s.add_argument("--usd", required=True)
+    s.add_argument("--actor", required=True)
+    s.add_argument("--reason", required=True)
+    s = sub.add_parser("compare-resolve", help="resolve a Gemini attempt with unknown billing (charged or not)")
+    s.add_argument("--attempt-id", required=True)
+    s.add_argument("--charged", required=True, choices=("yes", "no"))
+    s.add_argument("--actor", required=True)
+    s.add_argument("--reason", required=True)
+    sub.add_parser("golden-counts", help="rows of every gold set by status, from the databases")
     s = sub.add_parser("compare-runs", help="comparison table and K1-default recommendation from recorded runs")
     s.add_argument("--run-id", action="append", required=True)
     s = sub.add_parser("draft-activation", help="decision file for the owner to complete; activates nothing")
@@ -776,6 +861,8 @@ COMMANDS = {"init": cmd_init, "set-limit": cmd_set_limit, "register-embedding-ra
             "resolve-metadata": cmd_resolve_metadata, "plan-embeddings": cmd_plan_embeddings,
             "build-dense": cmd_build_dense, "evaluate-retrieval": cmd_evaluate_retrieval,
             "trial-reranker": cmd_trial_reranker, "activate-run": cmd_activate_run, "report": cmd_report,
+            "compare": cmd_compare, "compare-cap": cmd_compare_cap, "compare-resolve": cmd_compare_resolve,
+            "golden-counts": cmd_golden_counts,
             "compare-runs": cmd_compare_runs, "draft-activation": cmd_draft_activation,
             "fidelity": cmd_fidelity, "ocr": cmd_ocr, "build-keyword": cmd_build_keyword, "check": cmd_check, "validate-gold": cmd_validate_gold,
             "configure-budget": cmd_configure_budget, "budget-status": cmd_budget_status,

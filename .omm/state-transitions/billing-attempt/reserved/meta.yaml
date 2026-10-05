@@ -1,0 +1,9 @@
+created: 2026-10-05T09:51:29.869Z
+updated: 2026-10-05T09:51:29.870Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: reserved
+children: []
+parentPath:
+  - billing-attempt

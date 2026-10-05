@@ -1,0 +1,1 @@
+Final cost from usage at the attempt's frozen rates (`price_json`). Settling above the reservation sets `budget_settings.frozen_reason`, which refuses all later admissions until the owner inspects it.

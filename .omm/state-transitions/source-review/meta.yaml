@@ -1,21 +1,23 @@
 created: 2026-10-05 03:34:28.764000+00:00
-updated: 2026-10-05 04:06:30.717000+00:00
-update_count: 4
+updated: 2026-10-05 09:51:31.805000+00:00
+update_count: 6
 last_field: diagram
 kind: nested-class
 title: source-review
 children:
 - auto-flagged
 - auto-verified
-- human-checked
+- human-reviewed
 - quarantined
 - unreviewed
 parentPath: []
 prev_diagram: "graph TD\r\n  unreviewed[\"unreviewed\\nsrc/rfp_assistant/ingestion.py\"\
-  ] -->|\"fidelity run passes\"| auto-verified[\"auto_verified\\nsrc/rfp_assistant/fidelity.py\"\
-  ]\r\n  unreviewed -->|\"fidelity finds differences\"| auto-flagged[\"auto_flagged\\\
-  nsrc/rfp_assistant/fidelity.py\"]\r\n  auto-flagged -->|\"confirm_fidelity on 검증\"\
-  | sample-checked[\"sample_checked\\nsrc/rfp_assistant/service.py\"]\r\n  unreviewed\
-  \ -->|\"import-reviews\"| reviewed[\"reviewed\\nsrc/rfp_assistant/ingestion.py\"\
-  ]\r\n  needs-recovery[\"needs_recovery\\nsrc/rfp_assistant/ingestion.py\"] -->|\"\
-  recover-source passes\"| unreviewed"
+  ]\r\n  auto_verified[\"auto_verified\\nsrc/rfp_assistant/fidelity.py\"]\r\n  auto_flagged[\"\
+  auto_flagged\\nsrc/rfp_assistant/fidelity.py\"]\r\n  human_checked[\"sample_checked\
+  \ or reviewed\\nsrc/rfp_assistant/ingestion.py\"]\r\n  quarantined[\"quarantined,\
+  \ needs_recovery\\nsrc/rfp_assistant/ingestion.py\"]\r\n  unreviewed -->|\"fidelity\
+  \ run passes\"| auto_verified\r\n  unreviewed -->|\"fidelity finds differences\"\
+  | auto_flagged\r\n  auto_flagged -->|\"person confirms places\"| human_checked\r\
+  \n  auto_verified -->|\"review record imported\"| human_checked\r\n  unreviewed\
+  \ -->|\"converter fails on reingest\"| quarantined\r\n  quarantined -->|\"recover-source\
+  \ passes\"| unreviewed\r\n  human_checked -->|\"new extraction output\"| unreviewed"

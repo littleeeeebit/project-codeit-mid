@@ -1,1 +1,1 @@
-Written by `_finish` for `technical_error` (preparation, provider, settlement or validation failure), for `clarification_required` raised from `ServiceError` or a frozen-estimate mismatch, and by `_fail_unscheduled` when executor submission fails. The billing state still reflects any settled or unknown attempt.
+Terminal: `technical_error` (provider, settlement or validation failure) or `clarification_required` (`ServiceError`, a changed frozen-run estimate). Billing may still be `unknown` and need reconciliation.

@@ -1,0 +1,1 @@
+`service._stored_quote` scans `idx.chunks` linearly once per evidence unit (about 19k chunks × 10 units per answer). It is cheap at this corpus size; `idx.row_of` would make it a direct lookup.

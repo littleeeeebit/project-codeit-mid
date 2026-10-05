@@ -507,11 +507,13 @@ def fuse(settings: Settings, lexical_ids: list[str], dense_ids: list[str]) -> li
 
 def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, question: str,
              scope: list[tuple[DocRef, str]], *, mode: str | None = None, dense=None, query_vector=None,
-             reranker=None, rerank_depth: int | None = None) -> RetrievalResult:
+             reranker=None, rerank_depth: int | None = None, rerank_protect: int = 0) -> RetrievalResult:
     """scope pairs each selected DocRef with its active extraction ID; nothing outside it can be scored.
 
     Modes: whitespace_bm25 (K0), kiwi_bm25 (K1), dense (D), hybrid (H: K1 + D by RRF), hybrid_rerank (HR). A mode
-    whose dense matrix, query vector or reranker is unavailable falls back and says so in `fallback`."""
+    whose dense matrix, query vector or reranker is unavailable falls back and says so in `fallback`.
+    `rerank_protect` keeps up to that many leading BM25 rows of the fused order in place and reranks only the rows
+    below them (below-the-head mode); 0 reranks the whole list."""
     t0 = time.perf_counter()
     trace_id = str(uuid.uuid4())
     mode = mode or settings.retrieval_mode
@@ -619,7 +621,11 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
     rerank_info = None
     if mode == "hybrid_rerank":
         depth = min(rerank_depth or settings.fused_top_k, len(ordered))
-        pool = ordered[:depth]
+        lexical_rows = {i for i, _ in lexical}
+        protect = 0  # the BM25 head as fused: leading rows that came from the keyword channel
+        while protect < min(rerank_protect, depth) and ordered[protect] in lexical_rows:
+            protect += 1
+        head, pool = ordered[:protect], ordered[protect:depth]
         try:
             scored, rerank_info = reranker.rerank(question, [index.chunks[i] for i in pool])
         except Exception as exc:  # noqa: BLE001 - an inference failure serves the H order, visibly
@@ -630,7 +636,7 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
             reranked = [pool[p] for p, _ in scored if 0 <= p < len(pool) and pool[p] in admitted]
             candidates += [{"chunk_id": cid(pool[p]), "channel": "rerank", "rank": r + 1, "score": round(s, 6)}
                            for r, (p, s) in enumerate(scored) if 0 <= p < len(pool)]
-            ordered = list(dict.fromkeys(reranked + ordered[depth:]))
+            ordered = list(dict.fromkeys(head + reranked + ordered[depth:]))
     t5 = time.perf_counter()
     ranking = list(dict.fromkeys(exact + ordered))  # exact identifier matches stay ahead of every ranker
 

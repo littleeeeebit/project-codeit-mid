@@ -1,9 +1,0 @@
-created: 2026-10-05T04:06:36.580Z
-updated: 2026-10-05T04:06:36.581Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: manifest-import
-children: []
-parentPath:
-  - corpus-ingestion

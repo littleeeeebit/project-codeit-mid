@@ -1,0 +1,1 @@
+Internals of ocr.py beyond its function list were not read; this description follows README and the call site in `ingest_source`.

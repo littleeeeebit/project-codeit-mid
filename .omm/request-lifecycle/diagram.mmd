@@ -1,17 +1,8 @@
 graph TD
-  ask_screen["Ask screen submit\nweb/src/components/ask/ask-page.tsx"]
-  ask_route["POST /api/ask\nsrc/rfp_assistant/api.py"]
-  submit_answer["Validate and persist\nsrc/rfp_assistant/service.py"]
-  worker_claim["Worker claims queued\nsrc/rfp_assistant/service.py"]
-  paid_answer["Retrieve, price, reserve\nsrc/rfp_assistant/service.py"]
-  model_call["gpt-6-luna call\nsrc/rfp_assistant/generation.py"]
-  answer_validation["Citation validation\nsrc/rfp_assistant/generation.py"]
-  status_poll["Status polling\nsrc/rfp_assistant/api.py"]
-  ask_screen -->|"scope, question, mode"| ask_route
-  ask_route -->|"fresh generation_id key"| submit_answer
-  submit_answer -->|"request_id on executor"| worker_claim
-  worker_claim -->|"snapshot, rebuilt principal"| paid_answer
-  paid_answer -->|"dispatching attempt"| model_call
-  model_call -->|"structured JSON, usage"| answer_validation
-  answer_validation -->|"result_json persisted"| status_poll
-  ask_screen -->|"poll every second"| status_poll
+  ask-screen["Ask screen\nweb/src/components/ask/ask-page.tsx"] -->|"POST /api/ask"| ask-route["Ask route\nsrc/rfp_assistant/api.py"]
+  ask-route -->|"service.ask"| submit-answer["Submit answer\nsrc/rfp_assistant/service.py"]
+  submit-answer -->|"persisted request_id"| request-runner["Request runner\nsrc/rfp_assistant/service.py"]
+  request-runner -->|"claim queued to running"| paid-answer["Paid answer\nsrc/rfp_assistant/service.py"]
+  paid-answer -->|"reserve, dispatch, settle"| ledger-dispatch["Ledger dispatch\nsrc/rfp_assistant/budget.py"]
+  paid-answer -->|"_finish result_json"| status-poll["Status poll\nsrc/rfp_assistant/service.py"]
+  ask-screen -->|"GET every second"| status-poll

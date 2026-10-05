@@ -1,0 +1,1 @@
+`.runtime/runs/<run_id>/` holds `config.json`, `traces.jsonl`, `scores.json` and `report.md`, frozen by dataset hash, evaluated population, index manifest, analyzer, dense version, limits and corpus-route rule. Comparison cells and tables live in `.runtime/compare/`; estimates and approvals in `.runtime/compare/estimates/`.

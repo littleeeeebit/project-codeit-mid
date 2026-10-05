@@ -93,42 +93,65 @@ def verified(vector, dimensions, expected_checksum=None):
     return value
 
 
-def cache_get(settings, payload_hash):
-    from .dense import EMBED_POLICY
+def _identity(settings):
+    from .dense import embed_policy
 
+    return settings.embedding_model, settings.embedding_dimensions, embed_policy(settings.embedding_model)
+
+
+def cache_get(settings, payload_hash):
     with open_db(settings.db_path) as conn:
         row = conn.execute("SELECT * FROM embedding_payloads WHERE payload_hash=?", (payload_hash,)).fetchone()
-    if row is None or (row["model"], row["dimensions"], row["policy"]) != \
-            (settings.embedding_model, settings.embedding_dimensions, EMBED_POLICY):
+    if row is None or (row["model"], row["dimensions"], row["policy"]) != _identity(settings):
         return None
     return verified(row["embedding"], settings.embedding_dimensions, row["vector_checksum"])
 
 
-def cache_put(settings, payload_hash, vector, provenance):
-    from .dense import DenseError, EMBED_POLICY
+def cached_hashes(settings, hashes):
+    """The subset of `hashes` with a cache entry of this model, dimensions and policy (one query, not verified)."""
+    model, dims, policy = _identity(settings)
+    with open_db(settings.db_path) as conn:
+        return {r[0] for r in conn.execute("SELECT payload_hash FROM embedding_payloads WHERE payload_hash = ANY(?) "
+                                           "AND model=? AND dimensions=? AND policy=?",
+                                           (list(hashes), model, dims, policy))}
 
-    vector = verified(vector, settings.embedding_dimensions)
-    text_hash = provenance.get("normalized_payload_sha256")
-    if not isinstance(text_hash, str) or len(text_hash) != 64:
-        raise DenseError("pgvector cache requires the normalized provider payload hash")
+
+def cache_put(settings, payload_hash, vector, provenance):
+    cache_put_many(settings, [(payload_hash, vector, provenance)])
+
+
+def cache_put_many(settings, entries):
+    """Insert verified vectors in one transaction; an existing entry must be the same vector."""
+    from .dense import DenseError
+
+    model, dims, policy = _identity(settings)
+    rows = []
+    for payload_hash, vector, provenance in entries:
+        vector = verified(vector, dims)
+        text_hash = provenance.get("normalized_payload_sha256")
+        if not isinstance(text_hash, str) or len(text_hash) != 64:
+            raise DenseError("pgvector cache requires the normalized provider payload hash")
+        rows.append((payload_hash, model, dims, policy, text_hash, checksum(vector), dumps(provenance), vector))
+    if not rows:
+        return
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
-        conn.execute("INSERT INTO embedding_payloads VALUES (?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING",
-                     (payload_hash, settings.embedding_model, settings.embedding_dimensions, EMBED_POLICY,
-                      text_hash, checksum(vector), dumps(provenance), vector))
-        row = conn.execute("SELECT * FROM embedding_payloads WHERE payload_hash=?", (payload_hash,)).fetchone()
-        if (row["model"], row["dimensions"], row["policy"], row["normalized_payload_sha256"], row["vector_checksum"]) != \
-                (settings.embedding_model, settings.embedding_dimensions, EMBED_POLICY, text_hash, checksum(vector)):
-            raise DenseError("refusing to overwrite a different verified pgvector cache entry")
-        verified(row["embedding"], settings.embedding_dimensions, row["vector_checksum"])
+        conn.executemany("INSERT INTO embedding_payloads VALUES (?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING", rows)
+        stored = {r["payload_hash"]: r for r in conn.execute(
+            "SELECT payload_hash, model, dimensions, policy, normalized_payload_sha256, vector_checksum, embedding "
+            "FROM embedding_payloads WHERE payload_hash = ANY(?)", ([r[0] for r in rows],))}
+        for h, m, d, pol, text_hash, check, _, _ in rows:
+            row = stored.get(h)
+            if row is None or (row["model"], row["dimensions"], row["policy"], row["normalized_payload_sha256"],
+                               row["vector_checksum"]) != (m, d, pol, text_hash, check):
+                raise DenseError("refusing to overwrite a different verified pgvector cache entry")
+            verified(row["embedding"], d, row["vector_checksum"])
 
 
 def publish(settings, version, payloads, config):
-    from .dense import EMBED_POLICY
-
+    model, dims, policy = _identity(settings)
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
         conn.execute("INSERT INTO embedding_sets VALUES (?,?,?,?,?,?,'building',?)",
-                     (version, config["base_index_version"], settings.embedding_model, settings.embedding_dimensions,
-                      EMBED_POLICY, len(payloads), dumps(config)))
+                     (version, config["base_index_version"], model, dims, policy, len(payloads), dumps(config)))
         conn.executemany("INSERT INTO embedding_set_rows VALUES (?,?,?,?,?,?)",
                          [(version, i, config["base_index_version"], p["chunk_id"], p["extraction_id"], p["payload_hash"])
                           for i, p in enumerate(payloads)])
@@ -148,7 +171,7 @@ class PgDenseIndex:
 
     @classmethod
     def load(cls, settings, version, base=None, require_ready=True):
-        from .dense import DenseError, EMBED_POLICY
+        from .dense import DenseError, embed_policy
 
         with open_db(settings.db_path) as conn:
             meta = conn.execute("SELECT * FROM embedding_sets WHERE set_version=?", (version,)).fetchone()
@@ -159,7 +182,7 @@ class PgDenseIndex:
             source = conn.execute("SELECT manifest_hash FROM indexes WHERE index_version=?", (meta["source_index"],)).fetchone()
             if index is None or (require_ready and index["state"] != "ready") or source is None or \
                     source[0] != config["base_manifest_hash"] or json.loads(index["config_json"]) != config or \
-                    (meta["model"], meta["dimensions"], meta["policy"]) != (config["model"], config["dimensions"], EMBED_POLICY):
+                    (meta["model"], meta["dimensions"], meta["policy"]) != (config["model"], config["dimensions"], embed_policy(config["model"])):
                 raise DenseError("pgvector set/source/configuration identity mismatch")
             rows = conn.execute("SELECT r.*,p.model,p.dimensions,p.policy,p.vector_checksum,p.embedding,c.extraction_id "
                                 "AS expected_extraction FROM embedding_set_rows r JOIN embedding_payloads p USING(payload_hash) "

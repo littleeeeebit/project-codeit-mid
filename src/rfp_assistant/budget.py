@@ -464,6 +464,13 @@ def recover(db: Path) -> dict:
             (dumps({"reason": "never dispatched before restart"}),)).rowcount
         if unknown or released:
             _bump(conn)
+        # The Gemini ledger (models.external_*) follows the same rule: a dispatch the process may have sent stays
+        # unknown, blocking further Gemini calls until the person resolves it (compare-resolve).
+        now = utcnow()
+        unknown += conn.execute("UPDATE external_attempts SET state = 'unknown', detail = ?, finished_at = ? "
+                                "WHERE state = 'dispatching'", ("process ended during dispatch", now)).rowcount
+        released += conn.execute("UPDATE external_attempts SET state = 'released', detail = ?, finished_at = ? "
+                                 "WHERE state = 'reserved'", ("never dispatched before restart", now)).rowcount
     return {"unknown": unknown, "released": released}
 
 

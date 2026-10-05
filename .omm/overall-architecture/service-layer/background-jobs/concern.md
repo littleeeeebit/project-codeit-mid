@@ -1,0 +1,1 @@
+`_refuse_closed_or_busy` checks only evaluation and judge threads, and `start_drafting` checks only drafting threads. A drafting run can therefore overlap an evaluation or judge run. Both reserve through the ledger, so the cap still holds; whether the overlap is intended is not stated.
