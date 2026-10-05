@@ -307,7 +307,7 @@ function Activate({ r, onActivated }: { r: Row; onActivated: () => void }) {
 
 const FACT: Record<string, string> = {
   licence: "라이선스", revision: "리비전", dims: "차원", context: "최대 입력 토큰", backend: "실행 위치", size_bytes: "가중치 크기",
-  peak_vram_mb: "최대 GPU 메모리", precision: "정밀도", max_length: "입력 길이", layer: "레이어 컷오프",
+  peak_vram_mb: "최대 GPU 메모리", precision: "정밀도", max_length: "입력 길이", layer: "레이어 컷오프", batch: "GPU에 맞춘 배치",
   cold_load_seconds: "첫 로드", chunks: "청크 수", duplicated_tokens: "중복 토큰", dense_version: "벡터 세트",
 };
 

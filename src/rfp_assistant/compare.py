@@ -616,7 +616,7 @@ class Runner:
                     "new_critical_vs_h": len(new_vs_h), "truncated_pairs": truncated, "load": load,
                     "licence": spec.licence, "revision": spec.revision, "precision": spec.precision,
                     "max_length": spec.max_length, "layer": spec.layer, "cold_load_seconds": load["cold_load_seconds"],
-                    "peak_vram_mb": model.peak_vram_mb(), "size_bytes": load["size_bytes"], **latency,
+                    "peak_vram_mb": model.peak_vram_mb(), "batch": model.batch, "size_bytes": load["size_bytes"], **latency,
                     "questions": sum((_questions(measured["results"][p], p) for p in ("dev", "whole")), [])}
             return self.store(key, cell)
         except Exception as exc:  # noqa: BLE001 - load failure, out of memory or a crash is a row with its reason

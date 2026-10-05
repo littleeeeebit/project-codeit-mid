@@ -636,7 +636,7 @@ class LocalReranker:
     """Cross-encoder loaded once per process; inference is bounded by a semaphore. Scores are raw model
     logits used only for ordering, never presented as a probability or confidence."""
 
-    def __init__(self, settings: Settings, device: str | None = None) -> None:
+    def __init__(self, settings: Settings) -> None:
         if not settings.reranker_revision:
             raise DenseError("reranker_revision is not pinned; set the model card's commit hash in the config file")
         if settings.reranker_max_concurrency != 1:
@@ -644,12 +644,15 @@ class LocalReranker:
                              "preprocessing (a concurrency-2 run crashed in CrossEncoder.predict)")
         import importlib.metadata as md
 
+        import torch
         from sentence_transformers import CrossEncoder
 
+        if not torch.cuda.is_available():
+            raise DenseError("no CUDA GPU: the reranker runs only on the GPU, never on the CPU")
         rss0 = _rss_mb()
         t0 = time.perf_counter()
         self.model = CrossEncoder(settings.reranker_model, revision=settings.reranker_revision,
-                                  max_length=settings.reranker_max_length, device=device)
+                                  max_length=settings.reranker_max_length, device="cuda")
         self.precision = settings.reranker_precision
         if self.precision == "fp16":
             if "cuda" not in str(getattr(self.model, "device", "")):

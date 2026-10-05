@@ -50,12 +50,22 @@
   },
   {
    "a": "docs/operations/runbook.md",
+   "b": "docs/plan/end-to-end/0-overview.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/operations/runbook.md",
    "b": "docs/plan/end-to-end/4-evaluation-and-release.md",
    "kind": "link"
   },
   {
    "a": "docs/operations/runbook.md",
    "b": "docs/operations/release-report.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/0-overview.md",
+   "b": "docs/operations/runbook.md",
    "kind": "link"
   },
   {
@@ -225,6 +235,11 @@
   },
   {
    "a": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
+   "b": "docs/plan/end-to-end/0-overview.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/2-corpus-and-retrieval.md",
    "b": "docs/plan/end-to-end/1-guarded-vertical-slice.md",
    "kind": "link"
   },
@@ -295,6 +310,11 @@
   },
   {
    "a": "docs/plan/end-to-end/4-evaluation-and-release.md",
+   "b": "docs/plan/end-to-end/0-overview.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/4-evaluation-and-release.md",
    "b": "docs/plan/end-to-end/5-team-operation.md",
    "kind": "link"
   },
@@ -321,6 +341,11 @@
   {
    "a": "docs/plan/end-to-end/5-team-operation.md",
    "b": "docs/rag/evaluation.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/5-team-operation.md",
+   "b": "docs/plan/end-to-end/0-overview.md",
    "kind": "link"
   },
   {
@@ -365,12 +390,22 @@
   },
   {
    "a": "docs/rag/evaluation.md",
+   "b": "docs/plan/end-to-end/0-overview.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/evaluation.md",
    "b": "docs/rag/golden-dataset.md",
    "kind": "link"
   },
   {
    "a": "docs/rag/frontend.md",
    "b": "DESIGN.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/rag/golden-dataset.md",
+   "b": "docs/plan/end-to-end/0-overview.md",
    "kind": "link"
   },
   {
@@ -486,6 +521,12 @@
   },
   {
    "a": ".wiki/gold-drafting",
+   "b": "docs/plan/end-to-end/0-overview.md",
+   "kind": "reads",
+   "cross": true
+  },
+  {
+   "a": ".wiki/gold-drafting",
    "b": "docs/plan/end-to-end/4-evaluation-and-release.md",
    "kind": "reads",
    "cross": true
@@ -552,7 +593,7 @@
   "read": 8,
   "orphans": 0,
   "pages": 2,
-  "decisions": 17,
+  "decisions": 18,
   "injectable_decisions": 4
  }
 }

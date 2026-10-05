@@ -151,10 +151,39 @@ def model_size_bytes(key: str, revision: str | None) -> int | None:
     return sum(p.stat().st_size for p in files) or None
 
 
+GPU_HEADROOM_MB = 512  # dedicated memory left free for the CUDA context, the desktop and cuBLAS workspaces
+_GPU_CAPPED = False
+
+
 def _cuda():
+    """torch on the CUDA GPU; local models never run on the CPU. The first call caps this process's allocator at the
+    dedicated memory free right then: on Windows (WDDM) an allocation past dedicated VRAM silently spills into
+    shared system memory and runs over PCIe at a fraction of the speed, so an out-of-memory error (which the
+    callers answer by halving the batch) is the better outcome."""
+    global _GPU_CAPPED
     import torch
 
-    return torch if torch.cuda.is_available() else None
+    if not torch.cuda.is_available():
+        raise ModelError("no CUDA GPU: local embedding models and rerankers run only on the GPU, never on the CPU")
+    if not _GPU_CAPPED:
+        free, total = torch.cuda.mem_get_info()
+        torch.cuda.set_per_process_memory_fraction(max(0.1, (free - GPU_HEADROOM_MB * 2 ** 20) / total))
+        _GPU_CAPPED = True
+    return torch
+
+
+def _halving(run, batch: int, what: str) -> tuple:
+    """run(batch) on the GPU, halving the batch after an out-of-memory error; (result, the batch that fit)."""
+    import torch
+
+    while True:
+        try:
+            return run(batch), batch
+        except torch.OutOfMemoryError:
+            free_gpu()
+            if batch == 1:
+                raise ModelError(f"{what}: out of GPU memory at batch 1") from None
+            batch = max(1, batch // 2)
 
 
 def _dtype(precision: str):
@@ -167,8 +196,9 @@ def free_gpu() -> None:
     import gc
 
     gc.collect()
-    torch = _cuda()
-    if torch is not None:
+    import torch
+
+    if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
 
@@ -263,20 +293,20 @@ def _versions() -> dict:
 class LocalEmbedder:
     """A sentence-transformers model loaded once on the GPU; calls are serialized (one shared tokenizer)."""
 
-    def __init__(self, spec: EmbeddingSpec, device: str | None = None) -> None:
+    def __init__(self, spec: EmbeddingSpec) -> None:
         from sentence_transformers import SentenceTransformer
 
         torch = _cuda()
-        device = device or ("cuda" if torch is not None else "cpu")
-        if torch is not None:
-            torch.cuda.reset_peak_memory_stats()
+        device = "cuda"
+        torch.cuda.reset_peak_memory_stats()
         t0 = time.perf_counter()
         self.spec = spec
+        self.batch = 32  # lowered for good after an out-of-memory error
         if spec.trust_remote_code:
             prepare_remote_class(spec.key, spec.revision)
         self.model = SentenceTransformer(spec.key, revision=spec.revision, device=device,
                                          trust_remote_code=spec.trust_remote_code,
-                                         model_kwargs={"dtype": _dtype(spec.precision)} if device == "cuda" else {})
+                                         model_kwargs={"dtype": _dtype(spec.precision)})
         self.restored_buffers = restore_buffers(self.model) if spec.trust_remote_code else 0
         self.cold_load_seconds = round(time.perf_counter() - t0, 2)
         prompts = getattr(self.model, "prompts", None) or {}
@@ -292,8 +322,7 @@ class LocalEmbedder:
         self.info = {"model": spec.key, "revision": spec.revision, "device": device, "precision": spec.precision,
                      "max_length": self.max_length, "cold_load_seconds": self.cold_load_seconds,
                      "versions": _versions()}
-        if torch is not None:
-            self.info["vram_after_load_mb"] = round(torch.cuda.max_memory_allocated() / 2 ** 20, 1)
+        self.info["vram_after_load_mb"] = round(torch.cuda.max_memory_allocated() / 2 ** 20, 1)
 
     def prefixed(self, texts: list[str], kind: str) -> list[str]:
         prompt = self.spec.query_prompt if kind == "query" else self.spec.doc_prompt
@@ -304,13 +333,15 @@ class LocalEmbedder:
         return sum(len(ids) > self.max_length for ids in tok(self.prefixed(texts, kind),
                                                              add_special_tokens=True)["input_ids"])
 
-    def embed(self, texts: list[str], kind: str, batch_size: int = 32) -> np.ndarray:
+    def embed(self, texts: list[str], kind: str, batch_size: int | None = None) -> np.ndarray:
         extra = {}
         if self.spec.task:
             extra["task"] = self.spec.task[0 if kind == "query" else 1]
+        prefixed = self.prefixed(texts, kind)
         with self._lock:
-            vecs = self.model.encode(self.prefixed(texts, kind), batch_size=batch_size, normalize_embeddings=True,
-                                     convert_to_numpy=True, show_progress_bar=False, **extra)
+            vecs, self.batch = _halving(lambda b: self.model.encode(
+                prefixed, batch_size=b, normalize_embeddings=True, convert_to_numpy=True, show_progress_bar=False,
+                **extra), min(batch_size or self.batch, self.batch), self.spec.key)
         vecs = np.asarray(vecs, dtype=np.float32)
         if vecs.shape != (len(texts), self.spec.dims) or not np.isfinite(vecs).all():
             raise ModelError(f"{self.spec.key}: invalid output {vecs.shape}")
@@ -319,9 +350,8 @@ class LocalEmbedder:
             raise ModelError(f"{self.spec.key}: zero vector")
         return vecs / norms
 
-    def peak_vram_mb(self) -> float | None:
-        torch = _cuda()
-        return round(torch.cuda.max_memory_allocated() / 2 ** 20, 1) if torch is not None else None
+    def peak_vram_mb(self) -> float:
+        return round(_cuda().cuda.max_memory_allocated() / 2 ** 20, 1)
 
 
 _EMBEDDERS: dict[str, LocalEmbedder] = {}
@@ -536,13 +566,13 @@ class LocalRerankerModel:
     ties by chunk ID; info with truncated pairs, queue and inference time). Scores order passages; they are never
     shown as probabilities."""
 
-    def __init__(self, spec: RerankerSpec, device: str | None = None) -> None:
+    def __init__(self, spec: RerankerSpec) -> None:
         torch = _cuda()
-        self.device = device or ("cuda" if torch is not None else "cpu")
-        if torch is not None:
-            torch.cuda.reset_peak_memory_stats()
+        self.device = "cuda"
+        torch.cuda.reset_peak_memory_stats()
         t0 = time.perf_counter()
         self.spec = spec
+        self.batch = spec.batch  # lowered for good after an out-of-memory error
         self.max_length = spec.max_length
         self._sem = threading.Lock()
         self._wait = threading.Lock()
@@ -551,7 +581,7 @@ class LocalRerankerModel:
 
             self.model = CrossEncoder(spec.key, revision=spec.revision, max_length=spec.max_length, device=self.device,
                                       trust_remote_code=spec.trust_remote_code,
-                                      model_kwargs={"dtype": _dtype(spec.precision)} if self.device == "cuda" else {})
+                                      model_kwargs={"dtype": _dtype(spec.precision)})
             self.tokenizer = self.model.tokenizer
         else:
             from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -573,8 +603,7 @@ class LocalRerankerModel:
                      "max_length": spec.max_length, "max_concurrency": 1, "backend": spec.backend,
                      "layer": spec.layer, "cold_load_seconds": self.cold_load_seconds, "license": spec.licence,
                      "versions": _versions()}
-        if torch is not None:
-            self.info["vram_after_load_mb"] = round(torch.cuda.max_memory_allocated() / 2 ** 20, 1)
+        self.info["vram_after_load_mb"] = round(torch.cuda.max_memory_allocated() / 2 ** 20, 1)
 
     # -- causal LM templates
     def _ids(self, text: str) -> list[int]:
@@ -624,24 +653,33 @@ class LocalRerankerModel:
         built = [self._pair_ids(q, p) for q, p in pairs]
         order = sorted(range(len(built)), key=lambda i: len(built[i][0]))
         out = [0.0] * len(built)
-        for start in range(0, len(order), self.spec.batch):
-            idx = order[start:start + self.spec.batch]
+
+        def forward(idx: list[int]) -> list[float]:
             batch = self.tokenizer.pad({"input_ids": [built[i][0] for i in idx]}, padding=True, return_tensors="pt")
             batch = {k: v.to(self.device) for k, v in batch.items()}
             with torch.inference_mode():
                 if self.spec.backend == "layerwise":
-                    res = self.model(**batch, return_dict=True, cutoff_layers=[self.spec.layer])
+                    res = self.model(**batch, return_dict=True, use_cache=False, cutoff_layers=[self.spec.layer])
                     vals = res[0][0][:, -1].view(-1).float()
                 else:
-                    logits = self.model(**batch).logits[:, -1, :].float()
+                    # Only the last position's logits: the full [batch, length, vocabulary] tensor is about 2 GB per
+                    # Gemma batch (256k vocabulary) and pushed the GPU into shared system memory. No KV cache either.
+                    logits = self.model(**batch, use_cache=False, logits_to_keep=1).logits[:, -1, :].float()
                     if self.spec.template == "bge-llm":
                         vals = logits[:, self._yes]
                     elif self.spec.template == "qwen3":
                         vals = torch.log_softmax(torch.stack([logits[:, self._no], logits[:, self._yes]], 1), 1)[:, 1]
                     else:
                         vals = logits[:, self._yes] - logits[:, self._no]
-            for i, v in zip(idx, vals.cpu().tolist()):
+            return vals.cpu().tolist()
+
+        start = 0
+        while start < len(order):
+            idx_of = lambda b: order[start:start + b]  # noqa: E731 - the batch that fits decides the slice
+            vals, self.batch = _halving(lambda b: forward(idx_of(b)), self.batch, self.spec.key)
+            for i, v in zip(idx_of(self.batch), vals):
                 out[i] = float(v)
+            start += self.batch
         return out, [t for _, t in built]
 
     def score(self, pairs: list[tuple[str, str]]) -> tuple[list[float], list[bool]]:
@@ -652,7 +690,8 @@ class LocalRerankerModel:
             if self.spec.backend == "cross":
                 tok = self.tokenizer
                 flags = [len(tok(q, p)["input_ids"]) > self.max_length for q, p in pairs]
-                vals = self.model.predict(pairs, batch_size=self.spec.batch, show_progress_bar=False)
+                vals, self.batch = _halving(lambda b: self.model.predict(pairs, batch_size=b, show_progress_bar=False),
+                                            self.batch, self.spec.key)
                 return [float(v) for v in vals], flags
             return self._score_causal(pairs)
 
@@ -670,9 +709,8 @@ class LocalRerankerModel:
         return [(i, scores[i]) for i in order], {"truncated": truncated, "queue_ms": round((t1 - t0) * 1000, 1),
                                                  "infer_ms": round((t2 - t1) * 1000, 1)}
 
-    def peak_vram_mb(self) -> float | None:
-        torch = _cuda()
-        return round(torch.cuda.max_memory_allocated() / 2 ** 20, 1) if torch is not None else None
+    def peak_vram_mb(self) -> float:
+        return round(_cuda().cuda.max_memory_allocated() / 2 ** 20, 1)
 
 
 def load_reranker_model(key: str) -> tuple[LocalRerankerModel | None, dict]:

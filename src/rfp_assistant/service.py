@@ -2101,7 +2101,7 @@ def judge_results(res: Resources, principal: Principal, run_id: str) -> dict:
 
 
 EXPERIMENT_FACTS = ("licence", "revision", "dims", "context", "backend", "size_bytes", "peak_vram_mb", "precision",
-                    "max_length", "layer", "cold_load_seconds", "chunks", "duplicated_tokens", "dense_version")
+                    "max_length", "layer", "batch", "cold_load_seconds", "chunks", "duplicated_tokens", "dense_version")
 
 
 def _failed(q: dict) -> bool:
