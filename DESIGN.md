@@ -404,3 +404,12 @@ The person who decides what serves comes here. Pipelines have already run every 
 - Model identities (licence, revision, dimensions, size, peak GPU memory, cold load, layer cutoff) and the golden-set counts are folded.
 
 ### Browser measurements
+
+Walked in Chrome 154, viewport by viewport with 100 px of overlap, at 1440×900 and 390×844, against the live 26-row embedding and 16-row reranker tables.
+
+- 1440×900: the 임베딩 tab is 3649 px tall (5 frames). The 리랭커 tab with a row open is 3229 px (4 frames). The serving headline, the tabs, the headline number and the first three table rows fit the first frame. scrollWidth equals the viewport; the wider columns scroll inside the table frame under the sticky row names.
+- 390×844: the 임베딩 tab with a row open is 5026 px (7 frames) and the 리랭커 tab is 4471 px (6 frames). scrollWidth is 390. The section is picked from the 검증 영역 선택 menu. The row names wrap to two or three lines next to the first metric, and the activation form stacks below the missed questions.
+- Fixed during the walk:
+  - Visually hidden "(최고)" spans escaped the table frame and widened the narrow page. The table frame is now `relative`.
+  - Every hybrid row ties at nDCG@5 0.941, because keyword_first keeps the BM25 head, so the marking said nothing. A column now marks its best value only when at most half of the complete rows share it. The headline says "13개 행이 같은 값" instead of listing 13 names.
+  - On hover, the sticky row name stayed white while the rest of the row turned grey. Both now take the same opaque hover colour.

@@ -68,11 +68,19 @@ function rowTitle(t: Table, r: Row): string {
   }).join(" · ");
 }
 
+/** The column's best value among complete rows and the rows holding it. */
+function top(t: Table, c: Column): { value: Value; rows: Row[]; complete: number } {
+  const done = t.rows.filter((r) => r.status === "complete");
+  const nums = done.map((r) => r.values[c.key]).filter((v): v is number => typeof v === "number");
+  if (!c.better || !nums.length) return { value: null, rows: [], complete: done.length };
+  const value = c.better === "high" ? Math.max(...nums) : Math.min(...nums);
+  return { value, rows: done.filter((r) => r.values[c.key] === value), complete: done.length };
+}
+
+/** Marked only when it sets rows apart: a best value held by more than half the rows marks nothing. */
 function best(t: Table, c: Column): Value {
-  if (!c.better) return null;
-  const nums = t.rows.filter((r) => r.status === "complete").map((r) => r.values[c.key]).filter((v): v is number => typeof v === "number");
-  if (!nums.length) return null;
-  return c.better === "high" ? Math.max(...nums) : Math.min(...nums);
+  const b = top(t, c);
+  return b.rows.length * 2 <= b.complete ? b.value : null;
 }
 
 export function ExperimentsSection() {
@@ -112,15 +120,14 @@ export function ExperimentsSection() {
 function Headline({ t }: { t: Table }) {
   const lead = t.columns.find((c) => c.better === "high");
   if (!lead) return null;
-  const top = best(t, lead);
-  const winners = t.rows.filter((r) => r.status === "complete" && r.values[lead.key] === top);
+  const { value: topValue, rows: winners } = top(t, lead);
   const serving = t.rows.find((r) => r.active);
-  if (top == null) return null;
+  if (topValue == null) return null;
   return (
     <div className="space-y-1">
       <p className="text-sm font-medium text-muted-foreground">가장 높은 {COLUMN[lead.key] ?? lead.label}</p>
-      <p className="text-4xl font-bold tabular-nums tracking-tight">{fmt(lead.key, top)}</p>
-      <p className="text-base [overflow-wrap:anywhere]">{winners.map((r) => rowTitle(t, r)).join(", ")}
+      <p className="text-4xl font-bold tabular-nums tracking-tight">{fmt(lead.key, topValue)}</p>
+      <p className="text-base [overflow-wrap:anywhere]">{winners.length > 3 ? `${winners.length}개 행이 같은 값` : winners.map((r) => rowTitle(t, r)).join(", ")}
         {serving && !winners.includes(serving) && <span className="text-muted-foreground"> · 서비스 중인 행은 {fmt(lead.key, serving.values[lead.key])}</span>}
         {serving && winners.includes(serving) && <span className="text-muted-foreground"> · 지금 서비스 중</span>}
       </p>
@@ -171,8 +178,8 @@ function MatrixView({ t, onActivated }: { t: Table; onActivated: () => void }) {
               const selected = r.index === open;
               const done = r.status === "complete";
               return (
-                <tr key={r.index} className={cn(selected ? "bg-accent" : "hover:bg-secondary/50", r.active && "border-l-4 border-l-primary")}>
-                  <th scope="row" className={cn("sticky left-0 z-10 min-w-[9rem] max-w-[18rem] px-3 py-2 text-left font-medium", selected ? "bg-accent" : "bg-background")}>
+                <tr key={r.index} className={cn(selected ? "bg-accent" : "group hover:bg-secondary", r.active && "border-l-4 border-l-primary")}>
+                  <th scope="row" className={cn("sticky left-0 z-10 min-w-[15rem] max-w-[20rem] px-3 py-2 text-left font-medium", selected ? "bg-accent" : "bg-background group-hover:bg-secondary")}>
                     <button type="button" aria-expanded={selected} onClick={() => setOpen(selected ? null : r.index)}
                             className="min-h-11 w-full text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [overflow-wrap:anywhere]">
                       {rowTitle(t, r)}
@@ -181,9 +188,9 @@ function MatrixView({ t, onActivated }: { t: Table; onActivated: () => void }) {
                   </th>
                   {done ? t.columns.map((c) => {
                     const v = r.values[c.key];
-                    const top = c.better && v != null && v === bests[c.key];
-                    return <td key={c.key} className={cn("whitespace-nowrap px-3 py-2 text-right tabular-nums", top ? "font-bold text-primary" : "text-foreground")}>
-                      {fmt(c.key, v)}{top && <span className="sr-only"> (최고)</span>}
+                    const isBest = c.better && v != null && v === bests[c.key];
+                    return <td key={c.key} className={cn("whitespace-nowrap px-3 py-2 text-right tabular-nums", isBest ? "font-bold text-primary" : "text-foreground")}>
+                      {fmt(c.key, v)}{isBest && <span className="sr-only"> (최고)</span>}
                     </td>;
                   }) : (
                     <td colSpan={t.columns.length} className="px-3 py-2 text-[13px] text-muted-foreground">
@@ -198,7 +205,8 @@ function MatrixView({ t, onActivated }: { t: Table; onActivated: () => void }) {
           </tbody>
         </table>
       </div>
-      <p className="text-[13px] text-muted-foreground">굵은 파란 값이 열마다 가장 좋은 값입니다. 개발 질문은 자기 문서 안에서, 전체 문서 열은 개발 질문과 바늘 질문을 모든 문서에서 검색한 결과입니다. 고정값: {Object.entries(t.fixed).map(([k, v]) => `${FIXED[k] ?? k} ${AXIS[k]?.[String(v)] ?? MODE[String(v)] ?? String(v)}`).join(", ") || "서비스 설정"}.
+      <p className="text-[13px] text-muted-foreground">굵은 파란 값이 열마다 가장 좋은 값입니다. 절반이 넘는 행이 같은 값이면 표시하지 않습니다. 개발 질문은 자기 문서 안에서, 전체 문서 열은 개발 질문과 바늘 질문을 모든 문서에서 검색한 결과입니다. 고정값: {Object.entries(t.fixed).map(([k, v]) => `${FIXED[k] ?? k} ${AXIS[k]?.[String(v)] ?? MODE[String(v)] ?? String(v)}`).join(", ") || "서비스 설정"}.
+        {t.matrix === "embedding" && " API 모델의 질의 임베딩 시간은 캐시되지 않은 유료 호출에서만 잴 수 있어, 비어 있으면 아직 재지 않은 것입니다."}
         {String(t.fixed.fusion ?? "").startsWith("keyword_first") && " 융합이 BM25 상위 6개를 제자리에 두므로 하이브리드와 상위 고정 행의 nDCG@5는 K1과 같습니다. 차이는 그 뒤 근거에서 나며, 근거 완전과 치명 실패 열에 보입니다."}</p>
       {cur && <RowDetail key={cur.index} t={t} r={cur} onActivated={onActivated} />}
     </section>
