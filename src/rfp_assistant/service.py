@@ -424,11 +424,16 @@ def _doc_rows(res: Resources, doc_ids: list[str] | None = None) -> list[dict]:
             "SELECT d.*, s.format, s.parse_status, s.review_status, s.reason_code, s.active_extraction_id "
             "FROM documents d JOIN sources s ON s.source_hash = d.active_source_hash ORDER BY d.csv_row_id").fetchall()
         resolutions = resolutions_by_doc(conn)
+    idx = res.index()
     out = []
     for r in rows:
         if doc_ids is not None and r["doc_id"] not in doc_ids:
             continue
         d = dict(r)
+        # Serving reads an original through the extraction its activated index holds: a re-parse moves
+        # `active_extraction_id` before the person activates the index built over the new extraction.
+        if idx is not None:
+            d["active_extraction_id"] = idx.served_extraction(d["active_source_hash"], d["active_extraction_id"])
         d["meta"] = json.loads(d.pop("normalized_metadata_json"))
         d["quality"] = json.loads(d.pop("quality_json"))
         d["resolutions"] = resolutions.get(d["doc_id"], {})

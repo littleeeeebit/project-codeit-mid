@@ -36,9 +36,9 @@ from decimal import Decimal
 
 from . import evaluation
 from .settings import Settings
-from .store import utcnow, write_text_atomic
+from .store import utcnow, write_bytes_atomic, write_text_atomic
 
-VERSION = "judge-set-1"
+VERSION = "judge-set-2"
 SEED = 20261005
 TYPES = ("amount", "unit", "qualifier", "date", "negation", "dropped_condition", "wrong_evidence")
 POSITIVE = {"link": "supporting", "answer_claim": "supported", "claim": "correct"}
@@ -224,7 +224,27 @@ def mutate_negation(text: str, passages: list[str]) -> tuple[str, dict] | None:
     return None
 
 
+def condition_stems(condition: str) -> set[str]:
+    """The content words of a condition, reduced so other wordings still match: the first two syllables of each
+    Korean word of two or more syllables (부가세 and 부가가치세 both give 부가), Latin words lowercased."""
+    stems = set()
+    for spelling in condition.split(" / "):
+        for word in re.findall(r"[가-힣]{2,}|[A-Za-z]{2,}", spelling):
+            stems.add(word[:2] if re.match(r"[가-힣]", word) else word.lower())
+    return stems | ({"부가"} if "vat" in stems else set())
+
+
+def condition_remains(text: str, condition: str) -> bool:
+    """Whether any content word of the condition is still in the text, in any wording. Conservative on purpose: a
+    dropped-condition mutant is a known failure only when nothing of the condition is left to read."""
+    lowered = text.lower()
+    return any(stem in lowered for stem in condition_stems(condition)) or ("vat" in lowered and "부가" in
+                                                                            condition_stems(condition))
+
+
 def drop_condition(texts: list[str], conditions: list[str]) -> tuple[list[str], dict] | None:
+    """Removes the first condition whose every wording can be removed; a condition the answer also states in other
+    words is skipped, because removing one spelling would not make the answer incomplete."""
     for condition in conditions:
         spellings = sorted({c.strip() for c in condition.split(" / ") if c.strip()}, key=len, reverse=True)
         if not any(sp in t for t in texts for sp in spellings):
@@ -234,6 +254,8 @@ def drop_condition(texts: list[str], conditions: list[str]) -> tuple[list[str], 
             for sp in spellings:
                 t = t.replace(sp, "")
             out.append(re.sub(r"[ \t]{2,}", " ", re.sub(r"\(\s*\)", "", t)).strip())
+        if condition_remains("\n".join(out), condition):
+            continue
         return out, {"from": condition, "to": ""}
     return None
 
@@ -297,6 +319,8 @@ def differs(source: dict, mutant: dict) -> str | None:
         spellings = [c.strip() for c in m["from"].split(" / ") if c.strip()]
         if any(sp in after for sp in spellings) or not any(sp in before for sp in spellings):
             return "the condition is still stated"
+        if condition_remains(after, m["from"]):
+            return "the condition is still stated in other words"
     elif kind == "wrong_evidence":
         if set(passages) & set(source.get("passages") or []) or not passages:
             return "the passages were not replaced"
@@ -424,6 +448,10 @@ def generate(settings: Settings) -> dict:
         prior = json.loads(path.read_text(encoding="utf-8"))
         if prior["set_sha256"] == out["set_sha256"]:
             return {**prior, "reused": True}
+        raw = (d / "items.jsonl").read_bytes()
+        if hashlib.sha256(raw).hexdigest() == prior["set_sha256"]:  # its runs stay checkable against it
+            write_bytes_atomic(d / "sets" / f"{prior['set_sha256']}.jsonl", raw)
+    write_text_atomic(d / "sets" / f"{out['set_sha256']}.jsonl", body)
     write_text_atomic(d / "items.jsonl", body)
     write_text_atomic(path, json.dumps({**out, "generated_at": utcnow()}, ensure_ascii=False, indent=1))
     return out
@@ -438,6 +466,17 @@ def load(settings: Settings) -> tuple[list[dict], dict]:
     if hashlib.sha256(raw).hexdigest() != manifest["set_sha256"]:
         raise ValueError("the judge set changed after it was generated; run `judge-set` again")
     return [json.loads(line) for line in raw.decode("utf-8").splitlines() if line.strip()], manifest
+
+
+def archived(settings: Settings, set_sha256: str) -> list[dict] | None:
+    """A set written earlier, by its hash, or None when it is missing or its bytes changed."""
+    path = root(settings) / "sets" / f"{set_sha256}.jsonl"
+    if not re.fullmatch(r"[0-9a-f]{64}", set_sha256 or "") or not path.exists():
+        return None
+    raw = path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != set_sha256:
+        return None
+    return [json.loads(line) for line in raw.decode("utf-8").splitlines() if line.strip()]
 
 
 def counts(settings: Settings) -> dict | None:

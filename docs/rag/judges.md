@@ -173,7 +173,7 @@ Runs resume: finished judgements are kept, and only the remainder runs again und
 
 The held-out part's 13 negatives cannot separate two judges. The judge golden set adds negatives whose labels are known by construction: `src/rfp_assistant/judge_set.py` takes the held-out part's approved positives and changes each one in a known way. No person reviews the mutants. Calibration items are never mutated, so the fitted thresholds never see them.
 
-`python -m rfp_assistant.cli judge-set` writes `.runtime/judges/judge-set/items.jsonl` and `manifest.json` (version `judge-set-1`, seed 20261005). For the same reference, split and generator, it reuses the file. The set is stored and counted apart from the RAG development set. `golden-counts` reports it in its own section, and the 판정 모델 비교 screen counts it in its set selector.
+`python -m rfp_assistant.cli judge-set` writes `.runtime/judges/judge-set/items.jsonl` and `manifest.json` (version `judge-set-2`, seed 20261005). For the same reference, split and generator, it reuses the file. Every set it writes is also kept as `sets/<set hash>.jsonl`, so a run stays checkable against the set it judged after the set is regenerated. The set is stored and counted apart from the RAG development set. `golden-counts` reports it in its own section, and the 판정 모델 비교 screen counts it in its set selector.
 
 | Mutation | What changes | Known label |
 | --- | --- | --- |
@@ -185,11 +185,11 @@ The held-out part's 13 negatives cannot separate two judges. The judge golden se
 | `dropped_condition` | A required fact's condition is removed from the answer | incomplete_qualifier |
 | `wrong_evidence` | The claim stays and its passages come from another question whose passages share at most 30% of its bigrams | unsupported |
 
-Every mutant passes a deterministic check (`judge_set.differs`). The text must change. The new value must not also appear in the passages. A negation must add a negation, and a dropped condition must really disappear from the answer. A mutant that fails the check is dropped and counted. Each row stores its `mutation` (`type`, `from`, `to`), its `source_id` and its known `reference` label. Each mutated source also appears once, unmutated, as a positive.
+Every mutant passes a deterministic check (`judge_set.differs`). The text must change. The new value must not also appear in the passages. A negation must add a negation, and a dropped condition must really disappear from the answer, in every wording. The generator skips a condition when any content word of it is left after removal (부가세 포함 is not dropped from an answer that also says 부가가치세가 포함됩니다), and the check refuses such a mutant too, so a dropped-condition row is a known failure only when nothing of the condition is left to read. A mutant that fails the check is dropped and counted. Each row stores its `mutation` (`type`, `from`, `to`), its `source_id` and its known `reference` label. Each mutated source also appears once, unmutated, as a positive.
 
-The generated set has 919 items: 633 negatives (amount 19, unit 27, qualifier 85, date 18, negation 206, dropped condition 28, wrong evidence 250) and 286 unmutated positives. No held-out answer states a VAT qualifier, so the qualifier rows are comparison and obligation flips.
+The generated set (`6709cba2…`) has 882 items: 612 negatives (amount 19, unit 27, qualifier 85, date 18, negation 206, dropped condition 7, wrong evidence 250) and 270 unmutated positives. The first set, `judge-set-1` (`937c075f…`, 919 items), had 28 dropped-condition rows; 21 of them removed one wording of a condition the answer still stated in another, so their `incomplete_qualifier` label was not known. Regenerating removed those 21 rows and the 16 positives left without a mutant. Every other row is byte-identical. No held-out answer states a VAT qualifier, so the qualifier rows are comparison and obligation flips.
 
-The run is part `judge_set` (`plan-run --action judge-comparison --part judge_set`, then `run-judges --estimate-id <id> --actor <name>`, or the screen's plan and start). It reuses the calibration thresholds, and its identity includes the set's hash. It runs Luna and bridged Jev only. Results report each judge's false-accept rate per mutation type, from the judge's own label even when a deterministic value check would settle the item, with a Wilson interval and the unmutated pass rate. The screen's set selector switches between the held-out verdict and this table. It produces no replacement verdict; the rule above stays the held-out rule.
+The run is part `judge_set` (`plan-run --action judge-comparison --part judge_set`, then `run-judges --estimate-id <id> --actor <name>`, or the screen's plan and start). It reuses the calibration thresholds, and its identity includes the set's hash. It runs Luna and bridged Jev only. Planning a judge-set run first copies, free, the finished judgements of earlier judge-set runs of the same configuration for items byte-identical to the current set's (checked against the archived set each run names), so a regenerated set pays only for new or changed items; results count the copies under `carried`. Results report each judge's false-accept rate per mutation type, from the judge's own label even when a deterministic value check would settle the item, with a Wilson interval and the unmutated pass rate. The screen's set selector switches between the held-out verdict and this table. It produces no replacement verdict; the rule above stays the held-out rule.
 
 The glossary hash that enters every run identity is computed over LF-normalised bytes, so a CRLF checkout no longer changes run identities.
 
@@ -238,6 +238,8 @@ So the rule does not show Jev to be as safe as this Luna judge against this refe
 
 Recorded 2026-10-05 from run `J-judge_set-1561349ff3d0`: set `937c075f…`, 919 items, thresholds `d9c0e8ac…`. The run went ahead only after the owner approved the priced estimate `3437659e8e37` (maximum $0.892478). They first moved $0.20 from `gold_eval` to `judge_eval`, because the maximum exceeded the $0.791058 left there. Actual spend was $0.156263: $0.141270 for 919 Luna calls and $0.014993 for 26 bridge translation calls. The 837 Jev calls are unpriced.
 
+The figures below are from run `J-judge_set-232e12b4efa0` on the corrected set `6709cba2…` (882 items). It made no provider call: all 1,764 of its judgements were carried from `J-judge_set-1561349ff3d0` for byte-identical items, so the cost above is the whole cost. On the first set, Luna passed 10 of 28 dropped-condition rows (35.7%) and bridged Jev 23 of 26 (88.5%); those rates are void, because 21 of the rows were not known failures.
+
 False-accept rate per mutation type: the share of judged mutants the judge itself passed. The last row is the pass rate on the unmutated sources, where higher is better.
 
 | Mutation | Items | Luna (Wilson 95%) | Jev, bridged (Wilson 95%) |
@@ -247,18 +249,18 @@ False-accept rate per mutation type: the share of judged mutants the judge itsel
 | qualifier | 85 | 27.1% (23/85; 18.8–37.3) | 55.0% (44/80; 44.1–65.4) |
 | date or period | 18 | 0.0% (0/18; 0–17.6) | 26.7% (4/15; 10.9–52.0) |
 | negation | 206 | 2.4% (5/206; 1.0–5.6) | 28.3% (54/191; 22.4–35.0) |
-| dropped condition | 28 | 35.7% (10/28; 20.7–54.2) | 88.5% (23/26; 71.0–96.0) |
+| dropped condition | 7 | 28.6% (2/7; 8.2–64.1) | 100% (7/7; 64.6–100) |
 | wrong evidence | 250 | 8.4% (21/250; 5.6–12.5) | 7.0% (15/213; 4.3–11.3) |
-| **all mutants** | 633 | **10.3% (65/633)** | **26.8% (153/570)** |
-| unmutated (pass rate) | 286 | 88.8% (254/286) | 88.8% (237/267) |
+| all mutants | 612 | 9.3% (57/612) | 24.9% (137/551) |
+| unmutated (pass rate) | 270 | 88.1% (238/270) | 88.5% (223/252) |
 
-Jev judged 837 of the 919 items. All 82 abstentions are bridge rejections: 64 `changed_protected_value` and 18 `residual_hangul`.
+Jev judged 803 of the 882 items. All 79 abstentions are bridge rejections: 62 `changed_protected_value` and 17 `residual_hangul`.
 
 What it shows:
 
 - Both judges pass about 89% of the correct answers, so the gap is not a stricter or looser overall threshold. Jev misses changed meaning.
-- Jev passes most answers that drop a required condition (88.5%), more than half of the flipped comparison and obligation words, and more than a quarter of the negated claims. Luna catches nearly every negation and shifted period.
-- Neither judge reliably catches a dropped condition or a flipped qualifier. Luna still passes about a third and a quarter of them, so a deterministic qualifier check stays worth more than either judge there.
+- Jev passes every answer that drops a required condition (7 of 7), more than half of the flipped comparison and obligation words, and more than a quarter of the negated claims. Luna catches nearly every negation and shifted period.
+- Neither judge reliably catches a dropped condition or a flipped qualifier. Luna still passes 2 of the 7 dropped conditions and about a quarter of the flipped qualifiers, so a deterministic qualifier check stays worth more than either judge there.
 - Wrong evidence and changed amounts are the only types where Jev matches Luna.
 
-This set does not change the held-out verdict, which remains under `replacement-rule-1`. It does show where the held-out reference's 13 negatives could not look: on 633 known failures, bridged Jev's false-accept rate is 2.6 times Luna's.
+This set does not change the held-out verdict, which remains under `replacement-rule-1`. It does show where the held-out reference's 13 negatives could not look: on 612 known failures, bridged Jev's false-accept rate is 2.7 times Luna's.

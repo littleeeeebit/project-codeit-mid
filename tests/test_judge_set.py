@@ -73,6 +73,18 @@ class MutationTest(unittest.TestCase):
         self.assertNotIn("부가세 포함", judge_set.target_text(got["dropped_condition"]))
         self.assertNotIn("300만", judge_set.target_text(got["amount"]))
 
+    def test_a_condition_the_answer_restates_in_other_words_is_never_dropped(self):
+        # review round 1, F4: removing "부가세 포함" leaves the answer complete when it also says 부가가치세 포함
+        source = claim_item()
+        source["answer_claims"] = [*source["answer_claims"], "해당 300만원에는 부가가치세가 포함됩니다."]
+        got = {m["mutation"]["type"]: m for m in judge_set.mutants(source, [source])}
+        self.assertNotEqual(got["dropped_condition"]["mutation"]["from"], "부가세 포함")
+        self.assertIsNone(judge_set.differs(source, got["dropped_condition"]))
+        removed = {**source, "answer_summary": source["answer_summary"].replace("부가세 포함 ", ""),
+                   "answer_claims": [c.replace("(부가세 포함)", "") for c in source["answer_claims"]],
+                   "blind_id": "x-dropped_condition", "mutation": {"type": "dropped_condition", "from": "부가세 포함"}}
+        self.assertEqual(judge_set.differs(source, removed), "the condition is still stated in other words")
+
     def test_the_set_pairs_each_mutated_source_with_its_unmutated_positive(self):
         unusable = link("dddd00000004", "q4", "담당자를 지정합니다.", ("- 사업 담당자를 지정",))
         items = [link(), DONOR, unusable, {**link("eeee00000005"), "reference": "unsupported"}]

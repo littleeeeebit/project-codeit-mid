@@ -780,6 +780,32 @@ def load_judgements(settings: Settings, run_id: str) -> dict[tuple[str, str], di
     return {(r["arm"], r["blind_id"]): r for r in read_jsonl(path)} if path.exists() else {}
 
 
+def carry(settings: Settings, inputs: dict) -> int:
+    """Free, judge set only: copies the finished judgements of earlier judge-set runs of the same configuration for
+    items byte-identical to this set's (checked against the archived set each run names), so a regenerated set
+    pays only for new or changed items. Returns how many were copied."""
+    if inputs["part"] != "judge_set":
+        return 0
+    run_id, same = inputs["run_id"], {k: v for k, v in inputs["config"].items() if k != "judge_set_sha256"}
+    mine = {i["blind_id"]: dumps(i) for i in inputs["items"]}
+    done, copied = load_judgements(settings, run_id), 0
+    for d in sorted((root(settings) / "runs").glob("J-judge_set-*")):
+        if d.name == run_id or not (d / "config.json").exists():
+            continue
+        config = json.loads((d / "config.json").read_text(encoding="utf-8"))
+        prior = judge_set.archived(settings, config.get("judge_set_sha256"))
+        if prior is None or any(config.get(k) != v for k, v in same.items()):
+            continue
+        theirs = {i["blind_id"]: dumps(i) for i in prior}
+        for (arm, b), record in load_judgements(settings, d.name).items():
+            if arm in ARMS and (arm, b) not in done and b in mine and theirs.get(b) == mine[b]:
+                run_dir(settings, run_id).mkdir(parents=True, exist_ok=True)
+                _append(settings, run_id, {**record, "carried_from": record.get("carried_from") or d.name})
+                done[(arm, b)] = record
+                copied += 1
+    return copied
+
+
 def _append(settings: Settings, run_id: str, record: dict) -> None:
     path = run_dir(settings, run_id) / "judgements.jsonl"
     with open(path, "a", encoding="utf-8") as f:
@@ -803,6 +829,7 @@ def plan(settings: Settings, part: str, *, store: bool = True) -> dict:
     the Jev calls (unpriced: TypeSafe reports no price). Binds the configuration, prices and token counts."""
     inputs = _inputs(settings, part)
     run_id, items = inputs["run_id"], inputs["items"]
+    carry(settings, inputs)
     done = load_judgements(settings, run_id)
     fmt_b = bridge_format()
     batches = []
@@ -824,7 +851,8 @@ def plan(settings: Settings, part: str, *, store: bool = True) -> dict:
     ledger = _ledger(settings)
     room = None if ledger["envelope_remaining_micro_usd"] is None else min(
         ledger["envelope_remaining_micro_usd"], ledger["available_micro_usd"])
-    blocked = ("paid calls are disabled" if not ledger["paid_enabled"] else
+    blocked = (None if not (batches or judge or jev) else  # nothing left to call: finishing it costs nothing
+               "paid calls are disabled" if not ledger["paid_enabled"] else
                "the judge_eval envelope is not allocated: the owner reallocates it with set-envelopes"
                if ledger["envelope_micro_usd"] is None else
                "the maximum exceeds the judge_eval envelope or the cap" if total > room else None)
@@ -1188,7 +1216,10 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
                       verdict=replacement_verdict(arms["luna"], arms["jev_bridged"])
                       if complete and config["part"] == "held_out" else None)
         if config["part"] == "judge_set":
-            result.update(mutations=mutations, judge_set_sha256=inputs["config"]["judge_set_sha256"])
+            # judgements copied from earlier runs were paid there: this run's ledger cost covers only its own calls
+            carried = Counter(r["carried_from"] for r in done.values() if r.get("carried_from"))
+            result.update(mutations=mutations, judge_set_sha256=inputs["config"]["judge_set_sha256"],
+                          carried=dict(carried))
     write_text_atomic(d / "results.json", json.dumps(result, ensure_ascii=False, indent=1))
     return result
 

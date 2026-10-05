@@ -16,9 +16,11 @@ activated embedding model, run the regression table (`compare.regression`) and w
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import traceback
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -27,7 +29,9 @@ from .store import open_db, utcnow, write_text_atomic
 
 STEPS = ("backup", "restore_check", "ingest", "fidelity", "keyword", "embedding", "regression", "report")
 ACTOR_NOTE = "maintenance"
-SCRATCH_SUFFIX = "_mrestore"  # <application db>_mrestore: dropped and recreated by every restore check
+# Every restore check creates `rfp_mrestore_<uuid>` and drops only that database afterwards. A run killed mid-check
+# leaves its scratch database behind under this prefix for the owner to drop by name.
+SCRATCH_PREFIX = "rfp_mrestore_"
 # Tables a no-change rerun still writes (the backup's own audit event); they do not make a new backup necessary.
 VOLATILE_TABLES = ("audit_events",)
 
@@ -73,8 +77,28 @@ def _stable(tables: dict) -> dict:
 # ---------------------------------------------------------------- steps
 
 
+def artifacts_digest(manifest_path: Path) -> str | None:
+    """One digest over a backup's dump and copied files, after checking each against its manifest; None when the
+    manifest is unreadable or any artifact is missing or changed. A restore check is bound to this digest."""
+    from .postgres import file_hash
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        parts = [file_hash(manifest_path.parent / "database.dump")]
+        if parts[0] != manifest["dump_sha256"]:
+            return None
+        for rel, expected in sorted(manifest["copied"].items()):
+            if file_hash(manifest_path.parent / "files" / rel) != expected:
+                return None
+            parts.append(f"{rel}:{expected}")
+    except (OSError, ValueError, KeyError):
+        return None
+    return hashlib.sha256("\n".join(parts).encode()).hexdigest()
+
+
 def step_backup(settings: Settings, ctx: dict, actor: str, **_) -> dict:
-    """Reuses the newest backup whose table digests still equal the database's; otherwise takes a new one."""
+    """Reuses the newest backup whose table digests still equal the database's and whose dump and copied files
+    still match its manifest; otherwise takes a new one."""
     from . import postgres_backup, release
     from .store import open_db as db
 
@@ -82,8 +106,8 @@ def step_backup(settings: Settings, ctx: dict, actor: str, **_) -> dict:
         current = _stable(postgres_backup._table_manifest(conn.raw))
     history = _backups(settings)
     for rec in reversed(history):
-        if Path(rec["manifest"]).exists() and _stable(rec["tables"]) == current:
-            ctx["backup"] = rec
+        if _stable(rec["tables"]) == current and (digest := artifacts_digest(Path(rec["manifest"]))):
+            ctx["backup"], ctx["backup_artifacts"] = rec, digest
             return {"status": "reused", "manifest": rec["manifest"], "taken_at": rec["taken_at"]}
     destination = backup_root(settings) / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     result = release.backup(settings, destination, actor, share_owner=True)
@@ -91,31 +115,45 @@ def step_backup(settings: Settings, ctx: dict, actor: str, **_) -> dict:
     rec = {"manifest": result["manifest"], "taken_at": manifest["created_at"], "tables": manifest["tables"],
            "ledger": result["ledger"], "restore_check": None}
     _save_backups(settings, history + [rec])
-    ctx["backup"] = rec
+    ctx["backup"], ctx["backup_artifacts"] = rec, artifacts_digest(Path(result["manifest"]))
+    if ctx["backup_artifacts"] is None:
+        raise StepFailed(f"the new backup's files do not match its manifest: {result['manifest']}")
     return {"manifest": rec["manifest"], "tables": result["tables"], "spent_micro_usd": result["ledger"].get(
         "spent_micro_usd")}
 
 
 def scratch(settings: Settings) -> tuple[str, str, str]:
-    """(admin DSN, scratch database name, scratch DSN) on the application database's server."""
+    """(admin DSN, a new unique scratch database name, its DSN) on the application database's server."""
     from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
     live = os.environ.get(settings.database_dsn_env)
     if not live:
         raise StepFailed(f"{settings.database_dsn_env} is not set")
     parts = conninfo_to_dict(live)
-    name = parts.get("dbname", "bidmate")[:48] + SCRATCH_SUFFIX
+    name = SCRATCH_PREFIX + uuid.uuid4().hex  # 45 characters: never another database's name, never truncated
     return make_conninfo(**{**parts, "dbname": "postgres"}), name, make_conninfo(**{**parts, "dbname": name})
 
 
-def _recreate_scratch(admin: str, name: str, drop_only: bool = False) -> None:
+def _create_scratch(admin: str, name: str) -> None:
+    """Creates the scratch database; an existing database of that name is refused, never replaced."""
+    import psycopg
+    from psycopg import errors, sql
+
+    with psycopg.connect(admin, autocommit=True, connect_timeout=5) as conn:
+        try:
+            conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+        except errors.DuplicateDatabase:
+            raise StepFailed(f"database {name} already exists; the restore check uses only a database it "
+                             "creates") from None
+
+
+def _drop_scratch(admin: str, name: str) -> None:
+    """Drops the scratch database this run created; called only after `_create_scratch(admin, name)` succeeded."""
     import psycopg
     from psycopg import sql
 
     with psycopg.connect(admin, autocommit=True, connect_timeout=5) as conn:
-        conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(name)))
-        if not drop_only:
-            conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+        conn.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
 
 
 def step_restore_check(settings: Settings, ctx: dict, **_) -> dict:
@@ -123,12 +161,13 @@ def step_restore_check(settings: Settings, ctx: dict, **_) -> dict:
     restore check already passed is not checked again. The scratch database is dropped afterwards."""
     from . import release
 
-    rec = ctx["backup"]
-    if (rec.get("restore_check") or {}).get("passed"):
+    rec, digest = ctx["backup"], ctx["backup_artifacts"]
+    checked = rec.get("restore_check") or {}
+    if checked.get("passed") and checked.get("artifacts") == digest:  # passed on exactly these files
         return {"status": "reused", "checked_at": rec["restore_check"]["checked_at"],
                 "checks": rec["restore_check"]["checks"]}
     admin, name, dsn = scratch(settings)
-    _recreate_scratch(admin, name)
+    _create_scratch(admin, name)
     previous = os.environ.get("RFP_RESTORE_DATABASE_DSN")
     os.environ["RFP_RESTORE_DATABASE_DSN"] = dsn
     try:
@@ -138,10 +177,10 @@ def step_restore_check(settings: Settings, ctx: dict, **_) -> dict:
             os.environ.pop("RFP_RESTORE_DATABASE_DSN", None)
         else:
             os.environ["RFP_RESTORE_DATABASE_DSN"] = previous
-        _recreate_scratch(admin, name, drop_only=True)
+        _drop_scratch(admin, name)
     failed = [k for k, ok in report["checks"].items() if not ok]
     rec["restore_check"] = {"passed": report["passed"], "checked_at": report["checked_at"],
-                            "checks": len(report["checks"]), "failed": failed}
+                            "checks": len(report["checks"]), "failed": failed, "artifacts": digest}
     _save_backups(settings, [rec if r["manifest"] == rec["manifest"] else r for r in _backups(settings)])
     if not report["passed"]:
         raise StepFailed(f"the backup did not restore cleanly: {', '.join(failed)[:400]}")
@@ -170,11 +209,11 @@ def step_ingest(settings: Settings, ctx: dict, **_) -> dict:
         raise StepFailed(f"{len(errors)} originals failed to parse: "
                          + "; ".join(f"{r['filename']}: {r.get('reason')}" for r in errors)[:400])
     after = active()
-    changed = {r["source_hash"]: r for r in results if before.get(r["source_hash"]) != after.get(r["source_hash"])}
-    ctx["changed_sources"] = sorted(changed)
+    changed = [r for r in results if before.get(r["source_hash"]) != after.get(r["source_hash"])]
+    ctx["changed_sources"] = sorted({r["source_hash"] for r in changed})
     return {"status": "done" if changed else "reused", "documents": len(results),
             "reparsed": sum(not r.get("reused") and r["status"] != "recovered" for r in results),
-            "changed": [{"filename": r["filename"], "status": r["status"]} for r in changed.values()],
+            "changed": [{"filename": r["filename"], "status": r["status"]} for r in changed],
             "audit_differences": manifest.get("audit_differences") or {}}
 
 

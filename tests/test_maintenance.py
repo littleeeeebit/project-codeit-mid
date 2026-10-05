@@ -11,7 +11,7 @@ from unittest import mock
 
 import psycopg
 
-from rfp_assistant import maintenance, service
+from rfp_assistant import ingestion, maintenance, service
 from rfp_assistant.generation import FakeTransport
 from rfp_assistant.retrieval import KeywordIndex, build_keyword_index
 from tests import fixtures
@@ -94,6 +94,41 @@ class SequenceTest(unittest.TestCase):
         self.assertTrue(again["reused"])
         self.assertEqual(again["provider_calls"], 0)
 
+    def test_a_reparse_does_not_change_what_serving_searches_before_activation(self):
+        ref = self.env.refs["기관A"]
+        res = service.Resources(self.s, transport=FakeTransport())
+        try:
+            before = service.retrieve(res, self.env.consultant, "하자보수 기간", [ref])
+            corpus = service.retrieve(res, self.env.consultant, "하자보수 기간", [], all_documents=True)
+        finally:
+            res.close()
+        self.assertTrue(before.evidence)
+        key, parse = ingestion.input_key, ingestion.parse_pdf
+
+        def next_parser(path):  # a parser change that alters one original's output
+            raw, warnings, reason = parse(path)
+            if ingestion.sha256_file(path) == ref.source_hash:
+                raw = [{**e, "raw_text": e["raw_text"] + " (개정)"} if i == len(raw) - 1 else e for i, e in enumerate(raw)]
+            return raw, warnings, reason
+
+        with mock.patch.object(ingestion, "input_key", lambda s, src: key(s, src) + "-next"), \
+                mock.patch.object(ingestion, "parse_pdf", next_parser):
+            state = self.run_with(backup=reused, restore_check=reused, regression=reused)
+        self.assertEqual(state["status"], "complete", state["reason"])
+        steps = {s["name"]: s for s in state["steps"]}
+        self.assertIn("기관A_통합 정보시스템.pdf", [c["filename"] for c in steps["ingest"]["detail"]["changed"]])
+        self.assertFalse(steps["keyword"]["detail"]["same_as_served"])  # the new extraction waits in its own index
+        res = service.Resources(self.s, transport=FakeTransport())
+        try:
+            after = service.retrieve(res, self.env.consultant, "하자보수 기간", [ref])
+            corpus_after = service.retrieve(res, self.env.consultant, "하자보수 기간", [], all_documents=True)
+        finally:
+            res.close()
+        self.assertEqual([(e.extraction_id, e.quote) for e in after.evidence],
+                         [(e.extraction_id, e.quote) for e in before.evidence])
+        self.assertEqual({e.doc_id for e in corpus_after.evidence}, {e.doc_id for e in corpus.evidence})
+        self.assertTrue(state["serving"]["unchanged"])
+
     def test_backup_and_restore_check_are_reused_when_nothing_changed(self):
         rest = dict(ingest=reused, fidelity=reused, keyword=reused, embedding=reused, regression=reused)
         first = self.run_with(**rest)
@@ -105,9 +140,73 @@ class SequenceTest(unittest.TestCase):
                          ("reused", "reused"))
         self.assertTrue(second["reused"])
         self.assertEqual(len(maintenance._backups(self.s)), 1)
-        admin, name, _ = maintenance.scratch(self.s)
+        admin, _, _ = maintenance.scratch(self.s)
         with psycopg.connect(admin, autocommit=True) as conn:  # the scratch restore target is gone again
-            self.assertIsNone(conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", (name,)).fetchone())
+            self.assertIsNone(conn.execute("SELECT 1 FROM pg_database WHERE datname LIKE %s",
+                                           (maintenance.SCRATCH_PREFIX + "%",)).fetchone())
+
+    def test_an_existing_scratch_name_is_refused_not_replaced(self):
+        from psycopg import sql
+
+        admin, name, dsn = maintenance.scratch(self.s)
+        with psycopg.connect(admin, autocommit=True) as conn:
+            conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+        try:
+            with psycopg.connect(dsn, autocommit=True) as conn:
+                conn.execute("CREATE TABLE unrelated (v int)")
+            with mock.patch.object(maintenance, "scratch", lambda s: (admin, name, dsn)):
+                with self.assertRaisesRegex(maintenance.StepFailed, "already exists"):
+                    maintenance.step_restore_check(self.s, {"backup": {"manifest": "unused"},
+                                                            "backup_artifacts": "x"})
+            with psycopg.connect(dsn, autocommit=True) as conn:
+                self.assertIsNotNone(conn.execute("SELECT to_regclass('unrelated')").fetchone()[0])
+        finally:
+            with psycopg.connect(admin, autocommit=True) as conn:
+                conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(name)))
+
+    def test_the_restore_check_never_touches_a_database_it_did_not_create(self):
+        from psycopg import sql
+        from psycopg.conninfo import conninfo_to_dict, make_conninfo
+
+        live = conninfo_to_dict(os.environ[self.s.database_dsn_env])
+        admin = make_conninfo(**{**live, "dbname": "postgres"})
+        other = live["dbname"][:48] + "_mrestore"  # the name the first version derived and dropped
+        with psycopg.connect(admin, autocommit=True) as conn:
+            conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(other)))
+            conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(other)))
+        try:
+            with psycopg.connect(make_conninfo(**{**live, "dbname": other}), autocommit=True) as conn:
+                conn.execute("CREATE TABLE unrelated (v int)")
+                conn.execute("INSERT INTO unrelated VALUES (7)")
+            state = self.run_with(ingest=reused, fidelity=reused, keyword=reused, embedding=reused,
+                                  regression=reused)
+            self.assertEqual(self.statuses(state)["restore_check"], "done", state["reason"])
+            with psycopg.connect(make_conninfo(**{**live, "dbname": other}), autocommit=True) as conn:
+                self.assertEqual(conn.execute("SELECT v FROM unrelated").fetchone()[0], 7)
+            with psycopg.connect(admin, autocommit=True) as conn:  # and the run's own scratch database is gone
+                left = [r[0] for r in conn.execute("SELECT datname FROM pg_database WHERE datname LIKE %s",
+                                                   (maintenance.SCRATCH_PREFIX + "%",))]
+            self.assertEqual(left, [])
+        finally:
+            with psycopg.connect(admin, autocommit=True) as conn:
+                conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(other)))
+
+    def test_a_damaged_backup_is_neither_reused_nor_trusted(self):
+        rest = dict(ingest=reused, fidelity=reused, keyword=reused, embedding=reused, regression=reused)
+        first = self.run_with(**rest)
+        self.assertEqual(first["status"], "complete", first["reason"])
+        manifest = Path(maintenance._backups(self.s)[-1]["manifest"])
+        with open(manifest.parent / "database.dump", "ab") as f:
+            f.write(b"\0")  # the manifest stays intact, the dump no longer matches it
+        second = self.run_with(**rest)
+        self.assertEqual((self.statuses(second)["backup"], self.statuses(second)["restore_check"]), ("done", "done"))
+        newest = Path(maintenance._backups(self.s)[-1]["manifest"])
+        self.assertNotEqual(newest, manifest)
+        copied = [p for p in (newest.parent / "files").rglob("*") if p.is_file()]
+        self.assertTrue(copied, "the fixture backup copies runtime files")
+        copied[0].write_bytes(copied[0].read_bytes() + b"x")  # a copied runtime file changed after the check
+        third = self.run_with(**rest)
+        self.assertEqual((self.statuses(third)["backup"], self.statuses(third)["restore_check"]), ("done", "done"))
 
     def test_the_button_runs_the_same_sequence_in_the_serving_process(self):
         res = service.Resources(self.s, transport=FakeTransport())

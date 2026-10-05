@@ -247,7 +247,13 @@ class KeywordIndex:
     scope_terms: dict = field(default_factory=dict)  # doc_id -> title/institution terms frozen at build
     analyzer_fp: str | None = None  # analyzer fingerprint the index tokens were built with
     has_metadata_snapshot: bool = True
+    # source_hash -> the extraction this index holds for it. Serving resolves an original through this, not through
+    # `sources.active_extraction_id`, which a re-parse moves before the person activates the index built over it.
+    source_extraction: dict[str, str] = field(default_factory=dict)
     _extra_bm25: dict = field(default_factory=dict, repr=False)
+
+    def served_extraction(self, source_hash: str, active: str | None) -> str | None:
+        return self.source_extraction.get(source_hash, active)
 
     def __post_init__(self) -> None:
         self.row_of = {c["chunk_id"]: i for i, c in enumerate(self.chunks)}
@@ -286,13 +292,17 @@ class KeywordIndex:
         for extraction_id in rows:
             for e in load_elements(settings, extraction_id):
                 elements[(extraction_id, e["element_id"])] = e
+        with open_db(settings.db_path) as conn:
+            source_extraction = {r["source_hash"]: r["extraction_id"] for r in conn.execute(
+                f"SELECT extraction_id, source_hash FROM extractions WHERE extraction_id IN "
+                f"({','.join('?' * len(rows))})", list(rows))} if rows else {}
         terms_path = manifest_path.parent / "scope-terms.json"
         scope_terms = json.loads(terms_path.read_text(encoding="utf-8")) if "scope-terms.json" in manifest["files"] \
             else {}
         return cls(version, manifest["config"]["review_scope"], chunks,
                    BM25Okapi([t["tokens"] or ["∅"] for t in tokens]), rows, elements,
                    manifest["config"].get("profile", "structural"), row["manifest_hash"], scope_terms,
-                   manifest["config"].get("analyzer"), "metadata_terms" in manifest["config"])
+                   manifest["config"].get("analyzer"), "metadata_terms" in manifest["config"], source_extraction)
 
 
 # ---------------------------------------------------------------- retrieval
@@ -357,7 +367,7 @@ def corpus_scope(settings: Settings, index: KeywordIndex) -> list[tuple[DocRef, 
                             "JOIN sources s ON s.source_hash = d.active_source_hash ORDER BY d.csv_row_id").fetchall()
     scope: dict[str, tuple[DocRef, str]] = {}
     for r in rows:
-        x = r["active_extraction_id"]
+        x = index.served_extraction(r["active_source_hash"], r["active_extraction_id"])
         if x in index.rows_by_extraction and x not in scope:
             scope[x] = (DocRef(r["doc_id"], r["active_source_hash"]), x)
     return list(scope.values())
