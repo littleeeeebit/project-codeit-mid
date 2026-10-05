@@ -123,10 +123,11 @@ class AskTracingTest(unittest.TestCase):
         exporter = InMemorySpanExporter()
         tracer = tracing.Tracing(NOWHERE, "pk-lf-test-multi", "sk-lf-test-multi", span_exporter=exporter)
         view, _, _ = self.ask(tracer, question="하자보수 기간은 얼마인가요? password:\n    hunter2hunter2\n"
-                                               'api_key: ",quoted4quoted4"\npassword: "alpha betabeta"')
+                                               'api_key: ",quoted4quoted4"\npassword: "alpha betabeta"\n'
+                                               r'password: "alpha\"escaped5escaped5"')
         self.assertEqual(view["status"], "completed")
         raw = "\n".join(str(v) for s in exporter.get_finished_spans() for v in s.attributes.values())
-        for secret in ("hunter2hunter2", "quoted4quoted4", "betabeta"):
+        for secret in ("hunter2hunter2", "quoted4quoted4", "betabeta", "escaped5escaped5"):
             self.assertNotIn(secret, raw)
             self.assertNotIn(secret, exported_text(exporter))
         self.assertIn("하자보수 기간은 얼마인가요?", exported_text(exporter))
@@ -263,14 +264,17 @@ class TracingLifecycleTest(unittest.TestCase):
         cases = [('password: ",hunter2hunter2"', "hunter2hunter2"), ('password: "alpha beta"', "beta"),
                  ("password: 'alpha beta'", "beta"), ("password: alpha beta", "beta"), ('api_key = "a,b c"', "b c"),
                  ('password: "unclosed hunter2hunter2', "hunter2hunter2"), ("비밀번호: hunter2hunter2", "hunter2hunter2"),
-                 ("패스워드 = hunter2hunter2", "hunter2hunter2")]
+                 ("패스워드 = hunter2hunter2", "hunter2hunter2"),
+                 # free text has no grammar for where a value ends: escaped or doubled quotes, a value on the next line
+                 (r'password: "alpha\"hunter2hunter2"', "hunter2hunter2"),
+                 ("password: 'it''s hunter2hunter2'", "hunter2hunter2"), ("password: alpha\nhunter2hunter2", "hunter2hunter2")]
         for question, secret in cases:
             for exported in (json.dumps({"question": question}), question, json.dumps(json.dumps({"q": question}))):
                 with self.subTest(exported=exported):
                     self.assertNotIn(secret, gate(exported))
-        # the value ends where a reader would end it: after its closing quote, or at the end of its line
+        # so everything after a secret name and its separator goes; the text before it stays
         kept = json.loads(gate(json.dumps({"question": 'x password: "alpha beta" 남는 문장.\n둘째 줄.'})))
-        self.assertEqual(kept["question"], f"x {tracing.REDACTED} 남는 문장.\n둘째 줄.")
+        self.assertEqual(kept["question"], f"x {tracing.REDACTED}")
 
     def test_an_attribute_too_deep_to_redact_leaves_redacted(self):
         from types import SimpleNamespace
