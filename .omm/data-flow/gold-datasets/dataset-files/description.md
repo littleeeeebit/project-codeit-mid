@@ -1,0 +1,1 @@
+`datasets/<name>.jsonl` and `sealed/test.jsonl` are renderings of the approved database rows (`dataset_rows`). `validate-gold` and `freeze-dataset` check and freeze them (frozen manifests record the dataset, review log and family map). Evaluation runs bind to their SHA and population hash.

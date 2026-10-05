@@ -1,0 +1,1 @@
+`uvicorn rfp_assistant.api:app --workers 1`. The API is mounted once (`app = create_app()`), and its lifespan owns the single `Resources` from `get_resources`, which is cached in `service._shared`. Sync FastAPI routes run on the threadpool, so the service functions are written to be thread-safe (locks around index loading, runner creation and job registries).

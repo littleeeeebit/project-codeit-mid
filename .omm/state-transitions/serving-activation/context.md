@@ -1,0 +1,1 @@
+Plan rule (README): pipelines run every variant, AI reviewers approve gold rows, and a person picks from comparison tables and activates. Nothing runs on a schedule.

@@ -1,1 +1,0 @@
-Terminal. `result_json` holds the `AnswerResult` with a domain status (`answered`, `insufficient_evidence`, `budget_blocked`, `ingestion_unavailable` and others). It is shown as the current answer only while `may_attach` holds.

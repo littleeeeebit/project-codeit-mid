@@ -75,6 +75,11 @@ def references(conn):
     return found
 
 
+# A parallel HNSW build asks for a dynamic shared-memory segment as large as maintenance_work_mem, which the
+# container's default 64 MB /dev/shm cannot hold; serial builds use local memory.
+SESSION_OPTIONS = {"pg_restore": "-c max_parallel_maintenance_workers=0"}
+
+
 def _run(program, target, args, log_dir):
     binary = shutil.which(program)
     if not binary:
@@ -90,6 +95,8 @@ def _run(program, target, args, log_dir):
             raise ValueError(f"unsupported backup DSN option {key}")
         if key in mapping:
             environment[mapping[key]] = value
+    if program in SESSION_OPTIONS:
+        environment["PGOPTIONS"] = f"{environment.get('PGOPTIONS', '')} {SESSION_OPTIONS[program]}".strip()
     result = subprocess.run([binary, *args], env=environment, capture_output=True, timeout=600)
     if result.returncode:
         store.write_bytes_atomic(log_dir / f"{program}-failure.log", result.stderr)
@@ -108,7 +115,7 @@ def _table_manifest(raw):
     return tables
 
 
-def backup(settings, destination, actor):
+def backup(settings, destination, actor, share_owner=False):
     from . import evaluation, release
 
     destination = Path(destination)
@@ -119,7 +126,9 @@ def backup(settings, destination, actor):
             raise ValueError("backup destination must not overlap live runtime or originals")
     destination.mkdir(parents=True, exist_ok=True)
     target = settings.db_path
-    lock = postgres.GatewayOwner(target)
+    # The maintenance sequence shares its own process's gateway owner (the serving app's button, or the `maintain`
+    # command's); everything else, and any other process's owner, is refused.
+    lock = (share_owner and postgres.borrow_owner(target)) or postgres.GatewayOwner(target)
     try:
         with store.open_db(target) as conn, store.tx(conn, immediate=True):
             if conn.execute("SELECT current_schema()").fetchone()[0] != "public":

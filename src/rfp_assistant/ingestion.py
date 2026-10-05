@@ -936,6 +936,21 @@ def record_review(settings: Settings, source_hash: str, reviewer: str, status: s
     return review_id
 
 
+def extraction_review_status(conn, extraction_id: str) -> str:
+    """The review state of one extraction from its own records, replayed the way the writers apply them: a
+    person's review sets it, a fidelity verdict sets it unless a person's positive review stands. For an extraction
+    that is no longer its source's active one, whose `sources` row now describes a newer revision."""
+    events = sorted([(r["created_at"], True, r["status"]) for r in conn.execute(
+        "SELECT created_at, status FROM reviews WHERE extraction_id = ?", (extraction_id,))]
+        + [(r["created_at"], False, r["verdict"]) for r in conn.execute(
+            "SELECT created_at, verdict FROM fidelity_checks WHERE extraction_id = ?", (extraction_id,))])
+    status = "unreviewed"
+    for _, human, value in events:
+        if human or status not in ("sample_checked", "reviewed"):
+            status = value
+    return status
+
+
 def _load_review_records(path: Path) -> list[dict]:
     if not path.is_absolute():
         raise IngestionError("review files are given by absolute path")

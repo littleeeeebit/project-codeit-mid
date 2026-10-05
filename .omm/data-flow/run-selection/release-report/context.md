@@ -1,0 +1,1 @@
+README: the Phase 4 pilot runtime behind the release report lives in a separate database, `bidmate_pilot_archive`, with paid admission disabled.

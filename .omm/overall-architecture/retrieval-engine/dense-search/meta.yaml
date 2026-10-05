@@ -1,7 +1,7 @@
 created: 2026-10-05T03:34:20.397Z
-updated: 2026-10-05T04:06:17.462Z
-update_count: 4
-last_field: context
+updated: 2026-10-05T21:23:51.136Z
+update_count: 5
+last_field: description
 kind: nested-class
 title: dense-search
 children: []

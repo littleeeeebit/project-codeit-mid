@@ -1516,6 +1516,18 @@
       "title": "Korean",
       "type": "object"
      },
+     "mutation": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mutation"
+     },
      "reference": {
       "title": "Reference",
       "type": "string"
@@ -2513,6 +2525,14 @@
       "title": "Matrix",
       "type": "string"
      },
+     "needs_evidence_review": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Needs Evidence Review",
+      "type": "array"
+     },
      "populations": {
       "additionalProperties": {
        "type": "string"
@@ -3317,7 +3337,8 @@
      "part": {
       "enum": [
        "calibration",
-       "held_out"
+       "held_out",
+       "judge_set"
       ],
       "title": "Part",
       "type": "string"
@@ -3391,6 +3412,16 @@
    },
    "JudgeOverview": {
     "properties": {
+     "judge_set": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/JudgeSetCounts"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "reference": {
       "anyOf": [
        {
@@ -3444,7 +3475,8 @@
      "part": {
       "enum": [
        "calibration",
-       "held_out"
+       "held_out",
+       "judge_set"
       ],
       "title": "Part",
       "type": "string"
@@ -3503,6 +3535,28 @@
       },
       "default": {},
       "title": "Config Hashes",
+      "type": "object"
+     },
+     "judge_set_sha256": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Judge Set Sha256"
+     },
+     "mutations": {
+      "additionalProperties": {
+       "additionalProperties": {
+        "$ref": "#/components/schemas/MutationRate"
+       },
+       "type": "object"
+      },
+      "default": {},
+      "title": "Mutations",
       "type": "object"
      },
      "part": {
@@ -3586,7 +3640,8 @@
      "part": {
       "enum": [
        "calibration",
-       "held_out"
+       "held_out",
+       "judge_set"
       ],
       "title": "Part",
       "type": "string"
@@ -3643,6 +3698,55 @@
     "title": "JudgeRun",
     "type": "object"
    },
+   "JudgeSetCounts": {
+    "properties": {
+     "by_kind": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "By Kind",
+      "type": "object"
+     },
+     "by_type": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "By Type",
+      "type": "object"
+     },
+     "items": {
+      "title": "Items",
+      "type": "integer"
+     },
+     "negatives": {
+      "title": "Negatives",
+      "type": "integer"
+     },
+     "positives": {
+      "title": "Positives",
+      "type": "integer"
+     },
+     "set_sha256": {
+      "title": "Set Sha256",
+      "type": "string"
+     },
+     "version": {
+      "title": "Version",
+      "type": "string"
+     }
+    },
+    "required": [
+     "version",
+     "items",
+     "positives",
+     "negatives",
+     "by_type",
+     "by_kind",
+     "set_sha256"
+    ],
+    "title": "JudgeSetCounts",
+    "type": "object"
+   },
    "JudgeSplit": {
     "properties": {
      "calibration": {
@@ -3693,6 +3797,222 @@
     "title": "Latency",
     "type": "object"
    },
+   "MaintenanceRun": {
+    "properties": {
+     "actor": {
+      "title": "Actor",
+      "type": "string"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     },
+     "provider_calls": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Provider Calls"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "reused": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reused"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "serving": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Serving"
+     },
+     "started_at": {
+      "title": "Started At",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "running",
+       "complete",
+       "unverified",
+       "failed",
+       "needs_approval",
+       "interrupted"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "steps": {
+      "items": {
+       "$ref": "#/components/schemas/MaintenanceStep"
+      },
+      "title": "Steps",
+      "type": "array"
+     },
+     "stopped_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stopped At"
+     }
+    },
+    "required": [
+     "run_id",
+     "actor",
+     "started_at",
+     "status",
+     "steps"
+    ],
+    "title": "MaintenanceRun",
+    "type": "object"
+   },
+   "MaintenanceStatus": {
+    "properties": {
+     "backup_root": {
+      "title": "Backup Root",
+      "type": "string"
+     },
+     "run": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MaintenanceRun"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "running": {
+      "title": "Running",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "running",
+     "run",
+     "backup_root"
+    ],
+    "title": "MaintenanceStatus",
+    "type": "object"
+   },
+   "MaintenanceStep": {
+    "properties": {
+     "detail": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Detail",
+      "type": "object"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     },
+     "name": {
+      "enum": [
+       "backup",
+       "restore_check",
+       "ingest",
+       "fidelity",
+       "keyword",
+       "embedding",
+       "regression",
+       "report"
+      ],
+      "title": "Name",
+      "type": "string"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "status": {
+      "enum": [
+       "pending",
+       "running",
+       "done",
+       "reused",
+       "skipped",
+       "failed",
+       "needs_approval"
+      ],
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "status"
+    ],
+    "title": "MaintenanceStep",
+    "type": "object"
+   },
    "MetadataRow": {
     "properties": {
      "field": {
@@ -3731,6 +4051,64 @@
      "reason"
     ],
     "title": "MissingField",
+    "type": "object"
+   },
+   "MutationRate": {
+    "properties": {
+     "code_settled": {
+      "title": "Code Settled",
+      "type": "integer"
+     },
+     "items": {
+      "title": "Items",
+      "type": "integer"
+     },
+     "judged": {
+      "title": "Judged",
+      "type": "integer"
+     },
+     "measure": {
+      "title": "Measure",
+      "type": "string"
+     },
+     "passed": {
+      "title": "Passed",
+      "type": "integer"
+     },
+     "rate": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rate"
+     },
+     "wilson95": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "number"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Wilson95"
+     }
+    },
+    "required": [
+     "items",
+     "judged",
+     "passed",
+     "code_settled",
+     "measure"
+    ],
+    "title": "MutationRate",
     "type": "object"
    },
    "NoteIn": {
@@ -7629,6 +8007,88 @@
      }
     },
     "summary": "Start Judges"
+   }
+  },
+  "/api/verify/maintenance": {
+   "get": {
+    "description": "The maintenance sequence's progress, or the last run's report.",
+    "operationId": "maintenance_status_api_verify_maintenance_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MaintenanceStatus"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Maintenance Status"
+   }
+  },
+  "/api/verify/maintenance/start": {
+   "post": {
+    "description": "Runs backup, restore check, ingest, fidelity, keyword, embedding and regression once, in order; a paid\nembedding stops at its estimate. Activates nothing.",
+    "operationId": "start_maintenance_api_verify_maintenance_start_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Started"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Start Maintenance"
    }
   },
   "/api/verify/overview": {

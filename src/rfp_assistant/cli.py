@@ -550,6 +550,42 @@ def cmd_judge_reference(args, settings):
     return 0
 
 
+def cmd_judge_set(args, settings):
+    """Free: mutates the reference's held-out positives into the judge golden set and checks every mutant."""
+    from . import judge_set
+
+    _print(judge_set.generate(settings))
+    return 0
+
+
+def cmd_run_judges(args, settings):
+    """Paid: runs a planned judge part through the gateway (`judge_eval`), never above its estimate; resumable."""
+    res = _paid_resources(settings)
+    try:
+        if res.transport is None:
+            raise judges.JudgeError(res.provider_note or "no provider transport")
+        result = judges.run(settings, res.transport, args.estimate_id, args.actor, closing=lambda: res._closed)
+    finally:
+        res.close()
+    _print({k: v for k, v in result.items() if k != "arms"})
+    return 0 if result["status"] == "complete" else 1
+
+
+def cmd_maintain(args, settings):
+    """The whole maintenance sequence once, in order, ending in the regression table and one report (stop the UI
+    first, or press 유지보수 실행 on the 검증 page). Exit 0 only when every step finished."""
+    from . import maintenance
+
+    res = _paid_resources(settings)
+    try:
+        state = maintenance.run(settings, res.analyzer, res.transport, args.actor, closing=lambda: res._closed)
+    finally:
+        res.close()
+    print(maintenance.report_md(state))
+    print(f"report: {maintenance.root(settings) / 'reports' / (state['run_id'] + '.md')}")
+    return 0 if state["status"] == "complete" else 1
+
+
 def cmd_judge_refit(args, settings):
     """Free: refits the Jev thresholds from the completed calibration run's stored judgements."""
     thresholds = judges.refit(settings)
@@ -730,7 +766,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("plan-run", help="estimate an answer evaluation before anything is sent (no provider call)")
     s.add_argument("--action", required=True, choices=list(answers.ACTIONS) + [judges.ACTION])
     s.add_argument("--part", choices=list(judges.PARTS), default="held_out",
-                   help="judge-comparison: calibration fits Jev thresholds; held_out is the reported part")
+                   help="judge-comparison: calibration fits Jev thresholds; held_out is the reported part; "
+                        "judge_set runs the mutated judge golden set")
     s.add_argument("--dataset", default="dev", help="answer-finalists: the reviewed development split")
     s.add_argument("--runs", help="answer-finalists: one or two retrieval run IDs (default: active + its finalist)")
     s.add_argument("--question-id", action="append",
@@ -841,6 +878,13 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("judge-reference", help="copy the reviewed development judge reference read-only and split it")
     s.add_argument("--archive", help="archived pilot runtime holding run A-9ef59b566d64 (default: the PR #8 archive)")
     sub.add_parser("judge-refit", help="free: refit Jev thresholds from the completed calibration run's judgements")
+    sub.add_parser("judge-set", help="free: build the judge golden set from mutated held-out positives")
+    s = sub.add_parser("maintain", help="backup, restore check, ingest, fidelity, keyword, embedding, regression, "
+                                        "report: in order, once (stop the UI first)")
+    s.add_argument("--actor", required=True)
+    s = sub.add_parser("run-judges", help="paid: run a planned judge part (stop the UI first); resumable")
+    s.add_argument("--estimate-id", required=True)
+    s.add_argument("--actor", required=True)
     envelopes = sub.add_parser("set-envelopes", help="owner reallocation in exact micro-USD, retaining the cap")
     envelopes.add_argument("--file", required=True)
     envelopes.add_argument("--actor", required=True)
@@ -862,7 +906,8 @@ COMMANDS = {"init": cmd_init, "set-limit": cmd_set_limit, "register-embedding-ra
             "build-dense": cmd_build_dense, "evaluate-retrieval": cmd_evaluate_retrieval,
             "trial-reranker": cmd_trial_reranker, "activate-run": cmd_activate_run, "report": cmd_report,
             "compare": cmd_compare, "compare-cap": cmd_compare_cap, "compare-resolve": cmd_compare_resolve,
-            "golden-counts": cmd_golden_counts,
+            "golden-counts": cmd_golden_counts, "judge-set": cmd_judge_set, "run-judges": cmd_run_judges,
+            "maintain": cmd_maintain,
             "compare-runs": cmd_compare_runs, "draft-activation": cmd_draft_activation,
             "fidelity": cmd_fidelity, "ocr": cmd_ocr, "build-keyword": cmd_build_keyword, "check": cmd_check, "validate-gold": cmd_validate_gold,
             "configure-budget": cmd_configure_budget, "budget-status": cmd_budget_status,

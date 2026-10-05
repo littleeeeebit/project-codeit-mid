@@ -1,5 +1,0 @@
-graph TD
-  pending["Pending\nsrc/rfp_assistant/gold.py"] -->|"decide approve"| approved["Approved\nsrc/rfp_assistant/gold.py"]
-  pending -->|"decide reject"| rejected["Rejected\nsrc/rfp_assistant/gold.py"]
-  approved -->|"second_review"| second-reviewed["Second reviewed\nsrc/rfp_assistant/gold.py"]
-  rejected -->|"gold infer reason"| rejection-wiki["Rejection wiki\nsrc/rfp_assistant/gold.py"]

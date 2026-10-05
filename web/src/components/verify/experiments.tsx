@@ -21,7 +21,7 @@ type Column = Schemas["ExperimentColumn"];
 type Question = Schemas["ExperimentQuestion"];
 type Value = Row["values"][string];
 
-const MATRIX: Record<string, string> = { lexical: "K0 · K1", chunking: "청킹", embedding: "임베딩", reranker: "리랭커" };
+const MATRIX: Record<string, string> = { lexical: "K0 · K1", chunking: "청킹", embedding: "임베딩", reranker: "리랭커", regression: "회귀 (유지보수)" };
 const COLUMN: Record<string, string> = {
   "dev.ndcg": "nDCG@5", "dev.support": "근거 완전", "whole.ndcg": "nDCG@5 전체 문서", "whole.support": "근거 완전 전체 문서",
   "needle.top5": "바늘 상위 5", "dev.critical": "치명 실패", "whole.critical": "치명 실패 전체 문서",
@@ -157,6 +157,12 @@ function MatrixView({ t, onActivated }: { t: Table; onActivated: () => void }) {
   return (
     <section aria-label={`${MATRIX[t.matrix] ?? t.title} 비교표`} className="space-y-6">
       <Headline t={t} />
+      {t.needs_evidence_review.length > 0 && (
+        <Notice tone="warn">
+          검증되지 않은 비교입니다. 다시 읽은 원문의 추출본이 바뀌어, 서비스 중인 색인 행이 채점한 질문 {t.needs_evidence_review.length}개가
+          새 색인 행에서 빠졌습니다. 근거를 다시 검토해야 새 색인 행을 믿을 수 있습니다: {t.needs_evidence_review.join(", ")}
+        </Notice>
+      )}
       <div className="relative overflow-x-auto rounded-xl border border-input">
         <table className="w-full border-collapse text-sm">
           <caption className="sr-only">{MATRIX[t.matrix] ?? t.title} 비교. 열 제목을 누르면 정렬되고, 행을 누르면 실패한 질문과 활성화가 열립니다.</caption>

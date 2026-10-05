@@ -1,0 +1,1 @@
+`_stored_quote` scans `idx.chunks` linearly for each evidence unit (about 19k chunks × ≤10 units). It is correct, but a `row_of` lookup would be O(1).

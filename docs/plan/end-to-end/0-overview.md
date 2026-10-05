@@ -39,7 +39,7 @@ Decided by the owner on 2026-10-05; every phase document and the [runbook](../..
 | AI reviewers | Approve or reject gold rows against the original, both development and sealed. The reviewer's identity differs from the drafter's; a drafter, or the model that drafted, never approves its own row | Review a row they drafted |
 | The person | Reads the comparison tables side by side and activates one row (`activate-run`, or the activate action on 검증 › 실험 비교) with their name and an optional note | Approve gold row by row, or wait for a schedule |
 
-Gates (nDCG@5 gain, new critical failures, added latency) are table columns. They inform the choice; they no longer block an activation the person makes. Maintenance is one command or one button (`compare --matrix <name>`, a rebuild, a backup, a reconciliation). Nothing runs on a schedule, and nothing changes what serves without the person's activation.
+Gates (nDCG@5 gain, new critical failures, added latency) are table columns. They inform the choice; they no longer block an activation the person makes. Maintenance is one command or one button (`compare --matrix <name>`, a reconciliation, and `maintain` or 검증 › 유지보수, which runs backup, restore check, ingest, fidelity, keyword rebuild, embedding and the regression table in order). Nothing runs on a schedule, and nothing changes what serves without the person's activation.
 
 ## Requirements already established
 

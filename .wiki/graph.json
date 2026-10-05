@@ -335,6 +335,11 @@
   },
   {
    "a": "docs/plan/end-to-end/5-team-operation.md",
+   "b": "docs/operations/runbook.md",
+   "kind": "link"
+  },
+  {
+   "a": "docs/plan/end-to-end/5-team-operation.md",
    "b": "docs/rag/budget.md",
    "kind": "link"
   },
@@ -593,7 +598,7 @@
   "read": 8,
   "orphans": 0,
   "pages": 2,
-  "decisions": 18,
-  "injectable_decisions": 4
+  "decisions": 20,
+  "injectable_decisions": 5
  }
 }

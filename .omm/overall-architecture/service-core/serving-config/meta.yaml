@@ -1,0 +1,9 @@
+created: 2026-10-05T21:23:50.283Z
+updated: 2026-10-05T21:23:50.414Z
+update_count: 2
+last_field: note
+kind: nested-class
+title: serving-config
+children: []
+parentPath:
+  - service-core

@@ -1,1 +1,0 @@
-Keeps holding its reservation. While any unknown attempt exists, `mark_dispatching` refuses every PostgreSQL dispatch, and `build-dense` refuses. It is resolved by the owner CLI `settle` (`settle_from_evidence`) or `reconcile`.

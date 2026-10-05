@@ -265,10 +265,13 @@ def family_bootstrap(results: list[dict], key: str, seed: int = BOOTSTRAP_SEED,
             "families": len(units), "seed": seed, "resamples": resamples, "unit": "source family"}
 
 
-def load_eval_rows(settings: Settings, name: str, sealed: bool = False) -> tuple[list[dict], list[dict], str]:
+def load_eval_rows(settings: Settings, name: str, sealed: bool = False,
+                   extractions: dict[str, str] | None = None) -> tuple[list[dict], list[dict], str]:
     """(scored rows, skipped rows with reasons, dataset sha256). Only independently reviewed dev rows whose
     evidence is pinned to the document's active extraction are scored; the rest are listed, not dropped. The
-    sealed test split is read only by the sealed run (`sealed=True`)."""
+    sealed test split is read only by the sealed run (`sealed=True`). `extractions` (source hash -> extraction)
+    names what the evaluated index holds where it differs from the active one: after a re-parse the served index
+    still holds the older extraction, and the questions pinned to it are still its questions."""
     if name in SEALED_SPLITS and not sealed:
         raise EvaluationError("the test split is sealed: it is evaluated once, by sealed-run under a release "
                               "freeze, never by evaluate-retrieval or plan-run")
@@ -278,9 +281,10 @@ def load_eval_rows(settings: Settings, name: str, sealed: bool = False) -> tuple
     raw = path.read_bytes()
     rows = read_jsonl(path)
     with open_db(settings.db_path) as conn:
-        active = {r["doc_id"]: (r["active_source_hash"], r["active_extraction_id"]) for r in conn.execute(
-            "SELECT d.doc_id, d.active_source_hash, s.active_extraction_id FROM documents d "
-            "JOIN sources s ON s.source_hash = d.active_source_hash")}
+        active = {r["doc_id"]: (r["active_source_hash"], (extractions or {}).get(r["active_source_hash"],
+                                                                                 r["active_extraction_id"]))
+                  for r in conn.execute("SELECT d.doc_id, d.active_source_hash, s.active_extraction_id FROM documents "
+                                        "d JOIN sources s ON s.source_hash = d.active_source_hash")}
     if name in GOLD_DATASETS:
         return _gold_eval_rows(rows, name, active) + (hashlib.sha256(raw).hexdigest(),)
     scored, skipped = [], []
@@ -1052,15 +1056,15 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
     bad = [x for x in labels if x not in RUN_MODES or x == "HR"]
     if bad:
         raise EvaluationError(f"unknown or unsupported run labels {bad}; HR runs through trial-reranker")
-    rows, skipped, dataset_sha = load_eval_rows(settings, dataset)
-    if not rows:
-        raise EvaluationError("no independently reviewed dev rows to evaluate")
     with open_db(settings.db_path) as conn:
         index_version = index_version or get_app_setting(conn, "active_index")
     try:
         index = KeywordIndex.load(settings, index_version)
     except RetrievalError as exc:
         raise EvaluationError(str(exc)) from None
+    rows, skipped, dataset_sha = load_eval_rows(settings, dataset, extractions=index.source_extraction)
+    if not rows:
+        raise EvaluationError("no independently reviewed dev rows to evaluate")
     from .retrieval import index_compatibility
 
     if index_compatibility(index, analyzer):
@@ -1228,10 +1232,10 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
     from .retrieval import KeywordIndex
     from .store import get_app_setting
 
-    rows, skipped, dataset_sha = load_eval_rows(settings, dataset)
     with open_db(settings.db_path) as conn:
         index_version = index_version or get_app_setting(conn, "active_index")
     index = KeywordIndex.load(settings, index_version)
+    rows, skipped, dataset_sha = load_eval_rows(settings, dataset, extractions=index.source_extraction)
     from .retrieval import index_compatibility
 
     if index_compatibility(index, analyzer):

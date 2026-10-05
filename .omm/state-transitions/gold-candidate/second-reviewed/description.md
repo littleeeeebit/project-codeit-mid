@@ -1,1 +1,0 @@
-An independent agree/disagree on an approved gold row (disputed deadlines, amounts, institutions), listed by `gold_awaiting_second_review`.

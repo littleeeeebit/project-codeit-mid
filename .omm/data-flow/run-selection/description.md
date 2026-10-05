@@ -1,0 +1,1 @@
+Runs are retrieval-only or answer evaluations frozen by dataset hash, population, index manifest, analyzer, dense version and limits under `.runtime/runs/<run_id>/`. A person reads comparison tables and activates one row; release evidence is built on top.

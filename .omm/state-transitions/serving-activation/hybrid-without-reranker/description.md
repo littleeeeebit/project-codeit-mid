@@ -1,1 +1,0 @@
-An HR run activated under a superseded `EVAL_VERSION` keeps hybrid retrieval with the reranker dropped (`stale_policy`) until a current trial is activated. `activated_embedding_model_unknown` similarly degrades to `kiwi_bm25`.

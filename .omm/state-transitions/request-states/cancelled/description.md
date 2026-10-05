@@ -1,0 +1,1 @@
+Either conclusive before the claim, or a running request whose `cancel_requested` flag `_finish` sees on a would-be `completed`, or a `_Stop('cancelled')`. The outcome is stored as history and never attached as the current answer (`may_attach`).

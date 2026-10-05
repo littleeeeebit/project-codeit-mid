@@ -1,26 +1,22 @@
 created: 2026-10-04 13:34:42.331000+00:00
-updated: 2026-10-05 09:51:13.763000+00:00
-update_count: 8
+updated: 2026-10-05 21:23:45.966000+00:00
+update_count: 10
 last_field: diagram
 kind: nested-class
 title: web-screens
 children:
 - api-client
-- app-header
 - ask-page
 - dataset-page
 - poll-hook
 - settings-page
 - verify-page
 parentPath: []
-prev_diagram: "graph TD\r\n  ask_page[\"Ask page\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  verify_page[\"Verification page\\nweb/src/components/verify/verify-page.tsx\"\
-  ]\r\n  dataset_page[\"Dataset page\\nweb/src/components/dataset/dataset-page.tsx\"\
-  ]\r\n  settings_page[\"Settings page\\nweb/src/app/settings/page.tsx\"]\r\n  use_poll[\"\
-  Keyed polling hook\\nweb/src/lib/use-poll.ts\"]\r\n  api_client[\"Typed API client\\\
-  nweb/src/lib/api.ts\"]\r\n  ask_page -->|\"poll request each second\"| use_poll\r\
-  \n  verify_page -->|\"poll overview, history\"| use_poll\r\n  dataset_page -->|\"\
-  poll runs, pending\"| use_poll\r\n  use_poll -->|\"read-only GETs\"| api_client\r\
-  \n  ask_page -->|\"ask, cancel, abandon\"| api_client\r\n  verify_page -->|\"traces,\
-  \ plans, starts\"| api_client\r\n  dataset_page -->|\"plan, start, decide\"| api_client\r\
-  \n  settings_page -->|\"PUT budget limit\"| api_client"
+prev_diagram: "graph TD\r\n  api-client[\"API client\\nweb/src/lib/api.ts\"] -->|\"\
+  X-Member header\"| ask-page[\"Ask page\\nweb/src/components/ask/ask-page.tsx\"]\r\
+  \n  api-client --> verify-page[\"Verify page\\nweb/src/components/verify/verify-page.tsx\"\
+  ]\r\n  api-client --> dataset-page[\"Dataset page\\nweb/src/components/dataset/dataset-page.tsx\"\
+  ]\r\n  api-client --> settings-page[\"Settings page\\nweb/src/app/settings/page.tsx\"\
+  ]\r\n  app-header[\"App header\\nweb/src/components/app-header.tsx\"] -->|\"GET\
+  \ /api/budget\"| api-client\r\n  ask-page -->|\"1 s status poll\"| poll-hook[\"\
+  Poll hook\\nweb/src/lib/use-poll.ts\"]"

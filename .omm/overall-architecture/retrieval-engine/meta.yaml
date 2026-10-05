@@ -1,28 +1,24 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-05 09:51:17.745000+00:00
-update_count: 10
+updated: 2026-10-05 21:23:50.689000+00:00
+update_count: 12
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
 children:
-- corpus-routing
 - dense-channel
 - dense-search
 - evidence-packing
 - fusion
-- fusion-and-rerank
 - keyword-index
-- lexical-channel
+- query-policy
 - reranker
 parentPath: []
-prev_diagram: "graph TD\r\n  corpus_router[\"Corpus routing\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  exact_codes[\"Requirement code match\\nsrc/rfp_assistant/retrieval.py\"]\r\
-  \n  lexical_bm25[\"Kiwi BM25 channel\\nsrc/rfp_assistant/retrieval.py\"]\r\n  dense_search[\"\
-  pgvector dense channel\\nsrc/rfp_assistant/vector_store.py\"]\r\n  fusion[\"Keyword-first\
-  \ RRF fusion\\nsrc/rfp_assistant/retrieval.py\"]\r\n  evidence_packer[\"Evidence\
-  \ packing\\nsrc/rfp_assistant/retrieval.py\"]\r\n  corpus_router -->|\"narrowed\
-  \ scope rows\"| exact_codes\r\n  corpus_router -->|\"allowed rows\"| lexical_bm25\r\
-  \n  corpus_router -->|\"allowed rows\"| dense_search\r\n  lexical_bm25 -->|\"top\
-  \ channel_top_k\"| fusion\r\n  dense_search -->|\"top channel_top_k\"| fusion\r\n\
-  \  exact_codes -->|\"pinned ahead of ranking\"| evidence_packer\r\n  fusion -->|\"\
-  fused order\"| evidence_packer"
+prev_diagram: "graph TD\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval.py\"\
+  ] -->|\"scope rows, scope terms\"| corpus-routing[\"Corpus routing\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  corpus-routing -->|\"allowed rows\"| lexical-channel[\"Lexical channel\\\
+  nsrc/rfp_assistant/retrieval.py\"]\r\n  corpus-routing -->|\"allowed rows\"| dense-channel[\"\
+  Dense channel\\nsrc/rfp_assistant/vector_store.py\"]\r\n  lexical-channel -->|\"\
+  BM25 ids\"| fusion-and-rerank[\"Fusion and rerank\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  dense-channel -->|\"cosine ids\"| fusion-and-rerank\r\n  fusion-and-rerank\
+  \ -->|\"ordered rows\"| evidence-packing[\"Evidence packing\\nsrc/rfp_assistant/retrieval.py\"\
+  ]"

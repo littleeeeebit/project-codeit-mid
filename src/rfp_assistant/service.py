@@ -27,8 +27,8 @@ from . import dense as dense_mod
 from .auth import require_any
 from .contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, EvidenceUnit, EvidenceView,
                         ManagedDownload, Principal, RequestView, RetrievalResult)
-from .ingestion import (CODE_RE, QUARANTINE_TEXT, load_elements, nfc, printed_pdf_path, record_review,
-                        resolutions_by_doc)
+from .ingestion import (CODE_RE, QUARANTINE_TEXT, extraction_review_status, load_elements, nfc, printed_pdf_path,
+                        record_review, resolutions_by_doc)
 from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extraction, corpus_scope, scope_rows
 from .retrieval import retrieve as _retrieve
 from .evaluation import EVAL_VERSION
@@ -419,16 +419,27 @@ def _authorize(res: Resources, principal: Principal | None, *capabilities: str) 
 
 
 def _doc_rows(res: Resources, doc_ids: list[str] | None = None) -> list[dict]:
+    idx = res.index()
     with open_db(res.settings.db_path) as conn:
         rows = conn.execute(
             "SELECT d.*, s.format, s.parse_status, s.review_status, s.reason_code, s.active_extraction_id "
             "FROM documents d JOIN sources s ON s.source_hash = d.active_source_hash ORDER BY d.csv_row_id").fetchall()
         resolutions = resolutions_by_doc(conn)
-    out = []
-    for r in rows:
-        if doc_ids is not None and r["doc_id"] not in doc_ids:
-            continue
-        d = dict(r)
+        out = []
+        for r in rows:
+            if doc_ids is not None and r["doc_id"] not in doc_ids:
+                continue
+            d = dict(r)
+            # Serving reads an original through the extraction its activated index holds: a re-parse moves
+            # `active_extraction_id` before the person activates the index built over the new extraction, and a
+            # failed re-parse quarantines the source without moving it. Either way the source's statuses describe
+            # the latest attempt, not the extraction the index serves, which then reports its own review.
+            served = idx.source_extraction.get(d["active_source_hash"]) if idx else None
+            if served is not None and (served != d["active_extraction_id"] or d["parse_status"] != "parsed"):
+                d.update(active_extraction_id=served, parse_status="parsed", reason_code=None,
+                         review_status=extraction_review_status(conn, served))
+            out.append(d)
+    for d in out:
         d["meta"] = json.loads(d.pop("normalized_metadata_json"))
         d["quality"] = json.loads(d.pop("quality_json"))
         d["resolutions"] = resolutions.get(d["doc_id"], {})
@@ -436,7 +447,6 @@ def _doc_rows(res: Resources, doc_ids: list[str] | None = None) -> list[dict]:
         # display; d["meta"] keeps the CSV values and d["resolutions"] the provenance.
         d["effective"] = {**d["meta"], **{f: r["value"] for f, r in d["resolutions"].items()}}
         d.pop("raw_metadata_json")
-        out.append(d)
     return out
 
 
@@ -2116,6 +2126,49 @@ def start_judges(res: Resources, principal: Principal, estimate_id: str) -> str:
     return run_id
 
 
+_MAINTENANCE_JOB: list[threading.Thread] = []  # at most one maintenance sequence per process
+
+
+def maintenance_status(res: Resources, principal: Principal) -> dict:
+    """The running or last maintenance run. A run recorded as running with no live thread was cut off by a stop."""
+    principal = _authorize(res, principal, "verifier")
+    from . import maintenance
+
+    running = any(t.is_alive() for t in _MAINTENANCE_JOB)
+    state = maintenance.last(res.settings)
+    if state and state["status"] == "running" and not running:
+        state = {**state, "status": "interrupted", "reason": state.get("reason") or "the process stopped mid-run"}
+    return {"running": running, "run": state, "backup_root": str(maintenance.backup_root(res.settings))}
+
+
+def start_maintenance(res: Resources, principal: Principal) -> str:
+    """Starts the maintenance sequence on this process's gateway in one background thread; the run is published
+    before the start returns. A paid embedding stops it at its estimate; nothing is activated."""
+    principal = _authorize(res, principal, "verifier")
+    from . import maintenance
+
+    with _EVAL_LOCK:
+        if res._closed:
+            raise ServiceError("서비스가 종료 중입니다.")
+        if any(t.is_alive() for t in _MAINTENANCE_JOB):
+            raise ServiceError("유지보수가 이미 실행 중입니다. 끝난 뒤 다시 시도하세요.")
+        state = maintenance.start_state(principal.member_id)
+        maintenance._write(res.settings, state)
+
+        def job() -> None:
+            maintenance.run(res.settings, res.analyzer, res.transport, principal.member_id,
+                            closing=lambda: res._closed, state=state)
+
+        thread = threading.Thread(target=job, name=f"rfp-maintenance-{state['run_id']}", daemon=True)
+        with res._runner_lock:  # close() joins it like every other job that may use the transport
+            if res._closed:
+                raise ServiceError("서비스가 종료 중입니다.")
+            _MAINTENANCE_JOB[:] = [thread]
+            res._jobs.append(thread)
+            thread.start()
+    return state["run_id"]
+
+
 def judge_results(res: Resources, principal: Principal, run_id: str) -> dict:
     principal = _authorize(res, principal, "verifier")
     from . import judges
@@ -2152,7 +2205,7 @@ def experiments(res: Resources, principal: Principal) -> dict:
                          "active": bool(r.get("run_id")) and r.get("run_id") == active.get("run_id")})
         tables.append({"matrix": t["matrix"], "title": t["title"], "created_at": t["created_at"],
                        "columns": t["columns"], "fixed": t.get("fixed") or {}, "populations": t["populations"],
-                       "rows": rows})
+                       "needs_evidence_review": t.get("needs_evidence_review") or [], "rows": rows})
     golden = compare.compare_dir(res.settings) / "golden-counts.json"
     reranker = active.get("reranker") or {}
     serving_detail = {"mode": active.get("mode"), "embedding": (active.get("embedding") or {}).get("model"),

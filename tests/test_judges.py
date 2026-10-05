@@ -116,6 +116,46 @@ class SplitIntegrityTest(unittest.TestCase):
             self.assertIsNone(judges.cached_translation(settings, masked))
 
 
+class JudgeSetCarryTest(unittest.TestCase):
+    """Review round 1, F4 follow-through: a regenerated set reuses only judgements of byte-identical items."""
+
+    def test_only_unchanged_items_of_the_same_configuration_are_carried(self):
+        from rfp_assistant import judge_set
+
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = SimpleNamespace(data_dir=Path(tmp))
+            old = [{"blind_id": "a-amount", "claim": "300만원"}, {"blind_id": "b-dropped_condition", "claim": "x"},
+                   {"blind_id": "c", "claim": "y"}]
+            new = [old[0], {"blind_id": "b-dropped_condition", "claim": "changed"}]
+            body = "".join(json.dumps(i, ensure_ascii=False, sort_keys=True) + "\n" for i in old)
+            old_sha = judges._sha(body)
+            sets = judge_set.root(settings) / "sets"
+            sets.mkdir(parents=True)
+            (sets / f"{old_sha}.jsonl").write_bytes(body.encode("utf-8"))
+            base = {"part": "judge_set", "model": judges.MODEL}
+
+            def prior(run_id, config):
+                d = judges.run_dir(settings, run_id)
+                d.mkdir(parents=True)
+                (d / "config.json").write_text(json.dumps({"run_id": run_id, **config}), encoding="utf-8")
+                for i in old:
+                    judges._append(settings, run_id, {"arm": "luna", "blind_id": i["blind_id"], "status": "done",
+                                                      "label": "unsupported"})
+
+            prior("J-judge_set-000000000001", {**base, "judge_set_sha256": old_sha})
+            prior("J-judge_set-000000000002", {**base, "model": "other", "judge_set_sha256": old_sha})
+            inputs = {"part": "judge_set", "run_id": "J-judge_set-0000000000ff", "items": new,
+                      "config": {**base, "judge_set_sha256": "f" * 64}}
+            self.assertEqual(judges.carry(settings, inputs), 1)
+            got = judges.load_judgements(settings, inputs["run_id"])
+            self.assertEqual(list(got), [("luna", "a-amount")])
+            self.assertEqual(got[("luna", "a-amount")]["carried_from"], "J-judge_set-000000000001")
+            self.assertEqual(judges.carry(settings, inputs), 0)  # idempotent
+            (sets / f"{old_sha}.jsonl").write_bytes(body.replace("300", "400").encode("utf-8"))
+            # an archived set whose bytes changed proves nothing about the items it judged
+            self.assertEqual(judges.carry(settings, {**inputs, "run_id": "J-judge_set-0000000000ee"}), 0)
+
+
 class CalibrationCoverageTest(unittest.TestCase):
     """Review round 1, F2: failed and untranslatable Jev items count against calibration coverage."""
 

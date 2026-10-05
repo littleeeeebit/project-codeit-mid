@@ -1,0 +1,1 @@
+An HR activation from a superseded `EVAL_VERSION` keeps hybrid retrieval and drops the reranker (`stale_policy`) until a current trial is activated. An embedding model outside `ALLOWED_EMBEDDING_MODELS` similarly degrades to `kiwi_bm25`.

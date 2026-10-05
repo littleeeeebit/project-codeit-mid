@@ -1,7 +1,0 @@
-graph TD
-  manifest-import["Manifest import\nsrc/rfp_assistant/ingestion.py"] -->|"documents, sources"| source-parsing["Source parsing\nsrc/rfp_assistant/ingestion.py"]
-  source-parsing -->|"raw elements"| ocr-merge["OCR merge\nsrc/rfp_assistant/ocr.py"]
-  ocr-merge -->|"elements + image_text"| extraction-revisions["Extraction revisions\nsrc/rfp_assistant/ingestion.py"]
-  extraction-revisions -->|"active extraction"| fidelity-check["Fidelity check\nsrc/rfp_assistant/fidelity.py"]
-  fidelity-check -->|"review_status"| keyword-build["Keyword build\nsrc/rfp_assistant/retrieval.py"]
-  extraction-revisions -->|"elements.jsonl"| keyword-build

@@ -24,6 +24,7 @@ from pathlib import Path
 
 from . import dense as dense_mod
 from . import evaluation as ev
+from . import judge_set
 from .models import EMBEDDINGS, GEMINI_PROVIDER, RERANKERS, ModelError, embedding_spec, free_gpu, model_size_bytes, reranker_spec
 from .settings import Settings
 from .store import dumps, open_db, tx, utcnow, write_text_atomic
@@ -80,6 +81,9 @@ COLUMNS = {  # (key, label, better: "high" | "low" | None) in display order
                  ("p95_loaded_ms", f"warm p95 {LOAD_USERS} users ms", "low"), ("gate", "gate", None),
                  ("needle.top5", "needle top-5", "high"), ("whole.ndcg", "nDCG@5 (whole)", "high")],
 }
+
+
+COLUMNS["regression"] = COLUMNS["lexical"] + [("new_critical_vs_k1", "critical vs K1", "low")]
 
 
 class CompareError(RuntimeError):
@@ -185,11 +189,13 @@ def row_settings(settings: Settings, row: dict) -> Settings:
 # ---------------------------------------------------------------- populations and artifacts
 
 
-def populations(settings: Settings) -> dict:
-    """dev (scoped), needles (unscoped) and their identities. `whole` is dev unscoped plus the needles."""
+def populations(settings: Settings, index=None) -> dict:
+    """dev (scoped), needles (unscoped) and their identities. `whole` is dev unscoped plus the needles. With an
+    index, the questions are those pinned to the extractions it holds (`load_eval_rows`)."""
     out = {}
     for name in ("dev", "corpus"):
-        rows, skipped, sha = ev.load_eval_rows(settings, name)
+        rows, skipped, sha = ev.load_eval_rows(settings, name,
+                                               extractions=index.source_extraction if index is not None else None)
         out[name] = {"rows": rows, "skipped": skipped, "dataset_sha256": sha,
                      "population_sha256": ev.population_identity(rows, skipped)}
     return out
@@ -262,7 +268,7 @@ def paid_estimate(settings: Settings, s: Settings, index, pops: dict | None = No
     Its ID binds the model, index manifest and missing payload set; any change makes a new estimate."""
     from . import budget
 
-    pops = pops or populations(settings)
+    pops = pops or populations(settings, index)
     queries = _missing_queries(s, pops)
     backend = embedding_spec(s.embedding_model).backend
     if backend == "openai":
@@ -570,10 +576,18 @@ def _cell_key(row: dict, index, pops: dict, extra: dict) -> str:
 class Runner:
     def __init__(self, settings: Settings, analyzer, transport=None) -> None:
         self.settings, self.analyzer, self.transport = settings, analyzer, transport
-        self.pops = populations(settings)
         self.approved = approvals(settings)
         self._indexes: dict[str, object] = {}
         self._baselines: dict[str, dict] = {}
+        self._pops: dict[str, dict] = {}
+
+    def pops_for(self, index) -> dict:
+        """The populations a row on this index is graded on: the questions pinned to the extractions it holds. After
+        a re-parse the served index keeps its questions, and an index over the new extraction lists them as
+        skipped (`evidence_revision_not_active`) until their evidence is reviewed again."""
+        if index.version not in self._pops:
+            self._pops[index.version] = populations(self.settings, index)
+        return self._pops[index.version]
 
     def index(self, profile: str, serving: dict | None = None):
         """The profile's keyword index; on the serving profile, the activated run's own index."""
@@ -625,7 +639,7 @@ class Runner:
         extra_key |= {"embedding": ev.embedding_identity(s) if row.get("embedding") else None,
                      "reranker": [s.reranker_model, s.reranker_revision, s.reranker_max_length, s.reranker_precision]
                      if row.get("reranker") else None}
-        return _cell_key(row, index, self.pops, extra_key), s, index
+        return _cell_key(row, index, self.pops_for(index), extra_key), s, index
 
     def recorded(self, row: dict) -> dict:
         """What the last run recorded for a row this run skips (`--only`), failures included, so the table keeps
@@ -650,6 +664,7 @@ class Runner:
             return hit
         if label == "HR":
             return self._rerank_row(key, row, base, s, index)
+        pops = self.pops_for(index)
         try:
             dense = facts = None
             vectors, qinfo = None, {"embed_ms": []}
@@ -662,20 +677,20 @@ class Runner:
                     return self.store(key, {"status": "failed", "reason": facts.get("error")})
                 paid = embedding_spec(s.embedding_model).backend != "local"
                 approved_queries: set[str] = set()
-                if paid and _missing_queries(s, self.pops):
+                if paid and _missing_queries(s, pops):
                     # Only an approval of the estimate that priced exactly these missing questions lets them be
                     # sent; an earlier approval for the same model covered other payloads and does not carry over.
-                    estimate = paid_estimate(self.settings, s, index, self.pops)
+                    estimate = paid_estimate(self.settings, s, index, pops)
                     if not estimate.get("approved_by"):
                         return {"status": "needs_approval", "estimate": estimate,
                                 "reason": f"{estimate['queries_to_embed']} query vectors need a paid call"}
                     approved_queries = set(estimate["queries"])
-                vectors, qinfo = query_vectors(self.settings, s, self.pops, self.transport, approved_queries)
+                vectors, qinfo = query_vectors(self.settings, s, pops, self.transport, approved_queries)
                 if qinfo["unavailable"]:
                     reasons = sorted({r for r in qinfo["unavailable"] if r})
                     return self.store(key, {"status": "failed", "reason": f"query vectors unavailable: {reasons}"})
-            measured = measure(self.settings, s, label, index, self.analyzer, self.pops, dense, vectors)
-            run_id = write_dev_run(self.settings, s, label, index, dense, self.analyzer, self.pops, measured)
+            measured = measure(self.settings, s, label, index, self.analyzer, pops, dense, vectors)
+            run_id = write_dev_run(self.settings, s, label, index, dense, self.analyzer, pops, measured)
             cell = {"status": "complete", "run_id": run_id, "label": label, **_summary(measured),
                     "questions": sum((_questions(measured["results"][p], p) for p in ("dev", "whole")), [])}
             if label in ("K0", "K1"):
@@ -706,15 +721,15 @@ class Runner:
             return {"status": "failed", "reason": f"the serving hybrid could not be measured: {h.get('reason')}"}
         protect = PROTECTED_HEAD if row["rerank_mode"] == "below_head" else 0
         spec = reranker_spec(row["reranker"])
-        model = None
+        model, pops = None, self.pops_for(index)
         try:
             hs = row_settings(self.settings, {**row, "retrieval": "hybrid", "reranker": None})
             dense, _ = ensure_dense(self.settings, hs, index, self.approved, self.transport)
-            vectors, _ = query_vectors(self.settings, hs, self.pops, self.transport, set())
+            vectors, _ = query_vectors(self.settings, hs, pops, self.transport, set())
             model = LocalRerankerModel(spec)
             load = {**model.info, "license": spec.licence, "size_bytes": model_size_bytes(spec.key, spec.revision)}
             cached = CachedReranker(self.settings, model)
-            measured = measure(self.settings, s, "HR", index, self.analyzer, self.pops, dense, vectors, cached,
+            measured = measure(self.settings, s, "HR", index, self.analyzer, pops, dense, vectors, cached,
                                protect)
             _raise_on_bypass(r for rs in measured["results"].values() for r in rs)  # every population
             latency = self._latency(s, index, dense, vectors, model, protect)
@@ -725,7 +740,7 @@ class Runner:
                     "added_p95_ms_under_load": latency["added_p95_ms"], "allowed_added_p95_ms": ev.GATE_ADDED_P95_MS,
                     "users": LOAD_USERS, "passed": gain >= ev.GATE_NDCG_GAIN and not new_vs_h
                     and latency["added_p95_ms"] <= ev.GATE_ADDED_P95_MS}
-            run_id = write_dev_run(self.settings, s, "HR", index, dense, self.analyzer, self.pops, measured, extra={
+            run_id = write_dev_run(self.settings, s, "HR", index, dense, self.analyzer, pops, measured, extra={
                 "h_run": h["run_id"], "rerank_depth": s.fused_top_k, "rerank_protect": protect, "gate": gate,
                 "reranker": {k: load.get(k) for k in ("model", "revision", "device", "max_length", "max_concurrency",
                                                       "precision", "backend", "layer")}})
@@ -749,7 +764,7 @@ class Runner:
     def _latency(self, s: Settings, index, dense, vectors, model, protect: int) -> dict:
         """Warm reranking latency without the score cache: once alone (sequential) and with LOAD_USERS concurrent
         questions, against the hybrid order without reranking under the same load."""
-        rows = [r for r in self.pops["dev"]["rows"] if ev.is_passage_row(r)]
+        rows = [r for r in self.pops_for(index)["dev"]["rows"] if ev.is_passage_row(r)]
         if not rows:
             return {"p95_alone_ms": None, "p95_loaded_ms": None, "added_p95_ms": 0}
         _raise_on_bypass(ev._execute(s, index, self.analyzer, rows[:1], "hybrid_rerank", dense, vectors, model,
@@ -836,7 +851,8 @@ def value(row: dict, key: str):
     return cur
 
 
-def write_table(settings: Settings, name: str, matrix: dict, rows: list[dict], base: dict, k1: dict) -> dict:
+def write_table(settings: Settings, name: str, matrix: dict, rows: list[dict], base: dict, k1: dict,
+                needs_evidence_review: list[str] | None = None) -> dict:
     columns = [{"key": k, "label": label, "better": better} for k, label, better in COLUMNS.get(name, COLUMNS["lexical"])]
     table = {"version": COMPARE_VERSION, "matrix": name, "title": matrix.get("title", name), "axes": matrix["axes"],
              "fixed": matrix.get("fixed") or {}, "base": base, "columns": columns, "created_at": utcnow(),
@@ -844,7 +860,7 @@ def write_table(settings: Settings, name: str, matrix: dict, rows: list[dict], b
              "populations": {"dev": "development rows on their own documents",
                              "whole": "development questions over all documents plus the needles",
                              "needles": "needle questions over all documents"},
-             "rows": rows}
+             "needs_evidence_review": needs_evidence_review or [], "rows": rows}
     d = compare_dir(settings) / "tables"
     write_text_atomic(d / f"{name}.json", dumps(table))
     write_text_atomic(d / f"{name}.md", table_md(table))
@@ -870,6 +886,11 @@ def table_md(table: dict) -> str:
         lines.append(f"| {r['name']} | {status} | " + " | ".join(_fmt(value(r, c["key"])) for c in cols)
                      + f" | `{r.get('run_id') or '—'}` |")
     lines += ["", "Populations: " + "; ".join(f"{k}: {v}" for k, v in table["populations"].items()) + "."]
+    if table.get("needs_evidence_review"):
+        lost = table["needs_evidence_review"]
+        lines += ["", f"Not verified: {len(lost)} question(s) the served rows are graded on are left out of the "
+                  f"rebuilt rows, because a re-parse replaced the extraction their evidence is pinned to. Review their "
+                  f"evidence again before the rebuilt rows count: {', '.join(f'`{q}`' for q in lost)}."]
     if str(table["fixed"].get("fusion", "")).startswith("keyword_first"):
         lines += ["", "Fusion `keyword_first` keeps the leading BM25 results (its last field, 6) in place, so nDCG@5 "
                   "equals K1's on every hybrid and below-the-head row; the varied axis moves the evidence after them, "
@@ -922,6 +943,7 @@ def golden_counts(settings: Settings) -> dict:
         "live": live, "live_dev_by_family": dev_batches, "pilot_archive": archive, "pilot_archive_error": archive_error,
         "judge_reference": {"items": judge.get("items"), "run_id": judge.get("run_id"),
                             "path": str(manifest.parent) if judge else None},
+        "judge_set": judge_set.counts(settings),
         "development_count": {"live_approved": live_dev, "release_report": 50, "pilot_archive_approved": pilot_dev,
                               "pilot_archive_questions": pilot_questions, "live_sealed_approved": sealed},
         "explanation": (
@@ -958,9 +980,56 @@ def golden_counts_md(r: dict) -> str:
     lines += table(r["pilot_archive"]) if r["pilot_archive"] else [f"Unavailable: {r['pilot_archive_error']}"]
     j = r["judge_reference"]
     lines += ["", "## Judge reference", "", f"{j['items']} reviewed reference verdicts (run `{j['run_id']}`), files "
-              f"under `{j['path']}`." if j["items"] else "No judge reference set.", "",
-              f"## 50 versus {r['development_count']['live_approved']} development rows", "", r["explanation"], ""]
+              f"under `{j['path']}`." if j["items"] else "No judge reference set.", ""]
+    s = r.get("judge_set")
+    lines += ["## Judge set (apart from the development set)", ""]
+    lines += [f"{s['negatives']} mutated negatives and {s['positives']} unmutated positives ({s['items']} items, "
+              f"`{s['version']}`), under `judges/judge-set/`; none of them is a development row.", "",
+              "| mutation | negatives |", "| --- | --- |",
+              *[f"| {k} | {n} |" for k, n in s["by_type"].items()], ""] if s else ["No judge set yet: `judge-set`.", ""]
+    lines += [f"## 50 versus {r['development_count']['live_approved']} development rows", "", r["explanation"], ""]
     return "\n".join(lines)
+
+
+REGRESSION = {"title": "회귀 (유지보수)", "axes": {"index": ["served", "rebuilt"]}, "fixed": {}}
+
+
+def regression(settings: Settings, analyzer, transport, rebuilt: str) -> dict:
+    """The maintenance regression table: K1 and the serving configuration on the served keyword index and on the
+    index maintenance just rebuilt, so drift after new or changed originals shows as rows of one table. Cached
+    cells are reused; when the rebuilt index is the served one, only the served rows exist. Activates nothing."""
+    runner = Runner(settings, analyzer, transport)
+    base = serving_base(settings)
+    k1 = runner.baseline("K1", base)
+    served = base["serving"]["index_version"]
+    rows = []
+    for where, version in [("served", served)] + ([("rebuilt", rebuilt)] if rebuilt != served else []):
+        at = {**base, "serving": {**base["serving"], "index_version": version}}
+        keyword = {**at, "retrieval": "keyword", "analyzer": "kiwi", "embedding": None, "reranker": None,
+                   "rerank_mode": None}
+        for row in [keyword] + ([at] if at["retrieval"] != "keyword" else []):
+            cell = runner.run_row(row, base)
+            if cell.get("status") == "complete" and k1.get("status") == "complete":
+                cell = {**cell, "new_critical_vs_k1": len(set(cell["dev"]["critical_ids"])
+                                                         - set(k1["dev"]["critical_ids"]))}
+            rows.append({"name": f"{where} · {row_label(row)} · {version[:8]}",
+                         "axes": {**{a: row[a] for a in AXES}, "index": where}, "index_version": version, **cell})
+    return write_table(settings, "regression", REGRESSION, rows, base, k1,
+                       needs_evidence_review=lost_to_reparse(runner, served, rebuilt))
+
+
+def lost_to_reparse(runner: "Runner", served: str, rebuilt: str) -> list[str]:
+    """Questions the served index is graded on that the rebuilt one cannot be: their evidence is pinned to an
+    extraction a re-parse replaced. The rebuilt rows leave them out until a person reviews their evidence again,
+    so a comparison that lost any is not a verified one."""
+    from .retrieval import KeywordIndex
+
+    if rebuilt == served:
+        return []
+    before, after = (runner.pops_for(KeywordIndex.load(runner.settings, v)) for v in (served, rebuilt))
+    return sorted({str(s["id"]) for name in ("dev", "corpus") for s in after[name]["skipped"]
+                   if s["reason"] == "evidence_revision_not_active"}
+                  & {str(ev.row_id(r)) for name in ("dev", "corpus") for r in before[name]["rows"]})
 
 
 def run_matrix(settings: Settings, analyzer, transport, matrix: str, only: list[str] | None = None) -> dict:

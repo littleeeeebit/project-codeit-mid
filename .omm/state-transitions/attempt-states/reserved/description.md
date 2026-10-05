@@ -1,0 +1,1 @@
+Inserted by `reserve()` at `max_cost`. It counts as pending against the cap and its envelope.

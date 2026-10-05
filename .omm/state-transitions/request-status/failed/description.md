@@ -1,1 +1,0 @@
-Terminal: `technical_error` (provider, settlement or validation failure) or `clarification_required` (`ServiceError`, a changed frozen-run estimate). Billing may still be `unknown` and need reconciliation.

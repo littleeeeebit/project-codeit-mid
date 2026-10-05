@@ -1,1 +1,0 @@
-`import_manifest` / `read_manifest_csv` normalize CSV rows (`normalize_row`), hash originals (`sha256_file`) and assign `doc_id_for(filename)`. Byte-identical files share one `sources` row while each document keeps its own metadata. `resolve-metadata` records canonical values with a rationale (`resolutions_by_doc`), which then drive filters, ranking and display.

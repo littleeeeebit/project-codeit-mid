@@ -1,1 +1,0 @@
-Terminal. Before dispatch it is free. After dispatch, the call's attempt still settles and the outcome is stored as history, never attached.

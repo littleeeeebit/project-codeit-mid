@@ -1,0 +1,9 @@
+created: 2026-10-05T21:23:59.528Z
+updated: 2026-10-05T21:23:59.529Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: released
+children: []
+parentPath:
+  - attempt-states

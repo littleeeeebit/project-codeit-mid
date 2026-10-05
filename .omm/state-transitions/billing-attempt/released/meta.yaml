@@ -1,9 +1,0 @@
-created: 2026-10-05T09:51:30.361Z
-updated: 2026-10-05T09:51:30.362Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: released
-children: []
-parentPath:
-  - billing-attempt

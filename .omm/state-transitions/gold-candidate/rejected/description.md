@@ -1,1 +1,0 @@
-Needs categories, and a note for `other`. The rejection-wiki page is rendered in the same transaction. A drafter may withdraw their own row only by rejecting it with a note.

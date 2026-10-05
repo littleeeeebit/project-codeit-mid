@@ -1,0 +1,1 @@
+The as-of date is always today (`date.today()` in `api.ask`); DESIGN.md removed the 기준일 control.

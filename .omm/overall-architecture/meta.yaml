@@ -1,9 +1,9 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-05T09:51:13.209Z
-update_count: 12
+updated: 2026-10-05T21:23:45.292Z
+update_count: 14
 last_field: diagram
-git_commit: 3de2dee
-git_branch: automated-comparison-pipeline
+git_commit: 797b897
+git_branch: judge-set-and-maintenance
 children:
   - api-shell
   - budget-ledger
@@ -14,6 +14,7 @@ children:
   - paid-gateway
   - persistence
   - postgresql-store
+  - provider-transport
   - retrieval-engine
   - runtime-artifacts
   - service-core
@@ -21,44 +22,29 @@ children:
   - web-screens
 prev_diagram: "graph TD\r
 
-  \  web_screens[\"Next.js screens\\nweb/src/app\"]\r
+  \  web-screens[\"Web screens\\nweb/src\"] -->|\"typed fetch + X-Member\"|
+  http-api[\"HTTP API\\nsrc/rfp_assistant/api.py\"]\r
 
-  \  http_api[\"FastAPI routes\\nsrc/rfp_assistant/api.py\"]\r
+  \  http-api -->|\"one service call per route\"| service-layer[\"Service
+  layer\\nsrc/rfp_assistant/service.py\"]\r
 
-  \  service_layer[\"Service orchestration\\nsrc/rfp_assistant/service.py\"]\r
+  \  service-layer -->|\"scoped question\"| retrieval-engine[\"Retrieval
+  engine\\nsrc/rfp_assistant/retrieval.py\"]\r
 
-  \  retrieval_engine[\"Retrieval engine\\nsrc/rfp_assistant/retrieval.py\"]\r
-
-  \  paid_gateway[\"Budget ledger and paid
+  \  service-layer -->|\"reserve, dispatch, settle\"| paid-gateway[\"Paid
   gateway\\nsrc/rfp_assistant/budget.py\"]\r
 
-  \  postgresql_store[\"PostgreSQL 18.6 +
-  pgvector\\nsrc/rfp_assistant/postgres.py\"]\r
+  \  retrieval-engine -->|\"vector search, chunk rows\"|
+  postgresql-store[\"PostgreSQL store\\nsrc/rfp_assistant/postgres.py\"]\r
 
-  \  runtime_artifacts[\"Runtime artifact trees\\n.runtime/\"]\r
+  \  service-layer -->|\"requests, audit, gold rows\"| postgresql-store\r
 
-  \  owner_cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"]\r
+  \  paid-gateway -->|\"attempts, advisory lock\"| postgresql-store\r
 
-  \  langfuse_tracing[\"Langfuse tracing\\nsrc/rfp_assistant/tracing.py\"]\r
+  \  offline-pipelines[\"Offline pipelines\\nsrc/rfp_assistant/compare.py\"]
+  -->|\"extractions, indexes, runs\"| postgresql-store\r
 
-  \  web_screens -->|\"JSON over /api/*\"| http_api\r
+  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"] -->|\"runs pipelines\"|
+  offline-pipelines\r
 
-  \  http_api -->|\"one service call per route\"| service_layer\r
-
-  \  service_layer -->|\"scoped question\"| retrieval_engine\r
-
-  \  service_layer -->|\"reserve, dispatch, settle\"| paid_gateway\r
-
-  \  retrieval_engine -->|\"exact vector search\"| postgresql_store\r
-
-  \  retrieval_engine -->|\"verified index files\"| runtime_artifacts\r
-
-  \  paid_gateway -->|\"ledger rows, advisory lock\"| postgresql_store\r
-
-  \  service_layer -->|\"requests, traces, reviews\"| postgresql_store\r
-
-  \  owner_cli -->|\"pipeline and admin\"| service_layer\r
-
-  \  owner_cli -->|\"writes extractions, indexes\"| runtime_artifacts\r
-
-  \  service_layer -.->|\"optional trace export\"| langfuse_tracing"
+  \  owner-cli -->|\"ledger-only admin\"| service-layer"

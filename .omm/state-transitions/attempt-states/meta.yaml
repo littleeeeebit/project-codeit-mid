@@ -1,0 +1,14 @@
+created: 2026-10-05T21:23:58.470Z
+updated: 2026-10-05T21:23:58.680Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: attempt-states
+children:
+  - dispatching
+  - reconciled
+  - released
+  - reserved
+  - settled
+  - unknown
+parentPath: []

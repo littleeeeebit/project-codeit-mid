@@ -1,0 +1,1 @@
+A run killed mid-check leaves `rfp_mrestore_*` behind for the owner to drop by name (documented in `SCRATCH_PREFIX`). The process-wide environment variable is changed temporarily from a background thread.

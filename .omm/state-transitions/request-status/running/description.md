@@ -1,1 +1,0 @@
-Claimed by one worker. Every paid stage first passes `_checkpoint` and the in-transaction `_dispatch_guard`, so `cancel_requested`, `res._closed`, or a status other than running stops the next dispatch.

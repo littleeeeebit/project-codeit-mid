@@ -1,1 +1,0 @@
-`POST /api/ask` (body `AskIn`: at most two scope refs, question, mode) calls `service.ask(res, member, _scope(body.scope), question, mode, date.today().isoformat())`. `service.ask` creates a fresh `generation_id`, uses it as the idempotency key, and returns `{request_id, generation_id, target}`, where `target = target_key(scope, question, mode, as_of)`.

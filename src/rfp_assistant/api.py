@@ -596,6 +596,35 @@ class RequestRef(BaseModel):
     request_id: str
 
 
+class MaintenanceStep(_Read):
+    name: Literal["backup", "restore_check", "ingest", "fidelity", "keyword", "embedding", "regression", "report"]
+    status: Literal["pending", "running", "done", "reused", "skipped", "failed", "needs_approval"]
+    started_at: str | None = None
+    finished_at: str | None = None
+    detail: dict[str, Any] = {}
+    reason: str | None = None
+
+
+class MaintenanceRun(_Read):
+    run_id: str
+    actor: str
+    started_at: str
+    finished_at: str | None = None
+    status: Literal["running", "complete", "unverified", "failed", "needs_approval", "interrupted"]
+    stopped_at: str | None = None
+    reason: str | None = None
+    steps: list[MaintenanceStep]
+    serving: dict[str, Any] | None = None
+    provider_calls: int | None = None
+    reused: bool | None = None
+
+
+class MaintenanceStatus(_Read):
+    running: bool
+    run: MaintenanceRun | None
+    backup_root: str
+
+
 class JudgeReference(_Read):
     run_id: str
     items: int
@@ -618,7 +647,7 @@ class ArmProgress(_Read):
 
 class JudgeRun(_Read):
     run_id: str
-    part: Literal["calibration", "held_out"]
+    part: Literal["calibration", "held_out", "judge_set"]
     created_at: str
     running: bool
     status: str
@@ -629,15 +658,26 @@ class JudgeRun(_Read):
     thresholds_fitted: bool
 
 
+class JudgeSetCounts(_Read):
+    version: str
+    items: int
+    positives: int
+    negatives: int
+    by_type: dict[str, int]
+    by_kind: dict[str, int]
+    set_sha256: str
+
+
 class JudgeOverview(_Read):
     reference: JudgeReference | None
     split: JudgeSplit | None
+    judge_set: JudgeSetCounts | None = None
     rule: dict[str, Any] | None = None
     runs: list[JudgeRun]
 
 
 class JudgePlanIn(BaseModel):
-    part: Literal["calibration", "held_out"]
+    part: Literal["calibration", "held_out", "judge_set"]
 
 
 class PaidPlan(_Read):
@@ -654,7 +694,7 @@ class JevPlan(_Read):
 
 class JudgeEstimate(_Read):
     estimate_id: str
-    part: Literal["calibration", "held_out"]
+    part: Literal["calibration", "held_out", "judge_set"]
     run_id: str
     items: int
     raw_sample: int
@@ -721,6 +761,16 @@ class ReplacementVerdict(_Read):
     rule: dict[str, Any]
 
 
+class MutationRate(_Read):
+    items: int
+    judged: int
+    passed: int
+    code_settled: int
+    rate: float | None = None
+    wilson95: list[float] | None = None
+    measure: str
+
+
 class JudgeResults(_Read):
     run_id: str
     part: str
@@ -731,6 +781,8 @@ class JudgeResults(_Read):
     verdict: ReplacementVerdict | None = None
     thresholds_sha256: str | None = None
     config_hashes: dict[str, str] = {}
+    mutations: dict[str, dict[str, MutationRate]] = {}
+    judge_set_sha256: str | None = None
 
 
 class ArmView(_Read):
@@ -749,6 +801,7 @@ class Disagreement(_Read):
     english: dict[str, Any] | None = None
     untranslatable: str | None = None
     arms: dict[str, ArmView | None]
+    mutation: dict[str, Any] | None = None
 
 
 class Finding(_Read):
@@ -870,6 +923,7 @@ class ExperimentTable(_Read):
     columns: list[ExperimentColumn]
     fixed: dict[str, Any]
     populations: dict[str, str]
+    needs_evidence_review: list[str] = []
     rows: list[ExperimentRow]
 
 
@@ -988,6 +1042,17 @@ def _verify_routes(app: FastAPI) -> None:
     @app.get("/api/verify/judges/disagreements/{run_id}", response_model=list[Disagreement])
     def judge_disagreements(run_id: str, res: Res, member: Member):
         return service.judge_disagreements(res, member, run_id)
+
+    @app.get("/api/verify/maintenance", response_model=MaintenanceStatus)
+    def maintenance_status(res: Res, member: Member):
+        """The maintenance sequence's progress, or the last run's report."""
+        return service.maintenance_status(res, member)
+
+    @app.post("/api/verify/maintenance/start", response_model=Started)
+    def start_maintenance(res: Res, member: Member):
+        """Runs backup, restore check, ingest, fidelity, keyword, embedding and regression once, in order; a paid
+        embedding stops at its estimate. Activates nothing."""
+        return Started(run_id=service.start_maintenance(res, member))
 
     @app.get("/api/verify/experiments", response_model=Experiments)
     def experiments(res: Res, member: Member):

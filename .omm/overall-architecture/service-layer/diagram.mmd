@@ -1,7 +1,0 @@
-graph TD
-  resources["Process resources\nsrc/rfp_assistant/service.py"] -->|"owns executor"| request-runner["Request runner\nsrc/rfp_assistant/service.py"]
-  request-runner -->|"run_queued(request_id)"| answer-orchestrator["Answer orchestrator\nsrc/rfp_assistant/service.py"]
-  verifier-functions["Verifier functions\nsrc/rfp_assistant/service.py"] -->|"vgen idempotent submit"| answer-orchestrator
-  resources -->|"registers threads"| background-jobs["Background jobs\nsrc/rfp_assistant/drafting.py"]
-  background-jobs -->|"submit_drafts batch"| gold-review["Gold review\nsrc/rfp_assistant/gold.py"]
-  verifier-functions -->|"activate_decision"| resources

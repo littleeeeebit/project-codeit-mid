@@ -1,6 +1,0 @@
-graph TD
-  matrix-spec["Matrix spec\nsrc/rfp_assistant/compare.py"] -->|"rows over serving base"| row-cache["Row cache\nsrc/rfp_assistant/compare.py"]
-  row-cache -->|"cache miss"| paid-approval["Paid approval\nsrc/rfp_assistant/compare.py"]
-  paid-approval -->|"approved or local"| measure-populations["Population measurement\nsrc/rfp_assistant/evaluation.py"]
-  measure-populations -->|"scores, run dir"| comparison-tables["Comparison tables\nsrc/rfp_assistant/compare.py"]
-  comparison-tables -->|"person picks row"| activation-gate["Activation gate\nsrc/rfp_assistant/evaluation.py"]

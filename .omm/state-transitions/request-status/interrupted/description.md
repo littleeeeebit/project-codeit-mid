@@ -1,1 +1,0 @@
-Set by a controlled shutdown or by startup recovery under a new gateway owner. It is never re-executed automatically; a dispatching attempt becomes `unknown` through `budget.recover`.

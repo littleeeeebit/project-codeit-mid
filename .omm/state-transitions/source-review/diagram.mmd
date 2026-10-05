@@ -1,6 +1,0 @@
-graph TD
-  quarantined["Quarantined\nsrc/rfp_assistant/ingestion.py"] -->|"recover-source passed"| unreviewed["Unreviewed\nsrc/rfp_assistant/ingestion.py"]
-  unreviewed -->|"fidelity passed"| auto-verified["Auto verified\nsrc/rfp_assistant/fidelity.py"]
-  unreviewed -->|"fidelity differences"| auto-flagged["Auto flagged\nsrc/rfp_assistant/fidelity.py"]
-  auto-flagged -->|"person checks places"| human-reviewed["Human reviewed\nsrc/rfp_assistant/ingestion.py"]
-  auto-verified -->|"new output revision"| unreviewed

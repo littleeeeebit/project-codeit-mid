@@ -1,1 +1,0 @@
-`AskPage.submit` releases any previous request (`/abandon`), POSTs `/api/ask` with `memberHeaders(member)`, and stores `Owned + member` only while `attempt.valid`; otherwise it abandons the new request immediately. A double click is blocked by `pending.current` and `busy`.

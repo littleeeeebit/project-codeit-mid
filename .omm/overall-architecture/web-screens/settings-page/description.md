@@ -1,1 +1,1 @@
-Reads `/api/budget` and PUTs `/api/budget/limit` with `cap_micro_usd` and a reason. That reaches `service.set_budget_limit` -> `budget.set_limit`, which changes the shared cumulative cap while keeping spending and reservations.
+Reads `GET /api/budget` and changes the shared cumulative cap through `PUT /api/budget/limit` (`service.set_budget_limit` → `budget.set_limit`). Spending and reservations are kept. `app-header.tsx` polls `/api/budget` to show the ledger snapshot and only the highest cap warning (`service.visible_warnings`).

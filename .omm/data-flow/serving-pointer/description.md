@@ -1,1 +1,0 @@
-`app_settings.active_run` (JSON serving config) and `active_index`, with the append-only `activations` history. Written only by `activate_decision` and by `build_keyword_index(activate=True)`; read only through `service.active_serving`.

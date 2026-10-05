@@ -1,1 +1,0 @@
-The comparison found differences, recorded with their exact elements, cells and pages in `fidelity_checks.findings_json`. Kept in the operating index, labeled.

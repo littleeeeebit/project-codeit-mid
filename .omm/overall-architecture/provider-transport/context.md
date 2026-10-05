@@ -1,0 +1,1 @@
+README: answers use `gpt-6-luna` with `reasoning_effort: low` and 4,000 max output tokens, reasoning included. The cap was restored on 2026-10-05 after a 2,000-token cap left comparisons with no room after reasoning.
