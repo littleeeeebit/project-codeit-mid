@@ -38,7 +38,7 @@ type Regression = { name: string; dev_ndcg?: number | null; dev_support?: number
   needle_top5?: number | null; dev_critical?: number | null };
 /** What the steps record in `detail` (maintenance.py). */
 type Detail = Partial<{
-  taken_at: string; tables: number; checks: number; checked_at: string; documents: number; changed: { filename: string }[];
+  taken_at: string; tables: number; checks: number; checked_at: string; documents: number; reparsed: number; changed: { filename: string }[];
   checked: number; same_as_served: boolean; index_version: string; served_index_version: string; model: string;
   embedded: number; cost_usd: number; rows: Regression[]; judge_set: { negatives: number; positives: number };
   development_rows: number; estimate: { estimate_id: string; total_micro_usd: number };
@@ -54,10 +54,12 @@ function summary(s: Step): string {
   switch (s.name) {
     case "backup": return s.status === "reused" ? `데이터가 그대로라 ${stamp(d.taken_at)} 백업을 씀` : `새 백업 · 표 ${n(d.tables)}개`;
     case "restore_check": return `검사 ${n(d.checks)}개 통과${s.status === "reused" ? ` · ${stamp(d.checked_at)}에 확인함` : ""}`;
-    case "ingest": return d.changed?.length ? `원문 ${n(d.documents)}개 중 ${d.changed.length}개 새로 읽음: ${d.changed.map((c) => c.filename).join(", ")}` : `원문 ${n(d.documents)}개 모두 그대로`;
+    case "ingest": return d.changed?.length ? `원문 ${n(d.documents)}개 중 ${d.changed.length}개 추출이 바뀜: ${d.changed.map((c) => c.filename).join(", ")}`
+      : `원문 ${n(d.documents)}개 추출 모두 그대로${d.reparsed ? ` (${d.reparsed}개는 입력 설정이 달라 다시 읽었지만 결과가 같음)` : ""}`;
     case "fidelity": return d.checked ? `HWP ${d.checked}개 대조` : "바뀐 HWP 없음";
     case "keyword": return d.same_as_served ? `서비스 중인 색인 ${short(d.index_version)} 그대로` : `새 색인 ${short(d.index_version)} · 서비스 중 ${short(d.served_index_version)} (활성화 전)`;
-    case "embedding": return s.status === "skipped" ? "키워드 검색만 서비스 중" : `${d.model} · 새로 임베딩 ${n(d.embedded ?? 0)}개 · ${d.cost_usd ? `$${d.cost_usd}` : "무료"}`;
+    case "embedding": return s.status === "skipped" ? "키워드 검색만 서비스 중"
+      : s.status === "reused" ? `${d.model} · 새 청크 없음` : `${d.model} · 새로 임베딩 ${n(d.embedded ?? 0)}개 · ${d.cost_usd ? `$${d.cost_usd}` : "무료"}`;
     case "regression": return `${d.rows?.length ?? 0}행 · 실험 비교의 '회귀 (유지보수)' 표`;
     case "report": return d.judge_set ? `개발 세트 ${n(d.development_rows)}행 · 판정 골든 세트 오답 ${n(d.judge_set.negatives)} / 정답 ${n(d.judge_set.positives)}` : `개발 세트 ${n(d.development_rows)}행`;
   }

@@ -75,7 +75,7 @@ def references(conn):
     return found
 
 
-def _run(program, target, args, log_dir):
+def _run(program, target, args, log_dir, options=""):
     binary = shutil.which(program)
     if not binary:
         directory = Path(os.environ.get("RFP_PG_BIN", "C:/Program Files/PostgreSQL/18/bin"))
@@ -90,6 +90,8 @@ def _run(program, target, args, log_dir):
             raise ValueError(f"unsupported backup DSN option {key}")
         if key in mapping:
             environment[mapping[key]] = value
+    if options:
+        environment["PGOPTIONS"] = f"{environment.get('PGOPTIONS', '')} {options}".strip()
     result = subprocess.run([binary, *args], env=environment, capture_output=True, timeout=600)
     if result.returncode:
         store.write_bytes_atomic(log_dir / f"{program}-failure.log", result.stderr)
@@ -189,7 +191,10 @@ def restore_check(settings, manifest_path, staging=None):
         try:
             _run("pg_restore", target, ["--no-owner", "--no-privileges", "--exit-on-error", "--single-transaction",
                                        "--exclude-schema=bidmate_recovery",
-                                       "--dbname=" + conninfo_to_dict(target.dsn())["dbname"], str(dump)], manifest_path.parent)
+                                       "--dbname=" + conninfo_to_dict(target.dsn())["dbname"], str(dump)], manifest_path.parent,
+                 # A parallel HNSW build asks for a dynamic shared-memory segment as large as maintenance_work_mem,
+                 # which the container's default 64 MB /dev/shm cannot hold; serial builds use local memory.
+                 options="-c max_parallel_maintenance_workers=0")
             _disable_restored_control(raw)
             with store.database_lifecycle(target), store.open_db(target) as conn:
                 actual = _table_manifest(conn.raw)

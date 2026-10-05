@@ -149,10 +149,19 @@ def step_restore_check(settings: Settings, ctx: dict, **_) -> dict:
 
 
 def step_ingest(settings: Settings, ctx: dict, **_) -> dict:
-    """Imports the manifest, then parses every original whose bytes, parser or inputs changed; the rest is reused."""
+    """Imports the manifest, then parses every original whose bytes, parser or inputs changed; the rest is reused.
+    An original counts as changed only when its active extraction differs afterwards: a re-parse whose output is
+    identical keeps its extraction (and its review), so nothing downstream changes."""
     from . import ingestion, store
 
     store.init_schema(settings.db_path)
+
+    def active() -> dict:
+        with open_db(settings.db_path) as conn:
+            return {r[0]: (r[1], r[2]) for r in conn.execute(
+                "SELECT source_hash, active_extraction_id, parse_status FROM sources")}
+
+    before = active()
     manifest = ingestion.import_manifest(settings)
     results = ingestion.ingest(settings)
     ingestion.write_ingest_report(settings, results)
@@ -160,9 +169,11 @@ def step_ingest(settings: Settings, ctx: dict, **_) -> dict:
     if errors:
         raise StepFailed(f"{len(errors)} originals failed to parse: "
                          + "; ".join(f"{r['filename']}: {r.get('reason')}" for r in errors)[:400])
-    changed = {r["source_hash"]: r for r in results if not r.get("reused") and r["status"] != "recovered"}
+    after = active()
+    changed = {r["source_hash"]: r for r in results if before.get(r["source_hash"]) != after.get(r["source_hash"])}
     ctx["changed_sources"] = sorted(changed)
     return {"status": "done" if changed else "reused", "documents": len(results),
+            "reparsed": sum(not r.get("reused") and r["status"] != "recovered" for r in results),
             "changed": [{"filename": r["filename"], "status": r["status"]} for r in changed.values()],
             "audit_differences": manifest.get("audit_differences") or {}}
 
@@ -226,7 +237,9 @@ def step_embedding(settings: Settings, ctx: dict, transport, **_) -> dict:
             raise NeedsApproval(est, f"{s.embedding_model}: new chunks need a paid embedding of at most "
                                      f"${est['total_micro_usd'] / 1e6:.4f}; approve estimate {est['estimate_id']}")
         raise StepFailed(str(facts.get("error") or "the embedding build stopped"))
-    return {"status": "reused" if existing else "done", "model": s.embedding_model, "dense_version": dense.version,
+    if existing:  # the facts describe the vector set's original build, not this run
+        return {"status": "reused", "model": s.embedding_model, "dense_version": dense.version}
+    return {"model": s.embedding_model, "dense_version": dense.version,
             "embedded": facts.get("embedded"), "cost_usd": round((facts.get("settled_micro_usd") or 0) / 1e6, 6)}
 
 
