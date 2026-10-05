@@ -139,6 +139,48 @@ class FollowUpTest(Base):
                 self.assertIn(shown, self.asked(rewrite)["conversation"][0]["answer"])
                 self.assertIn(shown, self.asked(answer)["conversation"][0]["answer"])
 
+    def test_a_generated_conflict_answer_can_be_followed_up_with_its_documents_labelled_by_coverage(self):
+        def conflict(messages):  # documents named only inside conflict alternatives, others only as missing
+            ev = json.loads(messages[-1]["content"])["evidence"]
+            docs = list(dict.fromkeys(e["doc_id"] for e in ev))
+            self.assertGreaterEqual(len(docs), 2)
+            first = {d: next(e["evidence_id"] for e in ev if e["doc_id"] == d) for d in docs}
+            body = {"status": "conflicting_evidence", "summary": "값이 다릅니다.", "summary_evidence_ids": [first[docs[0]]],
+                    "claims": [], "next_action": "발주처에 확인하세요.",
+                    "conflicts": [{"field": "하자보수 기간", "alternatives": [
+                        {"doc_id": d, "value": f"{n}년", "evidence_ids": [first[d]]} for n, d in enumerate(docs[:2], 1)]},
+                    ],
+                    "missing_fields": [{"doc_id": d, "field": "착수일", "reason": "not_found_in_context"}
+                                       for d in docs[1:]]}
+            return ProviderResponse(json.dumps(body, ensure_ascii=False), None, "stop",
+                                    {"prompt_tokens": 100, "completion_tokens": 50}, str(uuid.uuid4()))
+        self.transport.responder = conflict
+        first = self.turn("제안요청서 사업 안내", scope=[], mode="corpus")
+        self.assertEqual(first.status, "conflicting_evidence", first.error)
+        # The fixture indexes two documents; a third covered document, missing only, completes the reviewed shape:
+        # A and B only inside the conflict, B and C as missing fields
+        first.coverage.append({"doc_id": "doc-c", "evidence": 1})
+        first.missing_fields.append({"doc_id": "doc-c", "field": "착수일", "reason": "not_found_in_context"})
+        with store.open_db(self.env.settings.db_path) as conn, store.tx(conn, immediate=True):
+            conn.execute("UPDATE requests SET result_json = ? WHERE request_id = ?",
+                         (json.dumps(asdict(first), ensure_ascii=False), first.request_id))
+        order = [c["doc_id"] for c in first.coverage]
+        self.transport.responder = generation._echo_first_evidence
+        client = TestClient(api.create_app(self.res))
+        with client:
+            follow = client.post("/api/ask", headers={"X-Member": quote("c1")}, json={
+                "scope": [], "question": "두 번째 값은 어느 문서인가요?", "mode": "corpus",
+                "previous_request_id": first.request_id})
+        self.assertEqual(follow.status_code, 200, follow.text)
+        history = service._answer_text(asdict(first))
+        a, b = order.index(first.conflicts[0]["alternatives"][0]["doc_id"]), \
+            order.index(first.conflicts[0]["alternatives"][1]["doc_id"])
+        self.assertIn(f"하자보수 기간: 문서 {a + 1} 1년 / 문서 {b + 1} 2년", history)
+        self.assertIn("문서 3 착수일: 확인되지 않음", history)
+        compare = {"mode": "compare", "summary": "s", "coverage": [{"doc_id": "x"}, {"doc_id": "y"}],
+                   "claims": [{"doc_id": "y", "text": "y의 기간은 3개월입니다."}]}
+        self.assertIn("문서 2 y의 기간은 3개월입니다.", service._answer_text(compare))  # as the screen groups them
+
     def test_carried_evidence_follows_the_fresh_evidence_once_and_only_while_it_is_indexed(self):
         chunks = self.res.index().chunks
         unit = lambda i, chunk: EvidenceUnit(f"E{i}", "doc", "h", chunk["extraction_id"], chunk["chunk_id"],

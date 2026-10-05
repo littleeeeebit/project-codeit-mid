@@ -821,10 +821,15 @@ def _answer_text(result: dict) -> str:
     """An earlier answer as the screen showed it, for the conversation context: the summary and sentences, then the
     metadata values, conflicting values, requirement rows in their displayed order, and what was not found. A
     follow-up may refer to any of these ("방금 나온 금액", "세 번째 요구사항")."""
-    docs = list(dict.fromkeys(x["doc_id"] for k in ("facts", "conflicts", "missing_fields")
-                              for x in result.get(k) or [] if x.get("doc_id")))
+    # Labels follow the screen (coverage order, as docLabel), then any other document the answer refers to; a
+    # conflict names its documents only inside its alternatives
+    docs = list(dict.fromkeys(x["doc_id"] for x in [
+        *(result.get("coverage") or []), *(result.get("claims") or []), *(result.get("facts") or []),
+        *(a for c in result.get("conflicts") or [] for a in c.get("alternatives") or []),
+        *(result.get("missing_fields") or [])] if x.get("doc_id")))
     side = (lambda d: f"문서 {docs.index(d) + 1} ") if len(docs) > 1 else (lambda d: "")
-    lines = [result.get("summary") or "", *(c["text"] for c in result.get("claims") or [])]
+    claim_side = side if result.get("mode") == "compare" else (lambda d: "")  # as the screen groups them
+    lines = [result.get("summary") or "", *(claim_side(c["doc_id"]) + c["text"] for c in result.get("claims") or [])]
     def shown(v) -> str:  # dates are stored as {precision, value}
         return "-" if v is None else str(v["value"] if isinstance(v, dict) and "value" in v else v)
 
