@@ -202,7 +202,7 @@ class LedgerAndCacheTest(unittest.TestCase):
                                               profile="fixed-512-64", activate=False)
         limits = {"fusion": "keyword_first", "rrf_k": 60, "dense_weight": 1.0, "keyword_head": 6, "channel_top_k": 40,
                   "fused_top_k": 50, "evidence_max_units": 10, "evidence_target_tokens": 3500,
-                  "evidence_max_tokens": 5000, "dense_search": "exact", "hnsw_ef_search": 100}
+                  "evidence_max_tokens": 5000, "dense_search": "hnsw", "hnsw_ef_search": 200}
         cfg = {"mode": "hybrid", "run_id": "H-x", "index_version": built["index_version"],
                "embedding": {"model": "nlpai-lab/KURE-v1", "dims": 1024}, "limits": limits}
         with mock.patch.object(service, "active_serving", return_value=cfg):
@@ -214,11 +214,26 @@ class LedgerAndCacheTest(unittest.TestCase):
         self.assertEqual((index.version, index.profile), (built["index_version"], "fixed-512-64"))
         s = compare.row_settings(self.env.settings, rows[0])
         self.assertEqual((s.channel_top_k, s.evidence_target_tokens, s.evidence_max_tokens), (40, 3500, 5000))
-        varied = compare.row_settings(self.env.settings, {**rows[0], "units": 6})  # a varied axis derives its own
-        self.assertEqual((varied.channel_top_k, varied.evidence_max_tokens), (50, 3200))
-        # Cell keys hash the axes only, so a row's key is the same with or without the serving record beside them.
-        self.assertEqual(compare._cell_key(rows[0], index, {}, {}),
-                         compare._cell_key({**rows[0], "serving": None}, index, {}, {}))
+        # Varying units derives only the evidence limits; depth, fusion and search stay as the run recorded them.
+        varied = compare.row_settings(self.env.settings, {**rows[0], "units": 6})
+        self.assertEqual((varied.evidence_max_units, varied.evidence_target_tokens, varied.evidence_max_tokens,
+                          varied.channel_top_k, varied.fused_top_k, varied.rrf_k, varied.dense_search,
+                          varied.hnsw_ef_search), (6, 2400, 3200, 40, 50, 60, "hnsw", 200))
+        deeper = compare.row_settings(self.env.settings, {**rows[0], "depth": 30})
+        self.assertEqual((deeper.channel_top_k, deeper.fused_top_k, deeper.evidence_max_tokens), (30, 30, 5000))
+
+    def test_a_cell_key_changes_with_every_effective_search_limit(self):
+        row = compare.matrix_rows(compare.MATRICES["embedding"], BASE)[1]
+        index = types.SimpleNamespace(manifest_hash="m")
+
+        def key(**limits):
+            runner = types.SimpleNamespace(settings=self.env.settings.with_(**limits), pops={},
+                                           index=lambda profile, serving=None: index)
+            return compare.Runner.row_key(runner, row)[0]
+
+        exact = key(dense_search="exact")
+        self.assertEqual(exact, key(dense_search="exact"))
+        self.assertEqual(len({exact, key(dense_search="hnsw"), key(dense_search="hnsw", hnsw_ef_search=200)}), 3)
 
     def test_serving_retires_gpu_models_the_activated_configuration_no_longer_uses(self):
         from rfp_assistant import service

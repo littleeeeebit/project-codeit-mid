@@ -47,11 +47,14 @@ MATRICES: dict[str, dict] = {
                  "fixed": {"retrieval": "hybrid_rerank"}},
 }
 SERVING_HYBRID = ("embedding", "fusion", "depth", "units")
-# The activated run's recorded limits a row keeps while its fusion, depth and units are the serving ones; a row that
-# varies one of them derives its limits from the row instead.
-SERVING_LIMITS = ("fusion", "rrf_k", "dense_weight", "keyword_head", "channel_top_k", "fused_top_k",
-                  "evidence_max_units", "evidence_target_tokens", "evidence_max_tokens", "dense_search",
-                  "hnsw_ef_search")
+# The limits each axis derives. A row keeps the activated run's recorded value of every limit whose axis it leaves at
+# the serving value, so varying one axis never moves another's limits; the search limits belong to no axis and always
+# come from the serving run.
+AXIS_LIMITS = {"fusion": ("fusion", "rrf_k", "dense_weight", "keyword_head"),
+               "depth": ("channel_top_k", "fused_top_k"),
+               "units": ("evidence_max_units", "evidence_target_tokens", "evidence_max_tokens")}
+UNTIED_LIMITS = ("dense_search", "hnsw_ef_search")
+SERVING_LIMITS = tuple(k for keys in AXIS_LIMITS.values() for k in keys) + UNTIED_LIMITS
 AXES = ("profile", "analyzer", "retrieval", "embedding", "fusion", "reranker", "rerank_mode", "units", "depth")
 COLUMNS = {  # (key, label, better: "high" | "low" | None) in display order
     "lexical": [("dev.ndcg", "nDCG@5 (dev)", "high"), ("dev.support", "complete support (dev)", "high"),
@@ -172,8 +175,10 @@ def row_settings(settings: Settings, row: dict) -> Settings:
         changes.update(reranker_model=r.key, reranker_revision=r.revision, reranker_max_length=r.max_length,
                        reranker_precision=r.precision)
     served = row.get("serving") or {}
-    if served.get("limits") and all(row[a] == served.get(a) for a in ("fusion", "depth", "units")):
-        changes.update(served["limits"])
+    recorded = served.get("limits") or {}
+    keep = list(UNTIED_LIMITS) + [k for axis, keys in AXIS_LIMITS.items() if row[axis] == served.get(axis)
+                                  for k in keys]
+    changes.update({k: recorded[k] for k in keep if k in recorded})
     return settings.with_(**changes)
 
 
@@ -547,6 +552,10 @@ def failure_reason(exc: BaseException) -> str:
     return f"{name}: {(str(exc).splitlines() or [''])[0]}"[:300]
 
 
+def limits_identity(s: Settings) -> dict:
+    return {k: getattr(s, k) for k in SERVING_LIMITS}
+
+
 def _cell_key(row: dict, index, pops: dict, extra: dict) -> str:
     row = {a: row.get(a) for a in AXES}  # what the serving base adds besides axes enters through index and extra
     return hashlib.sha256(dumps({"v": COMPARE_VERSION, "eval": ev.EVAL_VERSION, "row": row,
@@ -611,9 +620,8 @@ class Runner:
     def row_key(self, row: dict) -> tuple[str, Settings, object]:
         s = row_settings(self.settings, row)
         index = self.index(row["profile"], row.get("serving"))
-        derived = row_settings(self.settings, {**row, "serving": None})
-        extra_key = {"limits": {k: getattr(s, k) for k in SERVING_LIMITS}} if any(
-            getattr(s, k) != getattr(derived, k) for k in SERVING_LIMITS) else {}
+        # Every limit the row executes with is part of its identity, whatever the process defaults are.
+        extra_key = {"limits": limits_identity(s)}
         extra_key |= {"embedding": ev.embedding_identity(s) if row.get("embedding") else None,
                      "reranker": [s.reranker_model, s.reranker_revision, s.reranker_max_length, s.reranker_precision]
                      if row.get("reranker") else None}
