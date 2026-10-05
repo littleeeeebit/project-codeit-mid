@@ -462,7 +462,9 @@ def shared_budget(ctx: Context) -> dict:
 
 @flow("budget-recovery")
 def budget_recovery(ctx: Context) -> dict:
-    return {"reconciliation": ctx.unit("reconciliation-tests", ["tests.test_service.ReconciliationTest"])}
+    return {"reconciliation": ctx.unit("reconciliation-tests", [
+        "tests.test_service.ReconciliationTest",
+        "tests.test_release.BackupRestoreTest.test_budget_report_reads_the_ledger_without_a_key_gateway_or_provider"])}
 
 
 def pick_documents(ctx: Context, corpus: dict) -> tuple[str, str]:
@@ -516,6 +518,8 @@ def repository_gates(ctx: Context) -> dict:
     gate = (code == 0, unittest_summary(out, code))
     code, out = ctx.cli("phase4-gate", ["check", "--phase", "4", "--provider", "fake"])
     gate4 = (code == 0, unittest_summary(out, code))
+    code, out = ctx.cli("phase5-gate", ["check", "--phase", "5", "--provider", "fake"])
+    gate5 = (code == 0, unittest_summary(out, code))
     code, out = ctx.run("full-suite", [ctx.python, "-B", "-m", "unittest", "discover", "-s", "tests", "-t", "."])
     suite = (code == 0, unittest_summary(out, code))
     npm = shutil.which("npm")
@@ -524,7 +528,7 @@ def repository_gates(ctx: Context) -> dict:
         code, out = ctx.run(f"web-{script}", [npm, "run", script], 600, cwd=REPO / "web") if npm else (-1, "")
         web.append(f"{script} exit {code}" + (f": {out.strip()[-200:]}" if code else ""))
     checks = (bool(npm) and all(w.endswith("exit 0") for w in web), "; ".join(web) if npm else "npm is not on PATH")
-    return {"whitespace": whitespace, "phase3-gate": gate, "phase4-gate": gate4, "full-suite": suite,
+    return {"whitespace": whitespace, "phase3-gate": gate, "phase4-gate": gate4, "phase5-gate": gate5, "full-suite": suite,
             "web-checks": checks}
 
 
