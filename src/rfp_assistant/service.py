@@ -1083,44 +1083,18 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
 def _prepare_compare(res: Resources, principal: Principal, question: str, docs: list[dict], as_of: str,
                      request_id: str | None, allow_paid: bool = True, mode: str | None = None,
                      limits: dict | None = None, price_query_embedding: bool = True) -> dict:
-    """One scoped subquery per selected document (the same question; no paid rewriting). Each starts with up to
-    three evidence units and half the evidence target; unused room is redistributed only after both had a
-    coverage attempt, and the global ceiling still holds. Each side reports evidence or its limitation.
-    `mode` and narrowing `limits` (a verifier configuration) apply to both sides and to the global ceiling."""
-    s = res.run_settings()
-    s = s.with_(**_narrow_limits(s, limits))
-    if s.evidence_max_units < 2:
-        raise ServiceError("두 문서 비교는 근거 단위 한도가 2개 이상이어야 합니다(문서마다 1개 이상).")
-    half_units = s.evidence_max_units // 2
-    target, ceiling = s.evidence_target_tokens, s.evidence_max_tokens
-    depth = {"channel_top_k": s.channel_top_k, "fused_top_k": s.fused_top_k}
-    first = {**depth, "evidence_max_units": half_units, "evidence_target_tokens": max(1, target // 2),
-             "evidence_max_tokens": max(1, ceiling // 2)}
+    """One scoped subquery per selected document (the same question; no paid rewriting), each with the limits a
+    single-document question gets, exactly as `evaluation._execute` measures a comparison row. Halving them per side
+    served less than the retrieval gate measured (refresh50-ad-migration-design packed 4 of 13 groups while the gate
+    recorded it complete). Each side reports evidence or its limitation. `mode` and narrowing `limits` (a verifier
+    configuration) apply to both sides."""
     sides: dict[str, RetrievalResult | None] = {}
     for d in docs:
         if d["parse_status"] != "parsed" or not _indexed(res, d["active_extraction_id"]):
             sides[d["doc_id"]] = None
             continue
         sides[d["doc_id"]] = retrieve(res, principal, question, [DocRef(d["doc_id"], d["active_source_hash"])],
-                                      request_id=request_id, allow_paid=allow_paid, limits=first, mode=mode)
-    used = lambda: sum(r.evidence_tokens for r in sides.values() if r)  # noqa: E731
-    units = lambda: sum(len(r.evidence) for r in sides.values() if r)  # noqa: E731
-    for d in docs:  # second pass: a side that was cut by its half budget may use what the other left
-        r = sides[d["doc_id"]]
-        if r is None or not any(x["reason"] in ("token_budget", "unit_limit") for x in r.excluded):
-            continue
-        spare_tokens, spare_units = target - used(), s.evidence_max_units - units()
-        if spare_tokens <= 0 and spare_units <= 0:
-            continue
-        others = used() - r.evidence_tokens
-        wider = {**depth, "evidence_max_units": len(r.evidence) + max(0, spare_units),
-                 "evidence_target_tokens": max(1, r.evidence_tokens + max(0, spare_tokens)),
-                 "evidence_max_tokens": max(1, ceiling - others)}
-        wider["evidence_target_tokens"] = min(wider["evidence_target_tokens"], wider["evidence_max_tokens"])
-        again = retrieve(res, principal, question, [DocRef(d["doc_id"], d["active_source_hash"])],
-                         request_id=request_id, allow_paid=allow_paid, limits=wider, mode=mode)
-        if len(again.evidence) >= len(r.evidence) and used() - r.evidence_tokens + again.evidence_tokens <= ceiling:
-            sides[d["doc_id"]] = again
+                                      request_id=request_id, allow_paid=allow_paid, limits=limits, mode=mode)
     evidence: list[EvidenceUnit] = []
     coverage, limitations, candidates, excluded, ranking = [], [], [], [], []
     timings: dict[str, float] = {}
@@ -1142,8 +1116,6 @@ def _prepare_compare(res: Resources, principal: Principal, question: str, docs: 
             timings[k] = round(timings.get(k, 0) + v, 1)
         query_embedding = query_embedding or r.query_embedding
     total = sum(e.token_count for e in evidence)
-    if total > ceiling or len(evidence) > s.evidence_max_units:  # defensive: the global limits hold after expansion
-        raise ServiceError("비교 근거가 전체 한도를 넘었습니다. 질문을 좁혀 주세요.")
     first_r = next((r for r in sides.values() if r), None)
     merged = RetrievalResult(
         mode=first_r.mode if first_r else (mode or res.serving()["mode"]), scope=[DocRef(d["doc_id"], d["active_source_hash"])

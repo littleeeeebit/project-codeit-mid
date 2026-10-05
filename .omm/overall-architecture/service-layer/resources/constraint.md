@@ -1,0 +1,1 @@
+`threading._register_atexit(stop)` makes `close()` run before `concurrent.futures` joins its workers, so workers see the stop before their next paid stage. A weak method avoids keeping the index alive.

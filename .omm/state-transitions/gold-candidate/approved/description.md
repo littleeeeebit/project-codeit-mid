@@ -1,0 +1,1 @@
+Set by `gold.decide` (first decision wins, `expected_sha` must match, note required, reviewer must differ from the drafter, the drafting model and the drafting-run requester, and gold-2 rows need `original_inspected`). It records the source context and rewrites `datasets/<dataset>.jsonl` from the database.

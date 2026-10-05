@@ -1,15 +1,29 @@
-created: 2026-10-04T13:34:55.112Z
-updated: 2026-10-04T13:34:55.367Z
-update_count: 2
+created: 2026-10-04 13:34:55.112000+00:00
+updated: 2026-10-05 04:06:34.698000+00:00
+update_count: 6
 last_field: diagram
-git_commit: 95e8dc5
-git_branch: main
+git_commit: 4d8c212
+git_branch: close-answer-failures-phase5-runner-lint
 children:
-  - activation
-  - csv-manifest
-  - dense-build
-  - fidelity-check
-  - ingestion
-  - keyword-build
-  - ocr-merge
-  - retrieval-evaluation
+- activation
+- corpus-ingestion
+- dense-build
+- extraction
+- fidelity-check
+- gold-evaluation
+- index-build
+- ocr-merge
+- original-corpus
+- retrieval-selection
+- serving-resources
+prev_diagram: "graph TD\r\n  csv-manifest[\"CSV manifest and originals\\nsrc/rfp_assistant/ingestion.py\"\
+  ] -->|\"documents and sources rows\"| extraction[\"Parse HWP/PDF, merge OCR\\nsrc/rfp_assistant/ingestion.py\"\
+  ]\r\n  extraction -->|\"printed PDF comparison\"| fidelity-check[\"Fidelity check\\\
+  nsrc/rfp_assistant/fidelity.py\"]\r\n  extraction -->|\"active extractions\"| keyword-build[\"\
+  Chunk and BM25 index\\nsrc/rfp_assistant/retrieval.py\"]\r\n  fidelity-check -->|\"\
+  review status filter\"| keyword-build\r\n  keyword-build -->|\"chunk payloads\"\
+  | dense-build[\"Embeddings into pgvector\\nsrc/rfp_assistant/dense.py\"]\r\n  keyword-build\
+  \ -->|\"index version\"| retrieval-runs[\"Frozen retrieval runs\\nsrc/rfp_assistant/evaluation.py\"\
+  ]\r\n  dense-build -->|\"dense set version\"| retrieval-runs\r\n  retrieval-runs\
+  \ -->|\"owner decision file\"| serving-config[\"Serving configuration\\nsrc/rfp_assistant/service.py\"\
+  ]"

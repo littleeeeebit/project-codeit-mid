@@ -1,0 +1,1 @@
+Set by `ingest_source` when the HWP converter or PDF parser fails and no Hancom print can stand in. `parse_status='quarantined'`, `review_status='needs_recovery'`, with a `reason_code` that screens show through `QUARANTINE_TEXT`. Paid answers on such a document return `ingestion_unavailable`. The way out is `recover-source` with an approved PDF conversion and a passed comparison.

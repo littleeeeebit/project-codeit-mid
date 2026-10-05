@@ -1,0 +1,1 @@
+`submit_answer` fills an `admitted` list that nothing reads. If `_create`'s transaction fails after `admit()` acquired a slot (for example a database error at INSERT), the exception skips `runner.release()` and the slot stays taken until restart. Each leak lowers the 12-slot admission bound. This is observed in the code; how often it happens in operation is unknown.

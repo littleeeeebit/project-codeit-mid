@@ -1,0 +1,1 @@
+README records the served run H-0fffb2a6ec: BM25 top 6 kept in order, the rest by weighted RRF (k 60, dense weight 1.0), 50 candidates per channel, 10 evidence units. HNSW did not reach recall@20 0.99 on scoped questions, so exact search serves.

@@ -189,7 +189,8 @@ def price_row(pinned: PinnedResources, row: dict) -> dict:
     tokens = prep["input_tokens"]
     if qe.get("cache") == "miss":
         s = pinned.run_settings()
-        tokens += max(0, s.evidence_max_tokens - r.evidence_tokens)
+        sides = len(docs) if row.get("mode") == "compare" else 1  # each compared document has its own ceiling
+        tokens += max(0, s.evidence_max_tokens * sides - r.evidence_tokens)
         bound = budget.estimate(pinned.settings.db_path, pinned.settings.generation_model, tokens,
                                 pinned.settings.generation_max_output_tokens)
         bound += prep["estimate_micro_usd"] - budget.estimate(
@@ -215,7 +216,11 @@ def _ledger(settings: Settings, purpose: str = "gold_eval") -> dict:
 
 
 def _plan_inputs(settings: Settings, action: str, dataset: str | None, run_ids: list[str] | None,
-                 freeze_id: str | None) -> dict:
+                 freeze_id: str | None, question_ids: list[str] | None = None) -> dict:
+    """`question_ids` narrows a development run to those rows (e.g. a rerun of earlier failures); the finalists are
+    still checked against the whole population and the subset is part of the run identity."""
+    if question_ids and action != "answer-finalists":
+        raise AnswerEvalError("--question-id narrows only an answer-finalists run; the sealed set always runs whole")
     if action == "answer-finalists":
         if dataset not in ("dev",):
             raise AnswerEvalError("answer finalists are compared on the reviewed development split (`dev`)")
@@ -223,6 +228,13 @@ def _plan_inputs(settings: Settings, action: str, dataset: str | None, run_ids: 
         population = evaluation.population_identity(rows, skipped)
         finalists = _retrieval_finalists(settings, dataset, population, run_ids)
         extra = {}
+        if question_ids:
+            wanted = sorted(set(question_ids))
+            unknown = set(wanted) - {r["question_id"] for r in rows}
+            if unknown:
+                raise AnswerEvalError(f"not reviewed {dataset} rows: {', '.join(sorted(unknown))}")
+            rows = [r for r in rows if r["question_id"] in wanted]
+            extra = {"question_ids": wanted}
     elif action == "sealed":
         from . import sealed
 
@@ -241,17 +253,19 @@ def _plan_inputs(settings: Settings, action: str, dataset: str | None, run_ids: 
         raise AnswerEvalError(f"no independently reviewed {dataset} rows to evaluate")
     run_id = _identity(settings, action, dataset, sha, population, finalists, extra)
     return {"action": action, "dataset": dataset, "dataset_sha256": sha, "population_sha256": population,
-            "rows": rows, "skipped": skipped, "finalists": finalists, "run_id": run_id, "freeze_id": freeze_id}
+            "rows": rows, "skipped": skipped, "finalists": finalists, "run_id": run_id, "freeze_id": freeze_id,
+            "question_ids": extra.get("question_ids")}
 
 
 def plan_run(settings: Settings, action: str, dataset: str | None = None, run_ids: list[str] | None = None,
-             freeze_id: str | None = None, *, store: bool = True, post_test: bool = False) -> dict:
+             freeze_id: str | None = None, *, store: bool = True, post_test: bool = False,
+             question_ids: list[str] | None = None) -> dict:
     """Estimates every attempt a run could still make (generation, uncached query embeddings; no paid judge is
     planned) before anything is dispatched. The stored estimate binds the configuration, prices and per-row token
     counts; any change requires a new plan. Rows a run already completed are not priced again."""
     if action == "latency":
         return plan_latency(settings, store=store)
-    inputs = _plan_inputs(settings, action, dataset, run_ids, freeze_id)
+    inputs = _plan_inputs(settings, action, dataset, run_ids, freeze_id, question_ids)
     run_id = inputs["run_id"]
     if action == "sealed":
         from . import sealed
@@ -277,6 +291,7 @@ def plan_run(settings: Settings, action: str, dataset: str | None = None, run_id
         "estimate_id": uuid.uuid4().hex[:12], "action": action, "dataset": inputs["dataset"], "run_id": run_id,
         "freeze_id": freeze_id, "post_test_regression": post_test,
         "finalists": [f["run_id"] for f in inputs["finalists"]], "rows": len(inputs["rows"]),
+        "question_ids": inputs["question_ids"],
         "skipped": inputs["skipped"], "attempts_planned": sum(1 for p in per_row if not p["done"]
                                                              and p["max_micro_usd"]),
         "rows_remaining": remaining, "max_micro_usd": to_spend, "max_micro_usd_all_rows": total,
@@ -319,7 +334,8 @@ def recheck(settings: Settings, est: dict) -> dict:
         again = plan_latency(settings, est["waves"], est["users"], store=False)
     else:
         again = plan_run(settings, est["action"], est["dataset"], est["finalists"] if est["action"] != "sealed"
-                         else None, est.get("freeze_id"), store=False, post_test=est.get("post_test_regression", False))
+                         else None, est.get("freeze_id"), store=False, post_test=est.get("post_test_regression", False),
+                         question_ids=est.get("question_ids"))
     if again["fingerprint"] != est["fingerprint"]:
         raise AnswerEvalError("the configuration, prices or token counts changed since the estimate; run plan-run "
                               "again and review the new maximum")
@@ -356,7 +372,8 @@ def begin_answers(settings: Settings, estimate_id: str, actor: str, post_test_re
         raise AnswerEvalError("run-answers executes answer-finalists or sealed estimates; latency uses latency-run")
     recheck(settings, est)
     inputs = _plan_inputs(settings, est["action"], est["dataset"],
-                          est["finalists"] if est["action"] != "sealed" else None, est.get("freeze_id"))
+                          est["finalists"] if est["action"] != "sealed" else None, est.get("freeze_id"),
+                          est.get("question_ids"))
     run_id = est["run_id"]
     if est["action"] == "sealed":
         from . import sealed
@@ -372,7 +389,8 @@ def begin_answers(settings: Settings, estimate_id: str, actor: str, post_test_re
         "max_output_tokens": settings.generation_max_output_tokens, "freeze_id": est.get("freeze_id"),
         "label": "post-test regression" if est.get("post_test_regression") else (
             "sealed test" if est["action"] == "sealed" else "development finalists"),
-        "skipped": inputs["skipped"], "rows": len(inputs["rows"]), "created_at": utcnow(), "estimates": [],
+        "skipped": inputs["skipped"], "rows": len(inputs["rows"]), "question_ids": inputs["question_ids"],
+        "created_at": utcnow(), "estimates": [],
         "provenance": {"code": evaluation.code_fingerprint(), "hardware": evaluation.hardware(),
                        "metric_code_sha256": evaluation.metric_code_sha256()}}
     config["estimates"].append({"estimate_id": estimate_id, "max_micro_usd": est["max_micro_usd"], "actor": actor,
@@ -541,6 +559,25 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
         doc = row["scope"][0]["doc_id"]
         out["metadata_correct"] = bool(states) and all(states.get((doc, f)) == s for f, s in wanted.items())
         return out
+    # Row pass: the expected status and every gold group the packed evidence reached is cited. A group retrieval
+    # never delivered is a retrieval limit, reported beside it, not something the answer could have cited. A group
+    # counts only where a chunk's source spans carry its whole approved occurrence (`evaluation.group_grade` 2), never
+    # for sharing an element; without the index nothing can be graded and no answerable row passes.
+    evidence = record.get("evidence") or {}
+    chunks = {c["chunk_id"]: c for c in index.chunks} if index is not None else {}
+    cited_ids = {e for c in answer.get("claims") or [] for e in c.get("evidence_ids") or []}
+
+    def carried(g, ids) -> bool:
+        # Documents sharing an original share chunks: only evidence attributed to the group's document counts.
+        return any(chunk is not None and evaluation.group_grade(chunk, g, index.elements) == 2
+                   for chunk in (chunks.get(ev.get("chunk_id")) for ev in (evidence.get(eid) or {} for eid in ids)
+                                 if ev.get("doc_id") == g["doc_id"]))
+    reached = [g for g in groups if carried(g, evidence)]
+    out["groups"] = {"gold": len(groups), "retrieved": len(reached),
+                     "cited": sum(carried(g, cited_ids) for g in reached)} if index is not None else None
+    out["passed"] = out["status_ok"] and not out["technical"] and (
+        row["answerability"] != "answerable"
+        or (out["groups"] is not None and 0 < out["groups"]["retrieved"] == out["groups"]["cited"]))
     answered = outcome == "answered"
     single = len(scope_docs) == 1
     for c in row.get("required_claims") or []:
@@ -551,7 +588,6 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
         out["claims"].append({"claim_id": c["claim_id"], "item": item, "verdict": (reviewed or {}).get("verdict", verdict),
                               "deterministic": verdict, "reviewed_by": (reviewed or {}).get("reviewer"),
                               "critical_kind": c.get("critical_kind")})
-    chunks = {c["chunk_id"]: c for c in index.chunks} if index is not None else {}
     validity = record.get("link_validity") or {}
     for i, ac in enumerate(answer.get("claims") or []):
         supports = []
@@ -595,14 +631,20 @@ def served_retrieval(settings: Settings, index, row: dict, record: dict) -> dict
         return None
     chunk = lambda cid: index.chunks[index.row_of[cid]] if cid in index.row_of else None  # noqa: E731
     ranking = [c for c in map(chunk, r.get("ranking") or []) if c]
-    packed = [c for c in (chunk(e["chunk_id"]) for e in r.get("evidence") or []) if c]
+    evidence = r.get("evidence") or []
+    packed = [c for c in (chunk(e["chunk_id"]) for e in evidence) if c]
     scope, groups = evaluation.row_scope(row), evaluation.row_groups(row)
     if len(scope) == 1:
         metrics = evaluation.score_row(row, ranking, packed, index.elements, groups)
     else:
-        metrics = evaluation.combine_sides([evaluation.score_row(
-            row, [c for c in ranking if c["extraction_id"] == x], [c for c in packed if c["extraction_id"] == x],
-            index.elements, [g for g in groups if g["doc_id"] == ref.doc_id]) for ref, x in scope])
+        # Packed evidence is attributed by its document: two documents sharing an original share chunks. The merged
+        # ranking keeps no side boundary, but such sides rank the same original identically, so one copy is the side's.
+        def side(ref, x):
+            ranked = list({c["chunk_id"]: c for c in ranking if c["extraction_id"] == x}.values())
+            mine = [c for c in (chunk(e["chunk_id"]) for e in evidence if e.get("doc_id") == ref.doc_id) if c]
+            return evaluation.score_row(row, ranked, mine, index.elements,
+                                        [g for g in groups if g["doc_id"] == ref.doc_id])
+        metrics = evaluation.combine_sides([side(ref, x) for ref, x in scope])
     allowed = {x for _, x in scope}
     return {"id": row["question_id"], "type": row["question_type"], "critical": evaluation.row_critical(row),
             "families": evaluation.row_families(row), "metrics": metrics,
@@ -643,6 +685,10 @@ def aggregate_answers(scored: list[dict]) -> dict:
         by_type[t] = _wilson_rate(sum(c["verdict"] == "correct" for c in cs), len(cs))
     return {
         "rows": len(scored), "answerable_rows": len(answerable),
+        "rows_passed": _wilson_rate(sum(bool(s.get("passed")) for s in passage), len(passage)),
+        "rows_failed": [s["question_id"] for s in passage if not s.get("passed")],
+        "gold_groups_not_retrieved": {s["question_id"]: g["gold"] - g["retrieved"] for s in passage
+                                      for g in [s.get("groups") or {}] if g and g["retrieved"] < g["gold"]},
         "required_claim_correctness": _wilson_rate(sum(c["verdict"] == "correct" for c in claims), len(claims)),
         "question_completeness": _wilson_rate(len(complete_rows), len(answerable)),
         "claims_needing_review": sum(c["verdict"] == "needs_review" for c in claims),
@@ -716,7 +762,8 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
     progress = load_progress(settings, run_id)
     reviews = load_reviews(settings, run_id)
     rows, _, _ = evaluation.load_eval_rows(settings, config["dataset"], sealed=config["dataset"] == "test")
-    by_id = {r["question_id"]: r for r in rows}
+    wanted = config.get("question_ids")
+    by_id = {r["question_id"]: r for r in rows if not wanted or r["question_id"] in wanted}
     finalists, per_finalist, all_scored = {}, {}, []
     for f in config["finalists"]:
         index = None
@@ -747,7 +794,8 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
     write_jsonl_atomic(d / "scored.jsonl", all_scored)
     write_text_atomic(d / "report.md", answer_report_md(config, scores))
     return {"run_id": run_id, "status": scores["status"], "stop_reason": stop_reason,
-            "finalists": {k: {"completed": v["completed"], "of": v["of"],
+            "finalists": {k: {"completed": v["completed"], "of": v["of"], "rows_passed": v["rows_passed"],
+                              "rows_failed": v["rows_failed"],
                               "claim_correctness": v["required_claim_correctness"]["rate"],
                               "critical_wrong": len(v["critical_wrong"]),
                               "settled_micro_usd": v["cost"]["settled_micro_usd"]} for k, v in per_finalist.items()}}
@@ -784,6 +832,9 @@ def answer_report_md(config: dict, scores: dict) -> str:
     for rid, v in scores["finalists"].items():
         lines += [f"## Finalist `{rid}` ({v['mode']}): {v['completed']}/{v['of']} rows", "",
                   "| Metric | Value |", "| --- | --- |",
+                  f"| rows passed (expected status, every retrieved gold group cited) | {_fmt(v['rows_passed'])}; "
+                  f"failed {v['rows_failed'] or 'none'} |",
+                  f"| gold groups retrieval did not reach | {v['gold_groups_not_retrieved'] or 'none'} |",
                   f"| required-claim correctness | {_fmt(v['required_claim_correctness'])} |",
                   f"| question-level completeness | {_fmt(v['question_completeness'])} |",
                   f"| claims needing review | {v['claims_needing_review']} |",

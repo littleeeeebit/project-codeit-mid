@@ -1,0 +1,1 @@
+An `openapi-fetch` client typed from `api-schema.d.ts`, with base URL `""` (same origin). A middleware adds `X-Member: encodeURIComponent(readMember())` unless the caller set it. Ownership actions use `memberHeaders(owned.member)` so cancel and abandon carry the name the request was submitted under. `errorText` shows the server's `detail` string, or a generic connection message.

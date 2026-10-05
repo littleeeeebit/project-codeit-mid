@@ -1,0 +1,1 @@
+The original corpus, `.env` and `.runtime` are gitignored and absent from linked worktrees. A worktree must point `RFP_SOURCE_DIR` and `RFP_DATA_DIR` at the shared corpus and runtime, and the gateway still has exactly one owner.

@@ -1,12 +1,28 @@
-created: 2026-10-04T13:34:51.920Z
-updated: 2026-10-04T13:34:52.274Z
-update_count: 2
+created: 2026-10-04 13:34:51.920000+00:00
+updated: 2026-10-05T04:06:26.414Z
+update_count: 6
 last_field: diagram
-git_commit: 95e8dc5
-git_branch: main
+git_commit: 4d8c212
+git_branch: close-answer-failures-phase5-runner-lint
 children:
-  - attempt-states
-  - billing-rollup
-  - owner-reconciliation
-  - request-states
-  - startup-recovery
+  - attempt-billing
+  - gold-candidate
+  - request-status
+  - serving-activation
+  - source-review
+prev_diagram: "graph TD\r
+
+  \  serving-activation[\"Active serving
+  config\\nsrc/rfp_assistant/evaluation.py\"] -->|\"config snapshot per
+  request\"| request-status[\"Request status\\nsrc/rfp_assistant/service.py\"]\r
+
+  \  request-status -->|\"each paid stage reserves\"| attempt-billing[\"Attempt
+  billing state\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  attempt-billing -->|\"unknown refuses dispatch\"| request-status\r
+
+  \  source-review[\"Source review status\\nsrc/rfp_assistant/ingestion.py\"]
+  -->|\"filters reviewed-only index\"| serving-activation\r
+
+  \  gold-candidate[\"Gold candidate status\\nsrc/rfp_assistant/gold.py\"]
+  -->|\"approved rows score runs\"| serving-activation"

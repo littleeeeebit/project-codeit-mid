@@ -1,0 +1,1 @@
+Any change to `route_corpus` must change `ROUTE_RULE`. Runs record `limits.corpus_route`, and `active_serving` refuses to serve a run measured under another rule. The analyzer version (`kiwi-bm25-2`) and query policy (`scope-redundant-2`) are part of each index's fingerprint, and an outdated index is still served but marked `index_outdated:`.

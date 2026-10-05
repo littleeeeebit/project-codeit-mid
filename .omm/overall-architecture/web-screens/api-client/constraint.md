@@ -1,0 +1,1 @@
+tests/test_api.py fails when web/openapi.json is stale. Regenerate it with tools/openapi.py after changing a route.

@@ -1,15 +1,13 @@
 graph TD
-  resources["Process resources\nsrc/rfp_assistant/service.py"]
-  request-runner["Request executor\nsrc/rfp_assistant/service.py"]
-  answer-pipeline["Answer pipeline\nsrc/rfp_assistant/service.py"]
-  verifier-runs["Verifier traces\nsrc/rfp_assistant/service.py"]
-  evidence-access["Evidence and originals\nsrc/rfp_assistant/service.py"]
-  background-jobs["Drafting and evaluation jobs\nsrc/rfp_assistant/drafting.py"]
-  gold-review["Gold review queue\nsrc/rfp_assistant/gold.py"]
-  resources -->|lazily creates| request-runner
-  request-runner -->|run_queued by request id| answer-pipeline
-  resources -->|index, dense, reranker, transport| answer-pipeline
-  verifier-runs -->|frozen run as paid request| answer-pipeline
-  answer-pipeline -->|persisted evidence map| evidence-access
-  resources -->|lends transport and stop flag| background-jobs
-  background-jobs -->|valid drafts as batch| gold-review
+  resources["Process resource owner\nsrc/rfp_assistant/service.py"]
+  request_runner["Bounded request executor\nsrc/rfp_assistant/service.py"]
+  answer_orchestrator["Answer orchestration\nsrc/rfp_assistant/service.py"]
+  verifier_runs["Frozen verifier runs\nsrc/rfp_assistant/service.py"]
+  background_jobs["Paid background jobs\nsrc/rfp_assistant/drafting.py"]
+  gold_review["Gold review queue\nsrc/rfp_assistant/gold.py"]
+  resources -->|"lazily creates"| request_runner
+  request_runner -->|"run_queued(request_id)"| answer_orchestrator
+  answer_orchestrator -->|"index, dense, transport"| resources
+  verifier_runs -->|"idempotent generate request"| request_runner
+  background_jobs -->|"borrow transport, joined on close"| resources
+  background_jobs -->|"submit valid drafts"| gold_review

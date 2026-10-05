@@ -1,17 +1,17 @@
 graph TD
-  ask-page["Ask screen\nweb/src/components/ask/ask-page.tsx"]
-  admission["Validate, persist, admit\nsrc/rfp_assistant/service.py"]
-  executor["Bounded executor\nsrc/rfp_assistant/service.py"]
-  paid-stages["Paid answer stages\nsrc/rfp_assistant/service.py"]
-  finish-record["Request record\nsrc/rfp_assistant/service.py"]
-  status-poll["Status polling\nweb/src/lib/use-poll.ts"]
-  cancellation["Cancel and abandon\nsrc/rfp_assistant/service.py"]
-  ask-page -->|POST ask with scope| admission
-  admission -->|free modes inline| finish-record
-  admission -->|request id queued| executor
-  executor -->|claims queued to running| paid-stages
-  paid-stages -->|result and billing| finish-record
-  ask-page -->|poll every second| status-poll
-  status-poll -->|reads view and attachable| finish-record
-  ask-page -->|cancel or context change| cancellation
-  cancellation -->|cancel flag checked| paid-stages
+  ask_screen["Ask screen submit\nweb/src/components/ask/ask-page.tsx"]
+  ask_route["POST /api/ask\nsrc/rfp_assistant/api.py"]
+  submit_answer["Validate and persist\nsrc/rfp_assistant/service.py"]
+  worker_claim["Worker claims queued\nsrc/rfp_assistant/service.py"]
+  paid_answer["Retrieve, price, reserve\nsrc/rfp_assistant/service.py"]
+  model_call["gpt-6-luna call\nsrc/rfp_assistant/generation.py"]
+  answer_validation["Citation validation\nsrc/rfp_assistant/generation.py"]
+  status_poll["Status polling\nsrc/rfp_assistant/api.py"]
+  ask_screen -->|"scope, question, mode"| ask_route
+  ask_route -->|"fresh generation_id key"| submit_answer
+  submit_answer -->|"request_id on executor"| worker_claim
+  worker_claim -->|"snapshot, rebuilt principal"| paid_answer
+  paid_answer -->|"dispatching attempt"| model_call
+  model_call -->|"structured JSON, usage"| answer_validation
+  answer_validation -->|"result_json persisted"| status_poll
+  ask_screen -->|"poll every second"| status_poll

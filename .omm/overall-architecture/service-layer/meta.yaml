@@ -1,13 +1,12 @@
-created: 2026-10-04T13:34:42.724Z
-updated: 2026-10-04T13:34:42.855Z
-update_count: 2
+created: 2026-10-04 13:34:42.724000+00:00
+updated: 2026-10-05T04:06:13.621Z
+update_count: 4
 last_field: diagram
 kind: nested-class
 title: service-layer
 children:
-  - answer-pipeline
+  - answer-orchestrator
   - background-jobs
-  - evidence-access
   - gold-review
   - request-runner
   - resources

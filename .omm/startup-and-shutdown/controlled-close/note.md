@@ -1,0 +1,1 @@
+When the close-time recovery runs while a job thread is still alive, that thread's reserved attempt becomes released. Its next `mark_dispatching` then fails with 'attempt is not in reserved state'. That is a conservative failure, not a double charge.

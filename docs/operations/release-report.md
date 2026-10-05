@@ -2,7 +2,7 @@
 
 Status on 2026-10-02: limited local pilot, merged. Independent round 27 approved reviewed head `f33863d` with no new P0/P1 findings; its source was integrated unchanged into PR #8, which is merged. This does not certify unrestricted deployment or full phase-4 exit.
 
-The selected candidate retains all development/sealed failures and the original-source fallback. The owner reported a pass after viewing the app; this is limited-pilot acceptance, without invented individual actions or human gold-review calibration. Development and first frozen sealed review, real latency and pilot-app recovery are complete. The pilot ran in its own runtime; the live runtime was migrated separately (see the last section). Central runner registration remains open.
+The selected candidate retains all development/sealed failures and the original-source fallback. The owner reported a pass after viewing the app; this is limited-pilot acceptance, without invented individual actions or human gold-review calibration. Development and first frozen sealed review, real latency and pilot-app recovery are complete. The pilot ran in its own runtime; the live runtime was migrated separately (see the last section). Central runner registration was done on 2026-10-05 (see the last section).
 
 This is an AI-reviewed pilot, not human-reviewed 120-question gold. Private originals, questions, labels, responses, keys and runtime databases remain outside Git.
 
@@ -16,7 +16,7 @@ This is an AI-reviewed pilot, not human-reviewed 120-question gold. Private orig
 | Development labels | 50 approved rows; alternative-support and conflict corrections independently reviewed | API Luna drafts and source-based AI review; sticky disagreement survives later agreement until corrected revision |
 | Frozen test pilot | 14 approved rows, two each of seven types | Three families; source and disputed second reviews completed; first sealed run executed |
 | Accepted active-app migration/recovery | Schema 6 before/after idempotent initialization; all 18 fresh recovery checks passed; 285 mutable files; live ledger unchanged, staged paid generation disabled | Actual running app used for real-provider calls and owner acceptance; independently checked in round 27. Earlier 279-file recovery is retained as history |
-| Local verification settings | Saved, schema validated, UTF-8 without BOM | Server registration remains incomplete |
+| Local verification settings | Saved, schema validated, UTF-8 without BOM | Registered with the local verification service on 2026-10-05 (last section) |
 | Owner pilot acceptance | Owner reported a pass after viewing the app in this session | Limited-pilot usability acceptance; no per-step detail supplied, no claim of six participants or human gold calibration |
 | Fresh deployment-copy migration/recovery | Schema 3 to 6; all 18 existing tables retain their original values and counts; repeat migration unchanged; integrity and foreign-key checks pass; 18 recovery checks pass | Copy of the live DB/WAL and mutable files; live files unchanged, zero paid calls. The in-place migration followed later (last section) |
 
@@ -134,3 +134,38 @@ Jev's 27 abstentions are all bridge rejections: 21 `changed_protected_value` and
 - The app had been started with the fake provider. For these runs it was restarted on 8501 with the real provider and the same database. That restart changed no budget settings.
 - Judges never retrieve, so serving configuration played no part. The PR #12 fixed-1,536 dense/hybrid configuration stays refused. Since PR #13 the app serves hybrid run `H-0fffb2a6ec` with fusion `keyword_first:60:1.0:6`, which passed its gate against K1.
 - `/api/verify/fidelity` failed on PostgreSQL with a `GROUP BY` error, which blanked the whole 검증 page. It was fixed in `7cbe847` and checked live: 94 rows for 94 HWP sources.
+
+## The three answers that failed the PR #13 rerun (2026-10-05)
+
+PR #13's rerun of 26 paid answers left three failures. Their run records showed these causes:
+
+- `refresh50-ad-migration-design` ended `output_truncated`. The 2,000-token output cap includes reasoning tokens, and reasoning used it up before the 13 required evidence groups were written.
+- `refresh50-eg-input-error` and `refresh50-dh-linked-data` failed with `evidence_scope_mismatch`. An inference that compares the two documents needs evidence from both, and validation only let a claim cite its own document. The model had no valid way to cite such an inference.
+
+Fixes, each with a fake-provider regression test that fails without it:
+
+- The output cap is 4,000 tokens, the released candidate's cap (`tests.test_generation`).
+- Prompt `grounded-answer-10` and validation let a comparison inference cite the other compared document, as long as it also cites its own. Source facts still cite only their own document (`tests.test_service.ModesTest`).
+- The first paid rerun showed a third cause for `refresh50-ad-migration-design`: serving halved the evidence limits per comparison side, so it retrieved 4 of 13 groups, while the retrieval gate had measured each side with the full single-document limits. Each comparison side now gets the single-document limits the gate measured (`tests.test_service.ModesTest`). The owner chose this serving change in this task; `H-0fffb2a6ec`, its fusion and exact search are unchanged.
+
+A row now passes only when its status is the expected one, it has no technical failure, and an answerable row cites every gold group retrieval reached (and retrieval reached at least one). Reached and cited are graded on the chunks' source spans against the approved occurrence, as retrieval is; review round 1 found the first version matched elements only. Only evidence attributed to a group's own document counts, because two documents sharing an original share chunks (review round 3). Re-scored this way, both runs below keep their results. `plan-run --question-id` limits an answer run to listed rows.
+
+| Run | Rows | Result | Settled cost |
+| --- | --- | --- | --- |
+| `A-567426a3adce` | the three rows | 2/3: `eg` and `dh` passed; `ad` `insufficient_evidence` with 4 of 13 groups retrieved | $0.003653 |
+| `A-863087b6337f` | the three rows, after the packing fix | 3/3: `ad` 13/13 groups, `dh` 5/5, `eg` 2/2 | $0.005071 |
+
+Both runs were estimated with `plan-run` and approved by the owner before any paid call. Together they cost $0.008724. The ledger afterwards (`budget-report`, revision 5367): $2.136133 spent, $0 pending, $0 unknown, $7.863867 available. The 23 rows that passed in PR #13 and the sealed set were not rerun.
+
+## Central runner registration (2026-10-05)
+
+`verification.json` now lists Phase 5's plan as a contract, adds a `phase5-gate` assertion to `repository-gates`, and includes the read-only `budget-report` test in `budget-recovery`. The owner settings were saved through the local review settings on 2026-10-05 and are bound to that manifest's digest (`dc33e9d8…`); `.wiki/verification.local.json` stays git-ignored. The managed flow `python -B tools/verify.py repository-gates` then ran at head `a2e879a`, and its local-evidence block passed every assertion:
+
+| Assertion | Actual |
+| --- | --- |
+| whitespace | no whitespace errors |
+| phase3-gate | 71 tests OK, one skip |
+| phase4-gate | 72 tests OK |
+| phase5-gate | 55 tests OK |
+| full-suite | 363 tests OK, three skips |
+| web-checks | lint and typecheck exit 0 |

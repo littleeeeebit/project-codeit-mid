@@ -1,0 +1,1 @@
+Set by `_create` from `submit_answer` for paid modes, after an admission slot was acquired. The request input snapshot is durable before any work starts, so reruns and double clicks with the same key return this row.

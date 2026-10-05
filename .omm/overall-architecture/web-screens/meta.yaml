@@ -1,8 +1,25 @@
-created: 2026-10-04T13:34:42.331Z
-updated: 2026-10-04T13:34:42.331Z
-update_count: 1
-last_field: description
+created: 2026-10-04 13:34:42.331000+00:00
+updated: 2026-10-05 04:06:11.750000+00:00
+update_count: 6
+last_field: constraint
 kind: nested-class
 title: web-screens
-children: []
+children:
+- api-client
+- ask-page
+- dataset-page
+- settings-page
+- use-poll
+- verify-page
 parentPath: []
+prev_diagram: "graph TD\r\n  app-header[\"Header and budget meter\\nweb/src/components/app-header.tsx\"\
+  ] -->|\"GET /api/budget every 2s\"| api-client[\"Typed API client\\nweb/src/lib/api.ts\"\
+  ]\r\n  ask-page[\"Ask page\\nweb/src/components/ask/ask-page.tsx\"] -->|\"ask, poll,\
+  \ cancel, abandon\"| api-client\r\n  ask-page -->|\"picks one or two docs\"| document-search[\"\
+  Document picker\\nweb/src/components/ask/document-search.tsx\"]\r\n  ask-page -->|\"\
+  renders attachable result\"| answer-view[\"Answer and evidence pane\\nweb/src/components/ask/answer-view.tsx\"\
+  ]\r\n  verify-page[\"Verification page\\nweb/src/components/verify/verify-page.tsx\"\
+  ] -->|\"traces, evaluation, judges, fidelity\"| api-client\r\n  dataset-page[\"\
+  Dataset page\\nweb/src/components/dataset/dataset-page.tsx\"] -->|\"drafting and\
+  \ gold decisions\"| api-client\r\n  document-search -->|\"GET /api/documents\"|\
+  \ api-client"

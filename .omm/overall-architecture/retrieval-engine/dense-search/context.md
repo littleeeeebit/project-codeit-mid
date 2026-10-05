@@ -1,0 +1,1 @@
+The README says HNSW did not reach recall@20 of 0.99 against exact search on scoped questions, so exact search serves.

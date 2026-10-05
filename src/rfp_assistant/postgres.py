@@ -248,6 +248,14 @@ def tx(conn: Connection, immediate=False):
         yield conn
 
 
+@contextmanager
+def read_snapshot(conn: Connection):
+    """One read-only view: every read inside sees the same committed state (pooled connections autocommit)."""
+    with conn.raw.transaction():
+        conn.raw.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+        yield conn
+
+
 def init_schema(target: Target, schema: str, version: int):
     with open_db(target) as conn, conn.raw.transaction():
         conn.raw.execute("SELECT pg_advisory_xact_lock(%s)", (SCHEMA_LOCK,))

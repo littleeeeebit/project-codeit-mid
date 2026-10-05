@@ -1,0 +1,1 @@
+`usePoll(key, load, everyMs, done)` makes read-only GETs on a timer. When `key` changes, in-flight results for the old key are dropped without touching state. Returning true from `done` stops polling: the ask page stops once the request is no longer queued or running. `must()` turns an openapi-fetch refusal into an `Error` carrying the service's Korean `detail`.

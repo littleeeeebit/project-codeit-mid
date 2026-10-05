@@ -1,0 +1,1 @@
+`sources.parse_status` and `sources.review_status` describe how far an extraction can be trusted. They gate the index (`build_keyword_index` admits auto_verified, sample_checked and reviewed; `--include-unreviewed` adds unreviewed and auto_flagged), labels in traces and screens, and evidence warnings. Every review is also appended to the `reviews` table.

@@ -1,1 +1,0 @@
-The request is persisted with `request_json` and holds an executor admission slot. No paid stage has started. Cancelling here is conclusive and free.

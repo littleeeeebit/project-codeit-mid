@@ -1,13 +1,9 @@
-created: 2026-10-04T13:34:46.770Z
-updated: 2026-10-04T13:34:47.067Z
+created: 2026-10-04 13:34:46.770000+00:00
+updated: 2026-10-04 13:34:47.067000+00:00
 update_count: 3
 last_field: todo
 kind: nested-class
 title: persistence
 children:
-  - gateway-owner
-  - pgvector-store
-  - postgresql
-  - runtime-artifacts
-  - store-adapter
+- postgresql
 parentPath: []

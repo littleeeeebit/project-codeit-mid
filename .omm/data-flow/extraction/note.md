@@ -1,0 +1,1 @@
+I read ocr.run and the PaddleOCR / Gemini fallback logic only at signature and docstring level. The $0.50 Gemini cap is a separate JSONL ledger, not the PostgreSQL ledger (README).

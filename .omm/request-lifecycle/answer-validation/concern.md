@@ -1,0 +1,1 @@
+`_stored_quote` scans `idx.chunks` linearly for each evidence unit: about 19k chunks times up to 10 units per answer. `idx.row_of` already maps chunk ID to row and could make this a constant-time lookup. It costs latency only, not correctness.

@@ -1,19 +1,18 @@
 graph TD
-  csv-manifest["CSV manifest\nsrc/rfp_assistant/ingestion.py"]
-  ingestion["HWP and PDF parsing\nsrc/rfp_assistant/ingestion.py"]
-  fidelity-check["Original print comparison\nsrc/rfp_assistant/fidelity.py"]
-  ocr-merge["Image OCR\nsrc/rfp_assistant/ocr.py"]
-  keyword-build["Keyword index build\nsrc/rfp_assistant/retrieval.py"]
-  dense-build["Embedding build\nsrc/rfp_assistant/dense.py"]
-  retrieval-evaluation["Frozen retrieval runs\nsrc/rfp_assistant/evaluation.py"]
-  activation["Serving activation\nsrc/rfp_assistant/evaluation.py"]
-  csv-manifest -->|documents and sources rows| ingestion
-  fidelity-check -->|Hancom print PDF| ocr-merge
-  ocr-merge -->|image_text elements| ingestion
-  ingestion -->|extraction elements| fidelity-check
-  fidelity-check -->|review status| keyword-build
-  ingestion -->|active extraction| keyword-build
-  keyword-build -->|unique chunk payloads| dense-build
-  keyword-build -->|index manifest| retrieval-evaluation
-  dense-build -->|verified vectors| retrieval-evaluation
-  retrieval-evaluation -->|scored run and decision| activation
+  original_corpus["Original RFP files\n원본 데이터/files"]
+  corpus_ingestion["Manifest, parse, OCR merge\nsrc/rfp_assistant/ingestion.py"]
+  fidelity_check["Fidelity check\nsrc/rfp_assistant/fidelity.py"]
+  index_build["Keyword index build\nsrc/rfp_assistant/retrieval.py"]
+  dense_build["Embedding set build\nsrc/rfp_assistant/dense.py"]
+  gold_evaluation["Gold and release evaluation\nsrc/rfp_assistant/gold.py"]
+  retrieval_selection["Run evaluation and activation\nsrc/rfp_assistant/evaluation.py"]
+  serving_resources["Serving resources\nsrc/rfp_assistant/service.py"]
+  original_corpus -->|"CSV rows, original bytes"| corpus_ingestion
+  corpus_ingestion -->|"HWP extraction elements"| fidelity_check
+  fidelity_check -->|"review_status admits source"| index_build
+  corpus_ingestion -->|"elements.jsonl artifacts"| index_build
+  index_build -->|"chunk payloads"| dense_build
+  index_build -->|"frozen index version"| retrieval_selection
+  dense_build -->|"dense set version"| retrieval_selection
+  gold_evaluation -->|"reviewed dataset rows"| retrieval_selection
+  retrieval_selection -->|"active_run, active_index"| serving_resources

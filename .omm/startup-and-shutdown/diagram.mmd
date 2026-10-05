@@ -1,0 +1,13 @@
+graph TD
+  uvicorn_lifespan["API lifespan\nsrc/rfp_assistant/api.py"]
+  import_validation["Validated import gate\nsrc/rfp_assistant/postgres.py"]
+  schema_init["Schema and budget row\nsrc/rfp_assistant/store.py"]
+  gateway_claim["Gateway lock and recovery\nsrc/rfp_assistant/service.py"]
+  provider_setup["Transport and tracer\nsrc/rfp_assistant/service.py"]
+  controlled_close["Controlled close\nsrc/rfp_assistant/service.py"]
+  uvicorn_lifespan -->|"app_resources() at startup"| import_validation
+  import_validation -->|"validated import present"| schema_init
+  schema_init -->|"recover=True"| gateway_claim
+  gateway_claim -->|"owner check bound"| provider_setup
+  uvicorn_lifespan -->|"lifespan exit, atexit"| controlled_close
+  controlled_close -->|"release advisory lock"| gateway_claim

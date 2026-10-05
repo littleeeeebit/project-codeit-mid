@@ -1,0 +1,1 @@
+Set by `gold.decide` with at least one category from `REJECT_CATEGORIES` ('other' requires a note). `_write_rejection` renders a rejection wiki page. `gold infer` can later attach an inferred reason, and drafting reads these lessons (`drafting.lessons`).

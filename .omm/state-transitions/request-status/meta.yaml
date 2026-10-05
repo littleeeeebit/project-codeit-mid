@@ -1,0 +1,34 @@
+created: 2026-10-05T03:34:25.802Z
+updated: 2026-10-05T04:06:27.013Z
+update_count: 4
+last_field: diagram
+kind: nested-class
+title: request-status
+children:
+  - cancelled
+  - completed
+  - failed
+  - interrupted
+  - queued
+  - running
+parentPath: []
+prev_diagram: "graph TD\r
+
+  \  queued[\"queued\\nsrc/rfp_assistant/store.py\"] -->|\"run_queued claims\"|
+  running[\"running\\nsrc/rfp_assistant/store.py\"]\r
+
+  \  queued -->|\"cancel_request\"|
+  cancelled[\"cancelled\\nsrc/rfp_assistant/store.py\"]\r
+
+  \  queued -->|\"shutdown or restart\"|
+  interrupted[\"interrupted\\nsrc/rfp_assistant/store.py\"]\r
+
+  \  running -->|\"normal exit via _finish\"|
+  completed[\"completed\\nsrc/rfp_assistant/store.py\"]\r
+
+  \  running -->|\"error or refusal\"|
+  failed[\"failed\\nsrc/rfp_assistant/store.py\"]\r
+
+  \  running -->|\"cancel flag then finish\"| cancelled\r
+
+  \  running -->|\"pending at shutdown, restart\"| interrupted"

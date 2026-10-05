@@ -190,7 +190,7 @@ Bridged Jev's bands both have `lo = hi`, so no uncertain band survived the cover
 | Jev, bridged | 92.8% (350 of 377) | 89.1% (85.5–92.0) | 0.238 | 6 of 13 | 0.24 s |
 | Jev, raw Korean | 100% (120) | 80.0% (72.0–86.2) | 0.103 | 1 of 3 | 0.23 s |
 
-**Verdict: not replaceable.** False accepts decided it:
+Verdict: not replaceable. False accepts decided it:
 
 - kappa 0.238 ≥ 0.240 − 0.05: holds;
 - false accepts 6 ≤ 5: fails;

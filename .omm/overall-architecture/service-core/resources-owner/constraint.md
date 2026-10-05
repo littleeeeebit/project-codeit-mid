@@ -1,0 +1,1 @@
+dispatch=False builds a ledger-only owner (CLI budget commands beside the serving app): no transport and no lock, so any paid stage is refused at admission.

@@ -1,0 +1,1 @@
+Written by `_finish` when `done()` uses its default `request_status='completed'`: answered or conflicting outcomes, `insufficient_evidence`, `ingestion_unavailable` and also `budget_blocked`. So a budget refusal is a completed request with a domain status, not a failure. If `cancel_requested` was set while the request ran, a completed outcome is stored as cancelled instead.

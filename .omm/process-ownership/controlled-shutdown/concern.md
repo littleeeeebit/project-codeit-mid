@@ -1,0 +1,1 @@
+Job threads are daemon threads. If one outlives the deadline it keeps running against a closed transport until it errors, and recovery has already marked its work interrupted or unknown. That is conservative for billing but can leave a partial run directory that is completed only on rerun.

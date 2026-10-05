@@ -1,0 +1,1 @@
+Inserted by `budget.reserve` after every admission check passes, at `max_cost` (every input token at the cache-write rate plus maximum output). `budget.recover` at startup releases reservations that were never dispatched.

@@ -14,9 +14,10 @@ from pydantic import ValidationError
 from .chunking import count_tokens
 from .contracts import AnswerPayload, EvidenceUnit
 
-PROMPT_VERSION = "grounded-answer-9"  # 4: atomic obligations, per-document citations, conflict action; 5: corpus mode
+PROMPT_VERSION = "grounded-answer-10"  # 4: atomic obligations, per-document citations, conflict action; 5: corpus mode
 # 6: every claim cites evidence; absence goes to missing_fields only; 7: a restated absence is declared kind "absence"
 # 8: an "absence" claim's text is exactly its missing field; 9: absences go only to missing_fields
+# 10: a comparison inference may also cite the other compared document's evidence
 COUNT_METHOD = "tiktoken:o200k_base+per_message_4+schema+margin"
 PER_MESSAGE_TOKENS = 4
 
@@ -55,8 +56,11 @@ In corpus mode nobody selected the documents: they are the projects whose passag
 from all documents. Name the project behind each fact and never merge facts of different projects.
 Use only the evidence IDs listed in the request; use the given doc_id values exactly.
 Use evidence_ids_by_doc to check every claim and conflict alternative: each cited ID must belong to its doc_id.
+The one exception: in comparison mode, an inference that compares the documents cites at least one ID of its
+own doc_id and may add IDs of the other compared document.
 Hypothetical example: if D-A has E1 and D-B has E2, split a two-document fact into
-one D-A claim citing E1 and one D-B claim citing E2; never attach E2 to a D-A claim.
+one D-A claim citing E1 and one D-B claim citing E2; never attach E2 to a D-A source_fact.
+"D-A's period is shorter than D-B's" is then a D-A inference citing E1 and E2.
 These examples are instructions, not source facts or IDs to copy into an answer.
 
 Return a short conclusion, supported claims, missing information,
@@ -277,7 +281,8 @@ def count_request_tokens(messages: list[dict], response_format: dict, margin: in
 
 def validate_answer(response: ProviderResponse, evidence: list[EvidenceUnit], allowed_doc_ids: set[str],
                     stored_quotes: dict[str, str], required_doc_ids: set[str] | None = None) -> AnswerPayload:
-    """`required_doc_ids`: in a comparison, each of these documents must appear in a claim or a missing field."""
+    """`required_doc_ids`, given only for a comparison: each of these documents must appear in a claim or a missing
+    field, and an inference may also cite them (it compares the sides) as long as it cites its own document too."""
     if response.refusal:
         raise TechnicalError(f"model_refusal: {response.refusal[:200]}")
     if response.finish_reason == "length":
@@ -290,12 +295,12 @@ def validate_answer(response: ProviderResponse, evidence: list[EvidenceUnit], al
         raise TechnicalError(f"schema_invalid: {exc.errors()[:3]}") from None
     by_id = {e.evidence_id: e for e in evidence}
 
-    def check_refs(ids: list[str], doc_id: str) -> None:
+    def check_refs(ids: list[str], doc_id: str, also: set[str] = frozenset()) -> None:
         for eid in ids:
             ev = by_id.get(eid)
             if ev is None:
                 raise TechnicalError(f"unknown_evidence_id: {eid}")
-            if ev.doc_id != doc_id:
+            if ev.doc_id != doc_id and ev.doc_id not in also:
                 raise TechnicalError(f"evidence_scope_mismatch: {eid} belongs to another document")
             if stored_quotes.get(eid) != ev.quote:
                 raise TechnicalError(f"evidence_quote_mismatch: {eid}")
@@ -317,7 +322,12 @@ def validate_answer(response: ProviderResponse, evidence: list[EvidenceUnit], al
             raise TechnicalError(f"claim_outside_scope: {claim.doc_id}")
         if not claim.evidence_ids:
             raise TechnicalError("claim_without_evidence")
-        check_refs(claim.evidence_ids, claim.doc_id)
+        if required_doc_ids and claim.kind == "inference":
+            check_refs(claim.evidence_ids, claim.doc_id, required_doc_ids)
+            if all(by_id[eid].doc_id != claim.doc_id for eid in claim.evidence_ids):
+                raise TechnicalError(f"evidence_scope_mismatch: inference cites nothing of {claim.doc_id[:8]}")
+        else:
+            check_refs(claim.evidence_ids, claim.doc_id)
     for conflict in payload.conflicts:
         for alt in conflict.alternatives:
             if alt.doc_id not in allowed_doc_ids or not alt.evidence_ids:

@@ -1,0 +1,1 @@
+Drafting can run at the same time as an answer evaluation, and both charge `gold_eval`. The ledger's atomic `reserve` keeps the cap and envelope safe, but the two runs compete for the same envelope.

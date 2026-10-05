@@ -1,0 +1,1 @@
+Inserted by `gold.submit` (CLI `gold submit` or UI `submit_drafts`). Pending rows that no longer pass the shared checks surface as `pending_invalid` in `gold status` and as `current_errors` on the review screen. `gold repin` moves pending rows to a new extraction by element path after a parser revision.

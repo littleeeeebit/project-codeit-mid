@@ -1,0 +1,1 @@
+I did not read drafting._draft's internals. The reservation and guard behaviour comes from service.start_drafting and its docstrings.

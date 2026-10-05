@@ -830,6 +830,28 @@ class ServingTest(unittest.TestCase):
                                   (result.request_id,)).fetchone()[0]
         self.assertEqual(status, "completed")
 
+    def test_the_same_activation_rolls_back_to_the_known_good_run(self):
+        s, known_good = self.env.settings, self.res.serving()["run_id"]
+        (k1,) = evaluation.evaluate_retrieval(s, fixtures.analyzer(), self.transport, "dev-pilot", ["K1"])
+        decision = Path(self.tmp.name) / "decision.json"
+
+        def activate(run_id: str, mode: str) -> str:
+            decision.write_text(json.dumps({"run_id": run_id, "mode": mode, "decided_by": "owner",
+                                            "rationale": "phase 5 rollback check"}), encoding="utf-8")
+            evaluation.activate_run(s, run_id, decision)
+            res = service.Resources(s, transport=self.transport)  # a restart serves what was activated
+            try:
+                return res.serving()["run_id"]
+            finally:
+                res.close()
+
+        self.assertEqual(activate(k1["run_id"], "kiwi_bm25"), k1["run_id"])
+        self.assertEqual(activate(known_good, "hybrid"), known_good)
+        with store.open_db(s.db_path) as conn:
+            history = conn.execute("SELECT run_id, previous_json FROM activations ORDER BY created_at").fetchall()
+        self.assertEqual([r[0] for r in history], [known_good, k1["run_id"], known_good])
+        self.assertEqual([json.loads(r[1])["run_id"] for r in history[1:]], [known_good, k1["run_id"]])
+
     def test_an_activated_run_from_an_earlier_routing_rule_stops_serving_after_a_restart(self):
         # A routing deployment without re-measurement: the persisted run's fusion and whole-corpus evidence no longer
         # describe what retrieval does, so the restarted app serves the unselected default and says why.

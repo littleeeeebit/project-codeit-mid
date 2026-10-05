@@ -10,6 +10,7 @@ from unittest import mock
 from rfp_assistant import answers, auth, budget, evaluation, generation, gold, sealed, service, store
 from rfp_assistant.contracts import Principal
 from rfp_assistant.generation import FakeTransport, ProviderError
+from rfp_assistant.retrieval import KeywordIndex
 from tests import fixtures
 from tests import phase4_fixtures as p4
 
@@ -305,6 +306,67 @@ class MetricFixtureTest(unittest.TestCase):
         # a coordinate-free (older) alternative keeps the first occurrence
         free = {k: v for k, v in pinned["alternatives"][0].items() if k != "offsets"}
         self.assertEqual(evaluation.grade(at(first), free, els[("x", "p")]), 2)
+
+    def test_answer_coverage_is_graded_on_the_approved_occurrence_not_the_element(self):
+        """Review round 1 (F1): both occurrences packed, gold pinned to the second, only the first cited."""
+        raw = "이전 계약 하자보수: 12개월. 현재 계약 하자보수: 12개월."
+        q = "12개월"
+        first, second = raw.index(q), raw.rindex(q)
+        chunk = lambda cid, p: {"chunk_id": cid, "extraction_id": "x",  # noqa: E731
+                                "spans": [{"element_id": "p", "start": p, "end": p + len(q)}]}
+        index = mock.Mock(chunks=[chunk("c1", first), chunk("c2", second)],
+                          elements={("x", "p"): {"raw_text": raw, "table": None}})
+        pinned = {"group_id": "g1", "doc_id": "d", "alternatives": [
+            {"element_id": "p", "quote": q, "extraction_id": "x", "offsets": [second, second + len(q)]}]}
+        row = {**gold_row([pinned]), "question_type": "t", "answerability": "answerable",
+               "expected_status": "answered", "scope": [{"doc_id": "d"}]}
+        ev = lambda cid: {"doc_id": "d", "chunk_id": cid, "element_ids": ["p"], "quote": q}  # noqa: E731
+        cite = lambda *ids: {"finalist": "K", "outcome": "answered", "evidence": {"E1": ev("c1"), "E2": ev("c2")},  # noqa: E731
+                             "answer": {"claims": [{"text": q, "kind": "source_fact", "doc_id": "d",
+                                                    "evidence_ids": list(ids)}]}}
+        wrong = answers.score_record(row, cite("E1"), index, {})
+        self.assertEqual((wrong["groups"], wrong["passed"]), ({"gold": 1, "retrieved": 1, "cited": 0}, False))
+        right = answers.score_record(row, cite("E2"), index, {})
+        self.assertEqual((right["groups"], right["passed"]), ({"gold": 1, "retrieved": 1, "cited": 1}, True))
+        # only the first occurrence packed: retrieval never reached the approved one
+        reached = answers.score_record(row, {**cite("E1"), "evidence": {"E1": ev("c1")}}, index, {})
+        self.assertEqual((reached["groups"], reached["passed"]), ({"gold": 1, "retrieved": 0, "cited": 0}, False))
+        # without the index nothing can be graded, so nothing passes
+        self.assertEqual(answers.score_record(row, cite("E2"), None, {})["passed"], False)
+
+    def test_a_shared_original_credits_only_the_document_the_evidence_is_attributed_to(self):
+        """Review round 3 (F1): byte-identical originals of A and C share one chunk; only A's evidence is cited."""
+        raw = "하자보수 기간: 12개월."
+        q = "12개월"
+        start = raw.index(q)
+        index = mock.Mock(chunks=[{"chunk_id": "c1", "extraction_id": "x",
+                                   "spans": [{"element_id": "p", "start": start, "end": start + len(q)}]}],
+                          elements={("x", "p"): {"raw_text": raw, "table": None}})
+        group = lambda doc: {"group_id": f"g-{doc}", "doc_id": doc, "alternatives": [  # noqa: E731
+            {"element_id": "p", "quote": q, "extraction_id": "x", "offsets": [start, start + len(q)]}]}
+        row = {**gold_row([group("A"), group("C")]), "question_type": "t", "answerability": "answerable",
+               "expected_status": "answered", "mode": "compare", "scope": [{"doc_id": "A"}, {"doc_id": "C"}]}
+        ev = lambda doc: {"doc_id": doc, "chunk_id": "c1", "element_ids": ["p"], "quote": q}  # noqa: E731
+        record = {"finalist": "K", "outcome": "answered", "evidence": {"E1": ev("A"), "E2": ev("C")},
+                  "answer": {"claims": [{"text": q, "kind": "source_fact", "doc_id": "A", "evidence_ids": ["E1"]}],
+                             "missing_fields": [{"doc_id": "C", "field": "하자보수 기간"}]}}
+        one_side = answers.score_record(row, record, index, {})
+        self.assertEqual((one_side["groups"], one_side["passed"]), ({"gold": 2, "retrieved": 2, "cited": 1}, False))
+        both = {**record, "answer": {**record["answer"], "missing_fields": [], "claims": [
+            *record["answer"]["claims"], {"text": q, "kind": "source_fact", "doc_id": "C", "evidence_ids": ["E2"]}]}}
+        self.assertEqual(answers.score_record(row, both, index, {})["groups"], {"gold": 2, "retrieved": 2, "cited": 2})
+        # evidence packed only for A never reaches C's group either
+        only_a = {**record, "evidence": {"E1": ev("A")}}
+        self.assertEqual(answers.score_record(row, only_a, index, {})["groups"], {"gold": 2, "retrieved": 1, "cited": 1})
+        # the served-retrieval report splits a comparison the same way: by the evidence's document, not its extraction
+        index.row_of = {"c1": 0}
+        row["scope"] = [{"doc_id": d, "source_hash": "h", "extraction_id": "x"} for d in ("A", "C")]
+        trace = {"retrieval": {"ranking": ["c1", "c1"], "evidence": [{"doc_id": "A", "chunk_id": "c1"}]}}
+        conn = mock.MagicMock()
+        conn.__enter__.return_value.execute.return_value.fetchone.return_value = (json.dumps(trace),)
+        with mock.patch.object(answers, "open_db", return_value=conn):
+            served = answers.served_retrieval(mock.Mock(), index, row, {**only_a, "request_id": "r"})
+        self.assertEqual((served["metrics"]["packed_grades"], served["metrics"]["unit_grades@20"]), ([2, 0], [2, 2]))
 
     def test_named_cells_pick_the_approved_row(self):
         cells = [{"row": 0, "col": 0, "text": "이전 계약"}, {"row": 0, "col": 1, "text": "12개월"},
@@ -879,6 +941,42 @@ class AnswerRunTest(GoldRetrievalTest):
         self.assertEqual(out["status"], "complete")
         blocked = [r for r in answers.load_progress(self.s, out["run_id"]).values() if r["attempt_no"] == 2]
         self.assertEqual(len(blocked), 1)
+
+    def test_a_question_subset_runs_only_its_rows_and_scores_each_row(self):
+        # The PR #13 failures are rerun alone: the subset is part of the identity and the only rows planned or sent.
+        whole = answers.plan_run(self.s, "answer-finalists", "dev", [self.k1], store=False)
+        with self.assertRaisesRegex(answers.AnswerEvalError, "not reviewed dev rows: nope"):
+            answers.plan_run(self.s, "answer-finalists", "dev", [self.k1], question_ids=["nope"])
+        est = answers.plan_run(self.s, "answer-finalists", "dev", [self.k1], question_ids=["dev-compare"])
+        self.assertEqual((est["rows"], est["question_ids"]), (1, ["dev-compare"]))
+        self.assertNotEqual(est["run_id"], whole["run_id"])
+
+        def cite_all(messages):
+            by_doc = json.loads(messages[-1]["content"])["evidence_ids_by_doc"]
+            return generation.ProviderResponse(json.dumps({
+                "status": "answered", "summary": "s", "missing_fields": [], "conflicts": [], "next_action": None,
+                "claims": [{"text": "t", "kind": "source_fact", "doc_id": d, "evidence_ids": ids}
+                           for d, ids in by_doc.items() if ids]}), None, "stop",
+                {"prompt_tokens": 100, "completion_tokens": 10}, f"r-{len(transport.calls)}")
+
+        transport = FakeTransport(cite_all)
+        res = service.Resources(self.s, transport=transport, recover=True)
+        try:
+            out = answers.run_answers(self.s, res, est["estimate_id"], "tester")
+        finally:
+            res.close()
+        self.assertEqual((len(transport.calls), out["status"]), (1, "complete"))
+        passed = out["finalists"][self.k1]["rows_passed"]
+        self.assertEqual((passed["numerator"], passed["denominator"]), (1, 1))
+        # the same answer without the claim that cites a reached group fails: retrieval reached it, the answer didn't
+        (row,) = [r for r in evaluation.load_eval_rows(self.s, "dev")[0] if r["question_id"] == "dev-compare"]
+        record = answers.load_progress(self.s, out["run_id"])[(self.k1, "dev-compare")]
+        config = json.loads((answers.run_dir(self.s, out["run_id"]) / "config.json").read_text(encoding="utf-8"))
+        index = KeywordIndex.load(self.s, config["finalists"][0]["index_version"])
+        scored = answers.score_record(row, record, index, {})
+        self.assertEqual(scored["groups"], {"gold": 2, "retrieved": 2, "cited": 2})
+        dropped = {**record, "answer": {**record["answer"], "claims": record["answer"]["claims"][1:]}}
+        self.assertFalse(answers.score_record(row, dropped, index, {})["passed"])
 
     def test_changed_prices_or_prompts_need_a_new_plan(self):
         est = answers.plan_run(self.s, "answer-finalists", "dev", [self.k1])

@@ -612,6 +612,8 @@ class ReconciliationTest(Base):
         record = {"reconciliation_id": "2026-10-01", "interval_start": "2026-01-01T00:00:00+00:00",
                   "interval_end": "2099-01-01T00:00:00+00:00", "provider_total_micro_usd": 700, "scope": "proj",
                   "evidence": "usage export 2026-10-01", "covered_attempt_ids": [a["attempt_id"]]}
+        with self.assertRaises(auth.AuthError):  # owner only
+            service.reconcile(self.res, self.env.consultant, record)
         snap = service.reconcile(self.res, admin, record)
         self.assertEqual((snap.spent_micro_usd, snap.pending_micro_usd), (700, 0))
         snap = service.reconcile(self.res, admin, record)  # harmless re-import
@@ -718,7 +720,8 @@ class ModesTest(Base):
         self.assertGreaterEqual(sides[self.a.doc_id]["evidence"], 1)
         self.assertGreaterEqual(sides[self.d.doc_id]["evidence"], 1)
         self.assertEqual(sorted(r.evidence), [f"E{i}" for i in range(1, len(r.evidence) + 1)])
-        self.assertLessEqual(sum(e["token_count"] for e in r.evidence.values()), self.settings.evidence_max_tokens)
+        for side in sides.values():
+            self.assertLessEqual(side["tokens"], self.settings.evidence_max_tokens)
         self.assertEqual({c["doc_id"] for c in r.claims}, {self.a.doc_id, self.d.doc_id})
         sent = json.loads(self.transport.calls[0]["messages"][1]["content"])
         self.assertEqual(sent["mode"], "compare")
@@ -736,6 +739,46 @@ class ModesTest(Base):
         r = self.run_req(req(self.a, mode="compare", question="시스템 구축 내용은?", scope=[self.a, self.d]))
         self.assertEqual(r.status, "technical_error")
         self.assertIn("comparison_side_missing", r.error)
+
+    def test_each_comparison_side_packs_what_its_single_document_question_packs(self):
+        # refresh50-ad-migration-design (PR #13): the gate measures each side with full limits, but serving halved
+        # them and packed 4 of 13 groups; the group's chunk ranked 7th on its side, past the 5-unit half.
+        v, lim, question = self.env.verifier, {"evidence_max_units": 3}, "사업명 시스템 운영 하자보수 계약 조건"
+        pair = service.verifier_trace(self.res, v, question, [self.a, self.d], "2026-09-30", limits=lim)
+        packed = [e["chunk_id"] for e in pair["retrieval"]["evidence"]]
+        alone = [e["chunk_id"] for ref in (self.a, self.d) for e in service.verifier_trace(
+            self.res, v, question, [ref], "2026-09-30", limits=lim)["retrieval"]["evidence"]]
+        self.assertGreater(len(alone), 2)  # at least one side needs more than half the units
+        self.assertEqual(packed, alone)
+
+    def test_a_comparison_inference_cites_both_sides_but_a_fact_only_its_own(self):
+        # refresh50-eg-input-error / dh-linked-data (PR #13): every fact cited its own side, and the one inference
+        # comparing the sides cited both, e.g. {"kind": "inference", "doc_id": B, "evidence_ids": ["E1", "E6"]}.
+        def answer(kind, own, other):
+            def respond(messages):
+                by_doc = json.loads(messages[-1]["content"])["evidence_ids_by_doc"]
+                (a, ea), (b, eb) = by_doc.items()
+                facts = [{"text": f"{d} 사실", "kind": "source_fact", "doc_id": d, "evidence_ids": [e[0]]}
+                         for d, e in ((a, ea), (b, eb))]
+                ids = ([eb[0]] if own else []) + ([ea[0]] if other else [])
+                return ProviderResponse(json.dumps({"status": "answered", "summary": "비교", "missing_fields": [],
+                    "conflicts": [], "next_action": None, "claims": facts + [
+                        {"text": "B가 A보다 짧다", "kind": kind, "doc_id": b, "evidence_ids": ids}]}),
+                    None, "stop", {"prompt_tokens": 100, "completion_tokens": 10}, str(uuid.uuid4()))
+            return respond
+
+        for kind, own, other, error in (("inference", True, True, None),
+                                        ("source_fact", True, True, "evidence_scope_mismatch"),
+                                        ("inference", False, True, "evidence_scope_mismatch")):
+            with self.subTest(kind=kind, own=own):
+                self.transport.responder = answer(kind, own, other)
+                r = self.run_req(req(self.a, mode="compare", question="시스템 구축 내용은?", scope=[self.a, self.d]))
+                if error is None:
+                    self.assertEqual(r.status, "answered", r.error)
+                    self.assertEqual(len(r.claims[-1]["evidence_ids"]), 2)
+                else:
+                    self.assertEqual(r.status, "technical_error")
+                    self.assertIn(error, r.error)
 
     def test_an_unavailable_side_is_an_explicit_limitation(self):
         r = self.run_req(req(self.a, mode="compare", question="하자보수 기간은?", scope=[self.a, self.e]))
@@ -838,13 +881,9 @@ class VerifierTest(Base):
         pair = service.verifier_trace(self.res, v, "시스템 구축", [self.a, self.d], "2026-09-30",
                                       mode="whitespace_bm25", limits={"evidence_max_units": 2})
         self.assertEqual((pair["config"]["mode"], pair["retrieval"]["mode"]), ("whitespace_bm25", "whitespace_bm25"))
-        self.assertLessEqual(len(pair["retrieval"]["evidence"]), 2)
+        self.assertTrue(all(c["evidence"] <= 2 for c in pair["coverage"]))  # the limits apply to each side
         self.assertEqual(pair["config"]["effective_limits"]["evidence_max_units"], 2)
         self.assertEqual([c["doc_id"] for c in pair["coverage"]], [self.a.doc_id, self.d.doc_id])
-        with self.assertRaises(service.ServiceError):  # one unit cannot cover two documents: refused, not stored
-            service.verifier_trace(self.res, v, "시스템 구축", [self.a, self.d], "2026-09-30",
-                                   limits={"evidence_max_units": 1})
-        self.assertEqual(len(service.verifier_runs(self.res, v)), 1)
         wide = service.verifier_trace(self.res, v, Q, [self.a], "2026-09-30", limits={"evidence_max_units": 99})
         self.assertEqual(wide["config"]["limits"], {"evidence_max_units": self.settings.evidence_max_units})
 

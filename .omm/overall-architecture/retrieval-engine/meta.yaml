@@ -1,15 +1,24 @@
-created: 2026-10-04T13:34:44.752Z
-updated: 2026-10-04T13:34:44.887Z
-update_count: 2
-last_field: diagram
+created: 2026-10-04 13:34:44.752000+00:00
+updated: 2026-10-05 04:06:16.606000+00:00
+update_count: 8
+last_field: constraint
 kind: nested-class
 title: retrieval-engine
 children:
-  - analyzer
-  - dense-index
-  - evidence-packer
-  - keyword-index
-  - query-policy
-  - rank-fusion
-  - reranker
+- corpus-router
+- dense-search
+- evidence-packer
+- exact-codes
+- fusion
+- lexical-bm25
+- reranker
 parentPath: []
+prev_diagram: "graph TD\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval.py\"\
+  ] -->|\"chunks, BM25, scope terms\"| corpus-router[\"Scope and corpus routing\\\
+  nsrc/rfp_assistant/retrieval.py\"]\r\n  corpus-router -->|\"admitted rows\"| lexical-ranker[\"\
+  Kiwi BM25 ranking\\nsrc/rfp_assistant/retrieval.py\"]\r\n  corpus-router -->|\"\
+  admitted row orders\"| dense-search[\"Exact pgvector search\\nsrc/rfp_assistant/vector_store.py\"\
+  ]\r\n  lexical-ranker -->|\"top 50 BM25 ids\"| fusion[\"Keyword-first RRF fusion\\\
+  nsrc/rfp_assistant/retrieval.py\"]\r\n  dense-search -->|\"top 50 cosine ids\"|\
+  \ fusion\r\n  fusion -->|\"ranked chunk ids\"| evidence-packer[\"Evidence packing\\\
+  nsrc/rfp_assistant/retrieval.py\"]"

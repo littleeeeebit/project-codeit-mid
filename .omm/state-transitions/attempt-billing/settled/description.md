@@ -1,0 +1,1 @@
+Set exactly once by `budget.settle` from reported usage at the attempt's frozen rates. A cost above the reservation freezes paid admission (`frozen_reason`). Settling from reconciled adds a compensating negative adjustment, so the provider total is not counted twice.

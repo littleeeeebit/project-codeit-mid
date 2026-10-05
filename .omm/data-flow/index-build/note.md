@@ -1,0 +1,1 @@
+An index built under another analyzer or query policy, or without the scope-terms snapshot, still serves, marked `index_outdated:`. `evaluate-retrieval`, `trial-reranker`, run validation and activation refuse it.

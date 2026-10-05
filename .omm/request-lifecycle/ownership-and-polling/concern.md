@@ -1,0 +1,1 @@
+request_status and get_request allow access when member_id matches or the principal has 'verifier'. auth.visitor grants every capability (contracts.CAPABILITIES includes verifier), so any UI visitor can read any request and open its evidence by ID. This matches the documented no-login decision but means member scoping is attribution only.

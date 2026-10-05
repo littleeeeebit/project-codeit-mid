@@ -1,0 +1,13 @@
+graph TD
+  reserve["Atomic admission\nsrc/rfp_assistant/budget.py"]
+  dispatch_marker["Dispatch marker\nsrc/rfp_assistant/budget.py"]
+  provider_transport["Provider transport\nsrc/rfp_assistant/generation.py"]
+  settlement["Settlement or unknown\nsrc/rfp_assistant/budget.py"]
+  gateway_owner["Gateway advisory lock\nsrc/rfp_assistant/postgres.py"]
+  owner_admin["Owner reconciliation\nsrc/rfp_assistant/budget.py"]
+  reserve -->|"attempt reserved"| dispatch_marker
+  dispatch_marker -->|"stop guard passed"| provider_transport
+  provider_transport -->|"usage or error"| settlement
+  gateway_owner -->|"owner_guard in transaction"| reserve
+  gateway_owner -->|"owner check per call"| provider_transport
+  owner_admin -->|"resolves unknown attempts"| settlement

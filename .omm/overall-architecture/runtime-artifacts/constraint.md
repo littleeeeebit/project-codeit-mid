@@ -1,0 +1,1 @@
+A new extraction revision leaves old artifacts and element rows in place for pinned gold rows and issued citations. Rebuilding an index keeps the old one for issued citations and rollback. Do not delete these trees: the validated import's references include them, and startup refuses if a referenced artifact changes.

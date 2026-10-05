@@ -1,0 +1,1 @@
+What `service.active_serving(settings)` returns for every request, latency sample and verifier configuration, read from `app_settings.active_run` and `active_index`. `retrieval.retrieve` may still fall back per request when a stage is unavailable.

@@ -1,0 +1,1 @@
+Gemini has its own $0.50 cap, recorded in `.runtime/ocr/gemini-ledger.jsonl` outside the main ledger. OCR text is chunked separately, cited as OCR (`ocr_text` warning) and skipped by the fidelity check.

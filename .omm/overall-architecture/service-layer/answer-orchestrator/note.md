@@ -1,0 +1,1 @@
+`compare` runs `_prepare_compare`: one scoped retrieval per selected document at the single-document limits, so it serves what the retrieval gate measured. Evidence IDs are renumbered E1..En across sides. Validation requires every represented side to appear in a claim or a missing field.

@@ -1,0 +1,13 @@
+graph TD
+  unreviewed["unreviewed\nsrc/rfp_assistant/ingestion.py"]
+  auto_verified["auto_verified\nsrc/rfp_assistant/fidelity.py"]
+  auto_flagged["auto_flagged\nsrc/rfp_assistant/fidelity.py"]
+  human_checked["sample_checked or reviewed\nsrc/rfp_assistant/ingestion.py"]
+  quarantined["quarantined, needs_recovery\nsrc/rfp_assistant/ingestion.py"]
+  unreviewed -->|"fidelity run passes"| auto_verified
+  unreviewed -->|"fidelity finds differences"| auto_flagged
+  auto_flagged -->|"person confirms places"| human_checked
+  auto_verified -->|"review record imported"| human_checked
+  unreviewed -->|"converter fails on reingest"| quarantined
+  quarantined -->|"recover-source passes"| unreviewed
+  human_checked -->|"new extraction output"| unreviewed

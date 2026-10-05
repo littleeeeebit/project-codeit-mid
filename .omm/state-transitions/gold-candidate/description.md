@@ -1,0 +1,1 @@
+`gold_candidates.status` plus the append-only `gold_reviews` log. Only approved rows (and, for disputed rows, those with an agreeing second review) count as valid gold for `validate-gold`, `freeze-dataset` and runs.

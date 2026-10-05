@@ -1,1 +1,0 @@
-`POST /api/gold/{id}/second-review` → `gold.second_review` applies only to approved gold rows. It requires a note and a reviewer distinct from the drafter, the first reviewer and the drafting model. A disagreement keeps the row out of valid gold until a corrected revision is approved. `GET /api/verify/overview` lists rows awaiting it (`gold_awaiting_second_review`).

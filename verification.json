@@ -3,7 +3,8 @@
  "contracts": [
   "docs/plan/end-to-end/3-workflows-and-operations.md",
   "docs/plan/end-to-end/implementation-contracts.md",
-  "docs/plan/end-to-end/4-evaluation-and-release.md"
+  "docs/plan/end-to-end/4-evaluation-and-release.md",
+  "docs/plan/end-to-end/5-team-operation.md"
  ],
  "prose_paths": [
   "README.md",
@@ -216,6 +217,7 @@
     "src/rfp_assistant/settings.py",
     "src/rfp_assistant/store.py",
     "tests/fixtures.py",
+    "tests/test_release.py",
     "tests/test_service.py",
     "tools/verify.py",
     "verification.json"
@@ -226,7 +228,7 @@
    "assertions": [
     {
      "id": "reconciliation",
-     "expected": "Reconciliation and owner-settlement tests pass"
+     "expected": "Reconciliation, owner-settlement and read-only budget-report tests pass"
     }
    ]
   },
@@ -307,6 +309,10 @@
     {
      "id": "phase4-gate",
      "expected": "check --phase 4 --provider fake passes"
+    },
+    {
+     "id": "phase5-gate",
+     "expected": "check --phase 5 --provider fake passes"
     },
     {
      "id": "full-suite",

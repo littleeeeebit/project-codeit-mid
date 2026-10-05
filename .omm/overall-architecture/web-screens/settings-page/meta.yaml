@@ -1,0 +1,9 @@
+created: 2026-10-05T04:06:12.468Z
+updated: 2026-10-05T04:06:12.630Z
+update_count: 2
+last_field: concern
+kind: nested-class
+title: settings-page
+children: []
+parentPath:
+  - web-screens

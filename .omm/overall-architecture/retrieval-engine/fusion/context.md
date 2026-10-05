@@ -1,0 +1,1 @@
+According to the README, the activated run uses keyword_first with the BM25 top 6, k 60 and dense weight 1.0: 50 candidates per channel, 50 fused, 10 evidence units. These values come from the run's recorded limits through `Resources.run_settings`, not from `settings.py` defaults (`fusion='rrf'`, `keyword_head=20`, `evidence_max_units=6`).

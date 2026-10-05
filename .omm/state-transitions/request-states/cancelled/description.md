@@ -1,1 +1,0 @@
-Cancelled while queued, or cancel-requested during a run that then completed or stopped at a checkpoint. Never attachable (`may_attach` refuses `cancel_requested` or `cancelled`).

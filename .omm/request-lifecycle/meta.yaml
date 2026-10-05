@@ -1,14 +1,29 @@
-created: 2026-10-04T13:34:48.815Z
-updated: 2026-10-04T13:34:49.161Z
-update_count: 2
+created: 2026-10-04 13:34:48.815000+00:00
+updated: 2026-10-05 04:06:22.696000+00:00
+update_count: 6
 last_field: diagram
-git_commit: 95e8dc5
-git_branch: main
+git_commit: 4d8c212
+git_branch: close-answer-failures-phase5-runner-lint
 children:
-  - admission
-  - ask-page
-  - cancellation
-  - executor
-  - finish-record
-  - paid-stages
-  - status-poll
+- answer-validation
+- ask-route
+- ask-screen
+- cancellation
+- finish-record
+- model-call
+- ownership-and-polling
+- paid-answer
+- paid-answer-pipeline
+- status-poll
+- submit-answer
+- worker-claim
+prev_diagram: "graph TD\r\n  ask-page[\"Ask page\\nweb/src/components/ask/ask-page.tsx\"\
+  ] -->|\"POST /api/ask\"| submit-answer[\"Validate and persist\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  submit-answer -->|\"metadata, inventory inline\"| free-modes[\"Free answers\\\
+  nsrc/rfp_assistant/service.py\"]\r\n  submit-answer -->|\"queued request ID\"| request-runner[\"\
+  Bounded executor\\nsrc/rfp_assistant/service.py\"]\r\n  request-runner -->|\"claim\
+  \ queued to running\"| paid-answer-pipeline[\"Paid answer pipeline\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  paid-answer-pipeline -->|\"result_json and trace_json\"| requests-table[\"\
+  requests and attempts\\nsrc/rfp_assistant/store.py\"]\r\n  ask-page -->|\"GET status\
+  \ every 1s\"| ownership-and-polling[\"Status and attach check\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  ownership-and-polling -->|\"reads view\"| requests-table"

@@ -1,0 +1,9 @@
+created: 2026-10-05T04:06:16.996Z
+updated: 2026-10-05T04:06:16.997Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: lexical-bm25
+children: []
+parentPath:
+  - retrieval-engine
