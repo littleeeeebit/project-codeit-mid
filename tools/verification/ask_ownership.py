@@ -7,6 +7,8 @@ lifecycle behaviour, not actual-corpus answer quality or user acceptance.
 from __future__ import annotations
 
 import asyncio
+import json
+import re
 import socket
 import sys
 import tempfile
@@ -171,14 +173,33 @@ class AskOwnershipTest(unittest.TestCase):
         self.page.get_by_role("link", name="검증", exact=True).click()
         self.wait_for(lambda: self.rows()[0]["status"] == "cancelled", "late initial response escaped navigation cleanup")
 
-    def test_editing_a_completed_question_detaches_the_previous_answer(self):
+    def test_changing_the_documents_starts_a_new_conversation_and_detaches_its_answers(self):
         self.page.locator("main button[type=submit]").click()
         answer = self.page.locator('section[aria-label="답변"]')
-        expect(answer).to_be_visible(timeout=15000)
+        expect(answer.get_by_text(re.compile(r"^요청 [0-9a-f]{8} · "))).to_be_visible(timeout=15000)
         self.page.locator("#question").fill("사업 예산과 부가가치세 조건은 무엇인가요?")
+        expect(answer).to_have_count(1)  # typing the next question keeps the conversation
+        self.page.get_by_role("checkbox").first.uncheck()
         expect(answer).to_have_count(0)
         self.page.get_by_role("button", name="내 최근 요청").click()
         expect(self.page.get_by_role("button", name=QUESTION, exact=False)).to_be_visible()
+
+    def test_a_follow_up_shows_its_standalone_question_and_opens_markers_in_the_shared_pane(self):
+        self.page.locator("main button[type=submit]").click()
+        latest = self.page.get_by_role("region", name="답변", exact=True)
+        expect(latest.get_by_text(re.compile(r"^요청 [0-9a-f]{8} · "))).to_be_visible(timeout=15000)
+        self.page.locator("#question").fill("그 기간은 언제부터 계산하나요?")
+        self.page.get_by_role("button", name="이어서 질문 · 유료 2회").click()
+        expect(self.page.get_by_role("region", name="질문 1의 답변")).to_be_visible()
+        expect(self.page.get_by_text(re.compile("^검색에 쓴 질문 · "))).to_be_visible(timeout=15000)
+        marker = latest.get_by_role("button", name=re.compile(r"^근거 \d+ 원문 보기$")).first
+        marker.click()
+        pane = self.page.get_by_role("complementary", name="대화 근거", exact=True)
+        expect(pane.get_by_role("heading", name=re.compile(r"^근거 \d+ 원문 인용$"))).to_be_visible()
+        expect(pane.locator("blockquote")).to_be_visible()
+        rows = self.rows()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(json.loads(rows[1]["request_json"])["previous_request_id"], rows[0]["request_id"])
 
 
 if __name__ == "__main__":

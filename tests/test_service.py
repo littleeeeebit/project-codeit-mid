@@ -761,7 +761,8 @@ class ModesTest(Base):
                 facts = [{"text": f"{d} 사실", "kind": "source_fact", "doc_id": d, "evidence_ids": [e[0]]}
                          for d, e in ((a, ea), (b, eb))]
                 ids = ([eb[0]] if own else []) + ([ea[0]] if other else [])
-                return ProviderResponse(json.dumps({"status": "answered", "summary": "비교", "missing_fields": [],
+                return ProviderResponse(json.dumps({"status": "answered", "summary": "비교",
+                    "summary_evidence_ids": [ea[0], eb[0]], "missing_fields": [],
                     "conflicts": [], "next_action": None, "claims": facts + [
                         {"text": "B가 A보다 짧다", "kind": kind, "doc_id": b, "evidence_ids": ids}]}),
                     None, "stop", {"prompt_tokens": 100, "completion_tokens": 10}, str(uuid.uuid4()))

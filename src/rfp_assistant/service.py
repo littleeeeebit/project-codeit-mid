@@ -26,7 +26,7 @@ from . import auth, budget, fidelity, generation, gold, postgres, tracing
 from . import dense as dense_mod
 from .auth import require_any
 from .contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, EvidenceUnit, EvidenceView,
-                        ManagedDownload, Principal, RequestView, RetrievalResult)
+                        ManagedDownload, Principal, RequestView, RetrievalResult, TERMINAL_STATUSES)
 from .ingestion import (CODE_RE, QUARANTINE_TEXT, extraction_review_status, load_elements, nfc, printed_pdf_path,
                         record_review, resolutions_by_doc)
 from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extraction, corpus_scope, scope_rows
@@ -140,6 +140,7 @@ class Resources:
         self._runner: RequestRunner | None = None
         self._runner_lock = threading.Lock()
         self._jobs: list[threading.Thread] = []  # drafting, answer evaluation, judge runs: joined by close()
+        self.partials: dict[str, str] = {}  # request_id -> answer streamed so far, until the request finishes
         self._closed = False
         closer = weakref.WeakMethod(self.close)  # atexit must not keep every Resources (and its index) alive
 
@@ -641,6 +642,8 @@ def _config_snapshot(res: Resources, request: AnswerRequest) -> dict:
 def _input_hash(request: AnswerRequest) -> str:
     data = {"q": nfc(request.question), "scope": [asdict(s) for s in request.scope], "mode": request.mode,
             "as_of": request.as_of, "config": request.config_id, "run": request.verifier_run_id}
+    if request.previous_request_id:  # absent otherwise, so a stored single-turn key keeps its hash
+        data["previous"] = request.previous_request_id
     return hashlib.sha256(dumps(data).encode()).hexdigest()
 
 
@@ -684,6 +687,7 @@ def _finish(res: Resources, request_id: str, result: AnswerResult, trace: dict, 
             status = row["status"]
         conn.execute("UPDATE requests SET status = ?, trace_json = ?, result_json = ?, updated_at = ? "
                      "WHERE request_id = ?", (status, dumps(trace), dumps(asdict(result)), utcnow(), request_id))
+    res.partials.pop(request_id, None)  # the stored outcome replaces what was streamed
     return result
 
 
@@ -776,10 +780,42 @@ def _validate_request(res: Resources, request: AnswerRequest) -> str:
     return question
 
 
+CONVERSATION_TURNS = 6  # earlier turns a follow-up is rewritten from, newest kept
+CONVERSATION_ANSWER_CHARACTERS = 600  # of each earlier answer: enough to name what it was about
+FREE_TURNS = {"metadata": "기본 정보 조회", "inventory": "요구사항 목록 조회"}
+
+
+def _conversation(res: Resources, principal: Principal, request: AnswerRequest) -> list[dict]:
+    """The earlier turns of the conversation `request` continues, oldest first, as {question, answer}. Every earlier
+    turn must be this member's, finished and asked of the same scope; otherwise the request is refused before it
+    is queued. A rewritten turn contributes its standalone question, so references stay resolved."""
+    if request.previous_request_id and request.verifier_run_id:
+        raise ServiceError("검증 실행에서 만드는 답변은 대화를 이어 갈 수 없습니다.")
+    scope = [asdict(r) for r in request.scope]
+    turns, previous = [], request.previous_request_id
+    with open_db(res.settings.db_path) as conn:
+        while previous and len(turns) < CONVERSATION_TURNS:
+            row = conn.execute("SELECT member_id, status, scope_json, request_json, result_json FROM requests "
+                               "WHERE request_id = ?", (previous,)).fetchone()
+            if row is None or row["member_id"] != principal.member_id or not row["request_json"]:
+                raise ServiceError("이어서 질문할 이전 대화를 찾을 수 없습니다.")
+            if row["status"] not in TERMINAL_STATUSES:
+                raise ServiceError("이전 질문의 답변이 끝난 뒤에 이어서 질문할 수 있습니다.")
+            if json.loads(row["scope_json"]) != scope:
+                raise ServiceError("대화 중에는 질문 범위를 바꿀 수 없습니다. 새 대화로 질문하세요.")
+            snap, result = json.loads(row["request_json"]), json.loads(row["result_json"] or "{}")
+            answer = " ".join([result.get("summary") or ""] + [c["text"] for c in result.get("claims") or []])
+            turns.append({"question": result.get("standalone_question") or snap.get("question")
+                          or FREE_TURNS.get(snap.get("mode"), ""),
+                          "answer": answer.strip()[:CONVERSATION_ANSWER_CHARACTERS] or "(답변 없음)"})
+            previous = snap.get("previous_request_id", "")
+    return turns[::-1]
+
+
 def _request_snapshot(principal: Principal, request: AnswerRequest, question: str) -> dict:
     return {"question": question, "scope": [asdict(r) for r in request.scope], "mode": request.mode,
             "as_of": request.as_of, "config_id": request.config_id, "verifier_run_id": request.verifier_run_id,
-            "generation_id": request.generation_id,
+            "generation_id": request.generation_id, "previous_request_id": request.previous_request_id,
             "idempotency_key": request.idempotency_key, "capabilities": sorted(principal.capabilities)}
 
 
@@ -814,6 +850,7 @@ def answer(res: Resources, principal: Principal, request: AnswerRequest) -> Answ
     """Synchronous worker entry (CLI, tests): the same execution as a background request, on this thread."""
     principal = _authorize(res, principal, "consultant", "verifier")
     question = _validate_request(res, request)
+    _conversation(res, principal, request)
     request_id, prior = _create(res, principal, request, question, "running")
     if prior is not None:
         if prior["result_json"]:
@@ -828,6 +865,7 @@ def submit_answer(res: Resources, principal: Principal, request: AnswerRequest) 
     The same key returns the same request across reruns; a full queue is rejected before any paid work."""
     principal = _authorize(res, principal, "consultant", "verifier")
     question = _validate_request(res, request)
+    _conversation(res, principal, request)
     if request.mode in FREE_MODES:
         request_id, prior = _create(res, principal, request, question, "running")
         if prior is None:
@@ -874,7 +912,8 @@ def run_queued(res: Resources, request_id: str) -> None:
     request = AnswerRequest(idempotency_key=snap["idempotency_key"], generation_id=snap["generation_id"],
                             question=snap["question"], scope=[DocRef(**r) for r in snap["scope"]],
                             mode=snap["mode"], as_of=snap["as_of"], config_id=snap["config_id"],
-                            verifier_run_id=snap.get("verifier_run_id", ""))
+                            verifier_run_id=snap.get("verifier_run_id", ""),
+                            previous_request_id=snap.get("previous_request_id", ""))
     principal = Principal(row["member_id"], frozenset(snap["capabilities"]))
     _execute(res, principal, request_id, request, snap["question"])
 
@@ -920,7 +959,8 @@ def _execute(res: Resources, principal: Principal, request_id: str, request: Ans
     with tracing.run(res.tracing, "answer-question", seed=request_id, user_id=principal.member_id,
                      input={"question": question, "scope": scope, "mode": request.mode, "as_of": request.as_of},
                      metadata={"request_id": request_id, "member_id": principal.member_id, "as_of": request.as_of,
-                               "mode": request.mode, "scope": dumps(scope)[:200]},
+                               "mode": request.mode, "scope": dumps(scope)[:200],
+                               "previous_request_id": request.previous_request_id},
                      tags=["ask", request.mode]) as root:
         result = _execute_traced(res, principal, request_id, request, question, root)
     return result
@@ -954,13 +994,14 @@ def _execute_traced(res: Resources, principal: Principal, request_id: str, reque
 
 
 CITATION_ERRORS = ("unknown_evidence_id", "evidence_scope_mismatch", "evidence_quote_mismatch",
-                   "claim_without_evidence", "conflict_without_evidence")
+                   "claim_without_evidence", "conflict_without_evidence", "summary_without_evidence")
 
 
 def _trace_outcome(root: tracing.Step, result: AnswerResult, trace: dict) -> None:
     """The answer as the trace output, and the free deterministic scores known for every exit path."""
     root.update(lambda: {"output": {k: getattr(result, k) for k in (
-        "status", "summary", "claims", "missing_fields", "conflicts", "next_action", "billing_state", "error")},
+        "status", "standalone_question", "summary", "summary_evidence_ids", "claims", "missing_fields", "conflicts",
+        "next_action", "billing_state", "error")},
         "level": "ERROR" if result.status == "technical_error" else "DEFAULT"})
     root.score_trace("insufficient_evidence", 1.0 if result.status == "insufficient_evidence" else 0.0, "BOOLEAN")
     if "retrieval" in trace:
@@ -982,7 +1023,14 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
     # A frozen verifier run is generated from exactly the evidence it shows: no new retrieval, so no query
     # embedding is paid and a cache miss cannot switch it to another mode (refused when serving changed since).
     frozen = _frozen_run_for(res, request, question)
-    principal = _checkpoint(res, request_id, principal)  # the query embedding may be the first paid stage
+    principal = _checkpoint(res, request_id, principal)  # the rewrite or the query embedding may be the first paid stage
+    history = [] if frozen is not None else _conversation(res, principal, request)
+    if history:  # a follow-up: retrieval and the answer use the standalone question rewritten from the conversation
+        question = _rewrite(res, principal, request_id, question, history, docs, trace, done)
+        if isinstance(question, AnswerResult):
+            return question
+        done = functools.partial(done, standalone_question=question)
+        principal = _checkpoint(res, request_id, principal)
     try:
         if frozen is not None:
             prep = _frozen_prep(res, question, request, docs, frozen)
@@ -1019,68 +1067,19 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
         return done("insufficient_evidence", f"{where}에서 질문과 관련된 근거를 찾지 못했습니다.",
                     missing_fields=server_missing, **common)
     principal = _checkpoint(res, request_id, principal)
-    admission = budget.reserve(s.db_path, request_id=request_id, member_id=principal.member_id, stage="generation",
-                               purpose=res.paid_purpose, model=s.generation_model, input_tokens=prep["input_tokens"],
-                               max_output_tokens=s.generation_max_output_tokens, count_method=generation.COUNT_METHOD,
-                               ceiling_micro_usd=frozen["estimate_micro_usd"] if frozen is not None else None)
-    trace["admission"] = admission
-    if admission["reason"] == "above_consented_maximum":
-        return done("clarification_required", "요금 설정이 바뀌어 예약 금액이 검증 실행에서 동의한 최대 비용을 넘습니다. "
-                    "새 검증 실행을 만든 뒤 다시 생성하세요. (유료 호출 없음)", request_status="failed",
-                    evidence=evidence_map, error=admission["reason"], **common)
-    if not admission["admitted"]:
-        return done("budget_blocked", "공유 사용 한도 또는 유료 호출 설정 때문에 답변 생성을 시작하지 않았습니다. "
-                    "검색과 원문 열람은 계속 사용할 수 있습니다.", evidence=evidence_map, error=admission["reason"],
-                    **common)
-    attempt_id = admission["attempt_id"]
-    if res.transport is None:
-        budget.release(s.db_path, attempt_id, "provider_unavailable")
-        return done("technical_error", "유료 모델 연결이 설정되지 않았습니다.", request_status="failed",
-                    evidence=evidence_map, error=res.provider_note, **common)
-    try:  # the stop check and the dispatching marker are one transaction: no shutdown can slip between them
-        budget.mark_dispatching(s.db_path, attempt_id, _dispatch_guard(res, request_id))
-    except budget.DispatchRefused as refused:
-        reason = str(refused)
-        raise _Stop(reason, reason, STOPS[reason]) from None
-    with tracing.step("generate-answer", "generation", model=s.generation_model, input=prep["messages"],
-                      model_parameters={"reasoning_effort": s.generation_reasoning_effort,
-                                        "max_completion_tokens": s.generation_max_output_tokens},
-                      metadata={"attempt_id": attempt_id, "prompt_version": generation.PROMPT_VERSION}) as gen:
-        try:
-            response = res.transport.chat(model=s.generation_model, messages=prep["messages"],
-                                          response_format=prep["response_format"],
-                                          max_completion_tokens=s.generation_max_output_tokens,
-                                          reasoning_effort=s.generation_reasoning_effort)
-        except generation.ProviderError as exc:
-            gen.update(level="ERROR", status_message=str(exc)[:300])
-            if exc.pre_execution:
-                budget.release(s.db_path, attempt_id, str(exc)[:300], confirmed_pre_execution=True)
-            else:
-                budget.mark_unknown(s.db_path, attempt_id, str(exc))
-            return done("technical_error", "모델 호출에 실패했습니다. 자동으로 다시 시도하지 않습니다.",
-                        request_status="failed", evidence=evidence_map, error=str(exc)[:300], **common)
-        except Exception as exc:  # noqa: BLE001 - e.g. a transport closed by shutdown: execution may have happened
-            gen.update(level="ERROR", status_message=type(exc).__name__)
-            budget.mark_unknown(s.db_path, attempt_id, f"{type(exc).__name__}: {exc}")
-            return done("technical_error", "모델 호출 중 연결이 끊겼습니다. 비용은 확인 전까지 보류로 남습니다.",
-                        request_status="failed", evidence=evidence_map, error=f"{type(exc).__name__}: {exc}"[:300],
-                        **common)
-        gen.update(lambda: {"output": tracing.readable(response.content), "metadata": {
-            "response_id": response.response_id, "finish_reason": response.finish_reason,
-            "refusal": response.refusal, "reasoning_tokens": (response.usage or {}).get("reasoning_tokens")}})
-        if response.usage is None:
-            budget.mark_unknown(s.db_path, attempt_id, "provider returned no usage")
-        else:
-            trace["usage"] = response.usage
-            try:
-                trace["settlement"] = budget.settle(s.db_path, attempt_id, response.usage, response.response_id)
-            except Exception as exc:  # noqa: BLE001 - e.g. a reused response ID or a locked ledger
-                # The call was billed but could not be recorded: keep it conservatively pending for the recovery view.
-                budget.mark_unknown(s.db_path, attempt_id, f"settlement_failed: {type(exc).__name__}: {exc}")
-                return done("technical_error", "사용량을 기록하지 못했습니다. 비용은 확인 전까지 보류로 남습니다.",
-                            request_status="failed", evidence=evidence_map,
-                            error=f"settlement_failed: {type(exc).__name__}"[:300], **common)
-            gen.update(lambda: tracing.usage_and_cost(response.usage, trace["settlement"]))
+
+    def streamed(content: str) -> None:  # read by `answer_progress` until `_finish` stores the validated outcome
+        res.partials[request_id] = content
+
+    response = _metered_chat(
+        res, principal, request_id, stage="generation", step="generate-answer",
+        prompt_version=generation.PROMPT_VERSION, messages=prep["messages"],
+        response_format=prep["response_format"], input_tokens=prep["input_tokens"],
+        max_output_tokens=s.generation_max_output_tokens, record=trace,
+        fail=functools.partial(done, evidence=evidence_map, **common),
+        ceiling=frozen["estimate_micro_usd"] if frozen is not None else None, on_delta=streamed)
+    if isinstance(response, AnswerResult):
+        return response
     stored = {e.evidence_id: _stored_quote(res, e) for e in retrieval.evidence}
     represented = {c["doc_id"] for c in coverage if c.get("evidence")}
     try:
@@ -1098,7 +1097,7 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
                     check.score_trace("citation_valid", 0.0, "BOOLEAN")
                 raise
             check.update(lambda: {"output": {"passed": True, "status": payload.status, "cited_evidence_ids": sorted(
-                {i for c in payload.claims for i in c.evidence_ids})}})
+                {i for c in payload.claims for i in c.evidence_ids} | set(payload.summary_evidence_ids))}})
             check.score_trace("citation_valid", 1.0, "BOOLEAN")
     except generation.TechnicalError as exc:
         trace["raw_output"] = (response.content or "")[:4000]
@@ -1109,7 +1108,108 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
     missing += [m for m in server_missing if (m["doc_id"], m["field"]) not in seen]
     return done(payload.status, payload.summary, claims=[c.model_dump() for c in payload.claims],
                 missing_fields=missing, conflicts=[c.model_dump() for c in payload.conflicts],
-                next_action=payload.next_action, evidence=evidence_map, **common)
+                next_action=payload.next_action, evidence=evidence_map,
+                summary_evidence_ids=payload.summary_evidence_ids, **common)
+
+
+REWRITE_MAX_OUTPUT_TOKENS = 1500  # reasoning included; the output is one question
+
+
+def _rewrite(res: Resources, principal: Principal, request_id: str, question: str, history: list[dict],
+             docs: list[dict], trace: dict, done) -> str | AnswerResult:
+    """The follow-up as one standalone question, from the conversation, through the gateway. Returns the question,
+    or the request's outcome when the call was refused or its output unusable (billed, never retried)."""
+    messages = generation.build_rewrite_messages(history, question, [d["effective"]["title"] for d in docs])
+    rf = generation.rewrite_json_schema()
+    record = trace["rewrite"] = {"asked": question, "conversation_turns": len(history),
+                                 "prompt_version": generation.REWRITE_PROMPT_VERSION}
+    response = _metered_chat(
+        res, principal, request_id, stage="query_rewrite", step="rewrite-question",
+        prompt_version=generation.REWRITE_PROMPT_VERSION, messages=messages, response_format=rf,
+        input_tokens=generation.count_request_tokens(messages, rf, res.settings.framing_margin_tokens),
+        max_output_tokens=REWRITE_MAX_OUTPUT_TOKENS, record=record, fail=done)
+    if isinstance(response, AnswerResult):
+        return response
+    try:
+        record["query"] = generation.validate_rewrite(response, res.settings.question_max_characters)
+    except generation.TechnicalError as exc:
+        record["raw_output"] = (response.content or "")[:2000]
+        return done("technical_error", "이어진 질문을 검색용 질문으로 바꾸지 못했습니다. 비용은 기록되었으며 자동 재시도는 "
+                    "하지 않습니다.", request_status="failed", error=str(exc)[:300])
+    return record["query"]
+
+
+def _metered_chat(res: Resources, principal: Principal, request_id: str, *, stage: str, step: str,
+                  prompt_version: str, messages: list[dict], response_format: dict, input_tokens: int,
+                  max_output_tokens: int, record: dict, fail, ceiling: int | None = None, on_delta=None):
+    """One paid chat call of a request through the gateway: reserve its maximum, mark it dispatching under the
+    request's stop check, call, then settle, release (confirmed pre-execution) or keep it unknown. Returns the
+    provider response, or `fail(...)`'s outcome when the call was refused or failed; never retries. `record`
+    receives the admission, usage and settlement."""
+    s = res.settings
+    admission = budget.reserve(s.db_path, request_id=request_id, member_id=principal.member_id, stage=stage,
+                               purpose=res.paid_purpose, model=s.generation_model, input_tokens=input_tokens,
+                               max_output_tokens=max_output_tokens, count_method=generation.COUNT_METHOD,
+                               ceiling_micro_usd=ceiling)
+    record["admission"] = admission
+    if admission["reason"] == "above_consented_maximum":
+        return fail("clarification_required", "요금 설정이 바뀌어 예약 금액이 검증 실행에서 동의한 최대 비용을 넘습니다. "
+                    "새 검증 실행을 만든 뒤 다시 생성하세요. (유료 호출 없음)", request_status="failed",
+                    error=admission["reason"])
+    if not admission["admitted"]:
+        return fail("budget_blocked", "공유 사용 한도 또는 유료 호출 설정 때문에 답변 생성을 시작하지 않았습니다. "
+                    "검색과 원문 열람은 계속 사용할 수 있습니다.", error=admission["reason"])
+    attempt_id = admission["attempt_id"]
+    if res.transport is None:
+        budget.release(s.db_path, attempt_id, "provider_unavailable")
+        return fail("technical_error", "유료 모델 연결이 설정되지 않았습니다.", request_status="failed",
+                    error=res.provider_note)
+    try:  # the stop check and the dispatching marker are one transaction: no shutdown can slip between them
+        budget.mark_dispatching(s.db_path, attempt_id, _dispatch_guard(res, request_id))
+    except budget.DispatchRefused as refused:
+        reason = str(refused)
+        if reason in STOPS:
+            raise _Stop(reason, reason, STOPS[reason]) from None
+        # the ledger refused (unresolved unknown billing, maintenance, lost ownership): released, nothing sent
+        return fail("budget_blocked", "결제 기록 점검 중이어서 유료 호출을 시작하지 않았습니다. 검색과 원문 열람은 계속 "
+                    "사용할 수 있습니다.", error=reason[:300])
+    with tracing.step(step, "generation", model=s.generation_model, input=messages,
+                      model_parameters={"reasoning_effort": s.generation_reasoning_effort,
+                                        "max_completion_tokens": max_output_tokens},
+                      metadata={"attempt_id": attempt_id, "prompt_version": prompt_version}) as gen:
+        try:
+            response = res.transport.chat(model=s.generation_model, messages=messages,
+                                          response_format=response_format, max_completion_tokens=max_output_tokens,
+                                          reasoning_effort=s.generation_reasoning_effort, on_delta=on_delta)
+        except generation.ProviderError as exc:
+            gen.update(level="ERROR", status_message=str(exc)[:300])
+            if exc.pre_execution:
+                budget.release(s.db_path, attempt_id, str(exc)[:300], confirmed_pre_execution=True)
+            else:
+                budget.mark_unknown(s.db_path, attempt_id, str(exc))
+            return fail("technical_error", "모델 호출에 실패했습니다. 자동으로 다시 시도하지 않습니다.",
+                        request_status="failed", error=str(exc)[:300])
+        except Exception as exc:  # noqa: BLE001 - e.g. a transport closed by shutdown: execution may have happened
+            gen.update(level="ERROR", status_message=type(exc).__name__)
+            budget.mark_unknown(s.db_path, attempt_id, f"{type(exc).__name__}: {exc}")
+            return fail("technical_error", "모델 호출 중 연결이 끊겼습니다. 비용은 확인 전까지 보류로 남습니다.",
+                        request_status="failed", error=f"{type(exc).__name__}: {exc}"[:300])
+        gen.update(lambda: {"output": tracing.readable(response.content), "metadata": {
+            "response_id": response.response_id, "finish_reason": response.finish_reason,
+            "refusal": response.refusal, "reasoning_tokens": (response.usage or {}).get("reasoning_tokens")}})
+        if response.usage is None:
+            budget.mark_unknown(s.db_path, attempt_id, "provider returned no usage")
+        else:
+            record["usage"] = response.usage
+            try:
+                record["settlement"] = budget.settle(s.db_path, attempt_id, response.usage, response.response_id)
+            except Exception as exc:  # noqa: BLE001 - e.g. a reused response ID or a locked ledger
+                # The call was billed but could not be recorded: keep it conservatively pending for the recovery view.
+                budget.mark_unknown(s.db_path, attempt_id, f"settlement_failed: {type(exc).__name__}: {exc}")
+                return fail("technical_error", "사용량을 기록하지 못했습니다. 비용은 확인 전까지 보류로 남습니다.",
+                            request_status="failed", error=f"settlement_failed: {type(exc).__name__}"[:300])
+            gen.update(lambda: tracing.usage_and_cost(response.usage, record["settlement"]))
+    return response
 
 
 # ---------------------------------------------------------------- balanced two-document comparison
@@ -2334,9 +2434,11 @@ def build_head() -> str:
     return head if out.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", head) else "unknown"
 
 
-def target_key(scope: list[tuple[str, str]], question: str, mode: str, as_of: str) -> str:
-    """Identity of what a screen currently asks: selected (doc_id, source_hash) pairs, question, mode, date."""
-    data = {"scope": [list(x) for x in scope], "q": " ".join((question or "").split()), "mode": mode, "as_of": as_of}
+def target_key(scope: list[tuple[str, str]], question: str, mode: str, as_of: str, previous: str = "") -> str:
+    """Identity of what a screen currently asks: selected (doc_id, source_hash) pairs, question, mode, date, and the
+    conversation turn it follows."""
+    data = {"scope": [list(x) for x in scope], "q": " ".join((question or "").split()), "mode": mode, "as_of": as_of,
+            "previous": previous}
     return hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
@@ -2373,14 +2475,26 @@ def find_documents(res: Resources, principal: Principal, query: str = "", instit
 
 
 def ask(res: Resources, principal: Principal, scope: list[tuple[str, str]], question: str, mode: str,
-        as_of: str) -> dict:
-    """One question from 질문하기 under a fresh generation ID; returns the ownership record the screen keeps."""
+        as_of: str, previous_request_id: str = "") -> dict:
+    """One question from 질문하기 under a fresh generation ID, continuing the conversation of `previous_request_id`
+    when given; returns the ownership record the screen keeps."""
     generation_id = str(uuid.uuid4())
     request_id = submit_answer(res, principal, AnswerRequest(
         idempotency_key=generation_id, generation_id=generation_id, question=question or "",
-        scope=[DocRef(*x) for x in scope], mode=mode, as_of=as_of))
+        scope=[DocRef(*x) for x in scope], mode=mode, as_of=as_of, previous_request_id=previous_request_id))
     return {"request_id": request_id, "generation_id": generation_id,
-            "target": target_key(scope, question, mode, as_of)}
+            "target": target_key(scope, question, mode, as_of, previous_request_id)}
+
+
+def answer_progress(res: Resources, principal: Principal, request_id: str, generation_id: str) -> dict:
+    """Read-only, for a streaming screen: whether the request finished, and the unvalidated answer written so far
+    (None before generation starts, once it finished, or when this generation no longer owns it). The validated
+    outcome comes only from `request_status`."""
+    view = request_status(res, principal, request_id)
+    content = res.partials.get(request_id)
+    live = view.status == "running" and not view.cancel_requested and view.generation_id == generation_id
+    return {"finished": view.status not in ("queued", "running"),
+            "partial": generation.partial_answer(content) if live and content else None}
 
 
 def trace_documents(res: Resources, principal: Principal) -> list[dict]:

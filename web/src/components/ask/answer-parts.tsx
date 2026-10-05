@@ -20,12 +20,71 @@ export function docLabel(a: Answer, docId: string): string {
   return order.length > 1 && order.includes(docId) ? `문서 ${order.indexOf(docId) + 1}` : "";
 }
 
-export function citedIds(a: Answer, ids: string[]): string[] {
-  return ids.filter((id) => id in a.evidence);
+/** How an answer's citations open: marker numbers by evidence ID, the open one, and what a click does. */
+export type Cite = { numbers: Map<string, number>; active?: string | null; onCite?: (id: string) => void };
+
+/** Numbers 1, 2, … in first-cited order (summary, sentences, conflicts, requirements), so a reader meets them
+ *  in order. A streamed answer is numbered by the same rule, so its numbers survive validation. */
+export function citationNumbers(ids: string[]): Map<string, number> {
+  return new Map(ids.map((id, i) => [id, i + 1]));
+}
+
+/** Numbered citation markers at the end of a sentence. Without `onCite` (a streamed, unvalidated answer) they
+ *  are plain numbers: nothing can be opened before validation keeps the evidence. */
+export function Markers({ ids, cite }: { ids: string[]; cite: Cite }) {
+  const shown = [...new Set(ids.filter((id) => cite.numbers.has(id)))];
+  if (!shown.length) return null;
+  return (
+    <span className="ml-1 inline-flex gap-0.5 align-[0.1em]">
+      {shown.map((id) => {
+        const n = cite.numbers.get(id);
+        return cite.onCite ? (
+          <button key={id} type="button" onClick={() => cite.onCite!(id)} aria-pressed={cite.active === id}
+                  aria-label={`근거 ${n} 원문 보기`}
+                  className={cn("inline-flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-[13px] leading-none font-bold tabular-nums outline-none",
+                    "focus-visible:ring-3 focus-visible:ring-ring/50",
+                    cite.active === id ? "bg-primary text-primary-foreground" : "bg-accent text-primary hover:bg-primary/15")}>
+            {n}
+          </button>
+        ) : (
+          <span key={id} className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-secondary px-1 text-[13px] leading-none font-semibold text-muted-foreground tabular-nums">
+            {n}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+type Sentence = { text: string; kind: string; doc_id: string; evidence_ids: string[] };
+
+/** The answer as sentences, each ending with its markers; a comparison groups them under 문서 1 and 문서 2. */
+export function Sentences({ claims, cite, labelOf }: {
+  claims: Sentence[]; cite: Cite; labelOf: (docId: string) => string;
+}) {
+  if (!claims.length) return null;
+  const groups = new Map<string, Sentence[]>();
+  for (const c of claims) groups.set(labelOf(c.doc_id), [...(groups.get(labelOf(c.doc_id)) ?? []), c]);
+  return (
+    <section className="space-y-4" aria-label="답변 내용">
+      {[...groups.entries()].map(([doc, items]) => (
+        <div key={doc} className="space-y-2.5">
+          {doc && <h3 className="text-sm font-bold text-muted-foreground">{doc}</h3>}
+          {items.map((c, i) => (
+            <p key={i} className="text-base [overflow-wrap:anywhere]">
+              {c.kind === "inference" && <StatusBadge tone="warn" className="mr-1.5 align-[0.1em]">추론</StatusBadge>}
+              {c.text}
+              <Markers ids={c.evidence_ids} cite={cite} />
+            </p>
+          ))}
+        </div>
+      ))}
+    </section>
+  );
 }
 
 /** The state badge and the conclusion; every state has its own body (DESIGN.md, result states). */
-export function StateHead({ answer, large = false }: { answer: Answer; large?: boolean }) {
+export function StateHead({ answer, large = false, cite }: { answer: Answer; large?: boolean; cite?: Cite }) {
   const s = STATUS[answer.status] ?? { label: answer.status, tone: "neutral" as const };
   if (answer.status === "technical_error") {
     return (
@@ -63,16 +122,17 @@ export function StateHead({ answer, large = false }: { answer: Answer; large?: b
     );
   }
   return (
-    <div className="space-y-3 rounded-xl border border-primary/25 bg-accent/40 p-5">
-      <div className="flex flex-wrap items-center gap-3"><span className="text-sm font-semibold">답변 요약</span><StatusBadge tone={s.tone} size="md">{s.label}</StatusBadge></div>
-      <p className={cn("leading-relaxed font-semibold text-foreground", large ? "text-[22px] leading-snug" : "text-lg")}>
+    <div className="space-y-2">
+      <StatusBadge tone={s.tone}>{s.label}</StatusBadge>
+      <p className={cn("font-semibold text-foreground [overflow-wrap:anywhere]", large ? "text-[22px] leading-snug" : "text-lg leading-relaxed")}>
         {answer.summary}
+        {cite && <Markers ids={answer.summary_evidence_ids} cite={cite} />}
       </p>
     </div>
   );
 }
 
-export function ConflictTable({ answer, onCite }: { answer: Answer; onCite: (id: string) => void }) {
+export function ConflictTable({ answer, cite }: { answer: Answer; cite: Cite }) {
   if (!answer.conflicts.length) return null;
   const pair = answer.coverage.length > 1;
   return (
@@ -81,9 +141,9 @@ export function ConflictTable({ answer, onCite }: { answer: Answer; onCite: (id:
         {answer.conflicts.flatMap((c) => c.alternatives.map((alt, i) => (
           <tr key={`${c.field}-${i}`}>
             <td className={cn(td, "font-medium")}>{i === 0 ? label(FIELD, c.field) : ""}</td>
-            {pair && <td className={td}>{docLabel(answer, alt.doc_id) || "-"}</td>}
+            {pair && <td className={cn(td, "whitespace-nowrap")}>{docLabel(answer, alt.doc_id) || "-"}</td>}
             <td className={cn(td, "font-semibold")}>{String(alt.value)}</td>
-            <td className={td}><Chips answer={answer} ids={alt.evidence_ids} onCite={onCite} /></td>
+            <td className={td}><Markers ids={alt.evidence_ids} cite={cite} /></td>
           </tr>
         )))}
       </Table>
@@ -210,27 +270,6 @@ export function InventoryTable({ answer, onCite }: { answer: Answer; onCite: (id
   );
 }
 
-/** Citation chips: a button per evidence ID, opening the original quote. */
-export function Chips({ answer, ids, onCite, active }: {
-  answer: Answer; ids: string[]; onCite: (id: string) => void; active?: string | null;
-}) {
-  const cited = citedIds(answer, ids);
-  if (!cited.length) return null;
-  return (
-    <span className="inline-flex flex-wrap gap-1 align-middle">
-      {cited.map((id) => (
-        <button key={id} type="button" onClick={() => onCite(id)} aria-pressed={active === id}
-                aria-label={`근거 ${id} 원문 보기`}
-                className={cn("inline-flex h-8 min-w-9 items-center justify-center rounded-md border border-primary/20 px-2 text-sm font-bold tabular-nums outline-none",
-                  "focus-visible:ring-3 focus-visible:ring-ring/50",
-                  active === id ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground hover:bg-primary/15")}>
-          {id}
-        </button>
-      ))}
-    </span>
-  );
-}
-
 export function useEvidence(requestId: string, evidenceId: string | null) {
   return usePoll(evidenceId ? `${requestId}/${evidenceId}` : null, () => must(
     api.GET("/api/requests/{request_id}/evidence/{evidence_id}",
@@ -238,17 +277,17 @@ export function useEvidence(requestId: string, evidenceId: string | null) {
 }
 
 /** The opened citation: the exact quote first, optional surrounding paragraphs, location and original file. */
-export function EvidenceDetail({ requestId, evidenceId }: {
-  requestId: string; evidenceId: string | null;
+export function EvidenceDetail({ requestId, evidenceId, number }: {
+  requestId: string; evidenceId: string | null; number?: number;
 }) {
   const { data, error, loading } = useEvidence(requestId, evidenceId);
   if (!evidenceId) return null;
   if (loading) return <div className="space-y-2"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-20 w-full" /></div>;
   if (error || !data) return <p role="alert" className="text-sm text-bad">{error}</p>;
-  return <EvidenceBody key={data.evidence_id} ev={data} />;
+  return <EvidenceBody key={data.evidence_id} ev={data} number={number} />;
 }
 
-export function EvidenceBody({ ev }: { ev: Evidence }) {
+export function EvidenceBody({ ev, number }: { ev: Evidence; number?: number }) {
   const [around, setAround] = useState(false);
   const [fullQuote, setFullQuote] = useState(false);
   const paragraphs = ev.context.length ? ev.context : [{ element_id: "q", text: ev.quote, cited: true, location: {} }];
@@ -260,7 +299,9 @@ export function EvidenceBody({ ev }: { ev: Evidence }) {
   return (
     <div className="space-y-5">
       <div className="space-y-2">
-        <h3 className="text-lg font-bold">원문 인용 <span className="ml-1 text-primary">{ev.evidence_id}</span></h3>
+        <h3 className="text-lg font-bold">
+          {number ? <>근거 <span className="text-primary">{number}</span> 원문 인용</> : <>원문 인용 <span className="ml-1 text-primary">{ev.evidence_id}</span></>}
+        </h3>
         <p className="text-base font-semibold">{ev.title || "제목 없음"}</p>
         <p className="text-[13px] text-muted-foreground">{locationText(ev.location)} · {label(REVIEW, ev.review_status)}</p>
       </div>
@@ -313,12 +354,14 @@ export function RequestFooter({ view }: { view: RequestView }) {
   );
 }
 
-/** Every evidence ID the answer cites, in first-cited order: what a source row or pane lists. */
+/** IDs in first-cited order across `lists`, each once. */
+export function firstCited(lists: string[][], keep: (id: string) => boolean = () => true): string[] {
+  return [...new Set(lists.flat().filter(keep))];
+}
+
+/** Every evidence ID the answer cites, in first-cited order: what the markers number and the pane opens. */
 export function citedInOrder(a: Answer): string[] {
-  const seen: string[] = [];
-  const add = (ids: string[]) => ids.forEach((id) => id in a.evidence && !seen.includes(id) && seen.push(id));
-  a.claims.forEach((c) => add(c.evidence_ids));
-  a.conflicts.forEach((c) => c.alternatives.forEach((alt) => add(alt.evidence_ids)));
-  a.inventory?.items.forEach((i) => i.evidence_id && add([i.evidence_id]));
-  return seen;
+  return firstCited([a.summary_evidence_ids, ...a.claims.map((c) => c.evidence_ids),
+    ...a.conflicts.flatMap((c) => c.alternatives.map((alt) => alt.evidence_ids)),
+    ...(a.inventory?.items ?? []).map((i) => (i.evidence_id ? [i.evidence_id] : []))], (id) => id in a.evidence);
 }

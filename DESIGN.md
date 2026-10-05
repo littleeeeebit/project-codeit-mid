@@ -128,7 +128,8 @@ Every answer opens with a status badge carrying its text label, and each state h
 | State | Badge | Body |
 | --- | --- | --- |
 | Loading (queued or running) | 대기 중 / 처리 중, neutral | What is happening, the reserved maximum once known, and 요청 취소 |
-| Complete | 답변, green | Conclusion, then the claim list with citation chips |
+| Streaming (running, model writing) | 작성 중 · 검증 전, neutral | The provisional summary and sentences behind a dashed edge; markers not yet openable (§12) |
+| Complete | 답변, green | Conclusion, then one sentence per claim, each ending with numbered citation markers |
 | Insufficient evidence | 근거 부족, amber | Conclusion, the table of unconfirmed fields with reasons, the next action as a callout |
 | Clarification | 확인 필요, blue | The question back to the user as a callout, then any claims |
 | Conflict | 근거 충돌, amber | A table of the competing values with their citations, side by side |
@@ -138,11 +139,11 @@ Every answer opens with a status badge carrying its text label, and each state h
 
 ### Request ownership
 
-There is no login. The typed name lives in browser storage; React state holds the selected scope, mode and owned request `{request_id, generation_id, target}`. `target` hashes the scope, question, mode and date (`service.target_key`). Submitting creates one generation and idempotency ID; read-only polling reuses it and never resubmits. While the owned request is unfinished, the input is disabled. The answer pane renders a request only when `service.may_attach` holds: same request, generation and target, and not cancelled. Changing the selection or mode makes the old request history; it is cancelled only while still queued (`service.abandon_request`), and its billing continues regardless.
+There is no login. The typed name lives in browser storage; React state holds the selected scope, mode and owned request `{request_id, generation_id, target}`. `target` hashes the scope, question, mode and date (`service.target_key`). Submitting creates one generation and idempotency ID; read-only polling reuses it and never resubmits. While the owned request is unfinished, the input is disabled. The answer pane renders a request only when `service.may_attach` holds: same request, generation and target, and not cancelled. In a conversation each turn holds its own ownership, and its target also hashes the previous turn's request ID. Changing the selection or scope, or pressing 새 대화, ends the conversation and makes its turns history; it is cancelled only while still queued (`service.abandon_request`), and its billing continues regardless.
 
 ### Polling
 
-Read-only client polling: the budget row every 2 s, the owned request every 1 s while unfinished, and a development evaluation or drafting run every 2 s while it runs. None of these polls can submit, embed, generate, index or judge. Finished results update the current component. A failed ledger read shows "최신 아님" and never shows numbers as live.
+Read-only client polling: the budget row every 2 s, the owned request every 1 s while unfinished, and a development evaluation or drafting run every 2 s while it runs. A running paid answer is also read from `GET /api/requests/{id}/stream` (server-sent events, read through fetch so the submitting member's header goes with it). It carries only the partial text and a final `done` event, after which the poll fetches the validated outcome at once. None of these polls can submit, embed, generate, index or judge. Finished results update the current component. A failed ledger read shows "최신 아님" and never shows numbers as live.
 
 ### Shell boundary
 
@@ -413,3 +414,52 @@ Walked in Chrome 154, viewport by viewport with 100 px of overlap, at 1440×900 
   - Visually hidden "(최고)" spans escaped the table frame and widened the narrow page. The table frame is now `relative`.
   - Every hybrid row ties at nDCG@5 0.941, because keyword_first keeps the BM25 head, so the marking said nothing. A column now marks its best value only when at most half of the complete rows share it. The headline says "13개 행이 같은 값" instead of listing 13 names.
   - On hover, the sticky row name stayed white while the rest of the row turned grey. Both now take the same opaque hover colour.
+
+## 12. 질문하기 as a conversation
+
+### Purpose and layout
+
+The person asks, reads the answer, and asks again without restating the project. A conversation is bound to its scope: the picked documents, or 전체 문서. Changing the documents or the scope, or pressing 새 대화, ends the conversation. Its turns stay under 내 최근 요청. The mode can change between turns, so a comparison conversation can take a free 기본 정보 비교 turn.
+
+```
+[질문하기 header, scope switch, picked documents]
+대화  질문 3개                                  [새 대화]
+┌──────────── conversation (3fr) ────────────┐ ┌──── 대화 근거 (2fr, sticky) ────┐
+│                       [ question 1 bubble ] │ │ 질문 3의 근거                    │
+│ ● 답변                                       │ │ 근거 2 원문 인용                 │
+│ Summary sentence. ①②                        │ │ document · page/table · 대조     │
+│ Claim sentence. ①                           │ │ ▌ quote                          │
+│ 요청 … · 정산 $0.0010                        │ │ [앞뒤 문단 포함 전체 원문 보기]   │
+│      [ question 2 bubble                    ] │ │ [원문 파일 받기]                 │
+│      [ 검색에 쓴 질문 · standalone query    ] │ └──────────────────────────────────┘
+│ ● 작성 중 · 검증 전   예약 최대 $0.0028 [요청 취소]
+│ ┊ provisional summary ①②                   │
+│ ┊ provisional sentences                     │
+│ ┌ composer (sticky bottom) ───────────────┐ │
+│ │ [ 이어서 질문하세요                      ] │ │
+│ │ [modes]             [이어서 질문 · 유료 2회] │ │
+│ └─────────────────────────────────────────┘ │
+└─────────────────────────────────────────────┘
+```
+
+- The question is a right-aligned bubble. After a follow-up is answered, the bubble shows the standalone query that retrieval used ("검색에 쓴 질문 · …", 13 px muted). The person can see what the history turned the question into.
+- Each answer is a list of sentences, not boxed cards. The summary is one sentence at 18 px semibold. Each claim is one 16 px sentence. A comparison groups the claims under 문서 1 and 문서 2. Every sentence ends with numbered markers (24 px square, 13 px bold). The numbers follow the order of first citation in that answer: summary, claims, conflicts, then inventory. The summary of an answered result must cite at least one evidence ID, or validation rejects it (`summary_without_evidence`).
+- A marker opens its evidence in the shared 대화 근거 pane: the quote with its location and review warning, the neighbouring text, and the original download. The pane is captioned with the turn it belongs to (질문 k의 근거). The open marker is filled navy; the others are pale. The latest answer opens its first citation by itself.
+- Below 1024 px the pane is a bottom sheet (up to 80% of the height, its own scroll). It opens only when a marker is tapped, takes focus, and closes with Escape or ✕. Wide screens never set it, so rotating or resizing does not leave a sheet open.
+- Streaming: while the model writes, the turn shows 작성 중 · 검증 전 with the reserved maximum and 요청 취소. The partial summary and sentences appear behind a dashed left edge, with the note that they are provisional. Their markers are numbered but cannot be opened. On completion the validated answer replaces the provisional text. A rejected answer shows its failure state instead (insufficient evidence, clarification, conflict or technical error); no provisional text is left behind.
+- Each new turn scrolls its question to the top of the view, so the answer streams in above the composer.
+- The composer sticks to the bottom of the conversation column and stays small: a one-line growing field (up to 160 px), then the mode tabs (13 px) and the button on one row. While a turn is unfinished the field is disabled and its placeholder says why. A paid follow-up is labelled 이어서 질문 · 유료 2회: one call rewrites the question, the other answers it. Both are reserved and settled through the existing gateway.
+
+### Browser measurements
+
+Walked in Chrome 154 with real paid conversations of three turns each (member `claude-chat-walk`, 2026-10-06). Each conversation was walked at 1440×900, then the same page was resized to 390×844 and walked again, viewport by viewport with 100 px of overlap. Twelve turns cost $0.0131 in total, including eight follow-up rewrites; the budget row moved from $2.45 to $2.46.
+
+- Selected document (한영대학교): 근거 충돌 with its conflict table, then two 답변 turns. The page was 1943 px at 1440 and 4536 px at 390.
+- 전체 문서 (고려대학교 차세대 포털): three 답변 turns. Each follow-up's standalone query restated the project name. The page was 1926 px and 4351 px.
+- Two-document comparison, twice: 근거 충돌, 근거 부족 with its unconfirmed-fields table, then 답변 grouped by 문서 1 and 문서 2. The pages were 3003/3081 px at 1440 and 5989/6185 px at 390.
+- scrollWidth equalled the viewport at both widths in every walk. Provisional text appeared 3–16 s after submission, and the validated answer replaced it 1–7 s later. The bottom sheet measured 390×675 at 390×844, and Escape closed it.
+- Langfuse shows the follow-up's `rewrite-question` generation, with the standalone query as its output and before `retrieve-evidence`. The root `answer-question` output carries `standalone_question`.
+- Fixed during the walk:
+  - The first sticky composer was about 225 px tall at 1440 and 290 px at 390 (mode tabs, a two-line field and a button row). It covered the streaming text. It is now about 135 px and 180 px, and each new turn scrolls to the top.
+  - A desktop marker click set the sheet state, so resizing to phone width showed an open sheet. Only narrow clicks open it now.
+  - The conflict table's 문서 column wrapped "문서 1" onto two lines. That cell no longer wraps.
