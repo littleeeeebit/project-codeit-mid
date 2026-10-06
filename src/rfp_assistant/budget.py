@@ -461,12 +461,17 @@ def reconcile(db: Path, actor: str, reconciliation_id: str, interval_start: str,
         if not evidence.strip() or not scope.strip():
             raise BudgetError("reconciliation needs the provider scope and dated evidence")
         for attempt_id in covered_attempt_ids:  # only explicitly covered unknown attempts inside the interval
-            a = conn.execute("SELECT state, dispatched_at FROM attempts WHERE attempt_id = ?",
+            a = conn.execute("SELECT state, dispatched_at, price_json FROM attempts WHERE attempt_id = ?",
                              (attempt_id,)).fetchone()
             if a is None or a["state"] != "unknown":
                 raise BudgetError(f"covered attempt {attempt_id} is not an unknown attempt")
             if not a["dispatched_at"] or not interval_start <= a["dispatched_at"] <= interval_end:
                 raise BudgetError(f"covered attempt {attempt_id} was not dispatched inside the interval")
+            # Only this project's evidence can resolve this project's bill.
+            billed_to = json.loads(a["price_json"] or "{}").get("billing_scope")
+            if billed_to != scope if billed_to is not None else unscoped != "include":
+                raise BudgetError(f"covered attempt {attempt_id} is billed to "
+                                  f"{billed_to or 'the server-environment key (unscoped)'}, not to {scope}")
         overlap = conn.execute(
             "SELECT 1 FROM adjustments WHERE correction_key LIKE 'reconcile:%' AND scope = ? "
             "AND NOT (interval_end < ? OR interval_start > ?)", (scope, interval_start, interval_end)).fetchone()

@@ -127,6 +127,18 @@ class ApiFlowTest(unittest.TestCase):
         finally:
             res.close()
 
+    def test_an_evaluation_answers_with_its_recorded_model_whatever_the_browser_chose(self):
+        from rfp_assistant import answers
+
+        pinned = answers.PinnedResources(self.env.settings, None, {"mode": "kiwi_bm25"})
+        token = service.generation.REQUEST_MODEL.set("gpt-5-nano")  # the browser that started the run chose nano
+        try:
+            self.assertEqual(self.res.generation_model(), "gpt-5-nano")
+            self.assertEqual(pinned.generation_model(), self.env.settings.generation_model)
+        finally:
+            service.generation.REQUEST_MODEL.reset(token)
+            pinned.close()
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.env = fixtures.make_env(Path(self.tmp.name))

@@ -77,6 +77,11 @@ class PinnedResources(service.Resources):
     def serving(self) -> dict:
         return dict(self._pinned)
 
+    def generation_model(self) -> str:
+        """The model the run's estimate, identity and config.json record, never the starting browser's choice;
+        that browser's key and billing project still pay (they stay bound in the job's context)."""
+        return self.settings.generation_model
+
     @property
     def _closed(self) -> bool:
         return self._own_closed or bool(self._owner is not None and self._owner._closed)
