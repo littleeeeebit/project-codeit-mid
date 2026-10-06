@@ -1,0 +1,1 @@
+`TimeoutStopSec` must exceed `shutdown_wait_seconds` plus the provider timeout. Otherwise systemd SIGKILLs during settlement and leaves `unknown` billing that blocks all dispatch until reconciled.

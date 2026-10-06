@@ -1,0 +1,1 @@
+`fuse` computes weighted RRF (`rrf_k` 60, `dense_weight`). With `fusion == keyword_first`, the first `keyword_head` (6) BM25 rows stay in BM25 order ahead of the RRF remainder, so a dense row can never displace a protected keyword match. The result is truncated to `fused_top_k`.

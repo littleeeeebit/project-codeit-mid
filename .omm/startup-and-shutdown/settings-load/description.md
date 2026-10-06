@@ -1,1 +1,0 @@
-settings.py resolves paths from the repository location, never the working directory. Optional overrides must be absolute. `RFP_DATABASE_DSN` must come from the process environment. `RFP_CONFIG_FILE` supplies nonsecret `Settings` fields, and unknown keys are rejected. `OPENAI_API_KEY` and `LANGFUSE_*` are read from the environment and then from the repository `.env`.

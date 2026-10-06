@@ -1,1 +1,0 @@
-Rejected candidates are recorded with categories (`gold.REJECT_CATEGORIES`) and a note. `gold infer` attaches an agent-inferred reason later. The drafting context (`gold excerpts`) feeds past rejections back to the drafters.

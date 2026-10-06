@@ -1,9 +1,0 @@
-created: 2026-10-05T23:55:10.000Z
-updated: 2026-10-05T23:55:10.000Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: member-header
-children: []
-parentPath:
-  - http-api

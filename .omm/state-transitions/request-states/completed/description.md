@@ -1,0 +1,1 @@
+Set by `_finish` for every `done()` without an explicit request_status: answered, insufficient evidence, ingestion unavailable, metadata/inventory, and `budget_blocked`. A completed request can serve as `previous_request_id` for a follow-up.

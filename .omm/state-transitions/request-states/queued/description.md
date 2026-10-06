@@ -1,0 +1,1 @@
+Inserted by `_create(..., 'queued', before_insert=admit)` for paid modes after a runner slot is acquired. It is the only state in which `cancel_request` cancels conclusively, and `abandon_request` acts only here.

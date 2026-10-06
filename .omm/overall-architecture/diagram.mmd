@@ -1,19 +1,18 @@
 graph TD
-  web-screens["Next.js screens\nweb/src/components/ask/ask-page.tsx"]
-  http-api["FastAPI routes\nsrc/rfp_assistant/api.py"]
-  service-core["Service core\nsrc/rfp_assistant/service.py"]
+  web-screens["Next.js screens\nweb/src/app"]
+  api-layer["FastAPI routes\nsrc/rfp_assistant/api.py"]
+  service-core["Service facade and owner\nsrc/rfp_assistant/service.py"]
   retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval.py"]
   paid-gateway["Paid gateway and ledger\nsrc/rfp_assistant/budget.py"]
-  postgresql-store["PostgreSQL store\nsrc/rfp_assistant/postgres.py"]
-  runtime-artifacts["Runtime artifact files\n.runtime"]
+  postgresql-store["PostgreSQL 18.6 + pgvector\nsrc/rfp_assistant/postgres.py"]
   offline-pipelines["Owner CLI pipelines\nsrc/rfp_assistant/cli.py"]
-  web-screens -->|JSON polls and SSE| http-api
-  http-api -->|one service call per route| service-core
-  service-core -->|scoped retrieval| retrieval-engine
-  service-core -->|metered chat calls| paid-gateway
-  service-core -->|request snapshots and outcomes| postgresql-store
-  paid-gateway -->|attempt ledger rows| postgresql-store
-  retrieval-engine -->|index files by version| runtime-artifacts
-  retrieval-engine -->|pgvector search| postgresql-store
-  offline-pipelines -->|ingest, index, activate| postgresql-store
-  offline-pipelines -->|indexes, runs, tables| runtime-artifacts
+  langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/tracing.py"]
+  web-screens -->|JSON and SSE| api-layer
+  api-layer -->|one service call| service-core
+  service-core -->|scoped question| retrieval-engine
+  service-core -->|reserve dispatch settle| paid-gateway
+  retrieval-engine -->|chunks and vectors| postgresql-store
+  paid-gateway -->|attempt rows| postgresql-store
+  service-core -->|requests and results| postgresql-store
+  offline-pipelines -->|extractions indexes runs| postgresql-store
+  service-core -.->|observability only| langfuse-tracing

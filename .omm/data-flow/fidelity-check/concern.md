@@ -1,0 +1,1 @@
+This depends on a Windows host with Hancom Viewer. On the Linux VM, the maintenance `fidelity` step would fail for any new or changed HWP extraction. This is inferred from the printing dependency and was not exercised.

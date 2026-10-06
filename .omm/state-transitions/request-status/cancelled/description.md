@@ -1,1 +1,0 @@
-Set immediately for a queued request. For a running one it is reached at `_finish` (completed + cancel flag), or through `_Stop('cancelled')` raised by a checkpoint or `DispatchRefused`. `answer_progress` stops serving partials as soon as the flag is set.

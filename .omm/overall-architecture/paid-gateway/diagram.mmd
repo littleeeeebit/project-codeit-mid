@@ -1,15 +1,13 @@
 graph TD
-  metered-chat["Metered chat stage\nsrc/rfp_assistant/service.py"]
-  budget-admission["Budget reservation\nsrc/rfp_assistant/budget.py"]
-  dispatch-guard["Dispatch marker and guard\nsrc/rfp_assistant/budget.py"]
-  gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/postgres.py"]
-  provider-transport["Provider transport\nsrc/rfp_assistant/generation.py"]
-  settlement["Settle, release, unknown\nsrc/rfp_assistant/budget.py"]
-  langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/tracing.py"]
-  metered-chat -->|reserve maximum cost| budget-admission
-  budget-admission -->|owner check| gateway-owner
-  metered-chat -->|mark dispatching| dispatch-guard
-  dispatch-guard -->|owner and unknown check| gateway-owner
-  metered-chat -->|chat with on_delta| provider-transport
-  provider-transport -->|usage or provider error| settlement
-  metered-chat -->|generation span and cost| langfuse-tracing
+  budget-admission["reserve admission\nsrc/rfp_assistant/budget.py"]
+  dispatch-marker["mark_dispatching guard\nsrc/rfp_assistant/budget.py"]
+  provider-transport["OpenAI or Fake transport\nsrc/rfp_assistant/generation.py"]
+  settlement["settle release mark_unknown\nsrc/rfp_assistant/budget.py"]
+  gateway-owner["Advisory lock owner\nsrc/rfp_assistant/postgres.py"]
+  owner-reconciliation["Owner budget CLI\nsrc/rfp_assistant/cli.py"]
+  budget-admission -->|attempt reserved| dispatch-marker
+  dispatch-marker -->|attempt dispatching| provider-transport
+  provider-transport -->|usage or error| settlement
+  gateway-owner -->|owner_guard checks| budget-admission
+  gateway-owner -->|owner_check per call| provider-transport
+  owner-reconciliation -->|reconcile unknown| settlement

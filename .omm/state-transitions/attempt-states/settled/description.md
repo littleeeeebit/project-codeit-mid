@@ -1,0 +1,1 @@
+`budget.settle` stores `settled_micro_usd`, `raw_usage_json` and `response_id`. If the cost exceeds the reservation it sets `budget_settings.frozen_reason`, and every later `reserve` returns `frozen` until the owner clears it.

@@ -1,1 +1,0 @@
-Approved rows render into `.runtime/datasets/dev.jsonl`, and `gold check` verifies that the file equals its database rendering. `validate-gold` labels sets below the 60 + 60 targets `pilot`. `freeze-dataset` freezes a manifest that runs and releases bind to.

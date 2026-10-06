@@ -1,27 +1,29 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-05 23:55:11.621000+00:00
-update_count: 6
+updated: 2026-10-06 07:31:26.499000+00:00
+update_count: 8
 last_field: diagram
 kind: nested-class
 title: service-core
 children:
-- answer-execution
-- ask-submission
 - background-jobs
 - conversation-context
-- evidence-views
-- progress-partials
+- key-sessions
+- partials-buffer
 - request-runner
 - resources-owner
 - serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  resources-owner[\"Resources owner\\nsrc/rfp_assistant/service.py\"\
-  ] -->|lazily creates| request-runner[\"RequestRunner executor\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  request-runner -->|run_queued request_id| answer-orchestration[\"Answer orchestration\\\
-  nsrc/rfp_assistant/service.py\"]\r\n  answer-orchestration -->|run settings and\
-  \ index| serving-config[\"Serving configuration\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  verifier-runs[\"Verifier runs\\nsrc/rfp_assistant/service.py\"] -->|frozen\
-  \ evidence generation| answer-orchestration\r\n  verifier-runs -->|config_id snapshot|\
-  \ serving-config\r\n  background-jobs[\"Background jobs\\nsrc/rfp_assistant/service.py\"\
-  ] -->|borrow transport and join on close| resources-owner\r\n  resources-owner -->|loads\
-  \ index dense reranker| serving-config"
+prev_diagram: "graph TD\r\n  resources-owner[\"Process resources\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  ask-submission[\"Ask and submit_answer\\nsrc/rfp_assistant/service.py\"]\r\
+  \n  request-runner[\"Bounded request runner\\nsrc/rfp_assistant/service.py\"]\r\n\
+  \  answer-execution[\"Answer execution\\nsrc/rfp_assistant/service.py\"]\r\n  conversation-context[\"\
+  Conversation context\\nsrc/rfp_assistant/service.py\"]\r\n  progress-partials[\"\
+  Streaming partials\\nsrc/rfp_assistant/generation.py\"]\r\n  evidence-views[\"Request\
+  \ views and evidence\\nsrc/rfp_assistant/service.py\"]\r\n  background-jobs[\"Verifier\
+  \ background jobs\\nsrc/rfp_assistant/service.py\"]\r\n  ask-submission -->|persist\
+  \ then submit id| request-runner\r\n  request-runner -->|run_queued claims row|\
+  \ answer-execution\r\n  answer-execution -->|earlier turns, carried units| conversation-context\r\
+  \n  answer-execution -->|on_delta content| progress-partials\r\n  resources-owner\
+  \ -->|index, transport, tracing| answer-execution\r\n  resources-owner -->|loaded\
+  \ index elements| evidence-views\r\n  background-jobs -->|shared transport, joined\
+  \ on close| resources-owner"

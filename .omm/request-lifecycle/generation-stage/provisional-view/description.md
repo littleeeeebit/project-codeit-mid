@@ -1,1 +1,0 @@
-`Provisional` in ask-page.tsx renders the streamed summary and claims under the badge '작성 중 · 검증 전'. Its markers are not openable, because the evidence map exists only in the validated outcome. The validated `AnswerBody` or a failure state replaces it when the poll sees a terminal status.

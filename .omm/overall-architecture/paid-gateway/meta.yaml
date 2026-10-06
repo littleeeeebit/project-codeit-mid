@@ -1,45 +1,31 @@
 created: 2026-10-05 04:06:18.173000+00:00
-updated: 2026-10-05T23:55:17.667Z
-update_count: 7
+updated: 2026-10-06 07:31:30.762000+00:00
+update_count: 9
 last_field: diagram
 kind: nested-class
 title: paid-gateway
 children:
-  - answer-validation
-  - budget-admission
-  - budget-ledger
-  - dispatch-guard
-  - dispatch-marker
-  - gateway-owner
-  - langfuse-tracing
-  - metered-chat
-  - openai-transport
-  - provider-transport
-  - settlement
+- answer-validation
+- budget-admission
+- budget-ledger
+- dispatch-guard
+- dispatch-marker
+- gateway-owner
+- langfuse-tracing
+- openai-transport
+- owner-reconciliation
+- provider-transport
+- settlement
 parentPath: []
-prev_diagram: "graph TD\r
-
-  \  reserve[\"Atomic admission\\nsrc/rfp_assistant/budget.py\"]\r
-
-  \  dispatch_marker[\"Dispatch marker\\nsrc/rfp_assistant/budget.py\"]\r
-
-  \  provider_transport[\"Provider
-  transport\\nsrc/rfp_assistant/generation.py\"]\r
-
-  \  settlement[\"Settlement or unknown\\nsrc/rfp_assistant/budget.py\"]\r
-
-  \  gateway_owner[\"Gateway advisory lock\\nsrc/rfp_assistant/postgres.py\"]\r
-
-  \  owner_admin[\"Owner reconciliation\\nsrc/rfp_assistant/budget.py\"]\r
-
-  \  reserve -->|\"attempt reserved\"| dispatch_marker\r
-
-  \  dispatch_marker -->|\"stop guard passed\"| provider_transport\r
-
-  \  provider_transport -->|\"usage or error\"| settlement\r
-
-  \  gateway_owner -->|\"owner_guard in transaction\"| reserve\r
-
-  \  gateway_owner -->|\"owner check per call\"| provider_transport\r
-
-  \  owner_admin -->|\"resolves unknown attempts\"| settlement"
+prev_diagram: "graph TD\r\n  metered-chat[\"Metered chat stage\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  budget-admission[\"Budget reservation\\nsrc/rfp_assistant/budget.py\"]\r\n\
+  \  dispatch-guard[\"Dispatch marker and guard\\nsrc/rfp_assistant/budget.py\"]\r\
+  \n  gateway-owner[\"Gateway advisory lock\\nsrc/rfp_assistant/postgres.py\"]\r\n\
+  \  provider-transport[\"Provider transport\\nsrc/rfp_assistant/generation.py\"]\r\
+  \n  settlement[\"Settle, release, unknown\\nsrc/rfp_assistant/budget.py\"]\r\n \
+  \ langfuse-tracing[\"Langfuse tracing\\nsrc/rfp_assistant/tracing.py\"]\r\n  metered-chat\
+  \ -->|reserve maximum cost| budget-admission\r\n  budget-admission -->|owner check|\
+  \ gateway-owner\r\n  metered-chat -->|mark dispatching| dispatch-guard\r\n  dispatch-guard\
+  \ -->|owner and unknown check| gateway-owner\r\n  metered-chat -->|chat with on_delta|\
+  \ provider-transport\r\n  provider-transport -->|usage or provider error| settlement\r\
+  \n  metered-chat -->|generation span and cost| langfuse-tracing"

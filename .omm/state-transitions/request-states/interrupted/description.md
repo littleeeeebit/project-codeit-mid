@@ -1,0 +1,1 @@
+Set by `RequestRunner.shutdown` (queued always; running only if workers outlive the wait), by `Resources.close` when jobs are still alive, and by `recover_requests` on the next startup that acquires ownership. It is never replayed, and the result says to ask again.

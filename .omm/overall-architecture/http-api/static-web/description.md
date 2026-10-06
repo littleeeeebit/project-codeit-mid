@@ -1,1 +1,0 @@
-When web/out exists (`npm run build` produces the static export), `StaticFiles(directory=WEB, html=True)` is mounted at `/` after every API route. One process on one port then serves both. For screen work, the README uses `npm run dev` on port 8510, which forwards `/api/*` to `RFP_API_URL` (default 127.0.0.1:8511).

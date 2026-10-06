@@ -1,1 +1,0 @@
-`gold_decide` requires a note. It refuses approval by the member who requested the drafting run, and the drafting model cannot approve either. It passes the expected row hash to `gold.decide`, which guards against concurrent edits. Sealed test candidates are refused here and reviewed only through the owner CLI. Disputed approvals wait for `gold_second_review`.

@@ -1,0 +1,1 @@
+`budget.reconcile` moves unknown attempts covered by an owner-recorded provider total to `reconciled`, which unblocks dispatch. If real usage arrives later, `settle` accepts it and inserts a compensating negative adjustment so the provider total is not double-counted.

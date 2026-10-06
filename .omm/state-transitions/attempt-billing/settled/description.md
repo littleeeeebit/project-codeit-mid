@@ -1,1 +1,0 @@
-Final cost from reported usage at the frozen rates. `settle` is idempotent (a duplicate returns the stored cost). An overrun freezes all paid admission.

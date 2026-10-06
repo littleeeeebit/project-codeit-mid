@@ -1,0 +1,1 @@
+`dense()` loads `PgDenseIndex`, which reads and checksum-verifies every vector of the set (about 19k rows). This happens on the first request after startup or after an activation, inside `_index_lock`, so concurrent retrievals wait behind it.

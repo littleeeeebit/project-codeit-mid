@@ -1,1 +1,0 @@
-`draft_slot` builds a question-type, intent, documents and sources slot from development documents and elements. `plan_drafting` prices all slots and checks `paid_enabled`, the `gold_eval` envelope and available cap (`fits`).

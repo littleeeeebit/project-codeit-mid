@@ -1,9 +1,0 @@
-created: 2026-10-05T23:55:27.654Z
-updated: 2026-10-05T23:55:27.655Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: drain-loop
-children: []
-parentPath:
-  - generation-stage

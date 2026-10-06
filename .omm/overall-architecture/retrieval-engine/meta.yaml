@@ -1,26 +1,31 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-05 23:55:15.280000+00:00
-update_count: 14
+updated: 2026-10-06 07:31:28.840000+00:00
+update_count: 16
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
 children:
-- corpus-routing
+- bm25-channel
+- corpus-router
 - dense-channel
 - dense-search
-- evidence-packing
+- evidence-packer
+- exact-codes
 - fusion
-- hybrid-fusion
 - keyword-index
-- lexical-ranking
 - reranker
-- serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  query-policy[\"Analyzer and query policy\\nsrc/rfp_assistant/retrieval.py\"\
-  ] -->|kept query tokens| keyword-index[\"Kiwi BM25 index\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  query-policy -->|routed scope rows| dense-search[\"pgvector search\\nsrc/rfp_assistant/vector_store.py\"\
-  ]\r\n  keyword-index -->|lexical ranking| fusion[\"Keyword-first RRF\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  dense-search -->|cosine ranking| fusion\r\n  fusion -->|pool below protected\
-  \ head| reranker[\"Local reranker\\nsrc/rfp_assistant/dense.py\"]\r\n  fusion -->|fused\
-  \ order| evidence-packing[\"Evidence packing\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  reranker -->|reordered pool| evidence-packing"
+prev_diagram: "graph TD\r\n  serving-config[\"Activated serving config\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval.py\"]\r\n  corpus-routing[\"\
+  Corpus routing and codes\\nsrc/rfp_assistant/retrieval.py\"]\r\n  lexical-ranking[\"\
+  Kiwi BM25 ranking\\nsrc/rfp_assistant/retrieval.py\"]\r\n  dense-search[\"Dense\
+  \ query and search\\nsrc/rfp_assistant/vector_store.py\"]\r\n  hybrid-fusion[\"\
+  Keyword-first RRF fusion\\nsrc/rfp_assistant/retrieval.py\"]\r\n  reranker[\"Local\
+  \ reranker\\nsrc/rfp_assistant/dense.py\"]\r\n  evidence-packing[\"Evidence packing\\\
+  nsrc/rfp_assistant/retrieval.py\"]\r\n  serving-config -->|active index version|\
+  \ keyword-index\r\n  serving-config -->|embedding model and limits| dense-search\r\
+  \n  keyword-index -->|scope terms, BM25 rows| corpus-routing\r\n  corpus-routing\
+  \ -->|narrowed allowed rows| lexical-ranking\r\n  lexical-ranking -->|BM25 top k|\
+  \ hybrid-fusion\r\n  dense-search -->|cosine top k| hybrid-fusion\r\n  hybrid-fusion\
+  \ -->|fused pool below head| reranker\r\n  reranker -->|reordered pool| evidence-packing\r\
+  \n  hybrid-fusion -->|order without reranker| evidence-packing"

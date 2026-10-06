@@ -1,15 +1,9 @@
-created: 2026-10-05T03:34:21.317Z
-updated: 2026-10-05T23:55:20.032Z
-update_count: 9
-last_field: diagram
+created: 2026-10-05 03:34:21.317000+00:00
+updated: 2026-10-06 07:31:32.248000+00:00
+update_count: 10
+last_field: description
 kind: nested-class
 title: postgresql-store
 children:
-  - application-mutex
-  - connection-pool
-  - control-tables
-  - corpus-tables
-  - ledger-tables
-  - request-tables
-  - vector-tables
+- application-mutex
 parentPath: []

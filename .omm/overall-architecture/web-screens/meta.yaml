@@ -1,20 +1,14 @@
 created: 2026-10-04 13:34:42.331000+00:00
-updated: 2026-10-05 23:55:07.644000+00:00
-update_count: 13
-last_field: context
+updated: 2026-10-06 07:31:25.846000+00:00
+update_count: 14
+last_field: description
 kind: nested-class
 title: web-screens
 children:
-- answer-stream
 - api-client
 - ask-page
-- dataset-screens
-- document-search
-- evidence-pane
 - settings-page
-- turn-view
 - verify-page
-- verify-screens
 parentPath: []
 prev_diagram: "graph TD\r\n  ask-page[\"Ask page\\nweb/src/components/ask/ask-page.tsx\"\
   ] -->|POST ask cancel abandon| api-client[\"Typed API client\\nweb/src/lib/api.ts\"\

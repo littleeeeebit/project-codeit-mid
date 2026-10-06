@@ -1,1 +1,0 @@
-`postgres.tx(conn, immediate=True)` begins a transaction and runs `SELECT id FROM application_mutex WHERE id = 1 FOR UPDATE`. All idempotent request creation, admission, dispatch marking, settlement, status changes and activation are therefore serialized database-wide.

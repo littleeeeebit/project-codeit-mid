@@ -1,10 +1,11 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-05T23:55:06.688Z
-update_count: 16
+updated: 2026-10-06T07:31:25.527Z
+update_count: 18
 last_field: diagram
-git_commit: 467d0b9
-git_branch: chat-multiturn-streaming
+git_commit: 80ccafa
+git_branch: deploy-gcp-vm-ssh-tunnel
 children:
+  - api-layer
   - api-shell
   - budget-ledger
   - http-api
@@ -22,28 +23,38 @@ children:
   - web-screens
 prev_diagram: "graph TD\r
 
-  \  web-screens[\"Next.js screens\\nweb/src/app/page.tsx\"] -->|typed fetch
-  with X-Member| http-api[\"FastAPI routes\\nsrc/rfp_assistant/api.py\"]\r
+  \  web-screens[\"Next.js screens\\nweb/src/components/ask/ask-page.tsx\"]\r
 
-  \  http-api -->|one service call per route| service-core[\"Service
-  core\\nsrc/rfp_assistant/service.py\"]\r
+  \  http-api[\"FastAPI routes\\nsrc/rfp_assistant/api.py\"]\r
 
-  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"] -->|own or ledger-only
-  Resources| service-core\r
+  \  service-core[\"Service core\\nsrc/rfp_assistant/service.py\"]\r
 
-  \  service-core -->|scoped question| retrieval-engine[\"Retrieval
-  engine\\nsrc/rfp_assistant/retrieval.py\"]\r
+  \  retrieval-engine[\"Retrieval engine\\nsrc/rfp_assistant/retrieval.py\"]\r
 
-  \  service-core -->|reserve dispatch settle| budget-ledger[\"Budget
-  ledger\\nsrc/rfp_assistant/budget.py\"]\r
+  \  paid-gateway[\"Paid gateway and ledger\\nsrc/rfp_assistant/budget.py\"]\r
 
-  \  service-core -->|chat and embed| provider-transport[\"Provider
-  transport\\nsrc/rfp_assistant/generation.py\"]\r
+  \  postgresql-store[\"PostgreSQL store\\nsrc/rfp_assistant/postgres.py\"]\r
 
-  \  retrieval-engine -->|chunks and vectors| postgresql-store[\"PostgreSQL and
-  pgvector\\nsrc/rfp_assistant/postgres.py\"]\r
+  \  runtime-artifacts[\"Runtime artifact files\\n.runtime\"]\r
 
-  \  budget-ledger -->|attempts rows| postgresql-store\r
+  \  offline-pipelines[\"Owner CLI pipelines\\nsrc/rfp_assistant/cli.py\"]\r
 
-  \  retrieval-engine -->|index manifests and files| runtime-artifacts[\"Runtime
-  artifacts\\nsrc/rfp_assistant/store.py\"]"
+  \  web-screens -->|JSON polls and SSE| http-api\r
+
+  \  http-api -->|one service call per route| service-core\r
+
+  \  service-core -->|scoped retrieval| retrieval-engine\r
+
+  \  service-core -->|metered chat calls| paid-gateway\r
+
+  \  service-core -->|request snapshots and outcomes| postgresql-store\r
+
+  \  paid-gateway -->|attempt ledger rows| postgresql-store\r
+
+  \  retrieval-engine -->|index files by version| runtime-artifacts\r
+
+  \  retrieval-engine -->|pgvector search| postgresql-store\r
+
+  \  offline-pipelines -->|ingest, index, activate| postgresql-store\r
+
+  \  offline-pipelines -->|indexes, runs, tables| runtime-artifacts"

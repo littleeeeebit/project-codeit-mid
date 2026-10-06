@@ -1,1 +1,0 @@
-Nothing was sent, or the provider confirmed it never executed (4xx classes, lost ownership before the call). It costs nothing.

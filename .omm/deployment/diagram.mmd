@@ -1,0 +1,13 @@
+graph TD
+  member-browser["Member browser\nweb/out"]
+  ssh-forward["SSH local forward 8501\ndocs/operations/runbook.md"]
+  systemd-unit["bidmate systemd unit\ntools/bidmate.service"]
+  app-process["uvicorn single worker\nsrc/rfp_assistant/api.py"]
+  postgres-container["PostgreSQL container\ntools/start-postgresql.sh"]
+  owner-cli["Owner CLI wrapper\ntools/bidmate-cli.sh"]
+  member-browser -->|localhost 8501| ssh-forward
+  ssh-forward -->|loopback 127.0.0.1| app-process
+  systemd-unit -->|ExecStartPre then start| app-process
+  systemd-unit -->|compose up wait| postgres-container
+  app-process -->|pool and advisory lock| postgres-container
+  owner-cli -->|same env as service| postgres-container

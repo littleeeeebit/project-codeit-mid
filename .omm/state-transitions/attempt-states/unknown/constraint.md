@@ -1,0 +1,1 @@
+While any `unknown` row exists, `mark_dispatching` refuses all PostgreSQL dispatch and `paid on` refuses. The owner must run `unresolved` → `settle` or `reconcile` first (runbook §12).

@@ -1,0 +1,1 @@
+Plan rule (`docs/plan/end-to-end/0-overview.md`): pipelines run every variant, a person picks from the table, and nothing activates on its own or on a schedule.

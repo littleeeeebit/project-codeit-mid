@@ -1,0 +1,1 @@
+This is the only bridge from offline artifacts to live serving; see `state-transitions/serving-activation` for the write. `compare-runs` recommends keeping K1 unless another current-policy mode gains at least +0.03 nDCG@5 with no new critical failure. The final choice is the person's, through `activate-run --decided-by` or the 실험 비교 activate action.

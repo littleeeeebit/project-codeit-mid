@@ -1,37 +1,37 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-05 23:55:33.951000+00:00
-update_count: 12
+updated: 2026-10-06 07:31:40.024000+00:00
+update_count: 14
 last_field: diagram
-git_commit: 467d0b9
-git_branch: chat-multiturn-streaming
+git_commit: 80ccafa
+git_branch: deploy-gcp-vm-ssh-tunnel
 children:
 - activation
 - corpus-ingestion
+- dense-vectors
+- evaluation-runs
 - extraction
-- extraction-store
 - fidelity-check
 - gold-dataset
 - index-build
-- ingestion-parse
-- keyword-index-build
-- manifest-import
+- ingestion
+- keyword-index
 - ocr-merge
 - original-corpus
-- retrieval-runs
 - retrieval-selection
 - run-selection
-- serving-pointer
-- source-files
-- vector-sets
-prev_diagram: "graph TD\r\n  originals[\"Originals and CSV manifest\\nsrc/rfp_assistant/ingestion.py\"\
-  ] -->|parse changed inputs| extraction[\"Extractions and elements\\nsrc/rfp_assistant/ingestion.py\"\
-  ]\r\n  extraction -->|Hancom print comparison| fidelity-check[\"Fidelity verdicts\\\
-  nsrc/rfp_assistant/fidelity.py\"]\r\n  fidelity-check -->|review_status filter|\
-  \ keyword-index[\"Keyword index build\\nsrc/rfp_assistant/retrieval.py\"]\r\n  extraction\
-  \ -->|elements chunked by profile| keyword-index\r\n  keyword-index -->|chunk payloads|\
-  \ embedding-sets[\"Embedding sets\\nsrc/rfp_assistant/vector_store.py\"]\r\n  gold-datasets[\"\
-  Gold datasets\\nsrc/rfp_assistant/gold.py\"] -->|graded questions| run-selection[\"\
-  Runs and activation\\nsrc/rfp_assistant/compare.py\"]\r\n  keyword-index -->|frozen\
-  \ index version| run-selection\r\n  embedding-sets -->|dense_version| run-selection\r\
-  \n  run-selection -->|active_run setting| served-answers[\"Served answers\\nsrc/rfp_assistant/service.py\"\
-  ]"
+prev_diagram: "graph TD\r\n  source-files[\"Original files and CSV\\nsrc/rfp_assistant/ingestion.py\"\
+  ]\r\n  manifest-import[\"Manifest import\\nsrc/rfp_assistant/ingestion.py\"]\r\n\
+  \  ingestion-parse[\"Parse, OCR merge, diagnose\\nsrc/rfp_assistant/ingestion.py\"\
+  ]\r\n  extraction-store[\"Extraction revisions\\nsrc/rfp_assistant/store.py\"]\r\
+  \n  keyword-index-build[\"Keyword index build\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  vector-sets[\"Embedding vector sets\\nsrc/rfp_assistant/vector_store.py\"\
+  ]\r\n  gold-dataset[\"Gold question datasets\\nsrc/rfp_assistant/gold.py\"]\r\n\
+  \  retrieval-runs[\"Frozen retrieval runs\\nsrc/rfp_assistant/evaluation.py\"]\r\
+  \n  serving-pointer[\"Serving activation pointer\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  source-files -->|CSV rows and file hashes| manifest-import\r\n  manifest-import\
+  \ -->|sources and documents rows| ingestion-parse\r\n  ingestion-parse -->|elements\
+  \ and artifact| extraction-store\r\n  extraction-store -->|chunk profiles| keyword-index-build\r\
+  \n  keyword-index-build -->|unique payloads| vector-sets\r\n  keyword-index-build\
+  \ -->|index manifest| retrieval-runs\r\n  vector-sets -->|verified dense matrix|\
+  \ retrieval-runs\r\n  gold-dataset -->|reviewed questions and spans| retrieval-runs\r\
+  \n  retrieval-runs -->|person activates| serving-pointer"

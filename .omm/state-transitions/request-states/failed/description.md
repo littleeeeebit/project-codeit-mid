@@ -1,0 +1,1 @@
+Set by `_finish` with `request_status='failed'` (technical errors, validation failures, `clarification_required` from `ServiceError`, a consented ceiling exceeded) or by `_fail_unscheduled`. It is terminal, and nothing retries automatically.

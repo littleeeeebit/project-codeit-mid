@@ -1,1 +1,0 @@
-Entered by `run_queued`, or directly by `_create` for free modes and the synchronous `answer()`. While running, `_checkpoint` before each paid stage and the dispatch guard stop the next stage if `cancel_requested` is set, the row is no longer running, or `Resources` is closing.

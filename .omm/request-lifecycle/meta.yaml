@@ -1,33 +1,39 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-05 23:55:24.308000+00:00
-update_count: 12
+updated: 2026-10-06 07:31:33.300000+00:00
+update_count: 14
 last_field: diagram
-git_commit: 467d0b9
-git_branch: chat-multiturn-streaming
+git_commit: 80ccafa
+git_branch: deploy-gcp-vm-ssh-tunnel
 children:
+- admission
 - answer-validation
 - ask-page
-- ask-route
+- ask-submission
 - cancellation
+- evidence-preparation
 - finish-record
 - follow-up-rewrite
-- generation-stage
-- outcome-store
+- metered-generation
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
 - paid-call
-- request-admission
-- retrieval-stage
-- runner-claim
+- screen-follow
 - status-poll
 - validation
-prev_diagram: "graph TD\r\n  ask-page[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
-  ] -->|POST /api/ask| admission[\"Validate and persist\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  admission -->|request_id to executor| worker[\"Worker claim\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  worker -->|checkpoint then retrieve| retrieval-stage[\"Retrieve and price\\\
-  nsrc/rfp_assistant/service.py\"]\r\n  retrieval-stage -->|input token estimate|\
-  \ paid-call[\"Reserve dispatch settle\\nsrc/rfp_assistant/budget.py\"]\r\n  paid-call\
-  \ -->|provider response| validation[\"Citation validation\\nsrc/rfp_assistant/generation.py\"\
-  ]\r\n  validation -->|AnswerResult| finish[\"Finish request row\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  ask-page -->|poll GET request| finish"
+- worker-execution
+prev_diagram: "graph TD\r\n  ask-route[\"Ask route\\nsrc/rfp_assistant/api.py\"]\r\
+  \n  request-admission[\"Validate, persist, admit\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  runner-claim[\"Runner claims request\\nsrc/rfp_assistant/service.py\"]\r\n\
+  \  follow-up-rewrite[\"Follow-up rewrite stage\\nsrc/rfp_assistant/generation.py\"\
+  ]\r\n  retrieval-stage[\"Retrieval and pricing\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  generation-stage[\"Streaming generation stage\\nsrc/rfp_assistant/generation.py\"\
+  ]\r\n  answer-validation[\"Answer validation\\nsrc/rfp_assistant/generation.py\"\
+  ]\r\n  outcome-store[\"Outcome and attachment\\nsrc/rfp_assistant/service.py\"]\r\
+  \n  ask-route -->|AnswerRequest with fresh ids| request-admission\r\n  request-admission\
+  \ -->|queued row, request id| runner-claim\r\n  runner-claim -->|follow-up with\
+  \ history| follow-up-rewrite\r\n  runner-claim -->|first turn| retrieval-stage\r\
+  \n  follow-up-rewrite -->|standalone question| retrieval-stage\r\n  retrieval-stage\
+  \ -->|messages and estimate| generation-stage\r\n  retrieval-stage -->|no evidence\
+  \ found| outcome-store\r\n  generation-stage -->|provider response| answer-validation\r\
+  \n  answer-validation -->|AnswerResult| outcome-store"

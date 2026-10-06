@@ -1,0 +1,1 @@
+The same `api:app` as on a developer machine. On Linux, recorded Windows artifact paths must resolve through `RFP_PATH_MAP`, or `require_imported_database` refuses startup. The `.runtime` index and extraction files referenced by the database must exist on the VM with identical hashes.

@@ -1,0 +1,1 @@
+The README says the owner approved a $5 dedicated allowance with a $5 hard cap. The live ledger carries adjustment `external:pr8-pilot-ledger` ($0.448818) so its spent total matches the provider account.

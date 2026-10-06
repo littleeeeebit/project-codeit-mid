@@ -1,19 +1,17 @@
 graph TD
-  source-files["Original files and CSV\nsrc/rfp_assistant/ingestion.py"]
-  manifest-import["Manifest import\nsrc/rfp_assistant/ingestion.py"]
-  ingestion-parse["Parse, OCR merge, diagnose\nsrc/rfp_assistant/ingestion.py"]
-  extraction-store["Extraction revisions\nsrc/rfp_assistant/store.py"]
-  keyword-index-build["Keyword index build\nsrc/rfp_assistant/retrieval.py"]
-  vector-sets["Embedding vector sets\nsrc/rfp_assistant/vector_store.py"]
-  gold-dataset["Gold question datasets\nsrc/rfp_assistant/gold.py"]
-  retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation.py"]
-  serving-pointer["Serving activation pointer\nsrc/rfp_assistant/service.py"]
-  source-files -->|CSV rows and file hashes| manifest-import
-  manifest-import -->|sources and documents rows| ingestion-parse
-  ingestion-parse -->|elements and artifact| extraction-store
-  extraction-store -->|chunk profiles| keyword-index-build
-  keyword-index-build -->|unique payloads| vector-sets
-  keyword-index-build -->|index manifest| retrieval-runs
-  vector-sets -->|verified dense matrix| retrieval-runs
-  gold-dataset -->|reviewed questions and spans| retrieval-runs
-  retrieval-runs -->|person activates| serving-pointer
+  ingestion["Manifest ingest and OCR\nsrc/rfp_assistant/ingestion.py"]
+  fidelity-check["HWP fidelity check\nsrc/rfp_assistant/fidelity.py"]
+  keyword-index["Keyword index build\nsrc/rfp_assistant/retrieval.py"]
+  dense-vectors["Embedding sets\nsrc/rfp_assistant/vector_store.py"]
+  gold-dataset["Gold review queue\nsrc/rfp_assistant/gold.py"]
+  evaluation-runs["Frozen runs and compare\nsrc/rfp_assistant/evaluation.py"]
+  activation["activate_decision\nsrc/rfp_assistant/evaluation.py"]
+  ingestion -->|extraction elements| fidelity-check
+  fidelity-check -->|review_status verdict| keyword-index
+  ingestion -->|parsed extractions| keyword-index
+  keyword-index -->|chunk payloads| dense-vectors
+  ingestion -->|source passages| gold-dataset
+  gold-dataset -->|approved dev rows| evaluation-runs
+  keyword-index -->|index version| evaluation-runs
+  dense-vectors -->|dense version| evaluation-runs
+  evaluation-runs -->|person picks run| activation

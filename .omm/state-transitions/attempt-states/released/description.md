@@ -1,0 +1,1 @@
+Covers stops before dispatch, a missing provider key (`provider_unavailable`), 4xx pre-execution errors, lost ownership detected in `_check_owner`, and reservations a restart found undispatched. Released attempts do not count as spend.

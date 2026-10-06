@@ -1,0 +1,1 @@
+`step_backup` takes a PostgreSQL dump with an artifact manifest under `backup_root`. `step_restore_check` restores it into a scratch database (`rfp_mrestore_*`), compares tables (ignoring `VOLATILE_TABLES` such as `audit_events`), then drops the scratch database. A failure stops the sequence before any data changes.

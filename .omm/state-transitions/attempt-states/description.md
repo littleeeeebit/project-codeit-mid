@@ -1,0 +1,1 @@
+`attempts.state` per paid provider call. `OPEN_STATES = (reserved, dispatching, unknown)` count against the cap as pending; settled counts as spent.

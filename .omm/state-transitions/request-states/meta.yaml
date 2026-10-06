@@ -1,0 +1,14 @@
+created: 2026-10-06T07:31:36.144Z
+updated: 2026-10-06T07:31:36.284Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: request-states
+children:
+  - cancelled
+  - completed
+  - failed
+  - interrupted
+  - queued
+  - running
+parentPath: []

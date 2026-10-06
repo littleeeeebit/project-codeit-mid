@@ -1,14 +1,8 @@
 created: 2026-10-05 04:06:43.527000+00:00
-updated: 2026-10-05T23:55:38.874Z
+updated: 2026-10-05 23:55:38.874000+00:00
 update_count: 4
 last_field: diagram
 git_commit: 467d0b9
 git_branch: chat-multiturn-streaming
 children:
-  - controlled-close
-  - database-validation
-  - gateway-claim
-  - restart-recovery
-  - settings-load
-  - transport-setup
-  - uvicorn-lifespan
+- controlled-close

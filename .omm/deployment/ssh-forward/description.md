@@ -1,0 +1,1 @@
+The only network path to the app. The server binds 127.0.0.1, and since there is no login, the tunnel's SSH authentication is the effective access control for spending the shared budget.

@@ -1,1 +1,0 @@
-`start_drafting` refuses if the estimate rose above the consented maximum, if it does not fit, or if another drafting run is alive. It writes `drafts/<run_id>/request.json` with `requested_by`, then runs `drafting._generate` in a thread with a guard that stops when the service closes. The outputs are `output/candidates.jsonl`, `invalid.json` and `receipt.json`.

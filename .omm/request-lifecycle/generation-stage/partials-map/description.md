@@ -1,1 +1,0 @@
-`Resources.partials` is in process memory, written by the worker thread and read by route threads. `_finish` pops the entry on every exit path, so a finished request never streams stale text.
