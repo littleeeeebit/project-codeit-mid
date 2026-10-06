@@ -677,15 +677,15 @@ def verifier_generation(ctx: Context) -> dict:
         ctx.act("sign in through the hub", "consultant page", lambda: ctx.open_app(page, origin, member))
 
         def freeze():
-            with urllib.request.urlopen(f"{origin}/api/verify/trace-sources", timeout=30) as r:
-                title = json.loads(r.read())["documents"][0]["title"]  # what the form offers first
+            # the page's request context carries its session cookie; a bare urlopen would be refused with 401
+            title = page.request.get(f"{origin}/api/verify/trace-sources", timeout=30000).json()["documents"][0]["title"]
             page.get_by_role("link", name="검증").click()
             page.get_by_role("button", name=re.compile("^검색 추적")).click()  # the left menu
             page.get_by_role("textbox", name="질문", exact=True).fill(corpus["question"])
             page.get_by_label(re.compile(r"^문서 \(최대 2개")).fill(title[:20])
             page.get_by_role("button", name=re.compile(re.escape(title[:20]))).first.click()
             page.get_by_role("button", name="검색만 실행 · 무료").click()
-            shown = wait_text(page, r"실행 vr-", 60000)
+            shown = wait_text(page, r"^선택된 근거 \d+개$", 60000)  # the frozen run opens on its evidence stage
             runs = db_rows(corpus["dsn"],"SELECT run_id, trace_json FROM verifier_runs WHERE member_id = ?",
                            (member,))
             est = json.loads(runs[-1]["trace_json"])["estimate_micro_usd"] if runs else None
@@ -696,6 +696,7 @@ def verifier_generation(ctx: Context) -> dict:
         def generate():
             run = db_rows(corpus["dsn"],"SELECT run_id, trace_json FROM verifier_runs WHERE member_id = ? "
                                               "ORDER BY created_at DESC LIMIT 1", (member,))[0]
+            page.get_by_role("button", name=re.compile(r"^5\. 답변 생성")).click()  # the paid stage of the run
             button = page.get_by_role("button", name="유료 답변 생성", exact=True)
             disabled_before = button.is_disabled()  # no consent yet
             page.get_by_label("이 범위로 유료 답변 생성을 1회 실행합니다").check()
