@@ -18,13 +18,11 @@ import time
 from datetime import date
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
-from rfp_assistant import api
 from rfp_assistant.contracts import DocRef
 from rfp_assistant.service import auth, service
 from rfp_assistant.settings import load_settings
 from rfp_assistant.storage import store
+from tests import fake_hub
 
 MEMBER = "verification-runner"
 
@@ -75,7 +73,7 @@ def main(run_dir: Path) -> int:
                              provider="fake")  # RFP_DATABASE_DSN: the copy tools/verify.py restored
     res = service.Resources(settings, recover=True)
     principal = auth.visitor(MEMBER)
-    client = TestClient(api.create_app(res), headers={"X-Member": MEMBER})
+    client = fake_hub.client(res, MEMBER)  # signed in as MEMBER through the fake hub
     client.__enter__()  # runs the lifespan, which hands `res` to the routes (and leaves closing it to us)
     try:
         serving = {k: v for k, v in res.serving().items() if k in ("run_id", "mode", "index_version", "dense_version")}

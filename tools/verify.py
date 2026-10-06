@@ -17,7 +17,8 @@ runner therefore reads the supported keys (CONFIG_KEYS) from `.env` first and fr
 for keys `.env` does not set; every observation names where its corpus came from. OPENAI_API_KEY is never read.
 Browser flows build the screens in web/ (`npm run build`, so the checked HEAD is what is served; needs Node and
 `npm ci` in web/), serve them with the API through one uvicorn worker on RFP_VERIFY_ORIGIN (default
-http://127.0.0.1:8765) and drive them with Playwright
+http://127.0.0.1:8765), sign each browser in through tests/fake_hub.py (a stand-in for JupyterHub's OAuth provider,
+run in this process, whose allowlist is MEMBERS) and drive them with Playwright
 (`pip install -e .[verify]`); RFP_VERIFY_BROWSER_EXECUTABLE selects a browser binary, otherwise Playwright's
 Chromium and then the installed Chrome are tried. Under the service, a dataset flow without a configured corpus
 fails with that prerequisite named instead of silently using fixtures.
@@ -37,6 +38,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -52,6 +54,9 @@ MANIFEST = REPO / "verification.json"
 FAKE_QUESTION = "하자보수 기간은 얼마인가요?"
 DATASET_QUESTION = "하자보수 기간과 유지보수 조건을 비교해 주세요."
 READ_ONLY_DIRS = ("indexes", "extracted", "recovered", "reviews", "ocr", "datasets")  # linked, never written here
+# Every hub user a browser flow signs in as: the served app's allowlist (BIDMATE_ALLOWED_USERS) on the fake hub.
+MEMBERS = [f"verify-{os.getpid()}", *(f"verify-{kind}-{os.getpid()}" for kind in ("history", "verifier", "cap", "a11y")),
+           *(f"verify-six-{i}-{os.getpid()}" for i in range(1, 7))]
 FLOWS: dict = {}
 
 
@@ -74,7 +79,8 @@ class Context:
         self.browser_tool = ""
         self.build_head = ""
         self.config, self.config_source = owner_config()
-        self.env = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY" and not k.startswith("RFP_")}
+        self.env = {k: v for k, v in os.environ.items()
+                    if k != "OPENAI_API_KEY" and not k.startswith(("RFP_", "BIDMATE_"))}
         self.env.update(PYTHONPATH=os.pathsep.join([str(REPO / "src"), str(REPO)]), PYTHONDONTWRITEBYTECODE="1",
                         PYTHONUTF8="1")
 
@@ -155,8 +161,10 @@ class Context:
         host, port = found.groups()
         config = self.work / "fake-config.json"
         config.write_text(json.dumps({"provider": "fake", "fake_delay_seconds": delay}), encoding="utf-8")
+        from tests import fake_hub  # members sign in through a stand-in for JupyterHub, run in this process
+
         env = {**self.env, "RFP_SOURCE_DIR": corpus["source_dir"], "RFP_DATA_DIR": corpus["data_dir"],
-               "RFP_CONFIG_FILE": str(config)}
+               "RFP_CONFIG_FILE": str(config), **fake_hub.hub().env(f"{origin}/api/auth/callback", MEMBERS)}
         npm = shutil.which("npm")
         if npm is None:
             raise RuntimeError("browser flows need Node.js: npm is not on PATH (then `npm ci` in web/)")
@@ -173,11 +181,15 @@ class Context:
             if self.server.poll() is not None:
                 raise RuntimeError(f"the app exited with {self.server.returncode}; see {self.work / 'server.log'}")
             try:
-                with urllib.request.urlopen(f"{origin}/api/info", timeout=2) as r:
-                    if r.status == 200:
-                        return origin
+                urllib.request.urlopen(f"{origin}/api/auth/me", timeout=2).close()
+            except urllib.error.HTTPError as answered:  # up once the lifespan opened the data; 401 = sign-in works
+                if answered.code == 401:
+                    return origin
+                raise RuntimeError(f"the app answered {answered.code}: {answered.read()[:300]!r}") from None
             except OSError:
                 time.sleep(0.5)
+            else:
+                raise RuntimeError("the app let /api/auth/me through without signing in")
         raise RuntimeError("the app did not become healthy within 90 s")
 
     def close(self) -> None:
@@ -228,18 +240,21 @@ class Context:
         return ok, actual
 
     def open_app(self, page, origin: str, name: str) -> tuple[bool, str]:
+        """Signs in as `name` the way a member does: the app's sign-in entry, the (fake) hub's form, back home."""
+        from tests import fake_hub
+
+        fake_hub.browser_sign_in(page, origin, name)
+        account = page.locator("header").get_by_text(name, exact=True).count()
         page.goto(origin + "/verify/")
         build = page.locator("details").filter(has=page.get_by_text("빌드 정보", exact=True))
         build.locator("summary").click(timeout=60000)
         found = re.fullmatch(r"[0-9a-f]{40}|unknown", build.locator("p").inner_text().strip())
         self.build_head = found.group(0) if found else "not shown"
         page.goto(origin + "/")
-        box = page.get_by_label("이름", exact=True)  # in the header bar; kept in this browser, sent as X-Member
-        box.wait_for(timeout=60000)
-        login = page.get_by_text("접속 토큰").count() + page.get_by_label("비밀번호").count()
-        box.fill(name)
-        heading = page.get_by_role("heading", name="질문하기").count()
-        return login == 0 and heading == 1, f"login controls {login}; served build {self.build_head}; 질문하기 shown {heading == 1}"
+        heading = page.get_by_role("heading", name="질문하기")
+        heading.wait_for(timeout=60000)
+        return account == 1 and heading.count() == 1, (f"signed in through the hub as {name}, shown in the header "
+                                                        f"{account == 1}; served build {self.build_head}; 질문하기 shown")
 
 
 # ---------------------------------------------------------------- helpers
@@ -423,9 +438,10 @@ def member_requests(dsn: str, member: str) -> list[dict]:
 
 @flow("access")
 def access(ctx: Context) -> dict:
-    return {"role-declarations": ctx.unit("access-tests", [
-        "tests.test_service.VisitorTest", "tests.test_service.AuthorizationTest",
-        "tests.test_generation.AnswerFlowTest.test_verifier_actions_require_the_role"])}
+    return {"hub-sign-in": ctx.unit("sign-in-tests", ["tests.test_api.LoginTest"]),
+            "role-declarations": ctx.unit("access-tests", [
+                "tests.test_service.VisitorTest", "tests.test_service.AuthorizationTest",
+                "tests.test_generation.AnswerFlowTest.test_verifier_actions_require_the_role"])}
 
 
 @flow("question-modes")
@@ -579,8 +595,8 @@ def consultant_answer(ctx: Context) -> dict:
     def body(ctx, browser, origin, corpus):
         page = ctx.page(browser, origin)
         member = f"verify-{os.getpid()}"
-        out = {"no-login": ctx.act("open the app and type a name", "consultant page without a login form",
-                                   lambda: ctx.open_app(page, origin, member))}
+        out = {"hub-sign-in": ctx.act("sign in through the hub", "consultant page under the hub account",
+                                      lambda: ctx.open_app(page, origin, member))}
 
         def answer():
             pick_first_document(page)
@@ -620,7 +636,7 @@ def request_history(ctx: Context) -> dict:
     def body(ctx, browser, origin, corpus):
         page = ctx.page(browser, origin)
         member = f"verify-history-{os.getpid()}"
-        ctx.act("open the app and type a name", "consultant page", lambda: ctx.open_app(page, origin, member))
+        ctx.act("sign in through the hub", "consultant page", lambda: ctx.open_app(page, origin, member))
 
         def twice():
             pick_first_document(page)
@@ -658,7 +674,7 @@ def verifier_generation(ctx: Context) -> dict:
     def body(ctx, browser, origin, corpus):
         page = ctx.page(browser, origin)
         member = f"verify-verifier-{os.getpid()}"
-        ctx.act("open the app and type a name", "consultant page", lambda: ctx.open_app(page, origin, member))
+        ctx.act("sign in through the hub", "consultant page", lambda: ctx.open_app(page, origin, member))
 
         def freeze():
             with urllib.request.urlopen(f"{origin}/api/verify/trace-sources", timeout=30) as r:
@@ -728,8 +744,8 @@ def six_sessions(ctx: Context) -> dict:
                 page.get_by_role("textbox", name="질문").wait_for(timeout=30000)
                 page.get_by_role("textbox", name="질문").fill(corpus["question"])
                 pages.append(page)
-            return len(pages) == 6, f"{len(pages)} browser sessions, each with its own typed name, document and question"
-        ctx.act("open six sessions with different names", "six ready sessions", open_all)
+            return len(pages) == 6, f"{len(pages)} browser sessions, each signed in as its own hub user, with a document and question"
+        ctx.act("sign six sessions in as different hub users", "six ready sessions", open_all)
 
         def watch():
             started = time.monotonic()
@@ -916,6 +932,7 @@ def accessibility(ctx: Context) -> dict:
         ring = ctx.act("inspect every keyboard focus stop", "a visible focus indicator", rings)
 
         others = ctx.page(browser, origin)  # 검증 and 데이터셋 만들기, beside the answered 질문하기
+        ctx.open_app(others, origin, member)  # a new browser context: it signs in too
 
         def open_other(path: str):
             others.goto(origin + path)

@@ -17,7 +17,7 @@
  "flows": [
   {
    "id": "access",
-   "title": "Open access with attribution; role declarations hold at the service",
+   "title": "JupyterHub sign-in gates the API; role declarations hold at the service",
    "kind": "command",
    "command": "python -B tools/verify.py access",
    "paths": [
@@ -32,7 +32,9 @@
     "src/rfp_assistant/service/service.py",
     "src/rfp_assistant/settings.py",
     "src/rfp_assistant/storage/store.py",
+    "tests/fake_hub.py",
     "tests/fixtures.py",
+    "tests/test_api.py",
     "tests/test_generation.py",
     "tests/test_service.py",
     "tools/verify.py",
@@ -42,6 +44,10 @@
     "settings"
    ],
    "assertions": [
+    {
+     "id": "hub-sign-in",
+     "expected": "Through the fake hub, an allowlisted user gets an HttpOnly SameSite=Lax session; a user off the allowlist gets 403, a bad or missing state 400, and neither a session; every other /api route answers 401 without one; with no hub settings the API answers 503"
+    },
     {
      "id": "role-declarations",
      "expected": "Visitor, authorization and verifier-role tests pass: narrower principals are refused and sealed rows are never served"
@@ -371,6 +377,7 @@
    "kind": "browser",
    "command": "python -B tools/verify.py consultant-answer",
    "paths": [
+    "tests/fake_hub.py",
     "src/rfp_assistant/api.py",
     "web/*",
     "pyproject.toml",
@@ -394,8 +401,8 @@
    ],
    "assertions": [
     {
-     "id": "no-login",
-     "expected": "The served app opens on the consultant page without a login form"
+     "id": "hub-sign-in",
+     "expected": "The served app shows the JupyterHub sign-in entry; signing in through the fake hub opens the consultant page with that account in the header"
     },
     {
      "id": "grounded-answer",
@@ -417,6 +424,7 @@
    "kind": "browser",
    "command": "python -B tools/verify.py request-history",
    "paths": [
+    "tests/fake_hub.py",
     "src/rfp_assistant/api.py",
     "web/*",
     "pyproject.toml",
@@ -453,6 +461,7 @@
    "kind": "browser",
    "command": "python -B tools/verify.py verifier-generation",
    "paths": [
+    "tests/fake_hub.py",
     "src/rfp_assistant/api.py",
     "web/*",
     "pyproject.toml",
@@ -490,6 +499,7 @@
    "kind": "browser",
    "command": "python -B tools/verify.py six-sessions",
    "paths": [
+    "tests/fake_hub.py",
     "src/rfp_assistant/api.py",
     "web/*",
     "pyproject.toml",
@@ -514,7 +524,7 @@
    "assertions": [
     {
      "id": "six-attributed",
-     "expected": "Six sessions with different typed names each submit once; every request finishes attributed to its own name with at most one generation attempt and no open reservation"
+     "expected": "Six sessions signed in as different hub users each submit once; every request finishes attributed to its own account with at most one generation attempt and no open reservation"
     },
     {
      "id": "shared-reservation-visible",
@@ -528,6 +538,7 @@
    "kind": "browser",
    "command": "python -B tools/verify.py cap-exhaustion",
    "paths": [
+    "tests/fake_hub.py",
     "src/rfp_assistant/api.py",
     "web/*",
     "pyproject.toml",
@@ -575,6 +586,7 @@
    "kind": "browser",
    "command": "python -B tools/verify.py accessibility",
    "paths": [
+    "tests/fake_hub.py",
     "src/rfp_assistant/api.py",
     "web/*",
     "DESIGN.md",
