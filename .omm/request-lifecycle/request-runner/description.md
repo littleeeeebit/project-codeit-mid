@@ -1,0 +1,1 @@
+The worker claims queued→running only when cancel_requested = 0, rebuilds the principal from the persisted snapshot (not from UI state), and enters _execute, which opens the Langfuse trace. A request cancelled while queued is never claimed.

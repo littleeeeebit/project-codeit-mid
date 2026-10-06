@@ -1,8 +1,14 @@
 created: 2026-10-04T13:34:48.684Z
-updated: 2026-10-05T21:23:52.703Z
-update_count: 6
-last_field: description
+updated: 2026-10-06T08:29:00.965Z
+update_count: 8
+last_field: diagram
 kind: nested-class
 title: owner-cli
-children: []
+children:
+  - budget-admin
+  - corpus-commands
+  - gold-review
+  - maintenance-sequence
+  - phase4-release
+  - retrieval-selection
 parentPath: []

@@ -1,12 +1,5 @@
 graph TD
-  request-status["Request status\nsrc/rfp_assistant/service.py"]
-  attempt-billing["Attempt billing state\nsrc/rfp_assistant/budget.py"]
-  gateway-owner["Gateway ownership\nsrc/rfp_assistant/postgres.py"]
-  serving-activation["Serving activation\nsrc/rfp_assistant/evaluation.py"]
-  source-review["Source review status\nsrc/rfp_assistant/ingestion.py"]
-  gold-candidate["Gold candidate decision\nsrc/rfp_assistant/gold.py"]
-  request-status -->|"stop check in dispatch"| attempt-billing
-  gateway-owner -->|"owner_guard at admission"| attempt-billing
-  gateway-owner -->|"startup recovery"| request-status
-  source-review -->|"gates index sources"| serving-activation
-  gold-candidate -->|"approved rows grade runs"| serving-activation
+  request-status["Request status\nsrc/rfp_assistant/service.py"] -->|stop reason guards dispatch| attempt-billing["Attempt billing state\nsrc/rfp_assistant/budget.py"]
+  attempt-billing -->|billing_state precedence| request-status
+  gold-candidate["Gold candidate status\nsrc/rfp_assistant/gold.py"] -->|approved rows score runs| serving-activation["Serving activation\nsrc/rfp_assistant/evaluation.py"]
+  serving-activation -->|config snapshot per request| request-status

@@ -1,0 +1,1 @@
+Members are sudoers on the VM and could read process memory. The runbook's backstop is a dedicated, revocable OpenAI project key with its own provider budget.

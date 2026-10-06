@@ -1,0 +1,1 @@
+Paid CLI jobs and backup require stopping the service first, because only one gateway owner may exist.

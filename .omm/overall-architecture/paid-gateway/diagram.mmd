@@ -1,0 +1,7 @@
+graph TD
+  admission["Atomic reservation\nsrc/rfp_assistant/budget.py"] -->|attempt reserved| dispatch-marker["Stop-checked dispatch marker\nsrc/rfp_assistant/budget.py"]
+  gateway-owner["Advisory lock owner\nsrc/rfp_assistant/postgres.py"] -->|owner_guard in both txns| admission
+  gateway-owner -->|owner_guard| dispatch-marker
+  dispatch-marker -->|dispatching| openai-transport["Per-browser OpenAI clients\nsrc/rfp_assistant/generation.py"]
+  openai-transport -->|usage or error| settlement["Settle, release or unknown\nsrc/rfp_assistant/budget.py"]
+  startup-recovery["Restart recovery\nsrc/rfp_assistant/budget.py"] -->|dispatching to unknown| settlement

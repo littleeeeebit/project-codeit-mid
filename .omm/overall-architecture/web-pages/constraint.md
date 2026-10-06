@@ -1,0 +1,1 @@
+Types come from web/src/lib/api-schema.d.ts, generated from web/openapi.json by tools/openapi.py. tests/test_api.py fails while the schema is stale.

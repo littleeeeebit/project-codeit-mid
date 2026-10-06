@@ -1,9 +1,15 @@
 created: 2026-10-06 07:31:43.364000+00:00
-updated: 2026-10-06 07:31:44.182000+00:00
-update_count: 3
-last_field: note
-git_commit: 80ccafa
+updated: 2026-10-06T08:29:21.756Z
+update_count: 6
+last_field: constraint
+git_commit: 53becaa
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
-- app-process
-- systemd-unit
+  - app-process
+  - key-sessions
+  - member-browser
+  - postgres-container
+  - ssh-tunnel
+  - static-web-build
+  - systemd-unit
+  - uvicorn-service

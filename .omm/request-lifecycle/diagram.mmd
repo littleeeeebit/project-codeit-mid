@@ -1,18 +1,9 @@
 graph TD
-  composer["Ask composer\nweb/src/components/ask/ask-page.tsx"]
-  ask-route["Ask route\nsrc/rfp_assistant/api.py"]
-  persist["Persist and admit\nsrc/rfp_assistant/service.py"]
-  worker["Executor worker\nsrc/rfp_assistant/service.py"]
-  retrieve-step["Scoped retrieval\nsrc/rfp_assistant/retrieval.py"]
-  generate-step["Metered streaming call\nsrc/rfp_assistant/generation.py"]
-  finish-step["Validate and store\nsrc/rfp_assistant/service.py"]
-  watchers["Status poll and SSE\nweb/src/lib/use-answer-stream.ts"]
-  composer -->|"scope, question, mode"| ask-route
-  ask-route -->|"service.ask"| persist
-  persist -->|"Owned record back"| composer
-  persist -->|"request_id queued"| worker
-  worker -->|"rewrite, then search"| retrieve-step
-  retrieve-step -->|"evidence, priced prompt"| generate-step
-  generate-step -->|"partials via stream"| watchers
-  generate-step -->|"content and usage"| finish-step
-  finish-step -->|"result_json, billing"| watchers
+  ask-route["POST /api/ask\nsrc/rfp_assistant/api.py"] -->|AnswerRequest with new generation_id| submit-answer["Validate and persist\nsrc/rfp_assistant/service.py"]
+  submit-answer -->|request_id queued| request-runner["Executor worker\nsrc/rfp_assistant/service.py"]
+  request-runner -->|follow-up only| follow-up-rewrite["Standalone query rewrite\nsrc/rfp_assistant/service.py"]
+  request-runner -->|question and scope| evidence-retrieval["Retrieve and price\nsrc/rfp_assistant/service.py"]
+  follow-up-rewrite -->|standalone question| evidence-retrieval
+  evidence-retrieval -->|messages and estimate| metered-generation["Streamed paid generation\nsrc/rfp_assistant/service.py"]
+  metered-generation -->|provider response| answer-validation["Citation validation and finish\nsrc/rfp_assistant/generation.py"]
+  status-polling["Poll, stream, attach\nweb/src/components/ask/ask-page.tsx"] -->|reads status and partials| answer-validation

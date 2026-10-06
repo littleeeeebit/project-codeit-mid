@@ -1,36 +1,36 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-06 07:57:20.695000+00:00
-update_count: 16
+updated: 2026-10-06 08:29:15.224000+00:00
+update_count: 18
 last_field: diagram
-git_commit: a41f33d
+git_commit: 53becaa
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
 - activation
-- active-run
 - corpus-ingestion
-- evidence-view
+- csv-manifest
+- embedding-sets
 - extraction
-- extractions
 - fidelity-check
 - index-build
-- keyword-indexes
+- keyword-build
 - ocr-merge
 - original-corpus
 - originals
-- request-records
+- retrieval-runs
 - retrieval-selection
 - run-selection
-- vector-sets
-prev_diagram: "graph TD\r\n  ingestion[\"Manifest ingest and OCR\\nsrc/rfp_assistant/ingestion.py\"\
-  ]\r\n  fidelity-check[\"HWP fidelity check\\nsrc/rfp_assistant/fidelity.py\"]\r\n\
-  \  keyword-index[\"Keyword index build\\nsrc/rfp_assistant/retrieval.py\"]\r\n \
-  \ dense-vectors[\"Embedding sets\\nsrc/rfp_assistant/vector_store.py\"]\r\n  gold-dataset[\"\
-  Gold review queue\\nsrc/rfp_assistant/gold.py\"]\r\n  evaluation-runs[\"Frozen runs\
-  \ and compare\\nsrc/rfp_assistant/evaluation.py\"]\r\n  activation[\"activate_decision\\\
-  nsrc/rfp_assistant/evaluation.py\"]\r\n  ingestion -->|extraction elements| fidelity-check\r\
-  \n  fidelity-check -->|review_status verdict| keyword-index\r\n  ingestion -->|parsed\
-  \ extractions| keyword-index\r\n  keyword-index -->|chunk payloads| dense-vectors\r\
-  \n  ingestion -->|source passages| gold-dataset\r\n  gold-dataset -->|approved dev\
-  \ rows| evaluation-runs\r\n  keyword-index -->|index version| evaluation-runs\r\n\
-  \  dense-vectors -->|dense version| evaluation-runs\r\n  evaluation-runs -->|person\
-  \ picks run| activation"
+- serving-activation
+- source-parsing
+prev_diagram: "graph TD\r\n  originals[\"Original RFP files\\n원본 데이터/files\"]\r\n\
+  \  extractions[\"Extraction artifacts\\nsrc/rfp_assistant/ingestion.py\"]\r\n  keyword-indexes[\"\
+  Keyword index versions\\nsrc/rfp_assistant/retrieval.py\"]\r\n  vector-sets[\"pgvector\
+  \ embedding sets\\nsrc/rfp_assistant/vector_store.py\"]\r\n  active-run[\"Active\
+  \ serving pointer\\nsrc/rfp_assistant/evaluation.py\"]\r\n  request-records[\"Request\
+  \ records\\nsrc/rfp_assistant/service.py\"]\r\n  evidence-view[\"Citation and download\\\
+  nsrc/rfp_assistant/service.py\"]\r\n  originals -->|\"sha256, parse HWP or PDF\"\
+  | extractions\r\n  extractions -->|\"elements into chunks\"| keyword-indexes\r\n\
+  \  keyword-indexes -->|\"chunk payload hashes\"| vector-sets\r\n  keyword-indexes\
+  \ -->|\"index_version\"| active-run\r\n  vector-sets -->|\"dense_version\"| active-run\r\
+  \n  active-run -->|\"serving config per request\"| request-records\r\n  request-records\
+  \ -->|\"persisted evidence map\"| evidence-view\r\n  originals -->|\"hash-checked\
+  \ bytes\"| evidence-view"

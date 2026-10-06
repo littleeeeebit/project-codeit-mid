@@ -1,0 +1,1 @@
+embedding_payloads (payload_hash → model, dimensions, policy, vector, checksum; also the query-vector cache), embedding_sets (one per dense version, FK to indexes) and embedding_set_rows (row_order ↔ chunk_id, FK to chunks). cache_put_many refuses to overwrite a different verified vector. An HNSW index can be built by build_hnsw, but README records that exact search serves.

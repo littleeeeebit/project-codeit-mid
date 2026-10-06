@@ -1,7 +1,7 @@
 created: 2026-10-06T07:57:17.322Z
-updated: 2026-10-06T07:57:17.860Z
-update_count: 3
-last_field: concern
+updated: 2026-10-06T08:29:12.864Z
+update_count: 6
+last_field: constraint
 kind: nested-class
 title: attempt-billing
 children:
@@ -12,3 +12,32 @@ children:
   - settled
   - unknown
 parentPath: []
+prev_diagram: "graph TD\r
+
+  \  reserved[\"reserved\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  dispatching[\"dispatching\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  settled[\"settled\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  released[\"released\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  unknown[\"unknown\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  reconciled[\"reconciled\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  reserved -->|\"guard passes\"| dispatching\r
+
+  \  reserved -->|\"guard refuses or restart\"| released\r
+
+  \  dispatching -->|\"settle from usage\"| settled\r
+
+  \  dispatching -->|\"confirmed pre-execution 4xx\"| released\r
+
+  \  dispatching -->|\"timeout, no usage, restart\"| unknown\r
+
+  \  unknown -->|\"owner reconcile\"| reconciled\r
+
+  \  unknown -->|\"settle from evidence\"| settled\r
+
+  \  reconciled -->|\"late usage arrives\"| settled"

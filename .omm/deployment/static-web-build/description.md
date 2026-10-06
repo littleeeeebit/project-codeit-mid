@@ -1,0 +1,1 @@
+web/out from `npm run build` (a static export), mounted by api.create_app at `/` with html=True only if the directory exists. For local screen work, `npm run dev` on 8510 forwards /api/* to RFP_API_URL (README).

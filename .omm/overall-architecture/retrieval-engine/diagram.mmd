@@ -1,14 +1,7 @@
 graph TD
-  keyword-index["Keyword index loader\nsrc/rfp_assistant/retrieval.py"]
-  corpus-route["Corpus project routing\nsrc/rfp_assistant/retrieval.py"]
-  lexical["Kiwi BM25 ranking\nsrc/rfp_assistant/retrieval.py"]
-  query-vector["Query embedding cache\nsrc/rfp_assistant/dense.py"]
-  dense-search["pgvector search\nsrc/rfp_assistant/vector_store.py"]
-  fusion["Keyword-first fusion\nsrc/rfp_assistant/retrieval.py"]
-  reranker["Optional local reranker\nsrc/rfp_assistant/dense.py"]
-  keyword-index -->|"chunks, BM25, scope terms"| lexical
-  corpus-route -->|"narrowed scope rows"| lexical
-  query-vector -->|"unit query vector"| dense-search
-  lexical -->|"ranked BM25 ids"| fusion
-  dense-search -->|"ranked cosine ids"| fusion
-  fusion -->|"pool in HR mode"| reranker
+  keyword-index["Loaded keyword index\nsrc/rfp_assistant/retrieval.py"] -->|rows in scope| corpus-routing["Project-name routing\nsrc/rfp_assistant/retrieval.py"]
+  corpus-routing -->|allowed rows| lexical-ranking["Exact codes and BM25\nsrc/rfp_assistant/retrieval.py"]
+  corpus-routing -->|allowed rows| dense-search["pgvector cosine search\nsrc/rfp_assistant/vector_store.py"]
+  lexical-ranking -->|BM25 order| fusion-and-rerank["keyword_first RRF, rerank\nsrc/rfp_assistant/retrieval.py"]
+  dense-search -->|dense order| fusion-and-rerank
+  fusion-and-rerank -->|final ranking| evidence-packing["Evidence unit packing\nsrc/rfp_assistant/retrieval.py"]

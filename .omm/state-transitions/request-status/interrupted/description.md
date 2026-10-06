@@ -1,1 +1,1 @@
-Set by `RequestRunner.shutdown` (queued rows, and running rows if workers did not finish in time) and by `recover_requests` when a new gateway owner starts. Nothing is replayed automatically.
+Written by RequestRunner.shutdown (queued always; running if workers did not finish in time) and by recover_requests at the next owner start. A worker that reaches a checkpoint after shutdown began raises _Stop('interrupted').

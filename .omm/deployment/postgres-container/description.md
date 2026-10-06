@@ -1,0 +1,1 @@
+compose.postgresql.yaml started by tools/start-postgresql.sh (Linux) or tools/start-postgresql.ps1 (Windows) on loopback 55432 with credentials in .runtime/postgresql.env. The application database is bidmate_app; the Phase 4 pilot archive lives in a separate bidmate_pilot_archive with paid admission off.

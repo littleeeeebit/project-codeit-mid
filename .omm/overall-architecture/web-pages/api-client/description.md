@@ -1,0 +1,1 @@
+createClient<paths>({baseUrl: ""}) with a middleware that sets X-Member = encodeURIComponent(readMember()) unless a call passes memberHeaders(name) explicitly. Ownership actions (poll, cancel, abandon, stream) pass the member captured at submission. errorText() surfaces the service's Korean `detail` string; api.py maps ServiceError to 400 and AuthError to 403.

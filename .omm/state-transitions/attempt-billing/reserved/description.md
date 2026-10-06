@@ -1,1 +1,1 @@
-Inserted by `budget.reserve` with `price_json` {model, rates, rate_version, billing_scope}. Nothing has been sent yet.
+Created by budget.reserve with the maximum cost held against the cap and the purpose envelope. budget.recover releases it at restart if it was never dispatched.

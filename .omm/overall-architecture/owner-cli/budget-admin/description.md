@@ -1,0 +1,1 @@
+configure-budget, budget-status, paid on/off (sets paid_enabled and PostgreSQL paid_admission together), unresolved, settle (from evidence), reconcile, adjust, audit, set-limit and set-envelopes. Each takes --actor and a reason and writes audit_events. Ledger-only commands use Resources(dispatch=False), so they can run beside the serving process without the gateway lock.

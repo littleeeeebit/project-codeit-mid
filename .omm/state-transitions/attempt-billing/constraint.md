@@ -1,0 +1,1 @@
+Any `unknown` attempt in PostgreSQL refuses every new dispatch (mark_dispatching) until reconciled. An overrun settlement freezes paid admission (frozen_reason).

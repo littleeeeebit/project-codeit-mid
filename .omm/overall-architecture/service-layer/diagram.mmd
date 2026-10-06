@@ -1,0 +1,7 @@
+graph TD
+  resources["Process owner\nsrc/rfp_assistant/service.py"] -->|creates lazily| request-runner["Bounded executor\nsrc/rfp_assistant/service.py"]
+  request-runner -->|run_queued by request_id| answer-pipeline["Answer execution\nsrc/rfp_assistant/service.py"]
+  answer-pipeline -->|index, dense, reranker| resources
+  background-jobs["Drafting, eval, judges, maintenance\nsrc/rfp_assistant/service.py"] -->|borrow transport| resources
+  verifier-runs["Frozen retrieval traces\nsrc/rfp_assistant/service.py"] -->|generate_from_run| request-runner
+  evidence-access["Evidence and originals\nsrc/rfp_assistant/service.py"] -->|reads result_json evidence| answer-pipeline

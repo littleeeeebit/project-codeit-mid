@@ -1,1 +1,1 @@
-Direct from queued in `cancel_request`, with no paid call. From running, `_finish` turns a would-be `completed` into `cancelled` when `cancel_requested` is set, or a `_Stop("cancelled")` from a checkpoint or dispatch guard does so. `abandon_request` cancels only queued requests.
+Immediate for a queued request (cancel_request writes a cancelled result with no paid call). For a running request, it is set by _finish when cancel_requested was raised, or when a _Stop('cancelled') ends the run. The provisional stream is withdrawn (`data: null`) as soon as the flag is set.

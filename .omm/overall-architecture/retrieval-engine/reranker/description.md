@@ -1,1 +1,0 @@
-Used only when the activation is `hybrid_rerank` with a reranker config. `Resources.reranker()` loads one `LocalReranker` per (model, revision, max_length, concurrency, precision) key on the GPU and frees the previous model first. An inference error or a missing model falls back to H (`hybrid_rerank->hybrid:reranker_unavailable`). `rerank_protect` keeps the BM25 head in place.

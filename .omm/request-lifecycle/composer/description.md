@@ -1,1 +1,0 @@
-`AskPage.submit` refuses while `busy` (the latest turn is not finished). It captures `readMember()` once and posts `{scope:[{doc_id, source_hash}], question, mode, previous_request_id}`. If the conversation was abandoned while the POST was in flight (`pending.current.valid = false`), it immediately abandons the returned request.

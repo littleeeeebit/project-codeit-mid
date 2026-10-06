@@ -1,0 +1,1 @@
+Every public function begins with _authorize(...). There is no login, so the UI visitor holds every capability. Narrower principals exist only for CLI and test callers.

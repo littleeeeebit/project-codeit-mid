@@ -1,0 +1,1 @@
+`ssh -N -L 8501:127.0.0.1:8501 <user>@<codeit address>` with each member's project-metadata SSH key. That key list is the access control. The VM address is ephemeral, per the runbook.

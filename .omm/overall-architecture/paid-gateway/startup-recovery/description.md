@@ -1,0 +1,1 @@
+Run by Resources._own after taking the lock, and in close() when jobs outlive the shutdown wait. service.recover_requests marks queued and running requests `interrupted` and replays nothing. budget.recover moves `dispatching` attempts to `unknown` (the process may have sent them) and `reserved` ones to `released`. It applies the same rule to the Gemini external_attempts ledger.

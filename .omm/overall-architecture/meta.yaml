@@ -1,14 +1,15 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-06T07:56:58.530Z
-update_count: 20
+updated: 2026-10-06T08:28:47.144Z
+update_count: 22
 last_field: diagram
-git_commit: a41f33d
+git_commit: 53becaa
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
   - api-layer
   - api-routes
   - api-shell
   - budget-ledger
+  - data-stores
   - http-api
   - langfuse-tracing
   - offline-pipelines
@@ -23,40 +24,40 @@ children:
   - runtime-artifacts
   - service-core
   - service-layer
+  - web-pages
   - web-screens
 prev_diagram: "graph TD\r
 
-  \  web-screens[\"Next.js screens\\nweb/src/app\"]\r
+  \  web-screens[\"Next.js screens\\nweb/src/components\"]\r
 
-  \  api-layer[\"FastAPI routes\\nsrc/rfp_assistant/api.py\"]\r
+  \  api-routes[\"FastAPI routes\\nsrc/rfp_assistant/api.py\"]\r
 
-  \  service-core[\"Service facade and owner\\nsrc/rfp_assistant/service.py\"]\r
+  \  service-core[\"Service orchestration\\nsrc/rfp_assistant/service.py\"]\r
 
-  \  retrieval-engine[\"Retrieval engine\\nsrc/rfp_assistant/retrieval.py\"]\r
+  \  retrieval-engine[\"Hybrid retrieval\\nsrc/rfp_assistant/retrieval.py\"]\r
 
-  \  paid-gateway[\"Paid gateway and ledger\\nsrc/rfp_assistant/budget.py\"]\r
+  \  budget-ledger[\"Budget ledger\\nsrc/rfp_assistant/budget.py\"]\r
 
-  \  postgresql-store[\"PostgreSQL 18.6 +
+  \  openai-transport[\"Provider
+  transport\\nsrc/rfp_assistant/generation.py\"]\r
+
+  \  postgres-store[\"PostgreSQL and
   pgvector\\nsrc/rfp_assistant/postgres.py\"]\r
 
   \  offline-pipelines[\"Owner CLI pipelines\\nsrc/rfp_assistant/cli.py\"]\r
 
-  \  langfuse-tracing[\"Langfuse tracing\\nsrc/rfp_assistant/tracing.py\"]\r
+  \  web-screens -->|\"REST, X-Member, SSE\"| api-routes\r
 
-  \  web-screens -->|JSON and SSE| api-layer\r
+  \  api-routes -->|\"one service call each\"| service-core\r
 
-  \  api-layer -->|one service call| service-core\r
+  \  service-core -->|\"scoped question\"| retrieval-engine\r
 
-  \  service-core -->|scoped question| retrieval-engine\r
+  \  service-core -->|\"reserve, dispatch, settle\"| budget-ledger\r
 
-  \  service-core -->|reserve dispatch settle| paid-gateway\r
+  \  service-core -->|\"chat with session key\"| openai-transport\r
 
-  \  retrieval-engine -->|chunks and vectors| postgresql-store\r
+  \  retrieval-engine -->|\"chunks, vector SQL\"| postgres-store\r
 
-  \  paid-gateway -->|attempt rows| postgresql-store\r
+  \  budget-ledger -->|\"attempts rows, lock check\"| postgres-store\r
 
-  \  service-core -->|requests and results| postgresql-store\r
-
-  \  offline-pipelines -->|extractions indexes runs| postgresql-store\r
-
-  \  service-core -.->|observability only| langfuse-tracing"
+  \  offline-pipelines -->|\"ingest, index, activate\"| postgres-store"

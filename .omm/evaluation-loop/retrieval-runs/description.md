@@ -1,1 +1,0 @@
-`evaluate-retrieval` and compare rows write `.runtime/runs/<run_id>/` (`config.json`, `traces.jsonl`, `scores.json`, `report.md`). Each run is frozen by dataset hash, evaluated population, index manifest, analyzer, dense version, limits and `EVAL_VERSION`. Metrics are graded against source spans, never chunk IDs: hit@k, nDCG@5, completeness, critical failures, Wilson intervals.

@@ -1,0 +1,1 @@
+Never start with --host 0.0.0.0 on `codeit`. The shared project firewall opens 8501, and there is no login.

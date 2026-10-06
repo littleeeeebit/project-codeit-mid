@@ -1,0 +1,6 @@
+graph TD
+  application-tables["Corpus and request tables\nsrc/rfp_assistant/store.py"] -->|chunks reference index| runtime-artifacts["Immutable files under .runtime\nsrc/rfp_assistant/ingestion.py"]
+  ledger-tables["Attempts, adjustments, budget\nsrc/rfp_assistant/budget.py"] -->|request_id link| application-tables
+  vector-tables["pgvector payloads and sets\nsrc/rfp_assistant/vector_store.py"] -->|FK to chunks| application-tables
+  gold-projections["Dataset and rejection files\nsrc/rfp_assistant/gold.py"] -->|rendered from| application-tables
+  import-validation["Validated import marker\nsrc/rfp_assistant/postgres.py"] -->|hashes of| runtime-artifacts

@@ -1,1 +1,1 @@
-How source bytes become a cited answer. Every artifact is content-addressed and immutable, and old revisions are kept, so issued citations and pinned gold rows keep resolving after re-parses and rebuilds.
+Corpus data path from the CSV manifest and original files to the evidence a served answer cites, and how a retrieval configuration becomes the serving one. Every arrow is a CLI command or maintenance step; the serving process only reads the results, except the 실험 비교 activate route.

@@ -1,0 +1,1 @@
+The migration_import and migration_validation rows record the 2026-10-04 cutover snapshot and references_json (artifact hashes). require_imported_database refuses startup when the import is incomplete, validation failed, recovery is blocked or any referenced artifact hash changed. GatewayOwner.check and owner_guard re-check validation_ready before every paid dispatch.

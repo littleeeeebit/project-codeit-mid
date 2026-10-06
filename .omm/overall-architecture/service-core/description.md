@@ -1,1 +1,0 @@
-`service.py` is the only module the API calls. It authorizes each public function by capability (`_authorize`), owns process resources, admits and executes answer requests, and starts the paid background jobs: drafting, answer evaluation, judge runs and maintenance. Each job is registered in `Resources._jobs`, so `close()` can join it.

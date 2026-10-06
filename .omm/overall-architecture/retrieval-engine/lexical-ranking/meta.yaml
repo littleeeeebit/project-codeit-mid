@@ -1,0 +1,9 @@
+created: 2026-10-06T08:28:54.549Z
+updated: 2026-10-06T08:28:54.550Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: lexical-ranking
+children: []
+parentPath:
+  - retrieval-engine

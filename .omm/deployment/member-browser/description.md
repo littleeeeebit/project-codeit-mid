@@ -1,0 +1,1 @@
+Opens http://127.0.0.1:8501 through the tunnel. Each browser keeps its own typed member name (local storage) and, after entering a key, its own `bidmate_key_session` cookie.

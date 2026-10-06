@@ -1,0 +1,1 @@
+plan-embeddings prices the uncached unique payloads; build-dense (OpenAI, `embedding` envelope), build_local_dense (GPU) or build_gemini_dense fill embedding_payloads. publish_dense / vector_store.publish creates a set bound to its keyword index, verifies it, then marks it ready. Query vectors are cached in the same payload table.

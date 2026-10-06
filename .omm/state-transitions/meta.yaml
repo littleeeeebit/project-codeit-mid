@@ -1,8 +1,8 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-06 07:57:14.636000+00:00
-update_count: 16
+updated: 2026-10-06 08:29:10.126000+00:00
+update_count: 18
 last_field: diagram
-git_commit: a41f33d
+git_commit: 53becaa
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
 - attempt-billing
@@ -12,12 +12,13 @@ children:
 - gold-candidate-states
 - request-status
 - serving-activation
-- source-review
-prev_diagram: "graph TD\r\n  request-states[\"Request status\\nsrc/rfp_assistant/store.py\"\
-  ]\r\n  attempt-states[\"Attempt billing state\\nsrc/rfp_assistant/budget.py\"]\r\
-  \n  process-ownership[\"Gateway ownership\\nsrc/rfp_assistant/postgres.py\"]\r\n\
-  \  serving-activation[\"Serving activation\\nsrc/rfp_assistant/evaluation.py\"]\r\
-  \n  request-states -->|one per paid stage| attempt-states\r\n  attempt-states -->|billing_state\
-  \ on finish| request-states\r\n  process-ownership -->|restart marks interrupted|\
-  \ request-states\r\n  process-ownership -->|dispatching becomes unknown| attempt-states\r\
-  \n  serving-activation -->|config snapshot per request| request-states"
+prev_diagram: "graph TD\r\n  request-status[\"Request status\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  attempt-billing[\"Attempt billing state\\nsrc/rfp_assistant/budget.py\"]\r\
+  \n  gateway-owner[\"Gateway ownership\\nsrc/rfp_assistant/postgres.py\"]\r\n  serving-activation[\"\
+  Serving activation\\nsrc/rfp_assistant/evaluation.py\"]\r\n  source-review[\"Source\
+  \ review status\\nsrc/rfp_assistant/ingestion.py\"]\r\n  gold-candidate[\"Gold candidate\
+  \ decision\\nsrc/rfp_assistant/gold.py\"]\r\n  request-status -->|\"stop check in\
+  \ dispatch\"| attempt-billing\r\n  gateway-owner -->|\"owner_guard at admission\"\
+  | attempt-billing\r\n  gateway-owner -->|\"startup recovery\"| request-status\r\n\
+  \  source-review -->|\"gates index sources\"| serving-activation\r\n  gold-candidate\
+  \ -->|\"approved rows grade runs\"| serving-activation"

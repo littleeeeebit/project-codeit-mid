@@ -1,1 +1,0 @@
-`active_serving(settings)` reads `app_settings.active_run` and `active_index` on every call (each `Resources.serving()`), so a new activation takes effect on the next request without a restart. `Resources.index()` and `dense()` reload when the version changes.

@@ -1,1 +1,1 @@
-Written for provider errors, a missing key, validation (`TechnicalError`) failures, rewrite failures, `ServiceError` raised mid-execution, and unschedulable submissions (`_fail_unscheduled`). Billing for a dispatched attempt may still be `unknown`.
+Written when done(request_status='failed'): validation, provider, settlement or retrieval failures and ServiceErrors raised during execution. _fail_unscheduled also sets it when the executor refused the submit.

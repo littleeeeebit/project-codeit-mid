@@ -1,0 +1,1 @@
+How the shared instance runs (runbook §3, tools/bidmate.service, compose.postgresql.yaml). Members reach a loopback-only uvicorn on the team VM through SSH port forwarding. PostgreSQL runs in Docker on loopback 55432. API keys arrive only through the 설정 page into process memory.

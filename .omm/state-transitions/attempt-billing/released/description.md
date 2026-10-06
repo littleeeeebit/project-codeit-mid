@@ -1,1 +1,1 @@
-No cost. Reached when a dispatch guard refuses (`stopped_before_dispatch:<reason>`), when no key is set (`provider_unavailable`), when the provider confirms a 4xx before execution, or when startup recovery finds reservations that were never dispatched.
+No charge: refused before dispatch (stopped_before_dispatch:<reason>, provider_unavailable), a confirmed pre-execution 4xx, or never dispatched before a restart.

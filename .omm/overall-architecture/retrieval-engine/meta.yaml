@@ -1,27 +1,28 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-06 07:57:05.897000+00:00
-update_count: 20
-last_field: note
+updated: 2026-10-06 08:28:53.793000+00:00
+update_count: 22
+last_field: diagram
 kind: nested-class
 title: retrieval-engine
 children:
 - corpus-route
+- corpus-routing
 - dense-channel
 - dense-search
+- evidence-packing
 - fusion
+- fusion-and-rerank
 - keyword-index
-- lexical
-- query-vector
+- lexical-ranking
 - reranker
 parentPath: []
-prev_diagram: "graph TD\r\n  corpus-router[\"Corpus routing\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  exact-codes[\"Requirement code match\\nsrc/rfp_assistant/retrieval.py\"]\r\
-  \n  bm25-channel[\"Kiwi BM25 channel\\nsrc/rfp_assistant/retrieval.py\"]\r\n  dense-channel[\"\
-  Query vector and pgvector\\nsrc/rfp_assistant/vector_store.py\"]\r\n  fusion[\"\
-  Keyword-first RRF\\nsrc/rfp_assistant/retrieval.py\"]\r\n  reranker[\"Local reranker\\\
-  nsrc/rfp_assistant/dense.py\"]\r\n  evidence-packer[\"Evidence packing\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  corpus-router -->|narrowed scope rows| bm25-channel\r\n  corpus-router -->|narrowed\
-  \ scope rows| dense-channel\r\n  bm25-channel -->|lexical ranking| fusion\r\n  dense-channel\
-  \ -->|cosine ranking| fusion\r\n  fusion -->|fused pool| reranker\r\n  exact-codes\
-  \ -->|always first| evidence-packer\r\n  fusion -->|ordered rows| evidence-packer\r\
-  \n  reranker -->|reordered pool| evidence-packer"
+prev_diagram: "graph TD\r\n  keyword-index[\"Keyword index loader\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  corpus-route[\"Corpus project routing\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  lexical[\"Kiwi BM25 ranking\\nsrc/rfp_assistant/retrieval.py\"]\r\n  query-vector[\"\
+  Query embedding cache\\nsrc/rfp_assistant/dense.py\"]\r\n  dense-search[\"pgvector\
+  \ search\\nsrc/rfp_assistant/vector_store.py\"]\r\n  fusion[\"Keyword-first fusion\\\
+  nsrc/rfp_assistant/retrieval.py\"]\r\n  reranker[\"Optional local reranker\\nsrc/rfp_assistant/dense.py\"\
+  ]\r\n  keyword-index -->|\"chunks, BM25, scope terms\"| lexical\r\n  corpus-route\
+  \ -->|\"narrowed scope rows\"| lexical\r\n  query-vector -->|\"unit query vector\"\
+  | dense-search\r\n  lexical -->|\"ranked BM25 ids\"| fusion\r\n  dense-search -->|\"\
+  ranked cosine ids\"| fusion\r\n  fusion -->|\"pool in HR mode\"| reranker"

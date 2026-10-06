@@ -1,0 +1,1 @@
+`python -m rfp_assistant.cli <command>` (src/rfp_assistant/cli.py), also wrapped on the VM by tools/bidmate-cli.sh with the service's environment. Commands build their own service.Resources: a full owner for paid jobs, which must not run beside the serving app because of the gateway lock, or dispatch=False ledger-only owners for budget administration beside the app.

@@ -1,1 +1,0 @@
-`.runtime/datasets/dev.jsonl` (gold-2), the pilot `dev-pilot`, and the sealed `.runtime/sealed/test.jsonl` are rendered from the database after every decision. `gold check` verifies that the files and the wiki equal their database rendering. `validate-gold` and `freeze-dataset` produce the frozen manifests that runs bind to.

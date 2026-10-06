@@ -1,1 +1,1 @@
-`budget.settle` computes the cost from uncached, cached, cache-write and completion tokens at the attempt's recorded rates, exactly once. A duplicate settle returns `duplicate`. A cost above the reservation sets `frozen_reason`, which stops all admission. Settling a `reconciled` attempt inserts a negative `late-settlement:` adjustment so the cost is not counted twice.
+Exactly-once cost from reported usage. It may also come from the owner CLI `settle` with evidence, or from a late settle after reconciliation, which then adds a negative adjustment.

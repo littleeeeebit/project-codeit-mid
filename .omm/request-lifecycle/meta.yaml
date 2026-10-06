@@ -1,40 +1,39 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-06 07:57:11.831000+00:00
-update_count: 16
-last_field: diagram
-git_commit: a41f33d
+updated: 2026-10-06 08:29:05.093000+00:00
+update_count: 19
+last_field: constraint
+git_commit: 53becaa
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
 - answer-validation
 - ask-page
 - ask-route
 - cancellation
-- composer
+- cancellation-and-shutdown
+- evidence-retrieval
 - finish-record
 - finish-step
-- generate-step
+- follow-up-rewrite
+- metered-generation
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
 - paid-call
-- persist
-- retrieve-step
+- request-runner
 - status-poll
+- status-polling
+- submit-answer
 - validation
-- watchers
-- worker
-prev_diagram: "graph TD\r\n  ask-submission[\"Ask page submit\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  admission[\"submit_answer and _create\\nsrc/rfp_assistant/service.py\"]\r\
-  \n  worker-execution[\"run_queued and _execute\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  follow-up-rewrite[\"Follow-up rewrite\\nsrc/rfp_assistant/service.py\"]\r\
-  \n  evidence-preparation[\"prepare_answer and _priced\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  metered-generation[\"_metered_chat generation\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  answer-validation[\"validate_answer and _finish\\nsrc/rfp_assistant/generation.py\"\
-  ]\r\n  screen-follow[\"Poll and SSE stream\\nweb/src/lib/use-answer-stream.ts\"\
-  ]\r\n  ask-submission -->|POST ask| admission\r\n  admission -->|request_id to executor|\
-  \ worker-execution\r\n  worker-execution -->|has previous turn| follow-up-rewrite\r\
-  \n  follow-up-rewrite -->|standalone question| evidence-preparation\r\n  worker-execution\
-  \ -->|first turn| evidence-preparation\r\n  evidence-preparation -->|messages and\
-  \ estimate| metered-generation\r\n  metered-generation -->|provider response| answer-validation\r\
-  \n  screen-follow -->|status and partials| answer-validation\r\n  ask-submission\
-  \ -->|ownership record| screen-follow"
+prev_diagram: "graph TD\r\n  composer[\"Ask composer\\nweb/src/components/ask/ask-page.tsx\"\
+  ]\r\n  ask-route[\"Ask route\\nsrc/rfp_assistant/api.py\"]\r\n  persist[\"Persist\
+  \ and admit\\nsrc/rfp_assistant/service.py\"]\r\n  worker[\"Executor worker\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  retrieve-step[\"Scoped retrieval\\nsrc/rfp_assistant/retrieval.py\"]\r\n\
+  \  generate-step[\"Metered streaming call\\nsrc/rfp_assistant/generation.py\"]\r\
+  \n  finish-step[\"Validate and store\\nsrc/rfp_assistant/service.py\"]\r\n  watchers[\"\
+  Status poll and SSE\\nweb/src/lib/use-answer-stream.ts\"]\r\n  composer -->|\"scope,\
+  \ question, mode\"| ask-route\r\n  ask-route -->|\"service.ask\"| persist\r\n  persist\
+  \ -->|\"Owned record back\"| composer\r\n  persist -->|\"request_id queued\"| worker\r\
+  \n  worker -->|\"rewrite, then search\"| retrieve-step\r\n  retrieve-step -->|\"\
+  evidence, priced prompt\"| generate-step\r\n  generate-step -->|\"partials via stream\"\
+  | watchers\r\n  generate-step -->|\"content and usage\"| finish-step\r\n  finish-step\
+  \ -->|\"result_json, billing\"| watchers"

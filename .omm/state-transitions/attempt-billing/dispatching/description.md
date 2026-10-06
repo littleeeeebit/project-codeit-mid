@@ -1,1 +1,1 @@
-Set by `mark_dispatching` just before the network call, in the same transaction as the request's stop guard, the owner guard, the `paid_admission` check and the no-unknown check. This is the durable marker that a call may have executed.
+The durable marker written before the network call, in the same transaction as the request stop check. It counts as pending cost.
