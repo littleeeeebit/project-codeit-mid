@@ -1,39 +1,37 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-06 09:09:02.819000+00:00
-update_count: 22
+updated: 2026-10-06 10:18:29.846000+00:00
+update_count: 24
 last_field: diagram
-git_commit: cc684cc
-git_branch: deploy-gcp-vm-ssh-tunnel
+git_commit: '4317974'
+git_branch: rename-records-and-tools-by-purpose
 children:
 - activation
 - corpus-ingestion
 - embedding-sets
-- evidence-view
+- evaluation-runs
 - extraction
-- extraction-artifacts
+- fidelity-and-ocr
 - fidelity-check
 - fidelity-ocr
 - frozen-runs
+- gold-review
 - index-build
-- keyword-index-files
-- ledger-records
+- ingestion
+- keyword-index-build
 - ocr-merge
 - original-corpus
 - originals
-- request-records
 - retrieval-selection
 - run-selection
 - source-originals
-prev_diagram: "graph TD\r\n  sourceManifest[\"CSV manifest and originals\\nsrc/rfp_assistant/ingestion.py\"\
-  ]\r\n  parsing[\"HWP and PDF parsing\\nsrc/rfp_assistant/ingestion.py\"]\r\n  fidelityOcr[\"\
-  Fidelity check and OCR\\nsrc/rfp_assistant/fidelity.py\"]\r\n  keywordBuild[\"Chunking\
-  \ and keyword index\\nsrc/rfp_assistant/chunking.py\"]\r\n  embeddingSets[\"Embedding\
-  \ sets\\nsrc/rfp_assistant/dense.py\"]\r\n  frozenRuns[\"Frozen runs and matrices\\\
-  nsrc/rfp_assistant/compare.py\"]\r\n  activation[\"Human activation\\nsrc/rfp_assistant/evaluation.py\"\
-  ]\r\n  maintenanceSeq[\"Maintenance sequence\\nsrc/rfp_assistant/maintenance.py\"\
-  ]\r\n  sourceManifest -->|documents and sources rows| parsing\r\n  parsing -->|extraction\
-  \ revision, elements| fidelityOcr\r\n  fidelityOcr -->|OCR text on next ingest|\
-  \ parsing\r\n  fidelityOcr -->|review_status filter| keywordBuild\r\n  keywordBuild\
-  \ -->|index_version, chunks| embeddingSets\r\n  keywordBuild -->|BM25 index| frozenRuns\r\
-  \n  embeddingSets -->|ready vector set| frozenRuns\r\n  frozenRuns -->|person picks\
-  \ a row| activation\r\n  maintenanceSeq -->|reruns stages, no activation| keywordBuild"
+prev_diagram: "graph TD\r\n  source-originals[\"Original HWP and PDF\\n원본 데이터/files\"\
+  ] -->|\"sha256, parse\"| extraction-artifacts[\"Element extractions\\n.runtime/extracted\"\
+  ]\r\n  extraction-artifacts -->|\"chunk profile, Kiwi tokens\"| keyword-index-files[\"\
+  Keyword index files\\n.runtime/indexes\"]\r\n  keyword-index-files -->|\"chunk payload\
+  \ hashes\"| embedding-sets[\"pgvector embedding sets\\nsrc/rfp_assistant/vector_store.py\"\
+  ]\r\n  keyword-index-files -->|\"packed EvidenceUnit\"| request-records[\"Request\
+  \ rows\\nsrc/rfp_assistant/service.py\"]\r\n  embedding-sets -->|\"dense ranks\"\
+  | request-records\r\n  ledger-records[\"Ledger attempts\\nsrc/rfp_assistant/budget.py\"\
+  ] -->|\"billing by request_id\"| request-records\r\n  request-records -->|\"evidence\
+  \ map lookup\"| evidence-view[\"Evidence pane\\nweb/src/components/ask/answer-parts.tsx\"\
+  ]"

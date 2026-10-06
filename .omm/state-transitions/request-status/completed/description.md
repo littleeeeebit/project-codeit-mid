@@ -1,1 +1,0 @@
-Written by `_finish` when the outcome is a domain status (`answered`, `insufficient_evidence`, `ingestion_unavailable`, `budget_blocked`). If `cancel_requested` was set while running, `_finish` stores `cancelled` instead.

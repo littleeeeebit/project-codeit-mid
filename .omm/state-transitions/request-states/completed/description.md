@@ -1,0 +1,1 @@
+Written by `_finish` for every domain outcome that is not an error: `answered` and the other model statuses, `insufficient_evidence`, `ingestion_unavailable`, `budget_blocked`, and the free metadata and inventory results. Whether a screen shows it as the current answer depends on `may_attach`, not on this status.

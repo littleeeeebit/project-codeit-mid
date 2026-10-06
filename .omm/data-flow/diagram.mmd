@@ -1,8 +1,9 @@
 graph TD
-  source-originals["Original HWP and PDF\n원본 데이터/files"] -->|"sha256, parse"| extraction-artifacts["Element extractions\n.runtime/extracted"]
-  extraction-artifacts -->|"chunk profile, Kiwi tokens"| keyword-index-files["Keyword index files\n.runtime/indexes"]
-  keyword-index-files -->|"chunk payload hashes"| embedding-sets["pgvector embedding sets\nsrc/rfp_assistant/vector_store.py"]
-  keyword-index-files -->|"packed EvidenceUnit"| request-records["Request rows\nsrc/rfp_assistant/service.py"]
-  embedding-sets -->|"dense ranks"| request-records
-  ledger-records["Ledger attempts\nsrc/rfp_assistant/budget.py"] -->|"billing by request_id"| request-records
-  request-records -->|"evidence map lookup"| evidence-view["Evidence pane\nweb/src/components/ask/answer-parts.tsx"]
+  source-originals["Originals and CSV manifest\nsrc/rfp_assistant/ingestion.py"] -->|"sha256 and document rows"| ingestion["Parse and revision\nsrc/rfp_assistant/ingestion.py"]
+  ingestion -->|"elements vs printed PDF"| fidelity-and-ocr["Fidelity and OCR\nsrc/rfp_assistant/fidelity.py"]
+  fidelity-and-ocr -->|"review status, image text"| keyword-index-build["Keyword index build\nsrc/rfp_assistant/retrieval.py"]
+  keyword-index-build -->|"chunk payloads"| embedding-sets["Embedding sets\nsrc/rfp_assistant/dense.py"]
+  keyword-index-build -->|"index version"| evaluation-runs["Frozen runs and matrices\nsrc/rfp_assistant/compare.py"]
+  embedding-sets -->|"dense version"| evaluation-runs
+  gold-review["Gold drafting and review\nsrc/rfp_assistant/gold.py"] -->|"approved dataset rows"| evaluation-runs
+  evaluation-runs -->|"person picks a row"| activation["Activation\nsrc/rfp_assistant/evaluation.py"]

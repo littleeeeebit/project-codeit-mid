@@ -1,0 +1,1 @@
+How a serving or CLI process gains the right to run and to spend, and how it gives that right back. Startup refuses an unvalidated database. Exclusive gateway ownership comes before any recovery or dispatch. Shutdown persists every unfinished state conservatively instead of replaying it.

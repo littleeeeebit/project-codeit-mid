@@ -1,0 +1,1 @@
+Written by `_finish` when `done(..., request_status='failed')` is called: a `ServiceError` (`clarification_required`), retrieval or estimate errors, provider failures, rewrite or answer validation failures, settlement failures, or unexpected exceptions (`technical_error`). Also written by `_fail_unscheduled` when the executor refused the submission.

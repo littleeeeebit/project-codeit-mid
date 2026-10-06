@@ -1,1 +1,0 @@
-Workflows on the 검증 and 데이터셋 만들기 screens. They share the process's gateway and the ledger's per-purpose envelopes. Every paid workflow first shows a free maximum and runs only within the consented amount. None of them changes what serves except the explicit activate action.

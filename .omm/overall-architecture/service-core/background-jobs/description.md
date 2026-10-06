@@ -1,1 +1,7 @@
-Paid or long work started from the screens runs in daemon threads registered in `res._jobs`, so `close()` joins them. Answer evaluation (`start_answer_evaluation` → `answers.run_answers`) and judge runs (`start_judges` → `judges.run`) share `_EVAL_LOCK`, and `_refuse_closed_or_busy` allows only one of them at a time. Drafting (`start_drafting` → `drafting._generate`, which is guarded to report `interrupted` once closed) uses `_DRAFT_LOCK`. Maintenance (`start_maintenance` → `maintenance.run(closing=lambda: res._closed)`) allows a single `_MAINTENANCE_JOB`. Each job publishes its run directory or state before the start call returns and writes `last-error.txt`, `error.txt` or `interrupted.txt` on failure. A rerun resumes and never re-sends finished rows (per the docstrings; `answers.py`/`judges.py` internals were not read line by line).
+Paid and long-running verifier work runs in daemon threads started through `_start_job` or directly:
+- answer evaluation (`_EVAL_JOBS`)
+- judge comparison (`_JUDGE_JOBS`)
+- gold drafting (`_DRAFT_JOBS`, under `_DRAFT_LOCK`)
+- maintenance (`_MAINTENANCE_JOB`)
+
+Each thread runs in a copied context and is appended to `res._jobs` under `_runner_lock`, so `close()` joins it. Each job receives a `closing` callback or a guard returning `interrupted` so it stops before the next paid call. `_refuse_closed_or_busy` allows one evaluation or judge run at a time. Run state is published to files under `.runtime` before the start call returns, and failures are written as `error.txt`, `interrupted.txt` or `last-error.txt`.

@@ -1,9 +1,9 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-06T09:08:32.943Z
-update_count: 26
+updated: 2026-10-06T10:18:00.868Z
+update_count: 28
 last_field: diagram
-git_commit: cc684cc
-git_branch: deploy-gcp-vm-ssh-tunnel
+git_commit: "4317974"
+git_branch: rename-records-and-tools-by-purpose
 children:
   - api-layer
   - api-routes
@@ -13,6 +13,7 @@ children:
   - data-stores
   - http-api
   - langfuse-tracing
+  - offline-cli
   - offline-pipelines
   - openai-transport
   - owner-cli
@@ -29,38 +30,31 @@ children:
   - web-screens
 prev_diagram: "graph TD\r
 
-  \  webScreens[\"Web screens\\nweb/src/components/ask/ask-page.tsx\"]\r
+  \  web-screens[\"Next.js screens\\nweb/src\"] -->|\"typed JSON and SSE\"|
+  http-api[\"FastAPI routes\\nsrc/rfp_assistant/api.py\"]\r
 
-  \  httpApi[\"HTTP API\\nsrc/rfp_assistant/api.py\"]\r
+  \  http-api -->|\"one service call each\"| service-core[\"Service
+  orchestration\\nsrc/rfp_assistant/service.py\"]\r
 
-  \  serviceLayer[\"Service orchestration\\nsrc/rfp_assistant/service.py\"]\r
+  \  service-core -->|\"scoped question\"| retrieval-engine[\"Retrieval
+  engine\\nsrc/rfp_assistant/retrieval.py\"]\r
 
-  \  retrievalEngine[\"Retrieval engine\\nsrc/rfp_assistant/retrieval.py\"]\r
+  \  service-core -->|\"metered paid stages\"| paid-gateway[\"Paid gateway and
+  ledger\\nsrc/rfp_assistant/budget.py\"]\r
 
-  \  budgetLedger[\"Paid gateway ledger\\nsrc/rfp_assistant/budget.py\"]\r
-
-  \  providerTransport[\"Provider
-  transport\\nsrc/rfp_assistant/generation.py\"]\r
-
-  \  postgresStore[\"PostgreSQL and
+  \  service-core -->|\"requests, verifier runs\"| postgres-store[\"PostgreSQL +
   pgvector\\nsrc/rfp_assistant/postgres.py\"]\r
 
-  \  ownerCli[\"Owner CLI pipelines\\nsrc/rfp_assistant/cli.py\"]\r
+  \  retrieval-engine -->|\"exact vector search\"| postgres-store\r
 
-  \  webScreens -->|JSON fetch with X-Member| httpApi\r
+  \  paid-gateway -->|\"attempt rows under mutex\"| postgres-store\r
 
-  \  httpApi -->|one service call per route| serviceLayer\r
+  \  corpus-pipeline[\"Corpus pipeline\\nsrc/rfp_assistant/ingestion.py\"]
+  -->|\"index manifest, chunks\"| retrieval-engine\r
 
-  \  serviceLayer -->|scoped question| retrievalEngine\r
+  \  corpus-pipeline -->|\"extractions, vectors\"| postgres-store\r
 
-  \  serviceLayer -->|reserve, dispatch, settle| budgetLedger\r
+  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"] -->|\"ingest, build,
+  activate\"| corpus-pipeline\r
 
-  \  serviceLayer -->|chat with on_delta| providerTransport\r
-
-  \  retrievalEngine -->|BM25 rows, vector search| postgresStore\r
-
-  \  budgetLedger -->|attempt rows, locked tx| postgresStore\r
-
-  \  ownerCli -->|ingest, index, activate| postgresStore\r
-
-  \  ownerCli -->|own Resources instance| serviceLayer"
+  \  owner-cli -->|\"ledger-only admin\"| paid-gateway"

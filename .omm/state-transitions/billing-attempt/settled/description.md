@@ -1,1 +1,0 @@
-Exactly once from provider usage. An overrun beyond the reservation sets `frozen_reason`, which blocks all new admissions.

@@ -1,1 +1,6 @@
-데이터셋 만들기 lists `/api/gold/pending` and `/api/drafting/runs`. In the drafting tab (`draft.tsx`) the verifier picks development documents and elements (`/api/drafting/documents`, `.../elements`), shapes slots (`/api/drafting/slots`), gets a free maximum (`/api/drafting/plan`), starts paid drafting with that consented maximum (`/api/drafting/start`), and sends valid drafts to the queue (`/api/drafting/runs/{run_id}/submit`). In the review tab (`review.tsx`) the reviewer opens a candidate next to its source spans (`/api/gold/{candidate_id}`) and approves or rejects it with a note (`/api/gold/{candidate_id}/decide`).
+The 데이터셋 만들기 page works in three steps:
+1. Pick development documents and passages through `/api/drafting/documents` and `/elements`, and build slots with `/api/drafting/slots`.
+2. Price the run with `/api/drafting/plan`, then start it with `/api/drafting/start` and the consented maximum.
+3. Send the valid drafts to the queue with `/api/drafting/runs/{id}/submit`.
+
+Reviewers then read `/api/gold/pending` and `/api/gold/{candidate_id}`, and approve or reject with `/api/gold/{candidate_id}/decide`.

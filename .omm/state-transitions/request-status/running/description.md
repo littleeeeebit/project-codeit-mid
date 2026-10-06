@@ -1,1 +1,0 @@
-Set by `run_queued`'s conditional update, or directly at insert for free modes and the synchronous `answer()`. `cancel_request` only sets `cancel_requested=1`: no new paid stage starts (`_checkpoint`, `_dispatch_guard`), but a call already dispatched still settles.

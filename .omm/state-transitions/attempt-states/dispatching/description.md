@@ -1,0 +1,1 @@
+The durable marker written just before the network call by `mark_dispatching`, in the same transaction as the stop and ownership checks. Startup `budget.recover` turns any remaining `dispatching` attempt into `unknown`, because the previous process may have sent it.

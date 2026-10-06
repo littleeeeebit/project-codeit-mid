@@ -1,8 +1,0 @@
-graph TD
-  manifest-import["CSV manifest\nsrc/rfp_assistant/ingestion.py"] -->|"documents, sources"| source-ingest["Parse originals\nsrc/rfp_assistant/ingestion.py"]
-  ocr-and-fidelity["OCR and fidelity\nsrc/rfp_assistant/fidelity.py"] -->|"print text, review status"| source-ingest
-  source-ingest -->|"element revisions"| keyword-build["Chunk + keyword build\nsrc/rfp_assistant/retrieval.py"]
-  keyword-build -->|"index version"| dense-build["Embedding sets\nsrc/rfp_assistant/dense.py"]
-  keyword-build -->|"frozen index"| comparison-runs["Evaluation runs\nsrc/rfp_assistant/compare.py"]
-  dense-build -->|"vector set version"| comparison-runs
-  comparison-runs -->|"person picks a row"| run-activation["Run activation\nsrc/rfp_assistant/evaluation.py"]

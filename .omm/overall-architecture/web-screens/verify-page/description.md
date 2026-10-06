@@ -1,1 +1,8 @@
-검증 loads `/api/verify/overview`, `/api/verify/fidelity`, `/api/verify/ingestion` and `/api/verify/traces`. Its tabs map onto routes. Trace (`trace.tsx`): run a frozen retrieval trace, compare two traces, and generate a paid answer from one (`/api/verify/traces/{run_id}/generate`, then poll `/api/requests/{id}`). Evaluation (`evaluation.tsx`): plan, then start the dev answer evaluation. Judges (`judges.tsx`): plan, start, results, disagreements. Maintenance (`maintenance.tsx`): status and start. Experiments (`experiments.tsx`): comparison tables and activating a row. Gold (`gold.tsx`): recent decisions and second review. Fidelity: confirm. Records: verification history and all members' requests.
+The 검증 page loads `/api/verify/overview`, `/fidelity`, `/ingestion` and `/traces`. Its tabs map to service functions:
+- trace runs (`run_trace`, `generate_from_run_id`)
+- experiment tables with activation (`experiments`, `activate_experiment`)
+- maintenance (`start_maintenance`, `maintenance_status`)
+- answer evaluation and judge comparison (plan, then start, against a consented estimate)
+- HWP fidelity pages and confirmation
+- gold second review and recent decisions
+- the verification history

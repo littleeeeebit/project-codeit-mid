@@ -1,26 +1,37 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-06 09:08:55.494000+00:00
-update_count: 22
+updated: 2026-10-06T10:18:22.380Z
+update_count: 24
 last_field: diagram
-git_commit: cc684cc
-git_branch: deploy-gcp-vm-ssh-tunnel
+git_commit: "4317974"
+git_branch: rename-records-and-tools-by-purpose
 children:
-- attempt-billing
-- attempt-record
-- attempt-states
-- billing-attempt
-- gateway-owner
-- gold-candidate
-- gold-candidate-states
-- maintenance-run
-- request-status
-- serving-activation
-prev_diagram: "graph TD\r\n  requestRecord[\"Request record\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  attemptRecord[\"Billing attempt\\nsrc/rfp_assistant/budget.py\"]\r\n  servingActivation[\"\
-  Serving activation\\nsrc/rfp_assistant/evaluation.py\"]\r\n  goldCandidate[\"Gold\
-  \ candidate\\nsrc/rfp_assistant/gold.py\"]\r\n  maintenanceRun[\"Maintenance run\\\
-  nsrc/rfp_assistant/maintenance.py\"]\r\n  requestRecord -->|owns paid stages| attemptRecord\r\
-  \n  attemptRecord -->|unknown blocks dispatch| requestRecord\r\n  servingActivation\
-  \ -->|config snapshot per request| requestRecord\r\n  goldCandidate -->|approved\
-  \ rows scored by runs| servingActivation\r\n  maintenanceRun -->|builds candidates,\
-  \ never activates| servingActivation"
+  - attempt-billing
+  - attempt-record
+  - attempt-states
+  - billing-attempt
+  - gateway-owner
+  - gold-candidate
+  - gold-candidate-states
+  - maintenance-run
+  - request-states
+  - request-status
+  - serving-activation
+  - source-states
+prev_diagram: "graph TD\r
+
+  \  request-status[\"Request status\\nsrc/rfp_assistant/service.py\"]
+  -->|\"stop check at dispatch\"| billing-attempt[\"Billing attempt
+  state\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  billing-attempt -->|\"derived billing_state\"| request-status\r
+
+  \  serving-activation[\"Serving
+  activation\\nsrc/rfp_assistant/evaluation.py\"] -->|\"config snapshot per
+  request\"| request-status\r
+
+  \  gold-candidate[\"Gold candidate state\\nsrc/rfp_assistant/gold.py\"]
+  -->|\"approved rows score runs\"| serving-activation\r
+
+  \  maintenance-run[\"Maintenance run
+  state\\nsrc/rfp_assistant/maintenance.py\"] -->|\"regression, never
+  activates\"| serving-activation"

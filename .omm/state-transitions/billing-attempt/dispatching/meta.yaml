@@ -1,9 +1,0 @@
-created: 2026-10-06T09:08:58.583Z
-updated: 2026-10-06T09:08:58.584Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: dispatching
-children: []
-parentPath:
-  - billing-attempt

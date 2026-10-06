@@ -1,34 +1,31 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-06 09:08:41.303000+00:00
-update_count: 26
+updated: 2026-10-06 10:18:10.271000+00:00
+update_count: 28
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
 children:
 - corpus-route
 - corpus-router
+- corpus-routing
 - dense-channel
 - dense-search
-- evidence-packer
+- evidence-packing
 - fusion
 - keyword-index
-- lexical-ranker
+- lexical-ranking
 - local-reranker
-- query-embedding
-- rank-fusion
 - reranker
 - serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  servingConfig[\"Activated serving config\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  corpusRouter[\"Corpus project routing\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  keywordIndex[\"Kiwi BM25 index\\nsrc/rfp_assistant/retrieval.py\"]\r\n  queryVector[\"\
-  Query vector cache\\nsrc/rfp_assistant/dense.py\"]\r\n  denseSearch[\"pgvector exact\
-  \ search\\nsrc/rfp_assistant/vector_store.py\"]\r\n  fusion[\"Keyword-first RRF\
-  \ fusion\\nsrc/rfp_assistant/retrieval.py\"]\r\n  reranker[\"Optional local reranker\\\
-  nsrc/rfp_assistant/dense.py\"]\r\n  packer[\"Evidence packer\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  servingConfig -->|mode, limits, versions| corpusRouter\r\n  corpusRouter\
-  \ -->|narrowed scope rows| keywordIndex\r\n  servingConfig -->|embedding model and\
-  \ dims| queryVector\r\n  queryVector -->|unit vector| denseSearch\r\n  keywordIndex\
-  \ -->|BM25 top 50| fusion\r\n  denseSearch -->|cosine top 50| fusion\r\n  fusion\
-  \ -->|pool below BM25 head| reranker\r\n  fusion -->|fused ranking| packer\r\n \
-  \ reranker -->|reranked pool| packer"
+prev_diagram: "graph TD\r\n  keyword-index[\"Loaded keyword index\\nsrc/rfp_assistant/retrieval.py\"\
+  ] -->|\"scoped rows\"| corpus-router[\"Corpus routing\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  corpus-router -->|\"allowed rows\"| lexical-ranker[\"Kiwi BM25 ranker\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  corpus-router -->|\"allowed rows\"| dense-search[\"pgvector search\\nsrc/rfp_assistant/vector_store.py\"\
+  ]\r\n  query-embedding[\"Query vector cache\\nsrc/rfp_assistant/dense.py\"] -->|\"\
+  query vector\"| dense-search\r\n  lexical-ranker -->|\"BM25 ids\"| rank-fusion[\"\
+  Keyword-first RRF\\nsrc/rfp_assistant/retrieval.py\"]\r\n  dense-search -->|\"dense\
+  \ ids\"| rank-fusion\r\n  rank-fusion -->|\"fused pool\"| local-reranker[\"Optional\
+  \ reranker\\nsrc/rfp_assistant/dense.py\"]\r\n  rank-fusion -->|\"ranking\"| evidence-packer[\"\
+  Evidence packing\\nsrc/rfp_assistant/retrieval.py\"]\r\n  local-reranker -->|\"\
+  reordered pool\"| evidence-packer"

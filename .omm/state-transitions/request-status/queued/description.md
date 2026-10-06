@@ -1,1 +1,0 @@
-Inserted by `_create(..., "queued")` after admission. No reservation exists yet. `cancel_request` cancels a queued request conclusively, storing a cancelled result ('유료 호출은 없습니다'), and `abandon_request` does the same only while the request is queued.

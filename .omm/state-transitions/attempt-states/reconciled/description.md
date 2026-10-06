@@ -1,0 +1,1 @@
+Set by `budget.reconcile` for explicitly covered unknown attempts inside a closed, non-overlapping interval of the same billing scope. The recorded adjustment is the provider total minus the local settled cost. Unscoped attempts (paid with the server-environment key) need an explicit include or exclude decision.

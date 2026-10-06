@@ -1,0 +1,1 @@
+`requests.status`, plus the `cancel_requested` flag. Paid requests start `queued`; free modes start `running`. Nothing is ever replayed after a restart.

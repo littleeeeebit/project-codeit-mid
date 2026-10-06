@@ -1,1 +1,1 @@
-End-to-end path of one paid question from 질문하기. Free modes (`metadata`, `inventory`) take the same intake but `submit_answer` executes them inline on the HTTP thread, with no executor slot and no ledger.
+A paid question, from click to stored answer. The HTTP request returns as soon as the request row is persisted and queued. Execution, streaming and billing then happen on the executor thread. The screen follows the request through read-only polls and the server-sent-events stream, and renders the validated outcome only while it still owns the request.

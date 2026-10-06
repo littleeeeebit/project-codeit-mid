@@ -1,1 +1,0 @@
-`.runtime/extracted/<source_hash>/<parser fingerprint>[/<content id>]/elements.jsonl`, mirrored in the `elements` table (kind, raw_text, search_text, location, table). Revisions are bound to their content. Superseded revisions remain because traces, gold rows and citations pin them.
