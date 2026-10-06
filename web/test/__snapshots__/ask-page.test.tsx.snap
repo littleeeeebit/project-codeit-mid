@@ -267,13 +267,13 @@ exports[`asking > an answer, its first citation opened, then a follow-up and 새
             class="mt-1 text-[13px] text-muted-foreground"
           >
             한국교육학술정보원
-             · 
+             ·␠
             1억 3,000만원
-             · 공개 
+             · 공개␠
             2024-03-02
-             · 
+             ·␠
             PDF
-             · 
+             ·␠
             자동 대조 통과
           </p>
         </div>
@@ -347,11 +347,11 @@ exports[`asking > an answer, its first citation opened, then a follow-up and 새
         <h2
           class="text-lg font-bold"
         >
-          대화 
+          대화␠
           <span
             class="ml-1 text-sm font-medium text-muted-foreground"
           >
-            질문 
+            질문␠
             1
             개
           </span>
@@ -516,13 +516,13 @@ exports[`asking > an answer, its first citation opened, then a follow-up and 새
             <p
               class="border-t pt-3 text-[13px] text-muted-foreground tabular-nums"
             >
-              요청 
+              요청␠
               req-0000
-               · 
+               ·␠
               완료
-               · 
+               ·␠
               정산됨
-               · 
+               ·␠
               정산 $0.0012
             </p>
           </div>
@@ -680,7 +680,7 @@ exports[`asking > an answer, its first citation opened, then a follow-up and 새
           <h3
             class="text-lg font-bold"
           >
-            근거 
+            근거␠
             <span
               class="text-primary"
             >
@@ -697,7 +697,7 @@ exports[`asking > an answer, its first citation opened, then a follow-up and 새
             class="text-[13px] text-muted-foreground"
           >
             PDF 12쪽 (인쇄 쪽번호 11) · 제3장 &gt; 하자보수
-             · 
+             ·␠
             자동 대조 통과
           </p>
         </div>
@@ -771,7 +771,7 @@ exports[`asking > an answer, its first citation opened, then a follow-up and 새
       data-state="closed"
       type="button"
     >
-      내 최근 요청 
+      내 최근 요청␠
       <svg
         aria-hidden="true"
         class="lucide lucide-chevron-down size-4 transition-transform group-data-[state=open]:rotate-180"
@@ -886,7 +886,7 @@ exports[`selection and modes > nothing selected: the empty state, and the docume
               data-state="closed"
               type="button"
             >
-              상세 조건 
+              상세 조건␠
               <svg
                 aria-hidden="true"
                 class="lucide lucide-chevron-down size-3.5 transition-transform group-data-[state=open]:rotate-180"
@@ -961,9 +961,9 @@ exports[`selection and modes > nothing selected: the empty state, and the docume
                     class="block text-[13px] text-muted-foreground"
                   >
                     한국교육학술정보원
-                     · 
+                     ·␠
                     1억 3,000만원
-                     · 마감 
+                     · 마감␠
                     2024-03-20 10:00
                   </span>
                   <div
@@ -1018,9 +1018,9 @@ exports[`selection and modes > nothing selected: the empty state, and the docume
                     class="block text-[13px] text-muted-foreground"
                   >
                     기관 미상
-                     · 
+                     ·␠
                     5,230만원
-                     · 마감 
+                     · 마감␠
                     2024-03-20 10:00
                   </span>
                   <div
@@ -1051,7 +1051,7 @@ exports[`selection and modes > nothing selected: the empty state, and the docume
                         aria-hidden="true"
                         class="size-1.5 rounded-full bg-warn"
                       />
-                      기록 충돌: 
+                      기록 충돌:␠
                       사업 금액
                     </span>
                   </div>
@@ -1085,9 +1085,9 @@ exports[`selection and modes > nothing selected: the empty state, and the docume
                     class="block text-[13px] text-muted-foreground"
                   >
                     한국교육학술정보원
-                     · 
+                     ·␠
                     1억 3,000만원
-                     · 마감 
+                     · 마감␠
                     2024-03-20 10:00
                   </span>
                   <div
@@ -1205,7 +1205,7 @@ exports[`selection and modes > nothing selected: the empty state, and the docume
           data-state="closed"
           type="button"
         >
-          내 최근 요청 
+          내 최근 요청␠
           <svg
             aria-hidden="true"
             class="lucide lucide-chevron-down size-4 transition-transform group-data-[state=open]:rotate-180"
@@ -1320,13 +1320,13 @@ exports[`selection and modes > one document offers answer, basic information and
             class="mt-1 text-[13px] text-muted-foreground"
           >
             한국교육학술정보원
-             · 
+             ·␠
             1억 3,000만원
-             · 공개 
+             · 공개␠
             2024-03-02
-             · 
+             ·␠
             PDF
-             · 
+             ·␠
             자동 대조 통과
           </p>
         </div>
@@ -1510,7 +1510,7 @@ exports[`selection and modes > one document offers answer, basic information and
       data-state="closed"
       type="button"
     >
-      내 최근 요청 
+      내 최근 요청␠
       <svg
         aria-hidden="true"
         class="lucide lucide-chevron-down size-4 transition-transform group-data-[state=open]:rotate-180"

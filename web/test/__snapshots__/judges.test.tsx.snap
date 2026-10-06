@@ -11,7 +11,7 @@ exports[`the disagreement review > opens on false accepts, filters, searches and
       class="text-sm text-muted-foreground"
     >
       인용 하나
-       · 기준 판정 
+       · 기준 판정␠
       <span
         class="font-semibold text-bad"
       >
@@ -69,7 +69,7 @@ exports[`the disagreement review > opens on false accepts, filters, searches and
         <span
           class="text-xs tabular-nums text-muted-foreground"
         >
-          지지 확률 
+          지지 확률␠
           0.71
         </span>
       </p>
@@ -141,7 +141,7 @@ exports[`the disagreement review > opens on false accepts, filters, searches and
             ›
           </span>
           근거 인용
-           
+␠␠␠␠␠␠␠␠␠␠␠
           2
           개
         </summary>
@@ -198,7 +198,7 @@ exports[`the disagreement review > opens on false accepts, filters, searches and
       class="text-sm text-muted-foreground"
     >
       필수 사실
-       · 기준 판정 
+       · 기준 판정␠
       <span
         class="font-semibold text-ok"
       >
@@ -213,7 +213,7 @@ exports[`the disagreement review > opens on false accepts, filters, searches and
     <p
       class="text-sm"
     >
-      필수 사실 · 
+      필수 사실 ·␠
       1억 3천만원
     </p>
     <p
@@ -224,13 +224,13 @@ exports[`the disagreement review > opens on false accepts, filters, searches and
       >
         금액을 바꿈
       </span>
-       · 
+       ·␠
       <span
         class="line-through"
       >
         1억 3천만원
       </span>
-       → 
+       →␠
       1억 원
     </p>
   </header>
@@ -305,7 +305,7 @@ exports[`the disagreement review > opens on false accepts, filters, searches and
     <p
       class="text-sm text-warn"
     >
-      영어 다리 없음 · 
+      영어 다리 없음 ·␠
       protected value changed
       . 번역이 보호한 값을 바꾸거나 한글을 남겨 Jev에 보내지 않았습니다.
     </p>
@@ -449,11 +449,11 @@ exports[`the judge golden set > false accepts per mutation type, overall without
               <dd
                 class="text-sm tabular-nums text-muted-foreground"
               >
-                판정한 오답 
+                판정한 오답␠
                 55
-                개 중 
+                개 중␠
                 2
-                개 · 정답 통과 
+                개 · 정답 통과␠
                 95.0%
               </dd>
             </div>
@@ -474,11 +474,11 @@ exports[`the judge golden set > false accepts per mutation type, overall without
               <dd
                 class="text-sm tabular-nums text-muted-foreground"
               >
-                판정한 오답 
+                판정한 오답␠
                 54
-                개 중 
+                개 중␠
                 7
-                개 · 정답 통과 
+                개 · 정답 통과␠
                 90.0%
               </dd>
             </div>
@@ -559,7 +559,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
                     <span
                       class="hidden sm:inline"
                     >
-                       · 
+                       ·␠
                       1.0%
                       –
                       20.0%
@@ -583,7 +583,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
                     <span
                       class="hidden sm:inline"
                     >
-                       · 
+                       ·␠
                       1.0%
                       –
                       20.0%
@@ -622,7 +622,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
                     <span
                       class="hidden sm:inline"
                     >
-                       · 
+                       ·␠
                       1.0%
                       –
                       20.0%
@@ -646,7 +646,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
                     <span
                       class="hidden sm:inline"
                     >
-                       · 
+                       ·␠
                       1.0%
                       –
                       20.0%
@@ -685,7 +685,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
                     <span
                       class="hidden sm:inline"
                     >
-                       · 
+                       ·␠
                       1.0%
                       –
                       20.0%
@@ -709,7 +709,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
                     <span
                       class="hidden sm:inline"
                     >
-                       · 
+                       ·␠
                       1.0%
                       –
                       20.0%
@@ -725,7 +725,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
         >
           오답 행은 판정 모델 스스로 통과로 판정한 비율(낮을수록 좋음)이고, 마지막 행은 변형 안 한 정답을 통과시킨 비율(높을수록 좋음)입니다. 보류는 분모에서 뺍니다. 코드가 값으로 판정할 수 있는 항목(
           3
-          건)도 판정 모델 자신의 답으로 셉니다. Jev는 영어 다리를 거친 판정입니다. 세트 
+          건)도 판정 모델 자신의 답으로 셉니다. Jev는 영어 다리를 거친 판정입니다. 세트␠
           feedface
           .
         </p>
@@ -739,7 +739,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
         class="text-lg font-bold"
         id="judge-review"
       >
-        판정이 엇갈린 
+        판정이 엇갈린␠
         15
         건
       </h3>
@@ -757,7 +757,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
             type="button"
           >
             틀린 답을 통과시킴
-             
+␠␠␠␠␠␠␠␠␠␠␠␠␠
             <span
               class="tabular-nums opacity-70"
             >
@@ -770,7 +770,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
             type="button"
           >
             Luna가 기준과 다름
-             
+␠␠␠␠␠␠␠␠␠␠␠␠␠
             <span
               class="tabular-nums opacity-70"
             >
@@ -783,7 +783,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
             type="button"
           >
             Jev가 기준과 다름
-             
+␠␠␠␠␠␠␠␠␠␠␠␠␠
             <span
               class="tabular-nums opacity-70"
             >
@@ -796,7 +796,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
             type="button"
           >
             Jev 보류
-             
+␠␠␠␠␠␠␠␠␠␠␠␠␠
             <span
               class="tabular-nums opacity-70"
             >
@@ -809,7 +809,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
             type="button"
           >
             전체
-             
+␠␠␠␠␠␠␠␠␠␠␠␠␠
             <span
               class="tabular-nums opacity-70"
             >
@@ -877,16 +877,16 @@ exports[`the judge golden set > false accepts per mutation type, overall without
                 <span
                   class="block text-xs text-muted-foreground"
                 >
-                  기준 
+                  기준␠
                   <span
                     class="font-semibold text-bad"
                   >
                     근거 없음
                   </span>
                   <span>
-                     · 
+                     ·␠
                     Jev
-                     
+␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠
                     <span
                       class="font-semibold text-ok"
                     >
@@ -912,7 +912,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
                 class="text-sm text-muted-foreground"
               >
                 인용 하나
-                 · 기준 판정 
+                 · 기준 판정␠
                 <span
                   class="font-semibold text-bad"
                 >
@@ -970,7 +970,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
                   <span
                     class="text-xs tabular-nums text-muted-foreground"
                   >
-                    지지 확률 
+                    지지 확률␠
                     0.71
                   </span>
                 </p>
@@ -1042,7 +1042,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
                       ›
                     </span>
                     근거 인용
-                     
+␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠
                     2
                     개
                   </summary>
@@ -1118,15 +1118,15 @@ exports[`the judge golden set > false accepts per mutation type, overall without
         <p
           class="text-sm text-muted-foreground"
         >
-          기준 
+          기준␠
           A-ref
-           · 
+           ·␠
           240
-          개 · 보정 
+          개 · 보정␠
           120
-           / 평가 
+           / 평가␠
           120
-           · 원문 대조 표본 
+           · 원문 대조 표본␠
           30
         </p>
         <ul
@@ -1161,7 +1161,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
                 class="text-xs text-muted-foreground sm:ml-auto"
               >
                 2026-10-05 08:00
-                 · 번역 묶음 
+                 · 번역 묶음␠
                 4
                 개
               </span>
@@ -1201,7 +1201,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
                 class="text-xs text-muted-foreground sm:ml-auto"
               >
                 2026-10-05 08:00
-                 · 번역 묶음 
+                 · 번역 묶음␠
                 4
                 개
               </span>
@@ -1259,7 +1259,7 @@ exports[`the judge golden set > false accepts per mutation type, overall without
               data-slot="button"
               data-variant="outline"
             >
-              비용 추정 
+              비용 추정␠
               <span
                 class="text-ok"
               >
@@ -1361,7 +1361,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
               class="text-sm text-muted-foreground tabular-nums"
             >
               0.762 이상이어야
-               · Luna 
+               · Luna␠
               0.812
             </dd>
           </div>
@@ -1391,7 +1391,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
               class="text-sm text-muted-foreground tabular-nums"
             >
               2건 이하여야
-               · Luna 
+               · Luna␠
               2건
             </dd>
           </div>
@@ -1421,7 +1421,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
               class="text-sm text-muted-foreground tabular-nums"
             >
               90.0% 이상이어야
-               · Luna 
+               · Luna␠
               95.0%
             </dd>
           </div>
@@ -1447,25 +1447,25 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
               class="max-w-3xl space-y-2 text-sm leading-relaxed text-muted-foreground"
             >
               <p>
-                기준 세트에서 불통과로 검토된 항목이 
+                기준 세트에서 불통과로 검토된 항목이␠
                 18
                 건뿐이라 카파와 잘못 통과는 한두 건에도 크게 움직입니다. 이 결과는 “이 기준에서 Luna보다 나쁘지 않다”는 뜻이지, 검토자를 대신할 만큼 믿을 만하다는 뜻은 아닙니다.
               </p>
               <p>
-                규칙 
+                규칙␠
                 r1
-                은 평가 실행 전에 코드와 docs/rag/judges.md에 정해 두었습니다. 세 조건을 모두 넘어야 교체 가능이고, 어느 쪽이든 판정한 항목이 
+                은 평가 실행 전에 코드와 docs/rag/judges.md에 정해 두었습니다. 세 조건을 모두 넘어야 교체 가능이고, 어느 쪽이든 판정한 항목이␠
                 100
                 개 미만이면 판단 보류입니다.
               </p>
               <p>
-                기준: 
+                기준:␠
                 A-ref
-                의 독립 검토 
+                의 독립 검토␠
                 240
-                개 중 평가용 
+                개 중 평가용␠
                 120
-                개. 보정용 
+                개. 보정용␠
                 120
                 개는 Jev 임계값을 맞추는 데만 썼습니다.
               </p>
@@ -1564,7 +1564,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
               <span
                 class="text-sm font-normal text-muted-foreground"
               >
-                 / 
+                 /␠
                 18
                 건
               </span>
@@ -1659,7 +1659,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
               <span
                 class="text-sm font-normal text-muted-foreground"
               >
-                 / 
+                 /␠
                 18
                 건
               </span>
@@ -1755,7 +1755,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
               <span
                 class="text-sm font-normal text-muted-foreground"
               >
-                 / 
+                 /␠
                 18
                 건
               </span>
@@ -2022,7 +2022,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
             <p
               class="max-w-3xl text-sm text-muted-foreground"
             >
-              카파는 통과(지지·근거 있음·정확)와 불통과로 나눠 셉니다. 보류(불확실 구간, 호출 실패, 번역 불가)는 오답이 아니라 미판정입니다. 지연은 한 번에 한 호출씩 잰 값입니다. 임계값 
+              카파는 통과(지지·근거 있음·정확)와 불통과로 나눠 셉니다. 보류(불확실 구간, 호출 실패, 번역 불가)는 오답이 아니라 미판정입니다. 지연은 한 번에 한 호출씩 잰 값입니다. 임계값␠
               abcdef01
               .
             </p>
@@ -2300,7 +2300,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
         class="text-lg font-bold"
         id="judge-review"
       >
-        판정이 엇갈린 
+        판정이 엇갈린␠
         15
         건
       </h3>
@@ -2318,7 +2318,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
             type="button"
           >
             틀린 답을 통과시킴
-             
+␠␠␠␠␠␠␠␠␠␠␠␠␠
             <span
               class="tabular-nums opacity-70"
             >
@@ -2331,7 +2331,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
             type="button"
           >
             Luna가 기준과 다름
-             
+␠␠␠␠␠␠␠␠␠␠␠␠␠
             <span
               class="tabular-nums opacity-70"
             >
@@ -2344,7 +2344,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
             type="button"
           >
             Jev가 기준과 다름
-             
+␠␠␠␠␠␠␠␠␠␠␠␠␠
             <span
               class="tabular-nums opacity-70"
             >
@@ -2357,7 +2357,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
             type="button"
           >
             Jev 보류
-             
+␠␠␠␠␠␠␠␠␠␠␠␠␠
             <span
               class="tabular-nums opacity-70"
             >
@@ -2370,7 +2370,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
             type="button"
           >
             전체
-             
+␠␠␠␠␠␠␠␠␠␠␠␠␠
             <span
               class="tabular-nums opacity-70"
             >
@@ -2438,16 +2438,16 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
                 <span
                   class="block text-xs text-muted-foreground"
                 >
-                  기준 
+                  기준␠
                   <span
                     class="font-semibold text-bad"
                   >
                     근거 없음
                   </span>
                   <span>
-                     · 
+                     ·␠
                     Jev
-                     
+␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠
                     <span
                       class="font-semibold text-ok"
                     >
@@ -2473,7 +2473,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
                 class="text-sm text-muted-foreground"
               >
                 인용 하나
-                 · 기준 판정 
+                 · 기준 판정␠
                 <span
                   class="font-semibold text-bad"
                 >
@@ -2531,7 +2531,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
                   <span
                     class="text-xs tabular-nums text-muted-foreground"
                   >
-                    지지 확률 
+                    지지 확률␠
                     0.71
                   </span>
                 </p>
@@ -2603,7 +2603,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
                       ›
                     </span>
                     근거 인용
-                     
+␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠
                     2
                     개
                   </summary>
@@ -2679,15 +2679,15 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
         <p
           class="text-sm text-muted-foreground"
         >
-          기준 
+          기준␠
           A-ref
-           · 
+           ·␠
           240
-          개 · 보정 
+          개 · 보정␠
           120
-           / 평가 
+           / 평가␠
           120
-           · 원문 대조 표본 
+           · 원문 대조 표본␠
           30
         </p>
         <ul
@@ -2722,7 +2722,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
                 class="text-xs text-muted-foreground sm:ml-auto"
               >
                 2026-10-05 08:00
-                 · 번역 묶음 
+                 · 번역 묶음␠
                 4
                 개
               </span>
@@ -2767,7 +2767,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
                 class="text-xs text-muted-foreground sm:ml-auto"
               >
                 2026-10-04 08:00
-                 · 번역 묶음 
+                 · 번역 묶음␠
                 4
                 개
               </span>
@@ -2821,7 +2821,7 @@ exports[`the verdict > replaceable: three conditions met, the arms side by side,
               data-slot="button"
               data-variant="outline"
             >
-              비용 추정 
+              비용 추정␠
               <span
                 class="text-ok"
               >
