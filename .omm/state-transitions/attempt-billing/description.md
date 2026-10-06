@@ -1,1 +1,0 @@
-attempts.state per paid stage. The request's billing_state is the first match in BILLING_PRECEDENCE (unknown, pending, reconciled, settled, released); reserved and dispatching display as pending.

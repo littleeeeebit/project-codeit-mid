@@ -1,5 +1,11 @@
 graph TD
-  request-status["Request status\nsrc/rfp_assistant/service.py"] -->|stop reason guards dispatch| attempt-billing["Attempt billing state\nsrc/rfp_assistant/budget.py"]
-  attempt-billing -->|billing_state precedence| request-status
-  gold-candidate["Gold candidate status\nsrc/rfp_assistant/gold.py"] -->|approved rows score runs| serving-activation["Serving activation\nsrc/rfp_assistant/evaluation.py"]
-  serving-activation -->|config snapshot per request| request-status
+  requestRecord["Request record\nsrc/rfp_assistant/service.py"]
+  attemptRecord["Billing attempt\nsrc/rfp_assistant/budget.py"]
+  servingActivation["Serving activation\nsrc/rfp_assistant/evaluation.py"]
+  goldCandidate["Gold candidate\nsrc/rfp_assistant/gold.py"]
+  maintenanceRun["Maintenance run\nsrc/rfp_assistant/maintenance.py"]
+  requestRecord -->|owns paid stages| attemptRecord
+  attemptRecord -->|unknown blocks dispatch| requestRecord
+  servingActivation -->|config snapshot per request| requestRecord
+  goldCandidate -->|approved rows scored by runs| servingActivation
+  maintenanceRun -->|builds candidates, never activates| servingActivation

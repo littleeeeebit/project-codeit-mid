@@ -1,1 +1,0 @@
-Created by budget.reserve with the maximum cost held against the cap and the purpose envelope. budget.recover releases it at restart if it was never dispatched.

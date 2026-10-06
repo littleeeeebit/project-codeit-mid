@@ -1,0 +1,1 @@
+Inside `retrieval.retrieve`, a dense mode without a matrix, with a matrix whose base index differs, without a query vector or with a dimension mismatch falls back to kiwi_bm25. A missing or failing reranker falls back to hybrid. The fallback string is stored in `RetrievalResult.fallback` and in limitations such as `dense_unavailable`. Search keeps working; it is never silent.

@@ -1,0 +1,15 @@
+created: 2026-10-06T08:48:29.812Z
+updated: 2026-10-06T08:48:29.999Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: request-record
+children:
+  - cancel-request
+  - checkpoint
+  - claim-request
+  - create-request
+  - finish-request
+  - recover-requests
+  - runner-shutdown
+parentPath: []

@@ -1,19 +1,31 @@
 created: 2026-10-04 13:34:42.331000+00:00
-updated: 2026-10-06 07:56:59.153000+00:00
-update_count: 16
-last_field: diagram
+updated: 2026-10-06T08:48:04.768Z
+update_count: 17
+last_field: description
 kind: nested-class
 title: web-screens
 children:
-- api-client
-- ask-page
-- settings-page
-- verify-page
+  - api-client
+  - ask-page
+  - settings-page
+  - verify-page
 parentPath: []
-prev_diagram: "graph TD\r\n  ask-page[\"Ask page\\nweb/src/components/ask/ask-page.tsx\"\
-  ] -->|POST ask cancel abandon| api-client[\"Typed API client\\nweb/src/lib/api.ts\"\
-  ]\r\n  ask-page -->|request status every 1 s| poll-hook[\"Polling hook\\nweb/src/lib/use-poll.ts\"\
-  ]\r\n  verify-page[\"Verify page\\nweb/src/components/verify/verify-page.tsx\"]\
-  \ -->|job and trace progress| poll-hook\r\n  dataset-page[\"Dataset page\\nweb/src/components/dataset/dataset-page.tsx\"\
-  ] -->|drafting runs and queue| poll-hook\r\n  settings-page[\"Settings page\\nweb/src/app/settings/page.tsx\"\
-  ] -->|PUT budget limit| api-client\r\n  poll-hook -->|read-only GETs| api-client"
+prev_diagram: "graph TD\r
+
+  \  ask-page[\"Ask page\\nweb/src/components/ask/ask-page.tsx\"] -->|POST ask
+  cancel abandon| api-client[\"Typed API client\\nweb/src/lib/api.ts\"]\r
+
+  \  ask-page -->|request status every 1 s| poll-hook[\"Polling
+  hook\\nweb/src/lib/use-poll.ts\"]\r
+
+  \  verify-page[\"Verify page\\nweb/src/components/verify/verify-page.tsx\"]
+  -->|job and trace progress| poll-hook\r
+
+  \  dataset-page[\"Dataset
+  page\\nweb/src/components/dataset/dataset-page.tsx\"] -->|drafting runs and
+  queue| poll-hook\r
+
+  \  settings-page[\"Settings page\\nweb/src/app/settings/page.tsx\"] -->|PUT
+  budget limit| api-client\r
+
+  \  poll-hook -->|read-only GETs| api-client"

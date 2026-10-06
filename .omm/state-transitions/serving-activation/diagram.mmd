@@ -1,0 +1,10 @@
+graph TD
+  buildKeyword["Keyword build pointer\nsrc/rfp_assistant/retrieval.py"]
+  activateDecision["Activate a run\nsrc/rfp_assistant/evaluation.py"]
+  activeServing["Effective serving config\nsrc/rfp_assistant/service.py"]
+  resourceReload["Index and model reload\nsrc/rfp_assistant/service.py"]
+  retrievalFallback["Per-request fallback\nsrc/rfp_assistant/retrieval.py"]
+  buildKeyword -->|active_index before selection| activeServing
+  activateDecision -->|active_run and active_index| activeServing
+  activeServing -->|new versions| resourceReload
+  resourceReload -->|missing matrix or vector| retrievalFallback

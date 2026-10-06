@@ -1,0 +1,1 @@
+`build_keyword_index(activate=True)` (retrieval.py:144) sets `active_index` to the new or reused version. `cmd_build_keyword` warns that once an `active_run` exists, a new structural index must be evaluated and activated to serve. Maintenance builds with `activate=False`.

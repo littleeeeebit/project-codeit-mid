@@ -1,0 +1,1 @@
+Any single unknown attempt in the database refuses every new dispatch (answers, rewrites, embeddings, drafting) until the owner runs `settle` or `reconcile` from provider evidence.

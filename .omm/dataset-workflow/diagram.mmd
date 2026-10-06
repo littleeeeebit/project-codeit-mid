@@ -1,0 +1,14 @@
+graph TD
+  draftScreen["Draft screen\nweb/src/components/dataset/draft.tsx"]
+  draftPlan["Free drafting estimate\nsrc/rfp_assistant/service.py"]
+  draftingJob["Drafting thread\nsrc/rfp_assistant/drafting.py"]
+  goldSubmit["Queue submission\nsrc/rfp_assistant/gold.py"]
+  reviewScreen["Review screen\nweb/src/components/dataset/review.tsx"]
+  goldDecide["Decision and second review\nsrc/rfp_assistant/gold.py"]
+  datasetFiles["Dataset and rejection wiki\nsrc/rfp_assistant/gold.py"]
+  draftScreen -->|slots of documents and passages| draftPlan
+  draftPlan -->|max cost, consent| draftingJob
+  draftingJob -->|candidates.jsonl, receipt| goldSubmit
+  goldSubmit -->|pending gold_candidates| reviewScreen
+  reviewScreen -->|decision, expected_sha, note| goldDecide
+  goldDecide -->|rendered from database| datasetFiles

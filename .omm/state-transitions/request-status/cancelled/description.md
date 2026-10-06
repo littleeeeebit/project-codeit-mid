@@ -1,1 +1,0 @@
-Immediate for a queued request (cancel_request writes a cancelled result with no paid call). For a running request, it is set by _finish when cancel_requested was raised, or when a _Stop('cancelled') ends the run. The provisional stream is withdrawn (`data: null`) as soon as the flag is set.

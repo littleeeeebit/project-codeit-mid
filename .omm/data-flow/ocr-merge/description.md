@@ -1,1 +1,0 @@
-ocr.merge (called inside ingest_source) places cached per-region OCR text as image_text elements next to the print text around each picture. The OCR runs separately (`ocr` command: local PaddleOCR-VL, then Gemini 3.5 Flash-Lite for flagged regions under its own $0.50 cap and Gemini ledger). Internals were not read; behaviour is taken from the README and the call site.

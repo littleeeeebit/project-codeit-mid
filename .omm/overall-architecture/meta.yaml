@@ -1,8 +1,8 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-06T08:28:47.144Z
-update_count: 22
+updated: 2026-10-06T08:48:04.112Z
+update_count: 24
 last_field: diagram
-git_commit: 53becaa
+git_commit: 4a77ef6
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
   - api-layer
@@ -28,36 +28,27 @@ children:
   - web-screens
 prev_diagram: "graph TD\r
 
-  \  web-screens[\"Next.js screens\\nweb/src/components\"]\r
+  \  web-pages[\"Next.js pages\\nweb/src/app/page.tsx\"] -->|JSON calls with
+  X-Member| http-api[\"FastAPI routes\\nsrc/rfp_assistant/api.py\"]\r
 
-  \  api-routes[\"FastAPI routes\\nsrc/rfp_assistant/api.py\"]\r
+  \  http-api -->|one service call per route| service-layer[\"Service
+  orchestration\\nsrc/rfp_assistant/service.py\"]\r
 
-  \  service-core[\"Service orchestration\\nsrc/rfp_assistant/service.py\"]\r
+  \  service-layer -->|scoped question| retrieval-engine[\"Hybrid
+  retrieval\\nsrc/rfp_assistant/retrieval.py\"]\r
 
-  \  retrieval-engine[\"Hybrid retrieval\\nsrc/rfp_assistant/retrieval.py\"]\r
+  \  service-layer -->|reserve, dispatch, settle| paid-gateway[\"Ledger and
+  provider gateway\\nsrc/rfp_assistant/budget.py\"]\r
 
-  \  budget-ledger[\"Budget ledger\\nsrc/rfp_assistant/budget.py\"]\r
+  \  service-layer -->|requests, results, reviews| data-stores[\"PostgreSQL and
+  runtime files\\nsrc/rfp_assistant/postgres.py\"]\r
 
-  \  openai-transport[\"Provider
-  transport\\nsrc/rfp_assistant/generation.py\"]\r
+  \  retrieval-engine -->|index files, pgvector search| data-stores\r
 
-  \  postgres-store[\"PostgreSQL and
-  pgvector\\nsrc/rfp_assistant/postgres.py\"]\r
+  \  owner-cli[\"Owner CLI pipelines\\nsrc/rfp_assistant/cli.py\"] -->|ingest,
+  index, activate| data-stores\r
 
-  \  offline-pipelines[\"Owner CLI pipelines\\nsrc/rfp_assistant/cli.py\"]\r
+  \  owner-cli -->|paid batch work| paid-gateway\r
 
-  \  web-screens -->|\"REST, X-Member, SSE\"| api-routes\r
-
-  \  api-routes -->|\"one service call each\"| service-core\r
-
-  \  service-core -->|\"scoped question\"| retrieval-engine\r
-
-  \  service-core -->|\"reserve, dispatch, settle\"| budget-ledger\r
-
-  \  service-core -->|\"chat with session key\"| openai-transport\r
-
-  \  retrieval-engine -->|\"chunks, vector SQL\"| postgres-store\r
-
-  \  budget-ledger -->|\"attempts rows, lock check\"| postgres-store\r
-
-  \  offline-pipelines -->|\"ingest, index, activate\"| postgres-store"
+  \  service-layer -.->|spans and scores| langfuse-tracing[\"Langfuse
+  tracing\\nsrc/rfp_assistant/tracing.py\"]"

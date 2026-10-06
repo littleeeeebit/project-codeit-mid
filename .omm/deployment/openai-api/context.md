@@ -1,0 +1,1 @@
+The 4,000-token cap was restored on 2026-10-05 after a 2,000-token cap left a comparison no room past its reasoning (README; decision record in .wiki/decisions).

@@ -1,0 +1,1 @@
+`active_serving` is read on every retrieval and applies the downgrades described under retrieval-engine/serving-config. Requests record the effective `serving` subset in their config snapshot, so a later activation never rewrites what an earlier answer used.

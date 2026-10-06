@@ -1,10 +1,18 @@
 graph TD
-  csv-manifest["CSV manifest import\nsrc/rfp_assistant/ingestion.py"] -->|documents and sources rows| source-parsing["HWP and PDF parsing\nsrc/rfp_assistant/ingestion.py"]
-  ocr-merge["Image text OCR\nsrc/rfp_assistant/ocr.py"] -->|image_text elements| source-parsing
-  source-parsing -->|extraction revision| fidelity-check["Hancom print comparison\nsrc/rfp_assistant/fidelity.py"]
-  source-parsing -->|elements.jsonl| keyword-build["Chunk and keyword index\nsrc/rfp_assistant/retrieval.py"]
-  fidelity-check -->|review_status| keyword-build
-  keyword-build -->|chunk payloads| embedding-sets["pgvector embedding sets\nsrc/rfp_assistant/dense.py"]
-  embedding-sets -->|dense_version| retrieval-runs["Frozen runs and matrices\nsrc/rfp_assistant/compare.py"]
-  keyword-build -->|index_version| retrieval-runs
-  retrieval-runs -->|person picks a row| serving-activation["activate-run\nsrc/rfp_assistant/evaluation.py"]
+  sourceManifest["CSV manifest and originals\nsrc/rfp_assistant/ingestion.py"]
+  parsing["HWP and PDF parsing\nsrc/rfp_assistant/ingestion.py"]
+  fidelityOcr["Fidelity check and OCR\nsrc/rfp_assistant/fidelity.py"]
+  keywordBuild["Chunking and keyword index\nsrc/rfp_assistant/chunking.py"]
+  embeddingSets["Embedding sets\nsrc/rfp_assistant/dense.py"]
+  frozenRuns["Frozen runs and matrices\nsrc/rfp_assistant/compare.py"]
+  activation["Human activation\nsrc/rfp_assistant/evaluation.py"]
+  maintenanceSeq["Maintenance sequence\nsrc/rfp_assistant/maintenance.py"]
+  sourceManifest -->|documents and sources rows| parsing
+  parsing -->|extraction revision, elements| fidelityOcr
+  fidelityOcr -->|OCR text on next ingest| parsing
+  fidelityOcr -->|review_status filter| keywordBuild
+  keywordBuild -->|index_version, chunks| embeddingSets
+  keywordBuild -->|BM25 index| frozenRuns
+  embeddingSets -->|ready vector set| frozenRuns
+  frozenRuns -->|person picks a row| activation
+  maintenanceSeq -->|reruns stages, no activation| keywordBuild

@@ -1,0 +1,1 @@
+`mark_dispatching` (budget.py:344) runs the request's guard, the owner guard, the paid-admission check and a global check for any `unknown` attempt. On any refusal it moves the attempt `reserved → released` (`stopped_before_dispatch:<reason>`) and raises DispatchRefused; otherwise `reserved → dispatching` with dispatched_at. This durable marker is written before the network call.

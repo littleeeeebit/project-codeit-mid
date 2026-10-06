@@ -1,1 +1,0 @@
-설정 page. It reads and writes GET/PUT /api/settings/api-key and PUT /api/settings/model, and reads GET /api/budget and writes PUT /api/budget/limit. Entering a key sets the HttpOnly SameSite=Strict cookie `bidmate_key_session`. The key itself never returns to the browser. Only the call sites were confirmed; the page's layout was not read.

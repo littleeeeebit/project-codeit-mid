@@ -1,11 +1,16 @@
 created: 2026-10-05 03:34:25.621000+00:00
-updated: 2026-10-06T08:29:14.478Z
-update_count: 13
-last_field: description
+updated: 2026-10-06T08:48:38.084Z
+update_count: 15
+last_field: diagram
 kind: nested-class
 title: serving-activation
 children:
+  - activate-decision
   - activated-run
+  - active-serving
+  - build-keyword
+  - resource-reload
+  - retrieval-fallback
 parentPath: []
 prev_diagram: "graph TD\r
 

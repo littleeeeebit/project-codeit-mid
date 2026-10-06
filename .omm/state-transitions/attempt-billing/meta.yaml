@@ -1,43 +1,18 @@
-created: 2026-10-06T07:57:17.322Z
-updated: 2026-10-06T08:29:12.864Z
+created: 2026-10-06 07:57:17.322000+00:00
+updated: 2026-10-06 08:29:12.864000+00:00
 update_count: 6
 last_field: constraint
 kind: nested-class
 title: attempt-billing
-children:
-  - dispatching
-  - reconciled
-  - released
-  - reserved
-  - settled
-  - unknown
+children: []
 parentPath: []
-prev_diagram: "graph TD\r
-
-  \  reserved[\"reserved\\nsrc/rfp_assistant/budget.py\"]\r
-
-  \  dispatching[\"dispatching\\nsrc/rfp_assistant/budget.py\"]\r
-
-  \  settled[\"settled\\nsrc/rfp_assistant/budget.py\"]\r
-
-  \  released[\"released\\nsrc/rfp_assistant/budget.py\"]\r
-
-  \  unknown[\"unknown\\nsrc/rfp_assistant/budget.py\"]\r
-
-  \  reconciled[\"reconciled\\nsrc/rfp_assistant/budget.py\"]\r
-
-  \  reserved -->|\"guard passes\"| dispatching\r
-
-  \  reserved -->|\"guard refuses or restart\"| released\r
-
-  \  dispatching -->|\"settle from usage\"| settled\r
-
-  \  dispatching -->|\"confirmed pre-execution 4xx\"| released\r
-
-  \  dispatching -->|\"timeout, no usage, restart\"| unknown\r
-
-  \  unknown -->|\"owner reconcile\"| reconciled\r
-
-  \  unknown -->|\"settle from evidence\"| settled\r
-
-  \  reconciled -->|\"late usage arrives\"| settled"
+prev_diagram: "graph TD\r\n  reserved[\"reserved\\nsrc/rfp_assistant/budget.py\"]\r\
+  \n  dispatching[\"dispatching\\nsrc/rfp_assistant/budget.py\"]\r\n  settled[\"settled\\\
+  nsrc/rfp_assistant/budget.py\"]\r\n  released[\"released\\nsrc/rfp_assistant/budget.py\"\
+  ]\r\n  unknown[\"unknown\\nsrc/rfp_assistant/budget.py\"]\r\n  reconciled[\"reconciled\\\
+  nsrc/rfp_assistant/budget.py\"]\r\n  reserved -->|\"guard passes\"| dispatching\r\
+  \n  reserved -->|\"guard refuses or restart\"| released\r\n  dispatching -->|\"\
+  settle from usage\"| settled\r\n  dispatching -->|\"confirmed pre-execution 4xx\"\
+  | released\r\n  dispatching -->|\"timeout, no usage, restart\"| unknown\r\n  unknown\
+  \ -->|\"owner reconcile\"| reconciled\r\n  unknown -->|\"settle from evidence\"\
+  | settled\r\n  reconciled -->|\"late usage arrives\"| settled"

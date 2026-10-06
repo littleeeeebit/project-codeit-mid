@@ -1,7 +1,0 @@
-graph TD
-  corpus-commands["manifest, ingest, fidelity, ocr\nsrc/rfp_assistant/ingestion.py"] -->|extractions| retrieval-selection["build, evaluate, compare, activate\nsrc/rfp_assistant/evaluation.py"]
-  gold-review["gold submit, decide, validate\nsrc/rfp_assistant/gold.py"] -->|reviewed dev rows| retrieval-selection
-  retrieval-selection -->|active_run| phase4-release["freeze, sealed run, report\nsrc/rfp_assistant/sealed.py"]
-  maintenance-sequence["maintain\nsrc/rfp_assistant/maintenance.py"] -->|reuses steps of| corpus-commands
-  maintenance-sequence -->|regression table| retrieval-selection
-  budget-admin["paid, settle, reconcile, adjust\nsrc/rfp_assistant/budget.py"] -->|unblocks dispatch| phase4-release

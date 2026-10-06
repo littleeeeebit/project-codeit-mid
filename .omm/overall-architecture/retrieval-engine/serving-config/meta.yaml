@@ -1,0 +1,9 @@
+created: 2026-10-06T08:48:12.904Z
+updated: 2026-10-06T08:48:13.090Z
+update_count: 2
+last_field: context
+kind: nested-class
+title: serving-config
+children: []
+parentPath:
+  - retrieval-engine

@@ -1,0 +1,1 @@
+In code, the default envelope share for judge_eval is 0 (ENVELOPE_SHARES), so judge runs need an owner reallocation (`set-envelopes`). The live database values were not checked.

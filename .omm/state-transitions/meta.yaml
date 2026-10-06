@@ -1,24 +1,30 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-06 08:29:10.126000+00:00
-update_count: 18
+updated: 2026-10-06T08:48:29.140Z
+update_count: 20
 last_field: diagram
-git_commit: 53becaa
+git_commit: 4a77ef6
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
-- attempt-billing
-- attempt-states
-- gateway-owner
-- gold-candidate
-- gold-candidate-states
-- request-status
-- serving-activation
-prev_diagram: "graph TD\r\n  request-status[\"Request status\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  attempt-billing[\"Attempt billing state\\nsrc/rfp_assistant/budget.py\"]\r\
-  \n  gateway-owner[\"Gateway ownership\\nsrc/rfp_assistant/postgres.py\"]\r\n  serving-activation[\"\
-  Serving activation\\nsrc/rfp_assistant/evaluation.py\"]\r\n  source-review[\"Source\
-  \ review status\\nsrc/rfp_assistant/ingestion.py\"]\r\n  gold-candidate[\"Gold candidate\
-  \ decision\\nsrc/rfp_assistant/gold.py\"]\r\n  request-status -->|\"stop check in\
-  \ dispatch\"| attempt-billing\r\n  gateway-owner -->|\"owner_guard at admission\"\
-  | attempt-billing\r\n  gateway-owner -->|\"startup recovery\"| request-status\r\n\
-  \  source-review -->|\"gates index sources\"| serving-activation\r\n  gold-candidate\
-  \ -->|\"approved rows grade runs\"| serving-activation"
+  - attempt-billing
+  - attempt-record
+  - attempt-states
+  - gateway-owner
+  - gold-candidate
+  - gold-candidate-states
+  - maintenance-run
+  - request-record
+  - request-status
+  - serving-activation
+prev_diagram: "graph TD\r
+
+  \  request-status[\"Request status\\nsrc/rfp_assistant/service.py\"] -->|stop
+  reason guards dispatch| attempt-billing[\"Attempt billing
+  state\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  attempt-billing -->|billing_state precedence| request-status\r
+
+  \  gold-candidate[\"Gold candidate status\\nsrc/rfp_assistant/gold.py\"]
+  -->|approved rows score runs| serving-activation[\"Serving
+  activation\\nsrc/rfp_assistant/evaluation.py\"]\r
+
+  \  serving-activation -->|config snapshot per request| request-status"

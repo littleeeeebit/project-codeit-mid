@@ -1,1 +1,0 @@
-The provider may have executed: transport errors after dispatch, a response without usage, settle failures, or `dispatching` found at restart. It keeps its reservation as pending and blocks new dispatch.

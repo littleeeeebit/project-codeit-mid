@@ -1,0 +1,14 @@
+created: 2026-10-06T08:48:47.239Z
+updated: 2026-10-06T08:48:47.985Z
+update_count: 2
+last_field: diagram
+git_commit: 4a77ef6
+git_branch: deploy-gcp-vm-ssh-tunnel
+children:
+  - dataset-files
+  - draft-plan
+  - draft-screen
+  - drafting-job
+  - gold-decide
+  - gold-submit
+  - review-screen

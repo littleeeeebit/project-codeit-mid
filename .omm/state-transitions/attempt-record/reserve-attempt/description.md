@@ -1,0 +1,1 @@
+`budget.reserve` (budget.py:275) checks, in order: gateway owner, paid_enabled, `database_control.paid_admission`, frozen_reason, rate, purpose, consented ceiling, `cap − spent − pending`, then the envelope remainder. It inserts a `reserved` row. Lock timeouts or database errors return `ledger_unavailable` and fail closed.

@@ -1,0 +1,1 @@
+Embeddings, ingestion, OCR and evaluation runs are not traced. Verifier traces opened outside a run record nothing in Langfuse.

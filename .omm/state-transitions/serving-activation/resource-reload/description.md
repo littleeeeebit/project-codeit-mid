@@ -1,0 +1,1 @@
+`Resources.index`, `dense` and `reranker` compare the loaded versions with `active_serving` on each call and reload under `_index_lock`. `retire_inactive` frees GPU embedders and rerankers the new configuration does not use; requests already using a model keep their own reference.

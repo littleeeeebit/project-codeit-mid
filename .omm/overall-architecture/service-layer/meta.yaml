@@ -1,44 +1,28 @@
 created: 2026-10-04 13:34:42.724000+00:00
-updated: 2026-10-06T08:28:51.502Z
-update_count: 9
-last_field: constraint
+updated: 2026-10-06 08:48:06.523000+00:00
+update_count: 11
+last_field: diagram
 kind: nested-class
 title: service-layer
 children:
-  - answer-orchestrator
-  - answer-pipeline
-  - background-jobs
-  - evidence-access
-  - gold-review
-  - request-runner
-  - resources
-  - verifier-functions
-  - verifier-runs
+- answer-flow
+- answer-orchestrator
+- answer-pipeline
+- background-jobs
+- gateway-owner
+- gold-review
+- key-sessions
+- request-runner
+- resources
+- tracing-client
+- verifier-functions
 parentPath: []
-prev_diagram: "graph TD\r
-
-  \  resources[\"Process resource owner\\nsrc/rfp_assistant/service.py\"]\r
-
-  \  request_runner[\"Bounded request
-  executor\\nsrc/rfp_assistant/service.py\"]\r
-
-  \  answer_orchestrator[\"Answer
-  orchestration\\nsrc/rfp_assistant/service.py\"]\r
-
-  \  verifier_runs[\"Frozen verifier runs\\nsrc/rfp_assistant/service.py\"]\r
-
-  \  background_jobs[\"Paid background jobs\\nsrc/rfp_assistant/drafting.py\"]\r
-
-  \  gold_review[\"Gold review queue\\nsrc/rfp_assistant/gold.py\"]\r
-
-  \  resources -->|\"lazily creates\"| request_runner\r
-
-  \  request_runner -->|\"run_queued(request_id)\"| answer_orchestrator\r
-
-  \  answer_orchestrator -->|\"index, dense, transport\"| resources\r
-
-  \  verifier_runs -->|\"idempotent generate request\"| request_runner\r
-
-  \  background_jobs -->|\"borrow transport, joined on close\"| resources\r
-
-  \  background_jobs -->|\"submit valid drafts\"| gold_review"
+prev_diagram: "graph TD\r\n  resources[\"Process owner\\nsrc/rfp_assistant/service.py\"\
+  ] -->|creates lazily| request-runner[\"Bounded executor\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  request-runner -->|run_queued by request_id| answer-pipeline[\"Answer execution\\\
+  nsrc/rfp_assistant/service.py\"]\r\n  answer-pipeline -->|index, dense, reranker|\
+  \ resources\r\n  background-jobs[\"Drafting, eval, judges, maintenance\\nsrc/rfp_assistant/service.py\"\
+  ] -->|borrow transport| resources\r\n  verifier-runs[\"Frozen retrieval traces\\\
+  nsrc/rfp_assistant/service.py\"] -->|generate_from_run| request-runner\r\n  evidence-access[\"\
+  Evidence and originals\\nsrc/rfp_assistant/service.py\"] -->|reads result_json evidence|\
+  \ answer-pipeline"

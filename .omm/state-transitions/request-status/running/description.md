@@ -1,1 +1,0 @@
-Set by run_queued's conditional UPDATE (status = 'queued' AND cancel_requested = 0), or at insert for free modes and synchronous service.answer. While running, _stop_reason returns None unless cancel_requested is set or Resources is closing.

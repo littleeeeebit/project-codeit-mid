@@ -1,1 +1,0 @@
-Written by _finish for any domain outcome: answered, insufficient_evidence, conflicting_evidence, clarification_required from the model, budget_blocked or ingestion_unavailable. The domain status lives in result_json.status, separate from the execution status.

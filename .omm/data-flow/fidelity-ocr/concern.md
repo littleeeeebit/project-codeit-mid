@@ -1,0 +1,1 @@
+Uncertain: the maintenance `fidelity` step calls `fidelity.verify_source` for every HWP extraction without a verdict. On the Linux team VM, Hancom printing is presumably unavailable, so a changed HWP would likely fail that step there. I did not trace whether verify_source reuses existing prints in that case.

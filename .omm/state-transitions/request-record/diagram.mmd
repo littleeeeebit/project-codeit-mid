@@ -1,0 +1,14 @@
+graph TD
+  createRequest["Insert queued or running\nsrc/rfp_assistant/service.py"]
+  claimRequest["Claim queued to running\nsrc/rfp_assistant/service.py"]
+  checkpoint["Stop check before paid stage\nsrc/rfp_assistant/service.py"]
+  finishRequest["Store outcome\nsrc/rfp_assistant/service.py"]
+  cancelRequest["Cancel or abandon\nsrc/rfp_assistant/service.py"]
+  runnerShutdown["Controlled shutdown\nsrc/rfp_assistant/service.py"]
+  recoverRequests["Restart recovery\nsrc/rfp_assistant/service.py"]
+  createRequest -->|queued row| claimRequest
+  claimRequest -->|running| checkpoint
+  checkpoint -->|may continue| finishRequest
+  cancelRequest -->|cancel_requested flag| checkpoint
+  runnerShutdown -->|interrupted| checkpoint
+  recoverRequests -->|queued, running to interrupted| finishRequest

@@ -1,0 +1,1 @@
+`res.partials` is process memory, so streaming works only with the single serving worker. A dropped stream is harmless because the poll still delivers the outcome.

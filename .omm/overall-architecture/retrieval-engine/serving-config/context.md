@@ -1,0 +1,1 @@
+README records the current serving run as H-0fffb2a6ec: hybrid with keyword-first fusion, the BM25 top 6 kept in order, RRF k 60 with dense weight 1.0, 50 candidates per channel and 10 evidence units. That is a live database value, not something the code fixes.

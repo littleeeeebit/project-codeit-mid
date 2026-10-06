@@ -1,15 +1,25 @@
 created: 2026-10-06 07:31:43.364000+00:00
-updated: 2026-10-06T08:29:21.756Z
-update_count: 6
-last_field: constraint
-git_commit: 53becaa
+updated: 2026-10-06 08:48:52.492000+00:00
+update_count: 8
+last_field: diagram
+git_commit: 4a77ef6
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
-  - app-process
-  - key-sessions
-  - member-browser
-  - postgres-container
-  - ssh-tunnel
-  - static-web-build
-  - systemd-unit
-  - uvicorn-service
+- app-process
+- key-sessions
+- member-browser
+- openai-api
+- postgres-container
+- ssh-tunnel
+- systemd-unit
+- uvicorn-service
+- uvicorn-worker
+prev_diagram: "graph TD\r\n  member-browser[\"Member browser\\nweb/src/lib/member.ts\"\
+  ] -->|localhost 8501| ssh-tunnel[\"SSH local forward\\ndocs/operations/runbook.md\"\
+  ]\r\n  ssh-tunnel -->|127.0.0.1:8501 on codeit| uvicorn-service[\"systemd uvicorn,\
+  \ one worker\\ntools/bidmate.service\"]\r\n  uvicorn-service -->|serves static export|\
+  \ static-web-build[\"Built screens\\nweb/src/app/layout.tsx\"]\r\n  uvicorn-service\
+  \ -->|DSN from server.env| postgres-container[\"PostgreSQL 18.6 + pgvector\\ncompose.postgresql.yaml\"\
+  ]\r\n  member-browser -->|key entry cookie| key-sessions[\"In-memory key sessions\\\
+  nsrc/rfp_assistant/generation.py\"]\r\n  key-sessions -->|per-request contextvars|\
+  \ uvicorn-service"

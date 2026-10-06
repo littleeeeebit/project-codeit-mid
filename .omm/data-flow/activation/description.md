@@ -1,0 +1,1 @@
+The human step that turns a scored run into serving. See state-transitions/serving-activation/activate-decision. The decision records `decided_by`, a rationale or note, and an optional finalist run used by phase-4 answer evaluation.

@@ -1,1 +1,0 @@
-Exactly-once cost from reported usage. It may also come from the owner CLI `settle` with evidence, or from a late settle after reconciliation, which then adds a negative adjustment.

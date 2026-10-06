@@ -1,41 +1,19 @@
 created: 2026-10-05 23:55:29.570000+00:00
-updated: 2026-10-06T08:29:10.653Z
+updated: 2026-10-06 08:29:10.653000+00:00
 update_count: 6
 last_field: diagram
 kind: nested-class
 title: request-status
 children:
-  - cancelled
-  - completed
-  - failed
-  - interrupted
-  - queued
-  - running
+- failed
 parentPath: []
-prev_diagram: "graph TD\r
-
-  \  queued[\"queued\\nsrc/rfp_assistant/service.py\"]\r
-
-  \  running[\"running\\nsrc/rfp_assistant/service.py\"]\r
-
-  \  completed[\"completed\\nsrc/rfp_assistant/service.py\"]\r
-
-  \  failed[\"failed\\nsrc/rfp_assistant/service.py\"]\r
-
-  \  cancelled[\"cancelled\\nsrc/rfp_assistant/service.py\"]\r
-
-  \  interrupted[\"interrupted\\nsrc/rfp_assistant/service.py\"]\r
-
-  \  queued -->|\"run_queued claims\"| running\r
-
-  \  queued -->|\"cancel before claim\"| cancelled\r
-
-  \  queued -->|\"shutdown or restart\"| interrupted\r
-
-  \  running -->|\"_finish domain outcome\"| completed\r
-
-  \  running -->|\"technical or validation error\"| failed\r
-
-  \  running -->|\"cancel flag at finish\"| cancelled\r
-
-  \  running -->|\"restart recovery\"| interrupted"
+prev_diagram: "graph TD\r\n  queued[\"queued\\nsrc/rfp_assistant/service.py\"]\r\n\
+  \  running[\"running\\nsrc/rfp_assistant/service.py\"]\r\n  completed[\"completed\\\
+  nsrc/rfp_assistant/service.py\"]\r\n  failed[\"failed\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  cancelled[\"cancelled\\nsrc/rfp_assistant/service.py\"]\r\n  interrupted[\"\
+  interrupted\\nsrc/rfp_assistant/service.py\"]\r\n  queued -->|\"run_queued claims\"\
+  | running\r\n  queued -->|\"cancel before claim\"| cancelled\r\n  queued -->|\"\
+  shutdown or restart\"| interrupted\r\n  running -->|\"_finish domain outcome\"|\
+  \ completed\r\n  running -->|\"technical or validation error\"| failed\r\n  running\
+  \ -->|\"cancel flag at finish\"| cancelled\r\n  running -->|\"restart recovery\"\
+  | interrupted"

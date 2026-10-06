@@ -1,1 +1,0 @@
-fuse() runs weighted RRF (rrf_k, dense_weight) over BM25 and dense IDs. keyword_first then pins the first keyword_head BM25 rows in BM25 order before the rest, cut at fused_top_k. For hybrid_rerank, the LocalReranker reorders the pool below a protected BM25 head (rerank_protect). An inference exception falls back to the hybrid order with the error in `fallback`.

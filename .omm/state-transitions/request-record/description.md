@@ -1,0 +1,1 @@
+The `requests` row moves through queued, running, completed, failed, cancelled and interrupted. TERMINAL_STATUSES gate follow-ups. `cancel_requested` is a separate flag that blocks further paid stages and attachment.

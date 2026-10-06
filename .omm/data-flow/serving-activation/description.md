@@ -1,1 +1,0 @@
-evaluation.activate_decision validates the picked run and switches active_run and active_index atomically. The next request's Resources.index() and dense() reload the new versions; run_settings() applies the run's recorded limits and embedding. Rollback is activating an earlier run, which stays activatable as long as its artifacts verify.

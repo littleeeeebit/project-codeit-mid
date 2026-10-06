@@ -1,10 +1,18 @@
 graph TD
-  web-pages["Next.js pages\nweb/src/app/page.tsx"] -->|JSON calls with X-Member| http-api["FastAPI routes\nsrc/rfp_assistant/api.py"]
-  http-api -->|one service call per route| service-layer["Service orchestration\nsrc/rfp_assistant/service.py"]
-  service-layer -->|scoped question| retrieval-engine["Hybrid retrieval\nsrc/rfp_assistant/retrieval.py"]
-  service-layer -->|reserve, dispatch, settle| paid-gateway["Ledger and provider gateway\nsrc/rfp_assistant/budget.py"]
-  service-layer -->|requests, results, reviews| data-stores["PostgreSQL and runtime files\nsrc/rfp_assistant/postgres.py"]
-  retrieval-engine -->|index files, pgvector search| data-stores
-  owner-cli["Owner CLI pipelines\nsrc/rfp_assistant/cli.py"] -->|ingest, index, activate| data-stores
-  owner-cli -->|paid batch work| paid-gateway
-  service-layer -.->|spans and scores| langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/tracing.py"]
+  webScreens["Web screens\nweb/src/components/ask/ask-page.tsx"]
+  httpApi["HTTP API\nsrc/rfp_assistant/api.py"]
+  serviceLayer["Service orchestration\nsrc/rfp_assistant/service.py"]
+  retrievalEngine["Retrieval engine\nsrc/rfp_assistant/retrieval.py"]
+  budgetLedger["Paid gateway ledger\nsrc/rfp_assistant/budget.py"]
+  providerTransport["Provider transport\nsrc/rfp_assistant/generation.py"]
+  postgresStore["PostgreSQL and pgvector\nsrc/rfp_assistant/postgres.py"]
+  ownerCli["Owner CLI pipelines\nsrc/rfp_assistant/cli.py"]
+  webScreens -->|JSON fetch with X-Member| httpApi
+  httpApi -->|one service call per route| serviceLayer
+  serviceLayer -->|scoped question| retrievalEngine
+  serviceLayer -->|reserve, dispatch, settle| budgetLedger
+  serviceLayer -->|chat with on_delta| providerTransport
+  retrievalEngine -->|BM25 rows, vector search| postgresStore
+  budgetLedger -->|attempt rows, locked tx| postgresStore
+  ownerCli -->|ingest, index, activate| postgresStore
+  ownerCli -->|own Resources instance| serviceLayer

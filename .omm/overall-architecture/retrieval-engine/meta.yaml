@@ -1,28 +1,27 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-06 08:28:53.793000+00:00
-update_count: 22
+updated: 2026-10-06 08:48:12.734000+00:00
+update_count: 24
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
 children:
 - corpus-route
-- corpus-routing
+- corpus-router
 - dense-channel
 - dense-search
-- evidence-packing
 - fusion
-- fusion-and-rerank
 - keyword-index
-- lexical-ranking
+- packer
+- query-vector
 - reranker
+- serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  keyword-index[\"Keyword index loader\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  corpus-route[\"Corpus project routing\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  lexical[\"Kiwi BM25 ranking\\nsrc/rfp_assistant/retrieval.py\"]\r\n  query-vector[\"\
-  Query embedding cache\\nsrc/rfp_assistant/dense.py\"]\r\n  dense-search[\"pgvector\
-  \ search\\nsrc/rfp_assistant/vector_store.py\"]\r\n  fusion[\"Keyword-first fusion\\\
-  nsrc/rfp_assistant/retrieval.py\"]\r\n  reranker[\"Optional local reranker\\nsrc/rfp_assistant/dense.py\"\
-  ]\r\n  keyword-index -->|\"chunks, BM25, scope terms\"| lexical\r\n  corpus-route\
-  \ -->|\"narrowed scope rows\"| lexical\r\n  query-vector -->|\"unit query vector\"\
-  | dense-search\r\n  lexical -->|\"ranked BM25 ids\"| fusion\r\n  dense-search -->|\"\
-  ranked cosine ids\"| fusion\r\n  fusion -->|\"pool in HR mode\"| reranker"
+prev_diagram: "graph TD\r\n  keyword-index[\"Loaded keyword index\\nsrc/rfp_assistant/retrieval.py\"\
+  ] -->|rows in scope| corpus-routing[\"Project-name routing\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  corpus-routing -->|allowed rows| lexical-ranking[\"Exact codes and BM25\\\
+  nsrc/rfp_assistant/retrieval.py\"]\r\n  corpus-routing -->|allowed rows| dense-search[\"\
+  pgvector cosine search\\nsrc/rfp_assistant/vector_store.py\"]\r\n  lexical-ranking\
+  \ -->|BM25 order| fusion-and-rerank[\"keyword_first RRF, rerank\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  dense-search -->|dense order| fusion-and-rerank\r\n  fusion-and-rerank -->|final\
+  \ ranking| evidence-packing[\"Evidence unit packing\\nsrc/rfp_assistant/retrieval.py\"\
+  ]"

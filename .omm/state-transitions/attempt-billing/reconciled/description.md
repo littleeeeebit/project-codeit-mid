@@ -1,1 +1,0 @@
-Set by budget.reconcile for explicitly covered unknown attempts dispatched inside a closed interval of one billing scope. The provider total minus local settled cost is recorded as an adjustment.

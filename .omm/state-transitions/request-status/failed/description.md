@@ -1,1 +1,0 @@
-Written when done(request_status='failed'): validation, provider, settlement or retrieval failures and ServiceErrors raised during execution. _fail_unscheduled also sets it when the executor refused the submit.

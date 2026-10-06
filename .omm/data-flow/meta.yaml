@@ -1,36 +1,36 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-06 08:29:15.224000+00:00
-update_count: 18
+updated: 2026-10-06 08:48:42.334000+00:00
+update_count: 20
 last_field: diagram
-git_commit: 53becaa
+git_commit: 4a77ef6
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
 - activation
 - corpus-ingestion
-- csv-manifest
 - embedding-sets
 - extraction
 - fidelity-check
+- fidelity-ocr
+- frozen-runs
 - index-build
 - keyword-build
+- maintenance-seq
 - ocr-merge
 - original-corpus
 - originals
-- retrieval-runs
+- parsing
 - retrieval-selection
 - run-selection
-- serving-activation
-- source-parsing
-prev_diagram: "graph TD\r\n  originals[\"Original RFP files\\n원본 데이터/files\"]\r\n\
-  \  extractions[\"Extraction artifacts\\nsrc/rfp_assistant/ingestion.py\"]\r\n  keyword-indexes[\"\
-  Keyword index versions\\nsrc/rfp_assistant/retrieval.py\"]\r\n  vector-sets[\"pgvector\
-  \ embedding sets\\nsrc/rfp_assistant/vector_store.py\"]\r\n  active-run[\"Active\
-  \ serving pointer\\nsrc/rfp_assistant/evaluation.py\"]\r\n  request-records[\"Request\
-  \ records\\nsrc/rfp_assistant/service.py\"]\r\n  evidence-view[\"Citation and download\\\
-  nsrc/rfp_assistant/service.py\"]\r\n  originals -->|\"sha256, parse HWP or PDF\"\
-  | extractions\r\n  extractions -->|\"elements into chunks\"| keyword-indexes\r\n\
-  \  keyword-indexes -->|\"chunk payload hashes\"| vector-sets\r\n  keyword-indexes\
-  \ -->|\"index_version\"| active-run\r\n  vector-sets -->|\"dense_version\"| active-run\r\
-  \n  active-run -->|\"serving config per request\"| request-records\r\n  request-records\
-  \ -->|\"persisted evidence map\"| evidence-view\r\n  originals -->|\"hash-checked\
-  \ bytes\"| evidence-view"
+- source-manifest
+prev_diagram: "graph TD\r\n  csv-manifest[\"CSV manifest import\\nsrc/rfp_assistant/ingestion.py\"\
+  ] -->|documents and sources rows| source-parsing[\"HWP and PDF parsing\\nsrc/rfp_assistant/ingestion.py\"\
+  ]\r\n  ocr-merge[\"Image text OCR\\nsrc/rfp_assistant/ocr.py\"] -->|image_text elements|\
+  \ source-parsing\r\n  source-parsing -->|extraction revision| fidelity-check[\"\
+  Hancom print comparison\\nsrc/rfp_assistant/fidelity.py\"]\r\n  source-parsing -->|elements.jsonl|\
+  \ keyword-build[\"Chunk and keyword index\\nsrc/rfp_assistant/retrieval.py\"]\r\n\
+  \  fidelity-check -->|review_status| keyword-build\r\n  keyword-build -->|chunk\
+  \ payloads| embedding-sets[\"pgvector embedding sets\\nsrc/rfp_assistant/dense.py\"\
+  ]\r\n  embedding-sets -->|dense_version| retrieval-runs[\"Frozen runs and matrices\\\
+  nsrc/rfp_assistant/compare.py\"]\r\n  keyword-build -->|index_version| retrieval-runs\r\
+  \n  retrieval-runs -->|person picks a row| serving-activation[\"activate-run\\nsrc/rfp_assistant/evaluation.py\"\
+  ]"

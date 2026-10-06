@@ -1,1 +1,0 @@
-No charge: refused before dispatch (stopped_before_dispatch:<reason>, provider_unavailable), a confirmed pre-execution 4xx, or never dispatched before a restart.

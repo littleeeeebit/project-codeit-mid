@@ -1,1 +1,0 @@
-The durable marker written before the network call, in the same transaction as the request stop check. It counts as pending cost.

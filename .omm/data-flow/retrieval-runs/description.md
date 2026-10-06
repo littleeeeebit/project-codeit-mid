@@ -1,1 +1,0 @@
-evaluate-retrieval and compare --matrix score reviewed development and needle questions against source spans. They freeze dataset, population, index manifest, analyzer, dense version, limits and corpus_route into runs/<run_id>/config.json and scores.json. Comparison tables land in compare/tables and are listed read-only on 검증 › 실험 비교 (service.experiments).

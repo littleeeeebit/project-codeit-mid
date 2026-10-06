@@ -1,0 +1,1 @@
+`release` (budget.py:372) moves `reserved → released`. With `confirmed_pre_execution=True` it also moves `dispatching → released`; this is used only for 4xx provider rejections, a missing key, and ownership lost before execution.

@@ -1,0 +1,1 @@
+Change ROUTE_RULE whenever route_corpus changes; otherwise activated runs keep claiming gate evidence for routing they no longer describe.

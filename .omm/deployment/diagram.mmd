@@ -1,7 +1,13 @@
 graph TD
-  member-browser["Member browser\nweb/src/lib/member.ts"] -->|localhost 8501| ssh-tunnel["SSH local forward\ndocs/operations/runbook.md"]
-  ssh-tunnel -->|127.0.0.1:8501 on codeit| uvicorn-service["systemd uvicorn, one worker\ntools/bidmate.service"]
-  uvicorn-service -->|serves static export| static-web-build["Built screens\nweb/src/app/layout.tsx"]
-  uvicorn-service -->|DSN from server.env| postgres-container["PostgreSQL 18.6 + pgvector\ncompose.postgresql.yaml"]
-  member-browser -->|key entry cookie| key-sessions["In-memory key sessions\nsrc/rfp_assistant/generation.py"]
-  key-sessions -->|per-request contextvars| uvicorn-service
+  memberBrowser["Member browser\nweb/src/app/layout.tsx"]
+  sshTunnel["SSH local forward 8501\ndocs/operations/runbook.md"]
+  systemdUnit["systemd unit\ntools/bidmate.service"]
+  uvicornWorker["Single uvicorn worker\nsrc/rfp_assistant/api.py"]
+  postgresContainer["PostgreSQL container\ntools/start-postgresql.sh"]
+  openaiApi["OpenAI API\nsrc/rfp_assistant/generation.py"]
+  memberBrowser -->|localhost 8501| sshTunnel
+  sshTunnel -->|loopback on VM| uvicornWorker
+  systemdUnit -->|starts, SIGINT stop| uvicornWorker
+  systemdUnit -->|ExecStartPre| postgresContainer
+  uvicornWorker -->|psycopg pool, advisory lock| postgresContainer
+  uvicornWorker -->|per-browser key client| openaiApi

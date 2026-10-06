@@ -1,1 +1,0 @@
-Statuses: queued, running, completed, failed, cancelled, interrupted (RequestView Literal). cancel_requested is a separate flag that _finish uses to turn a would-be `completed` into `cancelled`. _finish keeps any non-running status already written (interrupted by shutdown, cancelled while queued). Nothing returns from a terminal state; nothing is replayed after restart.

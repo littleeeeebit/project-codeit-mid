@@ -1,7 +1,18 @@
 graph TD
-  keyword-index["Loaded keyword index\nsrc/rfp_assistant/retrieval.py"] -->|rows in scope| corpus-routing["Project-name routing\nsrc/rfp_assistant/retrieval.py"]
-  corpus-routing -->|allowed rows| lexical-ranking["Exact codes and BM25\nsrc/rfp_assistant/retrieval.py"]
-  corpus-routing -->|allowed rows| dense-search["pgvector cosine search\nsrc/rfp_assistant/vector_store.py"]
-  lexical-ranking -->|BM25 order| fusion-and-rerank["keyword_first RRF, rerank\nsrc/rfp_assistant/retrieval.py"]
-  dense-search -->|dense order| fusion-and-rerank
-  fusion-and-rerank -->|final ranking| evidence-packing["Evidence unit packing\nsrc/rfp_assistant/retrieval.py"]
+  servingConfig["Activated serving config\nsrc/rfp_assistant/service.py"]
+  corpusRouter["Corpus project routing\nsrc/rfp_assistant/retrieval.py"]
+  keywordIndex["Kiwi BM25 index\nsrc/rfp_assistant/retrieval.py"]
+  queryVector["Query vector cache\nsrc/rfp_assistant/dense.py"]
+  denseSearch["pgvector exact search\nsrc/rfp_assistant/vector_store.py"]
+  fusion["Keyword-first RRF fusion\nsrc/rfp_assistant/retrieval.py"]
+  reranker["Optional local reranker\nsrc/rfp_assistant/dense.py"]
+  packer["Evidence packer\nsrc/rfp_assistant/retrieval.py"]
+  servingConfig -->|mode, limits, versions| corpusRouter
+  corpusRouter -->|narrowed scope rows| keywordIndex
+  servingConfig -->|embedding model and dims| queryVector
+  queryVector -->|unit vector| denseSearch
+  keywordIndex -->|BM25 top 50| fusion
+  denseSearch -->|cosine top 50| fusion
+  fusion -->|pool below BM25 head| reranker
+  fusion -->|fused ranking| packer
+  reranker -->|reranked pool| packer

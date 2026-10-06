@@ -1,1 +1,1 @@
-`ssh -N -L 8501:127.0.0.1:8501 <user>@<codeit address>` with each member's project-metadata SSH key. That key list is the access control. The VM address is ephemeral, per the runbook.
+The only access path to the shared host: an SSH `-L 8501` forward to the VM's loopback. The exact command and the member list are in docs/operations/runbook.md §3.1.

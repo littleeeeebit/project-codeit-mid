@@ -1,0 +1,1 @@
+The single process that owns Resources, the gateway lock, the executor, the in-memory partials and key sessions, the loaded indexes and any GPU models. See overall-architecture/service-layer.

@@ -1,1 +1,0 @@
-gold.decide and second_review rewrite the dataset JSONL (dataset_path) from gold_candidates rows inside the same transaction. Rejections render Markdown pages under the rejections folder. gold.check verifies that every projection equals its database rendering and that batch files are unchanged; gold.sync rewrites them.

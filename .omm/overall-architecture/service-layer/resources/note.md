@@ -1,0 +1,1 @@
+`dispatch=False` creates a ledger-only owner (CLI settle/adjust/reconcile/paid/audit). It never takes the gateway lock and refuses paid stages at admission, so it can run beside the serving app.

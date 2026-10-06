@@ -1,39 +1,37 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-06 08:29:05.093000+00:00
-update_count: 19
-last_field: constraint
-git_commit: 53becaa
+updated: 2026-10-06 08:48:24.084000+00:00
+update_count: 21
+last_field: diagram
+git_commit: 4a77ef6
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
 - answer-validation
 - ask-page
 - ask-route
+- ask-screen
 - cancellation
-- cancellation-and-shutdown
-- evidence-retrieval
 - finish-record
 - finish-step
-- follow-up-rewrite
-- metered-generation
+- metered-chat
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
 - paid-call
 - request-runner
 - status-poll
-- status-polling
+- stream-and-poll
 - submit-answer
 - validation
-prev_diagram: "graph TD\r\n  composer[\"Ask composer\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  ask-route[\"Ask route\\nsrc/rfp_assistant/api.py\"]\r\n  persist[\"Persist\
-  \ and admit\\nsrc/rfp_assistant/service.py\"]\r\n  worker[\"Executor worker\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  retrieve-step[\"Scoped retrieval\\nsrc/rfp_assistant/retrieval.py\"]\r\n\
-  \  generate-step[\"Metered streaming call\\nsrc/rfp_assistant/generation.py\"]\r\
-  \n  finish-step[\"Validate and store\\nsrc/rfp_assistant/service.py\"]\r\n  watchers[\"\
-  Status poll and SSE\\nweb/src/lib/use-answer-stream.ts\"]\r\n  composer -->|\"scope,\
-  \ question, mode\"| ask-route\r\n  ask-route -->|\"service.ask\"| persist\r\n  persist\
-  \ -->|\"Owned record back\"| composer\r\n  persist -->|\"request_id queued\"| worker\r\
-  \n  worker -->|\"rewrite, then search\"| retrieve-step\r\n  retrieve-step -->|\"\
-  evidence, priced prompt\"| generate-step\r\n  generate-step -->|\"partials via stream\"\
-  | watchers\r\n  generate-step -->|\"content and usage\"| finish-step\r\n  finish-step\
-  \ -->|\"result_json, billing\"| watchers"
+prev_diagram: "graph TD\r\n  ask-route[\"POST /api/ask\\nsrc/rfp_assistant/api.py\"\
+  ] -->|AnswerRequest with new generation_id| submit-answer[\"Validate and persist\\\
+  nsrc/rfp_assistant/service.py\"]\r\n  submit-answer -->|request_id queued| request-runner[\"\
+  Executor worker\\nsrc/rfp_assistant/service.py\"]\r\n  request-runner -->|follow-up\
+  \ only| follow-up-rewrite[\"Standalone query rewrite\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  request-runner -->|question and scope| evidence-retrieval[\"Retrieve and\
+  \ price\\nsrc/rfp_assistant/service.py\"]\r\n  follow-up-rewrite -->|standalone\
+  \ question| evidence-retrieval\r\n  evidence-retrieval -->|messages and estimate|\
+  \ metered-generation[\"Streamed paid generation\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  metered-generation -->|provider response| answer-validation[\"Citation validation\
+  \ and finish\\nsrc/rfp_assistant/generation.py\"]\r\n  status-polling[\"Poll, stream,\
+  \ attach\\nweb/src/components/ask/ask-page.tsx\"] -->|reads status and partials|\
+  \ answer-validation"
