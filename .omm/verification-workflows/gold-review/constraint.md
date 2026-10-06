@@ -1,0 +1,1 @@
+Sealed test rows are reviewed only through the owner's CLI. No screen route exposes sealed questions or labels (`SealedState` carries counts only).

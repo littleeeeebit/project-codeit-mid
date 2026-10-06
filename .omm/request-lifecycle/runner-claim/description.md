@@ -1,1 +1,0 @@
-A pool worker runs `run_queued`, which claims `queued` → `running` only if not cancelled. A request cancelled while queued is never claimed. `_paid_answer` then resolves the scope. If every selected document is unparsed or unindexed, it returns `ingestion_unavailable` without paying. It loads a frozen verifier run if the request names one, and passes the first `_checkpoint`.

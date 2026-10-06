@@ -1,0 +1,1 @@
+`budget.recover(db)` runs only while the process holds the gateway lock (from `Resources._own`, and from `close()` when jobs outlive the wait). It moves `dispatching` → `unknown` ('process ended during dispatch') and `reserved` → `released`, and applies the same rule to Gemini's `external_attempts`. Nothing is replayed.

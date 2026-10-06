@@ -1,23 +1,26 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-05 23:55:29.277000+00:00
-update_count: 12
+updated: 2026-10-06 09:08:55.494000+00:00
+update_count: 22
 last_field: diagram
-git_commit: 467d0b9
-git_branch: chat-multiturn-streaming
+git_commit: cc684cc
+git_branch: deploy-gcp-vm-ssh-tunnel
 children:
 - attempt-billing
-- gateway-ownership
+- attempt-record
+- attempt-states
+- billing-attempt
+- gateway-owner
+- gold-candidate
 - gold-candidate-states
-- paid-admission-switches
+- maintenance-run
 - request-status
 - serving-activation
-prev_diagram: "graph TD\r\n  request-states[\"Request status\\nsrc/rfp_assistant/service.py\"\
-  ] -->|each paid stage reserves| attempt-states[\"Attempt billing state\\nsrc/rfp_assistant/budget.py\"\
-  ]\r\n  attempt-states -->|billing_state precedence| request-states\r\n  serving-activation[\"\
-  Serving activation\\nsrc/rfp_assistant/evaluation.py\"] -->|config snapshot per\
-  \ request| request-states\r\n  gold-candidate-states[\"Gold candidate status\\nsrc/rfp_assistant/gold.py\"\
-  ] -->|approved rows grade runs| serving-activation\r\n  maintenance-run-states[\"\
-  Maintenance run status\\nsrc/rfp_assistant/maintenance.py\"] -->|regression rows\
-  \ only| serving-activation\r\n  restart-recovery[\"Restart recovery\\nsrc/rfp_assistant/service.py\"\
-  ] -->|queued and running interrupted| request-states\r\n  restart-recovery -->|dispatching\
-  \ becomes unknown| attempt-states"
+prev_diagram: "graph TD\r\n  requestRecord[\"Request record\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  attemptRecord[\"Billing attempt\\nsrc/rfp_assistant/budget.py\"]\r\n  servingActivation[\"\
+  Serving activation\\nsrc/rfp_assistant/evaluation.py\"]\r\n  goldCandidate[\"Gold\
+  \ candidate\\nsrc/rfp_assistant/gold.py\"]\r\n  maintenanceRun[\"Maintenance run\\\
+  nsrc/rfp_assistant/maintenance.py\"]\r\n  requestRecord -->|owns paid stages| attemptRecord\r\
+  \n  attemptRecord -->|unknown blocks dispatch| requestRecord\r\n  servingActivation\
+  \ -->|config snapshot per request| requestRecord\r\n  goldCandidate -->|approved\
+  \ rows scored by runs| servingActivation\r\n  maintenanceRun -->|builds candidates,\
+  \ never activates| servingActivation"

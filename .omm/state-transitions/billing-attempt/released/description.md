@@ -1,0 +1,1 @@
+Nothing was sent, or the provider rejected the call before execution. Holds no cost.

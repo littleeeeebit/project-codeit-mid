@@ -1,0 +1,1 @@
+The SSE generator is synchronous and sleeps, so Starlette runs it in its threadpool. Each open stream holds one pool thread for the request's duration. That is fine for the six-member load, but it is a ceiling if streams multiply.

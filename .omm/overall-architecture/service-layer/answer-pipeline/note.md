@@ -1,0 +1,1 @@
+A ServiceError raised during execution is stored as status `clarification_required` with request status `failed`. Any other exception becomes `technical_error`.

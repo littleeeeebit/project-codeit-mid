@@ -1,0 +1,1 @@
+The single application_mutex row serializes every immediate transaction across admission, idempotency, settlement and reviews. The code marks this as an accepted ceiling (`ponytail:` comment in postgres.tx); per-account locks are the stated upgrade path.

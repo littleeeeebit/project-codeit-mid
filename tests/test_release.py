@@ -192,7 +192,7 @@ class ReconciliationFixtureTest(unittest.TestCase):
                 dispatched = conn.execute("SELECT dispatched_at FROM attempts WHERE attempt_id = ?",
                                           (attempt,)).fetchone()[0]
             budget.reconcile(db, "owner", "day-1", "2026-01-01T00:00:00+00:00", "2099-01-01T00:00:00+00:00", 60,
-                             "academy-project", "export.csv", [attempt])
+                             "academy-project", "export.csv", [attempt], unscoped="include")
             self.assertLessEqual("2026-01-01", dispatched)
             snap = budget.snapshot(db)
             self.assertEqual((snap.spent_micro_usd, snap.pending_micro_usd), (60, 0))

@@ -1,1 +1,0 @@
-`OpenAITransport._drain` concatenates `delta.content`, calls `on_delta(content)` after each piece, collects refusal and finish reason, and takes `usage` from the chunk that carries it. It returns `ProviderResponse(content, refusal, finish, usage, response_id)` for validation and settlement.

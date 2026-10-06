@@ -1,0 +1,1 @@
+This is a global stop. A single timeout blocks paid answers for every member until the owner runs `settle` or `reconcile`.

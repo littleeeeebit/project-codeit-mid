@@ -1,9 +1,0 @@
-created: 2026-10-05T23:55:21.501Z
-updated: 2026-10-05T23:55:21.502Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: control-tables
-children: []
-parentPath:
-  - postgresql-store

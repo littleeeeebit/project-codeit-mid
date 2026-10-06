@@ -1,1 +1,0 @@
-`Resources._own` borrows this process's live owner if one exists, without recovery because its work is live. Otherwise it takes `GatewayOwner` and fails with `GatewayLockError` when another process holds the lock. With a real API key, `_own` runs even without `recover=True`, so every PostgreSQL dispatch has an owner.

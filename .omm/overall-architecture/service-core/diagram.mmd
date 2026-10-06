@@ -1,16 +1,9 @@
 graph TD
-  resources-owner["Process resources\nsrc/rfp_assistant/service.py"]
-  ask-submission["Ask and submit_answer\nsrc/rfp_assistant/service.py"]
-  request-runner["Bounded request runner\nsrc/rfp_assistant/service.py"]
-  answer-execution["Answer execution\nsrc/rfp_assistant/service.py"]
-  conversation-context["Conversation context\nsrc/rfp_assistant/service.py"]
-  progress-partials["Streaming partials\nsrc/rfp_assistant/generation.py"]
-  evidence-views["Request views and evidence\nsrc/rfp_assistant/service.py"]
-  background-jobs["Verifier background jobs\nsrc/rfp_assistant/service.py"]
-  ask-submission -->|persist then submit id| request-runner
-  request-runner -->|run_queued claims row| answer-execution
-  answer-execution -->|earlier turns, carried units| conversation-context
-  answer-execution -->|on_delta content| progress-partials
-  resources-owner -->|index, transport, tracing| answer-execution
-  resources-owner -->|loaded index elements| evidence-views
-  background-jobs -->|shared transport, joined on close| resources-owner
+  app-resources["Process resources\nsrc/rfp_assistant/service.py"] -->|"owns executor"| request-runner["Bounded executor\nsrc/rfp_assistant/service.py"]
+  request-runner -->|"request_id only"| answer-pipeline["Answer execution\nsrc/rfp_assistant/service.py"]
+  answer-pipeline -->|"earlier turns, carried evidence"| conversation-context["Conversation context\nsrc/rfp_assistant/service.py"]
+  answer-pipeline -->|"paid chat stages"| metered-chat["Metered chat\nsrc/rfp_assistant/service.py"]
+  answer-pipeline -->|"retrieve with run settings"| serving-config["Serving config\nsrc/rfp_assistant/service.py"]
+  app-resources -->|"activated run, loaded index"| serving-config
+  app-resources -->|"joins on close"| background-jobs["Background jobs\nsrc/rfp_assistant/service.py"]
+  verifier-runs["Verifier trace runs\nsrc/rfp_assistant/service.py"] -->|"frozen evidence request"| answer-pipeline

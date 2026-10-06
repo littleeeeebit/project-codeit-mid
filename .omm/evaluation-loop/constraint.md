@@ -1,0 +1,1 @@
+The sealed `test` split never reaches the UI: `draft_documents` lists development-family documents only, `dataset_rows` refuses sealed sets, and `evaluation_overview` exposes only the sealed set's size and freeze state.

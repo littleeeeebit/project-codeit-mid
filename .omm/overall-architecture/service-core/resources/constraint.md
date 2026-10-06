@@ -1,0 +1,1 @@
+`close()` is also registered through `threading._register_atexit`, so it runs before `concurrent.futures` joins its workers. That way a worker's next paid stage sees the stop.

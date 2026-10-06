@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextvars
+import hashlib
 import json
 import re
 import threading
@@ -155,15 +157,62 @@ def _usage(u) -> dict | None:
             "reasoning_tokens": (getattr(out_details, "reasoning_tokens", 0) or 0) if out_details else 0}
 
 
-class OpenAITransport:
-    """Hidden SDK retries disabled, finite timeout. One instance is owned by service.Resources."""
+# The browser session whose key pays for the work running in this context. The API sets it per request from the
+# session cookie; threads that carry that work on start from a copy of the request's context.
+KEY_SESSION: contextvars.ContextVar[str | None] = contextvars.ContextVar("rfp_key_session", default=None)
+# The answer model that session had chosen when the HTTP request began: fixed for that request and all work it
+# starts, so a later change on 설정 never alters a request already submitted.
+REQUEST_MODEL: contextvars.ContextVar[str | None] = contextvars.ContextVar("rfp_request_model", default=None)
+NO_API_KEY = "OpenAI API 키가 설정되지 않았습니다. 설정 페이지에서 본인 키를 입력하세요."
 
-    def __init__(self, api_key: str, timeout: float, owner_check=None) -> None:
+
+class OpenAITransport:
+    """Hidden SDK retries disabled, finite timeout. One instance is owned by service.Resources.
+
+    Each browser session that entered a key on the 설정 page gets its own client; a call uses the client of
+    `KEY_SESSION`. `api_key` (the server environment, used by the CLI and personal machines) serves only a context
+    without a session key of its own. With neither, the call is refused before execution: nothing is charged."""
+
+    def __init__(self, api_key: str | None, timeout: float, owner_check=None) -> None:
         import openai
 
         self._openai = openai
-        self._client = openai.OpenAI(api_key=api_key, max_retries=0, timeout=timeout)
+        self._timeout = timeout
+        self._default = self._new(api_key) if api_key else None
+        self._sessions: dict[str, object] = {}
+        self._retired: list = []  # clients a key change replaced; calls already started on them finish there
+        self._lock = threading.Lock()
         self._owner_check = owner_check
+
+    def _new(self, api_key: str):
+        return self._openai.OpenAI(api_key=api_key, max_retries=0, timeout=self._timeout)
+
+    def set_key(self, session: str, api_key: str) -> None:
+        """That session's next call uses the new key. A call in flight keeps the client it started with."""
+        client = self._new(api_key)
+        with self._lock:
+            # ponytail: replaced clients stay open until close(); one per key change.
+            if session in self._sessions:
+                self._retired.append(self._sessions[session])
+            self._sessions[session] = client
+
+    def check_model(self, model: str) -> str | None:
+        """`check_api_key` for this context's key, which only this transport holds."""
+        with self._lock:
+            client = self._sessions.get(KEY_SESSION.get())
+        return _check(self._openai, client, model)[0] if client is not None else NO_API_KEY
+
+    def has_key(self) -> bool:
+        with self._lock:
+            return KEY_SESSION.get() in self._sessions or self._default is not None
+
+    @property
+    def _client(self):
+        with self._lock:
+            client = self._sessions.get(KEY_SESSION.get()) or self._default
+        if client is None:
+            raise ProviderError(NO_API_KEY, pre_execution=True)
+        return client
 
     def chat(self, *, model, messages, response_format, max_completion_tokens, reasoning_effort,
              on_delta=None) -> ProviderResponse:
@@ -177,7 +226,7 @@ class OpenAITransport:
         except (o.AuthenticationError, o.PermissionDeniedError, o.BadRequestError, o.NotFoundError,
                 o.RateLimitError, o.UnprocessableEntityError) as exc:
             # 4xx rejections happen before model execution.
-            raise ProviderError(f"{type(exc).__name__}: {exc}", pre_execution=True) from None
+            raise ProviderError(_reason(o, exc), pre_execution=True) from None
         except o.OpenAIError as exc:  # timeouts, connection loss, 5xx: execution may have happened
             raise ProviderError(f"{type(exc).__name__}: {exc}", pre_execution=False) from None
         if on_delta:
@@ -213,7 +262,7 @@ class OpenAITransport:
                                                   encoding_format="float")
         except (o.AuthenticationError, o.PermissionDeniedError, o.BadRequestError, o.NotFoundError,
                 o.RateLimitError, o.UnprocessableEntityError) as exc:
-            raise ProviderError(f"{type(exc).__name__}: {exc}", pre_execution=True) from None
+            raise ProviderError(_reason(o, exc), pre_execution=True) from None
         except o.OpenAIError as exc:
             raise ProviderError(f"{type(exc).__name__}: {exc}", pre_execution=False) from None
         data = sorted(resp.data, key=lambda d: d.index)
@@ -222,7 +271,10 @@ class OpenAITransport:
         return EmbeddingResponse([list(d.embedding) for d in data], usage, None)
 
     def close(self) -> None:
-        self._client.close()
+        with self._lock:
+            clients = [*self._retired, *self._sessions.values(), *([self._default] if self._default else [])]
+        for client in clients:
+            client.close()
 
     def _check_owner(self):
         if self._owner_check is not None:
@@ -230,6 +282,37 @@ class OpenAITransport:
                 self._owner_check()
             except RuntimeError:
                 raise ProviderError("paid gateway ownership was lost before provider execution", pre_execution=True) from None
+
+
+def _reason(openai, exc) -> str:
+    """An authentication error's message quotes part of the key; only its type is kept."""
+    return type(exc).__name__ if isinstance(exc, openai.AuthenticationError) else f"{type(exc).__name__}: {exc}"
+
+
+def check_api_key(api_key: str, model: str, timeout: float) -> tuple[str | None, str | None]:
+    """(problem, billing scope). The problem is None when the key can see `model`, otherwise a reason that never
+    contains the key. The billing scope is the key's OpenAI project (the `openai-project` response header), which
+    names whose bill an attempt lands on without revealing the key. Reading a model's metadata is free: no tokens,
+    no ledger entry."""
+    import openai
+
+    with openai.OpenAI(api_key=api_key, max_retries=0, timeout=timeout) as client:
+        problem, project = _check(openai, client, model)
+    if problem is None and not project:  # a legacy user key: a one-way digest still separates its bill
+        project = "key-sha256:" + hashlib.sha256(api_key.encode()).hexdigest()[:16]
+    return problem, project
+
+
+def _check(openai, client, model: str) -> tuple[str | None, str | None]:
+    try:
+        raw = client.models.with_raw_response.retrieve(model)
+    except openai.AuthenticationError:
+        return "OpenAI가 이 키를 거부했습니다.", None
+    except (openai.PermissionDeniedError, openai.NotFoundError):
+        return f"이 키로는 {model} 모델을 쓸 수 없습니다.", None
+    except openai.OpenAIError as exc:
+        return f"OpenAI에 확인하지 못했습니다 ({type(exc).__name__}).", None
+    return None, raw.headers.get("openai-project")
 
 
 class FakeTransport:

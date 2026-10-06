@@ -1,37 +1,39 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-05 23:55:33.951000+00:00
-update_count: 12
+updated: 2026-10-06 09:09:02.819000+00:00
+update_count: 22
 last_field: diagram
-git_commit: 467d0b9
-git_branch: chat-multiturn-streaming
+git_commit: cc684cc
+git_branch: deploy-gcp-vm-ssh-tunnel
 children:
 - activation
 - corpus-ingestion
+- embedding-sets
+- evidence-view
 - extraction
-- extraction-store
+- extraction-artifacts
 - fidelity-check
-- gold-dataset
+- fidelity-ocr
+- frozen-runs
 - index-build
-- ingestion-parse
-- keyword-index-build
-- manifest-import
+- keyword-index-files
+- ledger-records
 - ocr-merge
 - original-corpus
-- retrieval-runs
+- originals
+- request-records
 - retrieval-selection
 - run-selection
-- serving-pointer
-- source-files
-- vector-sets
-prev_diagram: "graph TD\r\n  originals[\"Originals and CSV manifest\\nsrc/rfp_assistant/ingestion.py\"\
-  ] -->|parse changed inputs| extraction[\"Extractions and elements\\nsrc/rfp_assistant/ingestion.py\"\
-  ]\r\n  extraction -->|Hancom print comparison| fidelity-check[\"Fidelity verdicts\\\
-  nsrc/rfp_assistant/fidelity.py\"]\r\n  fidelity-check -->|review_status filter|\
-  \ keyword-index[\"Keyword index build\\nsrc/rfp_assistant/retrieval.py\"]\r\n  extraction\
-  \ -->|elements chunked by profile| keyword-index\r\n  keyword-index -->|chunk payloads|\
-  \ embedding-sets[\"Embedding sets\\nsrc/rfp_assistant/vector_store.py\"]\r\n  gold-datasets[\"\
-  Gold datasets\\nsrc/rfp_assistant/gold.py\"] -->|graded questions| run-selection[\"\
-  Runs and activation\\nsrc/rfp_assistant/compare.py\"]\r\n  keyword-index -->|frozen\
-  \ index version| run-selection\r\n  embedding-sets -->|dense_version| run-selection\r\
-  \n  run-selection -->|active_run setting| served-answers[\"Served answers\\nsrc/rfp_assistant/service.py\"\
-  ]"
+- source-originals
+prev_diagram: "graph TD\r\n  sourceManifest[\"CSV manifest and originals\\nsrc/rfp_assistant/ingestion.py\"\
+  ]\r\n  parsing[\"HWP and PDF parsing\\nsrc/rfp_assistant/ingestion.py\"]\r\n  fidelityOcr[\"\
+  Fidelity check and OCR\\nsrc/rfp_assistant/fidelity.py\"]\r\n  keywordBuild[\"Chunking\
+  \ and keyword index\\nsrc/rfp_assistant/chunking.py\"]\r\n  embeddingSets[\"Embedding\
+  \ sets\\nsrc/rfp_assistant/dense.py\"]\r\n  frozenRuns[\"Frozen runs and matrices\\\
+  nsrc/rfp_assistant/compare.py\"]\r\n  activation[\"Human activation\\nsrc/rfp_assistant/evaluation.py\"\
+  ]\r\n  maintenanceSeq[\"Maintenance sequence\\nsrc/rfp_assistant/maintenance.py\"\
+  ]\r\n  sourceManifest -->|documents and sources rows| parsing\r\n  parsing -->|extraction\
+  \ revision, elements| fidelityOcr\r\n  fidelityOcr -->|OCR text on next ingest|\
+  \ parsing\r\n  fidelityOcr -->|review_status filter| keywordBuild\r\n  keywordBuild\
+  \ -->|index_version, chunks| embeddingSets\r\n  keywordBuild -->|BM25 index| frozenRuns\r\
+  \n  embeddingSets -->|ready vector set| frozenRuns\r\n  frozenRuns -->|person picks\
+  \ a row| activation\r\n  maintenanceSeq -->|reruns stages, no activation| keywordBuild"

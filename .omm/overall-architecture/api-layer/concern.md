@@ -1,0 +1,1 @@
+`GET /api/requests/{id}/stream` is a sync generator that calls `service.answer_progress` (one `request_status` DB read) every 0.15 s until the request finishes. Starlette runs it on its threadpool, so each open stream holds one pool thread and generates steady DB load for as long as it stays open.

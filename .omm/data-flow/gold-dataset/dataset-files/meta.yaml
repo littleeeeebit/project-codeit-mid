@@ -1,9 +1,0 @@
-created: 2026-10-05T23:55:37.675Z
-updated: 2026-10-05T23:55:37.676Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: dataset-files
-children: []
-parentPath:
-  - gold-dataset

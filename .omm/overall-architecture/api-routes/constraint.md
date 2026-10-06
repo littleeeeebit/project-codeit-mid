@@ -1,0 +1,1 @@
+`tests/test_api.py` checks that `api.py` imports nothing from the package except `service`.

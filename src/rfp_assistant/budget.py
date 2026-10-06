@@ -9,6 +9,7 @@ State machine (docs/plan/end-to-end/implementation-contracts.md):
 
 from __future__ import annotations
 
+import contextvars
 import json
 import math
 import uuid
@@ -17,7 +18,8 @@ from decimal import Decimal
 from pathlib import Path
 
 from .contracts import BudgetSnapshot
-from .settings import DEFAULT_RATES, RATE_VERSION, LARGE_RATE_VERSION, LARGE_RATE_CHECKED_AT
+from .settings import (ALLOWED_GENERATION_MODELS, DEFAULT_RATES, LARGE_RATE_CHECKED_AT, LARGE_RATE_VERSION,
+                       RATE_VERSION, SELECTABLE_RATE_SOURCE)
 from .store import OPERATIONAL_ERRORS, dumps, get_app_setting, open_db, set_app_setting, tx, utcnow
 from .postgres import Connection, Row, owner_guard, read_snapshot, require_owner, Target
 
@@ -48,6 +50,13 @@ def micro_cost(rates: dict, input_tokens: int, cached_tokens: int, output_tokens
 def max_cost(rates: dict, input_tokens: int, max_output_tokens: int) -> int:
     """Reservation upper bound: every input token billed at the dearest input rate (a cache write)."""
     return micro_cost(rates, input_tokens, 0, max_output_tokens, cache_write_tokens=input_tokens)
+
+
+# The provider project (billing scope) whose key pays for the paid work in this context, or None for the
+# server-environment key. Bound per HTTP request from the browser session (service.bind_request); every attempt
+# records it so a reconciliation subtracts only the attempts billed to the project it reconciles.
+BILLING_SCOPE: contextvars.ContextVar[str | None] = contextvars.ContextVar("rfp_billing_scope", default=None)
+UNSCOPED_CHOICES = ("include", "exclude")
 
 
 def _bump(conn: Connection) -> None:
@@ -216,6 +225,30 @@ def register_large_rate(db, actor: str, reason: str):
     return record
 
 
+def ensure_generation_rate(db, model: str, actor: str) -> dict | None:
+    """Adds this code's price for a selectable answer model the ledger has no rate for, audited. Every recorded
+    rate and the rate version stay as they were, so no price, estimate or fingerprint changes. None when the
+    ledger already prices the model."""
+    if model not in ALLOWED_GENERATION_MODELS:
+        raise BudgetError(f"{model} is not a selectable generation model")
+    with open_db(db) as conn, tx(conn, immediate=True):
+        row = _settings_row(conn)
+        rates = json.loads(row["rates_json"])
+        if model in rates:
+            return None
+        rates[model] = DEFAULT_RATES[model]
+        record = {"at": utcnow(), "actor": actor, "reason": "answer model selected on the settings page",
+                  "model": model, **SELECTABLE_RATE_SOURCE, "rates": rates[model]}
+        history = json.loads(row["history_json"]) + [record]
+        conn.execute("UPDATE budget_settings SET rates_json=?,history_json=?,revision=revision+1 WHERE id=1",
+                     (dumps(rates), dumps(history)))
+        conn.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?)",
+                     (str(uuid.uuid4()), actor, "register_generation_rate", "budget", record["reason"], dumps(record),
+                      utcnow()))
+        _bump(conn)
+    return record
+
+
 def _totals(conn: Connection) -> dict:
     spent = conn.execute("SELECT COALESCE(SUM(settled_micro_usd), 0) FROM attempts WHERE state = 'settled'").fetchone()[0]
     adjust = conn.execute("SELECT COALESCE(SUM(amount_micro_usd), 0) FROM adjustments").fetchone()[0]
@@ -282,7 +315,9 @@ def reserve(db: Path, *, request_id: str, member_id: str, stage: str, purpose: s
                 "estimated_input_tokens, max_output_tokens, count_method, price_json, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?, ?, ?)",
                 (attempt_id, request_id, member_id, stage, purpose, model, amount, input_tokens, max_output_tokens,
-                 count_method, dumps({"model": model, "rates": rates, "rate_version": row["rate_version"]}), utcnow()),
+                 count_method, dumps({"model": model, "rates": rates, "rate_version": row["rate_version"],
+                                      **({"billing_scope": scope} if (scope := BILLING_SCOPE.get()) else {})}),
+                 utcnow()),
             )
             _bump(conn)
     except OPERATIONAL_ERRORS:  # lock wait exceeded or database unavailable: fail closed, no DSN in errors
@@ -398,16 +433,25 @@ def add_adjustment(db: Path, actor: str, correction_key: str, amount_micro: int,
 
 
 def reconcile(db: Path, actor: str, reconciliation_id: str, interval_start: str, interval_end: str,
-              provider_total_micro: int, scope: str, evidence: str, covered_attempt_ids: list[str]) -> bool:
-    """Closed interval: records provider total minus local settled cost for it; covered unknown attempts
-    become reconciled and stop holding a reservation."""
+              provider_total_micro: int, scope: str, evidence: str, covered_attempt_ids: list[str],
+              unscoped: str | None = None) -> bool:
+    """Closed interval: records provider total minus the local settled cost billed to `scope` (the provider
+    project) for it; covered unknown attempts become reconciled and stop holding a reservation.
+
+    Attempts carry the project of the key that paid for them. Attempts with none (the server-environment key, and
+    every attempt before per-browser keys) belong to whichever project that key is: `unscoped` says whether they
+    are this scope's ("include") or not ("exclude"). An interval holding such attempts is refused without it, so
+    one project's total never cancels spending billed to another."""
     key = f"reconcile:{reconciliation_id}"
+    if unscoped is not None and unscoped not in UNSCOPED_CHOICES:
+        raise BudgetError(f"unscoped_attempts must be one of {UNSCOPED_CHOICES}")
     with open_db(db) as conn, tx(conn, immediate=True):
         prior = conn.execute("SELECT * FROM adjustments WHERE correction_key = ?", (key,)).fetchone()
         if prior is not None:
             same = (prior["interval_start"], prior["interval_end"], prior["scope"],
                     json.loads(prior["covered_attempts_json"])) == (interval_start, interval_end, scope,
                                                                      covered_attempt_ids)
+            same = same and _reason_part(prior, "unscoped_attempts") == str(unscoped)
             if not same or prior["evidence"] != evidence or _provider_total(conn, prior) != provider_total_micro:
                 raise BudgetError("this reconciliation ID was already imported with different values; a changed "
                                   "provider total needs a separate owner correction")
@@ -417,26 +461,42 @@ def reconcile(db: Path, actor: str, reconciliation_id: str, interval_start: str,
         if not evidence.strip() or not scope.strip():
             raise BudgetError("reconciliation needs the provider scope and dated evidence")
         for attempt_id in covered_attempt_ids:  # only explicitly covered unknown attempts inside the interval
-            a = conn.execute("SELECT state, dispatched_at FROM attempts WHERE attempt_id = ?",
+            a = conn.execute("SELECT state, dispatched_at, price_json FROM attempts WHERE attempt_id = ?",
                              (attempt_id,)).fetchone()
             if a is None or a["state"] != "unknown":
                 raise BudgetError(f"covered attempt {attempt_id} is not an unknown attempt")
             if not a["dispatched_at"] or not interval_start <= a["dispatched_at"] <= interval_end:
                 raise BudgetError(f"covered attempt {attempt_id} was not dispatched inside the interval")
+            # Only this project's evidence can resolve this project's bill.
+            billed_to = json.loads(a["price_json"] or "{}").get("billing_scope")
+            if billed_to != scope if billed_to is not None else unscoped != "include":
+                raise BudgetError(f"covered attempt {attempt_id} is billed to "
+                                  f"{billed_to or 'the server-environment key (unscoped)'}, not to {scope}")
         overlap = conn.execute(
             "SELECT 1 FROM adjustments WHERE correction_key LIKE 'reconcile:%' AND scope = ? "
             "AND NOT (interval_end < ? OR interval_start > ?)", (scope, interval_start, interval_end)).fetchone()
         if overlap:
             raise BudgetError("reconciliation intervals must not overlap")
-        local = conn.execute(
-            "SELECT COALESCE(SUM(settled_micro_usd), 0) FROM attempts WHERE state = 'settled' "
-            "AND finished_at >= ? AND finished_at <= ?", (interval_start, interval_end)).fetchone()[0]
+        local = unscoped_total = 0
+        for a in conn.execute("SELECT settled_micro_usd, price_json FROM attempts WHERE state = 'settled' "
+                              "AND finished_at >= ? AND finished_at <= ?", (interval_start, interval_end)):
+            billed_to = json.loads(a["price_json"] or "{}").get("billing_scope")
+            if billed_to is None:
+                unscoped_total += a["settled_micro_usd"]
+            elif billed_to == scope:
+                local += a["settled_micro_usd"]
+        if unscoped_total and unscoped is None:
+            raise BudgetError("the interval holds attempts paid with the server-environment key (no recorded "
+                              "project); set unscoped_attempts to include or exclude")
+        if unscoped == "include":
+            local += unscoped_total
         conn.execute(
             "INSERT INTO adjustments(adjustment_id, correction_key, amount_micro_usd, interval_start, interval_end, "
             "scope, evidence, reason, actor, covered_attempts_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (str(uuid.uuid4()), key, provider_total_micro - local, interval_start, interval_end, scope, evidence,
              f"provider reconciliation; provider_total_micro_usd={provider_total_micro}; "
-             f"local_settled_micro_usd={local}", actor, dumps(covered_attempt_ids), utcnow()))
+             f"local_settled_micro_usd={local}; unscoped_attempts={unscoped}", actor, dumps(covered_attempt_ids),
+             utcnow()))
         for attempt_id in covered_attempt_ids:
             conn.execute("UPDATE attempts SET state = 'reconciled' WHERE attempt_id = ? AND state = 'unknown'",
                          (attempt_id,))
@@ -446,11 +506,16 @@ def reconcile(db: Path, actor: str, reconciliation_id: str, interval_start: str,
 
 def _provider_total(conn: Connection, adjustment: Row) -> int | None:
     """The provider total an imported reconciliation recorded (reason text written by `reconcile`)."""
+    value = _reason_part(adjustment, "provider_total_micro_usd")
+    return None if value is None else int(value)
+
+
+def _reason_part(adjustment: Row, wanted: str) -> str | None:
     for part in adjustment["reason"].split(";"):
         name, _, value = part.strip().partition("=")
-        if name == "provider_total_micro_usd":
-            return int(value)
-    return None
+        if name == wanted:
+            return value
+    return "None" if wanted == "unscoped_attempts" else None  # imported before the field existed
 
 
 def recover(db: Path) -> dict:

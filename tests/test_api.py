@@ -2,6 +2,8 @@
 the visitor name, request ownership and errors survive the trip over HTTP."""
 
 import ast
+import dataclasses
+import json
 import tempfile
 import time
 import unittest
@@ -55,6 +57,87 @@ class ApiFlowTest(unittest.TestCase):
         for invalid in (0, -1, 0.5, True, "100"):
             self.assertEqual(self.client.put("/api/budget/limit", json={"cap_micro_usd": invalid, "reason": "test"}).status_code, 422)
         self.assertEqual(self.client.put("/api/budget/limit", json={"cap_micro_usd": 10_000_000, "reason": " "}).status_code, 400)
+
+    def test_an_api_key_belongs_to_the_browser_that_entered_it_and_is_never_shown(self):
+        secret = "sk-test-never-shown-0123456789"
+        with mock.patch.object(service, "read_api_key", return_value=None), \
+                mock.patch.object(service.tracing.Tracing, "from_settings", return_value=None):
+            res = service.Resources(dataclasses.replace(self.env.settings, provider="openai"))
+        with service.open_db(res.settings.db_path) as conn:  # a ledger configured before gpt-5-mini was selectable
+            rates = json.loads(conn.execute("SELECT rates_json FROM budget_settings").fetchone()[0])
+            conn.execute("UPDATE budget_settings SET rates_json = ?", (json.dumps(
+                {k: v for k, v in rates.items() if k != "gpt-5-mini"}),))
+        try:
+            app = api.create_app(res)
+            owner, teammate = TestClient(app), TestClient(app)  # two browsers: separate cookie jars
+            for browser in (owner, teammate):
+                browser.__enter__()
+                self.addCleanup(browser.__exit__, None, None, None)
+            self.assertEqual(owner.get("/api/settings/api-key", headers=self.headers).json()["configured"], False)
+            with mock.patch.object(service.generation, "check_api_key", return_value=("OpenAI가 이 키를 거부했습니다.", None)):
+                refused = owner.put("/api/settings/api-key", headers=self.headers,
+                                    json={"api_key": secret, "model": "gpt-5-mini"})
+            self.assertEqual(refused.status_code, 400)
+            self.assertIsNone(res.transport)
+            self.assertEqual(owner.put("/api/settings/api-key", headers=self.headers,
+                                       json={"api_key": secret, "model": "gpt-4o"}).status_code, 400)
+            with mock.patch.object(service.generation, "check_api_key", return_value=(None, "proj_owner")) as checked:
+                out = owner.put("/api/settings/api-key", headers=self.headers,
+                                json={"api_key": secret, "model": "gpt-5-mini"})
+            self.assertEqual(out.status_code, 200, out.text)
+            self.assertEqual(checked.call_args.args[1], "gpt-5-mini")  # the key is checked against the chosen model
+            self.assertEqual((out.json()["configured"], out.json()["set_by"], out.json()["model"]),
+                             (True, "김검토", "gpt-5-mini"))
+            with service.open_db(res.settings.db_path) as conn:  # its price entered the ledger, audited
+                rates = json.loads(conn.execute("SELECT rates_json FROM budget_settings").fetchone()[0])
+                registered = conn.execute("SELECT COUNT(*) FROM audit_events "
+                                          "WHERE action = 'register_generation_rate'").fetchone()[0]
+            self.assertEqual((rates["gpt-5-mini"], registered), (service.budget.DEFAULT_RATES["gpt-5-mini"], 1))
+            cookie = out.headers["set-cookie"]
+            self.assertIn("httponly", cookie.lower())
+            self.assertEqual(owner.get("/api/settings/api-key").json()["configured"], True)
+            seen = teammate.get("/api/settings/api-key").json()
+            self.assertEqual((seen["configured"], seen["set_by"], seen["model"]),
+                             (False, None, res.settings.generation_model))
+            self.assertEqual(teammate.put("/api/settings/model", json={"model": "gpt-5-nano"}).status_code, 400)
+            with mock.patch.object(res.transport, "check_model", return_value=None):
+                changed = owner.put("/api/settings/model", headers=self.headers, json={"model": "gpt-5-nano"})
+            self.assertEqual(changed.json()["model"], "gpt-5-nano", changed.text)
+            session = owner.cookies[api.KEY_COOKIE]
+            reset = service.bind_request(res, session)  # a request the owner's browser submits now
+            try:
+                self.assertEqual((res.paid_refusal(), res.generation_model(), service.budget.BILLING_SCOPE.get()),
+                                 ("", "gpt-5-nano", "proj_owner"))
+                with mock.patch.object(res.transport, "check_model", return_value=None):
+                    owner.put("/api/settings/model", headers=self.headers, json={"model": "gpt-5-mini"})
+                self.assertEqual(res.generation_model(), "gpt-5-nano")  # a submitted request keeps its model
+            finally:
+                reset()
+            self.assertEqual(res.generation_model(), res.settings.generation_model)
+            self.assertEqual(res.paid_refusal(), service.generation.NO_API_KEY)  # no session: the teammate
+            with self.assertRaises(service.generation.ProviderError) as refused_call:
+                res.transport.chat(model="m", messages=[], response_format=None, max_completion_tokens=1,
+                                   reasoning_effort=None)
+            self.assertTrue(refused_call.exception.pre_execution)  # refused before dispatch: nothing charged
+            with service.open_db(res.settings.db_path) as conn:
+                rows = [dict(r) for r in conn.execute("SELECT * FROM audit_events WHERE action = 'set_api_key'")]
+            self.assertEqual(len(rows), 1)
+            for shown in (out.text, cookie, refused.text, owner.get("/api/settings/api-key").text, repr(rows)):
+                self.assertNotIn(secret, shown)
+        finally:
+            res.close()
+
+    def test_an_evaluation_answers_with_its_recorded_model_whatever_the_browser_chose(self):
+        from rfp_assistant import answers
+
+        pinned = answers.PinnedResources(self.env.settings, None, {"mode": "kiwi_bm25"})
+        token = service.generation.REQUEST_MODEL.set("gpt-5-nano")  # the browser that started the run chose nano
+        try:
+            self.assertEqual(self.res.generation_model(), "gpt-5-nano")
+            self.assertEqual(pinned.generation_model(), self.env.settings.generation_model)
+        finally:
+            service.generation.REQUEST_MODEL.reset(token)
+            pinned.close()
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

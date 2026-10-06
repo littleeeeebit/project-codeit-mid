@@ -1,1 +1,0 @@
-Versioned and immutable. A rebuild with the same config reuses the ready version. A new analyzer, chunker or metadata snapshot yields a new version, and older index directories stay on disk for issued citations and rollback.

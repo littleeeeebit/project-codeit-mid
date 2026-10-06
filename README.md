@@ -47,10 +47,10 @@ Settings resolve from the repository location, never the working directory. Opti
 | `RFP_RESTORE_DATABASE_DSN` | none | `restore-check` only: an empty isolated database to restore into |
 | `RFP_CONFIG_FILE` | none | JSON with nonsecret `Settings` fields (unknown keys are rejected) |
 | `RFP_HWP_CONVERTER` | env `Scripts\hwp5proc.exe` | HWP → XML converter |
-| `OPENAI_API_KEY` | none | Process environment, then the repository `.env`; never printed |
+| `OPENAI_API_KEY` | none | Process environment, then the repository `.env`; never printed. Serves only a browser with no key of its own. The shared host has none: each member enters their own key on the 설정 page, held in memory per browser |
 | `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | none | Langfuse tracing; read like the API key. Any one missing turns tracing off |
 
-Without `OPENAI_API_KEY` the app still runs: search, filters, evidence browsing and retrieval traces are free; paid generation reports that the provider is unavailable. `provider: "fake"` in the config file never builds a real SDK client.
+Without a key the app still runs: search, filters, evidence browsing and retrieval traces are free; paid generation reports that the key is missing until one is entered on the 설정 page. `provider: "fake"` in the config file never builds a real SDK client.
 
 ### Langfuse tracing
 
@@ -90,6 +90,8 @@ cd web; npm ci; npm run build; cd ..                     # writes web/out (types
 $env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.example.json).Path   # RFP_DATABASE_DSN set
 python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
+
+The live shared instance runs on the team's GCP VM `codeit`, not on any member's machine. Members open it through an SSH local forward of 8501. The host, the tunnel command, the Linux start path (`tools/start-postgresql.sh`, `tools/bidmate.service`) and the member list are in [runbook §3](docs/operations/runbook.md#31-the-team-host-live-since-2026-10-06).
 
 Exactly one worker: paid requests run on the process's own executor and the process holds a database-wide gateway advisory lock. For screen
 work, run the API on 8511 and `npm run dev` in `web/` (port 8510, `/api/*` forwarded to `RFP_API_URL`, default

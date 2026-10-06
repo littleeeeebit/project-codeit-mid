@@ -1,49 +1,66 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-05T23:55:06.688Z
-update_count: 16
+updated: 2026-10-06T09:08:32.943Z
+update_count: 26
 last_field: diagram
-git_commit: 467d0b9
-git_branch: chat-multiturn-streaming
+git_commit: cc684cc
+git_branch: deploy-gcp-vm-ssh-tunnel
 children:
+  - api-layer
+  - api-routes
   - api-shell
   - budget-ledger
+  - corpus-pipeline
+  - data-stores
   - http-api
   - langfuse-tracing
   - offline-pipelines
+  - openai-transport
   - owner-cli
   - paid-gateway
   - persistence
+  - postgres-store
   - postgresql-store
   - provider-transport
   - retrieval-engine
   - runtime-artifacts
   - service-core
   - service-layer
+  - web-pages
   - web-screens
 prev_diagram: "graph TD\r
 
-  \  web-screens[\"Next.js screens\\nweb/src/app/page.tsx\"] -->|typed fetch
-  with X-Member| http-api[\"FastAPI routes\\nsrc/rfp_assistant/api.py\"]\r
+  \  webScreens[\"Web screens\\nweb/src/components/ask/ask-page.tsx\"]\r
 
-  \  http-api -->|one service call per route| service-core[\"Service
-  core\\nsrc/rfp_assistant/service.py\"]\r
+  \  httpApi[\"HTTP API\\nsrc/rfp_assistant/api.py\"]\r
 
-  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"] -->|own or ledger-only
-  Resources| service-core\r
+  \  serviceLayer[\"Service orchestration\\nsrc/rfp_assistant/service.py\"]\r
 
-  \  service-core -->|scoped question| retrieval-engine[\"Retrieval
-  engine\\nsrc/rfp_assistant/retrieval.py\"]\r
+  \  retrievalEngine[\"Retrieval engine\\nsrc/rfp_assistant/retrieval.py\"]\r
 
-  \  service-core -->|reserve dispatch settle| budget-ledger[\"Budget
-  ledger\\nsrc/rfp_assistant/budget.py\"]\r
+  \  budgetLedger[\"Paid gateway ledger\\nsrc/rfp_assistant/budget.py\"]\r
 
-  \  service-core -->|chat and embed| provider-transport[\"Provider
+  \  providerTransport[\"Provider
   transport\\nsrc/rfp_assistant/generation.py\"]\r
 
-  \  retrieval-engine -->|chunks and vectors| postgresql-store[\"PostgreSQL and
+  \  postgresStore[\"PostgreSQL and
   pgvector\\nsrc/rfp_assistant/postgres.py\"]\r
 
-  \  budget-ledger -->|attempts rows| postgresql-store\r
+  \  ownerCli[\"Owner CLI pipelines\\nsrc/rfp_assistant/cli.py\"]\r
 
-  \  retrieval-engine -->|index manifests and files| runtime-artifacts[\"Runtime
-  artifacts\\nsrc/rfp_assistant/store.py\"]"
+  \  webScreens -->|JSON fetch with X-Member| httpApi\r
+
+  \  httpApi -->|one service call per route| serviceLayer\r
+
+  \  serviceLayer -->|scoped question| retrievalEngine\r
+
+  \  serviceLayer -->|reserve, dispatch, settle| budgetLedger\r
+
+  \  serviceLayer -->|chat with on_delta| providerTransport\r
+
+  \  retrievalEngine -->|BM25 rows, vector search| postgresStore\r
+
+  \  budgetLedger -->|attempt rows, locked tx| postgresStore\r
+
+  \  ownerCli -->|ingest, index, activate| postgresStore\r
+
+  \  ownerCli -->|own Resources instance| serviceLayer"

@@ -1,0 +1,1 @@
+Per the comment in tools/bidmate.service, the shared VM sets no OPENAI_API_KEY; every member must enter a key after each restart.

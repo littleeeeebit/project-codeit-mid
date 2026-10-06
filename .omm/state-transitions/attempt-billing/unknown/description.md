@@ -1,1 +1,0 @@
-The call may have been billed. It keeps its reservation as pending. While any unknown attempt exists, `mark_dispatching` refuses all PostgreSQL dispatch, and `build-dense` and paid evaluation queries stop. It is resolved only by the owner's `settle` (with usage evidence) or `reconcile` (provider total over a closed, non-overlapping interval).

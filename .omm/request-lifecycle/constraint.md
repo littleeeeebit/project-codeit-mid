@@ -1,0 +1,1 @@
+Ownership: a turn renders only when its owned request_id, generation_id and target (service.target_key hashing scope, question, mode, date and previous turn) still match, and the request was not cancelled (service.may_attach).

@@ -611,7 +611,8 @@ class ReconciliationTest(Base):
         a = self.unknown_attempt()
         record = {"reconciliation_id": "2026-10-01", "interval_start": "2026-01-01T00:00:00+00:00",
                   "interval_end": "2099-01-01T00:00:00+00:00", "provider_total_micro_usd": 700, "scope": "proj",
-                  "evidence": "usage export 2026-10-01", "covered_attempt_ids": [a["attempt_id"]]}
+                  "evidence": "usage export 2026-10-01", "covered_attempt_ids": [a["attempt_id"]],
+                  "unscoped_attempts": "include"}
         with self.assertRaises(auth.AuthError):  # owner only
             service.reconcile(self.res, self.env.consultant, record)
         snap = service.reconcile(self.res, admin, record)

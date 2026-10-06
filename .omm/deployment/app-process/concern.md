@@ -1,0 +1,1 @@
+Whether the VM has CUDA for a local embedding model, or Hancom Viewer for HWP fidelity printing, is not established by the code. Dense retrieval degrades visibly to keyword fallback; maintenance's fidelity step would fail on changed HWP sources.

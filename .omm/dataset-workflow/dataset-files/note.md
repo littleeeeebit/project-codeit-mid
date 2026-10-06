@@ -1,0 +1,1 @@
+Labels are evidence groups of alternative source spans (hash, extraction, element, offsets or cells, exact quote), never chunk IDs, so a new chunk profile does not invalidate gold. `gold repin` moves pending rows to a new extraction by element path after a parser revision.

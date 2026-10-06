@@ -1,1 +1,0 @@
-The owner runs these through `python -m rfp_assistant.cli <command>`. Maintenance, evaluation, judging and drafting can also run from the 검증 and 데이터셋 screens on the server's own gateway. Each step reuses unchanged inputs. Paid steps stop at a priced estimate until a person approves. Nothing changes what serves until a person activates a run.

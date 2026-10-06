@@ -126,13 +126,12 @@ class PostgreSQLTests(unittest.TestCase):
         attempt = self.reserve(self.request("before-loss"))["attempt_id"]
         budget.mark_dispatching(self.target, attempt)
         self.admin.execute("SELECT pg_terminate_backend(%s)", (self.owner.conn.info.backend_pid,))
-        transport = generation.OpenAITransport.__new__(generation.OpenAITransport)
-        transport._owner_check = self.owner.check
-        transport._client = mock.Mock()
+        transport = generation.OpenAITransport(None, 5, owner_check=self.owner.check)
+        transport._default = mock.Mock()
         with self.assertRaises(generation.ProviderError) as stopped:
             transport.embed(model="text-embedding-3-large", inputs=["test"], dimensions=768)
         self.assertTrue(stopped.exception.pre_execution)
-        transport._client.embeddings.create.assert_not_called()
+        transport._default.embeddings.create.assert_not_called()
         with self.assertRaisesRegex(RuntimeError, "ownership was lost"):
             self.reserve(self.request("after-loss"))
         self.owner.release()
@@ -413,6 +412,21 @@ class SQLBoundaryTests(unittest.TestCase):
         self.assertEqual(list(row), [1, "é 한국어"])
         with self.assertRaisesRegex(ValueError, "non-PostgreSQL SQL"):
             postgres.bind_sql("PRAGMA user_version")
+
+    def test_references_recorded_on_another_host_resolve_through_the_path_map(self):
+        with tempfile.TemporaryDirectory() as directory:
+            original = Path(directory) / "원본 데이터" / "files" / "사업.hwp"
+            original.parent.mkdir(parents=True)
+            original.write_bytes(b"hwp")
+            recorded = "C:\\Users\\owner\\repo\\원본 데이터\\files\\사업.hwp"  # a Windows dump restored elsewhere
+            reference = {"kind": "original", "path": recorded, "expected_sha256": postgres.file_hash(original)}
+            with mock.patch.dict(os.environ, {"RFP_PATH_MAP": ""}):
+                self.assertFalse(postgres.references_valid([reference]))
+            with mock.patch.dict(os.environ, {"RFP_PATH_MAP": f"C:/Users/owner/repo={Path(directory).as_posix()}/"}):
+                self.assertEqual(postgres.host_path(recorded), original)
+                self.assertEqual(postgres.host_path("C:\\Users\\owner\\repository\\x"),
+                                 Path("C:\\Users\\owner\\repository\\x"))  # a prefix, not a path component
+                self.assertTrue(postgres.references_valid([reference]))
 
     def test_native_large_shortening_preserves_source_and_rejects_small(self):
         original = dense.unit_vector(np.arange(1, 3073), 3072)

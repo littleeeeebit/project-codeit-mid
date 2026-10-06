@@ -1,0 +1,1 @@
+An index built with another analyzer or query policy is still served but every result is marked `index_outdated:` (`index_compatibility`); evaluation and activation refuse it.

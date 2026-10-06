@@ -1,0 +1,1 @@
+Browser API keys live only in `OpenAITransport._sessions` and `Resources.key_sources` (which stores who set the key and when, never the key). A restart requires every member to enter their key again.

@@ -1,1 +1,0 @@
-Vectors are keyed by payload hash, model, dimensions and prefix policy (`dense.payload_hash`), so a rebuilt index reuses every cached vector. Query vectors are cached the same way, with kind `query`. Corpus builds go through estimates and approvals; query misses are paid only by a paid request.

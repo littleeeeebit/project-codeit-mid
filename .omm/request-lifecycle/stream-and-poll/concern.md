@@ -1,0 +1,1 @@
+Each open stream calls request_status (a pooled database read) every 150 ms for as long as the request runs.

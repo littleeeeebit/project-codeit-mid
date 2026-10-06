@@ -1,18 +1,10 @@
 graph TD
-  serving-config["Activated serving config\nsrc/rfp_assistant/service.py"]
-  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval.py"]
-  corpus-routing["Corpus routing and codes\nsrc/rfp_assistant/retrieval.py"]
-  lexical-ranking["Kiwi BM25 ranking\nsrc/rfp_assistant/retrieval.py"]
-  dense-search["Dense query and search\nsrc/rfp_assistant/vector_store.py"]
-  hybrid-fusion["Keyword-first RRF fusion\nsrc/rfp_assistant/retrieval.py"]
-  reranker["Local reranker\nsrc/rfp_assistant/dense.py"]
-  evidence-packing["Evidence packing\nsrc/rfp_assistant/retrieval.py"]
-  serving-config -->|active index version| keyword-index
-  serving-config -->|embedding model and limits| dense-search
-  keyword-index -->|scope terms, BM25 rows| corpus-routing
-  corpus-routing -->|narrowed allowed rows| lexical-ranking
-  lexical-ranking -->|BM25 top k| hybrid-fusion
-  dense-search -->|cosine top k| hybrid-fusion
-  hybrid-fusion -->|fused pool below head| reranker
-  reranker -->|reordered pool| evidence-packing
-  hybrid-fusion -->|order without reranker| evidence-packing
+  keyword-index["Loaded keyword index\nsrc/rfp_assistant/retrieval.py"] -->|"scoped rows"| corpus-router["Corpus routing\nsrc/rfp_assistant/retrieval.py"]
+  corpus-router -->|"allowed rows"| lexical-ranker["Kiwi BM25 ranker\nsrc/rfp_assistant/retrieval.py"]
+  corpus-router -->|"allowed rows"| dense-search["pgvector search\nsrc/rfp_assistant/vector_store.py"]
+  query-embedding["Query vector cache\nsrc/rfp_assistant/dense.py"] -->|"query vector"| dense-search
+  lexical-ranker -->|"BM25 ids"| rank-fusion["Keyword-first RRF\nsrc/rfp_assistant/retrieval.py"]
+  dense-search -->|"dense ids"| rank-fusion
+  rank-fusion -->|"fused pool"| local-reranker["Optional reranker\nsrc/rfp_assistant/dense.py"]
+  rank-fusion -->|"ranking"| evidence-packer["Evidence packing\nsrc/rfp_assistant/retrieval.py"]
+  local-reranker -->|"reordered pool"| evidence-packer

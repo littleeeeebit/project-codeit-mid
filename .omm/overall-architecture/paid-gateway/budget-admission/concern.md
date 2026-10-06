@@ -1,0 +1,1 @@
+`postgres.tx(immediate=True)` serializes every write transaction in the application on one row lock. The code marks this with a ponytail comment, so admission throughput is bounded by it.

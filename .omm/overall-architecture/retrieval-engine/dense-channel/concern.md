@@ -1,0 +1,1 @@
+If the activated run's embedding model is a local GPU model, `query_vector` and `retire_inactive` need CUDA in the serving process. On the team VM this depends on hardware the code does not check ahead of time. A failure only degrades to a keyword fallback, visible in limitations.

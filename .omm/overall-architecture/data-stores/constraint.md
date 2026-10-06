@@ -1,0 +1,1 @@
+tx(immediate=True) locks the single application_mutex row FOR UPDATE, which serializes every write transaction (marked with a ponytail comment in postgres.tx).

@@ -276,6 +276,74 @@
     "title": "AnswerRun",
     "type": "object"
    },
+   "ApiKeyIn": {
+    "properties": {
+     "api_key": {
+      "title": "Api Key",
+      "type": "string"
+     },
+     "model": {
+      "title": "Model",
+      "type": "string"
+     }
+    },
+    "required": [
+     "api_key",
+     "model"
+    ],
+    "title": "ApiKeyIn",
+    "type": "object"
+   },
+   "ApiKeyStatus": {
+    "properties": {
+     "configured": {
+      "title": "Configured",
+      "type": "boolean"
+     },
+     "model": {
+      "title": "Model",
+      "type": "string"
+     },
+     "models": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Models",
+      "type": "array"
+     },
+     "set_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Set At"
+     },
+     "set_by": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Set By"
+     }
+    },
+    "required": [
+     "configured",
+     "set_by",
+     "set_at",
+     "model",
+     "models"
+    ],
+    "title": "ApiKeyStatus",
+    "type": "object"
+   },
    "ArmMetrics": {
     "properties": {
      "abstentions": {
@@ -4074,6 +4142,19 @@
     "title": "MissingField",
     "type": "object"
    },
+   "ModelIn": {
+    "properties": {
+     "model": {
+      "title": "Model",
+      "type": "string"
+     }
+    },
+    "required": [
+     "model"
+    ],
+    "title": "ModelIn",
+    "type": "object"
+   },
    "MutationRate": {
     "properties": {
      "code_settled": {
@@ -7193,6 +7274,144 @@
      }
     },
     "summary": "Stream"
+   }
+  },
+  "/api/settings/api-key": {
+   "get": {
+    "operationId": "api_key_status_api_settings_api_key_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiKeyStatus"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Key Status"
+   },
+   "put": {
+    "operationId": "api_key_api_settings_api_key_put",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ApiKeyIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiKeyStatus"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Key"
+   }
+  },
+  "/api/settings/model": {
+   "put": {
+    "operationId": "generation_model_api_settings_model_put",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ModelIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiKeyStatus"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Generation Model"
    }
   },
   "/api/verify/compare": {

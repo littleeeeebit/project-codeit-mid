@@ -1,1 +1,0 @@
-Development gold questions come from a model-drafted, human-reviewed queue. Labels are evidence groups of source spans (hash, extraction, element, offsets, exact quote), never chunk IDs, so they survive re-chunking. `gold repin` moves pending rows to a new extraction by element path.

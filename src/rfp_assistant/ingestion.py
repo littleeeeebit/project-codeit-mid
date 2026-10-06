@@ -20,6 +20,7 @@ from importlib import metadata
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from .postgres import host_path
 from .settings import Settings
 from .store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
 
@@ -692,7 +693,7 @@ def ingest_source(settings: Settings, source_hash: str, force: bool = False) -> 
         prior = conn.execute("SELECT * FROM extraction_inputs WHERE source_hash = ?", (source_hash,)).fetchone()
     if src is None:
         raise IngestionError(f"unknown source {source_hash}")
-    original = Path(src["original_path"])
+    original = host_path(src["original_path"])
     if sha256_file(original) != source_hash:
         raise IngestionError(f"original bytes changed for {original.name}; rerun manifest")
     if recovery is not None and recovery["recovery_json"]:
@@ -706,7 +707,7 @@ def ingest_source(settings: Settings, source_hash: str, force: bool = False) -> 
         with open_db(settings.db_path) as conn:
             row = conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?",
                                (prior["extraction_id"],)).fetchone()
-        artifact = Path(row["artifact_path"]) if row else None
+        artifact = host_path(row["artifact_path"]) if row else None
         if (src["parse_status"] == "parsed" and src["active_extraction_id"] == prior["extraction_id"]
                 and artifact is not None and artifact.exists() and sha256_file(artifact) == prior["artifact_sha256"]):
             return {"source_hash": source_hash, "status": "parsed", "extraction_id": prior["extraction_id"],
@@ -792,7 +793,7 @@ def assign_revision(settings: Settings, source_hash: str, fp: str, raw: list[dic
     with open_db(settings.db_path) as conn:
         row = conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?", (base,)).fetchone()
     if row is not None:
-        stored = Path(row["artifact_path"])
+        stored = host_path(row["artifact_path"])
         if not (stored.exists() and read_jsonl(stored) == json.loads(json.dumps(elements, ensure_ascii=False))):
             digest = hashlib.sha256(dumps(elements).encode()).hexdigest()
             content_id = hashlib.sha256(f"{source_hash}:{fp}:{digest}".encode()).hexdigest()[:24]
@@ -803,7 +804,7 @@ def assign_revision(settings: Settings, source_hash: str, fp: str, raw: list[dic
         known = conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?",
                              (extraction_id,)).fetchone()
     if known is not None:
-        artifact = Path(known["artifact_path"])
+        artifact = host_path(known["artifact_path"])
     if not artifact.exists() or read_jsonl(artifact) != json.loads(json.dumps(elements, ensure_ascii=False)):
         write_jsonl_atomic(artifact, elements)
     return extraction_id, elements, artifact
@@ -1086,7 +1087,7 @@ def recover_source(settings: Settings, doc_id: str, converted_file: Path, review
     source_hash = src["source_hash"]
     if src["parse_status"] != "quarantined":
         raise IngestionError("only quarantined sources take a recovery artifact")
-    if sha256_file(Path(src["original_path"])) != source_hash:
+    if sha256_file(host_path(src["original_path"])) != source_hash:
         raise IngestionError("original bytes changed; rerun manifest")
     converted_hash = sha256_file(converted_file)
     managed = recovered_dir(settings, source_hash) / f"{converted_hash}.pdf"
@@ -1293,7 +1294,7 @@ def render_pages(settings: Settings, source_hash: str, pdf: Path | None = None, 
         src = conn.execute("SELECT format, original_path FROM sources WHERE source_hash = ?", (source_hash,)).fetchone()
     if src is None:
         raise IngestionError("unknown source")
-    pdf = pdf or (Path(src["original_path"]) if src["format"] == "pdf" else printed_pdf_path(settings, source_hash))
+    pdf = pdf or (host_path(src["original_path"]) if src["format"] == "pdf" else printed_pdf_path(settings, source_hash))
     if not pdf.exists():
         raise IngestionError("no rendering to split: print the HWP first (review print or fidelity run)")
     out = settings.data_dir / "reviews" / "rendered" / source_hash[:16]
@@ -1309,7 +1310,7 @@ def load_elements(settings: Settings, extraction_id: str) -> list[dict]:
         row = conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?", (extraction_id,)).fetchone()
     if row is None:
         raise IngestionError(f"unknown extraction {extraction_id}")
-    return read_jsonl(Path(row["artifact_path"]))
+    return read_jsonl(host_path(row["artifact_path"]))
 
 
 def today_seoul() -> date:

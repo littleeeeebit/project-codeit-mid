@@ -40,6 +40,7 @@ def create_app(resources=None) -> FastAPI:
                 app.state.res.close()
 
     app = FastAPI(title="RFP assistant", version="1", lifespan=lifespan)
+    app.add_middleware(_KeySession)
 
     @app.exception_handler(service.ServiceError)
     async def _service_error(_: Request, exc: Exception):
@@ -54,6 +55,25 @@ def create_app(resources=None) -> FastAPI:
     if WEB.is_dir():  # the built screens (`cd web && npm run build`); mounted last, so /api/* stays the API's
         app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
     return app
+
+
+KEY_COOKIE = "bidmate_key_session"
+
+
+class _KeySession:
+    """Paid work in a request pays with the key its browser entered on 설정 (the session cookie), or none, with
+    the model and billing project that browser had when the request began."""
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        session = Request(scope).cookies.get(KEY_COOKIE) if scope["type"] == "http" else None
+        reset = service.bind_request(getattr(scope["app"].state, "res", None), session)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            reset()
 
 
 async def _forbidden(_: Request, exc: Exception):
@@ -89,6 +109,23 @@ class Budget(BaseModel):
 class BudgetLimitIn(BaseModel):
     cap_micro_usd: int = Field(strict=True, gt=0, le=9_000_000_000_000_000)
     reason: str = Field(min_length=1, max_length=500)
+
+
+class ApiKeyIn(BaseModel):
+    api_key: str  # no length constraint here: a validation error would echo the value back; service checks it
+    model: str
+
+
+class ModelIn(BaseModel):
+    model: str
+
+
+class ApiKeyStatus(BaseModel):
+    configured: bool
+    set_by: str | None
+    set_at: str | None
+    model: str
+    models: list[str]
 
 
 class Dated(BaseModel):
@@ -290,6 +327,21 @@ def _routes(app: FastAPI) -> None:
     def budget_limit(body: BudgetLimitIn, res: Res, member: Member):
         snap = service.set_budget_limit(res, member, body.cap_micro_usd, body.reason)
         return Budget(snapshot=snap, warnings=service.visible_warnings(snap.warnings))
+
+    @app.get("/api/settings/api-key", response_model=ApiKeyStatus)
+    def api_key_status(res: Res, member: Member):
+        return service.api_key_status(res, member)
+
+    @app.put("/api/settings/api-key", response_model=ApiKeyStatus)
+    def api_key(body: ApiKeyIn, res: Res, member: Member, response: Response):
+        session, status = service.set_api_key(res, member, body.api_key, body.model)
+        # Not the key: an unguessable handle to it, sent only back to this server and unreadable by scripts.
+        response.set_cookie(KEY_COOKIE, session, httponly=True, samesite="strict", path="/")
+        return status
+
+    @app.put("/api/settings/model", response_model=ApiKeyStatus)
+    def generation_model(body: ModelIn, res: Res, member: Member):
+        return service.set_generation_model(res, member, body.model)
 
     @app.get("/api/documents", response_model=list[Document])
     def documents(res: Res, member: Member, query: str = "", institution: str = "", amount_min: int | None = None,

@@ -1,0 +1,1 @@
+The /api/verify/corrections GET/POST routes have no openapi-fetch call site in web/src. DESIGN.md §8 records that the manual correction form was removed, so these routes appear unused by the screens.

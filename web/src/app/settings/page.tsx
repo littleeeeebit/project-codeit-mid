@@ -8,6 +8,76 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+const MODEL_NOTES: Record<string, string> = {
+  "gpt-6-luna": "기본 모델",
+  "gpt-5-mini": "팀 공용 키로 쓸 수 있음",
+  "gpt-5-nano": "팀 공용 키로 쓸 수 있음 · 가장 저렴",
+};
+
+function ApiKeySection() {
+  const status = usePoll("settings-api-key", () => must(api.GET("/api/settings/api-key"), errorText), 5000);
+  const [key, setKey] = useState("");
+  const [picked, setPicked] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const s = status.data;
+  const model = picked || s?.model || "";
+
+  async function run(call: () => Promise<{ error?: unknown }>, done: string) {
+    setSaving(true);
+    setMessage("");
+    try {
+      const result = await call();
+      if (result.error) { setMessage(errorText(result.error)); return; }
+      setPicked("");
+      setMessage(done);
+      status.reload();
+    } catch { setMessage("서버에 연결하지 못했습니다."); }
+    finally { setKey(""); setSaving(false); }
+  }
+
+  function save(event: React.FormEvent) {
+    event.preventDefault();
+    if (key.trim()) {
+      void run(() => api.PUT("/api/settings/api-key", { body: { api_key: key, model } }),
+        `API 키와 ${model} 모델을 확인하고 이 브라우저에 적용했습니다. 이 브라우저의 유료 답변만 이 키를 씁니다.`);
+    } else {
+      void run(() => api.PUT("/api/settings/model", { body: { model } }),
+        `이 브라우저의 답변 모델을 ${model}(으)로 바꿨습니다.`);
+    }
+  }
+
+  return (
+    <section className="space-y-4 rounded-xl border p-6" aria-labelledby="api-key-heading">
+      <h2 id="api-key-heading" className="text-lg font-semibold">내 OpenAI API 키와 답변 모델</h2>
+      {s && (s.configured
+        ? <p className="text-sm">이 브라우저에 설정됨 · {s.model} · {s.set_by}{s.set_at ? ` · ${s.set_at}` : ""}</p>
+        : <p className="text-sm font-medium text-destructive">이 브라우저에는 키가 없습니다. 본인 키를 입력해야 유료 답변을 받을 수 있습니다.</p>)}
+      {status.error && <p role="alert">{status.error}</p>}
+      <form onSubmit={save} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="api-key">{s?.configured ? "새 키로 교체 (모델만 바꿀 때는 비워 두세요)" : "키 입력"}</Label>
+          <Input id="api-key" type="password" autoComplete="off" spellCheck={false} value={key}
+                 onChange={(event) => setKey(event.target.value)} required={!s?.configured} placeholder="sk-…" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="api-model">답변 모델</Label>
+          <select id="api-model" value={model} onChange={(event) => setPicked(event.target.value)}
+                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+            {(s?.models ?? []).map((m) => <option key={m} value={m}>{m}{MODEL_NOTES[m] ? ` — ${MODEL_NOTES[m]}` : ""}</option>)}
+          </select>
+          <p className="text-sm text-muted-foreground">키가 쓸 수 있는 모델이어야 합니다. 저장할 때 OpenAI에 무료로 확인합니다. 데이터셋 만들기와 평가는 이 선택과 관계없이 기본 모델(gpt-6-luna)을 씁니다.</p>
+        </div>
+        <p className="text-sm text-muted-foreground">키는 입력한 브라우저에서만 쓰입니다. 다른 팀원의 브라우저에는 보이지도 쓰이지도 않습니다. 서버 프로세스 메모리에만 있고 파일, 데이터베이스, 로그 어디에도 저장되지 않으며 화면에 다시 표시되지 않습니다. 서버가 다시 시작되거나 브라우저를 닫으면 다시 입력해야 합니다. 사용 금액은 모두 아래의 공유 한도에 함께 기록됩니다.</p>
+        <Button type="submit" disabled={saving || !model || (!key.trim() && (!s?.configured || model === s?.model))}>
+          {saving ? "확인 중…" : key.trim() ? "키 확인 후 적용" : "모델 변경"}
+        </Button>
+        <p role="status" aria-live="polite">{message}</p>
+      </form>
+    </section>
+  );
+}
+
 export default function SettingsPage() {
   const current = usePoll("settings-budget", () => must(api.GET("/api/budget"), errorText), 2000);
   const [limit, setLimit] = useState("");
@@ -38,6 +108,7 @@ export default function SettingsPage() {
   return (
     <main className="mx-auto w-full max-w-2xl space-y-6 px-6 py-10">
       <h1 className="text-2xl font-semibold">설정</h1>
+      <ApiKeySection />
       <section className="space-y-4 rounded-xl border p-6" aria-labelledby="budget-heading">
         <h2 id="budget-heading" className="text-lg font-semibold">API 사용 한도</h2>
         <p className="text-sm text-muted-foreground">이 서버를 사용하는 팀 전체에 적용되는 누적 달러 한도입니다. API 제공자의 계정 한도는 별도로 적용됩니다.</p>

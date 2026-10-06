@@ -1,9 +1,0 @@
-created: 2026-10-05T23:55:11.195Z
-updated: 2026-10-05T23:55:11.196Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: static-web
-children: []
-parentPath:
-  - http-api

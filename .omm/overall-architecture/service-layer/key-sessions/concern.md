@@ -1,0 +1,1 @@
+Replaced clients stay open until close(); this is marked as an accepted ceiling in the code (`ponytail:` comment).

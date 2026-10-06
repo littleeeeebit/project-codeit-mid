@@ -1,0 +1,1 @@
+The originals are never modified, and they are ignored by Git, so a linked worktree must point `RFP_SOURCE_DIR` and `RFP_DATA_DIR` at the shared corpus and runtime.

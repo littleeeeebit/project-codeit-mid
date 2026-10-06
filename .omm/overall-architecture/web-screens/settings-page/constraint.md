@@ -1,0 +1,1 @@
+The key lives only in the memory of `OpenAITransport._sessions`. A restart loses it, and members must enter it again.

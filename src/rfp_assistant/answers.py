@@ -77,6 +77,11 @@ class PinnedResources(service.Resources):
     def serving(self) -> dict:
         return dict(self._pinned)
 
+    def generation_model(self) -> str:
+        """The model the run's estimate, identity and config.json record, never the starting browser's choice;
+        that browser's key and billing project still pay (they stay bound in the job's context)."""
+        return self.settings.generation_model
+
     @property
     def _closed(self) -> bool:
         return self._own_closed or bool(self._owner is not None and self._owner._closed)
@@ -989,6 +994,7 @@ def plan_latency(settings: Settings, waves: int = 5, users: int = 6, *, store: b
 def latency_run(settings: Settings, owner: service.Resources, estimate_id: str, actor: str) -> dict:
     """Runs the planned waves, each wave's members answering concurrently as the executor's workers would, and records n,
     failures, per-wave timing and the first (cold) wave separately. A preliminary sample, not an SLA."""
+    import contextvars
     import threading
 
     est = load_estimate(settings, estimate_id)
@@ -1016,7 +1022,8 @@ def latency_run(settings: Settings, owner: service.Resources, estimate_id: str, 
                 timings.append({"question_id": qid, "ms": round((time.perf_counter() - t0) * 1000, 1),
                                 "status": r.status, "billing": r.billing_state})
 
-        threads = [threading.Thread(target=one, args=(i, qid)) for i, qid in enumerate(batch)]
+        threads = [threading.Thread(target=contextvars.copy_context().run, args=(one, i, qid))  # the job's key session
+                   for i, qid in enumerate(batch)]
         start = time.perf_counter()
         for t in threads:
             t.start()

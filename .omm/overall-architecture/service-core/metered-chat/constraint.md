@@ -1,0 +1,1 @@
+SDK retries are off (`max_retries=0`). A settlement above the reservation freezes all paid work (`budget_settings.frozen_reason`).

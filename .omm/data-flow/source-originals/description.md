@@ -1,0 +1,1 @@
+The managed originals directory (`RFP_SOURCE_DIR/files`) plus `data_list.csv`. `sources.source_hash` is the sha256 of the bytes. `original_download` serves only a (UUID doc_id, 64-hex source_hash) pair whose recorded path resolves inside `files_dir` and whose bytes still hash to the recorded value. Originals are never modified.

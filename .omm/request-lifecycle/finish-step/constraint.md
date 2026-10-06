@@ -1,0 +1,1 @@
+The model never supplies URLs, paths or pages. Citations open only from the persisted `result.evidence` map (`open_evidence`).

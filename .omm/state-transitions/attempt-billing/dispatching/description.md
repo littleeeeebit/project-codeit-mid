@@ -1,1 +1,0 @@
-The durable marker written just before the network call. On restart, `budget.recover` turns every dispatching attempt into `unknown` ('process ended during dispatch'), because the call may have executed.

@@ -1,0 +1,1 @@
+`reranker_max_concurrency` must stay 1. The shared tokenizer is used only under the model lock, because parallel preprocessing crashed on the real GPU (README).

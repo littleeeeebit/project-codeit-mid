@@ -1,0 +1,1 @@
+Tracing is off on the team VM (runbook §3.1: no LANGFUSE_* in server.env).

@@ -1,0 +1,1 @@
+Serving changes only through `evaluation.activate_decision`, whether from the CLI `activate-run` or the 실험 비교 activate button. `build-keyword` no longer moves `active_index` once an `active_run` exists.

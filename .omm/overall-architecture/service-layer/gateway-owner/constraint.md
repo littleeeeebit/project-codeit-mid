@@ -1,0 +1,1 @@
+Only one process may own the paid gateway per database. Stop the UI before running paid CLI maintenance (build-dense, run-answers, run-judges, latency-run).

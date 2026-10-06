@@ -1,0 +1,9 @@
+created: 2026-10-06T08:48:09.973Z
+updated: 2026-10-06T08:48:10.577Z
+update_count: 2
+last_field: note
+kind: nested-class
+title: tracing-client
+children: []
+parentPath:
+  - service-layer

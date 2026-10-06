@@ -1,1 +1,1 @@
-Set by `_create` for paid modes after admission. `RequestRunner.shutdown` and startup `recover_requests` move it to `interrupted`, and nothing is replayed. `cancel_request` (directly, or via abandon) moves it to `cancelled` with a result noting no paid call. `_fail_unscheduled` moves it to `failed` if executor submission fails.
+Inserted by `_create(..., "queued")` after admission. No reservation exists yet. `cancel_request` cancels a queued request conclusively, storing a cancelled result ('유료 호출은 없습니다'), and `abandon_request` does the same only while the request is queued.

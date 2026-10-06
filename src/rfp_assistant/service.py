@@ -7,11 +7,13 @@ once per process by `Resources` and closed by `Resources.close()`. Sessions only
 from __future__ import annotations
 
 import atexit
+import contextvars
 import dataclasses
 import functools
 import hashlib
 import json
 import re
+import secrets
 import subprocess
 import threading
 import time
@@ -33,8 +35,11 @@ from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extra
 from .retrieval import retrieve as _retrieve
 from .evaluation import EVAL_VERSION
 from .postgres import Row
-from .settings import ALLOWED_EMBEDDING_MODELS, Settings, read_api_key
+from .settings import ALLOWED_EMBEDDING_MODELS, ALLOWED_GENERATION_MODELS, Settings, read_api_key
 from .store import DATABASE_ERRORS, LockHeld, dumps, init_schema, open_db, tx, utcnow
+
+
+KEY_SESSION = generation.KEY_SESSION  # the API sets it from the browser's session cookie for each request
 
 
 class ServiceError(RuntimeError):
@@ -107,6 +112,7 @@ class Resources:
         self._borrowed_owner: postgres.GatewayOwner | None = None  # this process's owner, held by another Resources
         self.transport: generation.Transport | None = transport
         self.provider_note = ""
+        self.key_sources: dict[str, dict] = {}  # browser session -> who entered its key and when; never the key
         self.recovered: dict = {}
         if not self._dispatch:
             if recover or transport is not None:
@@ -119,14 +125,9 @@ class Resources:
         elif self._dispatch and transport is None:
             key = read_api_key("OPENAI_API_KEY")
             if key:
-                if self._lock is None and self._borrowed_owner is None:
-                    self._own(settings)
-                self.transport = generation.OpenAITransport(key, settings.request_timeout_seconds,
-                    owner_check=(self._lock or self._borrowed_owner).check)
-                if self.tracing is None:  # traced with the transport it observes; an injected transport is not
-                    self.tracing = tracing.Tracing.from_settings(settings)
+                self._openai_transport(key)
             else:
-                self.provider_note = "OPENAI_API_KEY is not configured; paid generation is unavailable"
+                self.provider_note = generation.NO_API_KEY
         if self.transport is not None and self._lock is None and self._borrowed_owner is None:
             self._own(settings)  # every PostgreSQL dispatch has a gateway owner
         self.analyzer = shared_analyzer()
@@ -156,6 +157,39 @@ class Resources:
         except (AttributeError, RuntimeError):  # no such hook, or the interpreter is already shutting down
             pass
         atexit.register(stop)
+
+    def _openai_transport(self, key: str | None) -> None:
+        if self._lock is None and self._borrowed_owner is None:
+            self._own(self.settings)
+        self.transport = generation.OpenAITransport(key, self.settings.request_timeout_seconds,
+                                                    owner_check=(self._lock or self._borrowed_owner).check)
+        if self.tracing is None:  # traced with the transport it observes; an injected transport is not
+            self.tracing = tracing.Tracing.from_settings(self.settings)
+
+    def set_api_key(self, session: str, key: str, member_id: str, model: str, billing_scope: str) -> None:
+        """A browser session's key from the 설정 page. It lives only in this process's memory: no file, row, log or
+        trace holds it, so a restart needs it entered again. Other sessions never use it."""
+        if not self._dispatch or self.settings.provider != "openai":
+            raise ServiceError("이 서버는 OpenAI 제공자로 실행되지 않아 API 키를 쓰지 않습니다.")
+        with self._runner_lock:  # close() takes it too: no transport appears after shutdown began
+            if self._closed:
+                raise ServiceError("서비스가 종료 중입니다.")
+            if not isinstance(self.transport, generation.OpenAITransport):
+                self._openai_transport(None)
+            self.transport.set_key(session, key)
+            self.key_sources[session] = {"set_by": member_id, "set_at": utcnow(), "model": model,
+                                         "billing_scope": billing_scope}
+
+    def generation_model(self) -> str:
+        """The answer model this request's browser had chosen when the request began, else the configured one."""
+        return generation.REQUEST_MODEL.get() or self.settings.generation_model
+
+    def paid_refusal(self) -> str:
+        """Why this context cannot dispatch a paid stage now, or "" when it can."""
+        if self.transport is None:
+            return self.provider_note
+        has_key = getattr(getattr(self.transport, "inner", self.transport), "has_key", None)
+        return generation.NO_API_KEY if has_key is not None and not has_key() else ""
 
     def _own(self, settings: Settings) -> None:
         shared = postgres.borrow_owner(settings.db_path)
@@ -326,7 +360,7 @@ class RequestRunner:
         with self._lock:
             if not self._accepting:
                 raise ServiceError("service is shutting down")
-            self._futures[request_id] = self._executor.submit(self._run, request_id)
+            self._futures[request_id] = self._executor.submit(contextvars.copy_context().run, self._run, request_id)
 
     def _run(self, request_id: str) -> None:
         try:
@@ -633,7 +667,7 @@ def _config_snapshot(res: Resources, request: AnswerRequest) -> dict:
     return {"config_id": request.config_id, "verifier_run_id": request.verifier_run_id or None,
             "index_version": idx.version if idx else None,
             "serving": {k: v for k, v in res.serving().items() if k in ("run_id", "mode", "dense_version")},
-            "prompt_version": generation.PROMPT_VERSION, "model": res.settings.generation_model,
+            "prompt_version": generation.PROMPT_VERSION, "model": res.generation_model(),
             "reasoning_effort": res.settings.generation_reasoning_effort,
             "rate_version": rate_version, "max_output_tokens": res.settings.generation_max_output_tokens,
             "settings": res.settings.fingerprint()}
@@ -752,7 +786,7 @@ def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retriev
             "evidence_tokens": retrieval.evidence_tokens, "prompt_input_tokens": tokens,
             "limitations": retrieval.limitations, "excluded": retrieval.excluded}})
     try:  # an unknown rate leaves the estimate empty; admission then refuses with `unknown_rate`
-        est = budget.estimate(res.settings.db_path, res.settings.generation_model, tokens,
+        est = budget.estimate(res.settings.db_path, res.generation_model(), tokens,
                               res.settings.generation_max_output_tokens)
         qe = retrieval.query_embedding or {}
         if price_query_embedding and qe.get("cache") == "miss" and not qe.get("attempt_id"):
@@ -1230,8 +1264,9 @@ def _metered_chat(res: Resources, principal: Principal, request_id: str, *, stag
     provider response, or `fail(...)`'s outcome when the call was refused or failed; never retries. `record`
     receives the admission, usage and settlement."""
     s = res.settings
+    model = res.generation_model()
     admission = budget.reserve(s.db_path, request_id=request_id, member_id=principal.member_id, stage=stage,
-                               purpose=res.paid_purpose, model=s.generation_model, input_tokens=input_tokens,
+                               purpose=res.paid_purpose, model=model, input_tokens=input_tokens,
                                max_output_tokens=max_output_tokens, count_method=generation.COUNT_METHOD,
                                ceiling_micro_usd=ceiling)
     record["admission"] = admission
@@ -1243,10 +1278,10 @@ def _metered_chat(res: Resources, principal: Principal, request_id: str, *, stag
         return fail("budget_blocked", "공유 사용 한도 또는 유료 호출 설정 때문에 답변 생성을 시작하지 않았습니다. "
                     "검색과 원문 열람은 계속 사용할 수 있습니다.", error=admission["reason"])
     attempt_id = admission["attempt_id"]
-    if res.transport is None:
+    if refusal := res.paid_refusal():
         budget.release(s.db_path, attempt_id, "provider_unavailable")
         return fail("technical_error", "유료 모델 연결이 설정되지 않았습니다.", request_status="failed",
-                    error=res.provider_note)
+                    error=refusal)
     try:  # the stop check and the dispatching marker are one transaction: no shutdown can slip between them
         budget.mark_dispatching(s.db_path, attempt_id, _dispatch_guard(res, request_id))
     except budget.DispatchRefused as refused:
@@ -1256,12 +1291,12 @@ def _metered_chat(res: Resources, principal: Principal, request_id: str, *, stag
         # the ledger refused (unresolved unknown billing, maintenance, lost ownership): released, nothing sent
         return fail("budget_blocked", "결제 기록 점검 중이어서 유료 호출을 시작하지 않았습니다. 검색과 원문 열람은 계속 "
                     "사용할 수 있습니다.", error=reason[:300])
-    with tracing.step(step, "generation", model=s.generation_model, input=messages,
+    with tracing.step(step, "generation", model=model, input=messages,
                       model_parameters={"reasoning_effort": s.generation_reasoning_effort,
                                         "max_completion_tokens": max_output_tokens},
                       metadata={"attempt_id": attempt_id, "prompt_version": prompt_version}) as gen:
         try:
-            response = res.transport.chat(model=s.generation_model, messages=messages,
+            response = res.transport.chat(model=model, messages=messages,
                                           response_format=response_format, max_completion_tokens=max_output_tokens,
                                           reasoning_effort=s.generation_reasoning_effort, on_delta=on_delta)
         except generation.ProviderError as exc:
@@ -1601,8 +1636,8 @@ def original_download(res: Resources, principal: Principal, doc_id: str, source_
         raise ServiceError("원문 식별자가 올바르지 않습니다.")
     (doc,) = _resolve_scope(res, [DocRef(doc_id, source_hash)])
     with open_db(res.settings.db_path) as conn:
-        path = Path(conn.execute("SELECT original_path FROM sources WHERE source_hash = ?",
-                                 (source_hash,)).fetchone()[0])
+        path = postgres.host_path(conn.execute("SELECT original_path FROM sources WHERE source_hash = ?",
+                                               (source_hash,)).fetchone()[0])
     resolved = path.resolve()
     if resolved.parent != res.settings.files_dir.resolve() or not resolved.is_file():
         raise ServiceError("관리되지 않는 원문 경로입니다.")
@@ -1633,6 +1668,84 @@ def set_budget_limit(res: Resources, principal: Principal, cap_micro_usd: int, r
         raise ServiceError(str(exc) if isinstance(exc, budget.BudgetError) else "ledger_unavailable") from None
     return budget_snapshot(res, principal)
 
+
+def api_key_status(res: Resources, principal: Principal) -> dict:
+    """Whether this browser session's paid calls have a key, and who entered it. The key never leaves the
+    transport; another browser's key is never reported here."""
+    _authorize(res, principal, "consultant", "verifier", "budget_admin")
+    source = res.key_sources.get(generation.KEY_SESSION.get())
+    if source is None and res.transport is not None and not res.paid_refusal():
+        source = {"set_by": "server environment", "set_at": None}
+    return {"configured": source is not None, "set_by": (source or {}).get("set_by"),
+            "set_at": (source or {}).get("set_at"),
+            "model": (source or {}).get("model") or res.settings.generation_model,
+            "models": list(ALLOWED_GENERATION_MODELS)}
+
+
+def bind_request(res: Resources | None, session: str | None):
+    """Fixes, for one HTTP request and all work it starts, the browser session's key, its answer model and its
+    billing scope as they are now. Returns the reset to call when the request ends."""
+    source = (res.key_sources.get(session) if res is not None and session else None) or {}
+    bound = [(generation.KEY_SESSION, session), (generation.REQUEST_MODEL, source.get("model")),
+             (budget.BILLING_SCOPE, source.get("billing_scope"))]
+    tokens = [(var, var.set(value)) for var, value in bound]
+
+    def reset() -> None:
+        for var, token in reversed(tokens):
+            var.reset(token)
+    return reset
+
+
+def _selectable(res: Resources, model: str, actor: str) -> None:
+    if model not in ALLOWED_GENERATION_MODELS:
+        raise ServiceError("선택할 수 없는 모델입니다.")
+    try:
+        budget.ensure_generation_rate(res.settings.db_path, model, actor)
+    except (*DATABASE_ERRORS, budget.BudgetError) as exc:
+        raise ServiceError(str(exc) if isinstance(exc, budget.BudgetError) else "ledger_unavailable") from None
+
+
+def set_generation_model(res: Resources, principal: Principal, model: str) -> dict:
+    """This browser's answer model for requests it starts from now on, checked against the key this browser
+    entered (a free metadata read). Requests already submitted keep the model they began with."""
+    principal = _authorize(res, principal, "budget_admin")
+    session = generation.KEY_SESSION.get()
+    if session not in res.key_sources:
+        raise ServiceError(generation.NO_API_KEY)
+    if problem := res.transport.check_model(model):
+        raise ServiceError(problem)
+    _selectable(res, model, principal.member_id)
+    res.key_sources[session] = {**res.key_sources[session], "model": model}
+    with open_db(res.settings.db_path) as conn, tx(conn, immediate=True):
+        _audit(conn, principal.member_id, "set_generation_model", "openai", "", {"model": model})
+    return api_key_status(res, principal)
+
+
+def set_api_key(res: Resources, principal: Principal, api_key: str, model: str) -> tuple[str, dict]:
+    """Checks the key against the serving model (a free metadata read), then gives it to a new browser session,
+    whose ID the caller puts in that browser's cookie. Returns (session, status). The audit row records who set a
+    key, never its value."""
+    principal = _authorize(res, principal, "budget_admin")
+    key = api_key.strip()
+    if not key or len(key) > 500 or not key.isascii() or any(c.isspace() for c in key):
+        raise ServiceError("API 키 형식이 아닙니다.")
+    if model not in ALLOWED_GENERATION_MODELS:
+        raise ServiceError("선택할 수 없는 모델입니다.")
+    problem, billing_scope = generation.check_api_key(key, model, res.settings.request_timeout_seconds)
+    if problem:
+        raise ServiceError(problem)
+    _selectable(res, model, principal.member_id)
+    # Always a new session: requests already running keep the session, key, model and project they began with.
+    session = secrets.token_urlsafe(32)
+    res.set_api_key(session, key, principal.member_id, model, billing_scope)
+    with open_db(res.settings.db_path) as conn, tx(conn, immediate=True):
+        _audit(conn, principal.member_id, "set_api_key", "openai", "", {"model": model, "billing_scope": billing_scope})
+    token = generation.KEY_SESSION.set(session)
+    try:
+        return session, api_key_status(res, principal)
+    finally:
+        generation.KEY_SESSION.reset(token)
+
 VERIFIER_MODES = ("whitespace_bm25", "kiwi_bm25", "dense", "hybrid", "hybrid_rerank")
 
 
@@ -1648,7 +1761,7 @@ def verifier_config(res: Resources, mode: str | None = None, limits: dict | None
            "dense_version": serving.get("dense_version"), "index_version": idx.version if idx else None,
            "limits": {k: narrowed[k] for k in sorted(narrowed)},
            "effective_limits": {k: narrowed.get(k, getattr(s, k)) for k in LIMIT_KEYS},
-           "prompt_version": generation.PROMPT_VERSION, "model": res.settings.generation_model}
+           "prompt_version": generation.PROMPT_VERSION, "model": res.generation_model()}
     if cfg["mode"] not in VERIFIER_MODES:
         raise ServiceError("알 수 없는 검색 방식입니다.")
     cfg["config_id"] = "vc-" + hashlib.sha256(dumps(cfg).encode()).hexdigest()[:12]
@@ -2045,7 +2158,7 @@ def reconcile(res: Resources, principal: Principal, record: dict) -> BudgetSnaps
     applied = budget.reconcile(res.settings.db_path, principal.member_id, str(record["reconciliation_id"]),
                                record["interval_start"], record["interval_end"],
                                int(record["provider_total_micro_usd"]), record["scope"], record["evidence"],
-                               list(record.get("covered_attempt_ids") or []))
+                               list(record.get("covered_attempt_ids") or []), record.get("unscoped_attempts"))
     if applied:
         with open_db(res.settings.db_path) as conn, tx(conn, immediate=True):
             _audit(conn, principal.member_id, "reconcile", str(record["reconciliation_id"]),
@@ -2235,13 +2348,13 @@ def start_answer_evaluation(res: Resources, principal: Principal, estimate_id: s
                 write_text_atomic(answers.run_dir(res.settings, run_id) / "last-error.txt",
                                   f"{type(exc).__name__}: {exc}"[:500])
 
-        _start_job(res, _EVAL_JOBS, run_id, threading.Thread(target=job, name=f"rfp-eval-{run_id}", daemon=True))
+        _start_job(res, _EVAL_JOBS, run_id, threading.Thread(target=contextvars.copy_context().run, args=(job,), name=f"rfp-eval-{run_id}", daemon=True))
     return run_id
 
 
 def _refuse_closed_or_busy(res: Resources) -> None:
-    if res.transport is None or res._closed:
-        raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
+    if res._closed or res.paid_refusal():
+        raise ServiceError(res.paid_refusal() or "서비스가 종료 중입니다.")
     if any(t.is_alive() for t in [*_EVAL_JOBS.values(), *_JUDGE_JOBS.values()]):
         raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
 
@@ -2249,8 +2362,8 @@ def _refuse_closed_or_busy(res: Resources) -> None:
 def _start_job(res: Resources, jobs: dict[str, threading.Thread], run_id: str, thread: threading.Thread) -> None:
     """Registers and starts a paid background job; called under `_EVAL_LOCK` after its run was published."""
     with res._runner_lock:  # close() must see and join every thread that uses its transport
-        if res.transport is None or res._closed:  # the run stays listed as partial; rerunning resumes it
-            raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
+        if res._closed or res.paid_refusal():  # the run stays listed as partial; rerunning resumes it
+            raise ServiceError(res.paid_refusal() or "서비스가 종료 중입니다.")
         jobs[run_id] = thread
         res._jobs.append(thread)
         thread.start()
@@ -2309,7 +2422,7 @@ def start_judges(res: Resources, principal: Principal, estimate_id: str) -> str:
                 write_text_atomic(judges.run_dir(res.settings, run_id) / "last-error.txt",
                                   f"{type(exc).__name__}: {exc}"[:500])
 
-        _start_job(res, _JUDGE_JOBS, run_id, threading.Thread(target=job, name=f"rfp-judge-{run_id}", daemon=True))
+        _start_job(res, _JUDGE_JOBS, run_id, threading.Thread(target=contextvars.copy_context().run, args=(job,), name=f"rfp-judge-{run_id}", daemon=True))
     return run_id
 
 
@@ -2346,7 +2459,7 @@ def start_maintenance(res: Resources, principal: Principal) -> str:
             maintenance.run(res.settings, res.analyzer, res.transport, principal.member_id,
                             closing=lambda: res._closed, state=state)
 
-        thread = threading.Thread(target=job, name=f"rfp-maintenance-{state['run_id']}", daemon=True)
+        thread = threading.Thread(target=contextvars.copy_context().run, args=(job,), name=f"rfp-maintenance-{state['run_id']}", daemon=True)
         with res._runner_lock:  # close() joins it like every other job that may use the transport
             if res._closed:
                 raise ServiceError("서비스가 종료 중입니다.")
@@ -2821,8 +2934,8 @@ def start_drafting(res: Resources, principal: Principal, slots: list[dict], cons
     if not est["fits"]:
         raise ServiceError("유료 호출이 꺼져 있거나 최대 비용이 평가 예산 또는 운영 한도를 넘습니다.")
     with _DRAFT_LOCK, res._runner_lock:
-        if res.transport is None or res._closed:
-            raise ServiceError(res.provider_note or "서비스가 종료 중입니다.")
+        if res._closed or res.paid_refusal():
+            raise ServiceError(res.paid_refusal() or "서비스가 종료 중입니다.")
         if any(t.is_alive() for t in _DRAFT_JOBS.values()):
             raise ServiceError("다른 초안 생성이 실행 중입니다. 끝난 뒤 다시 시도하세요.")
         run_id = f"draft-{date.today():%Y%m%d}-{uuid.uuid4().hex[:6]}"
@@ -2841,7 +2954,7 @@ def start_drafting(res: Resources, principal: Principal, slots: list[dict], cons
                 name = "interrupted.txt" if res._closed else "error.txt"
                 write_text_atomic(run_dir / name, f"{type(exc).__name__}: {exc}"[:500])
 
-        thread = threading.Thread(target=job, name=f"rfp-{run_id}", daemon=True)
+        thread = threading.Thread(target=contextvars.copy_context().run, args=(job,), name=f"rfp-{run_id}", daemon=True)
         _DRAFT_JOBS[run_id] = thread
         res._jobs.append(thread)
         thread.start()

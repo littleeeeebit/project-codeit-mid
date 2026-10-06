@@ -1,0 +1,1 @@
+Frozen runs record `corpus_route_record()`. `active_serving` refuses an activated run measured under a different `ROUTE_RULE` and serves the keyword default with `activated_run_stale:corpus_route`.

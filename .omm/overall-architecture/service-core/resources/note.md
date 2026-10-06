@@ -1,0 +1,1 @@
+`retire_inactive(cfg)` runs on every `retrieve` call. It unloads GPU embedders and the reranker that the current activation no longer uses.

@@ -1,0 +1,1 @@
+`attempts.state`. Open states (reserved, dispatching, unknown) hold their reservation against the cap. `_billing` aggregates a request's attempts with precedence unknown > pending (reserved or dispatching) > reconciled > settled > released.

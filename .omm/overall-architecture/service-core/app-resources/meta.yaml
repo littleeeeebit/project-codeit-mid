@@ -1,0 +1,9 @@
+created: 2026-10-06T09:08:37.447Z
+updated: 2026-10-06T09:08:37.897Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: app-resources
+children: []
+parentPath:
+  - service-core

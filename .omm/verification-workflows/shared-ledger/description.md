@@ -1,0 +1,1 @@
+The same `budget_settings` cap, split into purpose envelopes (`envelopes_for`; per the README these are interactive, embedding, gold_eval and judge_eval). `Resources.paid_purpose` is `interactive` for screen requests; background workflows reserve against their own purpose. The cap check and the envelope check are both made inside `reserve`.

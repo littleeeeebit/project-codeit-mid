@@ -1,14 +1,9 @@
-created: 2026-10-04T13:34:42.449Z
-updated: 2026-10-05T23:55:09.562Z
-update_count: 7
-last_field: diagram
+created: 2026-10-04 13:34:42.449000+00:00
+updated: 2026-10-06T09:08:35.858Z
+update_count: 11
+last_field: description
 kind: nested-class
 title: http-api
 children:
-  - app-lifespan
-  - ask-routes
-  - member-header
-  - static-web
   - stream-route
-  - verify-routes
 parentPath: []

@@ -1,0 +1,1 @@
+The dataset file and wiki pages must equal their database rendering (`gold check`). Never edit them by hand.

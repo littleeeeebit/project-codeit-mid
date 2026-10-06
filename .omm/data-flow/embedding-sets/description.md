@@ -1,0 +1,1 @@
+`embedding_payloads` stores one checksummed vector per (normalized payload, model, dims, policy). It is shared across sets and reused as the cache. `embedding_sets` and `embedding_set_rows` map a set version to a source index's chunk rows in row order. Query vectors are cached in the same payload table with kind `query`.

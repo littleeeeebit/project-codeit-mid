@@ -106,14 +106,70 @@ class BudgetLedgerTest(unittest.TestCase):
         budget.mark_dispatching(self.db, r["attempt_id"])
         budget.mark_unknown(self.db, r["attempt_id"], "timeout")
         budget.reconcile(self.db, "owner", "rec-1", "2026-01-01T00:00:00", "2099-01-01T00:00:00", 50, "proj",
-                         "provider export", [r["attempt_id"]])
+                         "provider export", [r["attempt_id"]], unscoped="include")
         snap = budget.snapshot(self.db)
         self.assertEqual((snap.spent_micro_usd, snap.pending_micro_usd), (50, 0))
         budget.settle(self.db, r["attempt_id"], {"prompt_tokens": 50, "completion_tokens": 0}, "resp-3")
         budget.settle(self.db, r["attempt_id"], {"prompt_tokens": 50, "completion_tokens": 0}, "resp-3")
         self.assertEqual(budget.snapshot(self.db).spent_micro_usd, 50)
         self.assertFalse(budget.reconcile(self.db, "owner", "rec-1", "2026-01-01T00:00:00", "2099-01-01T00:00:00",
-                                          50, "proj", "provider export", [r["attempt_id"]]))
+                                          50, "proj", "provider export", [r["attempt_id"]], unscoped="include"))
+
+    def test_a_reconciliation_subtracts_only_attempts_billed_to_its_project(self):
+        def settled(scope, tokens):
+            token = budget.BILLING_SCOPE.set(scope)
+            try:
+                r = self.reserve(tokens)
+            finally:
+                budget.BILLING_SCOPE.reset(token)
+            budget.mark_dispatching(self.db, r["attempt_id"])
+            budget.settle(self.db, r["attempt_id"], {"prompt_tokens": tokens, "completion_tokens": 0}, None)
+
+        settled("proj_a", 30)  # two browsers' keys from different projects, same interval
+        settled("proj_b", 30)
+        self.assertEqual(budget.snapshot(self.db).spent_micro_usd, 60)
+        budget.reconcile(self.db, "owner", "a-1", "2026-01-01T00:00:00", "2099-01-01T00:00:00", 30, "proj_a",
+                         "project A export", [])
+        self.assertEqual(budget.snapshot(self.db).spent_micro_usd, 60)  # A's own $30 against A's total: no change
+        settled(None, 10)  # the server-environment key: no recorded project
+        with self.assertRaises(budget.BudgetError):  # whose bill it is must be said, not assumed
+            budget.reconcile(self.db, "owner", "b-1", "2026-01-01T00:00:00", "2099-01-01T00:00:00", 30, "proj_b",
+                             "project B export", [])
+        budget.reconcile(self.db, "owner", "b-1", "2026-01-01T00:00:00", "2099-01-01T00:00:00", 30, "proj_b",
+                         "project B export", [], unscoped="exclude")
+        self.assertEqual(budget.snapshot(self.db).spent_micro_usd, 70)
+        with self.assertRaises(budget.BudgetError):  # the same ID with another choice is a different import
+            budget.reconcile(self.db, "owner", "b-1", "2026-01-01T00:00:00", "2099-01-01T00:00:00", 30, "proj_b",
+                             "project B export", [], unscoped="include")
+
+    def test_a_reconciliation_covers_only_unknown_attempts_billed_to_its_project(self):
+        def unknown(scope):
+            token = budget.BILLING_SCOPE.set(scope)
+            try:
+                r = self.reserve(20)
+            finally:
+                budget.BILLING_SCOPE.reset(token)
+            budget.mark_dispatching(self.db, r["attempt_id"])
+            budget.mark_unknown(self.db, r["attempt_id"], "timeout")
+            return r["attempt_id"]
+
+        theirs = unknown("proj_b")
+        with self.assertRaises(budget.BudgetError):  # A's evidence cannot resolve B's bill
+            budget.reconcile(self.db, "owner", "a-1", "2026-01-01T00:00:00", "2099-01-01T00:00:00", 0, "proj_a",
+                             "project A export", [theirs])
+        self.assertEqual(budget.snapshot(self.db).pending_micro_usd, 20)  # B's reservation still held
+        budget.reconcile(self.db, "owner", "b-1", "2026-01-01T00:00:00", "2099-01-01T00:00:00", 20, "proj_b",
+                         "project B export", [theirs])
+        self.assertEqual(budget.snapshot(self.db).pending_micro_usd, 0)  # B's own evidence clears it
+        server = unknown(None)  # the server-environment key: no recorded project
+        for choice in (None, "exclude"):  # nobody said it is A's bill
+            with self.assertRaises(budget.BudgetError):
+                budget.reconcile(self.db, "owner", "a-2", "2026-01-01T00:00:00", "2099-12-31T00:00:00", 20,
+                                 "proj_a", "project A export", [server], unscoped=choice)
+        self.assertEqual(budget.snapshot(self.db).pending_micro_usd, 20)
+        budget.reconcile(self.db, "owner", "a-2", "2026-01-01T00:00:00", "2099-12-31T00:00:00", 20, "proj_a",
+                         "project A export", [server], unscoped="include")
+        self.assertEqual(budget.snapshot(self.db).pending_micro_usd, 0)
 
     def test_init_never_resets_balance_and_paid_gates(self):
         budget.add_adjustment(self.db, "owner", "k", 20, "e", "r")

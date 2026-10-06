@@ -1,19 +1,8 @@
 graph TD
-  source-files["Original files and CSV\nsrc/rfp_assistant/ingestion.py"]
-  manifest-import["Manifest import\nsrc/rfp_assistant/ingestion.py"]
-  ingestion-parse["Parse, OCR merge, diagnose\nsrc/rfp_assistant/ingestion.py"]
-  extraction-store["Extraction revisions\nsrc/rfp_assistant/store.py"]
-  keyword-index-build["Keyword index build\nsrc/rfp_assistant/retrieval.py"]
-  vector-sets["Embedding vector sets\nsrc/rfp_assistant/vector_store.py"]
-  gold-dataset["Gold question datasets\nsrc/rfp_assistant/gold.py"]
-  retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation.py"]
-  serving-pointer["Serving activation pointer\nsrc/rfp_assistant/service.py"]
-  source-files -->|CSV rows and file hashes| manifest-import
-  manifest-import -->|sources and documents rows| ingestion-parse
-  ingestion-parse -->|elements and artifact| extraction-store
-  extraction-store -->|chunk profiles| keyword-index-build
-  keyword-index-build -->|unique payloads| vector-sets
-  keyword-index-build -->|index manifest| retrieval-runs
-  vector-sets -->|verified dense matrix| retrieval-runs
-  gold-dataset -->|reviewed questions and spans| retrieval-runs
-  retrieval-runs -->|person activates| serving-pointer
+  source-originals["Original HWP and PDF\n원본 데이터/files"] -->|"sha256, parse"| extraction-artifacts["Element extractions\n.runtime/extracted"]
+  extraction-artifacts -->|"chunk profile, Kiwi tokens"| keyword-index-files["Keyword index files\n.runtime/indexes"]
+  keyword-index-files -->|"chunk payload hashes"| embedding-sets["pgvector embedding sets\nsrc/rfp_assistant/vector_store.py"]
+  keyword-index-files -->|"packed EvidenceUnit"| request-records["Request rows\nsrc/rfp_assistant/service.py"]
+  embedding-sets -->|"dense ranks"| request-records
+  ledger-records["Ledger attempts\nsrc/rfp_assistant/budget.py"] -->|"billing by request_id"| request-records
+  request-records -->|"evidence map lookup"| evidence-view["Evidence pane\nweb/src/components/ask/answer-parts.tsx"]

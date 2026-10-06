@@ -1,0 +1,1 @@
+Keep `--host 127.0.0.1`. Without login, anyone who can reach the port can spend the shared budget.
