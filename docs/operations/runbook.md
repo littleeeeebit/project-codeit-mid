@@ -144,6 +144,16 @@ Never run more than one worker: the process owns the request executor and the da
 
 Paid generation stays disabled until `configure-budget` records the dates, prior use, allowance and cap (see the README). Fake-provider demonstrations use a config file with `{"provider": "fake"}` and optionally `"fake_delay_seconds": 4`. Such a config never builds a real SDK client.
 
+### 3.6 The sign-in cut-over (2026-10-06)
+
+The owner approved the hub edit and the switch to `0.0.0.0`. With no paid work pending (`budget-status` pending $0):
+
+1. `/root/jupyterhub_config.py` was backed up to `.bak-2026-10-06`. The `bidmate` service and the `bidmate-users` role were appended (3.1), with the client secret generated on the VM into `/etc/jupyterhub/bidmate-oauth-secret` (root, 600), because the config file is world-readable. The config was loaded with traitlets before the restart. `systemctl restart jupyterhub` stopped the running notebook servers. The hub log shows "Role bidmate-users added", "Creating oauth client service-bidmate" and "Adding external service bidmate".
+2. The branch went to `/srv/bidmate/app` as a bundle. `npm ci` and `npm run build` ran in `web/` (the VM had no `node_modules`). `server.env` got the six `BIDMATE_*` settings, with the secret copied from that file, never displayed. Backup: `server.env.bak-2026-10-06`.
+3. The first start failed with `FileNotFoundError` for `handoff/postgresql-pgvector/config.example.json`. The VM had run the PR #22 branch, and #23 moved that file to `docs/history/postgresql-migration/`. `RFP_CONFIG_FILE` in `server.env` now names the new path; the two files are byte-identical. A deploy that crosses a rename must check `server.env`'s paths too.
+4. On `127.0.0.1` first: `/api/info` and `/api/auth/me` answered 401, the screens answered 200, and `/api/auth/login` answered 303 to the hub's authorize URL with `client_id=service-bidmate` and an HttpOnly, SameSite=Lax state cookie. The hub sent an unsigned visitor to its login page, and its token endpoint refused a wrong secret with 401 `invalid_client`.
+5. The unit from `tools/infra/` (`--host 0.0.0.0`) was installed and restarted. The previous unit is kept as `bidmate.service.bak-2026-10-06`. From outside the VM, `http://35.255.64.243:8501/api/info` answered 401 ("로그인이 필요합니다.") and the screens answered 200.
+
 ## 4. Request execution and controlled stop
 
 - Paid answers run on a process-owned executor with 6 workers and at most 12 admitted unfinished requests (`request_workers`, `request_admission`). A full queue is refused before any paid work.
