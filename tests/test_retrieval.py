@@ -6,10 +6,12 @@ from unittest import mock
 
 from rank_bm25 import BM25Okapi
 
-from rfp_assistant import chunking, ingestion, retrieval, service
-from rfp_assistant.auth import AuthError
 from rfp_assistant.contracts import DocRef
-from rfp_assistant.retrieval import KeywordIndex, retrieve, rrf_fuse
+from rfp_assistant.corpus import ingestion
+from rfp_assistant.retrieval import chunking, retrieval
+from rfp_assistant.retrieval.retrieval import KeywordIndex, retrieve, rrf_fuse
+from rfp_assistant.service import service
+from rfp_assistant.service.auth import AuthError
 from rfp_assistant.settings import Settings
 from tests import fixtures
 
@@ -231,7 +233,7 @@ class RerankerScopeTest(unittest.TestCase):
 
 class SplitRowGradingTest(unittest.TestCase):
     def test_each_piece_of_an_oversized_row_is_graded_on_the_text_it_carries(self):
-        from rfp_assistant import evaluation
+        from rfp_assistant.evaluation import evaluation
 
         long = " ".join(f"항목{i} 세부 사양을 충족하여야 한다." for i in range(150)) + " 단, 부가가치세 별도이며 설치비는 제외한다."
         cells = (f'<TableRow><TableCell row="0" col="0"><Paragraph><LineSeg><Text>구분</Text></LineSeg></Paragraph></TableCell>'
@@ -334,7 +336,7 @@ class ObservedNumericMissTest(unittest.TestCase):
                                                          set()), set())
 
     def test_metadata_terms_are_frozen_into_the_index(self):
-        from rfp_assistant import service
+        from rfp_assistant.service import service
 
         env = fixtures.make_env(Path(self.tmp.name) / "env", paid=False)
         s = env.settings

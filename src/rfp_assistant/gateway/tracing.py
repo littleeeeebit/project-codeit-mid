@@ -17,7 +17,7 @@ import re
 import threading
 from contextlib import contextmanager
 
-from .settings import Settings, tracing_credentials
+from ..settings import Settings, tracing_credentials
 
 log = logging.getLogger(__name__)
 

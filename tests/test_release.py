@@ -11,9 +11,14 @@ from io import BytesIO, StringIO, TextIOWrapper
 from pathlib import Path
 from unittest import mock
 
-from rfp_assistant import answers, auth, budget, cli, dense, evaluation, generation, postgres, release, sealed, service, store
+from rfp_assistant.service import answers, auth, service
+from rfp_assistant.gateway import budget, generation
+from rfp_assistant import cli
+from rfp_assistant.retrieval import dense
+from rfp_assistant.evaluation import evaluation, release, sealed
+from rfp_assistant.storage import postgres, store
 from rfp_assistant.contracts import AnswerRequest
-from rfp_assistant.generation import FakeTransport
+from rfp_assistant.gateway.generation import FakeTransport
 from rfp_assistant.settings import DEFAULT_RATES
 from tests import fixtures
 from tests import release_fixtures as p4

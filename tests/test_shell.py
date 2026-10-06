@@ -11,8 +11,12 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from rfp_assistant import api, auth, budget, generation, gold, postgres, service
-from rfp_assistant.store import open_db
+from rfp_assistant import api
+from rfp_assistant.service import auth, service
+from rfp_assistant.gateway import budget, generation
+from rfp_assistant.evaluation import gold
+from rfp_assistant.storage import postgres
+from rfp_assistant.storage.store import open_db
 from tests import release_fixtures as fx
 
 

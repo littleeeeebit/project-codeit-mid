@@ -17,11 +17,11 @@ from pathlib import Path
 from rank_bm25 import BM25Okapi
 
 from . import chunking
-from .contracts import DocRef, EvidenceUnit, RetrievalResult
-from .ingestion import CODE_RE, load_elements, nfc
-from .postgres import host_path
-from .settings import Settings
-from .store import dumps, get_app_setting, open_db, read_jsonl, set_app_setting, tx, utcnow, write_jsonl_atomic, \
+from ..contracts import DocRef, EvidenceUnit, RetrievalResult
+from ..corpus.ingestion import CODE_RE, load_elements, nfc
+from ..storage.postgres import host_path
+from ..settings import Settings
+from ..storage.store import dumps, get_app_setting, open_db, read_jsonl, set_app_setting, tx, utcnow, write_jsonl_atomic, \
     write_text_atomic
 
 ANALYZER_VERSION = "kiwi-bm25-2"  # 2: spacing normalization of the analysis copy, scope-redundant query terms

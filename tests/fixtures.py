@@ -26,10 +26,12 @@ import psycopg
 from psycopg import sql
 from psycopg.conninfo import make_conninfo
 
-from rfp_assistant import budget, ingestion, postgres, store
 from rfp_assistant.contracts import DocRef, Principal
-from rfp_assistant.retrieval import Analyzer, build_keyword_index
+from rfp_assistant.corpus import ingestion
+from rfp_assistant.gateway import budget
+from rfp_assistant.retrieval.retrieval import Analyzer, build_keyword_index
 from rfp_assistant.settings import DEFAULT_RATES, REPO_ROOT, Settings
+from rfp_assistant.storage import postgres, store
 
 _ANALYZER: Analyzer | None = None
 _RUN: dict = {}

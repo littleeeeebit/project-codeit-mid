@@ -4,7 +4,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from rfp_assistant import evaluation, gold, ingestion, store
+from rfp_assistant.corpus import ingestion
+from rfp_assistant.evaluation import evaluation, gold
+from rfp_assistant.storage import store
 from tests.fixtures import make_env, make_pdf
 
 QUOTE = "하자보수 기간은 검수 완료일로부터 12개월로 한다."

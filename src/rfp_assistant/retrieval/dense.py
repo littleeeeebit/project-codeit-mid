@@ -23,12 +23,12 @@ from pathlib import Path
 
 import numpy as np
 
-from . import budget
-from .generation import ProviderError, Transport
-from .ingestion import nfc
-from .postgres import host_path
-from .settings import EMBEDDING_MAX_TOKENS_PER_INPUT, EMBEDDING_TOKENIZER, Settings
-from .store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
+from ..corpus.ingestion import nfc
+from ..gateway import budget
+from ..gateway.generation import ProviderError, Transport
+from ..settings import EMBEDDING_MAX_TOKENS_PER_INPUT, EMBEDDING_TOKENIZER, Settings
+from ..storage.postgres import host_path
+from ..storage.store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
 from .vector_store import PgDenseIndex as DenseIndex  # the only dense index: verified pgvector sets
 
 EMBED_POLICY = "nfc-strip:l2-unit:float32"
@@ -240,8 +240,8 @@ def query_vector(settings: Settings, transport: Transport | None, question: str,
     if not allow_paid or request_id is None:
         return None, {"cache": "miss", "payload_hash": h, "reason": "paid_query_embedding_not_allowed"}
     if backend == "gemini":
+        from ..settings import read_api_key
         from .models import GeminiClient, ModelError, gemini_embed
-        from .settings import read_api_key
 
         key = read_api_key("GEMINI_API_KEY")
         if not key:
@@ -505,8 +505,8 @@ def _gemini_batches(missing: dict[str, dict]) -> list[list[dict]]:
 
 
 def _gemini_client(settings: Settings):
+    from ..settings import read_api_key
     from .models import GeminiClient
-    from .settings import read_api_key
 
     key = read_api_key("GEMINI_API_KEY")
     if not key:

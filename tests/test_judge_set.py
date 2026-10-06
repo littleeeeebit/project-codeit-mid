@@ -2,7 +2,7 @@
 
 import unittest
 
-from rfp_assistant import judge_set
+from rfp_assistant.evaluation import judge_set
 
 PASSAGE = ("- 하자보수 기간은 검수 완료 후 12개월 이상으로 한다.\n- 하자보수 비용 300만원은 부가세 포함 금액이며 사업자가 부담하여야 함\n"
            "- 제안사는 하자보수 계획서를 사전에 제출하여야 함")

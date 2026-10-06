@@ -116,7 +116,7 @@ def _table_manifest(raw):
 
 
 def backup(settings, destination, actor, share_owner=False):
-    from . import evaluation, release
+    from ..evaluation import evaluation, release
 
     destination = Path(destination)
     if not destination.is_absolute() or (destination.exists() and any(destination.iterdir())):
@@ -162,8 +162,9 @@ def backup(settings, destination, actor, share_owner=False):
 
 
 def restore_check(settings, manifest_path, staging=None):
-    from . import budget, release
-    from .retrieval import KeywordIndex
+    from ..evaluation import release
+    from ..gateway import budget
+    from ..retrieval.retrieval import KeywordIndex
 
     manifest_path = Path(manifest_path)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

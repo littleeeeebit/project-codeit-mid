@@ -34,9 +34,9 @@ from collections import Counter
 from datetime import date, timedelta
 from decimal import Decimal
 
+from ..settings import Settings
+from ..storage.store import utcnow, write_bytes_atomic, write_text_atomic
 from . import evaluation
-from .settings import Settings
-from .store import utcnow, write_bytes_atomic, write_text_atomic
 
 VERSION = "judge-set-2"
 SEED = 20261005

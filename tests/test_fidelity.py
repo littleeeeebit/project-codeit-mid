@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pymupdf
 
-from rfp_assistant import fidelity
+from rfp_assistant.corpus import fidelity
 
 PARAGRAPHS = [
     "1.1 과업명 : 통합 정보시스템 구축 사업",

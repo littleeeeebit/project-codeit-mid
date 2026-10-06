@@ -8,7 +8,7 @@ still construct narrower principals.
 
 from __future__ import annotations
 
-from .contracts import CAPABILITIES, Principal
+from ..contracts import CAPABILITIES, Principal
 
 
 class AuthError(PermissionError):

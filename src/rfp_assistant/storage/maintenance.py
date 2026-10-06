@@ -24,7 +24,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .settings import Settings
+from ..settings import Settings
 from .store import open_db, utcnow, write_text_atomic
 
 STEPS = ("backup", "restore_check", "ingest", "fidelity", "keyword", "embedding", "regression", "report")
@@ -110,7 +110,8 @@ def artifacts_digest(manifest_path: Path) -> str | None:
 def step_backup(settings: Settings, ctx: dict, actor: str, **_) -> dict:
     """Reuses the newest backup whose table digests still equal the database's and whose dump, copied files and
     referenced originals, extractions and index files still match its manifest; otherwise takes a new one."""
-    from . import postgres_backup, release
+    from ..evaluation import release
+    from . import postgres_backup
     from .store import open_db as db
 
     with db(settings.db_path) as conn:
@@ -171,7 +172,7 @@ def _drop_scratch(admin: str, name: str) -> None:
 def step_restore_check(settings: Settings, ctx: dict, **_) -> dict:
     """Restores the backup into a fresh scratch database with paid admission off and checks it; a backup whose
     restore check already passed is not checked again. The scratch database is dropped afterwards."""
-    from . import release
+    from ..evaluation import release
 
     rec, digest = ctx["backup"], ctx["backup_artifacts"]
     checked = rec.get("restore_check") or {}
@@ -203,7 +204,8 @@ def step_ingest(settings: Settings, ctx: dict, **_) -> dict:
     """Imports the manifest, then parses every original whose bytes, parser or inputs changed; the rest is reused.
     An original counts as changed only when its active extraction differs afterwards: a re-parse whose output is
     identical keeps its extraction (and its review), so nothing downstream changes."""
-    from . import ingestion, store
+    from ..corpus import ingestion
+    from . import store
 
     store.init_schema(settings.db_path)
 
@@ -231,8 +233,8 @@ def step_ingest(settings: Settings, ctx: dict, **_) -> dict:
 
 def step_fidelity(settings: Settings, ctx: dict, **_) -> dict:
     """Checks every HWP extraction that has no fidelity verdict yet: the ones ingest just created or changed."""
-    from . import fidelity
-    from .ingestion import IngestionError
+    from ..corpus import fidelity
+    from ..corpus.ingestion import IngestionError
 
     with open_db(settings.db_path) as conn:
         todo = [r[0] for r in conn.execute(
@@ -253,8 +255,8 @@ def step_fidelity(settings: Settings, ctx: dict, **_) -> dict:
 
 def step_keyword(settings: Settings, ctx: dict, analyzer, **_) -> dict:
     """Builds (or reuses) the serving profile's keyword index over the current extractions, without activating it."""
-    from .retrieval import KeywordIndex, build_keyword_index
-    from .service import active_serving
+    from ..retrieval.retrieval import KeywordIndex, build_keyword_index
+    from ..service.service import active_serving
 
     served = active_serving(settings).get("index_version")
     if not served:
@@ -270,10 +272,10 @@ def step_keyword(settings: Settings, ctx: dict, analyzer, **_) -> dict:
 def step_embedding(settings: Settings, ctx: dict, transport, **_) -> dict:
     """Embeds the rebuilt index's uncached chunks with the activated embedding model: free for a local model,
     stopped at its estimate for a paid one until the person approves it."""
-    from . import compare
-    from . import evaluation as ev
-    from .retrieval import KeywordIndex
-    from .service import active_serving
+    from ..evaluation import compare
+    from ..evaluation import evaluation as ev
+    from ..retrieval.retrieval import KeywordIndex
+    from ..service.service import active_serving
 
     cfg = active_serving(settings)
     if not cfg.get("embedding") or cfg.get("mode") not in ("dense", "hybrid", "hybrid_rerank"):
@@ -303,7 +305,7 @@ def _row_view(r: dict) -> dict:
 
 def step_regression(settings: Settings, ctx: dict, analyzer, transport, started: str, **_) -> dict:
     """The regression table: K1 and the serving configuration on the served and the rebuilt index."""
-    from . import compare
+    from ..evaluation import compare
 
     table = compare.regression(settings, analyzer, transport, ctx["rebuilt_index"])
     rows = [_row_view(r) for r in table["rows"]]
@@ -327,7 +329,7 @@ STEP_FUNCTIONS = {"backup": step_backup, "restore_check": step_restore_check, "i
 
 
 def _serving(settings: Settings) -> dict:
-    from .service import active_serving
+    from ..service.service import active_serving
 
     cfg = active_serving(settings)
     return {k: cfg.get(k) for k in ("run_id", "mode", "index_version", "dense_version")}
@@ -335,7 +337,7 @@ def _serving(settings: Settings) -> dict:
 
 def _paid_attempts(settings: Settings, since: str) -> int:
     """Provider attempts the maintenance members recorded since `since`: OpenAI ledger and Gemini's own."""
-    from . import compare
+    from ..evaluation import compare
 
     with open_db(settings.db_path) as conn:
         openai = conn.execute("SELECT COUNT(*) FROM attempts WHERE member_id = ? AND created_at >= ?",
@@ -359,7 +361,7 @@ def start_state(actor: str) -> dict:
 def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: False,
         state: dict | None = None) -> dict:
     """Runs every step in order and writes one report. Stops at the first failed step or paid estimate."""
-    from . import compare
+    from ..evaluation import compare
 
     state = state or start_state(actor)
     started = state["started_at"]

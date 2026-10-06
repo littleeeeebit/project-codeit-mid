@@ -7,10 +7,13 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from rfp_assistant import answers, auth, budget, evaluation, generation, gold, sealed, service, store
 from rfp_assistant.contracts import Principal
-from rfp_assistant.generation import FakeTransport, ProviderError
-from rfp_assistant.retrieval import KeywordIndex
+from rfp_assistant.evaluation import evaluation, gold, sealed
+from rfp_assistant.gateway import budget, generation
+from rfp_assistant.gateway.generation import FakeTransport, ProviderError
+from rfp_assistant.retrieval.retrieval import KeywordIndex
+from rfp_assistant.service import answers, auth, service
+from rfp_assistant.storage import store
 from tests import fixtures
 from tests import release_fixtures as p4
 
@@ -394,7 +397,7 @@ class MetricFixtureTest(unittest.TestCase):
         first equal value in the row."""
         cells = [{"row": 0, "col": i, "text": t} for i, t in enumerate(["이전 계약", "12개월", "현재 계약", "12개월"])]
         cells += [{"row": 1, "col": 0, "text": "비고"}, {"row": 1, "col": 1, "text": "12개월 이내 하자보수"}]
-        from rfp_assistant.ingestion import render_table
+        from rfp_assistant.corpus.ingestion import render_table
 
         el = {"raw_text": render_table(cells), "table": {"cells": cells}}
         line = dict(evaluation.table_rows(el))[0]

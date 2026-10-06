@@ -15,10 +15,12 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from . import budget, evaluation, generation, ingestion
-from .postgres import read_snapshot
-from .settings import REPO_ROOT, Settings
-from .store import get_app_setting, open_db, utcnow, write_text_atomic
+from ..corpus import ingestion
+from ..gateway import budget, generation
+from ..settings import REPO_ROOT, Settings
+from ..storage.postgres import read_snapshot
+from ..storage.store import get_app_setting, open_db, utcnow, write_text_atomic
+from . import evaluation
 
 COPIED_TREES = ("datasets", "sealed", "runs", "releases")
 MAX_COPY_BYTES = 512 * 1024 * 1024  # the mutable trees are small; refuse to copy a mistaken multi-GB folder
@@ -61,7 +63,7 @@ def backup(settings: Settings, destination: Path, actor: str, share_owner: bool 
     """Owner backup (pg_dump custom format plus the mutable trees) to an absolute directory outside the runtime
     and sources. Original state is not modified. `share_owner`: the maintenance sequence runs it under its own
     process's gateway owner instead of refusing it."""
-    from .postgres_backup import backup as pg_backup
+    from ..storage.postgres_backup import backup as pg_backup
 
     if not destination.is_absolute():
         raise ReleaseError("--destination must be an absolute directory")
@@ -83,7 +85,7 @@ def restore_check(settings: Settings, manifest_path: Path, staging: Path | None 
     """Restores the PostgreSQL dump into the empty isolated database named by RFP_RESTORE_DATABASE_DSN with paid
     admission off and the fake provider, then compares tables, ledger, copied files and referenced artifacts with
     the manifest. Nothing in the live database is changed and no provider is contacted. This is the rollback."""
-    from .postgres_backup import restore_check as pg_restore_check
+    from ..storage.postgres_backup import restore_check as pg_restore_check
 
     if not manifest_path.is_absolute() or not manifest_path.exists():
         raise ReleaseError("--backup must be the absolute path of a backup's manifest.json")
@@ -186,7 +188,7 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
                                   ).fetchone()[0]
         history = json.loads(conn.execute("SELECT history_json FROM budget_settings WHERE id = 1").fetchone()[0])
     active = json.loads(active_run) if active_run else None  # the stored activation; `now` is what requests serve
-    from .service import active_serving, describe_serving
+    from ..service.service import active_serving, describe_serving
 
     now = active_serving(settings)
     snap =budget.snapshot(settings.db_path)

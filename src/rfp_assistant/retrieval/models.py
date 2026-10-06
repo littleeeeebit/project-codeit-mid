@@ -478,7 +478,7 @@ CREATE TABLE IF NOT EXISTS rerank_scores (
 
 
 def external_status(db, provider: str = GEMINI_PROVIDER) -> dict:
-    from .store import open_db
+    from ..storage.store import open_db
 
     with open_db(db) as conn:
         row = conn.execute("SELECT * FROM external_ledger WHERE provider = ?", (provider,)).fetchone()
@@ -495,7 +495,7 @@ def external_status(db, provider: str = GEMINI_PROVIDER) -> dict:
 
 def set_external_cap(db, cap_micro: int, actor: str, reason: str, provider: str = GEMINI_PROVIDER) -> dict:
     """The person's own cap for a provider outside the shared OpenAI allowance; never below what is committed."""
-    from .store import dumps, open_db, tx, utcnow
+    from ..storage.store import dumps, open_db, tx, utcnow
 
     if not actor.strip() or not reason.strip():
         raise ModelError("setting a cap needs the person's name and a reason")
@@ -514,7 +514,7 @@ def set_external_cap(db, cap_micro: int, actor: str, reason: str, provider: str 
 
 
 def external_reserve(db, tokens: int, purpose: str, provider: str = GEMINI_PROVIDER) -> dict:
-    from .store import open_db, tx, utcnow
+    from ..storage.store import open_db, tx, utcnow
 
     amount = gemini_cost_micro(tokens)
     with open_db(db) as conn, tx(conn, immediate=True):
@@ -541,8 +541,8 @@ def external_mark_dispatching(db, attempt_id: str, guard=None) -> None:
     owning request's stop check) and the gateway-owner check run in the same transaction, and a refusal releases the
     reservation before anything is sent. A process that ends after this point leaves `dispatching`, which startup
     recovery turns into `unknown`."""
-    from .postgres import owner_guard
-    from .store import open_db, tx, utcnow
+    from ..storage.postgres import owner_guard
+    from ..storage.store import open_db, tx, utcnow
 
     with open_db(db) as conn, tx(conn, immediate=True):
         reason = (guard(conn) if guard is not None else None) or owner_guard(conn)
@@ -558,7 +558,7 @@ def external_mark_dispatching(db, attempt_id: str, guard=None) -> None:
 
 
 def external_finish(db, attempt_id: str, state: str, settled_micro: int | None = None, detail: str = "") -> None:
-    from .store import open_db, tx, utcnow
+    from ..storage.store import open_db, tx, utcnow
 
     with open_db(db) as conn, tx(conn, immediate=True):
         conn.execute("UPDATE external_attempts SET state = ?, settled_micro_usd = ?, detail = ?, finished_at = ? "
@@ -569,7 +569,7 @@ def external_finish(db, attempt_id: str, state: str, settled_micro: int | None =
 def external_resolve(db, attempt_id: str, charged: bool, actor: str, reason: str) -> dict:
     """The person's resolution of an attempt with unknown billing (a timeout after dispatch): charged settles it at
     its reserved amount, not charged releases it. Its vectors were never cached, so a later run asks for them again."""
-    from .store import open_db, tx, utcnow
+    from ..storage.store import open_db, tx, utcnow
 
     if not actor.strip() or not reason.strip():
         raise ModelError("resolving an attempt needs the person's name and a reason")

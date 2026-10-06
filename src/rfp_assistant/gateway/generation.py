@@ -14,8 +14,8 @@ from typing import Callable, Protocol
 
 from pydantic import ValidationError
 
-from .chunking import count_tokens
-from .contracts import AnswerPayload, EvidenceUnit
+from ..contracts import AnswerPayload, EvidenceUnit
+from ..retrieval.chunking import count_tokens
 
 PROMPT_VERSION = "grounded-answer-12"  # 4: atomic obligations, per-document citations, conflict action; 5: corpus mode
 # 6: every claim cites evidence; absence goes to missing_fields only; 7: a restated absence is declared kind "absence"
@@ -366,7 +366,7 @@ def fake_embeddings(inputs: list[str], dimensions: int) -> EmbeddingResponse:
 
     import numpy as np
 
-    from .dense import count_embedding_tokens
+    from ..retrieval.dense import count_embedding_tokens
 
     vectors = []
     for text in inputs:

@@ -7,7 +7,7 @@ import json
 import re
 from functools import lru_cache
 
-from .ingestion import CODE_RE
+from ..corpus.ingestion import CODE_RE
 
 CHUNKER_VERSION = "structural-5"  # 4: tokenizer-offset windows, sibling links; 5: row-fragment offsets
 LABEL_LINES = 2  # title lines carried into the table below them

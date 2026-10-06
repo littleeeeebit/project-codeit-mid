@@ -27,10 +27,10 @@ from pathlib import Path
 
 from .evaluation import (GOLD_DATASETS, METADATA_TYPES, OPERATIONAL_TYPES, SEALED_SPLITS, GoldChecker, RowChecker,
                          dataset_path, split_of)
-from .ingestion import CODE_RE, QUARANTINE_TEXT, nfc
-from .postgres import Connection, Row
-from .settings import Settings
-from .store import dumps, open_db, tx, utcnow, write_jsonl_atomic, write_text_atomic
+from ..corpus.ingestion import CODE_RE, QUARANTINE_TEXT, nfc
+from ..storage.postgres import Connection, Row
+from ..settings import Settings
+from ..storage.store import dumps, open_db, tx, utcnow, write_jsonl_atomic, write_text_atomic
 
 # code -> Korean label shown to the reviewer
 REJECT_CATEGORIES = {

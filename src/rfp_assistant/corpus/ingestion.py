@@ -20,9 +20,9 @@ from importlib import metadata
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from .postgres import host_path
-from .settings import Settings
-from .store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
+from ..storage.postgres import host_path
+from ..settings import Settings
+from ..storage.store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
 
 # Committed namespace for doc_id = uuid5(NAMESPACE, NFC(csv filename)). Never change it.
 DOC_NAMESPACE = uuid.UUID("5b0f4c1e-8a57-4f0e-9d3c-2a6e1f7b9c42")

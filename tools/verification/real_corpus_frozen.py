@@ -20,9 +20,11 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from rfp_assistant import api, auth, service, store
+from rfp_assistant import api
 from rfp_assistant.contracts import DocRef
+from rfp_assistant.service import auth, service
 from rfp_assistant.settings import load_settings
+from rfp_assistant.storage import store
 
 MEMBER = "verification-runner"
 

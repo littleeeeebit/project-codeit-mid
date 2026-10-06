@@ -15,7 +15,10 @@ from urllib.parse import quote
 from fastapi.testclient import TestClient
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from rfp_assistant import api, budget, drafting, generation, service, settings as settings_mod, store, tracing
+from rfp_assistant import api, settings as settings_mod
+from rfp_assistant.gateway import budget, generation, tracing
+from rfp_assistant.service import drafting, service
+from rfp_assistant.storage import store
 from tests import fixtures
 from tests import release_fixtures as fx
 

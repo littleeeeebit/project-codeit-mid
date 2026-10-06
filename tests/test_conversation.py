@@ -14,9 +14,12 @@ from urllib.parse import quote
 
 from fastapi.testclient import TestClient
 
-from rfp_assistant import api, budget, generation, service, store
+from rfp_assistant import api
 from rfp_assistant.contracts import AnswerRequest, EvidenceUnit, Principal, RetrievalResult
-from rfp_assistant.generation import FakeTransport, ProviderError, ProviderResponse
+from rfp_assistant.gateway import budget, generation
+from rfp_assistant.gateway.generation import FakeTransport, ProviderError, ProviderResponse
+from rfp_assistant.service import service
+from rfp_assistant.storage import store
 from tests import fixtures
 
 FIRST = "통합 정보시스템 구축 사업은 어떤 사업인가요?"

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 from pgvector import Vector
 
-from .store import dumps, open_db, tx
+from ..storage.store import dumps, open_db, tx
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS embedding_payloads (

@@ -17,11 +17,11 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from .contracts import BudgetSnapshot
-from .settings import (ALLOWED_GENERATION_MODELS, DEFAULT_RATES, LARGE_RATE_CHECKED_AT, LARGE_RATE_VERSION,
+from ..contracts import BudgetSnapshot
+from ..settings import (ALLOWED_GENERATION_MODELS, DEFAULT_RATES, LARGE_RATE_CHECKED_AT, LARGE_RATE_VERSION,
                        RATE_VERSION, SELECTABLE_RATE_SOURCE)
-from .store import OPERATIONAL_ERRORS, dumps, get_app_setting, open_db, set_app_setting, tx, utcnow
-from .postgres import Connection, Row, owner_guard, read_snapshot, require_owner, Target
+from ..storage.store import OPERATIONAL_ERRORS, dumps, get_app_setting, open_db, set_app_setting, tx, utcnow
+from ..storage.postgres import Connection, Row, owner_guard, read_snapshot, require_owner, Target
 
 MICRO = 1_000_000
 # sixteenths of the operating cap; `judge_eval` (judges.py) starts empty and is funded only by an owner reallocation
@@ -136,7 +136,7 @@ def configure(db: Path, actor: str, *, project_start: date, project_end: date, p
 def set_paid_enabled(db: Path, actor: str, enabled: bool, reason: str) -> None:
     """The one paid switch: the ledger flag and PostgreSQL admission change together. Enabling requires the
     validated import, no recovery fence and no unknown billing; a restored database stays off until this runs."""
-    from .postgres import recovery_blocked, validation_ready
+    from ..storage.postgres import recovery_blocked, validation_ready
 
     with open_db(db) as conn, tx(conn, immediate=True):
         row = _settings_row(conn)

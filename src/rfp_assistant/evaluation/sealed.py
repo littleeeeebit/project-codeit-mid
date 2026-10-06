@@ -13,11 +13,13 @@ import hashlib
 import json
 from pathlib import Path
 
-from . import auth, evaluation, generation
-from .contracts import Principal
+from ..contracts import Principal
+from ..gateway import generation
+from ..service import auth
+from ..settings import Settings
+from ..storage.store import dumps, get_app_setting, open_db, utcnow, write_text_atomic
+from . import evaluation
 from .evaluation import EvaluationError
-from .settings import Settings
-from .store import dumps, get_app_setting, open_db, utcnow, write_text_atomic
 
 
 class SealedError(EvaluationError):
@@ -82,7 +84,7 @@ def sealed_exposures(settings: Settings, test_sha: str) -> list[dict]:
 def _selection_problems(settings: Settings, active: dict, answer_run_id: str, dev: dict | None) -> tuple[list, dict | None]:
     """The development answer run must have evaluated this very candidate: the activated serving configuration, the
     current prompt, model, reasoning and output cap, and the frozen development set."""
-    from . import answers
+    from ..service import answers
 
     problems: list[str] = []
     d = answers.run_dir(settings, answer_run_id)
@@ -196,7 +198,7 @@ def sealed_run_id(settings: Settings, base_id: str, post_test: bool) -> str:
 def begin(settings: Settings, est: dict, actor: str, reason: str | None) -> None:
     """Admits a sealed answer run: the first untouched run on a test set, its own resume, or (with a reason) one
     labeled post-test regression. Records the start once as an audit event."""
-    from . import answers
+    from ..service import answers
 
     freeze = load_freeze(settings, est["freeze_id"])
     problems = freeze_problems(settings, freeze)

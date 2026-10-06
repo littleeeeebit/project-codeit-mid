@@ -24,19 +24,23 @@ from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
-from . import auth, budget, fidelity, generation, gold, postgres, tracing
-from . import dense as dense_mod
+from . import auth
+from ..gateway import budget, generation, tracing
+from ..corpus import fidelity
+from ..evaluation import gold
+from ..storage import postgres
+from ..retrieval import dense as dense_mod
 from .auth import require_any
-from .contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, EvidenceUnit, EvidenceView,
+from ..contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, EvidenceUnit, EvidenceView,
                         ManagedDownload, Principal, RequestView, RetrievalResult, TERMINAL_STATUSES)
-from .ingestion import (CODE_RE, QUARANTINE_TEXT, extraction_review_status, load_elements, nfc, printed_pdf_path,
+from ..corpus.ingestion import (CODE_RE, QUARANTINE_TEXT, extraction_review_status, load_elements, nfc, printed_pdf_path,
                         record_review, resolutions_by_doc)
-from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extraction, corpus_scope, scope_rows
-from .retrieval import retrieve as _retrieve
-from .evaluation import EVAL_VERSION
-from .postgres import Row
-from .settings import ALLOWED_EMBEDDING_MODELS, ALLOWED_GENERATION_MODELS, Settings, read_api_key
-from .store import DATABASE_ERRORS, LockHeld, dumps, init_schema, open_db, tx, utcnow
+from ..retrieval.retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extraction, corpus_scope, scope_rows
+from ..retrieval.retrieval import retrieve as _retrieve
+from ..evaluation.evaluation import EVAL_VERSION
+from ..storage.postgres import Row
+from ..settings import ALLOWED_EMBEDDING_MODELS, ALLOWED_GENERATION_MODELS, Settings, read_api_key
+from ..storage.store import DATABASE_ERRORS, LockHeld, dumps, init_schema, open_db, tx, utcnow
 
 
 KEY_SESSION = generation.KEY_SESSION  # the API sets it from the browser's session cookie for each request
@@ -70,7 +74,7 @@ class Resources:
                  recover: bool = False, dispatch: bool = True, tracer: tracing.Tracing | None = None) -> None:
         """`dispatch=False` is the ledger-only owner (budget administration beside the serving app): no provider
         client and no gateway ownership, so any paid stage through it is refused at admission."""
-        from .store import database_lifecycle
+        from ..storage.store import database_lifecycle
 
         self._dispatch = dispatch
         self.tracing: tracing.Tracing | None = tracer
@@ -268,7 +272,7 @@ class Resources:
         """A serving transition (to another embedding, an API or keyword row, or away from reranking) retires the
         GPU models the activated configuration no longer uses, whichever process activated it; requests still
         using one keep their own reference until they finish."""
-        from .models import EMBEDDINGS, _EMBEDDERS, free_gpu, unload_embedders
+        from ..retrieval.models import EMBEDDINGS, _EMBEDDERS, free_gpu, unload_embedders
 
         model = (cfg.get("embedding") or {}).get("model") if cfg["mode"] in DENSE_MODES else None
         keep = model if model in EMBEDDINGS and EMBEDDINGS[model].backend == "local" else None
@@ -295,7 +299,7 @@ class Resources:
                 # Retire the previous model before loading the next, so both never need the GPU at once; a request
                 # still reranking with it keeps its own reference until it finishes.
                 self._reranker = None
-                from .models import free_gpu
+                from ..retrieval.models import free_gpu
 
                 free_gpu()
                 self._reranker, info = dense_mod.load_reranker(s)
@@ -399,8 +403,8 @@ _shared_lock = threading.Lock()
 def active_serving(settings: Settings) -> dict:
     """The activated retrieval configuration (`activate-run`), or the keyword default before any selection. Every
     reader of the activation goes through here (requests, latency samples), so none serves a run it would refuse."""
-    from .retrieval import corpus_route_record
-    from .store import get_app_setting
+    from ..retrieval.retrieval import corpus_route_record
+    from ..storage.store import get_app_setting
 
     with open_db(settings.db_path) as conn:
         run = get_app_setting(conn, "active_run")
@@ -630,7 +634,7 @@ def retrieve(res: Resources, principal: Principal, question: str, scope: list[Do
                            rerank_depth=(cfg.get("reranker") or {}).get("depth"),
                            rerank_protect=(cfg.get("reranker") or {}).get("protect") or 0)
         result.query_embedding = qinfo
-        from .retrieval import index_compatibility
+        from ..retrieval.retrieval import index_compatibility
 
         outdated = index_compatibility(idx, res.analyzer)
         if outdated:  # still served (search must keep working) but never silently: rebuild and re-evaluate
@@ -1931,11 +1935,11 @@ def dataset_rows(res: Resources, principal: Principal, dataset: str) -> list[dic
     if not path.exists():
         return []
     if dataset == "dev":
-        from .evaluation import load_eval_rows
+        from ..evaluation.evaluation import load_eval_rows
 
         rows, _, _ = load_eval_rows(res.settings, dataset)
         return rows
-    from .store import read_jsonl
+    from ..storage.store import read_jsonl
 
     return [r for r in read_jsonl(path) if r.get("reviewed_by")]
 
@@ -2248,7 +2252,7 @@ def gold_second_review(res: Resources, principal: Principal, candidate_id: str, 
 def gold_awaiting_second_review(res: Resources, principal: Principal) -> list[dict]:
     """Approved development gold rows marked disputed that still lack an independent second review."""
     principal = _authorize(res, principal, "verifier")
-    from .store import read_jsonl
+    from ..storage.store import read_jsonl
 
     path = res.settings.data_dir / "datasets" / "dev.jsonl"
     rows = read_jsonl(path) if path.exists() else []
@@ -2266,7 +2270,7 @@ def evaluation_overview(res: Resources, principal: Principal) -> dict:
     """What the verifier may see of phase 4: development validation and freeze state, the sealed set's size and
     freeze state only, development answer runs and their scores, and the latest release decision."""
     principal = _authorize(res, principal, "verifier")
-    from . import evaluation
+    from ..evaluation import evaluation
 
     s = res.settings
     dev = evaluation.dataset_path(s, "dev")
@@ -2343,7 +2347,7 @@ def start_answer_evaluation(res: Resources, principal: Principal, estimate_id: s
             try:
                 answers.run_answers(res.settings, res, estimate_id, principal.member_id, begun=begun)
             except Exception as exc:  # noqa: BLE001 - recorded for the overview; rows already finished stay
-                from .store import write_text_atomic
+                from ..storage.store import write_text_atomic
 
                 write_text_atomic(answers.run_dir(res.settings, run_id) / "last-error.txt",
                                   f"{type(exc).__name__}: {exc}"[:500])
@@ -2376,7 +2380,8 @@ def _judge_running() -> set[str]:
 
 
 def _judge_call(fn, *args):
-    from . import answers, judges
+    from . import answers
+    from ..evaluation import judges
 
     try:
         return fn(*args)
@@ -2387,7 +2392,7 @@ def _judge_call(fn, *args):
 def judge_overview(res: Resources, principal: Principal) -> dict:
     """The judge reference, its split, the declared replacement rule and every judge run with its progress."""
     principal = _authorize(res, principal, "verifier")
-    from . import judges
+    from ..evaluation import judges
 
     return _judge_call(judges.overview, res.settings, _judge_running())
 
@@ -2395,7 +2400,7 @@ def judge_overview(res: Resources, principal: Principal) -> dict:
 def plan_judges(res: Resources, principal: Principal, part: str) -> dict:
     """Free: prices every translation and Luna judge call a part still needs, and counts the Jev calls."""
     principal = _authorize(res, principal, "verifier")
-    from . import judges
+    from ..evaluation import judges
 
     return _judge_call(judges.plan, res.settings, part)
 
@@ -2404,7 +2409,7 @@ def start_judges(res: Resources, principal: Principal, estimate_id: str) -> str:
     """Runs a planned judge comparison part on this process's gateway in one background thread, never above the
     estimate the verifier consented to. One evaluation or comparison at a time; rerunning resumes."""
     principal = _authorize(res, principal, "verifier")
-    from . import judges
+    from ..evaluation import judges
 
     with _EVAL_LOCK:
         _refuse_closed_or_busy(res)
@@ -2417,7 +2422,7 @@ def start_judges(res: Resources, principal: Principal, estimate_id: str) -> str:
                 judges.run(res.settings, res.transport, estimate_id, principal.member_id,
                            closing=lambda: res._closed, begun=begun)
             except Exception as exc:  # noqa: BLE001 - recorded for the overview; finished judgements stay
-                from .store import write_text_atomic
+                from ..storage.store import write_text_atomic
 
                 write_text_atomic(judges.run_dir(res.settings, run_id) / "last-error.txt",
                                   f"{type(exc).__name__}: {exc}"[:500])
@@ -2432,7 +2437,7 @@ _MAINTENANCE_JOB: list[threading.Thread] = []  # at most one maintenance sequenc
 def maintenance_status(res: Resources, principal: Principal) -> dict:
     """The running or last maintenance run. A run recorded as running with no live thread was cut off by a stop."""
     principal = _authorize(res, principal, "verifier")
-    from . import maintenance
+    from ..storage import maintenance
 
     running = any(t.is_alive() for t in _MAINTENANCE_JOB)
     state = maintenance.last(res.settings)
@@ -2445,7 +2450,7 @@ def start_maintenance(res: Resources, principal: Principal) -> str:
     """Starts the maintenance sequence on this process's gateway in one background thread; the run is published
     before the start returns. A paid embedding stops it at its estimate; nothing is activated."""
     principal = _authorize(res, principal, "verifier")
-    from . import maintenance
+    from ..storage import maintenance
 
     with _EVAL_LOCK:
         if res._closed:
@@ -2471,7 +2476,7 @@ def start_maintenance(res: Resources, principal: Principal) -> str:
 
 def judge_results(res: Resources, principal: Principal, run_id: str) -> dict:
     principal = _authorize(res, principal, "verifier")
-    from . import judges
+    from ..evaluation import judges
 
     return _judge_call(judges.results, res.settings, run_id)
 
@@ -2489,7 +2494,7 @@ def experiments(res: Resources, principal: Principal) -> dict:
     """Every comparison table (`compare --matrix`), each row's column values, which row serves, and the gold
     counts. Per-question outcomes stay out of this listing (`experiment_questions`)."""
     principal = _authorize(res, principal, "verifier")
-    from . import compare
+    from ..evaluation import compare
 
     active = active_serving(res.settings)
     tables = []
@@ -2518,7 +2523,7 @@ def experiments(res: Resources, principal: Principal) -> dict:
 def experiment_questions(res: Resources, principal: Principal, matrix: str, index: int) -> list[dict]:
     """The questions one row failed: incomplete support, a critical failure, a missed top 5 or nDCG@5 below 1."""
     principal = _authorize(res, principal, "verifier")
-    from . import compare
+    from ..evaluation import compare
 
     table = next((t for t in compare.load_tables(res.settings) if t["matrix"] == matrix), None)
     if table is None or not 0 <= index < len(table["rows"]):
@@ -2529,7 +2534,7 @@ def experiment_questions(res: Resources, principal: Principal, matrix: str, inde
 def activate_experiment(res: Resources, principal: Principal, run_id: str, decided_by: str, note: str) -> dict:
     """The person's pick from a comparison table, through the same validation as `activate-run`."""
     principal = _authorize(res, principal, "verifier")
-    from . import evaluation
+    from ..evaluation import evaluation
 
     if not decided_by.strip():
         raise ServiceError("활성화하려면 고른 사람의 이름이 필요합니다.")
@@ -2545,7 +2550,7 @@ def activate_experiment(res: Resources, principal: Principal, run_id: str, decid
 
 def judge_disagreements(res: Resources, principal: Principal, run_id: str) -> list[dict]:
     principal = _authorize(res, principal, "verifier")
-    from . import judges
+    from ..evaluation import judges
 
     return _judge_call(judges.disagreements, res.settings, run_id)
 
@@ -2612,7 +2617,7 @@ SHELL_ERRORS = (ServiceError, auth.AuthError)  # what a screen catches and shows
 
 
 def app_resources() -> Resources:
-    from .settings import load_settings
+    from ..settings import load_settings
 
     return get_resources(load_settings())
 
@@ -2624,7 +2629,7 @@ def visitor(name: str | None) -> Principal:
 @functools.lru_cache(maxsize=1)
 def build_head() -> str:
     """The commit this server process loaded (read once), or `unknown` outside a checkout."""
-    from .settings import REPO_ROOT
+    from ..settings import REPO_ROOT
 
     try:
         out = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True, timeout=10)
@@ -2830,7 +2835,7 @@ def draft_documents(res: Resources, principal: Principal) -> list[dict]:
     """Documents drafting may use: current, parsed and assigned to a development family. A sealed-family document
     never appears, so no sealed source reaches development generation through this page."""
     principal = _authorize(res, principal, "verifier")
-    from . import evaluation
+    from ..evaluation import evaluation
 
     out = []
     with open_db(res.settings.db_path) as conn:
@@ -2926,7 +2931,7 @@ def start_drafting(res: Resources, principal: Principal, slots: list[dict], cons
     The run only prepares pending candidates; nothing is approved here."""
     principal = _authorize(res, principal, "verifier")
     from . import drafting
-    from .store import write_text_atomic
+    from ..storage.store import write_text_atomic
 
     est = plan_drafting(res, principal, slots)
     if est["max_micro_usd"] > consented_max_micro:
@@ -2965,7 +2970,7 @@ def drafting_runs(res: Resources, principal: Principal) -> list[dict]:
     """Every drafting run, newest first: who asked, its state, valid and invalid drafts, and whether its valid
     drafts were sent to review."""
     principal = _authorize(res, principal, "verifier")
-    from .store import read_jsonl
+    from ..storage.store import read_jsonl
 
     base = _drafts_dir(res.settings)
     with open_db(res.settings.db_path) as conn:
@@ -3000,7 +3005,8 @@ def drafting_runs(res: Resources, principal: Principal) -> list[dict]:
 def submit_drafts(res: Resources, principal: Principal, run_id: str) -> dict:
     """Sends a finished run's valid drafts to the development review queue as one batch drafted by the model."""
     principal = _authorize(res, principal, "verifier")
-    from . import drafting, evaluation
+    from . import drafting
+    from ..evaluation import evaluation
 
     run = next((r for r in drafting_runs(res, principal) if r["run_id"] == run_id), None)
     if run is None or run["status"] != "completed" or not run["rows"]:

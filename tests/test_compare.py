@@ -12,9 +12,12 @@ from unittest import mock
 
 import numpy as np
 
-from rfp_assistant import budget, compare, dense, models, store
-from rfp_assistant import postgres
-from rfp_assistant.store import dumps
+from rfp_assistant.gateway import budget
+from rfp_assistant.evaluation import compare
+from rfp_assistant.retrieval import dense, models
+from rfp_assistant.storage import store
+from rfp_assistant.storage import postgres
+from rfp_assistant.storage.store import dumps
 from tests import fixtures
 
 BASE = {"profile": "structural", "analyzer": "kiwi", "retrieval": "hybrid", "embedding": "text-embedding-3-large",
@@ -196,7 +199,8 @@ class LedgerAndCacheTest(unittest.TestCase):
             models.unload_embedders()
 
     def test_reranker_rows_keep_the_serving_index_and_its_recorded_limits(self):
-        from rfp_assistant import retrieval, service
+        from rfp_assistant.retrieval import retrieval
+        from rfp_assistant.service import service
 
         built = retrieval.build_keyword_index(self.env.settings, fixtures.analyzer(), include_unreviewed=True,
                                               profile="fixed-512-64", activate=False)
@@ -236,7 +240,7 @@ class LedgerAndCacheTest(unittest.TestCase):
         self.assertEqual(len({exact, key(dense_search="hnsw"), key(dense_search="hnsw", hnsw_ef_search=200)}), 3)
 
     def test_serving_retires_gpu_models_the_activated_configuration_no_longer_uses(self):
-        from rfp_assistant import service
+        from rfp_assistant.service import service
 
         def res():
             return types.SimpleNamespace(_index_lock=threading.Lock(), _reranker=object(), _reranker_key=("k",))
@@ -291,7 +295,7 @@ class LedgerAndCacheTest(unittest.TestCase):
         w[1] = 1
         with self.assertRaises(dense.DenseError):
             dense.cache_put_many(s, [("h1", w, meta)])
-        from rfp_assistant.vector_store import cached_hashes
+        from rfp_assistant.retrieval.vector_store import cached_hashes
 
         self.assertEqual(cached_hashes(s, {"h1", "h2"}), {"h1"})
         with store.open_db(s.db_path) as conn:

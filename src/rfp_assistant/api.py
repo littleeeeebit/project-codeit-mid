@@ -21,7 +21,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import service
+from .service import service
 
 WEB = Path(__file__).resolve().parents[2] / "web" / "out"
 

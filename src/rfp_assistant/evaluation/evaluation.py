@@ -14,10 +14,10 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from .chunking import table_rows
-from .ingestion import CODE_RE, nfc
-from .settings import Settings
-from .store import dumps, open_db, read_jsonl, utcnow, write_text_atomic
+from ..corpus.ingestion import CODE_RE, nfc
+from ..retrieval.chunking import table_rows
+from ..settings import Settings
+from ..storage.store import dumps, open_db, read_jsonl, utcnow, write_text_atomic
 
 QUESTION_TYPES = {
     "late_content", "table_fact", "numeric_qualifier", "repeated_code", "requirement_detail", "condition",
@@ -349,7 +349,7 @@ def row_critical(row: dict) -> bool:
 
 def row_scope(row: dict) -> list[tuple]:
     """[(DocRef, extraction_id)] the row's retrieval is restricted to (one per compared document)."""
-    from .contracts import DocRef
+    from ..contracts import DocRef
 
     if is_gold_row(row):
         return [(DocRef(s["doc_id"], s["source_hash"]), s.get("extraction_id")) for s in row.get("scope") or []]
@@ -842,7 +842,7 @@ def aggregate(results: list[dict], skipped: list[dict]) -> dict:
                       "packed_complete": rate(rows, "packed_complete")["rate"]}
     latencies = [r["timings_ms"]["total"] for r in results if r.get("timings_ms")]
     codes = [r["code_check"] for r in results if r.get("code_check")]
-    from .dense import percentile
+    from ..retrieval.dense import percentile
 
     gold = [r for r in passage if "unlabelled@5" in r["metrics"]]
     pool = {"ndcg_pool": {"judged_units": "required evidence groups (predeclared source spans)",
@@ -899,7 +899,7 @@ def _run_dir(settings: Settings, run_id: str) -> Path:
 
 
 def dense_policy(model: str) -> str:
-    from .dense import embed_policy
+    from ..retrieval.dense import embed_policy
 
     return embed_policy(model)
 
@@ -907,7 +907,7 @@ def dense_policy(model: str) -> str:
 def embedding_identity(settings: Settings) -> dict:
     """What a run records of its embedding model. The OpenAI identity stays {model, dims} so runs measured before
     other models existed keep their IDs; a local or Gemini model adds its pinned revision and prefix policy."""
-    from .models import EMBEDDINGS
+    from ..retrieval.models import EMBEDDINGS
 
     spec = EMBEDDINGS[settings.embedding_model]
     out = {"model": settings.embedding_model, "dims": settings.embedding_dimensions}
@@ -931,7 +931,7 @@ def _ready_dense_for(settings: Settings, index_version: str) -> str | None:
 
 def _frozen_config(settings: Settings, label: str, dataset: str, dataset_sha: str, index, dense, analyzer,
                    extra: dict | None = None, population: tuple[str, int] | None = None) -> dict:
-    from .retrieval import RUN_MODES, WhitespaceAnalyzer, analyzer_fingerprint, corpus_route_record
+    from ..retrieval.retrieval import RUN_MODES, WhitespaceAnalyzer, analyzer_fingerprint, corpus_route_record
 
     return {"eval_version": EVAL_VERSION, "label": label, "mode": RUN_MODES[label], "dataset": dataset,
             "dataset_sha256": dataset_sha, "population_sha256": population[0] if population else None,
@@ -954,7 +954,7 @@ def _execute(settings: Settings, index, analyzer, rows: list[dict], mode: str, d
              reranker=None, rerank_depth=None, unscoped: bool = False, rerank_protect: int = 0) -> list[dict]:
     """`unscoped` asks every question once over the whole corpus (the all-documents scope) instead of its row's
     selected documents; every evidence group is then scored on that single ranking."""
-    from .retrieval import corpus_scope, retrieve
+    from ..retrieval.retrieval import corpus_scope, retrieve
 
     corpus = corpus_scope(settings, index) if unscoped else None
     results = []
@@ -998,7 +998,7 @@ def _execute(settings: Settings, index, analyzer, rows: list[dict], mode: str, d
 def _write_run(settings: Settings, run_id: str, config: dict, results: list[dict], scores: dict) -> None:
     d = _run_dir(settings, run_id)
     write_text_atomic(d / "config.json", json.dumps(config, ensure_ascii=False, indent=1))
-    from .store import write_jsonl_atomic
+    from ..storage.store import write_jsonl_atomic
 
     write_jsonl_atomic(d / "traces.jsonl", results)
     write_text_atomic(d / "scores.json", json.dumps(scores, ensure_ascii=False, indent=1))
@@ -1049,9 +1049,9 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
     """Retrieval-only runs on identical source/scope/query versions; no answer generation. Query vectors are
     computed once, cached, and shared by D and H. A run whose configuration is already frozen with scores is
     reused unless `force`."""
-    from . import dense as dense_mod
-    from .retrieval import RUN_MODES, KeywordIndex, RetrievalError
-    from .store import get_app_setting
+    from ..retrieval import dense as dense_mod
+    from ..retrieval.retrieval import RUN_MODES, KeywordIndex, RetrievalError
+    from ..storage.store import get_app_setting
 
     bad = [x for x in labels if x not in RUN_MODES or x == "HR"]
     if bad:
@@ -1065,7 +1065,7 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
     rows, skipped, dataset_sha = load_eval_rows(settings, dataset, extractions=index.source_extraction)
     if not rows:
         raise EvaluationError("no independently reviewed dev rows to evaluate")
-    from .retrieval import index_compatibility
+    from ..retrieval.retrieval import index_compatibility
 
     if index_compatibility(index, analyzer):
         raise EvaluationError(index_compatibility(index, analyzer))
@@ -1152,11 +1152,12 @@ def code_fingerprint() -> dict:
     revision."""
     import subprocess
 
-    from .settings import REPO_ROOT
+    from ..settings import REPO_ROOT
 
     digest = hashlib.sha256()
-    for path in sorted((REPO_ROOT / "src" / "rfp_assistant").glob("*.py")):
-        digest.update(path.name.encode() + b"\0" + path.read_bytes())
+    package = REPO_ROOT / "src" / "rfp_assistant"
+    for path in sorted(package.rglob("*.py")):
+        digest.update(path.relative_to(package).as_posix().encode() + b"\0" + path.read_bytes())
     out = {"source_sha256": digest.hexdigest(), "git_revision": None, "git_dirty": None}
     try:
         rev = subprocess.run(["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"], capture_output=True, text=True,
@@ -1227,16 +1228,16 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
     under `users` concurrent queries, and the promotion gate. A load failure records the bypass."""
     from concurrent.futures import ThreadPoolExecutor
 
-    from . import dense as dense_mod
-    from .dense import percentile
-    from .retrieval import KeywordIndex
-    from .store import get_app_setting
+    from ..retrieval import dense as dense_mod
+    from ..retrieval.dense import percentile
+    from ..retrieval.retrieval import KeywordIndex
+    from ..storage.store import get_app_setting
 
     with open_db(settings.db_path) as conn:
         index_version = index_version or get_app_setting(conn, "active_index")
     index = KeywordIndex.load(settings, index_version)
     rows, skipped, dataset_sha = load_eval_rows(settings, dataset, extractions=index.source_extraction)
-    from .retrieval import index_compatibility
+    from ..retrieval.retrieval import index_compatibility
 
     if index_compatibility(index, analyzer):
         raise EvaluationError(index_compatibility(index, analyzer))
@@ -1249,7 +1250,7 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
     h_config, h_scores = load_run(settings, h_run)
     if h_config.get("population_sha256") != population_identity(rows, skipped):
         raise EvaluationError("the evaluated population changed since the frozen H run; rerun H before the trial")
-    from .retrieval import analyzer_fingerprint
+    from ..retrieval.retrieval import analyzer_fingerprint
 
     if h_config["analyzer"] != analyzer_fingerprint(analyzer):
         raise EvaluationError("the analyzer differs from the frozen H run; rerun H before the trial")
@@ -1374,8 +1375,8 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
 
 def run_errors(settings: Settings, run_id: str) -> list[str]:
     """Why a run cannot serve: incomplete, superseded policy, failed or unmeasured gate, artifacts not ready."""
-    from . import dense as dense_mod
-    from .retrieval import KeywordIndex, RetrievalError, corpus_route_record
+    from ..retrieval import dense as dense_mod
+    from ..retrieval.retrieval import KeywordIndex, RetrievalError, corpus_route_record
 
     config, scores = load_run(settings, run_id)
     errors = []
@@ -1402,7 +1403,7 @@ def run_errors(settings: Settings, run_id: str) -> list[str]:
         index = KeywordIndex.load(settings, config["index_version"])
         if index.manifest_hash != config["index_manifest_hash"]:
             errors.append("keyword index manifest changed since the run")
-        from .retrieval import index_compatibility
+        from ..retrieval.retrieval import index_compatibility
 
         if index_compatibility(index):
             errors.append(index_compatibility(index))
@@ -1428,7 +1429,7 @@ def decision_errors(settings: Settings, run_id: str, decision: dict) -> list[str
         errors.append("decision requires 'decided_by' (the person who picks the row); the note is optional")
     embedding = config.get("embedding")
     if embedding:
-        from .models import EMBEDDINGS
+        from ..retrieval.models import EMBEDDINGS
 
         spec = EMBEDDINGS.get(embedding.get("model"))
         if spec is None:
@@ -1485,7 +1486,7 @@ def activate_run(settings: Settings, run_id: str, decision_path: Path, actor: st
 
 def activate_decision(settings: Settings, run_id: str, decision: dict, actor: str) -> dict:
     """`activate-run` with the decision given directly: the 실험 비교 view sends the person's name and note."""
-    from .store import get_app_setting, set_app_setting, tx
+    from ..storage.store import get_app_setting, set_app_setting, tx
 
     config, scores = load_run(settings, run_id)
     errors = decision_errors(settings, run_id, decision)
@@ -1661,8 +1662,8 @@ def draft_activation(settings: Settings, run_ids: list[str], out_path: Path, sel
 def write_phase2_report(settings: Settings) -> Path:
     """`.runtime/releases/phase-2/report.md`: what is actually recorded in this data directory, nothing
     assumed. Missing steps appear as missing."""
-    from .ingestion import identity_report, manifest_report, review_coverage
-    from .store import get_app_setting
+    from ..corpus.ingestion import identity_report, manifest_report, review_coverage
+    from ..storage.store import get_app_setting
 
     manifest = manifest_report(settings)
     coverage = review_coverage(settings)
@@ -1678,7 +1679,7 @@ def write_phase2_report(settings: Settings) -> Path:
             "SELECT purpose, stage, state, COUNT(*) AS n, COALESCE(SUM(settled_micro_usd), 0) AS settled, "
             "COALESCE(SUM(reserved_micro_usd), 0) AS reserved FROM attempts GROUP BY purpose, stage, state")]
         envelopes = json.loads(conn.execute("SELECT envelopes_json FROM budget_settings WHERE id = 1").fetchone()[0])
-        from .budget import _purpose_used
+        from ..gateway.budget import _purpose_used
 
         used = {k: _purpose_used(conn, k) for k in envelopes}
         activations = [dict(r) for r in conn.execute("SELECT run_id, config_json, decision_json, actor, created_at "
@@ -1766,7 +1767,7 @@ def write_phase2_report(settings: Settings) -> Path:
     L += ["", "Envelopes (used incl. open reservations / envelope): " + ", ".join(
         f"{k} {usd(used[k])}/{usd(v)}" for k, v in envelopes.items()), "",
           "## Selection", ""]
-    from .service import active_serving, describe_serving
+    from ..service.service import active_serving, describe_serving
 
     now = active_serving(settings)  # what requests serve; a stored activation can be refused (routing changed)
     if active_run:
@@ -2485,7 +2486,7 @@ def frozen_dataset(settings: Settings, name: str) -> dict | None:
 
 
 def record_audit(settings: Settings, actor: str, action: str, target: str, reason: str, details: dict) -> str:
-    from .store import tx
+    from ..storage.store import tx
 
     event_id = str(uuid.uuid4())
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):

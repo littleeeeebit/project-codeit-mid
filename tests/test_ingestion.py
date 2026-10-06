@@ -5,8 +5,11 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest import mock
 
-from rfp_assistant import chunking, evaluation, ingestion, store
+from rfp_assistant.corpus import ingestion
+from rfp_assistant.evaluation import evaluation
+from rfp_assistant.retrieval import chunking
 from rfp_assistant.settings import Settings
+from rfp_assistant.storage import store
 from tests import fixtures
 
 NESTED_HWP = """<HwpDoc><BodyText><SectionDef><ColumnSet>

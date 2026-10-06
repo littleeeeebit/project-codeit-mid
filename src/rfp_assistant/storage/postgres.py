@@ -278,9 +278,9 @@ def init_schema(target: Target, schema: str, version: int):
         if current is not None and current > version:
             raise RuntimeError("PostgreSQL schema is newer than this application")
         conn.raw.execute(schema.replace("INTEGER", "BIGINT").replace("TEXT", 'TEXT COLLATE "C"'))
-        from .vector_store import SCHEMA as vector_schema
+        from ..retrieval.vector_store import SCHEMA as vector_schema
         conn.raw.execute(vector_schema)
-        from .models import EXTERNAL_SCHEMA
+        from ..retrieval.models import EXTERNAL_SCHEMA
         conn.raw.execute(EXTERNAL_SCHEMA)
         conn.raw.execute("CREATE TABLE IF NOT EXISTS application_mutex (id bigint PRIMARY KEY CHECK(id=1))")
         conn.raw.execute("INSERT INTO application_mutex VALUES (1) ON CONFLICT DO NOTHING")

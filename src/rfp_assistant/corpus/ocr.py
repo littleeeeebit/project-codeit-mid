@@ -16,11 +16,11 @@ import uuid
 from contextlib import nullcontext
 from pathlib import Path
 
+from ..settings import Settings, read_api_key
+from ..storage.postgres import host_path
+from ..storage.store import LockHeld, ProcessLock, dumps, open_db, utcnow, write_jsonl_atomic
 from .fidelity import IMAGE_MIN_AREA, norm
 from .ingestion import printed_pdf_path
-from .postgres import host_path
-from .settings import Settings, read_api_key
-from .store import LockHeld, ProcessLock, dumps, open_db, utcnow, write_jsonl_atomic
 
 LOCAL_MODEL = "PaddlePaddle/PaddleOCR-VL-1.6"
 LOCAL_REVISION = "c5630abae1d940eafe0697512a0325494b02ab42"

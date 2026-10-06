@@ -15,9 +15,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from . import auth, budget, dense, evaluation, generation, gold, store, tracing
-from .contracts import Principal
-from .settings import Settings, read_api_key
+from ..contracts import Principal
+from ..evaluation import evaluation, gold
+from ..gateway import budget, generation, tracing
+from ..retrieval import dense
+from ..settings import Settings, read_api_key
+from ..storage import store
+from . import auth
 
 MODEL = "gpt-6-luna"
 DRAFTER = "api-gpt-6-luna"
@@ -304,7 +308,7 @@ def generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, tra
         if not out.resolve().is_relative_to((settings.data_dir / "sealed").resolve()):
             raise gold.GoldError("Sealed drafts must stay inside the private sealed directory")
     try:
-        from .postgres import gateway_lock
+        from ..storage.postgres import gateway_lock
         lock = gateway_lock(settings.db_path, settings.data_dir)
     except store.LockHeld:
         raise gold.GoldError("another process already owns the paid gateway for this data directory") from None

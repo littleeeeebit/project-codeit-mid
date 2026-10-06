@@ -14,10 +14,12 @@ import time
 import uuid
 from pathlib import Path
 
-from . import budget, service, store
-from .contracts import AnswerRequest, Principal
-from .generation import FakeTransport, ProviderError
-from .settings import REPO_ROOT, Settings
+from ..contracts import AnswerRequest, Principal
+from ..gateway import budget
+from ..gateway.generation import FakeTransport, ProviderError
+from ..settings import REPO_ROOT, Settings
+from ..storage import store
+from . import service
 
 PHASE3_DIR = ("releases", "phase-3")
 

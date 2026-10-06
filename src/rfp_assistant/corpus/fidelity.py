@@ -17,9 +17,9 @@ import unicodedata
 from collections import Counter
 from pathlib import Path
 
+from ..settings import Settings
+from ..storage.store import dumps, open_db, tx, utcnow
 from .ingestion import IngestionError, load_elements, printed_pdf_path, sha256_file
-from .settings import Settings
-from .store import dumps, open_db, tx, utcnow
 
 FIDELITY_VERSION = "hancom-print-textlayer-1"
 VIEWER = Path(r"C:\Program Files (x86)\Hnc\Office 2024 Viewer\HOffice130\Bin\hwpviewer.exe")

@@ -6,9 +6,11 @@ import uuid
 from pathlib import Path
 from unittest import mock
 
-from rfp_assistant import auth, budget, generation, service, store
 from rfp_assistant.contracts import AnswerRequest, EvidenceUnit
-from rfp_assistant.generation import FakeTransport, ProviderError, ProviderResponse
+from rfp_assistant.gateway import budget, generation
+from rfp_assistant.gateway.generation import FakeTransport, ProviderError, ProviderResponse
+from rfp_assistant.service import auth, service
+from rfp_assistant.storage import store
 from tests import fixtures
 
 

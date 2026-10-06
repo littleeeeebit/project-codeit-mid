@@ -22,12 +22,12 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import dense as dense_mod
+from ..retrieval import dense as dense_mod
 from . import evaluation as ev
 from . import judge_set
-from .models import EMBEDDINGS, GEMINI_PROVIDER, RERANKERS, ModelError, embedding_spec, free_gpu, model_size_bytes, reranker_spec
-from .settings import Settings
-from .store import dumps, open_db, tx, utcnow, write_text_atomic
+from ..retrieval.models import EMBEDDINGS, GEMINI_PROVIDER, RERANKERS, ModelError, embedding_spec, free_gpu, model_size_bytes, reranker_spec
+from ..settings import Settings
+from ..storage.store import dumps, open_db, tx, utcnow, write_text_atomic
 
 COMPARE_VERSION = "compare-1"
 MEMBER = "owner-compare"
@@ -113,7 +113,7 @@ def load_matrix(name_or_path: str) -> tuple[str, dict]:
 
 def serving_base(settings: Settings) -> dict:
     """The serving run's value of every axis: what a row keeps unless its matrix varies it."""
-    from .service import active_serving
+    from ..service.service import active_serving
 
     cfg = active_serving(settings)
     limits = cfg.get("limits") or {}
@@ -203,8 +203,8 @@ def populations(settings: Settings, index=None) -> dict:
 
 def keyword_index(settings: Settings, analyzer, profile: str):
     """The profile's keyword index over the active index's source policy, built once and never activated."""
-    from .retrieval import KeywordIndex, build_keyword_index
-    from .store import get_app_setting
+    from ..retrieval.retrieval import KeywordIndex, build_keyword_index
+    from ..storage.store import get_app_setting
 
     with open_db(settings.db_path) as conn:
         active = get_app_setting(conn, "active_index")
@@ -254,7 +254,7 @@ def _estimates_dir(settings: Settings) -> Path:
 
 
 def _missing_queries(s: Settings, pops: dict) -> list[str]:
-    from .vector_store import cached_hashes
+    from ..retrieval.vector_store import cached_hashes
 
     questions = sorted({r["question"] for p in pops.values() for r in p["rows"] if ev.is_passage_row(r)})
     hashes = {dense_mod.payload_hash(dense_mod.normalize_payload(q), s.embedding_model, s.embedding_dimensions,
@@ -266,7 +266,7 @@ def _missing_queries(s: Settings, pops: dict) -> list[str]:
 def paid_estimate(settings: Settings, s: Settings, index, pops: dict | None = None) -> dict:
     """The priced plan of one paid model over this index: corpus payloads and comparison queries not yet cached.
     Its ID binds the model, index manifest and missing payload set; any change makes a new estimate."""
-    from . import budget
+    from ..gateway import budget
 
     pops = pops or populations(settings, index)
     queries = _missing_queries(s, pops)
@@ -283,7 +283,7 @@ def paid_estimate(settings: Settings, s: Settings, index, pops: dict | None = No
                 "query_tokens": q_tokens, "query_micro_usd": q_cost, "payloads_to_embed": corpus["payloads_to_embed"],
                 "fingerprint": corpus["fingerprint"]}
     else:
-        from .models import external_status, gemini_cost_micro
+        from ..retrieval.models import external_status, gemini_cost_micro
 
         corpus = dense_mod.plan_gemini(s, index.version)
         client = dense_mod._gemini_client(s)
@@ -438,7 +438,7 @@ def _questions(results: list[dict], population: str) -> list[dict]:
 
 def measure(settings: Settings, s: Settings, label: str, index, analyzer, pops: dict, dense=None, vectors=None,
             reranker=None, protect: int = 0) -> dict:
-    from .retrieval import RUN_MODES
+    from ..retrieval.retrieval import RUN_MODES
 
     mode = RUN_MODES[label]
     kw = dict(dense=dense, vectors=vectors, reranker=reranker, rerank_depth=s.fused_top_k if reranker else None,
@@ -508,7 +508,7 @@ def query_vectors(settings: Settings, s: Settings, pops: dict, transport,
             if qi.get("embed_ms") is not None and name == "dev":
                 info["embed_ms"].append(qi["embed_ms"])
     if embedding_spec(s.embedding_model).backend == "local":
-        from .models import local_embedder
+        from ..retrieval.models import local_embedder
 
         model = local_embedder(s.embedding_model)
         info["embed_ms"] = []
@@ -594,7 +594,7 @@ class Runner:
         version = (serving or {}).get("index_version")
         if version and (serving or {}).get("profile") == profile:
             if version not in self._indexes:
-                from .retrieval import KeywordIndex
+                from ..retrieval.retrieval import KeywordIndex
 
                 self._indexes[version] = KeywordIndex.load(self.settings, version)
             return self._indexes[version]
@@ -714,7 +714,7 @@ class Runner:
                                     "reason": failure_reason(exc)})
 
     def _rerank_row(self, key: str, row: dict, base: dict, s: Settings, index) -> dict:
-        from .models import LocalRerankerModel
+        from ..retrieval.models import LocalRerankerModel
 
         h = self.baseline("H", base)
         if h.get("status") != "complete":
@@ -806,7 +806,7 @@ class Runner:
                                 for o in only):
                 cell = self.recorded(row)
             else:
-                from .models import unload_embedders
+                from ..retrieval.models import unload_embedders
 
                 unload_embedders(keep=row.get("embedding"))  # one local model on the GPU at a time
                 cell = self.run_row(row, base)
@@ -1022,7 +1022,7 @@ def lost_to_reparse(runner: "Runner", served: str, rebuilt: str) -> list[str]:
     """Questions the served index is graded on that the rebuilt one cannot be: their evidence is pinned to an
     extraction a re-parse replaced. The rebuilt rows leave them out until a person reviews their evidence again,
     so a comparison that lost any is not a verified one."""
-    from .retrieval import KeywordIndex
+    from ..retrieval.retrieval import KeywordIndex
 
     if rebuilt == served:
         return []

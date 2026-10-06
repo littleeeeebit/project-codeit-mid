@@ -17,11 +17,13 @@ from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import budget, evaluation, generation, service
-from .contracts import AnswerRequest, DocRef, Principal
-from .evaluation import EvaluationError
-from .settings import Settings
-from .store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
+from ..contracts import AnswerRequest, DocRef, Principal
+from ..evaluation import evaluation
+from ..evaluation.evaluation import EvaluationError
+from ..gateway import budget, generation
+from ..settings import Settings
+from ..storage.store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
+from . import service
 
 ANSWER_EVAL_VERSION = "answer-eval-1"
 EVAL_MEMBER = "evaluation-job"  # fixed: resuming under another typed name must find the same idempotency keys
@@ -132,7 +134,7 @@ def _save_progress(settings: Settings, run_id: str, progress: dict) -> None:
 
 
 def _retrieval_finalists(settings: Settings, dataset: str, population: str, run_ids: list[str] | None) -> list[dict]:
-    from .store import get_app_setting
+    from ..storage.store import get_app_setting
 
     if not run_ids:
         with open_db(settings.db_path) as conn:
@@ -241,7 +243,7 @@ def _plan_inputs(settings: Settings, action: str, dataset: str | None, run_ids: 
             rows = [r for r in rows if r["question_id"] in wanted]
             extra = {"question_ids": wanted}
     elif action == "sealed":
-        from . import sealed
+        from ..evaluation import sealed
 
         freeze = sealed.load_freeze(settings, freeze_id or "")
         problems = sealed.freeze_problems(settings, freeze)
@@ -273,7 +275,7 @@ def plan_run(settings: Settings, action: str, dataset: str | None = None, run_id
     inputs = _plan_inputs(settings, action, dataset, run_ids, freeze_id, question_ids)
     run_id = inputs["run_id"]
     if action == "sealed":
-        from . import sealed
+        from ..evaluation import sealed
 
         run_id = sealed.sealed_run_id(settings, run_id, post_test)
     done = {k for k, r in load_progress(settings, run_id).items() if r["status"] == "done"}
@@ -381,7 +383,7 @@ def begin_answers(settings: Settings, estimate_id: str, actor: str, post_test_re
                           est.get("question_ids"))
     run_id = est["run_id"]
     if est["action"] == "sealed":
-        from . import sealed
+        from ..evaluation import sealed
 
         sealed.begin(settings, est, actor, post_test_reason)
     d = run_dir(settings, run_id)
@@ -681,7 +683,7 @@ def aggregate_answers(scored: list[dict]) -> dict:
                       "verdict": c["verdict"]}
                      for s in answerable for c in s["claims"]
                      if c["critical_kind"] and c["verdict"] in ("contested", "needs_review")]
-    from .dense import percentile
+    from ..retrieval.dense import percentile
 
     latencies = [s["latency_ms"] for s in scored if s.get("latency_ms") is not None]
     by_type: dict[str, dict] = {}
@@ -760,7 +762,7 @@ def ledger_cost(settings: Settings, run_id: str, finalist: str) -> dict:
 
 def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) -> dict:
     """Scores the recorded rows (free; no generation) and writes scores.json and report.md."""
-    from .retrieval import KeywordIndex
+    from ..retrieval.retrieval import KeywordIndex
 
     d = run_dir(settings, run_id)
     config = json.loads((d / "config.json").read_text(encoding="utf-8"))
@@ -1032,7 +1034,7 @@ def latency_run(settings: Settings, owner: service.Resources, estimate_id: str, 
         waves.append({"wave": w + 1, "wall_ms": round((time.perf_counter() - start) * 1000, 1), "requests": timings})
         if any(t["status"] == "budget_blocked" or t["billing"] == "unknown" for t in timings):
             break
-    from .dense import percentile
+    from ..retrieval.dense import percentile
 
     ok = [t["ms"] for wv in waves for t in wv["requests"] if t["status"] not in TECHNICAL]
     warm = [t["ms"] for wv in waves[1:] for t in wv["requests"] if t["status"] not in TECHNICAL]
