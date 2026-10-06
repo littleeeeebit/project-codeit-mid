@@ -126,13 +126,12 @@ class PostgreSQLTests(unittest.TestCase):
         attempt = self.reserve(self.request("before-loss"))["attempt_id"]
         budget.mark_dispatching(self.target, attempt)
         self.admin.execute("SELECT pg_terminate_backend(%s)", (self.owner.conn.info.backend_pid,))
-        transport = generation.OpenAITransport.__new__(generation.OpenAITransport)
-        transport._owner_check = self.owner.check
-        transport._client = mock.Mock()
+        transport = generation.OpenAITransport(None, 5, owner_check=self.owner.check)
+        transport._default = mock.Mock()
         with self.assertRaises(generation.ProviderError) as stopped:
             transport.embed(model="text-embedding-3-large", inputs=["test"], dimensions=768)
         self.assertTrue(stopped.exception.pre_execution)
-        transport._client.embeddings.create.assert_not_called()
+        transport._default.embeddings.create.assert_not_called()
         with self.assertRaisesRegex(RuntimeError, "ownership was lost"):
             self.reserve(self.request("after-loss"))
         self.owner.release()

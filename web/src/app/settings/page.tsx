@@ -21,7 +21,7 @@ function ApiKeySection() {
     try {
       const result = await api.PUT("/api/settings/api-key", { body: { api_key: key } });
       if (result.error) { setMessage(errorText(result.error)); return; }
-      setMessage("API 키를 확인하고 적용했습니다. 지금부터 유료 답변에 이 키를 씁니다.");
+      setMessage("API 키를 확인하고 이 브라우저에 적용했습니다. 이 브라우저의 유료 답변만 이 키를 씁니다.");
     } catch { setMessage("서버에 연결하지 못했습니다."); }
     finally { setKey(""); setSaving(false); }
   }
@@ -29,10 +29,10 @@ function ApiKeySection() {
   const s = status.data;
   return (
     <section className="space-y-4 rounded-xl border p-6" aria-labelledby="api-key-heading">
-      <h2 id="api-key-heading" className="text-lg font-semibold">OpenAI API 키</h2>
+      <h2 id="api-key-heading" className="text-lg font-semibold">내 OpenAI API 키</h2>
       {s && (s.configured
-        ? <p className="text-sm">설정됨 · {s.set_by} · {s.set_at}</p>
-        : <p className="text-sm font-medium text-destructive">설정되지 않았습니다. 키를 입력해야 질문에 답할 수 있습니다.</p>)}
+        ? <p className="text-sm">이 브라우저에 설정됨 · {s.set_by}{s.set_at ? ` · ${s.set_at}` : ""}</p>
+        : <p className="text-sm font-medium text-destructive">이 브라우저에는 키가 없습니다. 본인 키를 입력해야 유료 답변을 받을 수 있습니다.</p>)}
       {status.error && <p role="alert">{status.error}</p>}
       <form onSubmit={save} className="space-y-4">
         <div className="space-y-2">
@@ -40,7 +40,7 @@ function ApiKeySection() {
           <Input id="api-key" type="password" autoComplete="off" spellCheck={false} value={key}
                  onChange={(event) => setKey(event.target.value)} required placeholder="sk-…" />
         </div>
-        <p className="text-sm text-muted-foreground">키는 서버 프로세스 메모리에만 있고 파일, 데이터베이스, 로그 어디에도 저장되지 않으며 화면에 다시 표시되지 않습니다. 서버가 다시 시작되면 다시 입력해야 합니다.</p>
+        <p className="text-sm text-muted-foreground">키는 입력한 브라우저에서만 쓰입니다. 다른 팀원의 브라우저에는 보이지도 쓰이지도 않습니다. 서버 프로세스 메모리에만 있고 파일, 데이터베이스, 로그 어디에도 저장되지 않으며 화면에 다시 표시되지 않습니다. 서버가 다시 시작되거나 브라우저를 닫으면 다시 입력해야 합니다. 사용 금액은 모두 위의 공유 한도에 함께 기록됩니다.</p>
         <Button type="submit" disabled={saving || !key.trim()}>{saving ? "확인 중…" : "키 확인 후 적용"}</Button>
         <p role="status" aria-live="polite">{message}</p>
       </form>

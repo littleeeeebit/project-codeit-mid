@@ -40,6 +40,7 @@ def create_app(resources=None) -> FastAPI:
                 app.state.res.close()
 
     app = FastAPI(title="RFP assistant", version="1", lifespan=lifespan)
+    app.add_middleware(_KeySession)
 
     @app.exception_handler(service.ServiceError)
     async def _service_error(_: Request, exc: Exception):
@@ -54,6 +55,24 @@ def create_app(resources=None) -> FastAPI:
     if WEB.is_dir():  # the built screens (`cd web && npm run build`); mounted last, so /api/* stays the API's
         app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
     return app
+
+
+KEY_COOKIE = "bidmate_key_session"
+
+
+class _KeySession:
+    """Paid work in a request pays with the key its browser entered on 설정 (the session cookie), or none."""
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        session = Request(scope).cookies.get(KEY_COOKIE) if scope["type"] == "http" else None
+        token = service.KEY_SESSION.set(session)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            service.KEY_SESSION.reset(token)
 
 
 async def _forbidden(_: Request, exc: Exception):
@@ -306,8 +325,11 @@ def _routes(app: FastAPI) -> None:
         return service.api_key_status(res, member)
 
     @app.put("/api/settings/api-key", response_model=ApiKeyStatus)
-    def api_key(body: ApiKeyIn, res: Res, member: Member):
-        return service.set_api_key(res, member, body.api_key)
+    def api_key(body: ApiKeyIn, res: Res, member: Member, response: Response):
+        session, status = service.set_api_key(res, member, body.api_key)
+        # Not the key: an unguessable handle to it, sent only back to this server and unreadable by scripts.
+        response.set_cookie(KEY_COOKIE, session, httponly=True, samesite="strict", path="/")
+        return status
 
     @app.get("/api/documents", response_model=list[Document])
     def documents(res: Res, member: Member, query: str = "", institution: str = "", amount_min: int | None = None,

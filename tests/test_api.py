@@ -57,30 +57,43 @@ class ApiFlowTest(unittest.TestCase):
             self.assertEqual(self.client.put("/api/budget/limit", json={"cap_micro_usd": invalid, "reason": "test"}).status_code, 422)
         self.assertEqual(self.client.put("/api/budget/limit", json={"cap_micro_usd": 10_000_000, "reason": " "}).status_code, 400)
 
-    def test_settings_api_key_is_checked_held_in_memory_and_never_shown(self):
+    def test_an_api_key_belongs_to_the_browser_that_entered_it_and_is_never_shown(self):
         secret = "sk-test-never-shown-0123456789"
-        with mock.patch.object(service, "read_api_key", return_value=None), \
-                mock.patch.object(service.tracing.Tracing, "from_settings", return_value=None):
+        with mock.patch.object(service, "read_api_key", return_value=None),                 mock.patch.object(service.tracing.Tracing, "from_settings", return_value=None):
             res = service.Resources(dataclasses.replace(self.env.settings, provider="openai"))
         try:
-            client = TestClient(api.create_app(res))
-            client.__enter__()
-            self.addCleanup(client.__exit__, None, None, None)
-            self.assertEqual(client.get("/api/settings/api-key", headers=self.headers).json()["configured"], False)
+            app = api.create_app(res)
+            owner, teammate = TestClient(app), TestClient(app)  # two browsers: separate cookie jars
+            for browser in (owner, teammate):
+                browser.__enter__()
+                self.addCleanup(browser.__exit__, None, None, None)
+            self.assertEqual(owner.get("/api/settings/api-key", headers=self.headers).json()["configured"], False)
             with mock.patch.object(service.generation, "check_api_key", return_value="OpenAI가 이 키를 거부했습니다."):
-                refused = client.put("/api/settings/api-key", headers=self.headers, json={"api_key": secret})
+                refused = owner.put("/api/settings/api-key", headers=self.headers, json={"api_key": secret})
             self.assertEqual(refused.status_code, 400)
             self.assertIsNone(res.transport)
             with mock.patch.object(service.generation, "check_api_key", return_value=None):
-                out = client.put("/api/settings/api-key", headers=self.headers, json={"api_key": secret})
+                out = owner.put("/api/settings/api-key", headers=self.headers, json={"api_key": secret})
             self.assertEqual(out.status_code, 200, out.text)
             self.assertEqual((out.json()["configured"], out.json()["set_by"]), (True, "김검토"))
-            self.assertIsInstance(res.transport, service.generation.OpenAITransport)
-            self.assertEqual(res.provider_note, "")
+            cookie = out.headers["set-cookie"]
+            self.assertIn("httponly", cookie.lower())
+            self.assertEqual(owner.get("/api/settings/api-key").json()["configured"], True)
+            self.assertEqual(teammate.get("/api/settings/api-key").json(),
+                             {"configured": False, "set_by": None, "set_at": None})
+            session = owner.cookies[api.KEY_COOKIE]
+            token = service.KEY_SESSION.set(session)
+            self.assertEqual(res.paid_refusal(), "")
+            service.KEY_SESSION.reset(token)
+            self.assertEqual(res.paid_refusal(), service.generation.NO_API_KEY)  # no session: the teammate
+            with self.assertRaises(service.generation.ProviderError) as refused_call:
+                res.transport.chat(model="m", messages=[], response_format=None, max_completion_tokens=1,
+                                   reasoning_effort=None)
+            self.assertTrue(refused_call.exception.pre_execution)  # refused before dispatch: nothing charged
             with service.open_db(res.settings.db_path) as conn:
                 rows = [dict(r) for r in conn.execute("SELECT * FROM audit_events WHERE action = 'set_api_key'")]
             self.assertEqual(len(rows), 1)
-            for shown in (out.text, refused.text, client.get("/api/settings/api-key").text, repr(rows)):
+            for shown in (out.text, cookie, refused.text, owner.get("/api/settings/api-key").text, repr(rows)):
                 self.assertNotIn(secret, shown)
         finally:
             res.close()
