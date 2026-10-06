@@ -142,6 +142,18 @@ class LoginTest(unittest.TestCase):
         self.assertEqual(self.client.get("/api/auth/me").status_code, 200)
         self.assertEqual(self.client.post("/api/auth/logout", headers={"origin": "http://testserver"}).status_code, 204)
 
+    def test_only_a_local_run_trusts_the_next_dev_server_origin(self):
+        # `npm run dev` forwards /api/* with the browser's Origin (:8510) while Host becomes the API's (:8511)
+        proxied = {"host": "127.0.0.1:8511"}
+        local = TestClient(api.create_app(None, service.Login(local_member="dev")))
+        for origin, status in (("http://127.0.0.1:8510", 204), ("http://localhost:8510", 204),
+                               ("http://127.0.0.1:8000", 403), ("http://127.0.0.1:8510.evil", 403)):
+            out = local.post("/api/auth/logout", headers={**proxied, "origin": origin})
+            self.assertEqual(out.status_code, status, origin)
+        fake_hub.sign_in(self.client, "spai1302")  # the shared host never runs local mode: no dev origin there
+        out = self.client.post("/api/auth/logout", headers={**proxied, "origin": "http://127.0.0.1:8510"})
+        self.assertEqual(out.status_code, 403)
+
     def test_without_hub_settings_the_api_stays_closed(self):
         hub_env = fake_hub.hub().env(fake_hub.TEST_CALLBACK, ["spai1302"])
         partial = {k: v for k, v in hub_env.items() if k != "BIDMATE_OAUTH_CLIENT_SECRET"}

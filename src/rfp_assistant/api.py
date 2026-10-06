@@ -85,6 +85,10 @@ ACCOUNT_CHANGED = "X-BidMate-Account-Changed"
 STATE_COOKIE = "bidmate_login_state"
 SIGN_IN = ("/api/auth/login", "/api/auth/callback", "/api/auth/logout")  # the only /api routes open without a session
 SAFE_METHODS = ("GET", "HEAD", "OPTIONS")
+# `npm run dev` (web/package.json) serves the screens on :8510 and forwards /api/* here keeping the browser's Origin
+# while the Host becomes this API's. Trusted only with BIDMATE_LOCAL_MEMBER, which the shared host never runs
+# (auth.Login.from_env refuses it next to the hub settings), so a notebook page on :8000 stays refused everywhere.
+DEV_ORIGINS = ("127.0.0.1:8510", "localhost:8510")
 
 
 class _Session:
@@ -102,7 +106,8 @@ class _Session:
             return await self.app(scope, receive, send)
         request, login = Request(scope), scope["app"].state.login
         origin = request.headers.get("origin")
-        if request.method not in SAFE_METHODS and origin and urlsplit(origin).netloc != request.headers.get("host"):
+        trusted = {request.headers.get("host"), *(DEV_ORIGINS if login.local_member else ())}
+        if request.method not in SAFE_METHODS and origin and urlsplit(origin).netloc not in trusted:
             return await JSONResponse({"detail": "다른 사이트에서 보낸 요청은 받지 않습니다."}, 403)(scope, receive, send)
         if login.problem:
             return await JSONResponse({"detail": login.problem}, 503)(scope, receive, send)
