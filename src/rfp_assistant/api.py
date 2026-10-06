@@ -4,9 +4,10 @@
 Members sign in with their JupyterHub account. BidMate is the hub's OAuth client (the `bidmate` service):
 /api/auth/login sends the browser to the hub's /hub/api/oauth2/authorize, /api/auth/callback checks the state,
 exchanges the code at the hub's token endpoint from this server, reads /hub/api/user and, for a username on
-BIDMATE_ALLOWED_USERS, sets an HttpOnly SameSite=Lax session cookie; /api/auth/logout ends it. Every other /api
-route answers 401 without that session, and the session's hub username is who requests, reviews, corrections and
-audit rows are recorded under. The settings come only from the environment (/etc/bidmate/server.env on `codeit`,
+BIDMATE_ALLOWED_USERS, sets an HttpOnly SameSite=Lax session cookie on /api/ only, so it never rides to the hub's
+notebook servers on the same host; /api/auth/logout ends it. Every other /api route answers 401 without that
+session, and 409 when the screen names another account than the session's. The session's hub username is who
+requests, reviews, corrections and audit rows are recorded under. The settings come only from the environment (/etc/bidmate/server.env on `codeit`,
 runbook 3.1): without them every /api call is refused, unless BIDMATE_LOCAL_MEMBER names the one local developer.
 
 On `codeit` this serves http://35.255.64.243:8501 directly. The address is ephemeral: when it changes, update
@@ -26,7 +27,7 @@ from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 from typing import Annotated, Any, Literal
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 from fastapi import Depends, FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
@@ -73,6 +74,14 @@ def create_app(resources=None, login=None) -> FastAPI:
 
 
 SESSION_COOKIE = "bidmate_session"
+# Browsers scope cookies by host and path, never by port, so a cookie for "/" would also ride to the hub and the
+# notebook servers on :8000 of the same host, which run code from hub users off the allowlist. Only /api/ needs the
+# session (the screens are static), and :8000 serves the hub under /hub/ and notebooks under /user/<name>/.
+SESSION_PATH = "/api/"
+# The account a screen loaded as, URL-encoded. Tabs share one cookie, so signing in elsewhere silently changes whose
+# session every open screen sends; the screen names its account and the call is refused when the two differ.
+ACCOUNT_HEADER = "X-BidMate-Account"
+ACCOUNT_CHANGED = "X-BidMate-Account-Changed"
 STATE_COOKIE = "bidmate_login_state"
 SIGN_IN = ("/api/auth/login", "/api/auth/callback", "/api/auth/logout")  # the only /api routes open without a session
 SAFE_METHODS = ("GET", "HEAD", "OPTIONS")
@@ -82,7 +91,8 @@ class _Session:
     """Every /api route except the sign-in ones needs a signed-in member. Their paid work pays with the key that
     member entered on 설정, with the model and billing project they had when the request began. A state-changing
     call from another origin is refused: the session cookie is SameSite=Lax, and the hub's notebooks on :8000 count
-    as the same site."""
+    as the same site. A call naming a different account than the session's (ACCOUNT_HEADER) gets 409, and a
+    state-changing call naming none gets 428, so a screen never acts for an account it does not show."""
 
     def __init__(self, app) -> None:
         self.app = app
@@ -101,6 +111,12 @@ class _Session:
         member = login.member(request.cookies.get(SESSION_COOKIE))
         if member is None:
             return await JSONResponse({"detail": "로그인이 필요합니다."}, 401)(scope, receive, send)
+        named = request.headers.get(ACCOUNT_HEADER)
+        if named is not None and unquote(named) != member:
+            return await JSONResponse({"detail": "다른 탭에서 다른 계정으로 로그인했습니다. 화면을 새로 고칩니다."}, 409,
+                                      {ACCOUNT_CHANGED: "1"})(scope, receive, send)
+        if named is None and request.method not in SAFE_METHODS:
+            return await JSONResponse({"detail": "화면을 새로 고친 뒤 다시 시도하세요."}, 428)(scope, receive, send)
         scope.setdefault("state", {})["member"] = member
         reset = service.bind_request(getattr(scope["app"].state, "res", None), member)
         try:
@@ -390,14 +406,17 @@ def _auth_routes(app: FastAPI) -> None:
                 out = _login_page(exc.status, str(exc))
             else:
                 out = RedirectResponse("/", 303)
-                out.set_cookie(SESSION_COOKIE, session, httponly=True, samesite="lax", path="/")
+                out.set_cookie(SESSION_COOKIE, session, httponly=True, samesite="lax", path=SESSION_PATH)
         out.delete_cookie(STATE_COOKIE, path="/api/auth/")
+        # the first deployment set the session at "/"; left alone it would be sent last and shadow this one
+        out.delete_cookie(SESSION_COOKIE, path="/")
         return out
 
     @app.post("/api/auth/logout", status_code=204)
     def logout(request: Request, response: Response):
         request.app.state.login.sign_out(request.cookies.get(SESSION_COOKIE))
-        response.delete_cookie(SESSION_COOKIE, path="/")
+        response.delete_cookie(SESSION_COOKIE, path=SESSION_PATH)
+        response.delete_cookie(SESSION_COOKIE, path="/")  # the first deployment's path
 
     @app.get("/api/auth/me", response_model=Me)
     def me(request: Request, member: Member):

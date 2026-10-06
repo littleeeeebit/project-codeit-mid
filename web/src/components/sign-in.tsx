@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { api, errorText, type Schemas } from "@/lib/api";
+import { api, bindAccount, errorText, type Schemas } from "@/lib/api";
 import { buttonVariants } from "@/components/ui/button";
 
 type Me = Schemas["Me"];
@@ -20,7 +20,10 @@ export function SignedIn({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<{ me?: Me; out?: boolean; problem?: string }>({});
   useEffect(() => {
     api.GET("/api/auth/me").then(({ data, error, response }) => {
-      if (data) setState({ me: data });
+      if (data) {
+        bindAccount(data.name);  // before any screen inside renders and calls
+        setState({ me: data });
+      }
       else setState(response.status === 401 ? { out: true } : { problem: errorText(error) });
     }).catch(() => setState({ problem: errorText(null) }));
   }, []);

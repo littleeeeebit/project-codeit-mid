@@ -19,8 +19,33 @@ const expired: Middleware = {
   },
 };
 
+/** Tabs share one session cookie, so another tab's sign-in changes whose session this screen sends. Every call names
+ *  the account this screen loaded as; when the server's session is someone else's, it refuses the call and the page
+ *  reloads, so no form, result or key status of the old account survives under the new one. */
+let account: string | null = null;
+
+export function bindAccount(name: string): void {
+  account = name;
+}
+
+/** The header naming this screen's account, for the few calls that bypass `api` (the answer stream). */
+export function accountHeaders(): Record<string, string> {
+  return account === null ? {} : { "X-BidMate-Account": encodeURIComponent(account) };
+}
+
+const sameAccount: Middleware = {
+  onRequest({ request }) {
+    for (const [name, value] of Object.entries(accountHeaders())) request.headers.set(name, value);
+    return request;
+  },
+  onResponse({ response }) {
+    if (response.status === 409 && response.headers.get("X-BidMate-Account-Changed") === "1") window.location.reload();
+    return response;
+  },
+};
+
 export const api = createClient<paths>({ baseUrl: "" });
-api.use(expired);
+api.use(expired, sameAccount);
 
 /** The service's Korean message for a refused call, or a generic one when the server gave none. */
 export function errorText(error: unknown): string {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { accountHeaders } from "@/lib/api";
 
 /** What a streaming answer has written so far (service.answer_progress): unvalidated, shown as provisional. */
 export type Streamed = {
@@ -29,7 +30,8 @@ export function useAnswerStream(owned: { request_id: string; generation_id: stri
     const abort = new AbortController();
     (async () => {
       const url = `/api/requests/${encodeURIComponent(owned.request_id)}/stream?generation_id=${encodeURIComponent(owned.generation_id)}`;
-      const response = await fetch(url, { signal: abort.signal });
+      // a 409 for another account ends the stream here; the status poll through `api` reloads the page
+      const response = await fetch(url, { signal: abort.signal, headers: accountHeaders() });
       if (!response.ok || !response.body) return;
       const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
       let buffer = "";

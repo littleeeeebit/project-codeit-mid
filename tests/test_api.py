@@ -9,9 +9,10 @@ import re
 import tempfile
 import time
 import unittest
+import urllib.request
 from pathlib import Path
 from unittest import mock
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
@@ -72,6 +73,23 @@ class LoginTest(unittest.TestCase):
         self.assertEqual(self.client.get("/api/auth/me").json(), {"name": "spai1302", "local": False})
         self.assertEqual(self.client.post("/api/auth/logout").status_code, 204)
         self.assertEqual(self.client.get("/api/auth/me").status_code, 401)
+
+    def test_the_session_cookie_never_rides_to_the_hub_or_its_notebooks(self):
+        # Cookies are scoped by host and path, not port: the hub's notebook servers on :8000 share BidMate's host,
+        # and they run code from hub users off the allowlist. A browser-rule jar shows what each request carries.
+        self.client.cookies.set(api.SESSION_COOKIE, "from-the-first-deployment", domain="testserver.local", path="/")
+        fake_hub.sign_in(self.client, "spai1302")
+        jar = self.client.cookies.jar
+
+        def carried(url):
+            request = urllib.request.Request(url)
+            jar.add_cookie_header(request)
+            return (request.get_header("Cookie") or "").count(api.SESSION_COOKIE + "=")
+        self.assertEqual(carried("http://testserver:8501/api/info"), 1)  # the old "/" cookie was expired
+        self.assertEqual(self.client.get("/api/auth/me").json()["name"], "spai1302")
+        for elsewhere in ("http://testserver:8000/user/spai0332/api/kernels", "http://testserver:8000/hub/api/user",
+                          "http://testserver:8000/user/spai0332/lab", "http://testserver:8501/", "http://testserver/apix"):
+            self.assertFalse(carried(elsewhere), elsewhere)
 
     def test_a_hub_user_off_the_allowlist_gets_403_and_no_session(self):
         refused = fake_hub.sign_in(self.client, "spai0332")
@@ -153,6 +171,24 @@ class ApiFlowTest(unittest.TestCase):
         for invalid in (0, -1, 0.5, True, "100"):
             self.assertEqual(self.client.put("/api/budget/limit", json={"cap_micro_usd": invalid, "reason": "test"}).status_code, 422)
         self.assertEqual(self.client.put("/api/budget/limit", json={"cap_micro_usd": 10_000_000, "reason": " "}).status_code, 400)
+
+    def test_a_screen_signed_in_as_one_account_never_writes_as_the_account_that_replaced_its_cookie(self):
+        # Two tabs share one cookie jar. This screen loaded as 김검토; another tab then signed in as someone,
+        # replacing the session cookie. The screen still says 김검토 in every call it makes.
+        stale = {"X-BidMate-Account": quote("김검토")}
+        before = self.client.get("/api/budget").json()["snapshot"]["cap_micro_usd"]
+        fake_hub.sign_in(self.client, "someone")
+        out = self.client.put("/api/budget/limit", json={"cap_micro_usd": before + 1, "reason": "stale tab"},
+                              headers=stale)
+        self.assertEqual(out.status_code, 409, out.text)
+        self.assertEqual(out.headers.get("X-BidMate-Account-Changed"), "1")  # the screen reloads as someone
+        self.assertEqual(self.client.get("/api/budget", headers=stale).status_code, 409)  # stale reads too
+        self.assertEqual(self.client.get("/api/budget").json()["snapshot"]["cap_micro_usd"], before)
+        self.client.headers.pop("X-BidMate-Account")  # a write that names no account is refused outright
+        self.assertEqual(self.client.put("/api/budget/limit", json={"cap_micro_usd": before + 1, "reason": "x"})
+                         .status_code, 428)
+        self.assertEqual(self.client.get("/api/budget").status_code, 200)  # a read without one is fine
+        self.assertEqual(self.client.post("/api/auth/logout").status_code, 204)  # signing out names no account
 
     def test_an_api_key_belongs_to_the_account_that_entered_it_and_is_never_shown(self):
         secret = "sk-test-never-shown-0123456789"

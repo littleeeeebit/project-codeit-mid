@@ -175,6 +175,23 @@ class AskOwnershipTest(unittest.TestCase):
         self.page.remove_listener("request", observe)
         self.assertTrue(headers and all(name is None for _, name in headers), headers)
 
+    def test_a_tab_whose_cookie_another_tab_replaced_reloads_as_that_account_instead_of_acting_for_it(self):
+        other = next(self.members)
+        tab = self.context.new_page()  # the same browser: one cookie jar for both tabs
+        tab.goto(self.origin + "/api/auth/login")
+        tab.get_by_label("Username").fill(other)
+        tab.get_by_role("button", name="Sign in").click()
+        expect(tab.locator("header").get_by_text(other, exact=True)).to_be_visible(timeout=60000)
+        # The first tab's next call (its budget poll, or a submit) names the old account, is refused with 409, and
+        # the page reloads as the new one: the picked document and typed question are gone with the old screen.
+        expect(self.page.locator("header").get_by_text(other, exact=True)).to_be_visible(timeout=15000)
+        expect(self.page.get_by_role("checkbox").first).not_to_be_checked()
+        expect(self.page.locator("#question")).to_have_count(0)
+        with open_db(self.env.settings.db_path) as conn:
+            made = conn.execute("SELECT COUNT(*) FROM requests WHERE member_id IN (?, ?)",
+                                (self.member, other)).fetchone()[0]
+        self.assertEqual(made, 0)  # refused before the service: neither account asked anything
+
     def test_cancelling_a_streaming_answer_hides_its_provisional_text_while_the_provider_still_runs(self):
         self.hold.clear()
         self.page.locator("main button[type=submit]").click()

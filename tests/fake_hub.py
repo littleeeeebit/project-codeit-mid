@@ -12,7 +12,7 @@ import json
 import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlencode, urlsplit
+from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
 from rfp_assistant.service import auth
 
@@ -136,8 +136,12 @@ def browser_sign_in(page, origin: str, name: str) -> None:
 
 def sign_in(client, name: str):
     """Signs a TestClient in as `name` the way a browser does: login, the hub's consent, the callback. Returns the
-    callback's response; a refused one leaves the client without a session."""
+    callback's response; a refused one leaves the client without a session. Like the screens, the client then names
+    its account on every call."""
     to_hub = client.get("/api/auth/login", follow_redirects=False)
     assert to_hub.status_code == 303, to_hub.text
     query = {k: v[0] for k, v in parse_qs(urlsplit(to_hub.headers["location"]).query).items()}
-    return client.get(hub().grant(query, name), follow_redirects=False)
+    back = client.get(hub().grant(query, name), follow_redirects=False)
+    if back.status_code == 303:
+        client.headers["X-BidMate-Account"] = quote(name)
+    return back
