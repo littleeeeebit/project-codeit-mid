@@ -1,8 +1,8 @@
 graph TD
-  resources["Process resources\nsrc/rfp_assistant/service.py"] -->|"lazily creates"| request-runner["Request runner\nsrc/rfp_assistant/service.py"]
-  resources -->|"reads activation"| active-serving["Active serving config\nsrc/rfp_assistant/service.py"]
-  active-serving -->|"index, dense, reranker keys"| model-caches["Index and model caches\nsrc/rfp_assistant/service.py"]
-  request-runner -->|"run_queued by request ID"| answer-pipeline["Answer pipeline\nsrc/rfp_assistant/service.py"]
+  resources["Process resources\nsrc/rfp_assistant/service/service.py"] -->|"lazily creates"| request-runner["Request runner\nsrc/rfp_assistant/service/service.py"]
+  resources -->|"reads activation"| active-serving["Active serving config\nsrc/rfp_assistant/service/service.py"]
+  active-serving -->|"index, dense, reranker keys"| model-caches["Index and model caches\nsrc/rfp_assistant/service/service.py"]
+  request-runner -->|"run_queued by request ID"| answer-pipeline["Answer pipeline\nsrc/rfp_assistant/service/service.py"]
   answer-pipeline -->|"res.index, res.dense"| model-caches
-  answer-pipeline -->|"streamed partial text"| partials-buffer["Partial answer buffer\nsrc/rfp_assistant/service.py"]
-  resources -->|"registers and joins"| background-jobs["Background jobs\nsrc/rfp_assistant/service.py"]
+  answer-pipeline -->|"streamed partial text"| partials-buffer["Partial answer buffer\nsrc/rfp_assistant/service/service.py"]
+  resources -->|"registers and joins"| background-jobs["Background jobs\nsrc/rfp_assistant/service/service.py"]

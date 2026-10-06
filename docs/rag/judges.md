@@ -1,6 +1,6 @@
 # Comparing a Luna judge with a Jev judge
 
-The question: can the Jev classifier (TypeSafe, `jev-1.13.0`) replace an LLM-as-a-judge built on `gpt-6-luna` for reviewing development answers? Both judges are measured against the same independent blind review, and a rule fixed before the measurement decides. The code is `src/rfp_assistant/judges.py`; the screen is 검증 → 판정 모델 비교.
+The question: can the Jev classifier (TypeSafe, `jev-1.13.0`) replace an LLM-as-a-judge built on `gpt-6-luna` for reviewing development answers? Both judges are measured against the same independent blind review, and a rule fixed before the measurement decides. The code is `src/rfp_assistant/evaluation/judges.py`; the screen is 검증 → 판정 모델 비교.
 
 This page records the method as declared before any held-out run. The result section at the end is written after the run and does not change anything above it.
 
@@ -55,7 +55,7 @@ Calls go through the shared gateway: atomic admission, durable dispatch and sett
 
 ### Korean → English bridge
 
-Jev's Korean reading is poor, so Jev never receives Hangul. The bridge is gpt-6-luna with the committed procurement glossary (`src/rfp_assistant/judge_glossary.json`):
+Jev's Korean reading is poor, so Jev never receives Hangul. The bridge is gpt-6-luna with the committed procurement glossary (`src/rfp_assistant/evaluation/judge_glossary.json`):
 
 1. Protected values become placeholders `[[Vn]]` before translation. Each is rendered as follows when restored:
    - dates: ISO `2024-06-11 17:00`;
@@ -171,7 +171,7 @@ Runs resume: finished judgements are kept, and only the remainder runs again und
 
 ## Judge golden set (mutated correct answers)
 
-The held-out part's 13 negatives cannot separate two judges. The judge golden set adds negatives whose labels are known by construction: `src/rfp_assistant/judge_set.py` takes the held-out part's approved positives and changes each one in a known way. No person reviews the mutants. Calibration items are never mutated, so the fitted thresholds never see them.
+The held-out part's 13 negatives cannot separate two judges. The judge golden set adds negatives whose labels are known by construction: `src/rfp_assistant/evaluation/judge_set.py` takes the held-out part's approved positives and changes each one in a known way. No person reviews the mutants. Calibration items are never mutated, so the fitted thresholds never see them.
 
 `python -m rfp_assistant.cli judge-set` writes `.runtime/judges/judge-set/items.jsonl` and `manifest.json` (version `judge-set-2`, seed 20261005). For the same reference, split and generator, it reuses the file. Every set it writes is also kept as `sets/<set hash>.jsonl`, so a run stays checkable against the set it judged after the set is regenerated. The set is stored and counted apart from the RAG development set. `golden-counts` reports it in its own section, and the 판정 모델 비교 screen counts it in its set selector.
 
