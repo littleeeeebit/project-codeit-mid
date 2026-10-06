@@ -56,7 +56,7 @@ ssh -i <your private key> -N -L 8501:127.0.0.1:8501 <your username>@35.255.64.24
 
 `-i` can be dropped only when the key has one of ssh's default names (`~/.ssh/id_ed25519`, `id_rsa`, …); otherwise the server answers `Permission denied (publickey)`. A key that gcloud created is `~/.ssh/google_compute_engine` (the owner's, in PowerShell: `-i "$HOME/.ssh/google_compute_engine"`). Write key paths with forward slashes: chat apps drop a backslash before `.`, and PowerShell then reads `$HOME.ssh` as an empty property, leaving `\google_compute_engine`. If something on the member's PC already uses 8501, forward another local port (`-L 8502:127.0.0.1:8501`) and open that one.
 
-Then open <http://127.0.0.1:8501>: 질문하기, 검증 and 데이터셋 만들기. Whoever can SSH into `codeit` can spend the allowance and use admin pages; that list is the access control.
+Then open <http://127.0.0.1:8501>: 질문하기, 검증 and 데이터셋 만들기. Whoever can SSH into `codeit` can spend the allowance and use admin pages; that list is the access control. On 2026-10-06 the owner confirmed that a member other than the owner opened all three through their own tunnel and found them working.
 
 Who can reach it: the project-wide SSH-key metadata of `sprint-ai-01` (`codeit` does not block project keys; OS Login is off). Each member's existing key is installed as their own user (checked 2026-10-06):
 
