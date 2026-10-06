@@ -61,18 +61,19 @@ KEY_COOKIE = "bidmate_key_session"
 
 
 class _KeySession:
-    """Paid work in a request pays with the key its browser entered on 설정 (the session cookie), or none."""
+    """Paid work in a request pays with the key its browser entered on 설정 (the session cookie), or none, with
+    the model and billing project that browser had when the request began."""
 
     def __init__(self, app) -> None:
         self.app = app
 
     async def __call__(self, scope, receive, send):
         session = Request(scope).cookies.get(KEY_COOKIE) if scope["type"] == "http" else None
-        token = service.KEY_SESSION.set(session)
+        reset = service.bind_request(getattr(scope["app"].state, "res", None), session)
         try:
             await self.app(scope, receive, send)
         finally:
-            service.KEY_SESSION.reset(token)
+            reset()
 
 
 async def _forbidden(_: Request, exc: Exception):

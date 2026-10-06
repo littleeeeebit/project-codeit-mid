@@ -166,7 +166,7 @@ class Resources:
         if self.tracing is None:  # traced with the transport it observes; an injected transport is not
             self.tracing = tracing.Tracing.from_settings(self.settings)
 
-    def set_api_key(self, session: str, key: str, member_id: str, model: str) -> None:
+    def set_api_key(self, session: str, key: str, member_id: str, model: str, billing_scope: str) -> None:
         """A browser session's key from the 설정 page. It lives only in this process's memory: no file, row, log or
         trace holds it, so a restart needs it entered again. Other sessions never use it."""
         if not self._dispatch or self.settings.provider != "openai":
@@ -177,11 +177,12 @@ class Resources:
             if not isinstance(self.transport, generation.OpenAITransport):
                 self._openai_transport(None)
             self.transport.set_key(session, key)
-            self.key_sources[session] = {"set_by": member_id, "set_at": utcnow(), "model": model}
+            self.key_sources[session] = {"set_by": member_id, "set_at": utcnow(), "model": model,
+                                         "billing_scope": billing_scope}
 
     def generation_model(self) -> str:
-        """The answer model of this context's browser session (chosen with its key), else the configured one."""
-        return (self.key_sources.get(generation.KEY_SESSION.get()) or {}).get("model") or self.settings.generation_model
+        """The answer model this request's browser had chosen when the request began, else the configured one."""
+        return generation.REQUEST_MODEL.get() or self.settings.generation_model
 
     def paid_refusal(self) -> str:
         """Why this context cannot dispatch a paid stage now, or "" when it can."""
@@ -1676,8 +1677,23 @@ def api_key_status(res: Resources, principal: Principal) -> dict:
     if source is None and res.transport is not None and not res.paid_refusal():
         source = {"set_by": "server environment", "set_at": None}
     return {"configured": source is not None, "set_by": (source or {}).get("set_by"),
-            "set_at": (source or {}).get("set_at"), "model": res.generation_model(),
+            "set_at": (source or {}).get("set_at"),
+            "model": (source or {}).get("model") or res.settings.generation_model,
             "models": list(ALLOWED_GENERATION_MODELS)}
+
+
+def bind_request(res: Resources | None, session: str | None):
+    """Fixes, for one HTTP request and all work it starts, the browser session's key, its answer model and its
+    billing scope as they are now. Returns the reset to call when the request ends."""
+    source = (res.key_sources.get(session) if res is not None and session else None) or {}
+    bound = [(generation.KEY_SESSION, session), (generation.REQUEST_MODEL, source.get("model")),
+             (budget.BILLING_SCOPE, source.get("billing_scope"))]
+    tokens = [(var, var.set(value)) for var, value in bound]
+
+    def reset() -> None:
+        for var, token in reversed(tokens):
+            var.reset(token)
+    return reset
 
 
 def _selectable(res: Resources, model: str, actor: str) -> None:
@@ -1690,7 +1706,8 @@ def _selectable(res: Resources, model: str, actor: str) -> None:
 
 
 def set_generation_model(res: Resources, principal: Principal, model: str) -> dict:
-    """This browser's answer model, checked against the key this browser entered (a free metadata read)."""
+    """This browser's answer model for requests it starts from now on, checked against the key this browser
+    entered (a free metadata read). Requests already submitted keep the model they began with."""
     principal = _authorize(res, principal, "budget_admin")
     session = generation.KEY_SESSION.get()
     if session not in res.key_sources:
@@ -1714,16 +1731,15 @@ def set_api_key(res: Resources, principal: Principal, api_key: str, model: str) 
         raise ServiceError("API 키 형식이 아닙니다.")
     if model not in ALLOWED_GENERATION_MODELS:
         raise ServiceError("선택할 수 없는 모델입니다.")
-    problem = generation.check_api_key(key, model, res.settings.request_timeout_seconds)
+    problem, billing_scope = generation.check_api_key(key, model, res.settings.request_timeout_seconds)
     if problem:
         raise ServiceError(problem)
     _selectable(res, model, principal.member_id)
-    session = generation.KEY_SESSION.get()
-    if session not in res.key_sources:  # only a session this server issued is reused; a browser cannot pick one
-        session = secrets.token_urlsafe(32)
-    res.set_api_key(session, key, principal.member_id, model)
+    # Always a new session: requests already running keep the session, key, model and project they began with.
+    session = secrets.token_urlsafe(32)
+    res.set_api_key(session, key, principal.member_id, model, billing_scope)
     with open_db(res.settings.db_path) as conn, tx(conn, immediate=True):
-        _audit(conn, principal.member_id, "set_api_key", "openai", "", {"model": model})
+        _audit(conn, principal.member_id, "set_api_key", "openai", "", {"model": model, "billing_scope": billing_scope})
     token = generation.KEY_SESSION.set(session)
     try:
         return session, api_key_status(res, principal)
@@ -2142,7 +2158,7 @@ def reconcile(res: Resources, principal: Principal, record: dict) -> BudgetSnaps
     applied = budget.reconcile(res.settings.db_path, principal.member_id, str(record["reconciliation_id"]),
                                record["interval_start"], record["interval_end"],
                                int(record["provider_total_micro_usd"]), record["scope"], record["evidence"],
-                               list(record.get("covered_attempt_ids") or []))
+                               list(record.get("covered_attempt_ids") or []), record.get("unscoped_attempts"))
     if applied:
         with open_db(res.settings.db_path) as conn, tx(conn, immediate=True):
             _audit(conn, principal.member_id, "reconcile", str(record["reconciliation_id"]),

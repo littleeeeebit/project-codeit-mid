@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextvars
+import hashlib
 import json
 import re
 import threading
@@ -159,6 +160,9 @@ def _usage(u) -> dict | None:
 # The browser session whose key pays for the work running in this context. The API sets it per request from the
 # session cookie; threads that carry that work on start from a copy of the request's context.
 KEY_SESSION: contextvars.ContextVar[str | None] = contextvars.ContextVar("rfp_key_session", default=None)
+# The answer model that session had chosen when the HTTP request began: fixed for that request and all work it
+# starts, so a later change on 설정 never alters a request already submitted.
+REQUEST_MODEL: contextvars.ContextVar[str | None] = contextvars.ContextVar("rfp_request_model", default=None)
 NO_API_KEY = "OpenAI API 키가 설정되지 않았습니다. 설정 페이지에서 본인 키를 입력하세요."
 
 
@@ -196,7 +200,7 @@ class OpenAITransport:
         """`check_api_key` for this context's key, which only this transport holds."""
         with self._lock:
             client = self._sessions.get(KEY_SESSION.get())
-        return _check(self._openai, client, model) if client is not None else NO_API_KEY
+        return _check(self._openai, client, model)[0] if client is not None else NO_API_KEY
 
     def has_key(self) -> bool:
         with self._lock:
@@ -285,25 +289,30 @@ def _reason(openai, exc) -> str:
     return type(exc).__name__ if isinstance(exc, openai.AuthenticationError) else f"{type(exc).__name__}: {exc}"
 
 
-def check_api_key(api_key: str, model: str, timeout: float) -> str | None:
-    """None when the key can see `model`; otherwise a reason that never contains the key. Reading a model's
-    metadata is free: no tokens, no ledger entry."""
+def check_api_key(api_key: str, model: str, timeout: float) -> tuple[str | None, str | None]:
+    """(problem, billing scope). The problem is None when the key can see `model`, otherwise a reason that never
+    contains the key. The billing scope is the key's OpenAI project (the `openai-project` response header), which
+    names whose bill an attempt lands on without revealing the key. Reading a model's metadata is free: no tokens,
+    no ledger entry."""
     import openai
 
     with openai.OpenAI(api_key=api_key, max_retries=0, timeout=timeout) as client:
-        return _check(openai, client, model)
+        problem, project = _check(openai, client, model)
+    if problem is None and not project:  # a legacy user key: a one-way digest still separates its bill
+        project = "key-sha256:" + hashlib.sha256(api_key.encode()).hexdigest()[:16]
+    return problem, project
 
 
-def _check(openai, client, model: str) -> str | None:
+def _check(openai, client, model: str) -> tuple[str | None, str | None]:
     try:
-        client.models.retrieve(model)
+        raw = client.models.with_raw_response.retrieve(model)
     except openai.AuthenticationError:
-        return "OpenAI가 이 키를 거부했습니다."
+        return "OpenAI가 이 키를 거부했습니다.", None
     except (openai.PermissionDeniedError, openai.NotFoundError):
-        return f"이 키로는 {model} 모델을 쓸 수 없습니다."
+        return f"이 키로는 {model} 모델을 쓸 수 없습니다.", None
     except openai.OpenAIError as exc:
-        return f"OpenAI에 확인하지 못했습니다 ({type(exc).__name__})."
-    return None
+        return f"OpenAI에 확인하지 못했습니다 ({type(exc).__name__}).", None
+    return None, raw.headers.get("openai-project")
 
 
 class FakeTransport:

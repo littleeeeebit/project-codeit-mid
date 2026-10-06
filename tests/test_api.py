@@ -74,14 +74,14 @@ class ApiFlowTest(unittest.TestCase):
                 browser.__enter__()
                 self.addCleanup(browser.__exit__, None, None, None)
             self.assertEqual(owner.get("/api/settings/api-key", headers=self.headers).json()["configured"], False)
-            with mock.patch.object(service.generation, "check_api_key", return_value="OpenAI가 이 키를 거부했습니다."):
+            with mock.patch.object(service.generation, "check_api_key", return_value=("OpenAI가 이 키를 거부했습니다.", None)):
                 refused = owner.put("/api/settings/api-key", headers=self.headers,
                                     json={"api_key": secret, "model": "gpt-5-mini"})
             self.assertEqual(refused.status_code, 400)
             self.assertIsNone(res.transport)
             self.assertEqual(owner.put("/api/settings/api-key", headers=self.headers,
                                        json={"api_key": secret, "model": "gpt-4o"}).status_code, 400)
-            with mock.patch.object(service.generation, "check_api_key", return_value=None) as checked:
+            with mock.patch.object(service.generation, "check_api_key", return_value=(None, "proj_owner")) as checked:
                 out = owner.put("/api/settings/api-key", headers=self.headers,
                                 json={"api_key": secret, "model": "gpt-5-mini"})
             self.assertEqual(out.status_code, 200, out.text)
@@ -104,9 +104,15 @@ class ApiFlowTest(unittest.TestCase):
                 changed = owner.put("/api/settings/model", headers=self.headers, json={"model": "gpt-5-nano"})
             self.assertEqual(changed.json()["model"], "gpt-5-nano", changed.text)
             session = owner.cookies[api.KEY_COOKIE]
-            token = service.KEY_SESSION.set(session)
-            self.assertEqual((res.paid_refusal(), res.generation_model()), ("", "gpt-5-nano"))
-            service.KEY_SESSION.reset(token)
+            reset = service.bind_request(res, session)  # a request the owner's browser submits now
+            try:
+                self.assertEqual((res.paid_refusal(), res.generation_model(), service.budget.BILLING_SCOPE.get()),
+                                 ("", "gpt-5-nano", "proj_owner"))
+                with mock.patch.object(res.transport, "check_model", return_value=None):
+                    owner.put("/api/settings/model", headers=self.headers, json={"model": "gpt-5-mini"})
+                self.assertEqual(res.generation_model(), "gpt-5-nano")  # a submitted request keeps its model
+            finally:
+                reset()
             self.assertEqual(res.generation_model(), res.settings.generation_model)
             self.assertEqual(res.paid_refusal(), service.generation.NO_API_KEY)  # no session: the teammate
             with self.assertRaises(service.generation.ProviderError) as refused_call:

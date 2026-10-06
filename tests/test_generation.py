@@ -209,5 +209,28 @@ class SafetyTest(unittest.TestCase):
                 validate(respond([fact, absence], missing))
 
 
+class ApiKeyCheckTest(unittest.TestCase):
+    """The 설정 key check reads the key's OpenAI project (billing scope) from a free model-metadata call."""
+
+    def client(self, status, headers=None):
+        import httpx
+        import openai
+
+        def respond(request):
+            body = {"id": "gpt-5-mini", "object": "model", "created": 0, "owned_by": "openai"} if status == 200 \
+                else {"error": {"message": "denied", "type": "invalid_request_error"}}
+            return httpx.Response(status, json=body, headers=headers or {})
+
+        return openai, openai.OpenAI(api_key="sk-local-test", max_retries=0,
+                                     http_client=httpx.Client(transport=httpx.MockTransport(respond)))
+
+    def test_the_project_header_is_the_billing_scope_and_a_refusal_has_none(self):
+        self.assertEqual(generation._check(*self.client(200, {"openai-project": "proj_x"}), "gpt-5-mini"),
+                         (None, "proj_x"))
+        self.assertEqual(generation._check(*self.client(403), "gpt-6-luna"),
+                         ("이 키로는 gpt-6-luna 모델을 쓸 수 없습니다.", None))
+        self.assertEqual(generation._check(*self.client(401), "gpt-5-mini")[0], "OpenAI가 이 키를 거부했습니다.")
+
+
 if __name__ == "__main__":
     unittest.main()

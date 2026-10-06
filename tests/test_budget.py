@@ -115,6 +115,33 @@ class BudgetLedgerTest(unittest.TestCase):
         self.assertFalse(budget.reconcile(self.db, "owner", "rec-1", "2026-01-01T00:00:00", "2099-01-01T00:00:00",
                                           50, "proj", "provider export", [r["attempt_id"]]))
 
+    def test_a_reconciliation_subtracts_only_attempts_billed_to_its_project(self):
+        def settled(scope, tokens):
+            token = budget.BILLING_SCOPE.set(scope)
+            try:
+                r = self.reserve(tokens)
+            finally:
+                budget.BILLING_SCOPE.reset(token)
+            budget.mark_dispatching(self.db, r["attempt_id"])
+            budget.settle(self.db, r["attempt_id"], {"prompt_tokens": tokens, "completion_tokens": 0}, None)
+
+        settled("proj_a", 30)  # two browsers' keys from different projects, same interval
+        settled("proj_b", 30)
+        self.assertEqual(budget.snapshot(self.db).spent_micro_usd, 60)
+        budget.reconcile(self.db, "owner", "a-1", "2026-01-01T00:00:00", "2099-01-01T00:00:00", 30, "proj_a",
+                         "project A export", [])
+        self.assertEqual(budget.snapshot(self.db).spent_micro_usd, 60)  # A's own $30 against A's total: no change
+        settled(None, 10)  # the server-environment key: no recorded project
+        with self.assertRaises(budget.BudgetError):  # whose bill it is must be said, not assumed
+            budget.reconcile(self.db, "owner", "b-1", "2026-01-01T00:00:00", "2099-01-01T00:00:00", 30, "proj_b",
+                             "project B export", [])
+        budget.reconcile(self.db, "owner", "b-1", "2026-01-01T00:00:00", "2099-01-01T00:00:00", 30, "proj_b",
+                         "project B export", [], unscoped="exclude")
+        self.assertEqual(budget.snapshot(self.db).spent_micro_usd, 70)
+        with self.assertRaises(budget.BudgetError):  # the same ID with another choice is a different import
+            budget.reconcile(self.db, "owner", "b-1", "2026-01-01T00:00:00", "2099-01-01T00:00:00", 30, "proj_b",
+                             "project B export", [], unscoped="include")
+
     def test_init_never_resets_balance_and_paid_gates(self):
         budget.add_adjustment(self.db, "owner", "k", 20, "e", "r")
         store.init_schema(self.db)
