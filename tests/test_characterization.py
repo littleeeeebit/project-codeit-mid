@@ -1,0 +1,427 @@
+"""Characterization of the settings, CLI, scoring, comparison and service helpers as they behave today, so a
+refactor of these modules can show it changed nothing observable. Values are pinned from the current code."""
+
+import argparse
+import hashlib
+import importlib.util
+import json
+import os
+import tempfile
+import unittest
+from dataclasses import asdict
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+from pathlib import Path
+from unittest import mock
+
+from rfp_assistant import cli
+from rfp_assistant import settings as settings_mod
+from rfp_assistant.corpus import ingestion
+from rfp_assistant.evaluation import compare, evaluation, judges
+from rfp_assistant.service import answers, service
+from rfp_assistant.settings import Settings, SettingsError
+from tests import fixtures
+
+ROOT = Path(__file__).resolve().parents[1]
+CLI_SNAPSHOT = Path(__file__).parent / "snapshots" / "cli_parser.json"
+
+
+def rate(k, n, lo_hi):
+    return {"numerator": k, "denominator": n, "rate": None if not n else round(k / n, 4), "wilson95": lo_hi}
+
+
+def parser_shape() -> dict:
+    """Every subcommand's arguments: flag or positional name, destination, default, required, choices, type, nargs,
+    action. Help text is left out."""
+    sub = cli.build_parser()._subparsers._group_actions[0]
+    return {name: [{"name": a.option_strings or a.dest, "dest": a.dest, "default": a.default, "required": a.required,
+                    "choices": list(a.choices) if a.choices else None,
+                    "type": getattr(a.type, "__name__", None), "nargs": a.nargs, "action": type(a).__name__}
+                   for a in sp._actions if not isinstance(a, argparse._HelpAction)]
+            for name, sp in sorted(sub.choices.items())}
+
+
+class RateIntervalTest(unittest.TestCase):
+    def test_wilson_interval(self):
+        self.assertEqual([evaluation.wilson(k, n) for k, n in [(0, 0), (0, 1), (1, 1), (3, 10), (45, 50), (7, 7)]],
+                         [None, [0.0, 0.7935], [0.2065, 1.0], [0.1078, 0.6032], [0.7864, 0.9565], [0.6457, 1.0]])
+
+    def test_rate_dicts_agree_across_modules(self):
+        for k, n in [(0, 0), (3, 10), (1, 1)]:
+            self.assertEqual(judges.wilson(k, n), answers._wilson_rate(k, n))
+        self.assertEqual(judges.wilson(3, 10), rate(3, 10, [0.1078, 0.6032]))
+        self.assertEqual(judges.wilson(0, 0), rate(0, 0, None))
+
+    def test_rate_formatting(self):
+        r = judges.wilson(3, 10)
+        self.assertEqual(evaluation._fmt_rate(r), "0.3 (3/10, [0.1078, 0.6032])")
+        self.assertEqual([evaluation._fmt_rate(x) for x in ({}, None, judges.wilson(0, 0))], ["—"] * 3)
+        self.assertEqual(answers._fmt(r), "0.3 (3/10, Wilson [0.1078, 0.6032])")
+        self.assertEqual([answers._fmt(x) for x in ({}, None, judges.wilson(0, 0))], ["n/a (0 eligible)"] * 3)
+
+
+class SettingsTest(unittest.TestCase):
+    def settings(self, **kw):
+        return Settings(source_dir=Path("/src"), data_dir=Path("/data"), hwp_converter=None, **kw)
+
+    def test_defaults_and_constants(self):
+        s = self.settings()
+        self.assertEqual((s.provider, s.generation_model, s.generation_reasoning_effort, s.embedding_model,
+                          s.retrieval_mode, s.fusion, s.dense_search, s.request_workers, s.request_admission,
+                          s.jev_model, s.database_dsn_env),
+                         ("openai", "gpt-6-luna", "low", "text-embedding-3-large", "kiwi_bm25", "rrf", "exact", 6, 12,
+                          "jev-1.13.0", "RFP_DATABASE_DSN"))
+        self.assertEqual((s.csv_path, s.files_dir), (Path("/src/data_list.csv"), Path("/src/files")))
+        self.assertEqual(settings_mod.ALLOWED_GENERATION_MODELS, ("gpt-6-luna", "gpt-5-mini", "gpt-5-nano"))
+        self.assertEqual(settings_mod.REASONING_EFFORTS, ("none", "low", "medium", "high", "xhigh", "max"))
+        self.assertEqual(settings_mod.TRACING_ENV, ("LANGFUSE_HOST", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"))
+
+    def test_fingerprint(self):
+        s = self.settings()
+        data = {k: str(v) if isinstance(v, Path) else v for k, v in asdict(s).items()}
+        expected = hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]
+        self.assertEqual(s.fingerprint(), expected)
+        self.assertNotEqual(s.with_(generation_model="gpt-5-mini").fingerprint(), s.fingerprint())
+        self.assertEqual(s.with_().fingerprint(), s.fingerprint())
+
+    def test_rate_card(self):
+        self.assertEqual(settings_mod.rate_card("gpt-5-mini"),
+                         {"input": Decimal("0.25"), "cached_input": Decimal("0.025"), "output": Decimal("2.00")})
+        with self.assertRaisesRegex(SettingsError, "no verified rate for model 'nope'"):
+            settings_mod.rate_card("nope")
+
+    def test_read_api_key_env_then_dotenv(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, ".env").write_text("﻿X_KEY = 'from-file'\nEMPTY=\nY_KEY=\"q\"\n", encoding="utf-8")
+            with mock.patch.object(settings_mod, "REPO_ROOT", Path(tmp)), \
+                    mock.patch.dict(os.environ, {"X_KEY": "from-env"}):
+                self.assertEqual(settings_mod.read_api_key("X_KEY"), "from-env")
+            with mock.patch.object(settings_mod, "REPO_ROOT", Path(tmp)), mock.patch.dict(os.environ, clear=True):
+                self.assertEqual(settings_mod.read_api_key("X_KEY"), "from-file")
+                self.assertEqual(settings_mod.read_api_key("Y_KEY"), "q")
+                self.assertIsNone(settings_mod.read_api_key("EMPTY"))
+                self.assertIsNone(settings_mod.tracing_credentials())
+
+    def test_load_settings_refusals(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = {"RFP_DATA_DIR": tmp, "RFP_SOURCE_DIR": tmp, "RFP_HWP_CONVERTER": str(Path(tmp, "hwp5proc"))}
+            with mock.patch.dict(os.environ, {**base, "RFP_DATA_DIR": "relative"}, clear=True):
+                with self.assertRaisesRegex(SettingsError, "RFP_DATA_DIR must be an absolute path"):
+                    settings_mod.load_settings()
+            cfg = Path(tmp, "cfg.json")
+            cfg.write_text(json.dumps({"bogus": 1, "provider": "fake"}), encoding="utf-8")
+            with mock.patch.dict(os.environ, {**base, "RFP_CONFIG_FILE": str(cfg)}, clear=True):
+                with self.assertRaisesRegex(SettingsError, r"unknown configuration keys: \['bogus'\]"):
+                    settings_mod.load_settings()
+            with mock.patch.dict(os.environ, base, clear=True):
+                with self.assertRaisesRegex(SettingsError, "RFP_DATABASE_DSN is required"):
+                    settings_mod.load_settings()
+            with mock.patch.dict(os.environ, {**base, "RFP_DATABASE_DSN": "x"}, clear=True):
+                s = settings_mod.load_settings(provider="fake")
+                self.assertEqual((s.data_dir, s.source_dir, s.hwp_converter, s.provider),
+                                 (Path(tmp), Path(tmp), Path(tmp, "hwp5proc"), "fake"))
+
+    def test_validate_messages(self):
+        cases = [
+            ({"database_pool_max": 0}, "database pool maximum must be 1..16"),
+            ({"provider": "x"}, "provider must be 'openai' or 'fake'"),
+            ({"generation_model": "gpt-4"}, "generation model 'gpt-4' is not allowlisted"),
+            ({"embedding_model": "x"}, "embedding model 'x' is not a compared model"),
+            ({"reranker_model": "x"}, "reranker 'x' is not a compared model"),
+            ({"evidence_target_tokens": 6000}, "evidence target must be positive"),
+            ({"generation_reasoning_effort": "x"}, "generation_reasoning_effort must be one of"),
+            ({"generation_max_output_tokens": 8001}, "generation_max_output_tokens must be within 1..8000"),
+            ({"reranker_enabled": True}, "the reranker is enabled only through `activate-run`"),
+            ({"retrieval_mode": "hybrid"}, "retrieval_mode is the keyword default"),
+            ({"embedding_dimensions": 4000}, "embedding_dimensions exceeds the model's native size"),
+            ({"embedding_batch_inputs": 2049}, "embedding_batch_inputs must be within 1..2048"),
+            ({"embedding_batch_tokens": 300_001}, "embedding_batch_tokens must be within 1..300000"),
+            ({"reranker_max_concurrency": 2}, "reranker_max_concurrency must be 1"),
+            ({"reranker_precision": "int8"}, "reranker_precision must be"),
+            ({"fusion": "x"}, "fusion must be 'rrf' or 'keyword_first'"),
+            ({"dense_search": "x"}, "dense_search must be 'exact' or 'hnsw'"),
+            ({"rrf_k": 0}, "rrf_k, top-k depths and reranker concurrency must be positive"),
+            ({"request_workers": 7}, "request_workers must be 1..6"),
+            ({"fake_delay_seconds": 1.0}, "fake_delay_seconds applies only to provider 'fake'"),
+            ({"provider": "fake", "fake_delay_seconds": 121.0}, "fake_delay_seconds must be within 0..120"),
+        ]
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"RFP_DATABASE_DSN": "x"}):
+            ok = Settings(source_dir=Path(tmp), data_dir=Path(tmp, "d"), hwp_converter=None)
+            settings_mod.validate(ok)
+            self.assertTrue(Path(tmp, "d").is_dir())
+            for changes, message in cases:
+                with self.subTest(changes=changes), self.assertRaisesRegex(SettingsError, message):
+                    settings_mod.validate(ok.with_(**changes))
+
+
+class CliTest(unittest.TestCase):
+    def test_parser_matches_snapshot(self):
+        self.assertEqual(json.loads(json.dumps(parser_shape(), ensure_ascii=False, default=str)),
+                         json.loads(CLI_SNAPSHOT.read_text(encoding="utf-8")))
+
+    def test_every_subcommand_dispatches(self):
+        sub = cli.build_parser()._subparsers._group_actions[0]
+        self.assertEqual(set(cli.COMMANDS), set(sub.choices))
+        self.assertTrue(all(f.__name__ == "cmd_" + name.replace("-", "_") for name, f in cli.COMMANDS.items()))
+
+    def test_ids(self):
+        self.assertEqual(cli._ids(" a, ,b,"), ["a", "b"])
+        self.assertIsNone(cli._ids(""))
+        self.assertIsNone(cli._ids(None))
+
+
+class CompareFormattingTest(unittest.TestCase):
+    def test_fmt_and_value(self):
+        self.assertEqual([compare._fmt(v) for v in (None, 0.12345, 12345.67, -3.0, 7, "x", True)],
+                         ["—", "0.1235", "12,345.7", "-3.0000", "7", "x", "True"])
+        self.assertIsNone(compare.value({"a": {"b": None}}, "a.b.c"))
+        self.assertIsNone(compare.value({"a": 5}, "a.b"))
+        self.assertEqual(compare.value({"a": {"b": 2}}, "a.b"), 2)
+        self.assertEqual([compare.value({"gate_passed": g}, "gate") for g in (True, False, None)],
+                         ["pass", "fail", None])
+
+    def test_failure_reason(self):
+        self.assertEqual(compare.failure_reason(ValueError("boom\nsecond")), "ValueError: boom")
+        self.assertEqual(compare.failure_reason(ValueError()), "ValueError: ")
+        self.assertEqual(compare.failure_reason(type("OutOfMemoryError", (Exception,), {})()), "out of GPU memory")
+        self.assertTrue(compare.failure_reason(type("GatedRepoError", (Exception,), {})()).startswith("gated model:"))
+        self.assertEqual(len(compare.failure_reason(ValueError("x" * 400))), 300)
+
+    def test_table_md(self):
+        table = {"title": "T", "matrix": "embedding", "created_at": "2026-10-07T00:00:00Z",
+                 "fixed": {"fusion": "keyword_first:60:1.0:6"},
+                 "columns": [{"key": "dev.ndcg@5", "label": "nDCG@5"}, {"key": "gate", "label": "gate"},
+                             {"key": "ms", "label": "ms"}],
+                 "rows": [{"name": "a · b", "status": "complete", "dev": {"ndcg@5": 0.51234}, "gate_passed": True,
+                           "ms": 12345.6, "run_id": "R-1"},
+                          {"name": "c", "status": "failed", "reason": "x" * 200, "gate_passed": None}],
+                 "populations": {"dev": "d", "whole": "w"}, "needs_evidence_review": ["q1", "q2"]}
+        self.assertEqual(compare.table_md(table), "\n".join([
+            "# T (embedding)", "",
+            'Generated 2026-10-07T00:00:00Z by `compare --matrix embedding`. Fixed: '
+            '`{"fusion": "keyword_first:60:1.0:6"}`.', "",
+            "| Row | status | nDCG@5 | gate | ms | run |",
+            "| --- | --- | --- | --- | --- | --- |",
+            "| a · b | complete | 0.5123 | pass | 12,345.6 | `R-1` |",
+            "| c | failed: " + "x" * 112 + " | — | — | — | `—` |", "",
+            "Populations: dev: d; whole: w.", "",
+            "Not verified: 2 question(s) the served rows are graded on are left out of the rebuilt rows, because a "
+            "re-parse replaced the extraction their evidence is pinned to. Review their evidence again before the "
+            "rebuilt rows count: `q1`, `q2`.", "",
+            "Fusion `keyword_first` keeps the leading BM25 results (its last field, 6) in place, so nDCG@5 equals "
+            "K1's on every hybrid and below-the-head row; the varied axis moves the evidence after them, which "
+            "complete support and the critical counts show.", ""]))
+        plain = {**table, "fixed": {}, "needs_evidence_review": [], "rows": []}
+        self.assertTrue(compare.table_md(plain).endswith("| --- | --- | --- | --- | --- | --- |\n\n"
+                                                         "Populations: dev: d; whole: w.\n"))
+
+
+def scored_row(qid, typ, ans, outcome, claims=(), links=(), ac=(), passed=True, status_ok=True, lat=100, cost=10,
+               attempt=1, groups=None, leaks=0):
+    return {"question_id": qid, "type": typ, "answerability": ans, "outcome": outcome, "claims": list(claims),
+            "links": list(links), "answer_claims": list(ac), "passed": passed, "status_ok": status_ok,
+            "latency_ms": lat, "settled_micro_usd": cost, "attempt_no": attempt, "groups": groups,
+            "scope_leaks": leaks}
+
+
+def claim(i, verdict, kind=None):
+    return {"claim_id": i, "verdict": verdict, "critical_kind": kind}
+
+
+class AnswerScoringTest(unittest.TestCase):
+    SCORED = [
+        scored_row("q1", "fact", "answerable", "answered", [claim("c1", "correct"), claim("c2", "wrong_value", "amount")],
+                   [{"support": "supporting", "valid": True}, {"support": "unsupported", "valid": False}],
+                   [{"supported": True}, {"supported": False}], passed=False, groups={"gold": 2, "retrieved": 1}),
+        scored_row("q2", "fact", "answerable", "insufficient_evidence", [claim("c3", "needs_review", "date")],
+                   [{"support": "unjudged", "valid": True}], [{"supported": None}], lat=300, cost=30, attempt=2, leaks=1),
+        scored_row("q3", "compare", "answerable", "answered", [claim("c4", "correct")], lat=None),
+        scored_row("q4", "negative", "unanswerable", "answered", status_ok=False, cost=5),
+        scored_row("q5", "negative", "unanswerable", "technical_error", lat=50),
+        {"question_id": "m1", "type": "metadata", "answerability": "answerable", "outcome": "answered",
+         "metadata_correct": True, "latency_ms": 10, "settled_micro_usd": 0, "attempt_no": 1, "scope_leaks": 0,
+         "claims": [], "links": [], "answer_claims": []},
+    ]
+
+    def test_aggregate_answers(self):
+        third = rate(1, 3, [0.0615, 0.7923])
+        self.assertEqual(answers.aggregate_answers(self.SCORED), {
+            "rows": 6, "answerable_rows": 3, "rows_passed": rate(4, 5, [0.3755, 0.9638]), "rows_failed": ["q1"],
+            "gold_groups_not_retrieved": {"q1": 1}, "required_claim_correctness": rate(2, 4, [0.15, 0.85]),
+            "question_completeness": third, "claims_needing_review": 1,
+            "claim_verdicts": {"correct": 2, "wrong_value": 1, "contested": 0, "incomplete_qualifier": 0, "missing": 0,
+                               "needs_review": 1},
+            "critical_wrong": [{"question_id": "q1", "claim_id": "c2", "kind": "amount"}],
+            "critical_unresolved": [{"question_id": "q2", "claim_id": "c3", "kind": "date", "verdict": "needs_review"}],
+            "citation_precision_judged": rate(1, 2, [0.0945, 0.9055]), "citation_precision_lower_bound": third,
+            "links_unjudged": 1, "citation_coverage": third, "unsupported_claim_rate": third,
+            "answer_claims_unjudged": 1, "link_validity": rate(2, 3, [0.2077, 0.9385]),
+            "negative_handling": rate(1, 2, [0.0945, 0.9055]), "false_answers": ["q4"],
+            "unnecessary_refusals": third, "metadata_correct": rate(1, 1, [0.2065, 1.0]),
+            "technical_outcomes": {"technical_error": 1}, "scope_leaks": 1,
+            "by_type": {"compare": rate(1, 1, [0.2065, 1.0]), "fact": third},
+            "cost": {"settled_micro_usd": 65, "per_question_micro_usd": 10.8, "retried_rows": 1},
+            "latency_ms": {"p50": 100.0, "p95": 260.0, "n": 5, "condition": "sequential, single process, one call at a time"},
+        })
+
+    def test_aggregate_answers_empty(self):
+        agg = answers.aggregate_answers([])
+        empty = rate(0, 0, None)
+        self.assertEqual({k: v for k, v in agg.items() if v == empty},
+                         {k: empty for k in ("rows_passed", "required_claim_correctness", "question_completeness",
+                                             "citation_precision_judged", "citation_precision_lower_bound",
+                                             "citation_coverage", "unsupported_claim_rate", "link_validity",
+                                             "negative_handling", "unnecessary_refusals", "metadata_correct")})
+        self.assertEqual((agg["cost"], agg["latency_ms"]["p50"], agg["latency_ms"]["n"], agg["by_type"]),
+                         ({"settled_micro_usd": 0, "per_question_micro_usd": None, "retried_rows": 0}, None, 0, {}))
+
+    def test_compare_finalists(self):
+        agg = answers.aggregate_answers(self.SCORED)
+        extra = {"question_id": "q9", "claim_id": "c9", "kind": "date"}
+        per = {"A": agg, "B": {**agg, "required_claim_correctness": {"rate": 0.75}, "negative_handling": {"rate": None},
+                               "critical_wrong": agg["critical_wrong"] + [extra]}}
+        self.assertEqual(answers.compare_finalists(per), {
+            "baseline": "A", "candidate": "B", "claim_correctness_gain": 0.25, "negative_handling_gain": None,
+            "new_critical_wrong": [extra], "p95_ms": [260.0, 260.0], "settled_micro_usd": [65, 65],
+            "note": "development evidence for the owner's selection; small denominators: read the intervals"})
+
+    def test_doc_text_and_verbatim_support(self):
+        ans = {"summary": "요약 3개월", "claims": [{"text": "A는 12개월", "doc_id": "A"}, {"text": "B는 6개월", "doc_id": "B"}],
+               "conflicts": [{"alternatives": [{"value": "A 9개월", "doc_id": "A"}, {"value": "B 1년", "doc_id": "B"}]}]}
+        self.assertEqual(answers.doc_text(ans, "A", True), "요약 3개월 A는 12개월 A 9개월")
+        self.assertEqual(answers.doc_text(ans, "A", False), "A는 12개월 A 9개월")
+        self.assertEqual(answers.doc_text({}, None, True), "")
+        self.assertEqual([answers.verbatim_support(a, b) for a, b in [("하자 보수 12개월", "계약 후 하자보수12개월 이내"),
+                                                                     ("abc", "xabcx"), ("하자보수 6개월", "하자보수 12개월")]],
+                         [True, False, False])
+
+
+class RunIdentityTest(unittest.TestCase):
+    def test_run_dirs(self):
+        s = Settings(source_dir=Path("/src"), data_dir=Path("/data"), hwp_converter=None)
+        self.assertEqual(answers.run_dir(s, "A-1f"), Path("/data/runs/A-1f"))
+        self.assertEqual(answers.run_dir(s, "S-1f"), Path("/data/sealed/runs/S-1f"))
+        for bad in ("", None, "A/1", "A_1", "../x"):
+            with self.subTest(bad=bad), self.assertRaisesRegex(answers.AnswerEvalError, "invalid answer run id"):
+                answers.run_dir(s, bad)
+        self.assertEqual(judges.run_dir(s, "J-calibration-0123456789ab"),
+                         Path("/data/judges/runs/J-calibration-0123456789ab"))
+        for bad in ("", None, "J-Calibration-0123456789ab", "J-calibration-0123456789", "J-x-0123456789AB"):
+            with self.subTest(bad=bad), self.assertRaisesRegex(judges.JudgeError, "invalid judge run id"):
+                judges.run_dir(s, bad)
+        self.assertEqual(judges.run_id_for({"part": "p"}),
+                         "J-p-" + hashlib.sha256(b'{"part": "p"}').hexdigest()[:12])
+
+
+class EstimateTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.s = Settings(source_dir=Path(tmp.name), data_dir=Path(tmp.name), hwp_converter=None,
+                          database_dsn_env=fixtures.database())
+
+    def put(self, estimate_id, action, hours):
+        now = datetime.now(timezone.utc)
+        est = {"estimate_id": estimate_id, "action": action, "fingerprint": "f", "created_at": now.isoformat(),
+               "expires_at": (now + timedelta(hours=hours)).isoformat()}
+        answers._store_estimate(self.s, est)
+        return est
+
+    def test_load_estimate_in_both_modules(self):
+        judge = self.put("e-judge", judges.ACTION, 1)
+        run = self.put("e-run", "answer-finalists", 1)
+        self.put("e-old", judges.ACTION, -1)
+        self.assertEqual(judges.load_estimate(self.s, "e-judge"), judge)
+        self.assertEqual(answers.load_estimate(self.s, "e-run"), run)
+        self.assertEqual(answers.load_estimate(self.s, "e-judge"), judge)  # answers does not filter by action
+        with self.assertRaisesRegex(judges.JudgeError, "unknown judge estimate e-run; plan again"):
+            judges.load_estimate(self.s, "e-run")
+        with self.assertRaisesRegex(answers.AnswerEvalError, "unknown estimate nope; run plan-run first"):
+            answers.load_estimate(self.s, "nope")
+        with self.assertRaisesRegex(judges.JudgeError, "the estimate expired; plan again"):
+            judges.load_estimate(self.s, "e-old")
+        with self.assertRaisesRegex(answers.AnswerEvalError, "the estimate expired; run plan-run again"):
+            answers.load_estimate(self.s, "e-old")
+
+
+class ServiceHelpersTest(unittest.TestCase):
+    def test_describe_serving(self):
+        self.assertEqual(service.describe_serving({"run_id": None}), "keyword default (kiwi_bm25), no activated run")
+        self.assertEqual(service.describe_serving({"run_id": "R-1", "mode": "hybrid"}), "run `R-1` (hybrid)")
+        self.assertEqual(service.describe_serving({"run_id": "R-1", "fallback_reason": "x", "stale_run_id": "R-0"}),
+                         "keyword default (kiwi_bm25); activated run `R-0` not served: x")
+        self.assertEqual(service.describe_serving({"run_id": "R-1", "fallback_reason": "x"}),
+                         "keyword default (kiwi_bm25); activated run `R-1` not served: x")
+
+    def test_metadata_facts(self):
+        d = {"doc_id": "D1", "meta": {"title": "T", "institution": None, "amount_krw": 0, "notice": "N"},
+             "resolutions": {"notice": {"value": "N2", "evidence": "e"}},
+             "quality": {"provenance_conflicts": [{"field": "title", "values": ["T", "T2"]}]}}
+        unknown = lambda f: {"doc_id": "D1", "field": f, "value": None, "state": "unknown", "provenance": "csv"}  # noqa: E731
+        self.assertEqual(service.metadata_facts(d), [
+            {"doc_id": "D1", "field": "title", "value": "T", "state": "conflict", "provenance": "csv",
+             "alternatives": ["T", "T2"]},
+            unknown("institution"),
+            {"doc_id": "D1", "field": "notice", "value": "N2", "state": "resolved", "provenance": "resolution",
+             "evidence": "e", "csv_value": "N"},
+            unknown("revision"),
+            {"doc_id": "D1", "field": "amount_krw", "value": 0, "state": "zero_review", "provenance": "csv"},
+            unknown("published_at"), unknown("bid_start"), unknown("bid_close")])
+
+    def test_inventory_order_and_cited_ids(self):
+        items = [{"id": 1, "source_form": "SFR-001"}, {"id": 2, "source_form": "PER_01"}, {"id": 3, "source_form": None},
+                 {"id": 4, "source_form": "SFR-002"}, {"id": 5, "source_form": ""}, {"id": 6, "source_form": "PER-2"}]
+        self.assertEqual([i["id"] for i in service.inventory_display_order(items)], [1, 4, 2, 6, 3, 5])
+        self.assertEqual(service._cited_ids({"summary_evidence_ids": ["e2", "e1"], "claims": [{"evidence_ids": ["e1", "e3"]}],
+                                             "conflicts": [{"alternatives": [{"evidence_ids": ["e4", "e2"]}]}]}),
+                         ["e2", "e1", "e3", "e4"])
+
+
+class IngestionHelpersTest(unittest.TestCase):
+    def test_review_record_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            jsonl, single, many, bom = (Path(tmp, n) for n in ("r.jsonl", "one.json", "many.json", "bom.json"))
+            jsonl.write_text('{"a": 1}\n\n{"a": 2}\n', encoding="utf-8")
+            single.write_text('{"a": 1}', encoding="utf-8")
+            many.write_text('[{"a": 1}, {"a": 2}]', encoding="utf-8")
+            bom.write_bytes(b"\xef\xbb\xbf{}")
+            self.assertEqual(ingestion._load_review_records(jsonl), [{"a": 1}, {"a": 2}])
+            self.assertEqual(ingestion._load_review_records(single), [{"a": 1}])
+            self.assertEqual(ingestion._load_review_records(many), [{"a": 1}, {"a": 2}])
+            with self.assertRaisesRegex(ingestion.IngestionError, "UTF-8 without BOM"):
+                ingestion._load_review_records(bom)
+        with self.assertRaisesRegex(ingestion.IngestionError, "absolute path"):
+            ingestion._load_review_records(Path("r.jsonl"))
+
+    def test_identity_and_text(self):
+        self.assertEqual(ingestion.doc_id_for("기관A_통합 정보시스템.pdf"), "2325c786-bc0e-5646-b409-7f9717850c4d")
+        self.assertEqual(ingestion.search_text(" 가  나\n다 "), "가 나 다")
+
+
+class VerifyToolTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("verify_tool", ROOT / "tools" / "verify.py")
+        cls.verify = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.verify)
+
+    def test_unittest_summary(self):
+        v = self.verify
+        self.assertEqual(v.unittest_summary("...\nRan 12 tests in 3.4s\n\nOK\n", 0), "12 tests in 3.4 s: OK (exit 0)")
+        self.assertEqual(v.unittest_summary("Ran 1 test in 0.1s\nFAILED (failures=1)", 1),
+                         "1 tests in 0.1 s: FAILED (failures=1) (exit 1)")
+        self.assertEqual(v.unittest_summary("Ran 2 tests in 1s", 0), "2 tests in 1 s: no result line (exit 0)")
+        self.assertEqual(v.unittest_summary("nothing", 2), "no unittest summary (exit 2)")
+
+    def test_load_check_summary(self):
+        v = self.verify
+        self.assertEqual(v.load_check_summary(0, 'log {"passed": true, "n": 6, "x": [1]} tail'),
+                         (True, 'passed=True exit 0; {"n": 6}'))
+        self.assertEqual(v.load_check_summary(1, '{"passed": true}'), (False, "passed=True exit 1; {}"))
+        self.assertEqual(v.load_check_summary(0, "no json"), (False, "no JSON result (exit 0)"))
+        self.assertEqual((v.TERMINAL, v.FAKE_QUESTION), (("completed", "failed", "cancelled", "interrupted"),
+                                                         "하자보수 기간은 얼마인가요?"))
+
+
+if __name__ == "__main__":
+    unittest.main()

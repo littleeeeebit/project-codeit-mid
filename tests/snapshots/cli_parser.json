@@ -1,0 +1,2137 @@
+{
+ "activate-run": [
+  {
+   "name": [
+    "--run-id"
+   ],
+   "dest": "run_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--decision-file"
+   ],
+   "dest": "decision_file",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--decided-by"
+   ],
+   "dest": "decided_by",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--note"
+   ],
+   "dest": "note",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "adjust": [
+  {
+   "name": [
+    "--key"
+   ],
+   "dest": "key",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--amount-usd"
+   ],
+   "dest": "amount_usd",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--evidence"
+   ],
+   "dest": "evidence",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--reason"
+   ],
+   "dest": "reason",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": "owner-cli",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "audit": [
+  {
+   "name": [
+    "--limit"
+   ],
+   "dest": "limit",
+   "default": 50,
+   "required": false,
+   "choices": null,
+   "type": "int",
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": "owner-cli",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "backup": [
+  {
+   "name": [
+    "--destination"
+   ],
+   "dest": "destination",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": "owner-cli",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "budget-report": [],
+ "budget-status": [],
+ "build-dense": [
+  {
+   "name": [
+    "--index"
+   ],
+   "dest": "index",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--estimate-id"
+   ],
+   "dest": "estimate_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "build-keyword": [
+  {
+   "name": [
+    "--profile"
+   ],
+   "dest": "profile",
+   "default": "structural",
+   "required": false,
+   "choices": [
+    "fixed-256-32",
+    "fixed-512-64",
+    "fixed-800-96",
+    "structural"
+   ],
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--no-activate"
+   ],
+   "dest": "no_activate",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  },
+  {
+   "name": [
+    "--reviewed-only"
+   ],
+   "dest": "reviewed_only",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  },
+  {
+   "name": [
+    "--include-unreviewed"
+   ],
+   "dest": "include_unreviewed",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  }
+ ],
+ "check": [
+  {
+   "name": [
+    "--phase"
+   ],
+   "dest": "phase",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--provider"
+   ],
+   "dest": "provider",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--save"
+   ],
+   "dest": "save",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  }
+ ],
+ "compare": [
+  {
+   "name": [
+    "--matrix"
+   ],
+   "dest": "matrix",
+   "default": "lexical",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--only"
+   ],
+   "dest": "only",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_AppendAction"
+  },
+  {
+   "name": [
+    "--approve"
+   ],
+   "dest": "approve",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--approved-by"
+   ],
+   "dest": "approved_by",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "compare-cap": [
+  {
+   "name": [
+    "--usd"
+   ],
+   "dest": "usd",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--reason"
+   ],
+   "dest": "reason",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "compare-resolve": [
+  {
+   "name": [
+    "--attempt-id"
+   ],
+   "dest": "attempt_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--charged"
+   ],
+   "dest": "charged",
+   "default": null,
+   "required": true,
+   "choices": [
+    "yes",
+    "no"
+   ],
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--reason"
+   ],
+   "dest": "reason",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "compare-runs": [
+  {
+   "name": [
+    "--run-id"
+   ],
+   "dest": "run_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_AppendAction"
+  }
+ ],
+ "configure-budget": [
+  {
+   "name": [
+    "--start"
+   ],
+   "dest": "start",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--end"
+   ],
+   "dest": "end",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--prior-use-usd"
+   ],
+   "dest": "prior_use_usd",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--prior-use-evidence"
+   ],
+   "dest": "prior_use_evidence",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--allowance-usd"
+   ],
+   "dest": "allowance_usd",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--cap-usd"
+   ],
+   "dest": "cap_usd",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--confirm-rates"
+   ],
+   "dest": "confirm_rates",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  },
+  {
+   "name": [
+    "--enable-paid"
+   ],
+   "dest": "enable_paid",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  }
+ ],
+ "draft-activation": [
+  {
+   "name": [
+    "--runs"
+   ],
+   "dest": "runs",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--out"
+   ],
+   "dest": "out",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--select"
+   ],
+   "dest": "select",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "evaluate-retrieval": [
+  {
+   "name": [
+    "--dataset"
+   ],
+   "dest": "dataset",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--runs"
+   ],
+   "dest": "runs",
+   "default": "K0,K1,D,H",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--index"
+   ],
+   "dest": "index",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--allow-paid-queries"
+   ],
+   "dest": "allow_paid_queries",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  },
+  {
+   "name": [
+    "--force"
+   ],
+   "dest": "force",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  }
+ ],
+ "export-review": [
+  {
+   "name": [
+    "--run-id"
+   ],
+   "dest": "run_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--out"
+   ],
+   "dest": "out",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "fidelity": [
+  {
+   "name": "action",
+   "dest": "action",
+   "default": null,
+   "required": true,
+   "choices": [
+    "run",
+    "show"
+   ],
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--doc-id"
+   ],
+   "dest": "doc_id",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_AppendAction"
+  },
+  {
+   "name": [
+    "--reprint"
+   ],
+   "dest": "reprint",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  }
+ ],
+ "freeze-dataset": [
+  {
+   "name": [
+    "--dataset"
+   ],
+   "dest": "dataset",
+   "default": null,
+   "required": true,
+   "choices": [
+    "dev",
+    "test",
+    "corpus"
+   ],
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--reason"
+   ],
+   "dest": "reason",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "freeze-release": [
+  {
+   "name": [
+    "--run-id"
+   ],
+   "dest": "run_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--answer-run"
+   ],
+   "dest": "answer_run",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--decided-by"
+   ],
+   "dest": "decided_by",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--rationale"
+   ],
+   "dest": "rationale",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "gold": [
+  {
+   "name": "action",
+   "dest": "action",
+   "default": null,
+   "required": true,
+   "choices": [
+    "status",
+    "submit",
+    "infer",
+    "check",
+    "sync",
+    "repin",
+    "excerpts",
+    "generate",
+    "show",
+    "decide",
+    "second-review"
+   ],
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--out"
+   ],
+   "dest": "out",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--per-category"
+   ],
+   "dest": "per_category",
+   "default": 2,
+   "required": false,
+   "choices": null,
+   "type": "int",
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--max-cost-usd"
+   ],
+   "dest": "max_cost_usd",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--file"
+   ],
+   "dest": "file",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--batch"
+   ],
+   "dest": "batch",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--dataset"
+   ],
+   "dest": "dataset",
+   "default": "dev-pilot",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--drafted-by"
+   ],
+   "dest": "drafted_by",
+   "default": "",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--candidate-id"
+   ],
+   "dest": "candidate_id",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--by"
+   ],
+   "dest": "by",
+   "default": "",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--decision"
+   ],
+   "dest": "decision",
+   "default": null,
+   "required": false,
+   "choices": [
+    "approve",
+    "reject"
+   ],
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--reviewer"
+   ],
+   "dest": "reviewer",
+   "default": "",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--expected-sha"
+   ],
+   "dest": "expected_sha",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--original-inspected"
+   ],
+   "dest": "original_inspected",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  },
+  {
+   "name": [
+    "--disputed"
+   ],
+   "dest": "disputed",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  },
+  {
+   "name": [
+    "--category"
+   ],
+   "dest": "category",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_AppendAction"
+  },
+  {
+   "name": [
+    "--note"
+   ],
+   "dest": "note",
+   "default": "",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--agree"
+   ],
+   "dest": "agree",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  },
+  {
+   "name": [
+    "--disagree"
+   ],
+   "dest": "disagree",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  }
+ ],
+ "golden-counts": [],
+ "identity": [
+  {
+   "name": [
+    "--all"
+   ],
+   "dest": "all",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  }
+ ],
+ "import-review": [
+  {
+   "name": [
+    "--run-id"
+   ],
+   "dest": "run_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--file"
+   ],
+   "dest": "file",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--reviewer"
+   ],
+   "dest": "reviewer",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "import-reviews": [
+  {
+   "name": [
+    "--file"
+   ],
+   "dest": "file",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "ingest": [
+  {
+   "name": [
+    "--profile"
+   ],
+   "dest": "profile",
+   "default": "all",
+   "required": false,
+   "choices": [
+    "all"
+   ],
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--doc-id"
+   ],
+   "dest": "doc_id",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_AppendAction"
+  },
+  {
+   "name": [
+    "--force"
+   ],
+   "dest": "force",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  }
+ ],
+ "init": [
+  {
+   "name": [
+    "--paid-disabled"
+   ],
+   "dest": "paid_disabled",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  }
+ ],
+ "judge-reference": [
+  {
+   "name": [
+    "--archive"
+   ],
+   "dest": "archive",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "judge-refit": [],
+ "judge-set": [],
+ "latency-run": [
+  {
+   "name": [
+    "--estimate-id"
+   ],
+   "dest": "estimate_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "load-check": [
+  {
+   "name": [
+    "--users"
+   ],
+   "dest": "users",
+   "default": 6,
+   "required": false,
+   "choices": null,
+   "type": "int",
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--provider"
+   ],
+   "dest": "provider",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--requests"
+   ],
+   "dest": "requests",
+   "default": 2,
+   "required": false,
+   "choices": null,
+   "type": "int",
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--delay"
+   ],
+   "dest": "delay",
+   "default": 0.5,
+   "required": false,
+   "choices": null,
+   "type": "float",
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--fail-every"
+   ],
+   "dest": "fail_every",
+   "default": 0,
+   "required": false,
+   "choices": null,
+   "type": "int",
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--affordable"
+   ],
+   "dest": "affordable",
+   "default": 4,
+   "required": false,
+   "choices": null,
+   "type": "int",
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--save"
+   ],
+   "dest": "save",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  }
+ ],
+ "maintain": [
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "manifest": [],
+ "ocr": [
+  {
+   "name": [
+    "--doc-id"
+   ],
+   "dest": "doc_id",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_AppendAction"
+  },
+  {
+   "name": [
+    "--local-only"
+   ],
+   "dest": "local_only",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  }
+ ],
+ "paid": [
+  {
+   "name": "state",
+   "dest": "state",
+   "default": null,
+   "required": true,
+   "choices": [
+    "on",
+    "off"
+   ],
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--reason"
+   ],
+   "dest": "reason",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": "owner-cli",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "plan-embeddings": [
+  {
+   "name": [
+    "--index"
+   ],
+   "dest": "index",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "plan-run": [
+  {
+   "name": [
+    "--action"
+   ],
+   "dest": "action",
+   "default": null,
+   "required": true,
+   "choices": [
+    "answer-finalists",
+    "sealed",
+    "latency",
+    "judge-comparison"
+   ],
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--part"
+   ],
+   "dest": "part",
+   "default": "held_out",
+   "required": false,
+   "choices": [
+    "calibration",
+    "held_out",
+    "judge_set"
+   ],
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--dataset"
+   ],
+   "dest": "dataset",
+   "default": "dev",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--runs"
+   ],
+   "dest": "runs",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--question-id"
+   ],
+   "dest": "question_id",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_AppendAction"
+  },
+  {
+   "name": [
+    "--freeze-id"
+   ],
+   "dest": "freeze_id",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--post-test-regression"
+   ],
+   "dest": "post_test_regression",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  },
+  {
+   "name": [
+    "--waves"
+   ],
+   "dest": "waves",
+   "default": 5,
+   "required": false,
+   "choices": null,
+   "type": "int",
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--users"
+   ],
+   "dest": "users",
+   "default": 6,
+   "required": false,
+   "choices": null,
+   "type": "int",
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--verbose"
+   ],
+   "dest": "verbose",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  }
+ ],
+ "reconcile": [
+  {
+   "name": [
+    "--file"
+   ],
+   "dest": "file",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "recover-source": [
+  {
+   "name": [
+    "--doc-id"
+   ],
+   "dest": "doc_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--converted-file"
+   ],
+   "dest": "converted_file",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--review-file"
+   ],
+   "dest": "review_file",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "register-embedding-rate": [
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--reason"
+   ],
+   "dest": "reason",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "release-report": [
+  {
+   "name": [
+    "--latest"
+   ],
+   "dest": "latest",
+   "default": false,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": 0,
+   "action": "_StoreTrueAction"
+  },
+  {
+   "name": [
+    "--release-id"
+   ],
+   "dest": "release_id",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "report": [
+  {
+   "name": [
+    "--phase"
+   ],
+   "dest": "phase",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": "int",
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "resolve-metadata": [
+  {
+   "name": [
+    "--doc-id"
+   ],
+   "dest": "doc_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--field"
+   ],
+   "dest": "field",
+   "default": null,
+   "required": true,
+   "choices": [
+    "institution",
+    "title",
+    "notice",
+    "bid_close",
+    "amount_krw"
+   ],
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--value"
+   ],
+   "dest": "value",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--rationale"
+   ],
+   "dest": "rationale",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--evidence"
+   ],
+   "dest": "evidence",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "restore-check": [
+  {
+   "name": [
+    "--backup"
+   ],
+   "dest": "backup",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--staging"
+   ],
+   "dest": "staging",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "review": [
+  {
+   "name": "action",
+   "dest": "action",
+   "default": null,
+   "required": true,
+   "choices": [
+    "sheet",
+    "print",
+    "render",
+    "record"
+   ],
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--doc-id"
+   ],
+   "dest": "doc_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--pdf"
+   ],
+   "dest": "pdf",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--reviewer"
+   ],
+   "dest": "reviewer",
+   "default": "",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--status"
+   ],
+   "dest": "status",
+   "default": "sample_checked",
+   "required": false,
+   "choices": [
+    "unreviewed",
+    "sample_checked",
+    "reviewed",
+    "needs_recovery"
+   ],
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--locations"
+   ],
+   "dest": "locations",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--findings"
+   ],
+   "dest": "findings",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "run-answers": [
+  {
+   "name": [
+    "--estimate-id"
+   ],
+   "dest": "estimate_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--reason"
+   ],
+   "dest": "reason",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "run-judges": [
+  {
+   "name": [
+    "--estimate-id"
+   ],
+   "dest": "estimate_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "score-answers": [
+  {
+   "name": [
+    "--run-id"
+   ],
+   "dest": "run_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "set-envelopes": [
+  {
+   "name": [
+    "--file"
+   ],
+   "dest": "file",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--reason"
+   ],
+   "dest": "reason",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "set-limit": [
+  {
+   "name": [
+    "--usd"
+   ],
+   "dest": "usd",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--reason"
+   ],
+   "dest": "reason",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "settle": [
+  {
+   "name": [
+    "--attempt-id"
+   ],
+   "dest": "attempt_id",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--prompt-tokens"
+   ],
+   "dest": "prompt_tokens",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": "int",
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--completion-tokens"
+   ],
+   "dest": "completion_tokens",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": "int",
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--cached-tokens"
+   ],
+   "dest": "cached_tokens",
+   "default": 0,
+   "required": false,
+   "choices": null,
+   "type": "int",
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--response-id"
+   ],
+   "dest": "response_id",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--evidence"
+   ],
+   "dest": "evidence",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--reason"
+   ],
+   "dest": "reason",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--actor"
+   ],
+   "dest": "actor",
+   "default": "owner-cli",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "trial-reranker": [
+  {
+   "name": [
+    "--dataset"
+   ],
+   "dest": "dataset",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--candidate-counts"
+   ],
+   "dest": "candidate_counts",
+   "default": "10,20",
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  },
+  {
+   "name": [
+    "--index"
+   ],
+   "dest": "index",
+   "default": null,
+   "required": false,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ],
+ "unresolved": [],
+ "validate-gold": [
+  {
+   "name": [
+    "--dataset"
+   ],
+   "dest": "dataset",
+   "default": null,
+   "required": true,
+   "choices": null,
+   "type": null,
+   "nargs": null,
+   "action": "_StoreAction"
+  }
+ ]
+}
