@@ -162,8 +162,16 @@ class OpenAITransport:
         import openai
 
         self._openai = openai
+        self._timeout = timeout
         self._client = openai.OpenAI(api_key=api_key, max_retries=0, timeout=timeout)
+        self._retired: list = []  # clients a key change replaced; calls already started on them finish there
         self._owner_check = owner_check
+
+    def replace_key(self, api_key: str) -> None:
+        """The next call uses the new key. A call in flight keeps the client it started with."""
+        # ponytail: replaced clients stay open until close(); one per key change.
+        self._retired.append(self._client)
+        self._client = self._openai.OpenAI(api_key=api_key, max_retries=0, timeout=self._timeout)
 
     def chat(self, *, model, messages, response_format, max_completion_tokens, reasoning_effort,
              on_delta=None) -> ProviderResponse:
@@ -222,7 +230,8 @@ class OpenAITransport:
         return EmbeddingResponse([list(d.embedding) for d in data], usage, None)
 
     def close(self) -> None:
-        self._client.close()
+        for client in (*self._retired, self._client):
+            client.close()
 
     def _check_owner(self):
         if self._owner_check is not None:
@@ -230,6 +239,23 @@ class OpenAITransport:
                 self._owner_check()
             except RuntimeError:
                 raise ProviderError("paid gateway ownership was lost before provider execution", pre_execution=True) from None
+
+
+def check_api_key(api_key: str, model: str, timeout: float) -> str | None:
+    """None when the key can see `model`; otherwise a reason that never contains the key. Reading a model's
+    metadata is free: no tokens, no ledger entry."""
+    import openai
+
+    with openai.OpenAI(api_key=api_key, max_retries=0, timeout=timeout) as client:
+        try:
+            client.models.retrieve(model)
+        except openai.AuthenticationError:
+            return "OpenAI가 이 키를 거부했습니다."
+        except (openai.PermissionDeniedError, openai.NotFoundError):
+            return f"이 키로는 {model} 모델을 쓸 수 없습니다."
+        except openai.OpenAIError as exc:
+            return f"OpenAI에 확인하지 못했습니다 ({type(exc).__name__})."
+    return None
 
 
 class FakeTransport:

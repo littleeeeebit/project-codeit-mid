@@ -45,6 +45,8 @@ class GatewayLockError(ServiceError):
     pass
 
 
+NO_API_KEY = "OpenAI API 키가 설정되지 않았습니다. 설정 페이지에서 입력하세요."
+
 _ANALYZER: Analyzer | None = None
 _ANALYZER_LOCK = threading.Lock()
 
@@ -107,6 +109,7 @@ class Resources:
         self._borrowed_owner: postgres.GatewayOwner | None = None  # this process's owner, held by another Resources
         self.transport: generation.Transport | None = transport
         self.provider_note = ""
+        self.api_key_source: dict | None = None  # who gave the OpenAI key and when; never the key itself
         self.recovered: dict = {}
         if not self._dispatch:
             if recover or transport is not None:
@@ -119,14 +122,10 @@ class Resources:
         elif self._dispatch and transport is None:
             key = read_api_key("OPENAI_API_KEY")
             if key:
-                if self._lock is None and self._borrowed_owner is None:
-                    self._own(settings)
-                self.transport = generation.OpenAITransport(key, settings.request_timeout_seconds,
-                    owner_check=(self._lock or self._borrowed_owner).check)
-                if self.tracing is None:  # traced with the transport it observes; an injected transport is not
-                    self.tracing = tracing.Tracing.from_settings(settings)
+                self._openai_transport(key)
+                self.api_key_source = {"set_by": "server environment", "set_at": utcnow()}
             else:
-                self.provider_note = "OPENAI_API_KEY is not configured; paid generation is unavailable"
+                self.provider_note = NO_API_KEY
         if self.transport is not None and self._lock is None and self._borrowed_owner is None:
             self._own(settings)  # every PostgreSQL dispatch has a gateway owner
         self.analyzer = shared_analyzer()
@@ -156,6 +155,29 @@ class Resources:
         except (AttributeError, RuntimeError):  # no such hook, or the interpreter is already shutting down
             pass
         atexit.register(stop)
+
+    def _openai_transport(self, key: str) -> None:
+        if self._lock is None and self._borrowed_owner is None:
+            self._own(self.settings)
+        self.transport = generation.OpenAITransport(key, self.settings.request_timeout_seconds,
+                                                    owner_check=(self._lock or self._borrowed_owner).check)
+        if self.tracing is None:  # traced with the transport it observes; an injected transport is not
+            self.tracing = tracing.Tracing.from_settings(self.settings)
+
+    def set_api_key(self, key: str, member_id: str) -> None:
+        """The 설정 page's key. It lives only in this process's memory: no file, row, log or trace holds it, so a
+        restart needs it entered again. A call already running finishes with the key it started with."""
+        if not self._dispatch or self.settings.provider != "openai":
+            raise ServiceError("이 서버는 OpenAI 제공자로 실행되지 않아 API 키를 쓰지 않습니다.")
+        with self._runner_lock:  # close() takes it too: no transport appears after shutdown began
+            if self._closed:
+                raise ServiceError("서비스가 종료 중입니다.")
+            if isinstance(self.transport, generation.OpenAITransport):
+                self.transport.replace_key(key)
+            else:
+                self._openai_transport(key)
+            self.provider_note = ""
+            self.api_key_source = {"set_by": member_id, "set_at": utcnow()}
 
     def _own(self, settings: Settings) -> None:
         shared = postgres.borrow_owner(settings.db_path)
@@ -1632,6 +1654,28 @@ def set_budget_limit(res: Resources, principal: Principal, cap_micro_usd: int, r
     except (*DATABASE_ERRORS, budget.BudgetError) as exc:
         raise ServiceError(str(exc) if isinstance(exc, budget.BudgetError) else "ledger_unavailable") from None
     return budget_snapshot(res, principal)
+
+
+def api_key_status(res: Resources, principal: Principal) -> dict:
+    """Whether paid calls have a key, and who set it. The key itself never leaves the transport."""
+    _authorize(res, principal, "consultant", "verifier", "budget_admin")
+    return {"configured": res.api_key_source is not None, **(res.api_key_source or {"set_by": None, "set_at": None})}
+
+
+def set_api_key(res: Resources, principal: Principal, api_key: str) -> dict:
+    """Checks the key against the serving model (a free metadata read), then hands it to the running transport.
+    The audit row records who set a key, never its value."""
+    principal = _authorize(res, principal, "budget_admin")
+    key = api_key.strip()
+    if not key or len(key) > 500 or not key.isascii() or any(c.isspace() for c in key):
+        raise ServiceError("API 키 형식이 아닙니다.")
+    problem = generation.check_api_key(key, res.settings.generation_model, res.settings.request_timeout_seconds)
+    if problem:
+        raise ServiceError(problem)
+    res.set_api_key(key, principal.member_id)
+    with open_db(res.settings.db_path) as conn, tx(conn, immediate=True):
+        _audit(conn, principal.member_id, "set_api_key", "openai", "", {"model": res.settings.generation_model})
+    return api_key_status(res, principal)
 
 VERIFIER_MODES = ("whitespace_bm25", "kiwi_bm25", "dense", "hybrid", "hybrid_rerank")
 

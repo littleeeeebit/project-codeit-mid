@@ -91,6 +91,16 @@ class BudgetLimitIn(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 
 
+class ApiKeyIn(BaseModel):
+    api_key: str  # no length constraint here: a validation error would echo the value back; service checks it
+
+
+class ApiKeyStatus(BaseModel):
+    configured: bool
+    set_by: str | None
+    set_at: str | None
+
+
 class Dated(BaseModel):
     value: str
     precision: str
@@ -290,6 +300,14 @@ def _routes(app: FastAPI) -> None:
     def budget_limit(body: BudgetLimitIn, res: Res, member: Member):
         snap = service.set_budget_limit(res, member, body.cap_micro_usd, body.reason)
         return Budget(snapshot=snap, warnings=service.visible_warnings(snap.warnings))
+
+    @app.get("/api/settings/api-key", response_model=ApiKeyStatus)
+    def api_key_status(res: Res, member: Member):
+        return service.api_key_status(res, member)
+
+    @app.put("/api/settings/api-key", response_model=ApiKeyStatus)
+    def api_key(body: ApiKeyIn, res: Res, member: Member):
+        return service.set_api_key(res, member, body.api_key)
 
     @app.get("/api/documents", response_model=list[Document])
     def documents(res: Res, member: Member, query: str = "", institution: str = "", amount_min: int | None = None,
