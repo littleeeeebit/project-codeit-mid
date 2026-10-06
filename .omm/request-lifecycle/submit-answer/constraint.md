@@ -1,0 +1,1 @@
+Reusing an idempotency key with a different input hash is refused. Reusing it with the same input returns the existing request, so double clicks and reruns never start a second call.

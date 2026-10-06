@@ -1,0 +1,9 @@
+created: 2026-10-06T10:18:26.589Z
+updated: 2026-10-06T10:18:26.590Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: settled
+children: []
+parentPath:
+  - attempt-states

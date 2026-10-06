@@ -1,0 +1,1 @@
+Printing requires the Windows default printer to be 'Microsoft Print to PDF' and opens viewer windows. Do not print anything else while it runs.

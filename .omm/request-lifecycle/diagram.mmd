@@ -1,10 +1,10 @@
 graph TD
-  ask-submit["Ask submit\nweb/src/components/ask/ask-page.tsx"] -->|"POST /api/ask"| request-intake["Validate and persist\nsrc/rfp_assistant/service.py"]
-  request-intake -->|"request_id to executor"| worker-claim["Worker claim\nsrc/rfp_assistant/service.py"]
-  worker-claim -->|"follow-up with history"| query-rewrite["Follow-up rewrite\nsrc/rfp_assistant/generation.py"]
-  worker-claim -->|"first-turn question"| evidence-retrieval["Retrieve and price\nsrc/rfp_assistant/retrieval.py"]
-  query-rewrite -->|"standalone question"| evidence-retrieval
-  evidence-retrieval -->|"evidence units, estimate"| metered-generation["Metered generation\nsrc/rfp_assistant/service.py"]
-  metered-generation -->|"structured JSON"| answer-validation["Citation validation\nsrc/rfp_assistant/generation.py"]
-  metered-generation -->|"partial text"| outcome-delivery["Poll and SSE delivery\nweb/src/lib/use-answer-stream.ts"]
-  answer-validation -->|"result_json, status"| outcome-delivery
+  ask-composer["Ask composer\nweb/src/components/ask/ask-page.tsx"] -->|"POST /api/ask"| submit-answer["Validate and persist\nsrc/rfp_assistant/service.py"]
+  submit-answer -->|"request ID to executor"| run-queued["Claim queued request\nsrc/rfp_assistant/service.py"]
+  run-queued -->|"follow-up with history"| conversation-rewrite["Follow-up rewrite\nsrc/rfp_assistant/service.py"]
+  run-queued -->|"first-turn question"| paid-answer["Retrieve, generate, validate\nsrc/rfp_assistant/service.py"]
+  conversation-rewrite -->|"standalone question"| paid-answer
+  paid-answer -->|"outcome and trace"| finish-request["Persist outcome\nsrc/rfp_assistant/service.py"]
+  ask-composer -->|"poll status, read SSE"| stream-and-poll["Status poll and stream\nsrc/rfp_assistant/api.py"]
+  stream-and-poll -->|"reads row and partials"| finish-request
+  paid-answer -->|"spans and scores"| langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/tracing.py"]

@@ -1,1 +1,0 @@
-Durable marker written immediately before the network call, under the request's stop guard. If the process dies in this state, the next owner turns it into `unknown`.

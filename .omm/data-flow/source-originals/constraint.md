@@ -1,0 +1,1 @@
+Originals are never modified. The corpus is digital and should not be tested with scans.

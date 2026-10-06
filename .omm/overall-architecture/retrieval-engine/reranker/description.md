@@ -1,0 +1,1 @@
+This stage runs only in `hybrid_rerank` mode. `LocalReranker.rerank` scores the fused pool up to `rerank_depth`. When `rerank_protect` is set, it leaves the leading BM25 rows in place and reranks only the rows below them. An inference exception downgrades the request to `hybrid` with the reason in `fallback`. Queue and inference milliseconds go into the timings.

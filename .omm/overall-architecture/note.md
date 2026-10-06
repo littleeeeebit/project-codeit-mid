@@ -1,1 +1,1 @@
-Observed: PostgreSQL is the only backend; there is no `database_backend` setting. Since the 2026-10-04 cutover the application runs on `bidmate_app` with `handoff/postgresql-pgvector/config.example.json`.
+Observed: PostgreSQL is the only backend; there is no `database_backend` setting. Since the 2026-10-04 cutover the application runs on `bidmate_app` with `docs/history/postgresql-migration/config.example.json`.

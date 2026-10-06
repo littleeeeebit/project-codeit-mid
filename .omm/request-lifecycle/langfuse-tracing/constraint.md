@@ -1,0 +1,1 @@
+Tracing is observability only. Admission, reservations and settlement never read it, and an absent or failing Langfuse changes neither answers nor the ledger.

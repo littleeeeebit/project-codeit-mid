@@ -1,0 +1,1 @@
+`attempts.state` in the shared ledger. Reserved amounts count against the cap while an attempt is `reserved`, `dispatching` or `unknown`. A request shows these as `pending`, or as `unknown`, which takes precedence.

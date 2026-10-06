@@ -1,0 +1,1 @@
+No cost was incurred: the attempt was refused before dispatch, the provider returned a pre-execution 4xx, no key or provider was available, or a never-dispatched reservation was found at restart.

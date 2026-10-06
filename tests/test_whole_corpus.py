@@ -15,8 +15,8 @@ from rfp_assistant.contracts import AnswerRequest
 from rfp_assistant.generation import FakeTransport
 from rfp_assistant.retrieval import KeywordIndex, corpus_scope, fuse, retrieve, route_corpus
 from tests import fixtures
-from tools.check_large_quality import gate, needle_hits, parse_variant, variant_name
-from tools.check_vector_search import recall
+from tools.retrieval.fusion_gate import gate, needle_hits, parse_variant, variant_name
+from tools.retrieval.hnsw_recall import recall
 
 
 class CorpusAskTest(unittest.TestCase):

@@ -1,0 +1,9 @@
+created: 2026-10-06T10:18:26.224Z
+updated: 2026-10-06T10:18:26.226Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: reserved
+children: []
+parentPath:
+  - attempt-states

@@ -1,0 +1,1 @@
+There is no fallback database. Startup fails with a clear message when `RFP_DATABASE_DSN` is missing or points at an unvalidated database. Never store the DSN in a tracked file.

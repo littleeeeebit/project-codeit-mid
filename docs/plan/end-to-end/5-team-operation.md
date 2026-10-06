@@ -6,7 +6,7 @@ Enter with the actual [phase-4 release](4-evaluation-and-release.md), runbook, a
 
 ## Ownership and durable deployment
 
-Assign one operational owner and a backup owner from the team; record their roles in the runbook. There is no login: all six users connect to one application deployment whose network reach the owner decides. The ledger and every application record live in the PostgreSQL database `bidmate_app` (PostgreSQL 18.6 + pgvector 0.8.6, started by `tools/start-postgresql.ps1` on a persistent Docker volume). Immutable artifacts stay on the owner's persistent local disk. Ephemeral hosting that can lose or reset the database or the artifacts is outside this baseline.
+Assign one operational owner and a backup owner from the team; record their roles in the runbook. There is no login: all six users connect to one application deployment whose network reach the owner decides. The ledger and every application record live in the PostgreSQL database `bidmate_app` (PostgreSQL 18.6 + pgvector 0.8.6, started by `tools/infra/start-postgresql.ps1` on a persistent Docker volume). Immutable artifacts stay on the owner's persistent local disk. Ephemeral hosting that can lose or reset the database or the artifacts is outside this baseline.
 
 Hold the database-wide paid-gateway advisory lock while the real paid service is active. A second UI or gateway owner against the same database is refused, from any host. Maintenance CLI jobs acquire the same lock after the UI has stopped. Fake checks and tests use their own isolated PostgreSQL databases, never `bidmate_app`. The lock belongs to its database session, so a dead process releases it. Confirm that recovery after process death; never terminate a live owner's session to bypass it.
 

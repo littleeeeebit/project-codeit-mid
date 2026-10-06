@@ -1,0 +1,1 @@
+Set by `RequestRunner.shutdown`: queued requests always, and running ones when futures are still pending at the deadline. Also set at startup by `recover_requests`, before the new owner accepts work. `_finish` preserves `interrupted` if a worker returns after the mark. Interrupted requests are never re-executed.

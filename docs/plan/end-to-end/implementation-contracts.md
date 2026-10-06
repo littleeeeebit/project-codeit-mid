@@ -85,13 +85,13 @@ Locations use PDF one-based physical page, optional printed label, bounding box,
 
 PostgreSQL 18.6 + pgvector 0.8.6 is the only backend; the application database is `bidmate_app`. `postgres.py` owns pinned extension/schema initialization, a refcounted bounded psycopg pool, qmark parameter translation and a session gateway advisory lock. Each operation owns its connection/transaction; inference holds neither. Allowance admission and mutable writes serialize on the application mutex row. A failed PostgreSQL write fails; there is no fallback store. The 2026-10-04 cutover import from the previous database preserved every source table, including retired authentication records.
 
-Tests run on isolated PostgreSQL databases that `tests/fixtures.py` creates per test environment from a per-run template (pgvector installed) on the server started by `tools/start-postgresql.ps1`, or on the server named by `RFP_POSTGRES_TEST_DSN`. They drop their databases afterwards and never touch `bidmate_app`.
+Tests run on isolated PostgreSQL databases that `tests/fixtures.py` creates per test environment from a per-run template (pgvector installed) on the server started by `tools/infra/start-postgresql.ps1`, or on the server named by `RFP_POSTGRES_TEST_DSN`. They drop their databases afterwards and never touch `bidmate_app`.
 
 BIGINT micro-USD retains exact money. Immutable serialized JSON remains TEXT; C-collated text retains deterministic identity ordering. Foreign keys, original values, canonical digests, nullable zero distinctions and historical attempt price snapshots remain checked. Schema versions are in `schema_migrations`, not PRAGMA. Typed pgvector values have dimension checks; homogeneous embedding sets include source/payload/checksum/model/policy/provenance identities. Scoped exact cosine search in pgvector precedes ranking.
 
 The owner approved a $10 cumulative operating cap and paid migration work. The Settings control may change that cap through the existing budget-admin capability and visitor attribution, without resetting spending/reservations or enabling paid admission. It scales current envelopes and refuses any reduction below committed costs. This supersedes the earlier CLI-only limit-edit contract, while rate registration and unknown billing reconciliation remain maintenance actions.
 
-See the [PostgreSQL handover](../../../handoff/postgresql-pgvector/README.md) for real-database receipts, pinned versions, tested commands, production cutover prerequisites and unfinished quality/recovery acceptance.
+See the [PostgreSQL handover](../../history/postgresql-migration/README.md) for real-database receipts, pinned versions, tested commands, production cutover prerequisites and unfinished quality/recovery acceptance.
 
 ## Records and constraints
 

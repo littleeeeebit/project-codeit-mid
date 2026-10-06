@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from rfp_assistant import api, auth, budget, generation, gold, postgres, service
 from rfp_assistant.store import open_db
-from tests import phase4_fixtures as fx
+from tests import release_fixtures as fx
 
 
 class CandidateSpansTest(unittest.TestCase):

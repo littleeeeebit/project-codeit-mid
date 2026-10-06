@@ -1,1 +1,1 @@
-How content moves from the originals to a cited answer, and which identifiers bind each stage. Every citation can be traced back to bytes: (doc_id, source_hash) → extraction_id → element_ids → chunk_id → evidence_id within one request.
+Corpus data moves from the original HWP and PDF files to served evidence through immutable, hash-addressed stages. Each stage reuses unchanged inputs. Retrieval configurations are measured as frozen runs and only served after a person activates one.

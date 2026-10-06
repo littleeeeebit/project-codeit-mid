@@ -17,7 +17,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 from rfp_assistant import api, budget, drafting, generation, service, settings as settings_mod, store, tracing
 from tests import fixtures
-from tests import phase4_fixtures as fx
+from tests import release_fixtures as fx
 
 KEY = "sk-proj-" + "Zq8" * 16  # key-shaped, never a real credential
 NOWHERE = "http://127.0.0.1:9"  # discard port: connections are refused at once
@@ -301,16 +301,16 @@ class LangfuseLauncherTest(unittest.TestCase):
         volume = "'bidmate-langfuse_postgres_data'" if volume_exists else "$null"
         command = (f"function docker {{ $global:LASTEXITCODE = 0; if ($args[0] -eq 'volume') {{ {volume} }} "
                    f"else {{ Add-Content -LiteralPath '{(root / 'calls.txt').as_posix()}' -Value ($args -join ' ') }} }}; "
-                   f". '{(root / 'tools/start-langfuse.ps1').as_posix()}'")
+                   f". '{(root / 'tools/infra/start-langfuse.ps1').as_posix()}'")
         return subprocess.run(["pwsh", "-NoProfile", "-Command", command], capture_output=True, encoding="utf-8",
                               errors="replace")
 
     def test_secrets_are_generated_once_and_dotenv_keeps_its_other_lines(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "tools").mkdir()
-            shutil.copyfile(Path(__file__).resolve().parents[1] / "tools/start-langfuse.ps1",
-                            root / "tools/start-langfuse.ps1")
+            (root / "tools/infra").mkdir(parents=True)
+            shutil.copyfile(Path(__file__).resolve().parents[1] / "tools/infra/start-langfuse.ps1",
+                            root / "tools/infra/start-langfuse.ps1")
             (root / ".env").write_text("OPENAI_API_KEY=keep-me\nLANGFUSE_HOST=http://stale\n"
                                        'LANGFUSE_BASE_URL="http://elsewhere"\n', encoding="utf-8")
             for _ in range(2):

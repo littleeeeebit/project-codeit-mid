@@ -1,0 +1,1 @@
+Domain status and execution status differ: a `budget_blocked` or `insufficient_evidence` outcome is stored with execution status `completed`.

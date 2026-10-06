@@ -1,1 +1,0 @@
-Covered by an owner reconciliation interval of provider totals for the matching billing scope. A later `settle` writes a compensating `late-settlement:` adjustment.

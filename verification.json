@@ -10,8 +10,8 @@
   "README.md",
   "DESIGN.md",
   "docs/operations/runbook.md",
-  "handoff/phase3/README.md",
-  "handoff/phase4/README.md",
+  "docs/history/workflow-acceptance/README.md",
+  "docs/history/release-walkthrough/README.md",
   "docs/operations/release-report.md"
  ],
  "flows": [
@@ -281,7 +281,6 @@
     "DESIGN.md",
     "README.md",
     "docs/*",
-    "handoff/*",
     "pyproject.toml",
     "requirements.txt",
     "src/*",
@@ -342,7 +341,7 @@
     "src/rfp_assistant/service.py",
     "src/rfp_assistant/store.py",
     "tests/fixtures.py",
-    "tests/phase4_fixtures.py",
+    "tests/release_fixtures.py",
     "tests/test_evaluation.py",
     "tests/test_release.py",
     "tools/verify.py",

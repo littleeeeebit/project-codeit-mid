@@ -1,6 +1,22 @@
 # RFP assistant (입찰메이트)
 
-Internal assistant for historical Korean RFPs: search projects, select one document, ask a scoped question, receive one metered grounded answer, and open the original evidence. The plan lives in [docs/plan/end-to-end](docs/plan/end-to-end/0-overview.md); this README covers setup and launch for what is implemented (phases 1–4). Operations (access, stop/restart, billing recovery, reconciliation, evaluation, sealed run, backup/restore, index rollback) are in the [runbook](docs/operations/runbook.md); screen layout and request ownership in [DESIGN.md](DESIGN.md). Phase outcomes: [phase 2](handoff/phase2/README.md), [phase 3](handoff/phase3/README.md), [phase 4](handoff/phase4/README.md) and the [release report](docs/operations/release-report.md).
+Internal assistant for historical Korean RFPs: search projects, select one document, ask a scoped question, receive one metered grounded answer, and open the original evidence. The plan lives in [docs/plan/end-to-end](docs/plan/end-to-end/0-overview.md); this README covers setup and launch for what is implemented (phases 1–4). Operations (access, stop/restart, billing recovery, reconciliation, evaluation, sealed run, backup/restore, index rollback) are in the [runbook](docs/operations/runbook.md); screen layout and request ownership in [DESIGN.md](DESIGN.md). Phase outcomes: [phase 2](docs/history/retrieval-selection-kit/README.md), [phase 3](docs/history/workflow-acceptance/README.md), [phase 4](docs/history/release-walkthrough/README.md) and the [release report](docs/operations/release-report.md).
+
+## Where things live
+
+| Path | What it holds |
+| --- | --- |
+| `src/` | The `rfp_assistant` package: service, API, CLI, retrieval, evaluation ([Layout](#layout)) |
+| `web/` | The Next.js screens, exported to `web/out` and served by the API |
+| `tools/export/` | Read-only snapshots of recorded state and the CLI capture wrapper |
+| `tools/retrieval/` | Retrieval measurements: the fusion quality gate and HNSW recall |
+| `tools/infra/` | PostgreSQL and Langfuse launchers, the database init script, the VM's systemd unit and owner CLI wrapper |
+| `tools/verification/` | Helpers the flows in `verification.json` run; `tools/verify.py` runs the flows, `tools/openapi.py` writes the API schema |
+| `tests/` | `unittest` modules and their shared fixtures |
+| `docs/plan/` | The end-to-end plan and shared implementation contracts |
+| `docs/rag/` | Research and design notes behind each RAG stage |
+| `docs/operations/` | The runbook and the release report |
+| `docs/history/` | Finished records, one folder per topic: retrieval selection kit, workflow acceptance, release walkthrough, PostgreSQL migration, frontend redesign |
 
 ## Environment
 
@@ -17,7 +33,7 @@ The HWP converter (`hwp5proc` from pyhwp 0.1b15) is installed into the same envi
 
 ## Database: PostgreSQL only
 
-The application runs only on PostgreSQL 18.6 with pgvector 0.8.6. Every record lives there: documents, extractions, chunks, requests, traces, the billing ledger, audit events and the embedding vectors: the serving set and each compared model's own set, every one tagged with its model, dimensions and prefix policy. There is no other database and no fallback. Start Docker Desktop (Linux containers), then run `./tools/start-postgresql.ps1`. It starts the pinned server on loopback port 55432 and leaves `RFP_DATABASE_DSN` unchanged; it never selects the empty `bidmate_rehearsal` database. The application database is `bidmate_app`. Point `RFP_DATABASE_DSN` at it in the process environment, never in a file the repository tracks.
+The application runs only on PostgreSQL 18.6 with pgvector 0.8.6. Every record lives there: documents, extractions, chunks, requests, traces, the billing ledger, audit events and the embedding vectors: the serving set and each compared model's own set, every one tagged with its model, dimensions and prefix policy. There is no other database and no fallback. Start Docker Desktop (Linux containers), then run `./tools/infra/start-postgresql.ps1`. It starts the pinned server on loopback port 55432 and leaves `RFP_DATABASE_DSN` unchanged; it never selects the empty `bidmate_rehearsal` database. The application database is `bidmate_app`. Point `RFP_DATABASE_DSN` at it in the process environment, never in a file the repository tracks.
 
 Startup refuses to run with a clear message when `RFP_DATABASE_DSN` is missing, or when the database has no validated import (the `migration_import` / `migration_validation` marker plus unchanged artifact hashes, index payload files included). A failed validation or an open recovery fence also closes paid admission. Paid dispatch needs both the ledger switch and PostgreSQL paid admission, which `paid on` sets together, plus the database-wide gateway advisory lock that the serving process holds.
 
@@ -28,7 +44,7 @@ The cutover ran on 2026-10-04. With the UI and writes stopped, a final consisten
 - This is the best setting that passed the fusion gate against keyword-only K1 at the same limits. Among the alternatives measured, 20–30 units and the local reranker failed.
 - HNSW did not reach recall@20 0.99 against exact search on scoped questions, so exact search serves.
 
-Ask has an All documents scope across all 98 active sources. A question naming a project is narrowed to that project's documents; generic title words alone, such as 대학교 or 사업, narrow nothing. A question that only names the project gets its overview passages, ranked by meaning. The needle set finds the target passage in the top 5 for 32 of 33 questions (Wilson 95% 0.85–0.99). Measurements, the paid end-to-end check, the archive and the rollback are in the [PostgreSQL handover](handoff/postgresql-pgvector/README.md#postgresql-only-operation-2026-10-04).
+Ask has an All documents scope across all 98 active sources. A question naming a project is narrowed to that project's documents; generic title words alone, such as 대학교 or 사업, narrow nothing. A question that only names the project gets its overview passages, ranked by meaning. The needle set finds the target passage in the top 5 for 32 of 33 questions (Wilson 95% 0.85–0.99). Measurements, the paid end-to-end check, the archive and the rollback are in the [PostgreSQL handover](docs/history/postgresql-migration/README.md#postgresql-only-operation-2026-10-04).
 
 Ask is a conversation within one scope. A follow-up is first rewritten into a standalone retrieval query by a paid call through the same gateway, and the trace records it. Its answer also sees the conversation and the evidence the previous answer cited, so a restatement keeps the earlier facts. The answer then streams in as provisional text until validation finishes. Each sentence ends with numbered citation markers that open the evidence pane ([DESIGN.md §12](DESIGN.md#12-질문하기-as-a-conversation)).
 
@@ -56,7 +72,7 @@ Without a key the app still runs: search, filters, evidence browsing and retriev
 
 A local Langfuse v4 stack can record every `/api/ask` request and every drafting run. A request trace shows retrieval (chunk IDs, scores and text), the assembled evidence, the `gpt-6-luna` generation with its usage and ledger cost, and the answer validation. It carries three free, deterministic scores from the existing checks: `citation_valid`, `insufficient_evidence` and `evidence_tokens`. Embeddings, ingestion, OCR and evaluation runs are not traced. Tracing is observability only: admission, reservations and settlement never read it, and an absent, stopped or failing Langfuse changes neither answers nor the ledger.
 
-Start Docker Desktop, then run `./tools/start-langfuse.ps1`. The first run generates the stack's secrets into the gitignored `.runtime/langfuse.env`. It creates the organization, the project and its API keys headlessly, and starts `compose.langfuse.yaml` detached (Compose project `bidmate-langfuse`, with its own Postgres, ClickHouse, Redis and MinIO). Later runs reuse the same secrets and volumes. The script also writes the three `LANGFUSE_*` lines into `.env` and removes any `LANGFUSE_BASE_URL` there, which would point SDK tools elsewhere. Tracing starts with the next application start.
+Start Docker Desktop, then run `./tools/infra/start-langfuse.ps1`. The first run generates the stack's secrets into the gitignored `.runtime/langfuse.env`. It creates the organization, the project and its API keys headlessly, and starts `compose.langfuse.yaml` detached (Compose project `bidmate-langfuse`, with its own Postgres, ClickHouse, Redis and MinIO). Later runs reuse the same secrets and volumes. The script also writes the three `LANGFUSE_*` lines into `.env` and removes any `LANGFUSE_BASE_URL` there, which would point SDK tools elsewhere. Tracing starts with the next application start.
 
 The UI is at <http://127.0.0.2:3100> (MinIO media at port 9190). Both listen only on `127.0.0.2`, a loopback address of their own: browsers share cookies across ports, so a second local Langfuse on `127.0.0.1` would otherwise break this one's sign-in. Use that address rather than `localhost`, which a browser may resolve to `::1`. Sign in with `LANGFUSE_INIT_USER_EMAIL` and `LANGFUSE_INIT_USER_PASSWORD` from `.runtime/langfuse.env`. A request's trace ID is derived from its request ID (`Langfuse.create_trace_id(seed=request_id)`). Text is sent in full, except that one mask on the client redacts API keys, tokens and other secret-shaped values on export.
 
@@ -68,7 +84,7 @@ Answers use `gpt-6-luna` through Chat Completions with strict structured output,
 
 Run from any directory with the environment's interpreter:
 
-Every command except `check`, `load-check` and `restore-check` runs against `RFP_DATABASE_DSN` and refuses a database without a validated import. Every startup refuses an embedding model outside the compared registry (`models.EMBEDDINGS`) or at dimensions other than the ones it produces; serving then uses whatever embedding the activated run evaluated. Every connection, pooled, the paid gateway's or `restore-check`'s, refuses a server other than PostgreSQL 18.6, and pooled connections refuse pgvector other than 0.8.6. `check` and `load-check` use temporary databases on the server named by `RFP_POSTGRES_TEST_DSN` (default: the local server from `tools/start-postgresql.ps1`), and `restore-check` uses `RFP_RESTORE_DATABASE_DSN`. `init` creates the schema in a database the application owns; it never resets spending.
+Every command except `check`, `load-check` and `restore-check` runs against `RFP_DATABASE_DSN` and refuses a database without a validated import. Every startup refuses an embedding model outside the compared registry (`models.EMBEDDINGS`) or at dimensions other than the ones it produces; serving then uses whatever embedding the activated run evaluated. Every connection, pooled, the paid gateway's or `restore-check`'s, refuses a server other than PostgreSQL 18.6, and pooled connections refuse pgvector other than 0.8.6. `check` and `load-check` use temporary databases on the server named by `RFP_POSTGRES_TEST_DSN` (default: the local server from `tools/infra/start-postgresql.ps1`), and `restore-check` uses `RFP_RESTORE_DATABASE_DSN`. `init` creates the schema in a database the application owns; it never resets spending.
 
 ```powershell
 python -m rfp_assistant.cli init --paid-disabled          # schema + allowance row; never resets spending
@@ -87,11 +103,11 @@ a static export that the API serves itself, so one process on one port serves bo
 
 ```powershell
 cd web; npm ci; npm run build; cd ..                     # writes web/out (types come from web/openapi.json)
-$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.example.json).Path   # RFP_DATABASE_DSN set
+$env:RFP_CONFIG_FILE = (Resolve-Path docs/history/postgresql-migration/config.example.json).Path   # RFP_DATABASE_DSN set
 python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
 
-The live shared instance runs on the team's GCP VM `codeit`, not on any member's machine. Members open it through an SSH local forward of 8501. The host, the tunnel command, the Linux start path (`tools/start-postgresql.sh`, `tools/bidmate.service`) and the member list are in [runbook §3](docs/operations/runbook.md#31-the-team-host-live-since-2026-10-06).
+The live shared instance runs on the team's GCP VM `codeit`, not on any member's machine. Members open it through an SSH local forward of 8501. The host, the tunnel command, the Linux start path (`tools/infra/start-postgresql.sh`, `tools/infra/bidmate.service`) and the member list are in [runbook §3](docs/operations/runbook.md#31-the-team-host-live-since-2026-10-06).
 
 Exactly one worker: paid requests run on the process's own executor and the process holds a database-wide gateway advisory lock. For screen
 work, run the API on 8511 and `npm run dev` in `web/` (port 8510, `/api/*` forwarded to `RFP_API_URL`, default
@@ -219,7 +235,7 @@ python -m rfp_assistant.cli judge-set                     # free: mutated held-o
 
 ## Phase 4: evaluation and release
 
-Plan: [4-evaluation-and-release.md](docs/plan/end-to-end/4-evaluation-and-release.md). Procedure: [runbook §10–12](docs/operations/runbook.md#10-phase-4-evaluation-sealed-run-and-release). Outcome on this branch: [release report](docs/operations/release-report.md) and [phase-4 handoff](handoff/phase4/README.md).
+Plan: [4-evaluation-and-release.md](docs/plan/end-to-end/4-evaluation-and-release.md). Procedure: [runbook §10–12](docs/operations/runbook.md#10-phase-4-evaluation-sealed-run-and-release). Outcome on this branch: [release report](docs/operations/release-report.md) and [phase-4 handoff](docs/history/release-walkthrough/README.md).
 
 ```powershell
 python -m rfp_assistant.cli validate-gold --dataset dev                       # gold-2 rows; `test` prints IDs/counts only

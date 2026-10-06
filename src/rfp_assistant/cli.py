@@ -931,7 +931,7 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_restore_check(args, load_settings(provider="fake", database_dsn_env="RFP_RESTORE_DATABASE_DSN"))
         if args.command in ("check", "load-check"):
             # The automated checks build their own isolated test databases, never touching the live one; by
-            # default on the local server tools/start-postgresql.ps1 runs.
+            # default on the local server tools/infra/start-postgresql.ps1 runs.
             from tests.fixtures import server_dsn
 
             os.environ.setdefault("RFP_POSTGRES_TEST_DSN", server_dsn())

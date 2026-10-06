@@ -1,0 +1,1 @@
+Every immediate write transaction (admission, idempotency, settlement, request status) is serialized by the single `application_mutex` row. The code marks this as a deliberate ceiling, to be replaced by per-account locks only if measured throughput requires it.

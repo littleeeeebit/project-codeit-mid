@@ -1,0 +1,1 @@
+`_stored_quote` scans `idx.chunks` linearly for every evidence unit (about 19k active chunks). It runs for each unit when validating and when carrying evidence forward.

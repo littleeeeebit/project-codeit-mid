@@ -1,0 +1,1 @@
+Set directly from `queued` by `cancel_request`, or by `_finish` when a running request with `cancel_requested` would otherwise complete, or when `_Stop('cancelled')` fires at a checkpoint. A cancelled outcome is history only and never attachable.

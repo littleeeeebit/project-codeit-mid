@@ -1,0 +1,1 @@
+On submit, `AskPage` reads the member name once and posts `{scope, question, mode, previous_request_id}`. It stores the returned `Owned` record (`request_id`, a fresh `generation_id` and `target`) on a new turn. The composer stays disabled while the latest turn is `queued` or `running`, so a conversation always continues from a finished turn.

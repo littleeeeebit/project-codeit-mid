@@ -1,0 +1,1 @@
+Sidebar search over `GET /api/documents` with query, institution, amount and closing-date filters. It is served by `service.find_documents` → `search_projects`, which lists askable (indexed) documents first. Toggling a document calls `onToggle`, which releases the current conversation before the selection changes. Selection is capped at two documents.
