@@ -1,0 +1,1 @@
+`RFP_SOURCE_DIR` (default `<repo>/원본 데이터`) holds `data_list.csv` and `files/`. Originals are never modified. `original_download` serves only managed `(doc_id, source_hash)` pairs whose resolved path lies directly in `settings.files_dir` and whose bytes still hash to the recorded value.

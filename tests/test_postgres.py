@@ -14,7 +14,11 @@ from pathlib import Path
 import numpy as np
 import psycopg
 
-from rfp_assistant import budget, cli, dense, generation, postgres, postgres_backup, service, store, vector_store
+from rfp_assistant.gateway import budget, generation
+from rfp_assistant import cli
+from rfp_assistant.retrieval import dense, vector_store
+from rfp_assistant.storage import postgres, postgres_backup, store
+from rfp_assistant.service import service
 from rfp_assistant.settings import Settings
 from tests import fixtures
 
@@ -324,7 +328,7 @@ class PostgreSQLTests(unittest.TestCase):
             dense.DenseIndex.load(settings, index.version)
 
     def test_large_query_explicit_dimensions_normalization_and_pool_release(self):
-        from rfp_assistant.generation import FakeTransport
+        from rfp_assistant.gateway.generation import FakeTransport
 
         self.allow_fake_paid()
         settings = self.settings.with_(embedding_model="text-embedding-3-large", embedding_dimensions=1536)

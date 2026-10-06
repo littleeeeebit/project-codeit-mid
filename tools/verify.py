@@ -267,7 +267,7 @@ def copy_database(source_dsn: str, work: Path) -> str:
     test database. The dump file is removed; the copy is dropped when this process exits."""
     from psycopg.conninfo import conninfo_to_dict
 
-    from rfp_assistant import postgres, postgres_backup
+    from rfp_assistant.storage import postgres, postgres_backup
     from tests import fixtures
 
     os.environ["RFP_VERIFY_SOURCE_DSN"] = source_dsn
@@ -283,7 +283,7 @@ def copy_database(source_dsn: str, work: Path) -> str:
 
 
 def db_rows(dsn: str, sql: str, args=()) -> list[dict]:
-    from rfp_assistant.postgres import bind_sql
+    from rfp_assistant.storage.postgres import bind_sql
 
     with psycopg.connect(dsn, row_factory=dict_row, autocommit=True) as conn:
         return conn.execute(bind_sql(sql), args).fetchall()

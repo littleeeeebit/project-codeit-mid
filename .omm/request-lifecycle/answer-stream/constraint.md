@@ -1,0 +1,1 @@
+`res.partials` lives in process memory, which is one more reason the server runs with a single worker.

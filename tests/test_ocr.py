@@ -4,7 +4,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from rfp_assistant import ocr, postgres, store
+from rfp_assistant.corpus import ocr
+from rfp_assistant.storage import postgres, store
 from tests import fixtures
 
 
@@ -46,9 +47,9 @@ class MergeTest(unittest.TestCase):
     def test_image_text_lands_between_the_text_around_the_picture_and_chunks_on_its_own(self):
         import pymupdf
 
-        from rfp_assistant import ingestion
-        from rfp_assistant.chunking import build_chunks
-        from rfp_assistant.store import write_jsonl_atomic
+        from rfp_assistant.corpus import ingestion
+        from rfp_assistant.retrieval.chunking import build_chunks
+        from rfp_assistant.storage.store import write_jsonl_atomic
 
         with tempfile.TemporaryDirectory() as tmp:
             settings = SimpleNamespace(data_dir=Path(tmp))
@@ -76,8 +77,8 @@ class MergeTest(unittest.TestCase):
     def test_a_page_that_is_only_a_picture_follows_the_previous_page(self):
         import pymupdf
 
-        from rfp_assistant import ingestion
-        from rfp_assistant.store import write_jsonl_atomic
+        from rfp_assistant.corpus import ingestion
+        from rfp_assistant.storage.store import write_jsonl_atomic
 
         with tempfile.TemporaryDirectory() as tmp:
             settings = SimpleNamespace(data_dir=Path(tmp))
@@ -98,8 +99,8 @@ class MergeTest(unittest.TestCase):
     def test_the_same_text_placed_elsewhere_is_another_revision(self):
         import pymupdf
 
-        from rfp_assistant import ingestion
-        from rfp_assistant.store import write_jsonl_atomic
+        from rfp_assistant.corpus import ingestion
+        from rfp_assistant.storage.store import write_jsonl_atomic
 
         suffixes, orders = [], []
         with tempfile.TemporaryDirectory() as tmp:
@@ -122,8 +123,8 @@ class MergeTest(unittest.TestCase):
     def test_a_read_of_a_region_the_rendering_no_longer_has_is_stale_not_a_crash(self):
         import pymupdf
 
-        from rfp_assistant import ingestion
-        from rfp_assistant.store import write_jsonl_atomic
+        from rfp_assistant.corpus import ingestion
+        from rfp_assistant.storage.store import write_jsonl_atomic
 
         with tempfile.TemporaryDirectory() as tmp:
             settings = SimpleNamespace(data_dir=Path(tmp))
@@ -145,8 +146,8 @@ class MergeTest(unittest.TestCase):
     def test_a_caption_repeated_on_another_page_does_not_take_the_picture(self):
         import pymupdf
 
-        from rfp_assistant import ingestion
-        from rfp_assistant.store import write_jsonl_atomic
+        from rfp_assistant.corpus import ingestion
+        from rfp_assistant.storage.store import write_jsonl_atomic
 
         with tempfile.TemporaryDirectory() as tmp:
             settings = SimpleNamespace(data_dir=Path(tmp))
@@ -171,8 +172,8 @@ class MergeTest(unittest.TestCase):
     def test_a_caption_repeated_on_the_same_page_leaves_the_lower_anchor_to_place_the_picture(self):
         import pymupdf
 
-        from rfp_assistant import ingestion
-        from rfp_assistant.store import write_jsonl_atomic
+        from rfp_assistant.corpus import ingestion
+        from rfp_assistant.storage.store import write_jsonl_atomic
 
         with tempfile.TemporaryDirectory() as tmp:
             settings = SimpleNamespace(data_dir=Path(tmp))
@@ -195,8 +196,8 @@ class MergeTest(unittest.TestCase):
     def test_a_picture_before_the_first_heading_belongs_to_no_section(self):
         import pymupdf
 
-        from rfp_assistant import ingestion
-        from rfp_assistant.store import write_jsonl_atomic
+        from rfp_assistant.corpus import ingestion
+        from rfp_assistant.storage.store import write_jsonl_atomic
 
         with tempfile.TemporaryDirectory() as tmp:
             settings = SimpleNamespace(data_dir=Path(tmp))
@@ -217,8 +218,8 @@ class MergeTest(unittest.TestCase):
     def test_an_unplaced_picture_belongs_to_no_section(self):
         import pymupdf
 
-        from rfp_assistant import ingestion
-        from rfp_assistant.store import write_jsonl_atomic
+        from rfp_assistant.corpus import ingestion
+        from rfp_assistant.storage.store import write_jsonl_atomic
 
         with tempfile.TemporaryDirectory() as tmp:
             settings = SimpleNamespace(data_dir=Path(tmp))
@@ -279,7 +280,7 @@ class RunTest(unittest.TestCase):
         return {"page": page, "bbox": [0.0, 0.0, 100.0, 50.0], "digest": digest, "png": self.png}
 
     def cached(self, page, digest, status, text, source="h"):
-        from rfp_assistant.store import write_jsonl_atomic
+        from rfp_assistant.storage.store import write_jsonl_atomic
 
         local = {"text": text, "mean_prob": 0.99 if status == "local" else 0.5, "looped": False, "expected": 3,
                  "truncated": False}
@@ -361,7 +362,7 @@ class RunTest(unittest.TestCase):
         self.cached(1, "t", "local", "앞부분만")
         rows = ocr.load(self.settings, "h")
         rows[0]["local"]["truncated"] = True
-        from rfp_assistant.store import write_jsonl_atomic
+        from rfp_assistant.storage.store import write_jsonl_atomic
 
         write_jsonl_atomic(ocr.cache_path(self.settings, "h"), rows)
         self.run_ocr([self.region(1, "t")])
@@ -369,7 +370,7 @@ class RunTest(unittest.TestCase):
         self.assertEqual(ocr.load(self.settings, "h")[0]["status"], "gemini")
 
     def test_a_local_read_cached_before_truncation_was_recorded_is_read_again(self):
-        from rfp_assistant.store import write_jsonl_atomic
+        from rfp_assistant.storage.store import write_jsonl_atomic
 
         self.cached(1, "old", "local", "옛 판독")
         rows = ocr.load(self.settings, "h")
@@ -381,7 +382,7 @@ class RunTest(unittest.TestCase):
         self.assertEqual(ocr.load(self.settings, "h")[0]["text"], "새 판독")
 
     def test_a_second_run_is_refused_while_one_writes_the_cache(self):
-        from rfp_assistant.store import ProcessLock
+        from rfp_assistant.storage.store import ProcessLock
 
         lock = ProcessLock(self.settings.data_dir / "ocr" / "run.lock")
         try:

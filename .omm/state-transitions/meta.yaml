@@ -1,37 +1,26 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-06T10:18:22.380Z
-update_count: 24
+updated: 2026-10-06 12:38:01.835000+00:00
+update_count: 26
 last_field: diagram
-git_commit: "4317974"
-git_branch: rename-records-and-tools-by-purpose
+git_commit: 9a90e7f
+git_branch: split-src-into-layer-packages
 children:
-  - attempt-billing
-  - attempt-record
-  - attempt-states
-  - billing-attempt
-  - gateway-owner
-  - gold-candidate
-  - gold-candidate-states
-  - maintenance-run
-  - request-states
-  - request-status
-  - serving-activation
-  - source-states
-prev_diagram: "graph TD\r
-
-  \  request-status[\"Request status\\nsrc/rfp_assistant/service.py\"]
-  -->|\"stop check at dispatch\"| billing-attempt[\"Billing attempt
-  state\\nsrc/rfp_assistant/budget.py\"]\r
-
-  \  billing-attempt -->|\"derived billing_state\"| request-status\r
-
-  \  serving-activation[\"Serving
-  activation\\nsrc/rfp_assistant/evaluation.py\"] -->|\"config snapshot per
-  request\"| request-status\r
-
-  \  gold-candidate[\"Gold candidate state\\nsrc/rfp_assistant/gold.py\"]
-  -->|\"approved rows score runs\"| serving-activation\r
-
-  \  maintenance-run[\"Maintenance run
-  state\\nsrc/rfp_assistant/maintenance.py\"] -->|\"regression, never
-  activates\"| serving-activation"
+- attempt-billing
+- attempt-record
+- attempt-states
+- billing-attempt
+- gateway-owner
+- gold-candidate
+- gold-candidate-states
+- request-status
+- serving-activation
+- startup-recovery
+prev_diagram: "graph TD\r\n  request-states[\"Request status\\nsrc/rfp_assistant/service/service.py\"\
+  ] -->|\"billing_state derived from\"| attempt-states[\"Ledger attempt state\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  source-states[\"Source parse and review\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ] -->|\"review filter at build\"| serving-activation[\"Serving activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
+  ]\r\n  gold-candidate-states[\"Gold candidate review\\nsrc/rfp_assistant/evaluation/gold.py\"\
+  ] -->|\"approved rows score runs\"| serving-activation\r\n  maintenance-run[\"Maintenance\
+  \ run\\nsrc/rfp_assistant/storage/maintenance.py\"] -->|\"rebuilds, never activates\"\
+  | serving-activation\r\n  serving-activation -->|\"active_serving per request\"\
+  | request-states"

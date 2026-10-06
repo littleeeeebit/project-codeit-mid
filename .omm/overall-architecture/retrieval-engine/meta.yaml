@@ -1,31 +1,30 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-06 10:18:10.271000+00:00
-update_count: 28
+updated: 2026-10-06 12:37:55.254000+00:00
+update_count: 30
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
 children:
 - corpus-route
 - corpus-router
-- corpus-routing
 - dense-channel
 - dense-search
 - evidence-packing
 - fusion
+- fusion-rerank
 - keyword-index
 - lexical-ranking
 - local-reranker
 - reranker
 - serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  keyword-index[\"Loaded keyword index\\nsrc/rfp_assistant/retrieval.py\"\
-  ] -->|\"scoped rows\"| corpus-router[\"Corpus routing\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  corpus-router -->|\"allowed rows\"| lexical-ranker[\"Kiwi BM25 ranker\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  corpus-router -->|\"allowed rows\"| dense-search[\"pgvector search\\nsrc/rfp_assistant/vector_store.py\"\
-  ]\r\n  query-embedding[\"Query vector cache\\nsrc/rfp_assistant/dense.py\"] -->|\"\
-  query vector\"| dense-search\r\n  lexical-ranker -->|\"BM25 ids\"| rank-fusion[\"\
-  Keyword-first RRF\\nsrc/rfp_assistant/retrieval.py\"]\r\n  dense-search -->|\"dense\
-  \ ids\"| rank-fusion\r\n  rank-fusion -->|\"fused pool\"| local-reranker[\"Optional\
-  \ reranker\\nsrc/rfp_assistant/dense.py\"]\r\n  rank-fusion -->|\"ranking\"| evidence-packer[\"\
-  Evidence packing\\nsrc/rfp_assistant/retrieval.py\"]\r\n  local-reranker -->|\"\
-  reordered pool\"| evidence-packer"
+prev_diagram: "graph TD\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ] -->|\"scope rows and terms\"| corpus-routing[\"Corpus routing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  corpus-routing -->|\"narrowed scope\"| lexical-ranking[\"Lexical ranking\\\
+  nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  corpus-routing -->|\"allowed rows,\
+  \ query vector\"| dense-search[\"Dense search\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
+  ]\r\n  lexical-ranking -->|\"BM25 chunk IDs\"| fusion[\"Keyword-first fusion\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  dense-search -->|\"cosine chunk IDs\"| fusion\r\n  fusion -->|\"fused pool\"\
+  | reranker[\"Local reranker\\nsrc/rfp_assistant/retrieval/dense.py\"]\r\n  fusion\
+  \ -->|\"ranked order\"| evidence-packing[\"Evidence packing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  reranker -->|\"reordered pool\"| evidence-packing"

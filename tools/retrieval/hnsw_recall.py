@@ -18,9 +18,11 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
-from rfp_assistant import dense, evaluation, store, vector_store
-from rfp_assistant.retrieval import KeywordIndex, corpus_scope, scope_rows
+from rfp_assistant.evaluation import evaluation
+from rfp_assistant.retrieval import dense, vector_store
+from rfp_assistant.retrieval.retrieval import KeywordIndex, corpus_scope, scope_rows
 from rfp_assistant.settings import load_settings
+from rfp_assistant.storage import store
 
 K = 20
 EF_VALUES = (40, 100, 200, 400)

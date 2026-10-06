@@ -1,10 +1,9 @@
 graph TD
-  ask-composer["Ask composer\nweb/src/components/ask/ask-page.tsx"] -->|"POST /api/ask"| submit-answer["Validate and persist\nsrc/rfp_assistant/service.py"]
-  submit-answer -->|"request ID to executor"| run-queued["Claim queued request\nsrc/rfp_assistant/service.py"]
-  run-queued -->|"follow-up with history"| conversation-rewrite["Follow-up rewrite\nsrc/rfp_assistant/service.py"]
-  run-queued -->|"first-turn question"| paid-answer["Retrieve, generate, validate\nsrc/rfp_assistant/service.py"]
-  conversation-rewrite -->|"standalone question"| paid-answer
-  paid-answer -->|"outcome and trace"| finish-request["Persist outcome\nsrc/rfp_assistant/service.py"]
-  ask-composer -->|"poll status, read SSE"| stream-and-poll["Status poll and stream\nsrc/rfp_assistant/api.py"]
-  stream-and-poll -->|"reads row and partials"| finish-request
-  paid-answer -->|"spans and scores"| langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/tracing.py"]
+  ask-composer["Ask composer\nweb/src/components/ask/ask-page.tsx"] -->|"POST /api/ask"| submit-answer["Submit and admit\nsrc/rfp_assistant/service/service.py"]
+  submit-answer -->|"queued row, runner.submit"| request-worker["Request worker\nsrc/rfp_assistant/service/service.py"]
+  request-worker -->|"claims queued to running"| paid-stages["Paid answer stages\nsrc/rfp_assistant/service/service.py"]
+  paid-stages -->|"partial text in memory"| answer-stream["Answer stream\nsrc/rfp_assistant/api.py"]
+  paid-stages -->|"validated result, billing"| finish-request["Finish and store\nsrc/rfp_assistant/service/service.py"]
+  answer-stream -->|"SSE data then done"| ask-composer
+  finish-request -->|"result_json on requests row"| status-poll["Status poll\nsrc/rfp_assistant/api.py"]
+  status-poll -->|"view plus attachable"| ask-composer

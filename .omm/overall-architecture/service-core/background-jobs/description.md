@@ -1,7 +1,1 @@
-Paid and long-running verifier work runs in daemon threads started through `_start_job` or directly:
-- answer evaluation (`_EVAL_JOBS`)
-- judge comparison (`_JUDGE_JOBS`)
-- gold drafting (`_DRAFT_JOBS`, under `_DRAFT_LOCK`)
-- maintenance (`_MAINTENANCE_JOB`)
-
-Each thread runs in a copied context and is appended to `res._jobs` under `_runner_lock`, so `close()` joins it. Each job receives a `closing` callback or a guard returning `interrupted` so it stops before the next paid call. `_refuse_closed_or_busy` allows one evaluation or judge run at a time. Run state is published to files under `.runtime` before the start call returns, and failures are written as `error.txt`, `interrupted.txt` or `last-error.txt`.
+These are daemon threads started under `_EVAL_LOCK` or `_DRAFT_LOCK` with `contextvars.copy_context().run`, appended to `res._jobs` and joined by `close()`. `start_drafting` checks `plan_drafting` against the consented maximum, writes `drafts/<run_id>/request.json` and runs `drafting._generate` against the `gold_eval` envelope with a closing guard. `start_answer_evaluation` runs `answers.run_answers`, which uses `PinnedResources`, a `Resources` subclass that serves a recorded run's configuration with `paid_purpose = "gold_eval"` and calls `service.answer` row by row. `start_judges` runs `judges.run` against `judge_eval`. `start_maintenance` runs `maintenance.run`. Only one evaluation or judge job runs at a time (`_refuse_closed_or_busy`), plus at most one maintenance and one drafting run. Each run is published before the start call returns, so the next overview poll lists it. Failures are written to `last-error.txt`, `error.txt` or `interrupted.txt` in the run folder, and rerunning resumes.

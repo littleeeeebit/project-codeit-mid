@@ -20,9 +20,13 @@ from decimal import Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
-from rfp_assistant import budget, dense, evaluation, service, store
-from rfp_assistant.retrieval import KeywordIndex, index_compatibility
+from rfp_assistant.evaluation import evaluation
+from rfp_assistant.gateway import budget
+from rfp_assistant.retrieval import dense
+from rfp_assistant.retrieval.retrieval import KeywordIndex, index_compatibility
+from rfp_assistant.service import service
 from rfp_assistant.settings import load_settings
+from rfp_assistant.storage import store
 
 MEMBER = "claude-cutover"
 DEFAULT_VARIANTS = ("rrf:60:1.0", "rrf:60:0.5", "rrf:60:0.25", "keyword_first:60:1.0")

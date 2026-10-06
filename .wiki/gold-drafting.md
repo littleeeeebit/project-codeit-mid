@@ -5,7 +5,7 @@ triggers: ["골든|골드|데이터셋|질문 초안|초안 질문|거절|파일
 domain: rag
 reads:
   - docs/rag/golden-dataset.md
-  - src/rfp_assistant/gold.py
+  - src/rfp_assistant/evaluation/gold.py
 ---
 
 # Draft dataset questions only after learning from the rejection wiki

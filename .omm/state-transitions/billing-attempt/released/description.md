@@ -1,0 +1,1 @@
+No cost. Reached for a refusal before dispatch (`stopped_before_dispatch:<reason>`), a 4xx pre-execution rejection (`confirmed_pre_execution=True` also allows releasing from dispatching), or a reservation that was never dispatched before a restart.

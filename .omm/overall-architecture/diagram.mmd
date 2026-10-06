@@ -1,11 +1,11 @@
 graph TD
-  web-screens["Web screens\nweb/src/app/page.tsx"] -->|"typed fetch with X-Member"| http-api["HTTP API\nsrc/rfp_assistant/api.py"]
-  http-api -->|"one service call per route"| service-core["Service core\nsrc/rfp_assistant/service.py"]
-  service-core -->|"scoped evidence retrieval"| retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval.py"]
-  service-core -->|"metered paid stages"| paid-gateway["Paid gateway and ledger\nsrc/rfp_assistant/budget.py"]
-  retrieval-engine -->|"loads hash-checked index files"| runtime-artifacts["Runtime artifacts\nsrc/rfp_assistant/store.py"]
-  retrieval-engine -->|"pgvector exact search"| postgresql-store["PostgreSQL store\nsrc/rfp_assistant/postgres.py"]
-  service-core -->|"requests, sources, activation"| postgresql-store
-  paid-gateway -->|"attempt rows in one tx"| postgresql-store
-  offline-cli["Owner CLI\nsrc/rfp_assistant/cli.py"] -->|"ingest, build, evaluate"| runtime-artifacts
-  offline-cli -->|"records and ledger admin"| postgresql-store
+  web-screens["Web screens\nweb/src"] -->|"fetch /api/* with X-Member"| http-api["HTTP API\nsrc/rfp_assistant/api.py"]
+  http-api -->|"one service call per route"| service-core["Service core\nsrc/rfp_assistant/service/service.py"]
+  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"] -->|"commands call service, pipelines"| service-core
+  service-core -->|"retrieve scoped evidence"| retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval"]
+  service-core -->|"reserve, dispatch, settle"| paid-gateway["Paid gateway\nsrc/rfp_assistant/gateway"]
+  service-core -->|"requests, reviews, audit rows"| postgresql-store["PostgreSQL store\nsrc/rfp_assistant/storage"]
+  retrieval-engine -->|"index rows, pgvector search"| postgresql-store
+  paid-gateway -->|"attempts and adjustments"| postgresql-store
+  corpus-pipeline["Corpus pipeline\nsrc/rfp_assistant/corpus"] -->|"sources, extractions, elements"| postgresql-store
+  evaluation-suite["Evaluation suite\nsrc/rfp_assistant/evaluation"] -->|"writes active_run on activation"| postgresql-store

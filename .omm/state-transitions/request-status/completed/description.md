@@ -1,0 +1,1 @@
+Written by `_finish` for any domain outcome reached normally: answered, insufficient_evidence, ingestion_unavailable, budget_blocked, conflicting_evidence and so on. The domain status is in `result_json.status`, separate from the execution status.

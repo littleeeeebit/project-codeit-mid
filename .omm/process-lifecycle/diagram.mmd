@@ -1,5 +1,0 @@
-graph TD
-  startup-validation["Validated database check\nsrc/rfp_assistant/postgres.py"] -->|"pool and schema ready"| gateway-lock["Gateway ownership\nsrc/rfp_assistant/postgres.py"]
-  gateway-lock -->|"exclusive owner"| startup-recovery["Startup recovery\nsrc/rfp_assistant/service.py"]
-  startup-recovery -->|"serve until stop"| controlled-shutdown["Controlled shutdown\nsrc/rfp_assistant/service.py"]
-  ledger-only-owner["Ledger-only CLI owner\nsrc/rfp_assistant/cli.py"] -->|"validates, no lock"| startup-validation

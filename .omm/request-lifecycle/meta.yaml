@@ -1,15 +1,15 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-06 10:18:16.293000+00:00
-update_count: 25
+updated: 2026-10-06 12:38:00.329000+00:00
+update_count: 27
 last_field: diagram
-git_commit: '4317974'
-git_branch: rename-records-and-tools-by-purpose
+git_commit: 9a90e7f
+git_branch: split-src-into-layer-packages
 children:
+- answer-stream
 - answer-validation
 - ask-composer
 - ask-page
 - cancellation
-- conversation-rewrite
 - evidence-retrieval
 - finish-record
 - finish-request
@@ -19,20 +19,22 @@ children:
 - paid-answer
 - paid-answer-pipeline
 - paid-call
-- run-queued
+- paid-stages
+- request-worker
 - status-poll
 - stream-and-poll
 - submit-answer
 - validation
-prev_diagram: "graph TD\r\n  ask-submit[\"Ask submit\\nweb/src/components/ask/ask-page.tsx\"\
-  ] -->|\"POST /api/ask\"| request-intake[\"Validate and persist\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  request-intake -->|\"request_id to executor\"| worker-claim[\"Worker claim\\\
-  nsrc/rfp_assistant/service.py\"]\r\n  worker-claim -->|\"follow-up with history\"\
-  | query-rewrite[\"Follow-up rewrite\\nsrc/rfp_assistant/generation.py\"]\r\n  worker-claim\
-  \ -->|\"first-turn question\"| evidence-retrieval[\"Retrieve and price\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  query-rewrite -->|\"standalone question\"| evidence-retrieval\r\n  evidence-retrieval\
-  \ -->|\"evidence units, estimate\"| metered-generation[\"Metered generation\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  metered-generation -->|\"structured JSON\"| answer-validation[\"Citation\
-  \ validation\\nsrc/rfp_assistant/generation.py\"]\r\n  metered-generation -->|\"\
-  partial text\"| outcome-delivery[\"Poll and SSE delivery\\nweb/src/lib/use-answer-stream.ts\"\
-  ]\r\n  answer-validation -->|\"result_json, status\"| outcome-delivery"
+prev_diagram: "graph TD\r\n  ask-composer[\"Ask composer\\nweb/src/components/ask/ask-page.tsx\"\
+  ] -->|\"POST /api/ask\"| submit-answer[\"Validate and persist\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  submit-answer -->|\"request ID to executor\"| run-queued[\"Claim queued request\\\
+  nsrc/rfp_assistant/service/service.py\"]\r\n  run-queued -->|\"follow-up with history\"\
+  | conversation-rewrite[\"Follow-up rewrite\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  run-queued -->|\"first-turn question\"| paid-answer[\"Retrieve, generate,\
+  \ validate\\nsrc/rfp_assistant/service/service.py\"]\r\n  conversation-rewrite -->|\"\
+  standalone question\"| paid-answer\r\n  paid-answer -->|\"outcome and trace\"| finish-request[\"\
+  Persist outcome\\nsrc/rfp_assistant/service/service.py\"]\r\n  ask-composer -->|\"\
+  poll status, read SSE\"| stream-and-poll[\"Status poll and stream\\nsrc/rfp_assistant/api.py\"\
+  ]\r\n  stream-and-poll -->|\"reads row and partials\"| finish-request\r\n  paid-answer\
+  \ -->|\"spans and scores\"| langfuse-tracing[\"Langfuse tracing\\nsrc/rfp_assistant/gateway/tracing.py\"\
+  ]"

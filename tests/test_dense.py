@@ -6,10 +6,15 @@ import unittest.mock
 import uuid
 from pathlib import Path
 
-from rfp_assistant import budget, dense, evaluation, generation, ingestion, service, store
 from rfp_assistant.contracts import AnswerRequest
-from rfp_assistant.retrieval import KeywordIndex, build_keyword_index
-from rfp_assistant.store import get_app_setting, read_jsonl
+from rfp_assistant.corpus import ingestion
+from rfp_assistant.evaluation import evaluation
+from rfp_assistant.gateway import budget, generation
+from rfp_assistant.retrieval import dense
+from rfp_assistant.retrieval.retrieval import KeywordIndex, build_keyword_index
+from rfp_assistant.service import service
+from rfp_assistant.storage import store
+from rfp_assistant.storage.store import get_app_setting, read_jsonl
 from tests import fixtures
 
 
@@ -327,7 +332,7 @@ class EvaluationRunTest(unittest.TestCase):
             (d / "config.json").write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
 
     def test_below_the_head_reranking_keeps_the_bm25_head_and_reorders_only_the_rest(self):
-        from rfp_assistant import retrieval
+        from rfp_assistant.retrieval import retrieval
 
         s = self.env.settings.with_(fusion="keyword_first", keyword_head=2)
         idx = KeywordIndex.load(s)
@@ -580,7 +585,7 @@ class EvaluationRunTest(unittest.TestCase):
             s, hr["run_id"], {**hr_decision, "decided_by": " "})))
         decision.write_text(json.dumps({"run_id": runs["H"], "mode": "hybrid", "decided_by": "owner",
                                         "finalist_run_id": runs["K1"]}), encoding="utf-8")  # the note is optional
-        from rfp_assistant import retrieval
+        from rfp_assistant.retrieval import retrieval
 
         with unittest.mock.patch.object(retrieval, "ROUTE_RULE", "greedy-rare-term-2"), \
                 self.assertRaisesRegex(evaluation.EvaluationError, "corpus-routing rule"):  # measured under another
@@ -770,7 +775,7 @@ class IndexUpgradeTest(unittest.TestCase):
     """An index and runs recorded under an earlier query policy must be rebuilt, not silently reused."""
 
     def test_runs_on_an_index_from_an_earlier_query_policy_require_a_rebuild(self):
-        from rfp_assistant import retrieval
+        from rfp_assistant.retrieval import retrieval
 
         with tempfile.TemporaryDirectory() as tmp:
             with unittest.mock.patch.object(retrieval, "QUERY_POLICY", "scope-redundant-1"):
@@ -808,7 +813,7 @@ class IndexUpgradeTest(unittest.TestCase):
             self.assertEqual(evaluation.run_errors(s, new["run_id"]), [])
 
     def test_an_index_without_the_metadata_snapshot_is_incompatible(self):
-        from rfp_assistant import retrieval
+        from rfp_assistant.retrieval import retrieval
 
         index = KeywordIndex("legacy", "reviewed_only", [], None, {}, {}, has_metadata_snapshot=False)
         self.assertIn("predates the frozen title/institution snapshot", retrieval.index_compatibility(index))
@@ -880,7 +885,7 @@ class ServingTest(unittest.TestCase):
     def test_an_activated_run_from_an_earlier_routing_rule_stops_serving_after_a_restart(self):
         # A routing deployment without re-measurement: the persisted run's fusion and whole-corpus evidence no longer
         # describe what retrieval does, so the restarted app serves the unselected default and says why.
-        from rfp_assistant import retrieval
+        from rfp_assistant.retrieval import retrieval
 
         self.assertEqual(self.res.serving()["mode"], "hybrid")
         with unittest.mock.patch.object(retrieval, "ROUTE_RULE", "greedy-rare-term-2"):
@@ -895,7 +900,8 @@ class ServingTest(unittest.TestCase):
         self.assertEqual(result.mode, "kiwi_bm25")
         self.assertIn("activated_run_stale:corpus_route", result.limitations)
         # Reports state what requests serve, not the stored activation.
-        from rfp_assistant import ops, release
+        from rfp_assistant.evaluation import release
+        from rfp_assistant.service import ops
 
         stale = self.res.serving()["run_id"]
         with unittest.mock.patch.object(retrieval, "ROUTE_RULE", "greedy-rare-term-2"):
@@ -938,7 +944,7 @@ class ServingTest(unittest.TestCase):
             self.assertLessEqual(sum(r["reserved_micro_usd"] for r in rows), frozen["estimate_micro_usd"])
 
     def test_a_query_vector_of_another_size_falls_back_without_scoring(self):
-        from rfp_assistant.retrieval import retrieve
+        from rfp_assistant.retrieval.retrieval import retrieve
 
         idx = self.res.index()
         r = retrieve(self.res.run_settings(), idx, fixtures.analyzer(), "하자보수 기간",

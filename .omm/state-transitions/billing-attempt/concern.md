@@ -1,0 +1,1 @@
+`mark_dispatching` refuses every dispatch while any attempt in the database is `unknown` ("unknown PostgreSQL billing must be reconciled before dispatch"). One provider timeout therefore stops paid answers for every member until the owner runs `settle` or `reconcile`. This is fail-closed by design, but it is a shared-availability cost.

@@ -6,7 +6,13 @@ Internal assistant for historical Korean RFPs: search projects, select one docum
 
 | Path | What it holds |
 | --- | --- |
-| `src/` | The `rfp_assistant` package: service, API, CLI, retrieval, evaluation ([Layout](#layout)) |
+| `src/rfp_assistant/` | The package root: the two entry points `api.py` and `cli.py`, plus `settings.py` and `contracts.py` ([Layout](#layout)) |
+| `src/rfp_assistant/service/` | Service core: the behaviours screens and CLI call, answer runs, gold drafting, phase-3 operational checks, capability checks |
+| `src/rfp_assistant/retrieval/` | Retrieval engine: keyword index, chunking, dense search, pgvector sets, the embedding and reranker registry |
+| `src/rfp_assistant/corpus/` | Corpus pipeline: ingestion, OCR, extraction fidelity |
+| `src/rfp_assistant/evaluation/` | Evaluation: frozen runs, gold review, judges and their glossary, comparison matrices, sealed run, release |
+| `src/rfp_assistant/gateway/` | Paid gateway: the budget ledger, the only OpenAI call site, Langfuse tracing |
+| `src/rfp_assistant/storage/` | Storage: PostgreSQL schema and connections, atomic private files, backup and restore, the maintenance sequence |
 | `web/` | The Next.js screens, exported to `web/out` and served by the API |
 | `tools/export/` | Read-only snapshots of recorded state and the CLI capture wrapper |
 | `tools/retrieval/` | Retrieval measurements: the fusion quality gate and HNSW recall |
@@ -289,4 +295,4 @@ Recorded before any distribution decision:
 
 ## Layout
 
-`src/rfp_assistant/` holds one package: `settings`, `contracts`, `store`, `auth`, `ingestion`, `chunking`, `retrieval`, `dense` (embedding cache, matrix, reranker), `models` (the pinned embedding and reranker registry, local GPU runners, the Gemini ledger), `compare` (the axis-matrix runner and its tables), `budget`, `generation` (the only SDK call site), `service` (also the bounded request executor), `api` (the HTTP routes the screens call, one service function each), `cli`, `evaluation` (pilot and gold-2 validation, frozen retrieval runs, source-span metrics), `gold` (the review queue), `answers` (phase-4 answer runs, scoring, blind review, latency sample), `sealed` (release freeze and the single sealed run), `release` (backup, staged restore, release report), `ops` (fake-provider load check and the phase-3 report). `web/` holds the three pages, 질문하기, 검증 and 데이터셋 만들기; budget administration is owner CLI only. Tests are standard `unittest` under `tests/`.
+`src/rfp_assistant/` holds one package. Its subpackages follow the layers of the `.omm` architecture diagram; `api` (the HTTP routes the screens call, one service function each) and `cli` stay at the root as the two entry points, next to `settings` and `contracts`. `service/`: `service` (also the bounded request executor), `answers` (phase-4 answer runs, scoring, blind review, latency sample), `drafting`, `ops` (fake-provider load check and the phase-3 report), `auth`. `retrieval/`: `retrieval`, `chunking`, `dense` (embedding cache, matrix, reranker), `vector_store`, `models` (the pinned embedding and reranker registry, local GPU runners, the Gemini ledger). `corpus/`: `ingestion`, `ocr`, `fidelity`. `evaluation/`: `evaluation` (pilot and gold-2 validation, frozen retrieval runs, source-span metrics), `gold` (the review queue), `sealed` (release freeze and the single sealed run), `judges`, `judge_set`, `compare` (the axis-matrix runner and its tables), `release` (backup, staged restore, release report). `gateway/`: `budget`, `generation` (the only SDK call site), `tracing`. `storage/`: `postgres`, `store`, `postgres_backup`, `maintenance`. `web/` holds the three pages, 질문하기, 검증 and 데이터셋 만들기; budget administration is owner CLI only. Tests are standard `unittest` under `tests/`.

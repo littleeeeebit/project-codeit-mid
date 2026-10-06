@@ -1,0 +1,1 @@
+Inserted by `budget.reserve` with `max_cost` priced at the cache-write input rate, the price JSON, the rate version and the billing scope from the contextvar. `release` with `provider_unavailable` covers the case where no transport or key exists after admission.

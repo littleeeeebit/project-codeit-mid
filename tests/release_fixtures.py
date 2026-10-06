@@ -8,8 +8,10 @@ import io
 import json
 from pathlib import Path
 
-from rfp_assistant import evaluation, ingestion, store
-from rfp_assistant.retrieval import build_keyword_index
+from rfp_assistant.corpus import ingestion
+from rfp_assistant.evaluation import evaluation
+from rfp_assistant.retrieval.retrieval import build_keyword_index
+from rfp_assistant.storage import store
 from tests import fixtures
 
 PDF_F = fixtures.make_pdf([

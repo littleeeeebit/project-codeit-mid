@@ -1,0 +1,1 @@
+Written for technical errors, validation failures, provider failures, settlement failures and `clarification_required` refusals inside `_execute_traced`, as well as by `_fail_unscheduled`. Billing may still be `unknown` when the provider might have executed.

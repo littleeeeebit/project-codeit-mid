@@ -9,7 +9,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from rfp_assistant import judges, service
+from rfp_assistant.evaluation import judges
+from rfp_assistant.service import service
 
 ORGS = ["국방과학연구소"]
 
@@ -120,7 +121,7 @@ class JudgeSetCarryTest(unittest.TestCase):
     """Review round 1, F4 follow-through: a regenerated set reuses only judgements of byte-identical items."""
 
     def test_only_unchanged_items_of_the_same_configuration_are_carried(self):
-        from rfp_assistant import judge_set
+        from rfp_assistant.evaluation import judge_set
 
         with tempfile.TemporaryDirectory() as tmp:
             settings = SimpleNamespace(data_dir=Path(tmp))
@@ -246,7 +247,7 @@ class ShutdownTest(unittest.TestCase):
             self.assertEqual(seen, [run_id])
 
     def test_a_started_answer_evaluation_is_published_before_its_worker_proceeds(self):
-        from rfp_assistant import answers
+        from rfp_assistant.service import answers
 
         with tempfile.TemporaryDirectory() as tmp:
             res = self.resources(SimpleNamespace(shutdown_wait_seconds=10, data_dir=Path(tmp)), [])

@@ -11,8 +11,8 @@ from dataclasses import asdict, dataclass, field, replace
 from decimal import Decimal
 from pathlib import Path
 
-from .models import EMBEDDINGS, RERANKERS
-from .postgres import Target
+from .retrieval.models import EMBEDDINGS, RERANKERS
+from .storage.postgres import Target
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 

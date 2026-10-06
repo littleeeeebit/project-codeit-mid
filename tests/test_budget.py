@@ -4,7 +4,8 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from rfp_assistant import budget, postgres, store
+from rfp_assistant.gateway import budget
+from rfp_assistant.storage import postgres, store
 from tests import fixtures
 
 RATES = {"test-model": {"input": "1", "cached_input": "0.5", "output": "1"}}  # 1 micro-USD per token

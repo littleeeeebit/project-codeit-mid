@@ -1,0 +1,1 @@
+Statuses of `requests.status`. Paid modes start at `queued`. Free modes and synchronous `answer()` calls insert the row as `running` directly. `TERMINAL_STATUSES` gate follow-ups: a turn can only continue a finished one.

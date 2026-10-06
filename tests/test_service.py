@@ -16,10 +16,12 @@ from unittest import mock
 
 import psycopg
 
-from rfp_assistant import auth, budget, postgres, service, store
 from rfp_assistant.contracts import AnswerRequest, Principal
-from rfp_assistant.generation import FakeTransport, ProviderResponse
+from rfp_assistant.gateway import budget
+from rfp_assistant.gateway.generation import FakeTransport, ProviderResponse
+from rfp_assistant.service import auth, service
 from rfp_assistant.settings import DEFAULT_RATES
+from rfp_assistant.storage import postgres, store
 from tests import fixtures
 
 Q = "하자보수 기간은 얼마인가요?"
@@ -191,7 +193,7 @@ class SubmissionTest(Base):
         import inspect
 
         # The worker path (service and everything it imports) has no web dependency at all; api.py wraps it.
-        for module in (service, budget, auth, store, __import__("rfp_assistant.generation", fromlist=["x"])):
+        for module in (service, budget, auth, store, __import__("rfp_assistant.gateway.generation", fromlist=["x"])):
             self.assertNotIn("fastapi", inspect.getsource(module))
 
 
@@ -343,7 +345,7 @@ class ShutdownRestartTest(Base):
                                     service._dispatch_guard(self.res, rid))
         state = {a["attempt_id"]: a["state"] for a in self.attempts()}[admission["attempt_id"]]
         self.assertEqual(state, "released")
-        from rfp_assistant import dense
+        from rfp_assistant.retrieval import dense
 
         transport = FakeTransport()
         out = dense.metered_embed(self.settings, transport, ["질의"], 20, request_id=rid, member_id="c1",
@@ -392,7 +394,7 @@ class ShutdownRestartTest(Base):
                 with self.subTest(command=command.__name__), mock.patch.object(cli, "_print"):
                     self.assertEqual(command(Namespace(actor="owner", **extra), self.settings), 0)
             self.assertFalse(budget.snapshot(self.settings.db_path).paid_enabled)
-            from rfp_assistant import answers
+            from rfp_assistant.service import answers
 
             estimate = answers.PinnedResources(self.settings, None, {"run_id": None})  # estimate only
             self.assertIsNone(estimate.transport)
@@ -403,9 +405,9 @@ class ShutdownRestartTest(Base):
 SIGINT_CHILD = """
 import json, signal, sys, threading, time
 from pathlib import Path
-from rfp_assistant import service
+from rfp_assistant.service import service
 from rfp_assistant.contracts import AnswerRequest
-from rfp_assistant.generation import FakeTransport
+from rfp_assistant.gateway.generation import FakeTransport
 from tests import fixtures
 
 env = fixtures.make_env(Path(sys.argv[1]))
@@ -599,7 +601,7 @@ class SixUserBudgetTest(Base):
 
 class ReconciliationTest(Base):
     def unknown_attempt(self):
-        self.transport.responder = lambda m: __import__("rfp_assistant.generation", fromlist=["x"]).ProviderError(
+        self.transport.responder = lambda m: __import__("rfp_assistant.gateway.generation", fromlist=["x"]).ProviderError(
             "APITimeoutError", pre_execution=False)
         self.transport.gate.set()
         v = self.wait_done(service.submit_answer(self.res, self.env.consultant, req(self.a)))

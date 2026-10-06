@@ -16,7 +16,12 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from . import answers, auth, budget, chunking, drafting, evaluation, fidelity, gold, ingestion, judges, ops, release, sealed, service, store
+from .service import answers, auth, drafting, ops, service
+from .gateway import budget
+from .retrieval import chunking
+from .evaluation import evaluation, gold, judges, release, sealed
+from .corpus import fidelity, ingestion
+from .storage import store
 from .contracts import Principal
 from .settings import DEFAULT_RATES, RATE_VERSION, REPO_ROOT, load_settings
 
@@ -122,7 +127,7 @@ def cmd_fidelity(args, settings) -> int:
 
 
 def cmd_ocr(args, settings) -> int:
-    from . import ocr
+    from .corpus import ocr
 
     hashes = [_source_for(settings, d) for d in args.doc_id] if args.doc_id else None
     _print(ocr.run(settings, hashes, gemini=not args.local_only))
@@ -130,7 +135,7 @@ def cmd_ocr(args, settings) -> int:
 
 
 def cmd_build_keyword(args, settings) -> int:
-    from .retrieval import Analyzer, build_keyword_index
+    from .retrieval.retrieval import Analyzer, build_keyword_index
 
     with store.open_db(settings.db_path) as conn:
         selected = store.get_app_setting(conn, "active_run") is not None
@@ -151,14 +156,14 @@ def _paid_resources(settings):
 
 
 def cmd_plan_embeddings(args, settings) -> int:
-    from . import dense
+    from .retrieval import dense
 
     _print(dense.plan_embeddings(settings, args.index))
     return 0
 
 
 def cmd_build_dense(args, settings) -> int:
-    from . import dense
+    from .retrieval import dense
 
     res = _paid_resources(settings)
     try:
@@ -173,7 +178,7 @@ def cmd_build_dense(args, settings) -> int:
 def cmd_evaluate_retrieval(args, settings) -> int:
     res = _paid_resources(settings) if args.allow_paid_queries else None
     try:
-        from .retrieval import Analyzer
+        from .retrieval.retrieval import Analyzer
 
         summaries = evaluation.evaluate_retrieval(
             settings, res.analyzer if res else Analyzer(), res.transport if res else None, args.dataset,
@@ -187,7 +192,7 @@ def cmd_evaluate_retrieval(args, settings) -> int:
 
 
 def cmd_trial_reranker(args, settings) -> int:
-    from .retrieval import Analyzer
+    from .retrieval.retrieval import Analyzer
 
     depths = [int(x) for x in args.candidate_counts.split(",") if x.strip()]
     report = evaluation.trial_reranker(settings, Analyzer(), args.dataset, depths, index_version=args.index)
@@ -211,8 +216,8 @@ def cmd_activate_run(args, settings) -> int:
 
 def cmd_compare(args, settings) -> int:
     """Run one declared matrix (or price its paid steps) and write its table."""
-    from . import compare
-    from .retrieval import Analyzer
+    from .evaluation import compare
+    from .retrieval.retrieval import Analyzer
 
     if args.approve:
         _print(compare.approve_estimate(settings, args.approve, args.approved_by or ""))
@@ -242,7 +247,7 @@ def cmd_compare(args, settings) -> int:
 def cmd_compare_cap(args, settings) -> int:
     from decimal import Decimal
 
-    from . import models
+    from .retrieval import models
 
     cap = int(Decimal(args.usd) * 1_000_000)
     _print(models.set_external_cap(settings.db_path, cap, args.actor, args.reason))
@@ -252,7 +257,7 @@ def cmd_compare_cap(args, settings) -> int:
 
 
 def cmd_compare_resolve(args, settings) -> int:
-    from . import models
+    from .retrieval import models
 
     _print(models.external_resolve(settings.db_path, args.attempt_id, args.charged == "yes", args.actor, args.reason))
     evaluation.record_audit(settings, args.actor, "resolve-external-attempt", args.attempt_id, args.reason,
@@ -261,7 +266,7 @@ def cmd_compare_resolve(args, settings) -> int:
 
 
 def cmd_golden_counts(args, settings) -> int:
-    from . import compare
+    from .evaluation import compare
 
     report = compare.golden_counts(settings)
     print(compare.golden_counts_md(report))
@@ -552,7 +557,7 @@ def cmd_judge_reference(args, settings):
 
 def cmd_judge_set(args, settings):
     """Free: mutates the reference's held-out positives into the judge golden set and checks every mutant."""
-    from . import judge_set
+    from .evaluation import judge_set
 
     _print(judge_set.generate(settings))
     return 0
@@ -574,7 +579,7 @@ def cmd_run_judges(args, settings):
 def cmd_maintain(args, settings):
     """The whole maintenance sequence once, in order, ending in the regression table and one report (stop the UI
     first, or press 유지보수 실행 on the 검증 page). Exit 0 only when every step finished."""
-    from . import maintenance
+    from .storage import maintenance
 
     res = _paid_resources(settings)
     try:
@@ -939,7 +944,7 @@ def main(argv: list[str] | None = None) -> int:
         settings = load_settings()
         with store.database_lifecycle(settings.db_path):
             if args.command != "init":
-                from .postgres import require_imported_database
+                from .storage.postgres import require_imported_database
                 require_imported_database(settings.db_path)
                 if args.command != "budget-report":  # read-only: not even idempotent schema statements
                     store.init_schema(settings.db_path)

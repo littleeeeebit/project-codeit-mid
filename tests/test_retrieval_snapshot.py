@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from rfp_assistant import postgres, store
+from rfp_assistant.storage import postgres, store
 from tests import fixtures
 
 spec = importlib.util.spec_from_file_location("retrieval_snapshot", ROOT / "tools" / "export" / "retrieval_snapshot.py")

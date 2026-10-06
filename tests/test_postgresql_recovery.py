@@ -12,7 +12,9 @@ from unittest import mock
 
 import psycopg
 
-from rfp_assistant import cli, postgres, postgres_backup, service, store
+from rfp_assistant import cli
+from rfp_assistant.service import service
+from rfp_assistant.storage import postgres, postgres_backup, store
 from tests import fixtures
 
 
@@ -171,7 +173,7 @@ class PostgreSQLRecoveryTest(unittest.TestCase):
         script = """
 import sys, time
 from pathlib import Path
-from rfp_assistant import postgres_backup
+from rfp_assistant.storage import postgres_backup
 from rfp_assistant.settings import Settings
 original = postgres_backup._publish_restore_receipt
 def paused(raw, report):

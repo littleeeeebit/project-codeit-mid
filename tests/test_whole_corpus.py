@@ -10,10 +10,12 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from rfp_assistant import dense, service, store, vector_store
 from rfp_assistant.contracts import AnswerRequest
-from rfp_assistant.generation import FakeTransport
-from rfp_assistant.retrieval import KeywordIndex, corpus_scope, fuse, retrieve, route_corpus
+from rfp_assistant.gateway.generation import FakeTransport
+from rfp_assistant.retrieval import dense, vector_store
+from rfp_assistant.retrieval.retrieval import KeywordIndex, corpus_scope, fuse, retrieve, route_corpus
+from rfp_assistant.service import service
+from rfp_assistant.storage import store
 from tests import fixtures
 from tools.retrieval.fusion_gate import gate, needle_hits, parse_variant, variant_name
 from tools.retrieval.hnsw_recall import recall

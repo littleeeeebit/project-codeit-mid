@@ -13,7 +13,8 @@ from urllib.parse import quote
 
 from fastapi.testclient import TestClient
 
-from rfp_assistant import api, service
+from rfp_assistant import api
+from rfp_assistant.service import service
 from tests import fixtures
 
 API = Path(api.__file__)
@@ -128,7 +129,7 @@ class ApiFlowTest(unittest.TestCase):
             res.close()
 
     def test_an_evaluation_answers_with_its_recorded_model_whatever_the_browser_chose(self):
-        from rfp_assistant import answers
+        from rfp_assistant.service import answers
 
         pinned = answers.PinnedResources(self.env.settings, None, {"mode": "kiwi_bm25"})
         token = service.generation.REQUEST_MODEL.set("gpt-5-nano")  # the browser that started the run chose nano
@@ -253,7 +254,7 @@ class ApiFlowTest(unittest.TestCase):
         self.assertEqual(self.client.get("/api/verify/history?limit=0").status_code, 422)
 
     def test_history_includes_development_decisions_but_never_sealed_questions(self):
-        from rfp_assistant.store import open_db
+        from rfp_assistant.storage.store import open_db
 
         with open_db(self.env.settings.db_path) as conn:
             for dataset in ("dev", "test"):

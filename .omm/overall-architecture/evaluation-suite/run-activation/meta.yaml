@@ -1,0 +1,9 @@
+created: 2026-10-06T12:37:59.385Z
+updated: 2026-10-06T12:37:59.514Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: run-activation
+children: []
+parentPath:
+  - evaluation-suite

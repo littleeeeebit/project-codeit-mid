@@ -24,9 +24,10 @@ sys.path[:0] = [str(REPO / "src"), str(REPO)]
 import uvicorn
 from playwright.sync_api import expect, sync_playwright
 
-from rfp_assistant import api, service
-from rfp_assistant.generation import FakeTransport
-from rfp_assistant.store import open_db
+from rfp_assistant import api
+from rfp_assistant.gateway.generation import FakeTransport
+from rfp_assistant.service import service
+from rfp_assistant.storage.store import open_db
 from tests import fixtures
 
 QUESTION = "하자보수 기간은 얼마인가요?"

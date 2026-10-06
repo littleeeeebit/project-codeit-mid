@@ -1,9 +1,0 @@
-created: 2026-10-06T10:18:07.382Z
-updated: 2026-10-06T10:18:07.384Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: partials-buffer
-children: []
-parentPath:
-  - service-core

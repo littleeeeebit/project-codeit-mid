@@ -6,7 +6,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from rfp_assistant import auth, budget, drafting, evaluation, generation, gold, store
+from rfp_assistant.service import auth, drafting
+from rfp_assistant.gateway import budget, generation
+from rfp_assistant.evaluation import evaluation, gold
+from rfp_assistant.storage import store
 from tests import fixtures, release_fixtures as fx
 
 

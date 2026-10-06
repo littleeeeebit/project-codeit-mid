@@ -11,9 +11,11 @@ from unittest import mock
 
 import psycopg
 
-from rfp_assistant import ingestion, maintenance, service, store
-from rfp_assistant.generation import FakeTransport
-from rfp_assistant.retrieval import KeywordIndex, build_keyword_index
+from rfp_assistant.corpus import ingestion
+from rfp_assistant.gateway.generation import FakeTransport
+from rfp_assistant.retrieval.retrieval import KeywordIndex, build_keyword_index
+from rfp_assistant.service import service
+from rfp_assistant.storage import maintenance, store
 from tests import fixtures
 
 
@@ -159,7 +161,7 @@ class SequenceTest(unittest.TestCase):
     def test_a_reparse_keeps_the_served_questions_and_reports_the_ones_it_cost(self):
         # review round 2, F6: the served rows keep the question pinned to the served extraction; the rebuilt rows
         # cannot grade it, and the run says so instead of reporting a verified comparison
-        from rfp_assistant import compare
+        from rfp_assistant.evaluation import compare
         from tests import release_fixtures as p4
 
         with mock.patch.object(p4, "family_of", lambda env, key: "family-a"):

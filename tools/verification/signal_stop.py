@@ -24,7 +24,8 @@ from pathlib import Path
 if os.name == "nt":  # a new console may inherit "ignore Ctrl+C"; accept it explicitly
     import ctypes
     ctypes.windll.kernel32.SetConsoleCtrlHandler(None, False)
-from rfp_assistant import service, store
+from rfp_assistant.service import service
+from rfp_assistant.storage import store
 from rfp_assistant.contracts import AnswerRequest
 from tests import fixtures
 
