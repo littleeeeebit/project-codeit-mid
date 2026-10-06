@@ -91,6 +91,8 @@ $env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.example.
 python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
 
+The live shared instance runs on the team's GCP VM `codeit`, not on any member's machine. Members open it through an SSH local forward of 8501. The host, the tunnel command, the Linux start path (`tools/start-postgresql.sh`, `tools/bidmate.service`) and the member list are in [runbook §3](docs/operations/runbook.md#31-the-team-host-live-since-2026-10-06).
+
 Exactly one worker: paid requests run on the process's own executor and the process holds a database-wide gateway advisory lock. For screen
 work, run the API on 8511 and `npm run dev` in `web/` (port 8510, `/api/*` forwarded to `RFP_API_URL`, default
 `http://127.0.0.1:8511`). After changing a route or its shapes, regenerate the schema the screens are typed from with

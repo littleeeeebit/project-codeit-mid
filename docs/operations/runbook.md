@@ -31,6 +31,75 @@ There is no login (owner decision 2026-09-30, reaffirmed for phase 3 on 2026-10-
 
 ## 3. Launch
 
+### 3.1 The team host (live since 2026-10-06)
+
+The shared application runs on the team's existing GCP VM `codeit`. It is the only live ledger, the only gateway owner and the only place the API key lives. The owner's Windows server is no longer live (3.4).
+
+| | |
+| --- | --- |
+| VM | `codeit` (existing team VM, also JupyterHub), project `sprint-ai-01`, zone `us-central1-c`, Ubuntu 24.04 |
+| Machine | `g2-standard-4` (4 vCPU, 16 GB, one NVIDIA L4), 50 GB boot disk shared with the team |
+| Address | `35.255.64.243`, ephemeral: it changes if `codeit` is stopped and started. Read the new one in the console and update this line. |
+| Listening (BidMate) | uvicorn on `127.0.0.1:8501` (one worker); PostgreSQL 18.6 on `127.0.0.1:55432`. Nothing of BidMate listens on another address. |
+| Paths | checkout `/srv/bidmate/app`, originals `/srv/bidmate/app/원본 데이터`, runtime `/srv/bidmate/app/.runtime`, venv `/srv/bidmate/venv`, backups `/srv/bidmate/backups`, owned by the `bidmate` service user (mode 750) |
+| Secrets | `/etc/bidmate/server.env` (root, mode 600): `RFP_DATABASE_DSN`, `OPENAI_API_KEY`, `RFP_CONFIG_FILE`, `RFP_SOURCE_DIR`, `RFP_DATA_DIR`, `RFP_PATH_MAP`. No tracked file and no `.env` holds them; Langfuse tracing is off on the VM. |
+
+**Firewall.** `codeit` sits on the project's shared `default` network, whose rules (owned by the course project, not by BidMate) open tcp:22 and several other ports, 8501 among them, to every instance. BidMate does not rely on them: it binds only to loopback, so the only way in is SSH. Do not change the shared rules for BidMate, and never start it with `--host 0.0.0.0` here: the open 8501 rule would publish spending and administration to the internet.
+
+**Machine type.** On 2026-10-06, before choosing the host, the owner host's `bidmate_app` had `active_run` = `H-0fffb2a6ec`: hybrid, `text-embedding-3-large` @1536 through the OpenAI API, `reranker: null`. Serving needs no local embedding model or reranker, so a CPU VM would do. The owner chose the existing `codeit` instead; BidMate's venv has no torch and does not use its L4. Activating a local-model row (검증 › 실험 비교) would need torch with CUDA in `/srv/bidmate/venv` and GPU memory left over by the team's notebooks; do neither without the owner.
+
+**Reaching it.** No login, no Google sign-in. Each member connects with their own existing SSH key and keeps this open while using the app:
+
+```sh
+ssh -N -L 8501:127.0.0.1:8501 <your username>@35.255.64.243
+```
+
+Then open <http://127.0.0.1:8501>: 질문하기, 검증 and 데이터셋 만들기. Whoever can SSH into `codeit` can spend the allowance and use admin pages; that list is the access control.
+
+Who can reach it: the project-wide SSH-key metadata of `sprint-ai-01` (`codeit` does not block project keys; OS Login is off). Each member's existing key is installed as their own user (checked 2026-10-06):
+
+| User | Key fingerprint |
+| --- | --- |
+| `spai1302` | `SHA256:BW+8ViEOnm64nzB9Eea6U/9stkxJwLUdD5uZN34eIFE` |
+| `spai1303` (owner) | `SHA256:zuDvYLEQMSRtzl7xSSfEKxOSFwd4Uiowf0/Dhuaq1Os`, `SHA256:gYM2DId0G7uoteLRqADM7vz+EfznbAKdAoG/8k+YLjI` |
+| `spai1308` | `SHA256:gVmamf8+IBf/k5H1vwSA/i3TIc1htH9lS6kWxVBl9oM` |
+| `spai1316` | `SHA256:MS2LnwELSurZolhz+kSFv1aauY12WVxOpWzd9/njeLQ` |
+| `spai1319` | `SHA256:tEQoIDgZcPgc2G4UzRRCjzPQ6kiM1EdRNY7DWiU35Us` |
+| `spai1322` | `SHA256:+3WPv1N3cz+axixGWGun5UrafgqNSKZcLBtkwhDb7Rk` |
+
+All six are in `google-sudoers` on `codeit`, so each can also read `/etc/bidmate/server.env`. The secrets are kept out of the repository, not from the team. A key added to project metadata (Console › Compute Engine › Metadata › SSH keys) gives that person the same reach. Removing it there revokes it.
+
+### 3.2 Linux start path on `codeit`
+
+`tools/start-postgresql.sh` replaces `tools/start-postgresql.ps1`: it creates `.runtime/postgresql.env` (mode 600) once and starts `compose.postgresql.yaml` on loopback port 55432. `tools/bidmate.service` (installed as `/etc/systemd/system/bidmate.service`) runs it before uvicorn on `127.0.0.1:8501 --workers 1` as the `bidmate` user, with `/etc/bidmate/server.env`. It starts at boot and stops with SIGINT (the controlled stop of section 4).
+
+```sh
+sudo systemctl status bidmate          # or: restart / stop; logs with journalctl -u bidmate
+sudo ss -ltnp | grep -E ':(8501|55432) '   # 127.0.0.1:8501 python (uvicorn), 127.0.0.1:55432 docker-proxy
+sudo /srv/bidmate/app/tools/bidmate-cli.sh budget-status   # any owner CLI command, with the service's environment
+```
+
+Deploying a code change: the repository is private, so ship a bundle from the owner host (`git bundle create bidmate.bundle <branch>`, `scp` it to the VM), then on the VM `sudo -u bidmate git -C /srv/bidmate/app pull /tmp/bidmate.bundle <branch>`. Rebuild `web/out` there (`cd web && npm ci && npm run build`) when screens changed, then `sudo systemctl restart bidmate`. Stop the service before any paid CLI job or `backup` (section 1).
+
+The VM serves the owner host's restored database, whose rows keep Windows paths (`C:\Users\dasdk\PycharmProjects\project-codeit-mid\...`). `RFP_PATH_MAP=C:/Users/dasdk/PycharmProjects/project-codeit-mid=/srv/bidmate/app` maps them onto the copied originals and runtime. Every reader of a recorded original, extraction or index path goes through `postgres.host_path`. Paths written on the VM are Linux paths and need no mapping.
+
+### 3.3 The move (2026-10-06)
+
+1. The owner's server on `127.0.0.1:8501` was stopped with no queued or running request and no reserved or dispatching attempt.
+2. `backup --destination <repo>\.runtime-backups\vm-cutover-2026-10-06 --actor owner`: 33 tables, ledger revision 8902, spent $2.481366, pending $0, unknown $0, 2,965 settled attempts (reserved $4.001802, settled $2.032548), 225 requests.
+3. The originals (`원본 데이터`, 164 MB), the runtime (3.9 GB, without `archive/`, logs, `*.env` and private files) and the backup were copied to `codeit` with `tar | ssh`. The VM keeps its own `.runtime/postgresql.env`.
+4. `restore-check` into the VM's empty `bidmate_app` (`RFP_RESTORE_DATABASE_DSN`, `RFP_DATABASE_DSN` unset, `RFP_PATH_MAP` set) passed all 255 checks. The receipt shows revision 8902, spent 2,481,366, pending 0, unknown 0, the same attempt totals and 225 requests, before and after restart recovery. Paid admission is off.
+5. `systemctl enable --now bidmate`. Startup accepted the validated import and its artifact hashes through the path map.
+6. Through `ssh -L` from the owner's PC, 질문하기, 검증 and 데이터셋 만들기 loaded. For the last answered request (`0f380c5a-…`), the cited evidence opened, and its original HWP (4.2 MB) downloaded with a SHA-256 equal to its `source_hash`.
+
+Paid answers stay off until the owner reconciles the provider's usage since the dump (section 5) and runs `sudo /srv/bidmate/app/tools/bidmate-cli.sh paid on --actor <owner> --reason "..."` on `codeit`.
+
+### 3.4 The owner host is no longer live
+
+The Windows server on the owner's `127.0.0.1:8501` was stopped for the dump on 2026-10-06. It must not be started against its `bidmate_app` again: that database's ledger stopped at the dump and would spend a second, independent copy of the allowance. After the VM was verified, `paid off` was recorded on that copy, which also turns off its PostgreSQL paid admission. An accidental start there serves free pages but cannot spend. The copy stays until the owner drops it. Local screen work uses the fixture server or a fake-provider config (README). On the owner's PC, `127.0.0.1:8501` is now the tunnel to `codeit`.
+
+### 3.5 Local development
+
 Local development and single-host use:
 
 ```powershell
@@ -43,12 +112,7 @@ python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 The API serves the built screens from `web/out` and the routes under `/api/`, so members need only this one port.
 Never run more than one worker: the process owns the request executor and the database-wide paid-gateway lock.
 
-Team access is an **owner decision**. No host, tunnel or network has been configured or verified by this phase. Because there is no login, binding to `0.0.0.0` exposes spending and administration to everyone on that network. Choose deliberately:
-
-- Keep the server on `127.0.0.1` and give members an encrypted path to it. Examples: an SSH local forward (`ssh -L 8501:127.0.0.1:8501 <owner-host>`), or an existing organization VPN.
-- Bind to a trusted team network only (`--host <team-network address>`) when every person on that network may spend the allowance.
-
-Record the chosen host and who can reach it in the phase-3 report (`report --phase 3`) once it exists.
+Never bind to `0.0.0.0`: without a login it exposes spending and administration to everyone on that network. Team access is the SSH forward of 3.1. The phase-3 report (`report --phase 3`) prints the host from `<RFP_DATA_DIR>/releases/phase-3/team-host.json`, which the owner writes on the team host: `{"host", "reach", "tunnel", "members", "recorded_at"}`.
 
 Paid generation stays disabled until `configure-budget` records the dates, prior use, allowance and cap (see the README). Fake-provider demonstrations use a config file with `{"provider": "fake"}` and optionally `"fake_delay_seconds": 4`. Such a config never builds a real SDK client.
 
