@@ -1,0 +1,13 @@
+created: 2026-10-06T22:40:17.488Z
+updated: 2026-10-06T22:40:17.959Z
+update_count: 3
+last_field: constraint
+git_commit: "8486353"
+git_branch: web-login-jupyterhub-oauth
+children:
+  - hub-oauth
+  - login-route
+  - login-sessions
+  - request-binding
+  - session-middleware
+  - sign-in-gate

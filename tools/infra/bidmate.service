@@ -1,8 +1,10 @@
-# The shared app on the team VM (runbook section 3). One worker on loopback; members reach it through SSH -L.
-# /etc/bidmate/server.env (root-owned, mode 600) holds RFP_DATABASE_DSN and the paths, never OPENAI_API_KEY:
-# API keys enter only through the 설정 page and stay in the service's memory per browser (runbook 3.3).
+# The shared app on the team VM (runbook section 3): one worker, served at http://35.255.64.243:8501.
+# It listens on every address only because every /api route needs a JupyterHub sign-in (runbook section 2).
+# /etc/bidmate/server.env (root-owned, mode 600) holds RFP_DATABASE_DSN, the paths and the BIDMATE_* sign-in
+# settings; without the sign-in settings the API refuses every call. It never holds OPENAI_API_KEY: API keys
+# enter only through the 설정 page and stay in the service's memory per member account (runbook 3.3).
 [Unit]
-Description=BidMate RFP assistant on 127.0.0.1:8501
+Description=BidMate RFP assistant on 0.0.0.0:8501 (JupyterHub sign-in)
 After=docker.service network-online.target
 Requires=docker.service
 
@@ -11,7 +13,7 @@ User=bidmate
 WorkingDirectory=/srv/bidmate/app
 EnvironmentFile=/etc/bidmate/server.env
 ExecStartPre=/srv/bidmate/app/tools/infra/start-postgresql.sh
-ExecStart=/srv/bidmate/venv/bin/python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
+ExecStart=/srv/bidmate/venv/bin/python -m uvicorn rfp_assistant.api:app --host 0.0.0.0 --port 8501 --workers 1
 # A stop lets running requests settle (runbook section 4) before the gateway lock is released.
 KillSignal=SIGINT
 TimeoutStopSec=120

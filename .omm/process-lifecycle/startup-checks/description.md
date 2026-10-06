@@ -1,0 +1,1 @@
+`Resources._initialize` → `require_imported_database` (recovery fence, validated import, artifact hashes) → `init_schema` → `ensure_budget_row`. Pool creation also refuses any server other than 18.6 and pgvector other than 0.8.6. Any failure aborts startup, closing the transport and tracing and releasing ownership in the `__init__` exception path.

@@ -1,0 +1,1 @@
+The call may have executed (timeout, connection loss, 5xx, an exception during the call, missing usage, or a failed settlement). The attempt keeps its reservation and blocks further dispatch. The owner CLI `unresolved` lists these attempts; `settle` resolves one from dated provider usage evidence, and `reconcile` covers them by interval.

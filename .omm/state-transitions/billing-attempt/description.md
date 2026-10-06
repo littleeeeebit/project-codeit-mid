@@ -1,1 +1,0 @@
-States of `attempts.state`. Admission that is refused creates no row. The `reserved_micro_usd` of open states (reserved, dispatching, unknown) counts as pending against the cap.

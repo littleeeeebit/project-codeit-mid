@@ -40,10 +40,10 @@ function ApiKeySection() {
     event.preventDefault();
     if (key.trim()) {
       void run(() => api.PUT("/api/settings/api-key", { body: { api_key: key, model } }),
-        `API 키와 ${model} 모델을 확인하고 이 브라우저에 적용했습니다. 이 브라우저의 유료 답변만 이 키를 씁니다.`);
+        `API 키와 ${model} 모델을 확인하고 내 계정에 적용했습니다. 내 계정의 유료 답변만 이 키를 씁니다.`);
     } else {
       void run(() => api.PUT("/api/settings/model", { body: { model } }),
-        `이 브라우저의 답변 모델을 ${model}(으)로 바꿨습니다.`);
+        `내 계정의 답변 모델을 ${model}(으)로 바꿨습니다.`);
     }
   }
 
@@ -51,8 +51,8 @@ function ApiKeySection() {
     <section className="space-y-4 rounded-xl border p-6" aria-labelledby="api-key-heading">
       <h2 id="api-key-heading" className="text-lg font-semibold">내 OpenAI API 키와 답변 모델</h2>
       {s && (s.configured
-        ? <p className="text-sm">이 브라우저에 설정됨 · {s.model} · {s.set_by}{s.set_at ? ` · ${s.set_at}` : ""}</p>
-        : <p className="text-sm font-medium text-destructive">이 브라우저에는 키가 없습니다. 본인 키를 입력해야 유료 답변을 받을 수 있습니다.</p>)}
+        ? <p className="text-sm">내 계정에 설정됨 · {s.model} · {s.set_by}{s.set_at ? ` · ${s.set_at}` : ""}</p>
+        : <p className="text-sm font-medium text-destructive">내 계정에는 키가 없습니다. 본인 키를 입력해야 유료 답변을 받을 수 있습니다.</p>)}
       {status.error && <p role="alert">{status.error}</p>}
       <form onSubmit={save} className="space-y-4">
         <div className="space-y-2">
@@ -68,7 +68,7 @@ function ApiKeySection() {
           </select>
           <p className="text-sm text-muted-foreground">키가 쓸 수 있는 모델이어야 합니다. 저장할 때 OpenAI에 무료로 확인합니다. 데이터셋 만들기와 평가는 이 선택과 관계없이 기본 모델(gpt-6-luna)을 씁니다.</p>
         </div>
-        <p className="text-sm text-muted-foreground">키는 입력한 브라우저에서만 쓰입니다. 다른 팀원의 브라우저에는 보이지도 쓰이지도 않습니다. 서버 프로세스 메모리에만 있고 파일, 데이터베이스, 로그 어디에도 저장되지 않으며 화면에 다시 표시되지 않습니다. 서버가 다시 시작되거나 브라우저를 닫으면 다시 입력해야 합니다. 사용 금액은 모두 아래의 공유 한도에 함께 기록됩니다.</p>
+        <p className="text-sm text-muted-foreground">키는 로그인한 내 계정에만 쓰입니다. 같은 계정으로 다른 브라우저에서 로그인해도 쓰이고, 다른 팀원 계정에는 보이지도 쓰이지도 않습니다. 서버 프로세스 메모리에만 있고 파일, 데이터베이스, 로그 어디에도 저장되지 않으며 화면에 다시 표시되지 않습니다. 서버가 다시 시작되면 다시 입력해야 합니다. 사용 금액은 모두 아래의 공유 한도에 함께 기록됩니다.</p>
         <Button type="submit" disabled={saving || !model || (!key.trim() && (!s?.configured || model === s?.model))}>
           {saving ? "확인 중…" : key.trim() ? "키 확인 후 적용" : "모델 변경"}
         </Button>

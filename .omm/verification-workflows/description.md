@@ -1,0 +1,1 @@
+Workflows on the 검증 and 데이터셋 만들기 pages that inspect retrieval, build the gold dataset and run paid evaluations. Each one is a service function behind /api/verify/*, /api/drafting/* or /api/gold/*. The paid ones plan first (free estimate), then start only with the consented estimate id or maximum, and run as background jobs on the app's gateway.

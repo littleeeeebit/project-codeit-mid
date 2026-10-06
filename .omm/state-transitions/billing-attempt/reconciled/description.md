@@ -1,1 +1,0 @@
-Set by the owner's `budget.reconcile` for explicitly covered unknown attempts dispatched inside a closed, non-overlapping interval and billed to the same provider project. It records an `adjustments` row of the provider total minus the local settled cost. Attempts without a billing scope (server-environment key) require an explicit `unscoped` include or exclude choice.

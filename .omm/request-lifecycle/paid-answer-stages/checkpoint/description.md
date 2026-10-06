@@ -1,0 +1,1 @@
+`_checkpoint` → `_stop_reason` reads `requests.status`/`cancel_requested` and `res._closed`. A cancel request gives 'cancelled'; a closed service or a status other than running gives 'interrupted'. The stop takes effect before the next dispatch only; a call already in flight still settles.

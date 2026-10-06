@@ -1,0 +1,9 @@
+created: 2026-10-06T22:40:24.426Z
+updated: 2026-10-06T22:40:24.427Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: unknown
+children: []
+parentPath:
+  - billing-attempt-states

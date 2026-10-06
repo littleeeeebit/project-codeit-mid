@@ -1,0 +1,1 @@
+The defaults in settings.py (`channel_top_k` 20, `evidence_max_units` 6) are not what serves once a run is activated. The README records the active hybrid run H-0fffb2a6ec with 50 candidates per channel and 10 evidence units.

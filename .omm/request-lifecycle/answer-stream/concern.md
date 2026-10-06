@@ -1,0 +1,1 @@
+Each open stream holds a Starlette threadpool thread and checks out a database connection every 150 ms for the whole generation (this follows from the sync generator plus `request_status`). With 6 workers and 12 admissions this is bounded, but the cost grows with the number of open tabs. Observed from the code; not measured.

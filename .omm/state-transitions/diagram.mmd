@@ -1,6 +1,9 @@
 graph TD
-  request-status["Request status\nsrc/rfp_assistant/service/service.py"] -->|"stop check guards dispatch"| billing-attempt["Billing attempt\nsrc/rfp_assistant/gateway/budget.py"]
-  billing-attempt -->|"billing_state by precedence"| request-status
-  startup-recovery["Startup recovery\nsrc/rfp_assistant/service/service.py"] -->|"queued, running to interrupted"| request-status
-  startup-recovery -->|"dispatching to unknown"| billing-attempt
-  serving-activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"] -->|"snapshot in trace_json"| request-status
+  request-states["Request status\nsrc/rfp_assistant/service/service.py"]
+  billing-attempt-states["Billing attempt state\nsrc/rfp_assistant/gateway/budget.py"]
+  source-review-states["Source parse and review status\nsrc/rfp_assistant/corpus/ingestion.py"]
+  serving-activation["Serving activation pointer\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  request-states -->|cancel blocks next dispatch| billing-attempt-states
+  billing-attempt-states -->|billing_state rollup| request-states
+  source-review-states -->|eligibility for keyword index| serving-activation
+  serving-activation -->|config snapshot per request| request-states

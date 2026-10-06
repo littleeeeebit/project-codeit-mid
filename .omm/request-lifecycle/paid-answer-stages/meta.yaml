@@ -1,0 +1,15 @@
+created: 2026-10-06T22:40:20.307Z
+updated: 2026-10-06T22:40:20.454Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: paid-answer-stages
+children:
+  - checkpoint
+  - finish
+  - generate-answer
+  - prepare-evidence
+  - rewrite
+  - scope-check
+  - validate-answer
+parentPath: []

@@ -9,7 +9,7 @@ import { Download } from "lucide-react";
 import { cn } from "cn";
 import { api, errorText, originalHref, type Schemas } from "@/lib/api";
 import { ANSWERABILITY, GOLD_TYPE, label, locationText, REVIEW, REVIEW_TONE, STATUS } from "@/lib/format";
-import { useMember } from "@/lib/member";
+import { useMe } from "@/components/sign-in";
 import { must, usePoll } from "@/lib/use-poll";
 import { Section, Table, td } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
@@ -130,7 +130,7 @@ function Spans({ c }: { c: Candidate }) {
 }
 
 function DecideForm({ c, onDone }: { c: Candidate; onDone: (text: string) => void }) {
-  const member = useMember();
+  const member = useMe().name;
   const cats = usePoll("gold-cats", () => must(api.GET("/api/gold/reject-categories"), errorText), null);
   const [note, setNote] = useState("");
   const [inspected, setInspected] = useState(false);

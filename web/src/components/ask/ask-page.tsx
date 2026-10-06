@@ -3,9 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Download, X } from "lucide-react";
 import { cn } from "cn";
-import { api, type Doc, errorText, memberHeaders, originalHref, type Owned } from "@/lib/api";
+import { api, type Doc, errorText, originalHref, type Owned } from "@/lib/api";
 import { FIELD, label, REQUEST, REVIEW, REVIEW_WARNING, STATUS, usd, when, wonShort } from "@/lib/format";
-import { readMember, useMember } from "@/lib/member";
 import { useAnswerStream } from "@/lib/use-answer-stream";
 import { must, usePoll } from "@/lib/use-poll";
 import { StatusBadge } from "@/components/status-badge";
@@ -33,19 +32,17 @@ const SUBMIT: Record<Mode, string> = {
   inventory: "요구사항 목록 보기",
 };
 
-/** A request this screen owns, with the name it was asked under (taken once, at submit). */
-type Ownership = Owned & { member: string };
 /** One turn of the conversation: what was asked, in which mode, of which documents (in selection order). */
-type Turn = Ownership & { question: string; mode: Mode; docs: string[] };
+type Turn = Owned & { question: string; mode: Mode; docs: string[] };
 /** The citation the evidence pane shows: which turn's request, which evidence, and its marker number. */
 type Opened = { requestId: string; evidenceId: string; number: number; turn: number };
 
 const UNFINISHED = ["queued", "running"];
 const FREE_QUESTION: Partial<Record<Mode, string>> = { metadata: "기본 정보", inventory: "요구사항 목록" };
 
-async function abandon(owned: Ownership) {
+async function abandon(owned: Owned) {
   const { error, response } = await api.POST("/api/requests/{request_id}/abandon", {
-    params: { path: { request_id: owned.request_id } }, headers: memberHeaders(owned.member), keepalive: true,
+    params: { path: { request_id: owned.request_id } }, keepalive: true,
   });
   if (!response.ok) throw new Error(errorText(error));
 }
@@ -60,7 +57,7 @@ export function AskPage() {
   const [opened, setOpened] = useState<Opened | null>(null);
   const [sheet, setSheet] = useState(false);  // below the lg breakpoint the evidence pane is a bottom sheet
   const pane = useRef<HTMLElement>(null);
-  const owner = useRef<Ownership | null>(null);  // the latest turn: abandoned when the conversation is left
+  const owner = useRef<Owned | null>(null);  // the latest turn: abandoned when the conversation is left
   const pending = useRef<{ valid: boolean } | null>(null);
   const mounted = useRef(true);
   const [submitting, setSubmitting] = useState(false);
@@ -136,21 +133,18 @@ export function AskPage() {
     setSubmitError(null);
     const q = current.paid ? question.trim() : "";
     if (current.paid && !q) return setSubmitError("질문을 입력하세요.");
-    const member = readMember();
     const docs = scope === "all" ? [] : selected;
     const attempt = { valid: true };
     pending.current = attempt;
     setSubmitting(true);
     try {
-      const { data, error } = await api.POST("/api/ask", {
+      const { data: request, error } = await api.POST("/api/ask", {
         body: {
           scope: docs.map((d) => ({ doc_id: d.doc_id, source_hash: d.source_hash })),
           question: q, mode: current.id, previous_request_id: last?.request_id ?? "",
         },
-        headers: memberHeaders(member),
       });
-      if (error || !data) throw new Error(errorText(error));
-      const request = { ...data, member };
+      if (error || !request) throw new Error(errorText(error));
       if (mounted.current && attempt.valid) {
         owner.current = request;
         setTurns((t) => [...t, { ...request, question: q, mode: current.id, docs: docs.map((d) => d.doc_id) }]);
@@ -311,7 +305,6 @@ function TurnView({ turn, index, latest, opened, onCite, onStatus }: {
   const status = usePoll(`${turn.request_id}/${turn.generation_id}`, () => must(
     api.GET("/api/requests/{request_id}", {
       params: { path: { request_id: turn.request_id }, query: { generation_id: turn.generation_id, target: turn.target } },
-      headers: memberHeaders(turn.member),
     }), errorText), 1000, (d) => !UNFINISHED.includes(d.view.status));
   const v = status.data?.view;
   const live = !v || UNFINISHED.includes(v.status);
@@ -339,7 +332,7 @@ function TurnView({ turn, index, latest, opened, onCite, onStatus }: {
     setCancelError(null);
     try {
       const { error, response } = await api.POST("/api/requests/{request_id}/cancel", {
-        params: { path: { request_id: turn.request_id } }, headers: memberHeaders(turn.member),
+        params: { path: { request_id: turn.request_id } },
       });
       if (!response.ok) throw new Error(errorText(error));
       status.reload();
@@ -415,11 +408,10 @@ function Provisional({ streamed, docs }: { streamed: NonNullable<ReturnType<type
 }
 
 function History({ refresh }: { refresh: string }) {
-  const member = useMember();
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState<string | null>(null);
-  const { data } = usePoll(open ? `history-${member}-${refresh}` : null, () => must(api.GET("/api/requests", {
-    params: { query: { limit: 20 } }, headers: memberHeaders(member),
+  const { data } = usePoll(open ? `history-${refresh}` : null, () => must(api.GET("/api/requests", {
+    params: { query: { limit: 20 } },
   }), errorText), null);
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="border-t pt-6">

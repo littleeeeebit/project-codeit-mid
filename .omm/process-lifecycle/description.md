@@ -1,0 +1,1 @@
+Startup, ownership and controlled stop of the serving process, plus how out-of-process CLI owners coexist with it. This determines what happens to in-flight requests and billing across restarts.

@@ -1,0 +1,1 @@
+`_dataset_routes` is registered after `/api/gold/recent` so that `/api/gold/{candidate_id}` does not shadow it. The static mount is added last so `/api/*` stays the API's.

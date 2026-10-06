@@ -1,0 +1,1 @@
+GET /api/verify/experiments → `service.experiments` reads `compare.load_tables` and marks the serving row through `active_serving`. GET .../{matrix}/{index}/questions lists the failed questions. POST /api/verify/experiments/activate → `activate_experiment` → `evaluation.activate_decision`, with `decided_by` = the signed-in member and actor `verify:<member>`.

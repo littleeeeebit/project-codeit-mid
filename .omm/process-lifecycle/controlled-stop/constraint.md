@@ -1,0 +1,1 @@
+systemd allows 120 s, while the in-process wait is 20 s by default (settings range 0..300).

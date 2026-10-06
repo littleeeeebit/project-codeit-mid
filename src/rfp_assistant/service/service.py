@@ -43,7 +43,7 @@ from ..settings import ALLOWED_EMBEDDING_MODELS, ALLOWED_GENERATION_MODELS, Sett
 from ..storage.store import DATABASE_ERRORS, LockHeld, dumps, init_schema, open_db, tx, utcnow
 
 
-KEY_SESSION = generation.KEY_SESSION  # the API sets it from the browser's session cookie for each request
+KEY_SESSION = generation.KEY_SESSION  # the API binds the signed-in member's key session for each request
 
 
 class ServiceError(RuntimeError):
@@ -116,7 +116,8 @@ class Resources:
         self._borrowed_owner: postgres.GatewayOwner | None = None  # this process's owner, held by another Resources
         self.transport: generation.Transport | None = transport
         self.provider_note = ""
-        self.key_sources: dict[str, dict] = {}  # browser session -> who entered its key and when; never the key
+        self.key_sources: dict[str, dict] = {}  # key session -> who entered its key and when; never the key
+        self.member_keys: dict[str, str] = {}  # signed-in member -> their current key session
         self.recovered: dict = {}
         if not self._dispatch:
             if recover or transport is not None:
@@ -171,8 +172,9 @@ class Resources:
             self.tracing = tracing.Tracing.from_settings(self.settings)
 
     def set_api_key(self, session: str, key: str, member_id: str, model: str, billing_scope: str) -> None:
-        """A browser session's key from the 설정 page. It lives only in this process's memory: no file, row, log or
-        trace holds it, so a restart needs it entered again. Other sessions never use it."""
+        """A member's key from the 설정 page, under a new key session that becomes that member's current one. It
+        lives only in this process's memory: no file, row, log or trace holds it, so a restart needs it entered
+        again. Other members never use it."""
         if not self._dispatch or self.settings.provider != "openai":
             raise ServiceError("이 서버는 OpenAI 제공자로 실행되지 않아 API 키를 쓰지 않습니다.")
         with self._runner_lock:  # close() takes it too: no transport appears after shutdown began
@@ -183,9 +185,10 @@ class Resources:
             self.transport.set_key(session, key)
             self.key_sources[session] = {"set_by": member_id, "set_at": utcnow(), "model": model,
                                          "billing_scope": billing_scope}
+            self.member_keys[member_id] = session
 
     def generation_model(self) -> str:
-        """The answer model this request's browser had chosen when the request began, else the configured one."""
+        """The answer model this request's member had chosen when the request began, else the configured one."""
         return generation.REQUEST_MODEL.get() or self.settings.generation_model
 
     def paid_refusal(self) -> str:
@@ -449,8 +452,8 @@ def get_resources(settings: Settings) -> Resources:
 
 
 def _authorize(res: Resources, principal: Principal | None, *capabilities: str) -> Principal:
-    """States which role a public function serves. There is no login: the UI's visitor holds every capability;
-    in-process callers (CLI, tests) may pass narrower principals."""
+    """States which role a public function serves. Every signed-in member holds every capability; in-process
+    callers (CLI, tests) may pass narrower principals."""
     return require_any(principal, *capabilities)
 
 
@@ -1674,8 +1677,8 @@ def set_budget_limit(res: Resources, principal: Principal, cap_micro_usd: int, r
 
 
 def api_key_status(res: Resources, principal: Principal) -> dict:
-    """Whether this browser session's paid calls have a key, and who entered it. The key never leaves the
-    transport; another browser's key is never reported here."""
+    """Whether the signed-in member's paid calls have a key, and when they entered it. The key never leaves the
+    transport; another member's key is never reported here."""
     _authorize(res, principal, "consultant", "verifier", "budget_admin")
     source = res.key_sources.get(generation.KEY_SESSION.get())
     if source is None and res.transport is not None and not res.paid_refusal():
@@ -1686,10 +1689,11 @@ def api_key_status(res: Resources, principal: Principal) -> dict:
             "models": list(ALLOWED_GENERATION_MODELS)}
 
 
-def bind_request(res: Resources | None, session: str | None):
-    """Fixes, for one HTTP request and all work it starts, the browser session's key, its answer model and its
-    billing scope as they are now. Returns the reset to call when the request ends."""
-    source = (res.key_sources.get(session) if res is not None and session else None) or {}
+def bind_request(res: Resources | None, member_id: str | None):
+    """Fixes, for one HTTP request and all work it starts, the signed-in member's key, answer model and billing
+    scope as they are now. Returns the reset to call when the request ends."""
+    session = res.member_keys.get(member_id) if res is not None and member_id else None
+    source = (res.key_sources.get(session) if session else None) or {}
     bound = [(generation.KEY_SESSION, session), (generation.REQUEST_MODEL, source.get("model")),
              (budget.BILLING_SCOPE, source.get("billing_scope"))]
     tokens = [(var, var.set(value)) for var, value in bound]
@@ -1710,8 +1714,8 @@ def _selectable(res: Resources, model: str, actor: str) -> None:
 
 
 def set_generation_model(res: Resources, principal: Principal, model: str) -> dict:
-    """This browser's answer model for requests it starts from now on, checked against the key this browser
-    entered (a free metadata read). Requests already submitted keep the model they began with."""
+    """The member's answer model for requests they start from now on, checked against the key they entered (a
+    free metadata read). Requests already submitted keep the model they began with."""
     principal = _authorize(res, principal, "budget_admin")
     session = generation.KEY_SESSION.get()
     if session not in res.key_sources:
@@ -1725,10 +1729,9 @@ def set_generation_model(res: Resources, principal: Principal, model: str) -> di
     return api_key_status(res, principal)
 
 
-def set_api_key(res: Resources, principal: Principal, api_key: str, model: str) -> tuple[str, dict]:
-    """Checks the key against the serving model (a free metadata read), then gives it to a new browser session,
-    whose ID the caller puts in that browser's cookie. Returns (session, status). The audit row records who set a
-    key, never its value."""
+def set_api_key(res: Resources, principal: Principal, api_key: str, model: str) -> dict:
+    """Checks the key against the chosen model (a free metadata read), then makes it the member's, in every browser
+    they sign in from. Returns the member's key status. The audit row records who set a key, never its value."""
     principal = _authorize(res, principal, "budget_admin")
     key = api_key.strip()
     if not key or len(key) > 500 or not key.isascii() or any(c.isspace() for c in key):
@@ -1746,7 +1749,7 @@ def set_api_key(res: Resources, principal: Principal, api_key: str, model: str) 
         _audit(conn, principal.member_id, "set_api_key", "openai", "", {"model": model, "billing_scope": billing_scope})
     token = generation.KEY_SESSION.set(session)
     try:
-        return session, api_key_status(res, principal)
+        return api_key_status(res, principal)
     finally:
         generation.KEY_SESSION.reset(token)
 
@@ -2624,6 +2627,9 @@ def app_resources() -> Resources:
 
 def visitor(name: str | None) -> Principal:
     return auth.visitor(name)
+
+
+Login, LoginError = auth.Login, auth.LoginError  # the API's sign-in (JupyterHub OAuth) and its refusals
 
 
 @functools.lru_cache(maxsize=1)

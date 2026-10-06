@@ -1,6 +1,6 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-06 12:37:55.254000+00:00
-update_count: 30
+updated: 2026-10-06 22:40:14.094000+00:00
+update_count: 32
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
@@ -9,7 +9,7 @@ children:
 - corpus-router
 - dense-channel
 - dense-search
-- evidence-packing
+- evidence-packer
 - fusion
 - fusion-rerank
 - keyword-index
@@ -18,13 +18,12 @@ children:
 - reranker
 - serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ] -->|\"scope rows and terms\"| corpus-routing[\"Corpus routing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  corpus-routing -->|\"narrowed scope\"| lexical-ranking[\"Lexical ranking\\\
-  nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  corpus-routing -->|\"allowed rows,\
-  \ query vector\"| dense-search[\"Dense search\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
-  ]\r\n  lexical-ranking -->|\"BM25 chunk IDs\"| fusion[\"Keyword-first fusion\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  dense-search -->|\"cosine chunk IDs\"| fusion\r\n  fusion -->|\"fused pool\"\
-  | reranker[\"Local reranker\\nsrc/rfp_assistant/retrieval/dense.py\"]\r\n  fusion\
-  \ -->|\"ranked order\"| evidence-packing[\"Evidence packing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  reranker -->|\"reordered pool\"| evidence-packing"
+prev_diagram: "graph TD\r\n  serving-config[\"Serving config\\nsrc/rfp_assistant/service/service.py\"\
+  ] -->|\"mode, limits, versions\"| lexical-ranking[\"Lexical ranking\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ] -->|\"BM25 rows, scope terms\"| lexical-ranking\r\n  serving-config -->|\"embedding\
+  \ model, dims\"| dense-search[\"Dense search\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
+  ]\r\n  lexical-ranking -->|\"BM25 top k\"| fusion-rerank[\"Fusion and rerank\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  dense-search -->|\"cosine top k\"| fusion-rerank\r\n  fusion-rerank -->|\"\
+  ordered chunk rows\"| evidence-packing[\"Evidence packing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]"

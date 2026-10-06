@@ -1,0 +1,1 @@
+On PostgreSQL, `mark_dispatching` refuses every new dispatch while any attempt is `unknown` ('unknown PostgreSQL billing must be reconciled before dispatch'). A single timeout therefore halts all paid work for all members until the owner runs `settle` or `reconcile`.

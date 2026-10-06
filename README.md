@@ -110,14 +110,15 @@ a static export that the API serves itself, so one process on one port serves bo
 ```powershell
 cd web; npm ci; npm run build; cd ..                     # writes web/out (types come from web/openapi.json)
 $env:RFP_CONFIG_FILE = (Resolve-Path docs/history/postgresql-migration/config.example.json).Path   # RFP_DATABASE_DSN set
+$env:BIDMATE_LOCAL_MEMBER = "<your name>"   # local only: no hub to sign in with; never set on codeit
 python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
 
-The live shared instance runs on the team's GCP VM `codeit`, not on any member's machine. Members open it through an SSH local forward of 8501. The host, the tunnel command, the Linux start path (`tools/infra/start-postgresql.sh`, `tools/infra/bidmate.service`) and the member list are in [runbook §3](docs/operations/runbook.md#31-the-team-host-live-since-2026-10-06).
+The live shared instance runs on the team's GCP VM `codeit`, not on any member's machine. Members open <http://35.255.64.243:8501> and sign in with their JupyterHub account (see Access and paid use). The host, the sign-in settings, the Linux start path (`tools/infra/start-postgresql.sh`, `tools/infra/bidmate.service`) and the member list are in [runbook §3](docs/operations/runbook.md#31-the-team-host-live-since-2026-10-06).
 
 Exactly one worker: paid requests run on the process's own executor and the process holds a database-wide gateway advisory lock. For screen
-work, run the API on 8511 and `npm run dev` in `web/` (port 8510, `/api/*` forwarded to `RFP_API_URL`, default
-`http://127.0.0.1:8511`). After changing a route or its shapes, regenerate the schema the screens are typed from with
+work, run the API on 8511 (with `BIDMATE_LOCAL_MEMBER`) and `npm run dev` in `web/` (port 8510, `/api/*` forwarded to `RFP_API_URL`, default
+`http://127.0.0.1:8511`; only with `BIDMATE_LOCAL_MEMBER` does the API accept writes from that :8510 origin). After changing a route or its shapes, regenerate the schema the screens are typed from with
 `python tools/openapi.py`; `tests/test_api.py` fails while it is stale. `npm run lint` and `npm run typecheck` check
 `web/`.
 
@@ -267,7 +268,9 @@ python -m rfp_assistant.cli release-report --latest                            #
 
 ## Access and paid use
 
-There is no login (owner decision, reaffirmed for phase 3): every visitor gets the three pages 질문하기, 검증 and 데이터셋 만들기 (layout in [DESIGN.md](DESIGN.md)). The name typed in the header's 이름 field (default `owner`, kept in that browser) is recorded on paid requests, review decisions and corrections; it attributes work but does not authenticate anyone. Budget administration (settlement, reconciliation, external adjustments, paid on/off, the audit log) is owner CLI only: `unresolved`, `settle`, `reconcile`, `adjust`, `paid`, `audit`, each with `--actor` and a reason. Anyone who can reach the server can spend the budget, so keep `--host 127.0.0.1` unless everyone on that network may do so (see the [runbook](docs/operations/runbook.md)).
+Members sign in with their JupyterHub account, the one they use on `codeit`'s :8000 (owner decision 2026-10-06, which replaced the earlier no-login decision). BidMate is registered on the hub as the OAuth service `bidmate`. 로그인 sends the browser to the hub, the hub sends it back to `/api/auth/callback`, and BidMate exchanges the code with the hub from the server itself and asks the hub who signed in. BidMate never sees a password and keeps no user table. Only the hub usernames in `BIDMATE_ALLOWED_USERS` get a session (an HttpOnly cookie, 12 hours, kept in server memory); any other hub user gets 403. Every `/api` route except sign-in answers 401 without a session, and every allowed member gets all pages: 질문하기, 검증 and 데이터셋 만들기 (layout in [DESIGN.md](DESIGN.md)). The hub username is recorded on paid requests, review decisions, corrections and audit rows. Each member's OpenAI key from 설정 belongs to their account in any browser, and only in the server's memory.
+
+The sign-in settings come only from the server's environment (`/etc/bidmate/server.env` on `codeit`, [runbook §3.1](docs/operations/runbook.md#31-the-team-host-live-since-2026-10-06)). Without them the API refuses every call. A local run without a hub sets `BIDMATE_LOCAL_MEMBER` to the developer's name instead. Budget administration (settlement, reconciliation, external adjustments, paid on/off, the audit log) is owner CLI only: `unresolved`, `settle`, `reconcile`, `adjust`, `paid`, `audit`, each with `--actor` and a reason.
 
 Local verification: `verification.json` lists the major flows for the local verification service. Each flow runs as `python -B tools/verify.py <flow-id>` with the fake provider and ends with one `local-evidence` block. Browser flows need `pip install -e .[verify]`. See runbook §8.
 

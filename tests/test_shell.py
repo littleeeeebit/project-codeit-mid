@@ -17,6 +17,7 @@ from rfp_assistant.gateway import budget, generation
 from rfp_assistant.evaluation import gold
 from rfp_assistant.storage import postgres
 from rfp_assistant.storage.store import open_db
+from tests import fake_hub
 from tests import release_fixtures as fx
 
 
@@ -200,7 +201,11 @@ class ShellServiceTest(unittest.TestCase):
         self.assertTrue(service.drafting_runs(self.res, self.a)[0]["submitted"])
         with self.assertRaises(service.ServiceError):
             service.submit_drafts(self.res, self.a, run_id)
-        with TestClient(api.create_app(self.res)) as client:  # the review screen's calls, over HTTP
+        app = api.create_app(self.res, fake_hub.login("person-a", "person-b"))
+        with TestClient(app) as client, TestClient(app) as drafter:  # the review screen's calls, over HTTP
+            members = {"person-b": client, "person-a": drafter}
+            for name, browser in members.items():
+                fake_hub.sign_in(browser, name)
             (pending,) = client.get("/api/gold/pending").json()
             c = client.get(f"/api/gold/{pending['candidate_id']}").json()
             self.assertEqual((c["requested_by"], c["documents"][0]["found"]), ("person-a", True))
@@ -208,7 +213,7 @@ class ShellServiceTest(unittest.TestCase):
             self.assertIn({"text": fx.AMOUNT, "cited": True}, c["spans"][0]["segments"])
 
             def decide(who: str, note: str):
-                return client.post(f"/api/gold/{c['candidate_id']}/decide", headers={"X-Member": who}, json={
+                return members[who].post(f"/api/gold/{c['candidate_id']}/decide", json={
                     "decision": "approve", "expected_sha": c["row_sha256"], "note": note, "original_inspected": True})
 
             self.assertIn("메모", decide("person-b", "  ").json()["detail"])

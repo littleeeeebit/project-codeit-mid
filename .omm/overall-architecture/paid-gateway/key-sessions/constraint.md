@@ -1,0 +1,1 @@
+Keys exist only in process memory. On codeit, `/etc/bidmate/server.env` deliberately has no `OPENAI_API_KEY`, so after a restart every member must enter their key again on 설정.

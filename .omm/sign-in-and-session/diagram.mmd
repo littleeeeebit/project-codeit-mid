@@ -1,0 +1,14 @@
+graph TD
+  sign-in-gate["Sign-in gate\nweb/src/components/sign-in.tsx"]
+  login-route["Login and callback routes\nsrc/rfp_assistant/api.py"]
+  hub-oauth["JupyterHub OAuth, external\nsrc/rfp_assistant/service/auth.py"]
+  login-sessions["In-memory sessions\nsrc/rfp_assistant/service/auth.py"]
+  session-middleware["Session middleware\nsrc/rfp_assistant/api.py"]
+  request-binding["Per-request key binding\nsrc/rfp_assistant/service/service.py"]
+  sign-in-gate -->|401 redirects to login| login-route
+  login-route -->|authorize redirect with state| hub-oauth
+  hub-oauth -->|code back to callback| login-route
+  login-route -->|sign_in exchanges code| login-sessions
+  sign-in-gate -->|account header on calls| session-middleware
+  session-middleware -->|cookie to username| login-sessions
+  session-middleware -->|bind_request contextvars| request-binding

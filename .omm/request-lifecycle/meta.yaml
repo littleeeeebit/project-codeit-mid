@@ -1,14 +1,14 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-06 12:38:00.329000+00:00
-update_count: 27
+updated: 2026-10-06 22:40:19.457000+00:00
+update_count: 29
 last_field: diagram
-git_commit: 9a90e7f
-git_branch: split-src-into-layer-packages
+git_commit: '8486353'
+git_branch: web-login-jupyterhub-oauth
 children:
 - answer-stream
 - answer-validation
-- ask-composer
 - ask-page
+- ask-route
 - cancellation
 - evidence-retrieval
 - finish-record
@@ -18,23 +18,22 @@ children:
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
+- paid-answer-stages
 - paid-call
-- paid-stages
-- request-worker
+- request-runner
+- requests-table
 - status-poll
 - stream-and-poll
 - submit-answer
 - validation
 prev_diagram: "graph TD\r\n  ask-composer[\"Ask composer\\nweb/src/components/ask/ask-page.tsx\"\
-  ] -->|\"POST /api/ask\"| submit-answer[\"Validate and persist\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  submit-answer -->|\"request ID to executor\"| run-queued[\"Claim queued request\\\
-  nsrc/rfp_assistant/service/service.py\"]\r\n  run-queued -->|\"follow-up with history\"\
-  | conversation-rewrite[\"Follow-up rewrite\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  run-queued -->|\"first-turn question\"| paid-answer[\"Retrieve, generate,\
-  \ validate\\nsrc/rfp_assistant/service/service.py\"]\r\n  conversation-rewrite -->|\"\
-  standalone question\"| paid-answer\r\n  paid-answer -->|\"outcome and trace\"| finish-request[\"\
-  Persist outcome\\nsrc/rfp_assistant/service/service.py\"]\r\n  ask-composer -->|\"\
-  poll status, read SSE\"| stream-and-poll[\"Status poll and stream\\nsrc/rfp_assistant/api.py\"\
-  ]\r\n  stream-and-poll -->|\"reads row and partials\"| finish-request\r\n  paid-answer\
-  \ -->|\"spans and scores\"| langfuse-tracing[\"Langfuse tracing\\nsrc/rfp_assistant/gateway/tracing.py\"\
-  ]"
+  ] -->|\"POST /api/ask\"| submit-answer[\"Submit and admit\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  submit-answer -->|\"queued row, runner.submit\"| request-worker[\"Request\
+  \ worker\\nsrc/rfp_assistant/service/service.py\"]\r\n  request-worker -->|\"claims\
+  \ queued to running\"| paid-stages[\"Paid answer stages\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  paid-stages -->|\"partial text in memory\"| answer-stream[\"Answer stream\\\
+  nsrc/rfp_assistant/api.py\"]\r\n  paid-stages -->|\"validated result, billing\"\
+  | finish-request[\"Finish and store\\nsrc/rfp_assistant/service/service.py\"]\r\n\
+  \  answer-stream -->|\"SSE data then done\"| ask-composer\r\n  finish-request -->|\"\
+  result_json on requests row\"| status-poll[\"Status poll\\nsrc/rfp_assistant/api.py\"\
+  ]\r\n  status-poll -->|\"view plus attachable\"| ask-composer"

@@ -1,0 +1,1 @@
+`tx(immediate=True)` serializes every ledger, request and review write on one row (`SELECT ... FROM application_mutex WHERE id = 1 FOR UPDATE`). The code marks this with a ponytail comment: 'per-account locks only if measured throughput requires them'.

@@ -6,7 +6,7 @@ Enter with the actual [phase-4 release](4-evaluation-and-release.md), runbook, a
 
 ## Ownership and durable deployment
 
-Assign one operational owner and a backup owner from the team; record their roles in the runbook. There is no login: all six users connect to one application deployment whose network reach the owner decides. The ledger and every application record live in the PostgreSQL database `bidmate_app` (PostgreSQL 18.6 + pgvector 0.8.6, started by `tools/infra/start-postgresql.ps1` on a persistent Docker volume). Immutable artifacts stay on the owner's persistent local disk. Ephemeral hosting that can lose or reset the database or the artifacts is outside this baseline.
+Assign one operational owner and a backup owner from the team; record their roles in the runbook. All six users connect to one application deployment and sign in with their JupyterHub account (since 2026-10-06; runbook §2). The ledger and every application record live in the PostgreSQL database `bidmate_app` (PostgreSQL 18.6 + pgvector 0.8.6, started by `tools/infra/start-postgresql.ps1` on a persistent Docker volume). Immutable artifacts stay on the owner's persistent local disk. Ephemeral hosting that can lose or reset the database or the artifacts is outside this baseline.
 
 Hold the database-wide paid-gateway advisory lock while the real paid service is active. A second UI or gateway owner against the same database is refused, from any host. Maintenance CLI jobs acquire the same lock after the UI has stopped. Fake checks and tests use their own isolated PostgreSQL databases, never `bidmate_app`. The lock belongs to its database session, so a dead process releases it. Confirm that recovery after process death; never terminate a live owner's session to bypass it.
 
@@ -33,7 +33,7 @@ Maintenance is one command or one button. Pipelines run every variant and AI rev
 
 1. Run the release manifest/check commands on the actual shared host with paid mode initially disabled. Verify persistent data survives an application restart and machine/session restart as applicable.
 2. Confirm second-owner refusal and offline maintenance lock behavior. No member runs a separate academy-key application with its own ledger. If outside use is unavoidable, record that real-time scope is incomplete and reconcile dated owner evidence.
-3. There is no login: confirm the deployment's network exposure matches the owner's decision, that members type consistent names for attribution, and that the API key never appears in Git, screenshots or exports. Confirm sealed rows stay off the verifier page and every admin action leaves an audit event.
+3. Confirm that the allowlist (`BIDMATE_ALLOWED_USERS`) names exactly the members, that an unauthenticated API call answers 401, and that the API key never appears in Git, screenshots or exports. Confirm sealed rows stay off the verifier page and every admin action leaves an audit event.
 4. Record startup/shutdown procedure and recovery status. Re-enabling paid mode after recovery requires known-safe configuration and conservative handling of unresolved billing, not a clean-looking empty dashboard.
 
 ### 2. Back up and restore consistent state

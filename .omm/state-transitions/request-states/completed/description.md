@@ -1,0 +1,1 @@
+The `_finish` default request status. The domain outcome lives in `result_json.status`: answered, insufficient_evidence, ingestion_unavailable, budget_blocked, and other statuses produced by the model's payload.

@@ -1,0 +1,1 @@
+The account header exists because tabs share one cookie. Signing in as someone else in another tab would otherwise silently change whose session an open screen acts under.

@@ -1,0 +1,1 @@
+The cookie path is `/api/` because browsers scope cookies by host and path, not by port. A cookie at `/` would also be sent to the hub and to notebook servers on :8000, which run code from hub users who are not on the allowlist.

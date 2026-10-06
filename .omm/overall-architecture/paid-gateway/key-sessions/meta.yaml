@@ -1,0 +1,9 @@
+created: 2026-10-06T22:40:15.810Z
+updated: 2026-10-06T22:40:15.937Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: key-sessions
+children: []
+parentPath:
+  - paid-gateway

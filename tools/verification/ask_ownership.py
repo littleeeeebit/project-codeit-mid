@@ -15,7 +15,6 @@ import tempfile
 import threading
 import time
 import unittest
-import uuid
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -28,9 +27,10 @@ from rfp_assistant import api
 from rfp_assistant.gateway.generation import FakeTransport
 from rfp_assistant.service import service
 from rfp_assistant.storage.store import open_db
-from tests import fixtures
+from tests import fake_hub, fixtures
 
 QUESTION = "하자보수 기간은 얼마인가요?"
+MEMBERS = [f"alice-{i}" for i in range(20)]  # one fresh hub user per test, all on the allowlist
 
 
 class AskOwnershipTest(unittest.TestCase):
@@ -67,7 +67,12 @@ class AskOwnershipTest(unittest.TestCase):
         cls.transport.chat = held_chat
         cls.res = service.Resources(cls.env.settings.with_(request_workers=1, request_admission=16),
                                     transport=cls.transport)
-        app = api.create_app(cls.res)
+        cls.listener = socket.socket()
+        cls.listener.bind(("127.0.0.1", 0))
+        cls.origin = f"http://127.0.0.1:{cls.listener.getsockname()[1]}"
+        cls.members = iter(MEMBERS)
+        app = api.create_app(cls.res, service.Login.from_env(
+            fake_hub.hub().env(f"{cls.origin}/api/auth/callback", MEMBERS)))
         cls.post_delay = 0
 
         @app.middleware("http")
@@ -77,9 +82,6 @@ class AskOwnershipTest(unittest.TestCase):
                 await asyncio.sleep(cls.post_delay)
             return response
 
-        cls.listener = socket.socket()
-        cls.listener.bind(("127.0.0.1", 0))
-        cls.origin = f"http://127.0.0.1:{cls.listener.getsockname()[1]}"
         cls.server = uvicorn.Server(uvicorn.Config(app, log_level="warning"))
         cls.thread = threading.Thread(target=cls.server.run, kwargs={"sockets": [cls.listener]}, daemon=True)
         cls.thread.start()
@@ -110,11 +112,10 @@ class AskOwnershipTest(unittest.TestCase):
         self.streamed.clear()
         self.entered.clear()
         self.__class__.post_delay = 0
-        self.member = f"alice-{uuid.uuid4().hex[:8]}"
+        self.member = next(self.members)
         self.context = self.browser.new_context()
-        self.context.add_init_script(f"localStorage.setItem('rfp-member', '{self.member}')")
         self.page = self.context.new_page()
-        self.page.goto(self.origin)
+        fake_hub.browser_sign_in(self.page, self.origin, self.member)
         self.pick_document()
 
     def tearDown(self):
@@ -158,22 +159,38 @@ class AskOwnershipTest(unittest.TestCase):
         self.page.wait_for_timeout(1500)
         self.assertEqual(len(self.rows()), 1)
 
-    def test_cancel_and_poll_keep_the_submitting_member_after_the_header_changes(self):
+    def test_cancel_and_poll_ride_on_the_session_without_a_name_header(self):
         self.gate.clear()
         self.page.locator("main button[type=submit]").click()
         cancel = self.page.get_by_role("button", name="요청 취소", exact=True)
         cancel.wait_for()
-        self.page.locator("#member").fill("bob")
         headers = []
         def observe(request):
             if "/api/requests/" in request.url:
                 headers.append((request.method, request.headers.get("x-member")))
         self.page.on("request", observe)
         cancel.click()
-        self.wait_for(lambda: self.rows()[0]["cancel_requested"] == 1, "cancel used the editable header member")
+        self.wait_for(lambda: self.rows()[0]["cancel_requested"] == 1, "the signed-in member could not cancel")
         self.wait_for(lambda: any(method == "GET" for method, _ in headers), "ownership was not polled")
         self.page.remove_listener("request", observe)
-        self.assertTrue(headers and all(name == self.member for _, name in headers), headers)
+        self.assertTrue(headers and all(name is None for _, name in headers), headers)
+
+    def test_a_tab_whose_cookie_another_tab_replaced_reloads_as_that_account_instead_of_acting_for_it(self):
+        other = next(self.members)
+        tab = self.context.new_page()  # the same browser: one cookie jar for both tabs
+        tab.goto(self.origin + "/api/auth/login")
+        tab.get_by_label("Username").fill(other)
+        tab.get_by_role("button", name="Sign in").click()
+        expect(tab.locator("header").get_by_text(other, exact=True)).to_be_visible(timeout=60000)
+        # The first tab's next call (its budget poll, or a submit) names the old account, is refused with 409, and
+        # the page reloads as the new one: the picked document and typed question are gone with the old screen.
+        expect(self.page.locator("header").get_by_text(other, exact=True)).to_be_visible(timeout=15000)
+        expect(self.page.get_by_role("checkbox").first).not_to_be_checked()
+        expect(self.page.locator("#question")).to_have_count(0)
+        with open_db(self.env.settings.db_path) as conn:
+            made = conn.execute("SELECT COUNT(*) FROM requests WHERE member_id IN (?, ?)",
+                                (self.member, other)).fetchone()[0]
+        self.assertEqual(made, 0)  # refused before the service: neither account asked anything
 
     def test_cancelling_a_streaming_answer_hides_its_provisional_text_while_the_provider_still_runs(self):
         self.hold.clear()

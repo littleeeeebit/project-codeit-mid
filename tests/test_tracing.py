@@ -10,16 +10,14 @@ import unittest
 from dataclasses import asdict
 from pathlib import Path
 from unittest import mock
-from urllib.parse import quote
 
-from fastapi.testclient import TestClient
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from rfp_assistant import api, settings as settings_mod
+from rfp_assistant import settings as settings_mod
 from rfp_assistant.gateway import budget, generation, tracing
 from rfp_assistant.service import drafting, service
 from rfp_assistant.storage import store
-from tests import fixtures
+from tests import fake_hub, fixtures
 from tests import release_fixtures as fx
 
 KEY = "sk-proj-" + "Zq8" * 16  # key-shaped, never a real credential
@@ -59,17 +57,16 @@ class AskTracingTest(unittest.TestCase):
     def ask(self, tracer, responder=None, question=None) -> tuple[dict, list[dict], dict]:
         """One /api/ask through the HTTP app; returns the finished view, the ledger's attempts and the budget."""
         res = service.Resources(self.env.settings, generation.FakeTransport(responder), tracer=tracer)
-        client = TestClient(api.create_app(res))
+        client = fake_hub.client(res, "김검토")
         client.__enter__()
-        headers = {"X-Member": quote("김검토")}
         try:
             ref = self.env.refs["기관A"]
             body = {"question": question or "하자보수 기간은 얼마인가요?", "mode": "single", "as_of": "2024-06-01",
                     "scope": [{"doc_id": ref.doc_id, "source_hash": ref.source_hash}]}
-            owned = client.post("/api/ask", json=body, headers=headers).json()
+            owned = client.post("/api/ask", json=body).json()
             end = time.monotonic() + 10
             while True:
-                view = client.get(f"/api/requests/{owned['request_id']}", headers=headers).json()["view"]
+                view = client.get(f"/api/requests/{owned['request_id']}").json()["view"]
                 if view["status"] not in ("queued", "running") or time.monotonic() > end:
                     break
                 time.sleep(0.05)

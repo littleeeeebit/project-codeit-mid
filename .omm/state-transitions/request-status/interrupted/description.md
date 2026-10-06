@@ -1,1 +1,0 @@
-Set by `RequestRunner.shutdown` (queued rows always, running rows when futures outlive the wait), by `recover_requests` on a fresh gateway owner, and by `_Stop("interrupted")` when `res._closed`. Nothing is replayed automatically. The member asks again.

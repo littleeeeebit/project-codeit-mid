@@ -1,0 +1,16 @@
+graph TD
+  scope-check["Scope availability check\nsrc/rfp_assistant/service/service.py"]
+  checkpoint["Stop checkpoint\nsrc/rfp_assistant/service/service.py"]
+  rewrite["Follow-up rewrite\nsrc/rfp_assistant/service/service.py"]
+  prepare-evidence["Retrieve and price\nsrc/rfp_assistant/service/service.py"]
+  generate-answer["Metered generation\nsrc/rfp_assistant/service/service.py"]
+  validate-answer["Citation validation\nsrc/rfp_assistant/gateway/generation.py"]
+  finish["Persist outcome\nsrc/rfp_assistant/service/service.py"]
+  scope-check -->|parsed, indexed documents| checkpoint
+  checkpoint -->|follow-up with history| rewrite
+  checkpoint -->|first turn| prepare-evidence
+  rewrite -->|standalone question| prepare-evidence
+  prepare-evidence -->|messages, token count| generate-answer
+  prepare-evidence -->|no evidence found| finish
+  generate-answer -->|structured JSON response| validate-answer
+  validate-answer -->|payload or technical_error| finish

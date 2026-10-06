@@ -9,7 +9,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "cn";
 import { api, errorText, type Schemas } from "@/lib/api";
-import { useMember } from "@/lib/member";
 import { must, usePoll } from "@/lib/use-poll";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -287,8 +286,6 @@ function Failures({ q }: { q: { data?: Question[]; error?: string } }) {
 }
 
 function Activate({ r, onActivated }: { r: Row; onActivated: () => void }) {
-  const member = useMember();
-  const [name, setName] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [state, setState] = useState<{ busy: boolean; error?: string; done?: string }>({ busy: false });
   if (r.active) return <p className="text-base font-semibold text-primary">이 행이 지금 서비스 중입니다.</p>;
@@ -297,7 +294,7 @@ function Activate({ r, onActivated }: { r: Row; onActivated: () => void }) {
     e.preventDefault();
     setState({ busy: true });
     const { data, error } = await api.POST("/api/verify/experiments/activate", {
-      body: { run_id: r.run_id!, decided_by: (name ?? member).trim(), note },
+      body: { run_id: r.run_id!, note },
     });
     if (error) setState({ busy: false, error: errorText(error) });
     else { setState({ busy: false, done: data.activated_at }); onActivated(); }
@@ -305,14 +302,11 @@ function Activate({ r, onActivated }: { r: Row; onActivated: () => void }) {
   return (
     <form onSubmit={submit} className="space-y-4">
       <h5 className="text-lg font-bold">이 행으로 서비스 전환</h5>
-      <p className="text-sm text-muted-foreground">다음 질문부터 이 설정으로 검색합니다. 이전 설정은 활성화 기록에 남아 언제든 되돌릴 수 있습니다.</p>
-      <Field id="activate-name" label="고른 사람">
-        <input id="activate-name" required value={name ?? member} onChange={(e) => setName(e.target.value)} className={cn(field, "h-11")} />
-      </Field>
+      <p className="text-sm text-muted-foreground">다음 질문부터 이 설정으로 검색합니다. 로그인한 계정 이름으로 기록되며, 이전 설정은 활성화 기록에 남아 언제든 되돌릴 수 있습니다.</p>
       <Field id="activate-note" label="메모 (선택)">
         <textarea id="activate-note" value={note} onChange={(e) => setNote(e.target.value)} rows={3} className={cn(field, "py-2")} />
       </Field>
-      <Button type="submit" size="lg" disabled={state.busy || !(name ?? member).trim()}>{state.busy ? "전환 중" : "서비스 전환"}</Button>
+      <Button type="submit" size="lg" disabled={state.busy}>{state.busy ? "전환 중" : "서비스 전환"}</Button>
       {state.error && <Notice tone="bad">{state.error}</Notice>}
       {state.done && <Notice tone="ok">전환했습니다.</Notice>}
     </form>
