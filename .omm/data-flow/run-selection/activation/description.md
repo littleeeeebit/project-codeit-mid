@@ -1,1 +1,0 @@
-`evaluation.activate_decision`; see `state-transitions/serving-activation`. The 실험 비교 route requires a non-empty `decided_by` and records `verify:<member>` as the actor.

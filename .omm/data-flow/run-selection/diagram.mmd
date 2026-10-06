@@ -1,7 +1,0 @@
-graph TD
-  compare-runner["Axis matrix runner\nsrc/rfp_assistant/compare.py"] -->|writes activatable runs| retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation.py"]
-  retrieval-runs -->|person picks a row| activation["Activation decision\nsrc/rfp_assistant/evaluation.py"]
-  retrieval-runs -->|two finalists| answer-runs["Answer runs\nsrc/rfp_assistant/answers.py"]
-  answer-runs -->|freeze-release| sealed-run["Sealed test run\nsrc/rfp_assistant/sealed.py"]
-  sealed-run -->|recorded evidence| release-report["Release report\nsrc/rfp_assistant/release.py"]
-  answer-runs -->|blind review scores| release-report

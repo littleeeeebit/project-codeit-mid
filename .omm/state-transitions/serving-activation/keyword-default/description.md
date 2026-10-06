@@ -1,1 +1,0 @@
-No `active_run`: `settings.retrieval_mode` over the `active_index` pointer (moved by a structural `build-keyword` only before any selection), with no dense or reranker stage.

@@ -1,0 +1,9 @@
+created: 2026-10-05T23:55:28.277Z
+updated: 2026-10-05T23:55:28.278Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: use-answer-stream
+children: []
+parentPath:
+  - generation-stage

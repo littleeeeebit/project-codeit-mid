@@ -1,0 +1,1 @@
+Inserted by `budget.reserve` with `reserved_micro_usd = max_cost(rates, input_tokens, max_output_tokens)`. It counts as pending against the cap and the purpose envelope. Startup `budget.recover` releases any reservation left by a dead process ('never dispatched before restart').

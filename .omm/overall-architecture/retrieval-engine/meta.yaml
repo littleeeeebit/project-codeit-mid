@@ -1,24 +1,26 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-05 21:23:50.689000+00:00
-update_count: 12
+updated: 2026-10-05 23:55:15.280000+00:00
+update_count: 14
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
 children:
+- corpus-routing
 - dense-channel
 - dense-search
 - evidence-packing
 - fusion
+- hybrid-fusion
 - keyword-index
-- query-policy
+- lexical-ranking
 - reranker
+- serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval.py\"\
-  ] -->|\"scope rows, scope terms\"| corpus-routing[\"Corpus routing\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  corpus-routing -->|\"allowed rows\"| lexical-channel[\"Lexical channel\\\
-  nsrc/rfp_assistant/retrieval.py\"]\r\n  corpus-routing -->|\"allowed rows\"| dense-channel[\"\
-  Dense channel\\nsrc/rfp_assistant/vector_store.py\"]\r\n  lexical-channel -->|\"\
-  BM25 ids\"| fusion-and-rerank[\"Fusion and rerank\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  dense-channel -->|\"cosine ids\"| fusion-and-rerank\r\n  fusion-and-rerank\
-  \ -->|\"ordered rows\"| evidence-packing[\"Evidence packing\\nsrc/rfp_assistant/retrieval.py\"\
-  ]"
+prev_diagram: "graph TD\r\n  query-policy[\"Analyzer and query policy\\nsrc/rfp_assistant/retrieval.py\"\
+  ] -->|kept query tokens| keyword-index[\"Kiwi BM25 index\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  query-policy -->|routed scope rows| dense-search[\"pgvector search\\nsrc/rfp_assistant/vector_store.py\"\
+  ]\r\n  keyword-index -->|lexical ranking| fusion[\"Keyword-first RRF\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  dense-search -->|cosine ranking| fusion\r\n  fusion -->|pool below protected\
+  \ head| reranker[\"Local reranker\\nsrc/rfp_assistant/dense.py\"]\r\n  fusion -->|fused\
+  \ order| evidence-packing[\"Evidence packing\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  reranker -->|reordered pool| evidence-packing"

@@ -1,0 +1,17 @@
+graph TD
+  corpus-ingestion["Manifest and ingestion\nsrc/rfp_assistant/ingestion.py"]
+  fidelity-and-ocr["Fidelity check and OCR\nsrc/rfp_assistant/fidelity.py"]
+  keyword-build["Chunking and keyword build\nsrc/rfp_assistant/chunking.py"]
+  embedding-build["Embedding plan and build\nsrc/rfp_assistant/dense.py"]
+  comparison-runner["Axis matrix comparison\nsrc/rfp_assistant/compare.py"]
+  run-activation["Run validation and activation\nsrc/rfp_assistant/evaluation.py"]
+  gold-and-release["Gold, answers, sealed release\nsrc/rfp_assistant/gold.py"]
+  maintenance-sequence["Maintenance sequence\nsrc/rfp_assistant/maintenance.py"]
+  fidelity-and-ocr -->|review status, image_text| corpus-ingestion
+  corpus-ingestion -->|extraction revisions| keyword-build
+  keyword-build -->|index payload set| embedding-build
+  keyword-build -->|indexes per profile| comparison-runner
+  embedding-build -->|verified dense matrix| comparison-runner
+  gold-and-release -->|reviewed question populations| comparison-runner
+  comparison-runner -->|activatable runs| run-activation
+  maintenance-sequence -->|reruns steps in order| corpus-ingestion

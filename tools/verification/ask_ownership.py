@@ -7,6 +7,8 @@ lifecycle behaviour, not actual-corpus answer quality or user acceptance.
 from __future__ import annotations
 
 import asyncio
+import json
+import re
 import socket
 import sys
 import tempfile
@@ -49,6 +51,19 @@ class AskOwnershipTest(unittest.TestCase):
             return echo(messages)
 
         cls.transport.responder = reply
+        cls.hold, cls.streamed = threading.Event(), threading.Event()
+        cls.hold.set()
+        chat = cls.transport.chat
+
+        def held_chat(**kw):  # streams the whole answer, then holds the call open while `hold` is clear
+            response = chat(**kw)
+            if kw.get("on_delta"):
+                cls.streamed.set()
+                if not cls.hold.wait(30):
+                    raise AssertionError("held provider was not released")
+            return response
+
+        cls.transport.chat = held_chat
         cls.res = service.Resources(cls.env.settings.with_(request_workers=1, request_admission=16),
                                     transport=cls.transport)
         app = api.create_app(cls.res)
@@ -79,6 +94,7 @@ class AskOwnershipTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.gate.set()
+        cls.hold.set()
         cls.browser.close()
         cls.playwright.stop()
         cls.server.should_exit = True
@@ -89,6 +105,8 @@ class AskOwnershipTest(unittest.TestCase):
 
     def setUp(self):
         self.gate.set()
+        self.hold.set()
+        self.streamed.clear()
         self.entered.clear()
         self.__class__.post_delay = 0
         self.member = f"alice-{uuid.uuid4().hex[:8]}"
@@ -100,6 +118,7 @@ class AskOwnershipTest(unittest.TestCase):
 
     def tearDown(self):
         self.gate.set()
+        self.hold.set()
         self.context.close()
         if self.res._runner is not None:
             for future in list(self.res._runner._futures.values()):
@@ -155,6 +174,40 @@ class AskOwnershipTest(unittest.TestCase):
         self.page.remove_listener("request", observe)
         self.assertTrue(headers and all(name == self.member for _, name in headers), headers)
 
+    def test_cancelling_a_streaming_answer_hides_its_provisional_text_while_the_provider_still_runs(self):
+        self.hold.clear()
+        self.page.locator("main button[type=submit]").click()
+        provisional = self.page.get_by_text("검증 전 임시 답변입니다", exact=False)
+        expect(provisional).to_be_visible(timeout=15000)
+        self.page.get_by_role("button", name="요청 취소", exact=True).click()
+        self.wait_for(lambda: self.rows()[0]["cancel_requested"] == 1, "cancel was not recorded")
+        expect(provisional).to_have_count(0, timeout=5000)  # the provider is still held
+        expect(self.page.get_by_text("작성 중 · 검증 전")).to_have_count(0)
+        self.assertEqual(self.rows()[0]["status"], "running")
+        self.hold.set()
+        self.wait_for(lambda: self.rows()[0]["status"] == "cancelled", "the held call did not finish as cancelled")
+        expect(provisional).to_have_count(0)
+
+    def test_requirement_rows_and_their_citation_numbers_follow_the_grouped_table(self):
+        idx = self.res.index()
+        with open_db(self.env.settings.db_path) as conn:
+            for x in {xx for (xx, _) in idx.elements}:  # whichever document the screen picks first
+                els = sorted((e for (xx, _), e in idx.elements.items() if xx == x), key=lambda e: e["source_order"])
+                if len(els) < 3 or conn.execute("SELECT 1 FROM requirements WHERE extraction_id = ?", (x,)).fetchone():
+                    continue
+                for code, el in (("SFR-001", els[0]), ("PER-001", els[1]), ("SFR-002", els[2])):  # source order
+                    conn.execute("INSERT INTO requirements VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                 (idx.version, x, code, code, "detail", el["element_id"], code + " 이름"))
+        self.page.get_by_role("radio", name="요구사항 목록").click()
+        self.page.get_by_role("button", name="요구사항 목록 보기").click()
+        table = self.page.get_by_role("table", name="요구사항 목록")
+        expect(table).to_be_visible(timeout=15000)
+        codes = table.get_by_role("button", name=re.compile(r" 원문 보기$"))
+        self.assertEqual([c.inner_text() for c in codes.all()], ["SFR-001", "SFR-002", "PER-001"])
+        codes.nth(2).click()
+        pane = self.page.get_by_role("complementary", name="대화 근거", exact=True)
+        expect(pane.get_by_role("heading", name="근거 3 원문 인용")).to_be_visible()
+
     def test_navigation_abandons_queued_work(self):
         self.occupy_worker()
         self.page.locator("main button[type=submit]").click()
@@ -171,14 +224,33 @@ class AskOwnershipTest(unittest.TestCase):
         self.page.get_by_role("link", name="검증", exact=True).click()
         self.wait_for(lambda: self.rows()[0]["status"] == "cancelled", "late initial response escaped navigation cleanup")
 
-    def test_editing_a_completed_question_detaches_the_previous_answer(self):
+    def test_changing_the_documents_starts_a_new_conversation_and_detaches_its_answers(self):
         self.page.locator("main button[type=submit]").click()
         answer = self.page.locator('section[aria-label="답변"]')
-        expect(answer).to_be_visible(timeout=15000)
+        expect(answer.get_by_text(re.compile(r"^요청 [0-9a-f]{8} · "))).to_be_visible(timeout=15000)
         self.page.locator("#question").fill("사업 예산과 부가가치세 조건은 무엇인가요?")
+        expect(answer).to_have_count(1)  # typing the next question keeps the conversation
+        self.page.get_by_role("checkbox").first.uncheck()
         expect(answer).to_have_count(0)
         self.page.get_by_role("button", name="내 최근 요청").click()
         expect(self.page.get_by_role("button", name=QUESTION, exact=False)).to_be_visible()
+
+    def test_a_follow_up_shows_its_standalone_question_and_opens_markers_in_the_shared_pane(self):
+        self.page.locator("main button[type=submit]").click()
+        latest = self.page.get_by_role("region", name="답변", exact=True)
+        expect(latest.get_by_text(re.compile(r"^요청 [0-9a-f]{8} · "))).to_be_visible(timeout=15000)
+        self.page.locator("#question").fill("그 기간은 언제부터 계산하나요?")
+        self.page.get_by_role("button", name="이어서 질문 · 유료 2회").click()
+        expect(self.page.get_by_role("region", name="질문 1의 답변")).to_be_visible()
+        expect(self.page.get_by_text(re.compile("^검색에 쓴 질문 · "))).to_be_visible(timeout=15000)
+        marker = latest.get_by_role("button", name=re.compile(r"^근거 \d+ 원문 보기$")).first
+        marker.click()
+        pane = self.page.get_by_role("complementary", name="대화 근거", exact=True)
+        expect(pane.get_by_role("heading", name=re.compile(r"^근거 \d+ 원문 인용$"))).to_be_visible()
+        expect(pane.locator("blockquote")).to_be_visible()
+        rows = self.rows()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(json.loads(rows[1]["request_json"])["previous_request_id"], rows[0]["request_id"])
 
 
 if __name__ == "__main__":

@@ -8,6 +8,8 @@ attribution only. Paid work runs on the service's in-process executors, so serve
 
 from __future__ import annotations
 
+import json
+import time
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
@@ -15,7 +17,7 @@ from typing import Annotated, Any, Literal
 from urllib.parse import quote, unquote
 
 from fastapi import Depends, FastAPI, Header, Query, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -123,6 +125,7 @@ class AskIn(BaseModel):
     scope: list[ScopeRef] = Field(max_length=2)  # empty only for corpus (all documents)
     question: str = ""
     mode: Literal["single", "compare", "corpus", "metadata", "inventory"]
+    previous_request_id: str = Field("", max_length=100, description="The conversation's previous turn, if any")
 
 
 class Owned(BaseModel):
@@ -200,6 +203,8 @@ class Answer(_Read):
     request_id: str
     status: str = Field(description="Domain status, or technical_error / budget_blocked / ingestion_unavailable")
     summary: str
+    summary_evidence_ids: list[str] = []
+    standalone_question: str = Field("", description="A follow-up as rewritten from the conversation for retrieval")
     claims: list[Claim]
     missing_fields: list[MissingField]
     conflicts: list[Conflict]
@@ -296,7 +301,8 @@ def _routes(app: FastAPI) -> None:
     @app.post("/api/ask", response_model=Owned)
     def ask(body: AskIn, res: Res, member: Member):
         """Answers are as of today (DESIGN.md: the 기준일 control was removed)."""
-        return service.ask(res, member, _scope(body.scope), body.question, body.mode, date.today().isoformat())
+        return service.ask(res, member, _scope(body.scope), body.question, body.mode, date.today().isoformat(),
+                           body.previous_request_id)
 
     @app.get("/api/requests", response_model=list[RequestView])
     def requests(res: Res, member: Member, limit: int = 20, all_members: bool = False):
@@ -308,6 +314,28 @@ def _routes(app: FastAPI) -> None:
         view = service.request_status(res, member, request_id)
         owned = {"request_id": request_id, "generation_id": generation_id, "target": target}
         return RequestOut(view=view, attachable=bool(target) and service.may_attach(owned, target, view))
+
+    @app.get("/api/requests/{request_id}/stream")
+    def stream(request_id: str, res: Res, member: Member, generation_id: str = ""):
+        """Server-sent events: `data:` carries the unvalidated answer written so far whenever it grows, `data: null`
+        withdraws it once cancellation or a lost generation revokes it, then one `done` event when the request
+        finished. Read-only; the validated outcome still comes from the request."""
+        service.answer_progress(res, member, request_id, generation_id)  # refuse before the stream opens
+
+        def events():
+            last = None
+            while True:
+                progress = service.answer_progress(res, member, request_id, generation_id)
+                if progress["partial"] != last and (progress["partial"] is not None or not progress["finished"]):
+                    last = progress["partial"]  # a finished request keeps its last text until the outcome replaces it
+                    yield f"data: {json.dumps(last, ensure_ascii=False)}\n\n"
+                if progress["finished"]:
+                    yield "event: done\ndata: {}\n\n"
+                    return
+                time.sleep(0.15)
+
+        return StreamingResponse(events(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     @app.post("/api/requests/{request_id}/cancel", response_model=Cancelled)
     def cancel(request_id: str, res: Res, member: Member):

@@ -1,0 +1,1 @@
+Set by `_create` for paid modes after admission. `RequestRunner.shutdown` and startup `recover_requests` move it to `interrupted`, and nothing is replayed. `cancel_request` (directly, or via abandon) moves it to `cancelled` with a result noting no paid call. `_fail_unscheduled` moves it to `failed` if executor submission fails.

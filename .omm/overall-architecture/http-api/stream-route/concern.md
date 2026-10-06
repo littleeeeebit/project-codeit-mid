@@ -1,0 +1,1 @@
+Inference, not measured: the generator is synchronous and sleeps, so Starlette runs it in its worker threadpool. Each open stream holds a thread and re-reads the request row and its attempts every 150 ms (`request_status` → `_view`). With many concurrent viewers this could crowd the threadpool shared by every other sync route.

@@ -1,24 +1,45 @@
 created: 2026-10-05 04:06:18.173000+00:00
-updated: 2026-10-05 09:51:19.493000+00:00
-update_count: 5
+updated: 2026-10-05T23:55:17.667Z
+update_count: 7
 last_field: diagram
 kind: nested-class
 title: paid-gateway
 children:
-- answer-validation
-- budget-ledger
-- dispatch-marker
-- gateway-owner
-- langfuse-tracing
-- openai-transport
+  - answer-validation
+  - budget-admission
+  - budget-ledger
+  - dispatch-guard
+  - dispatch-marker
+  - gateway-owner
+  - langfuse-tracing
+  - metered-chat
+  - openai-transport
+  - provider-transport
+  - settlement
 parentPath: []
-prev_diagram: "graph TD\r\n  reserve[\"Atomic admission\\nsrc/rfp_assistant/budget.py\"\
-  ]\r\n  dispatch_marker[\"Dispatch marker\\nsrc/rfp_assistant/budget.py\"]\r\n  provider_transport[\"\
-  Provider transport\\nsrc/rfp_assistant/generation.py\"]\r\n  settlement[\"Settlement\
-  \ or unknown\\nsrc/rfp_assistant/budget.py\"]\r\n  gateway_owner[\"Gateway advisory\
-  \ lock\\nsrc/rfp_assistant/postgres.py\"]\r\n  owner_admin[\"Owner reconciliation\\\
-  nsrc/rfp_assistant/budget.py\"]\r\n  reserve -->|\"attempt reserved\"| dispatch_marker\r\
-  \n  dispatch_marker -->|\"stop guard passed\"| provider_transport\r\n  provider_transport\
-  \ -->|\"usage or error\"| settlement\r\n  gateway_owner -->|\"owner_guard in transaction\"\
-  | reserve\r\n  gateway_owner -->|\"owner check per call\"| provider_transport\r\n\
+prev_diagram: "graph TD\r
+
+  \  reserve[\"Atomic admission\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  dispatch_marker[\"Dispatch marker\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  provider_transport[\"Provider
+  transport\\nsrc/rfp_assistant/generation.py\"]\r
+
+  \  settlement[\"Settlement or unknown\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  gateway_owner[\"Gateway advisory lock\\nsrc/rfp_assistant/postgres.py\"]\r
+
+  \  owner_admin[\"Owner reconciliation\\nsrc/rfp_assistant/budget.py\"]\r
+
+  \  reserve -->|\"attempt reserved\"| dispatch_marker\r
+
+  \  dispatch_marker -->|\"stop guard passed\"| provider_transport\r
+
+  \  provider_transport -->|\"usage or error\"| settlement\r
+
+  \  gateway_owner -->|\"owner_guard in transaction\"| reserve\r
+
+  \  gateway_owner -->|\"owner check per call\"| provider_transport\r
+
   \  owner_admin -->|\"resolves unknown attempts\"| settlement"

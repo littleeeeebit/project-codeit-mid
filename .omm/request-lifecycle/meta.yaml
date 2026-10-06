@@ -1,30 +1,33 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-05 21:23:53.168000+00:00
-update_count: 10
+updated: 2026-10-05 23:55:24.308000+00:00
+update_count: 12
 last_field: diagram
-git_commit: 797b897
-git_branch: judge-set-and-maintenance
+git_commit: 467d0b9
+git_branch: chat-multiturn-streaming
 children:
-- admission
 - answer-validation
 - ask-page
+- ask-route
 - cancellation
-- finish
 - finish-record
+- follow-up-rewrite
+- generation-stage
+- outcome-store
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
 - paid-call
+- request-admission
 - retrieval-stage
+- runner-claim
 - status-poll
 - validation
-- worker
-prev_diagram: "graph TD\r\n  ask-screen[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
-  ] -->|\"POST /api/ask\"| ask-route[\"Ask route\\nsrc/rfp_assistant/api.py\"]\r\n\
-  \  ask-route -->|\"service.ask\"| submit-answer[\"Submit answer\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  submit-answer -->|\"persisted request_id\"| request-runner[\"Request runner\\\
-  nsrc/rfp_assistant/service.py\"]\r\n  request-runner -->|\"claim queued to running\"\
-  | paid-answer[\"Paid answer\\nsrc/rfp_assistant/service.py\"]\r\n  paid-answer -->|\"\
-  reserve, dispatch, settle\"| ledger-dispatch[\"Ledger dispatch\\nsrc/rfp_assistant/budget.py\"\
-  ]\r\n  paid-answer -->|\"_finish result_json\"| status-poll[\"Status poll\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  ask-screen -->|\"GET every second\"| status-poll"
+prev_diagram: "graph TD\r\n  ask-page[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
+  ] -->|POST /api/ask| admission[\"Validate and persist\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  admission -->|request_id to executor| worker[\"Worker claim\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  worker -->|checkpoint then retrieve| retrieval-stage[\"Retrieve and price\\\
+  nsrc/rfp_assistant/service.py\"]\r\n  retrieval-stage -->|input token estimate|\
+  \ paid-call[\"Reserve dispatch settle\\nsrc/rfp_assistant/budget.py\"]\r\n  paid-call\
+  \ -->|provider response| validation[\"Citation validation\\nsrc/rfp_assistant/generation.py\"\
+  ]\r\n  validation -->|AnswerResult| finish[\"Finish request row\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  ask-page -->|poll GET request| finish"

@@ -1,1 +1,0 @@
-Per paid provider call (`attempts`, stage `generation`, `embedding`, `judge_luna`, `judge_bridge`, drafting). Transitions are guarded `UPDATE ... WHERE state IN (...)`, so a duplicate transition is a no-op. The state machine is documented at the top of `budget.py`. Gemini embeddings follow the same states in `external_attempts` under their own cap.

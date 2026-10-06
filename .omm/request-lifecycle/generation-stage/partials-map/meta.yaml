@@ -1,0 +1,9 @@
+created: 2026-10-05T23:55:27.808Z
+updated: 2026-10-05T23:55:27.809Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: partials-map
+children: []
+parentPath:
+  - generation-stage

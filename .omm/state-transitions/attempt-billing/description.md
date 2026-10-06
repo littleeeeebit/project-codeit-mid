@@ -1,0 +1,1 @@
+`attempts.state` is one of `reserved`, `dispatching`, `settled`, `unknown`, `reconciled`, `released`. `_transition` only moves from the allowed source states, and every change bumps the budget revision.

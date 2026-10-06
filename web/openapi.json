@@ -190,6 +190,12 @@
       "title": "Request Id",
       "type": "string"
      },
+     "standalone_question": {
+      "default": "",
+      "description": "A follow-up as rewritten from the conversation for retrieval",
+      "title": "Standalone Question",
+      "type": "string"
+     },
      "status": {
       "description": "Domain status, or technical_error / budget_blocked / ingestion_unavailable",
       "title": "Status",
@@ -198,6 +204,14 @@
      "summary": {
       "title": "Summary",
       "type": "string"
+     },
+     "summary_evidence_ids": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Summary Evidence Ids",
+      "type": "array"
      }
     },
     "required": [
@@ -447,6 +461,13 @@
        "inventory"
       ],
       "title": "Mode",
+      "type": "string"
+     },
+     "previous_request_id": {
+      "default": "",
+      "description": "The conversation's previous turn, if any",
+      "maxLength": 100,
+      "title": "Previous Request Id",
       "type": "string"
      },
      "question": {
@@ -7114,6 +7135,64 @@
      }
     },
     "summary": "Export Request"
+   }
+  },
+  "/api/requests/{request_id}/stream": {
+   "get": {
+    "description": "Server-sent events: `data:` carries the unvalidated answer written so far whenever it grows, `data: null`\nwithdraws it once cancellation or a lost generation revokes it, then one `done` event when the request\nfinished. Read-only; the validated outcome still comes from the request.",
+    "operationId": "stream_api_requests__request_id__stream_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "request_id",
+      "required": true,
+      "schema": {
+       "title": "Request Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "generation_id",
+      "required": false,
+      "schema": {
+       "default": "",
+       "title": "Generation Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-member",
+      "required": false,
+      "schema": {
+       "default": "owner",
+       "title": "X-Member",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Stream"
    }
   },
   "/api/verify/compare": {

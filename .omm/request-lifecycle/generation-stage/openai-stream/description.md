@@ -1,0 +1,1 @@
+`chat.completions.create(stream=True, stream_options={include_usage: True})` with the strict `rfp_answer` schema. A failure before the stream starts is classified as pre-execution or not by exception type. Once streaming, any `OpenAIError` is never pre-execution, so the attempt becomes unknown.

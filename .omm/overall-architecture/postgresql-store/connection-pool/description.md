@@ -1,0 +1,1 @@
+`postgres.lifecycle` creates one reference-counted `psycopg_pool.ConnectionPool` per target, after a probe connection checks the server version. Every pooled connection is configured with `lock_timeout 5s`, `statement_timeout 60s` and a required pgvector version, and registers the vector type. `open_db` refuses when no lifecycle owns the pool or the DSN changed.

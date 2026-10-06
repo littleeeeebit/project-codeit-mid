@@ -1,0 +1,14 @@
+graph TD
+  connection-pool["Bounded connection pool\nsrc/rfp_assistant/postgres.py"]
+  application-mutex["Global write mutex\nsrc/rfp_assistant/postgres.py"]
+  request-tables["Requests and verifier runs\nsrc/rfp_assistant/store.py"]
+  ledger-tables["Attempts and budget ledger\nsrc/rfp_assistant/store.py"]
+  corpus-tables["Sources, elements, chunks\nsrc/rfp_assistant/store.py"]
+  vector-tables["pgvector embedding sets\nsrc/rfp_assistant/vector_store.py"]
+  control-tables["Activation and validation control\nsrc/rfp_assistant/postgres.py"]
+  connection-pool -->|immediate transactions lock| application-mutex
+  application-mutex -->|serializes request writes| request-tables
+  application-mutex -->|serializes ledger writes| ledger-tables
+  request-tables -->|attempts reference request_id| ledger-tables
+  corpus-tables -->|chunk row_order| vector-tables
+  control-tables -->|active_run and active_index| corpus-tables

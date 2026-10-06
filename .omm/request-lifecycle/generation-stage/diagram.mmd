@@ -1,0 +1,14 @@
+graph TD
+  openai-stream["Provider stream\nsrc/rfp_assistant/generation.py"]
+  drain-loop["Transport drain loop\nsrc/rfp_assistant/generation.py"]
+  partials-map["Partials map\nsrc/rfp_assistant/service.py"]
+  answer-progress["Progress reader\nsrc/rfp_assistant/service.py"]
+  sse-route["SSE route\nsrc/rfp_assistant/api.py"]
+  use-answer-stream["Stream hook\nweb/src/lib/use-answer-stream.ts"]
+  provisional-view["Provisional answer view\nweb/src/components/ask/ask-page.tsx"]
+  openai-stream -->|delta chunks, final usage| drain-loop
+  drain-loop -->|on_delta full content| partials-map
+  answer-progress -->|reads latest content| partials-map
+  sse-route -->|polls every 150 ms| answer-progress
+  sse-route -->|data, null, done events| use-answer-stream
+  use-answer-stream -->|Streamed summary and claims| provisional-view

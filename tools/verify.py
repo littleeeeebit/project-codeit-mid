@@ -340,27 +340,36 @@ def pick_first_document(page) -> None:
 
 
 def current_answer(page):
-    """The answer of the request this screen owns (the history renders its own answers separately)."""
+    """The answer of the conversation's latest turn (earlier turns and the history are labelled apart)."""
     return page.get_by_role("region", name="답변", exact=True)
 
 
-CHIP = re.compile(r"^근거 (E\d+) 원문 보기$")  # a claim's citation chip (aria-label)
+def conversation_pane(page):
+    """The evidence pane the conversation's markers open (the history keeps its own pane per answer)."""
+    return page.get_by_role("complementary", name="대화 근거", exact=True)
 
 
-def open_evidence(scope, page, which: int = -1) -> tuple[str, bool]:
-    """Clicks one citation chip inside `scope` (the last by default: the first is already open) and returns its
-    evidence ID and whether the quote pane of that answer then shows exactly that evidence."""
+def answer_pane(scope):
+    """The evidence pane beside one history answer."""
+    return scope.get_by_role("complementary", name="근거", exact=True)
+
+
+CHIP = re.compile(r"^근거 (\d+) 원문 보기$")  # a sentence's numbered citation marker (aria-label)
+
+
+def open_evidence(scope, pane, which: int = -1) -> tuple[str, bool]:
+    """Clicks one citation marker inside `scope` (the last by default: the first is already open) and returns its
+    number and whether `pane` then shows exactly that evidence."""
     chip = scope.get_by_role("button", name=CHIP).nth(which)
     chip.wait_for(timeout=30000)
-    evidence_id = CHIP.match(chip.get_attribute("aria-label")).group(1)
+    number = CHIP.match(chip.get_attribute("aria-label")).group(1)
     chip.click()
-    return evidence_id, evidence_opened(scope, evidence_id, 15000)
+    return number, evidence_opened(pane, number, 15000)
 
 
-def evidence_opened(scope, evidence_id: str, timeout_ms: int) -> bool:
+def evidence_opened(pane, number: str, timeout_ms: int) -> bool:
     try:
-        pane = scope.get_by_role("complementary", name="근거", exact=True)
-        pane.get_by_role("heading", name=f"원문 인용 {evidence_id}", exact=True).wait_for(timeout=timeout_ms)
+        pane.get_by_role("heading", name=f"근거 {number} 원문 인용", exact=True).wait_for(timeout=timeout_ms)
         pane.locator("blockquote").wait_for(timeout=timeout_ms)
         return True
     except Exception:  # noqa: BLE001
@@ -375,7 +384,7 @@ def wait_text(page, pattern: str, timeout_ms: int = 60000) -> bool:
         return False
 
 
-SUBMIT = re.compile(r"^답변 받기 · 유료 1회$")
+SUBMIT = re.compile(r"^(답변 받기 · 유료 1회|이어서 질문 · 유료 2회)$")  # a first turn, or a follow-up
 
 
 def ask(page, question: str) -> None:
@@ -586,15 +595,14 @@ def consultant_answer(ctx: Context) -> dict:
         out["grounded-answer"] = ctx.act("select the first document and ask", "a settled grounded answer", answer)
 
         def evidence():
-            evidence_id, opened = open_evidence(current_answer(page), page)
+            evidence_id, opened = open_evidence(current_answer(page), conversation_pane(page))
             return opened, f"quote pane {'shows' if opened else 'does not show'} 근거 {evidence_id} after one click"
         out["evidence-first-click"] = ctx.act("click a citation chip once", "the quote pane shows that evidence",
                                               evidence)
 
         def download():
             with page.expect_download(timeout=30000) as info:
-                current_answer(page).get_by_role("complementary", name="근거", exact=True).get_by_role(
-                    "link", name="원문 파일 받기").click()
+                conversation_pane(page).get_by_role("link", name="원문 파일 받기").click()
             path = ctx.work / "download.bin"
             info.value.save_as(path)
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -635,7 +643,7 @@ def request_history(ctx: Context) -> dict:
             entry = page.get_by_role("button", name=re.compile(f"요청 {older} · "))
             entry.click()
             item = entry.locator("xpath=..")  # the entry and the answer it opens share one box
-            evidence_id, opened = open_evidence(item, page)
+            evidence_id, opened = open_evidence(item, answer_pane(item))
             panes = page.get_by_role("complementary", name="근거", exact=True).count()
             return opened, (f"older request {older} opened; its pane shows 근거 {evidence_id} after one click "
                             f"({panes} quote panes on the page)")
@@ -895,7 +903,7 @@ def accessibility(ctx: Context) -> dict:
                 chip = tab_to(lambda i: i["tag"] == "BUTTON" and CHIP.match(i["name"]))
                 if chip:
                     page.keyboard.press("Enter")
-                    opened = evidence_opened(current_answer(page), CHIP.match(chip["name"]).group(1), 15000)
+                    opened = evidence_opened(conversation_pane(page), CHIP.match(chip["name"]).group(1), 15000)
             return bool(pick and box and submit and new and opened), (
                 f"document selected {bool(pick)}; question typed {bool(box)}; submitted {bool(submit)}; "
                 f"request {row['status'] if row else None}; evidence opened {opened}; {len(focused)} Tab stops")

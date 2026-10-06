@@ -1,1 +1,0 @@
-`_finish` with a domain status (`answered`, `insufficient_evidence`, `conflicting_evidence`, `ingestion_unavailable`, `budget_blocked`, …). A `budget_blocked` answer is `completed` with evidence attached and no generation attempt.

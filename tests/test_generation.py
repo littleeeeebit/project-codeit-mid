@@ -176,7 +176,8 @@ class SafetyTest(unittest.TestCase):
 
         def respond(claims, missing=()):
             return ProviderResponse(json.dumps({
-                "status": "answered", "summary": "s", "conflicts": [], "next_action": None,
+                "status": "answered", "summary": "s", "summary_evidence_ids": ["E1"], "conflicts": [],
+                "next_action": None,
                 "claims": [{"text": t, "kind": k, "doc_id": d, "evidence_ids": ids} for t, k, d, ids in claims],
                 "missing_fields": [{"doc_id": d, "field": f, "reason": "not_found_in_context"} for d, f in missing]},
                 ensure_ascii=False), None, "stop", None, None)

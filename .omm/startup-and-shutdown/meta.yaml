@@ -1,8 +1,14 @@
 created: 2026-10-05 04:06:43.527000+00:00
-updated: 2026-10-05 04:06:43.926000+00:00
-update_count: 2
+updated: 2026-10-05T23:55:38.874Z
+update_count: 4
 last_field: diagram
-git_commit: 4d8c212
-git_branch: close-answer-failures-phase5-runner-lint
+git_commit: 467d0b9
+git_branch: chat-multiturn-streaming
 children:
-- controlled-close
+  - controlled-close
+  - database-validation
+  - gateway-claim
+  - restart-recovery
+  - settings-load
+  - transport-setup
+  - uvicorn-lifespan

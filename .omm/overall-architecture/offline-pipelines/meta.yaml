@@ -1,12 +1,19 @@
 created: 2026-10-05 09:51:21.480000+00:00
-updated: 2026-10-05 09:51:21.635000+00:00
-update_count: 2
+updated: 2026-10-05T23:55:22.107Z
+update_count: 4
 last_field: diagram
 kind: nested-class
 title: offline-pipelines
 children:
-- comparison-runner
-- corpus-pipeline
-- embedding-builds
-- evaluation-release
+  - comparison-runner
+  - corpus-ingestion
+  - corpus-pipeline
+  - embedding-build
+  - embedding-builds
+  - evaluation-release
+  - fidelity-and-ocr
+  - gold-and-release
+  - keyword-build
+  - maintenance-sequence
+  - run-activation
 parentPath: []

@@ -1,0 +1,15 @@
+created: 2026-10-05T23:55:26.448Z
+updated: 2026-10-05T23:55:26.781Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: generation-stage
+children:
+  - answer-progress
+  - drain-loop
+  - openai-stream
+  - partials-map
+  - provisional-view
+  - sse-route
+  - use-answer-stream
+parentPath: []

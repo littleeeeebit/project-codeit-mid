@@ -962,6 +962,7 @@ class AnswerRunTest(GoldRetrievalTest):
             by_doc = json.loads(messages[-1]["content"])["evidence_ids_by_doc"]
             return generation.ProviderResponse(json.dumps({
                 "status": "answered", "summary": "s", "missing_fields": [], "conflicts": [], "next_action": None,
+                "summary_evidence_ids": [ids[0] for ids in by_doc.values() if ids][:1],
                 "claims": [{"text": "t", "kind": "source_fact", "doc_id": d, "evidence_ids": ids}
                            for d, ids in by_doc.items() if ids]}), None, "stop",
                 {"prompt_tokens": 100, "completion_tokens": 10}, f"r-{len(transport.calls)}")

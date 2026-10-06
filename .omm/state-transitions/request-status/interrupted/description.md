@@ -1,0 +1,1 @@
+Set by a controlled stop (`RequestRunner.shutdown`; `Resources.close` also calls `recover_requests` when jobs outlive the wait) or by restart recovery under a new gateway owner. A worker that is still running then sees `_stop_reason` = interrupted and starts no new paid stage. Its outcome is stored as history while the status stays interrupted.

@@ -1,8 +1,0 @@
-graph TD
-  backup["Backup\nsrc/rfp_assistant/maintenance.py"] -->|manifest and artifact digest| restore-check["Restore check\nsrc/rfp_assistant/maintenance.py"]
-  restore-check -->|passed on same artifacts| ingest["Manifest and ingest\nsrc/rfp_assistant/maintenance.py"]
-  ingest -->|changed sources| fidelity["HWP fidelity\nsrc/rfp_assistant/maintenance.py"]
-  fidelity -->|verdicts recorded| keyword["Keyword index\nsrc/rfp_assistant/maintenance.py"]
-  keyword -->|rebuilt index version| embedding["New chunk embedding\nsrc/rfp_assistant/maintenance.py"]
-  embedding -->|vectors ready| regression["Regression table\nsrc/rfp_assistant/compare.py"]
-  regression -->|rows and lost questions| report["Status report\nsrc/rfp_assistant/maintenance.py"]

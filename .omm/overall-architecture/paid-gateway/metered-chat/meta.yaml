@@ -1,0 +1,9 @@
+created: 2026-10-05T23:55:17.999Z
+updated: 2026-10-05T23:55:18.000Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: metered-chat
+children: []
+parentPath:
+  - paid-gateway

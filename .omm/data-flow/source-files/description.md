@@ -1,0 +1,1 @@
+`RFP_SOURCE_DIR` (default `<repo>/원본 데이터`) holds `data_list.csv` and `files/`. The README reports 100 CSV associations over 98 active sources. Originals are never modified. `original_download` serves them only after re-hashing.

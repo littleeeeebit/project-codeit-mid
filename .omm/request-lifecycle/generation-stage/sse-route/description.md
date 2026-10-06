@@ -1,0 +1,1 @@
+`/api/requests/{id}/stream` emits `data:` only when the partial changes. A finished request keeps its last text until the outcome replaces it. It sends `event: done` once finished. Headers are `Cache-Control: no-cache` and `X-Accel-Buffering: no`.

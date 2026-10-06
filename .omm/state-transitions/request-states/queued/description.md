@@ -1,1 +1,0 @@
-Inserted by `_create` for paid modes after a slot is taken. Nothing has been reserved. Cancelling here is conclusive: `cancel_request` writes `cancelled` with a 'no paid call' result.

@@ -1,0 +1,9 @@
+created: 2026-10-05T23:55:20.413Z
+updated: 2026-10-05T23:55:20.597Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: application-mutex
+children: []
+parentPath:
+  - postgresql-store

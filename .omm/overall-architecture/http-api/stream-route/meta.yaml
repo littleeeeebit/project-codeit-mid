@@ -1,0 +1,9 @@
+created: 2026-10-05T23:55:10.369Z
+updated: 2026-10-05T23:55:10.688Z
+update_count: 2
+last_field: concern
+kind: nested-class
+title: stream-route
+children: []
+parentPath:
+  - http-api

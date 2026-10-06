@@ -1,10 +1,19 @@
 graph TD
-  originals["Originals and CSV manifest\nsrc/rfp_assistant/ingestion.py"] -->|parse changed inputs| extraction["Extractions and elements\nsrc/rfp_assistant/ingestion.py"]
-  extraction -->|Hancom print comparison| fidelity-check["Fidelity verdicts\nsrc/rfp_assistant/fidelity.py"]
-  fidelity-check -->|review_status filter| keyword-index["Keyword index build\nsrc/rfp_assistant/retrieval.py"]
-  extraction -->|elements chunked by profile| keyword-index
-  keyword-index -->|chunk payloads| embedding-sets["Embedding sets\nsrc/rfp_assistant/vector_store.py"]
-  gold-datasets["Gold datasets\nsrc/rfp_assistant/gold.py"] -->|graded questions| run-selection["Runs and activation\nsrc/rfp_assistant/compare.py"]
-  keyword-index -->|frozen index version| run-selection
-  embedding-sets -->|dense_version| run-selection
-  run-selection -->|active_run setting| served-answers["Served answers\nsrc/rfp_assistant/service.py"]
+  source-files["Original files and CSV\nsrc/rfp_assistant/ingestion.py"]
+  manifest-import["Manifest import\nsrc/rfp_assistant/ingestion.py"]
+  ingestion-parse["Parse, OCR merge, diagnose\nsrc/rfp_assistant/ingestion.py"]
+  extraction-store["Extraction revisions\nsrc/rfp_assistant/store.py"]
+  keyword-index-build["Keyword index build\nsrc/rfp_assistant/retrieval.py"]
+  vector-sets["Embedding vector sets\nsrc/rfp_assistant/vector_store.py"]
+  gold-dataset["Gold question datasets\nsrc/rfp_assistant/gold.py"]
+  retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation.py"]
+  serving-pointer["Serving activation pointer\nsrc/rfp_assistant/service.py"]
+  source-files -->|CSV rows and file hashes| manifest-import
+  manifest-import -->|sources and documents rows| ingestion-parse
+  ingestion-parse -->|elements and artifact| extraction-store
+  extraction-store -->|chunk profiles| keyword-index-build
+  keyword-index-build -->|unique payloads| vector-sets
+  keyword-index-build -->|index manifest| retrieval-runs
+  vector-sets -->|verified dense matrix| retrieval-runs
+  gold-dataset -->|reviewed questions and spans| retrieval-runs
+  retrieval-runs -->|person activates| serving-pointer

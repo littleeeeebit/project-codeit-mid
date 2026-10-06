@@ -1,0 +1,1 @@
+See overall-architecture/offline-pipelines/corpus-ingestion. Each result and its diagnostics (`short_output`, `no_tables`, `thin_tail`, `blank_pages`, `replacement_characters` and others) go to `.runtime/reports/ingest-*.json`. Diagnostics never mark a source reviewed.

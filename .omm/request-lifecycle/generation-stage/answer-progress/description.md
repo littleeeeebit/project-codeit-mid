@@ -1,0 +1,1 @@
+`service.answer_progress(member, request_id, generation_id)` authorizes through `request_status`. It returns `finished` (status not queued or running) and `partial`. The partial is set only while the request is running, not cancel-requested, and owned by that `generation_id`; otherwise it is None, which withdraws the text.

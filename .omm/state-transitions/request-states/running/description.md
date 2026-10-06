@@ -1,1 +1,0 @@
-Set by the atomic claim in `run_queued`, or at insert for free modes and for the synchronous `answer()` used by evaluation. Cancelling only sets `cancel_requested=1`: the next `_checkpoint` or dispatch guard stops further paid stages, and a call already dispatched still settles.

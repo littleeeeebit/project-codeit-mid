@@ -1,0 +1,14 @@
+created: 2026-10-05T23:55:31.294Z
+updated: 2026-10-05T23:55:31.604Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: attempt-billing
+children:
+  - dispatching
+  - reconciled
+  - released
+  - reserved
+  - settled
+  - unknown
+parentPath: []

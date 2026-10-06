@@ -1,1 +1,0 @@
-The data that grades every run: development gold (`dev`, `dev-pilot`), the sealed `test` split, and the judge golden set. Labels are evidence groups of source spans (hash, extraction, element, offsets, exact quote), never chunk IDs.

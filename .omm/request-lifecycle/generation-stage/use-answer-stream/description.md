@@ -1,0 +1,1 @@
+Opened by `TurnView` only while the turn is live, not revoked, and in a paid mode. Its key is `request_id/generation_id`, and a key change aborts the fetch and drops late events. `done` reloads the status poll.

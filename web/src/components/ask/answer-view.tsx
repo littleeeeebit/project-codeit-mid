@@ -1,56 +1,44 @@
 "use client";
 
-// The answer layout the user picked on 2026-10-02 (DESIGN.md, 질문하기): numbered claims with citation chips on
-// the left, the opened quote in a sticky pane on the right.
+// The answer as sentences that each end with numbered citation markers (DESIGN.md, 질문하기 대화). A marker opens
+// its quote, neighbouring text and the original in an evidence pane: the conversation's shared pane, or the pane
+// AnswerView keeps beside one answer in the history and on 검증.
 
 import { useState } from "react";
 import { cn } from "cn";
 import type { Answer, RequestView } from "@/lib/api";
 import {
-  Chips, citedInOrder, ConflictTable, docLabel, EvidenceDetail, FactsTable, InventoryTable, MissingTable, NextAction,
-  RequestFooter, StateHead,
+  type Cite, citationNumbers, citedInOrder, ConflictTable, docLabel, EvidenceDetail, FactsTable, InventoryTable,
+  MissingTable, NextAction, RequestFooter, Sentences, StateHead,
 } from "./answer-parts";
-import { StatusBadge } from "@/components/status-badge";
+
+export function AnswerBody({ view, answer, cite }: { view: RequestView; answer: Answer; cite: Cite }) {
+  return (
+    <div className="space-y-6">
+      <StateHead answer={answer} cite={cite} />
+      <Sentences claims={answer.claims} cite={cite}
+                 labelOf={(d) => (answer.mode === "compare" ? docLabel(answer, d) : "")} />
+      <FactsTable answer={answer} />
+      <InventoryTable answer={answer} onCite={(id) => cite.onCite?.(id)} />
+      <ConflictTable answer={answer} cite={cite} />
+      <MissingTable answer={answer} />
+      <NextAction answer={answer} />
+      <RequestFooter view={view} />
+    </div>
+  );
+}
 
 export function AnswerView({ view, answer }: { view: RequestView; answer: Answer }) {
-  const [open, setOpen] = useState<string | null>(citedInOrder(answer)[0] ?? null);
-  const hasEvidence = Object.keys(answer.evidence).length > 0;  // basic information cites nothing: no empty pane
+  const order = citedInOrder(answer);
+  const [open, setOpen] = useState<string | null>(order[0] ?? null);
+  const numbers = citationNumbers(order);
   return (
-    <div className={cn("grid gap-8", hasEvidence && "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]")}>
-      <div className="space-y-6">
-        <StateHead answer={answer} />
-        {answer.claims.length > 0 && (
-          <section className="space-y-4" aria-label="답변 내용">
-            <h3 className="text-lg font-bold">답변 내용 <span className="text-sm font-medium text-muted-foreground">{answer.claims.length}개 항목</span></h3>
-            <ol className="divide-y divide-input rounded-xl border border-input bg-background">
-              {answer.claims.map((c, i) => (
-                <li key={i} className="flex gap-3 p-4">
-                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-accent text-sm font-bold text-primary tabular-nums">{i + 1}</span>
-                  <div className="min-w-0 space-y-3">
-                    <p className="text-base">{c.text}</p>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {c.kind === "inference" ? <StatusBadge tone="warn">추론</StatusBadge> : <span className="text-xs font-medium text-muted-foreground">원문 사실</span>}
-                      {docLabel(answer, c.doc_id) && <span className="text-xs font-semibold">{docLabel(answer, c.doc_id)}</span>}
-                      <Chips answer={answer} ids={c.evidence_ids} onCite={setOpen} active={open} />
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </section>
-        )}
-        <FactsTable answer={answer} />
-        <InventoryTable answer={answer} onCite={setOpen} />
-        <ConflictTable answer={answer} onCite={setOpen} />
-        <MissingTable answer={answer} />
-        <NextAction answer={answer} />
-        <RequestFooter view={view} />
-      </div>
-      {hasEvidence && (
+    <div className={cn("grid gap-8", order.length && "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]")}>
+      <AnswerBody view={view} answer={answer} cite={{ numbers, active: open, onCite: setOpen }} />
+      {order.length > 0 && (  // basic information cites nothing: no empty pane
         <aside aria-label="근거" className="lg:sticky lg:top-20 lg:self-start">
           <div className="rounded-2xl border border-input bg-background p-5">
-            {open ? <EvidenceDetail requestId={answer.request_id} evidenceId={open} />
-              : <p className="text-sm text-muted-foreground">근거 번호를 누르면 원문 인용과 주변 내용이 여기에 열립니다.</p>}
+            <EvidenceDetail requestId={answer.request_id} evidenceId={open} number={open ? numbers.get(open) : undefined} />
           </div>
         </aside>
       )}

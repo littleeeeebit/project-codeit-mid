@@ -1,0 +1,1 @@
+Opening and closing the serving process change behavior, because ownership and recovery decide whether unfinished paid work can be trusted. Construction refuses unsafe databases, claims the single gateway and conservatively recovers whatever a previous process left. Close rejects new work, waits a bounded time, records what is unfinished and releases ownership.

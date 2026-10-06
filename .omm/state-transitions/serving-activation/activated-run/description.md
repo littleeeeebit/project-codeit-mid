@@ -1,1 +1,0 @@
-The JSON written by `serving_config(run_id, config)`: mode, index_version, dense_version, embedding model/dims, reranker {model, revision, depth, protect, max_length, max_concurrency, precision}, limits (including `corpus_route`), `eval_version`, `activated_at` and `finalist_run_id`. `Resources.run_settings` applies it.

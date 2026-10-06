@@ -1,33 +1,37 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-05 21:24:01.789000+00:00
-update_count: 10
+updated: 2026-10-05 23:55:33.951000+00:00
+update_count: 12
 last_field: diagram
-git_commit: 797b897
-git_branch: judge-set-and-maintenance
+git_commit: 467d0b9
+git_branch: chat-multiturn-streaming
 children:
 - activation
 - corpus-ingestion
-- embedding-sets
 - extraction
+- extraction-store
 - fidelity-check
-- gold-datasets
+- gold-dataset
 - index-build
-- keyword-index
-- keyword-indexing
+- ingestion-parse
+- keyword-index-build
+- manifest-import
 - ocr-merge
 - original-corpus
-- originals
+- retrieval-runs
 - retrieval-selection
 - run-selection
-- served-answers
-prev_diagram: "graph TD\r\n  original-files[\"Original files\\n원본 데이터/files\"] -->|\"\
-  ingest parses\"| extraction-artifacts[\"Extraction artifacts\\nsrc/rfp_assistant/ingestion.py\"\
-  ]\r\n  extraction-artifacts -->|\"build-keyword chunks\"| keyword-index-files[\"\
-  Keyword index files\\nsrc/rfp_assistant/retrieval.py\"]\r\n  keyword-index-files\
-  \ -->|\"payload hashes embedded\"| embedding-sets[\"Embedding sets\\nsrc/rfp_assistant/vector_store.py\"\
-  ]\r\n  embedding-sets -->|\"measured by compare\"| retrieval-runs[\"Retrieval runs\\\
-  nsrc/rfp_assistant/evaluation.py\"]\r\n  gold-datasets[\"Gold datasets\\nsrc/rfp_assistant/gold.py\"\
-  ] -->|\"pinned spans scored\"| retrieval-runs\r\n  retrieval-runs -->|\"activate\
-  \ writes pointer\"| serving-pointer[\"Serving pointer\\nsrc/rfp_assistant/store.py\"\
-  ]\r\n  serving-pointer -->|\"per-request config\"| request-records[\"Request records\\\
-  nsrc/rfp_assistant/service.py\"]"
+- serving-pointer
+- source-files
+- vector-sets
+prev_diagram: "graph TD\r\n  originals[\"Originals and CSV manifest\\nsrc/rfp_assistant/ingestion.py\"\
+  ] -->|parse changed inputs| extraction[\"Extractions and elements\\nsrc/rfp_assistant/ingestion.py\"\
+  ]\r\n  extraction -->|Hancom print comparison| fidelity-check[\"Fidelity verdicts\\\
+  nsrc/rfp_assistant/fidelity.py\"]\r\n  fidelity-check -->|review_status filter|\
+  \ keyword-index[\"Keyword index build\\nsrc/rfp_assistant/retrieval.py\"]\r\n  extraction\
+  \ -->|elements chunked by profile| keyword-index\r\n  keyword-index -->|chunk payloads|\
+  \ embedding-sets[\"Embedding sets\\nsrc/rfp_assistant/vector_store.py\"]\r\n  gold-datasets[\"\
+  Gold datasets\\nsrc/rfp_assistant/gold.py\"] -->|graded questions| run-selection[\"\
+  Runs and activation\\nsrc/rfp_assistant/compare.py\"]\r\n  keyword-index -->|frozen\
+  \ index version| run-selection\r\n  embedding-sets -->|dense_version| run-selection\r\
+  \n  run-selection -->|active_run setting| served-answers[\"Served answers\\nsrc/rfp_assistant/service.py\"\
+  ]"

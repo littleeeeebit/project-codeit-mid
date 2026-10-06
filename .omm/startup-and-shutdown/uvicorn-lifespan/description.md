@@ -1,0 +1,1 @@
+`create_app`'s lifespan builds `get_resources(load_settings())` once per process and closes it on exit. `Resources` also registers `close` with `threading._register_atexit` (which runs before the executor's own join) and with `atexit`, so a SIGINT/SIGTERM stop reaches workers before their next paid stage.

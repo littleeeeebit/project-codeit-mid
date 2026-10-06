@@ -1,0 +1,1 @@
+`app_settings.active_run`/`active_index`, read by `active_serving` on every `Resources.serving()` call. The process reloads the keyword index or dense matrix lazily when the version changes, so activation takes effect without a restart. GPU models not used by the new activation are retired on the next retrieval (`retire_inactive`).

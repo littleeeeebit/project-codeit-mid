@@ -1,1 +1,0 @@
-Adds the golden counts (judge set, live approved development rows). `run()` then records the final status, serving before and after, provider attempts by the maintenance members since the start (OpenAI `owner-compare` plus Gemini), and `reused`.

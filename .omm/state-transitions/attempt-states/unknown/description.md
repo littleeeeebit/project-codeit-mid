@@ -1,1 +1,0 @@
-A timeout, connection loss, 5xx, missing usage or failed settlement. It keeps its reservation as pending. While any unknown attempt exists, `mark_dispatching` refuses every PostgreSQL dispatch, `build-dense` refuses, and answer and judge runs stop with `unknown_billing`.

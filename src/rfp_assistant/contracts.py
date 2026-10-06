@@ -68,6 +68,7 @@ class AnswerRequest:
     as_of: str = ""
     config_id: str = "default"
     verifier_run_id: str = ""  # generate from this frozen verifier run's evidence (its config_id is then implied)
+    previous_request_id: str = ""  # the conversation's previous turn: same member and scope, already finished
 
 
 @dataclass
@@ -89,6 +90,8 @@ class AnswerResult:
     inventory: dict | None = None  # inventory mode: structured requirements and the completeness declaration
     coverage: list[dict] = field(default_factory=list)  # per selected document: evidence count or limitation
     limitations: list[str] = field(default_factory=list)
+    summary_evidence_ids: list[str] = field(default_factory=list)
+    standalone_question: str = ""  # a follow-up rewritten from the conversation; what retrieval and the answer used
 
 
 REQUEST_STATUSES = ("queued", "running", "completed", "failed", "cancelled", "interrupted")
@@ -202,6 +205,7 @@ class Conflict(_Strict):
 class AnswerPayload(_Strict):
     status: Literal["answered", "insufficient_evidence", "clarification_required", "conflicting_evidence"]
     summary: str
+    summary_evidence_ids: list[str] = []  # required in the provider schema; the default reads older stored outputs
     claims: list[Claim]
     missing_fields: list[MissingField]
     conflicts: list[Conflict]

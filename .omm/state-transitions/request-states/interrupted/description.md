@@ -1,1 +1,0 @@
-Written by `RequestRunner.shutdown` (queued always; running only if workers did not finish in time), by `recover_requests` on a fresh gateway owner, or kept by `_finish` when the row is no longer running. It is never re-executed automatically; the page shows the restart note.

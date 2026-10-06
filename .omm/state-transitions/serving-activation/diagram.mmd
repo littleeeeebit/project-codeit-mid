@@ -1,7 +1,0 @@
-graph TD
-  keyword-default["Keyword default\nsrc/rfp_assistant/service.py"] -->|activate_decision| activated-run["Activated run\nsrc/rfp_assistant/evaluation.py"]
-  activated-run -->|another activation| activated-run
-  activated-run -->|corpus route rule changed| route-stale["Stale route fallback\nsrc/rfp_assistant/service.py"]
-  route-stale -->|serves as| keyword-default
-  activated-run -->|EVAL_VERSION changed| reranker-dropped["Hybrid without reranker\nsrc/rfp_assistant/service.py"]
-  activated-run -->|matrix or vector missing| request-fallback["Per-request fallback\nsrc/rfp_assistant/retrieval.py"]
