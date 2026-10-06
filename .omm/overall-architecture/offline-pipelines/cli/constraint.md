@@ -1,1 +1,1 @@
-Commands are the owner's interface, and every write takes `--actor` and a reason. Only the CLI administers the budget; the UI changes only the cap and the per-browser key.
+Commands are the owner's interface. Every budget write is attributed, but not every one takes `--actor`: `reconcile` reads its reason from the record and records `owner-cli`, and `configure-budget` records `owner-cli` in the settings history (options per command: owner-cli/budget-admin). Only the CLI administers the budget; the UI changes only the cap, the per-browser key and its answer model.

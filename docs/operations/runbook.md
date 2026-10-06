@@ -167,12 +167,14 @@ An `unknown` attempt holds its full reservation until evidence arrives. There is
     "interval_end": "2026-10-01T23:59:59+00:00", "provider_total_micro_usd": 412345,
     "scope": "<provider project, e.g. proj_abc123>", "evidence": "<dated export file or dashboard capture>",
     "covered_attempt_ids": ["<unknown attempt dispatched inside the interval>"],
-    "unscoped_attempts": "include"}
+    "unscoped_attempts": "include", "reason": "<why>"}
    ```
 
    ```powershell
    python -m rfp_assistant.cli reconcile --file C:\abs\reconcile-2026-10-01.json
    ```
+
+   `reconcile` takes only `--file`. Its audit event is recorded as `owner-cli` with the record's `reason` (default `provider reconciliation`).
 
    The adjustment is the provider total minus the local settled cost billed to that project in the same interval. Each attempt records the OpenAI project of the key that paid for it (the `openai-project` header the 설정 key check returns), so one member's project total never cancels spending billed to another member's project. Attempts with no recorded project were paid with the server-environment key; that is every attempt before 2026-10-06 and CLI work. `unscoped_attempts` says whether they belong to this scope (`include`) or not (`exclude`). An interval that holds such attempts is refused without it. Covered `unknown` attempts follow the same rule: each must be billed to the reconciled project, or be unscoped with `unscoped_attempts` set to `include`. Otherwise the import is refused, because one project's evidence cannot resolve another project's bill. Evaluation runs started from 검증 answer with the model their estimate and `config.json` record (`gpt-6-luna`), whatever answer model the starting browser chose; that browser's key and project still pay for them. Covered attempts must be `unknown` and dispatched inside the interval; they move to `reconciled`. Re-importing the same record is harmless. The same ID with a different total is refused, so a changed provider total needs an owner correction. Late usage for a covered attempt settles it and adds one compensating negative adjustment (`late-settlement:<attempt>`).
 3. Spend outside the gateway (a notebook, a direct key): record it on the admin page under 외부 사용 조정, with a unique key, the amount, evidence and a reason. A key cannot be applied twice.
