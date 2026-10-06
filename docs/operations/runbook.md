@@ -51,8 +51,10 @@ Machine type. On 2026-10-06, before choosing the host, the owner host's `bidmate
 Reaching it. No login, no Google sign-in. Each member connects with their own existing SSH key and keeps this open while using the app:
 
 ```sh
-ssh -N -L 8501:127.0.0.1:8501 <your username>@35.255.64.243
+ssh -i <your private key> -N -L 8501:127.0.0.1:8501 <your username>@35.255.64.243
 ```
+
+`-i` can be dropped only when the key has one of ssh's default names (`~/.ssh/id_ed25519`, `id_rsa`, …); otherwise the server answers `Permission denied (publickey)`. A key that gcloud created is `~/.ssh/google_compute_engine` (the owner's, in PowerShell: `-i $HOME\.ssh\google_compute_engine`). If something on the member's PC already uses 8501, forward another local port (`-L 8502:127.0.0.1:8501`) and open that one.
 
 Then open <http://127.0.0.1:8501>: 질문하기, 검증 and 데이터셋 만들기. Whoever can SSH into `codeit` can spend the allowance and use admin pages; that list is the access control.
 
