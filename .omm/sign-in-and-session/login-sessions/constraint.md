@@ -1,0 +1,1 @@
+Sessions live only in process memory, so a service restart signs everyone out.

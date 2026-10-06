@@ -1,39 +1,37 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-06 12:38:04.974000+00:00
-update_count: 26
+updated: 2026-10-06 22:40:25.308000+00:00
+update_count: 28
 last_field: diagram
-git_commit: 9a90e7f
-git_branch: split-src-into-layer-packages
+git_commit: '8486353'
+git_branch: web-login-jupyterhub-oauth
 children:
 - activation
+- cited-evidence
 - corpus-ingestion
-- embedding-sets
+- dense-build
 - extraction
-- extraction-artifacts
+- extractions
 - fidelity-and-ocr
 - fidelity-check
 - fidelity-ocr
 - frozen-runs
-- gold-datasets
 - index-build
-- keyword-index-build
+- keyword-build
 - ocr-merge
 - original-corpus
 - original-files
 - originals
-- request-records
+- retrieval-runs
 - retrieval-selection
 - run-selection
 - source-originals
-prev_diagram: "graph TD\r\n  source-originals[\"Originals and CSV manifest\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ] -->|\"sha256 and document rows\"| ingestion[\"Parse and revision\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  ingestion -->|\"elements vs printed PDF\"| fidelity-and-ocr[\"Fidelity and\
-  \ OCR\\nsrc/rfp_assistant/corpus/fidelity.py\"]\r\n  fidelity-and-ocr -->|\"review\
-  \ status, image text\"| keyword-index-build[\"Keyword index build\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  keyword-index-build -->|\"chunk payloads\"| embedding-sets[\"Embedding sets\\\
-  nsrc/rfp_assistant/retrieval/dense.py\"]\r\n  keyword-index-build -->|\"index version\"\
-  | evaluation-runs[\"Frozen runs and matrices\\nsrc/rfp_assistant/evaluation/compare.py\"\
-  ]\r\n  embedding-sets -->|\"dense version\"| evaluation-runs\r\n  gold-review[\"\
-  Gold drafting and review\\nsrc/rfp_assistant/evaluation/gold.py\"] -->|\"approved\
-  \ dataset rows\"| evaluation-runs\r\n  evaluation-runs -->|\"person picks a row\"\
-  | activation[\"Activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"]"
+prev_diagram: "graph TD\r\n  original-files[\"Original files\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ] -->|\"manifest then ingest\"| extraction-artifacts[\"Extraction artifacts\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  extraction-artifacts -->|\"build-keyword chunks\"| keyword-index-build[\"\
+  Keyword index build\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  keyword-index-build\
+  \ -->|\"payload hashes embedded\"| embedding-sets[\"pgvector sets\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
+  ]\r\n  gold-datasets[\"Gold datasets\\nsrc/rfp_assistant/evaluation/gold.py\"] -->|\"\
+  reviewed dev rows\"| frozen-runs[\"Frozen runs\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
+  ]\r\n  keyword-index-build -->|\"index manifest bound\"| frozen-runs\r\n  embedding-sets\
+  \ -->|\"dense_version bound\"| frozen-runs\r\n  frozen-runs -->|\"activate-run decision\"\
+  | request-records[\"Request records\\nsrc/rfp_assistant/service/service.py\"]"

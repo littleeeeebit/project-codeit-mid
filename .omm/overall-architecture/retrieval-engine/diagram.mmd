@@ -1,7 +1,14 @@
 graph TD
-  serving-config["Serving config\nsrc/rfp_assistant/service/service.py"] -->|"mode, limits, versions"| lexical-ranking["Lexical ranking\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval/retrieval.py"] -->|"BM25 rows, scope terms"| lexical-ranking
-  serving-config -->|"embedding model, dims"| dense-search["Dense search\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  lexical-ranking -->|"BM25 top k"| fusion-rerank["Fusion and rerank\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  dense-search -->|"cosine top k"| fusion-rerank
-  fusion-rerank -->|"ordered chunk rows"| evidence-packing["Evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  serving-config["Active serving config\nsrc/rfp_assistant/service/service.py"]
+  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  lexical-ranking["Kiwi BM25 ranking\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  dense-search["pgvector dense search\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  fusion-rerank["RRF fusion and reranker\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  evidence-packer["Evidence packer\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  serving-config -->|selects index version| keyword-index
+  serving-config -->|selects dense set, limits| dense-search
+  keyword-index -->|scoped rows| lexical-ranking
+  lexical-ranking -->|BM25 candidates| fusion-rerank
+  dense-search -->|cosine candidates| fusion-rerank
+  fusion-rerank -->|ranked chunk ids| evidence-packer
+  keyword-index -->|chunk bodies, spans| evidence-packer

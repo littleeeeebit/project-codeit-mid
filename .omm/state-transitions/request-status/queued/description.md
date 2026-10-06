@@ -1,1 +1,0 @@
-Inserted by `_create` after admission. The only transitions out are the worker claim, `cancel_request` (writes a cancelled `result_json`), `RequestRunner.shutdown` and `recover_requests`. A queued request has never reserved budget.

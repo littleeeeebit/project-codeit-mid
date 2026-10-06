@@ -1,0 +1,1 @@
+evaluation/compare.py internals were not read; this is based on the README and the `service.experiments` reader.

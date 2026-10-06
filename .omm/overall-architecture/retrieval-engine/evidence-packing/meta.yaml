@@ -1,9 +1,0 @@
-created: 2026-10-06T10:18:11.641Z
-updated: 2026-10-06T12:37:56.004Z
-update_count: 2
-last_field: description
-kind: nested-class
-title: evidence-packing
-children: []
-parentPath:
-  - retrieval-engine

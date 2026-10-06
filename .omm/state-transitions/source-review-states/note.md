@@ -1,0 +1,1 @@
+fidelity.py and the review-precedence logic were not read directly; precedence is taken from the README and the `record_review` call site.

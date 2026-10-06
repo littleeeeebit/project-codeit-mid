@@ -1,0 +1,1 @@
+No cost. Reached via `release` (provider unavailable, or a confirmed pre-execution error), via a refusing guard inside `mark_dispatching` (`stopped_before_dispatch:<reason>`), or via startup recovery of attempts that never dispatched.

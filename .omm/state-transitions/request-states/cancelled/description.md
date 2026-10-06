@@ -1,0 +1,1 @@
+Set by `cancel_request` on a queued row (with a 'cancelled' result and no paid call), or by `_finish` when a running request with `cancel_requested` completes or stops at a checkpoint. `abandon_request` (from the screen leaving a conversation) cancels only queued rows.

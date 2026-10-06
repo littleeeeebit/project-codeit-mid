@@ -1,0 +1,1 @@
+Answer evaluation and judge runs use the same process gateway as live members and the same global zero-unknown dispatch rule, so a timeout inside an evaluation also blocks member answers until it is reconciled.

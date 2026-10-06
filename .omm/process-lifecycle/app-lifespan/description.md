@@ -1,0 +1,1 @@
+The `create_app` lifespan sets `app.state.res = service.app_resources()` on startup and calls `res.close()` on shutdown. `app.state.login = Login.from_env()` is evaluated when the app is created. Tests inject `resources` and `login` instead.

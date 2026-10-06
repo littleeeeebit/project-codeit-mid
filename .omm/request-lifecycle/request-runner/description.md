@@ -1,0 +1,1 @@
+`run_queued(res, request_id)` claims the row with `UPDATE ... SET status='running' WHERE status='queued' AND cancel_requested=0`, so a request is claimed at most once and a cancelled one never starts. It rebuilds `AnswerRequest` and `Principal` from `request_json` and calls `_execute`. Workers receive only request ids and never touch UI state.

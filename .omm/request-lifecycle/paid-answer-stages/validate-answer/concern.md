@@ -1,0 +1,1 @@
+`_stored_quote` scans `idx.chunks` linearly for each evidence unit (about 19k chunks per README) on every validation and carried-evidence check. This is acceptable at 10 units, but it is O(units × chunks).

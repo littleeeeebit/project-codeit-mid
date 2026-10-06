@@ -1,0 +1,1 @@
+On mount, `sign-in.tsx` calls GET /api/auth/me. On success it calls `bindAccount(data.name)` before any inner screen renders, so every later call carries `X-BidMate-Account`. A 401 makes the `expired` middleware in api.ts call `window.location.replace('/api/auth/login')`. Sign-out POSTs /api/auth/logout. `Me.local` hides sign-out under `BIDMATE_LOCAL_MEMBER`.

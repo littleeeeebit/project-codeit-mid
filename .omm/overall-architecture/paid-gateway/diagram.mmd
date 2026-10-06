@@ -1,7 +1,13 @@
 graph TD
-  metered-call["Metered call\nsrc/rfp_assistant/service/service.py"] -->|"reserve max cost"| budget-ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"]
-  metered-call -->|"chat with on_delta"| provider-transport["Provider transport\nsrc/rfp_assistant/gateway/generation.py"]
-  budget-ledger -->|"owner_guard in transaction"| gateway-owner["Gateway owner lock\nsrc/rfp_assistant/storage/postgres.py"]
-  provider-transport -->|"owner check before call"| gateway-owner
-  metered-call -->|"generation span, usage, cost"| langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
-  metered-call -->|"validate structured output"| answer-validation["Answer validation\nsrc/rfp_assistant/gateway/generation.py"]
+  metered-call["Metered call wrapper\nsrc/rfp_assistant/service/service.py"]
+  budget-ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"]
+  gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
+  openai-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
+  key-sessions["Member key sessions\nsrc/rfp_assistant/service/service.py"]
+  tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
+  metered-call -->|reserve, dispatch, settle| budget-ledger
+  budget-ledger -->|owner_guard in transaction| gateway-owner
+  metered-call -->|chat or embed| openai-transport
+  openai-transport -->|client per KEY_SESSION| key-sessions
+  openai-transport -->|owner check before call| gateway-owner
+  metered-call -->|generation span, usage, cost| tracing

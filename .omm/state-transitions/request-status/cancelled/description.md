@@ -1,1 +1,0 @@
-Either immediate (queued, through `cancel_request`) or deferred: running with `cancel_requested=1`, then `_Stop("cancelled")` at the next checkpoint, or `_finish` converting a completed outcome. A cancelled request never attaches (`may_attach`), but an already dispatched call still settles.

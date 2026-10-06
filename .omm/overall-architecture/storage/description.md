@@ -1,0 +1,1 @@
+PostgreSQL is the only database. The application uses `bidmate_app`; `bidmate_pilot_archive` holds the phase-4 pilot data apart from the live ledger. Immutable artifacts live under `RFP_DATA_DIR` (`.runtime/`). Rows record absolute host paths, which `host_path` remaps via `RFP_PATH_MAP` so a Windows-written database can be served on Linux.

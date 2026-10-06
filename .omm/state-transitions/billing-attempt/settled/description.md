@@ -1,1 +1,0 @@
-`budget.settle` runs exactly once per attempt; a duplicate returns `duplicate=True`. A cost above the reservation sets `budget_settings.frozen_reason`, which blocks all further admission until inspected. Settling a reconciled attempt inserts a `late-settlement:` negative adjustment so the provider total is not double-counted.

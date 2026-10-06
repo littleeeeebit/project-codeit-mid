@@ -1,0 +1,1 @@
+The partial text is unvalidated. The UI labels it provisional, and only `result` from the status endpoint is the validated answer.

@@ -1,0 +1,1 @@
+`Hub.username(code)` POSTs `grant_type=authorization_code` to `{api_url}/hub/api/oauth2/token`, then GETs `{api_url}/hub/api/user` with the bearer token, using a 10 s timeout. Only the `name` field is used.

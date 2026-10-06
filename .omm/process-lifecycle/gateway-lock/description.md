@@ -1,0 +1,1 @@
+`Resources._own` → `postgres.gateway_lock` → `GatewayOwner` (`pg_try_advisory_lock`). A second process gets `LockHeld` → `GatewayLockError('another process already owns the paid gateway for this database')`. Additional `Resources` in the same process borrow the owner instead of re-locking.

@@ -1,1 +1,0 @@
-`RequestRunner._run` calls `run_queued`, whose atomic `UPDATE ... SET status='running' WHERE status='queued' AND cancel_requested = 0` makes a request claimed exactly once. A request cancelled while queued is never claimed. The worker rebuilds the `AnswerRequest` and `Principal` from the persisted `request_json` snapshot, never from UI state, and calls `_execute`.

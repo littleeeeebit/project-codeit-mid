@@ -1,0 +1,13 @@
+graph TD
+  connection-pool["Connection pool\nsrc/rfp_assistant/storage/postgres.py"]
+  startup-guard["Validated-import guard\nsrc/rfp_assistant/storage/postgres.py"]
+  app-tables["Schema and write mutex\nsrc/rfp_assistant/storage/store.py"]
+  runtime-files["Runtime artifacts\nsrc/rfp_assistant/storage/store.py"]
+  backup-restore["Backup and restore-check\nsrc/rfp_assistant/storage/postgres_backup.py"]
+  maintenance["Maintenance sequence\nsrc/rfp_assistant/storage/maintenance.py"]
+  startup-guard -->|reads import markers| connection-pool
+  startup-guard -->|hashes referenced artifacts| runtime-files
+  app-tables -->|transactions through| connection-pool
+  maintenance -->|backup then restore check| backup-restore
+  maintenance -->|ingest, index, embed| runtime-files
+  backup-restore -->|dump, staged restore| connection-pool

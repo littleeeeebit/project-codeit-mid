@@ -1,0 +1,9 @@
+created: 2026-10-06T22:40:21.191Z
+updated: 2026-10-06T22:40:21.313Z
+update_count: 2
+last_field: concern
+kind: nested-class
+title: validate-answer
+children: []
+parentPath:
+  - paid-answer-stages

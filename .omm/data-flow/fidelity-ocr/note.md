@@ -1,0 +1,1 @@
+The internals of corpus/fidelity.py and corpus/ocr.py (PaddleOCR-VL with a Gemini fallback under a separate $0.50 cap) were not read. That behavior is taken from the README.

@@ -1,8 +1,13 @@
 graph TD
-  resources["Resources owner\nsrc/rfp_assistant/service/service.py"] -->|"creates on first paid ask"| request-runner["RequestRunner executor\nsrc/rfp_assistant/service/service.py"]
-  request-runner -->|"run_queued(request_id)"| answer-pipeline["Answer pipeline\nsrc/rfp_assistant/service/service.py"]
-  resources -->|"lends index, transport, tracing"| answer-pipeline
-  answer-pipeline -->|"metadata or inventory mode"| free-answers["Free answers\nsrc/rfp_assistant/service/service.py"]
-  verifier-runs["Verifier runs\nsrc/rfp_assistant/service/service.py"] -->|"generate_from_run submits"| request-runner
-  resources -->|"registers and joins threads"| background-jobs["Background jobs\nsrc/rfp_assistant/service/service.py"]
-  background-jobs -->|"PinnedResources answer rows"| answer-pipeline
+  resources["Process resources\nsrc/rfp_assistant/service/service.py"]
+  request-runner["Bounded request executor\nsrc/rfp_assistant/service/service.py"]
+  answer-pipeline["Answer execution\nsrc/rfp_assistant/service/service.py"]
+  verifier-runs["Frozen verifier runs\nsrc/rfp_assistant/service/service.py"]
+  background-jobs["Paid background jobs\nsrc/rfp_assistant/service/drafting.py"]
+  gold-review["Gold review queue\nsrc/rfp_assistant/evaluation/gold.py"]
+  resources -->|lazily creates| request-runner
+  request-runner -->|run_queued per request id| answer-pipeline
+  answer-pipeline -->|index, dense, transport| resources
+  verifier-runs -->|generate submits request| request-runner
+  background-jobs -->|shared transport, joined on close| resources
+  background-jobs -->|submit drafts batch| gold-review

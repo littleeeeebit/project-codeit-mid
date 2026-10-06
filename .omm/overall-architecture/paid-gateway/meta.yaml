@@ -1,6 +1,6 @@
 created: 2026-10-05 04:06:18.173000+00:00
-updated: 2026-10-06 12:37:56.265000+00:00
-update_count: 18
+updated: 2026-10-06 22:40:15.170000+00:00
+update_count: 20
 last_field: diagram
 kind: nested-class
 title: paid-gateway
@@ -11,19 +11,19 @@ children:
 - dispatch-guard
 - dispatch-marker
 - gateway-owner
+- key-sessions
 - langfuse-tracing
 - metered-call
 - openai-transport
 - owner-reconciliation
-- provider-transport
+- tracing
 parentPath: []
-prev_diagram: "graph TD\r\n  metered-chat[\"Metered chat stage\\nsrc/rfp_assistant/service/service.py\"\
-  ] -->|\"reserve maximum cost\"| budget-reserve[\"Atomic reservation\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  metered-chat -->|\"stop check in tx\"| dispatch-guard[\"Dispatch marker\\\
-  nsrc/rfp_assistant/gateway/budget.py\"]\r\n  budget-reserve -->|\"owner_guard\"\
-  | gateway-owner[\"Gateway advisory lock\\nsrc/rfp_assistant/storage/postgres.py\"\
-  ]\r\n  dispatch-guard -->|\"owner_guard\"| gateway-owner\r\n  metered-chat -->|\"\
-  chat with session key\"| openai-transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\n  openai-transport -->|\"owner check per call\"| gateway-owner\r\n  metered-chat\
-  \ -->|\"usage or failure\"| settlement[\"Settle, release, unknown\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]"
+prev_diagram: "graph TD\r\n  metered-call[\"Metered call\\nsrc/rfp_assistant/service/service.py\"\
+  ] -->|\"reserve max cost\"| budget-ledger[\"Budget ledger\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  metered-call -->|\"chat with on_delta\"| provider-transport[\"Provider transport\\\
+  nsrc/rfp_assistant/gateway/generation.py\"]\r\n  budget-ledger -->|\"owner_guard\
+  \ in transaction\"| gateway-owner[\"Gateway owner lock\\nsrc/rfp_assistant/storage/postgres.py\"\
+  ]\r\n  provider-transport -->|\"owner check before call\"| gateway-owner\r\n  metered-call\
+  \ -->|\"generation span, usage, cost\"| langfuse-tracing[\"Langfuse tracing\\nsrc/rfp_assistant/gateway/tracing.py\"\
+  ]\r\n  metered-call -->|\"validate structured output\"| answer-validation[\"Answer\
+  \ validation\\nsrc/rfp_assistant/gateway/generation.py\"]"
