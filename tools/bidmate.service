@@ -1,5 +1,6 @@
 # The shared app on the team VM (runbook section 3). One worker on loopback; members reach it through SSH -L.
-# Secrets (RFP_DATABASE_DSN, OPENAI_API_KEY) live only in /etc/bidmate/server.env, root-owned, mode 600.
+# /etc/bidmate/server.env (root-owned, mode 600) holds RFP_DATABASE_DSN and the paths, never OPENAI_API_KEY:
+# API keys enter only through the 설정 page and stay in the service's memory per browser (runbook 3.3).
 [Unit]
 Description=BidMate RFP assistant on 127.0.0.1:8501
 After=docker.service network-online.target

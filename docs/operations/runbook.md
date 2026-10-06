@@ -18,7 +18,7 @@ The owner approved paid migration work and a $10 shared operating cap on 2026-10
 
 - One process owns the database at a time. The serving app and paid CLI jobs take the same database-wide session advisory lock across hosts. A second owner is refused with `GatewayLockError`. Stop the UI before paid maintenance (`build-dense`, `evaluate-retrieval --allow-paid-queries`).
 - The ledger, requests, audit events and corrections all live in the PostgreSQL application database. Immutable extraction and index artifacts stay under `RFP_DATA_DIR` on a local disk; a network share is outside the contract.
-- The operational config (`RFP_CONFIG_FILE`) holds no secrets. `OPENAI_API_KEY` stays in the server environment or `.env`.
+- The operational config (`RFP_CONFIG_FILE`) holds no secrets. On the shared host no file holds an API key: each member enters theirs on the 설정 page (3.3). On a personal machine, `OPENAI_API_KEY` may stay in the process environment or `.env`.
 
 ## 2. Access: no login
 

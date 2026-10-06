@@ -35,7 +35,7 @@ Resolve defaults from the installed package/repository location, never the proce
 | `RFP_DATA_DIR` | Repository `.runtime/`; all indexes, databases and reports derive from it |
 | `RFP_CONFIG_FILE` | Optional absolute path to nonsecret operational configuration |
 | `RFP_HWP_CONVERTER` | Absolute path to the isolated converter executable; validate before the HWP trial |
-| `OPENAI_API_KEY` | Server environment or the git-ignored `.env`; never print or export it |
+| `OPENAI_API_KEY` | Personal machines only: process environment or the git-ignored `.env`; never print or export it. The shared host has none in any file; members enter their own key on the 설정 page, held in memory per browser |
 | `allowance_usd`, `operational_cap_usd` | `20`, `16`; prior spending counts against the cap |
 | `project_start`, `project_end` | Required before paid mode; actual dates, not an automatic 28-day forecast |
 | `paid_enabled` | False until prior-use reconciliation and rate checks are recorded |
