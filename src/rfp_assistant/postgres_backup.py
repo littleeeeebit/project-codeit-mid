@@ -18,7 +18,7 @@ from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict
 
 from . import postgres, store
-from .postgres import file_hash, record_validation, references_valid
+from .postgres import file_hash, host_path, record_validation, references_valid
 
 # migration_* tables hold the validated-import marker of the final import; restores carry them over.
 METADATA_TABLES = {"database_control", "migration_import", "migration_checkpoints", "migration_validation", "schema_migrations",
@@ -68,7 +68,7 @@ def references(conn):
                ("index", "SELECT manifest_path, manifest_hash FROM indexes")]
     for kind, query in queries:
         for path, expected in conn.execute(query):
-            actual = file_hash(path) if Path(path).is_file() else None
+            actual = file_hash(host_path(path)) if host_path(path).is_file() else None
             found.append({"kind": kind, "path": path, "expected_sha256": expected or actual,
                           "accessible": actual is not None, "matches": actual is not None and
                           (expected is None or actual == expected)})

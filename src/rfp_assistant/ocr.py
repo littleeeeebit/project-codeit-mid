@@ -18,6 +18,7 @@ from pathlib import Path
 
 from .fidelity import IMAGE_MIN_AREA, norm
 from .ingestion import printed_pdf_path
+from .postgres import host_path
 from .settings import Settings, read_api_key
 from .store import LockHeld, ProcessLock, dumps, open_db, utcnow, write_jsonl_atomic
 
@@ -259,7 +260,7 @@ def cache_path(settings: Settings, source_hash: str) -> Path:
 
 
 def rendering_for(settings: Settings, src) -> Path:
-    return printed_pdf_path(settings, src["source_hash"]) if src["format"] == "hwp" else Path(src["original_path"])
+    return printed_pdf_path(settings, src["source_hash"]) if src["format"] == "hwp" else host_path(src["original_path"])
 
 
 def load(settings: Settings, source_hash: str) -> list[dict]:

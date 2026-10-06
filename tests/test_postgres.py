@@ -414,6 +414,21 @@ class SQLBoundaryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "non-PostgreSQL SQL"):
             postgres.bind_sql("PRAGMA user_version")
 
+    def test_references_recorded_on_another_host_resolve_through_the_path_map(self):
+        with tempfile.TemporaryDirectory() as directory:
+            original = Path(directory) / "원본 데이터" / "files" / "사업.hwp"
+            original.parent.mkdir(parents=True)
+            original.write_bytes(b"hwp")
+            recorded = "C:\\Users\\owner\\repo\\원본 데이터\\files\\사업.hwp"  # a Windows dump restored elsewhere
+            reference = {"kind": "original", "path": recorded, "expected_sha256": postgres.file_hash(original)}
+            with mock.patch.dict(os.environ, {"RFP_PATH_MAP": ""}):
+                self.assertFalse(postgres.references_valid([reference]))
+            with mock.patch.dict(os.environ, {"RFP_PATH_MAP": f"C:/Users/owner/repo={Path(directory).as_posix()}/"}):
+                self.assertEqual(postgres.host_path(recorded), original)
+                self.assertEqual(postgres.host_path("C:\\Users\\owner\\repository\\x"),
+                                 Path("C:\\Users\\owner\\repository\\x"))  # a prefix, not a path component
+                self.assertTrue(postgres.references_valid([reference]))
+
     def test_native_large_shortening_preserves_source_and_rejects_small(self):
         original = dense.unit_vector(np.arange(1, 3073), 3072)
         preserved = original.copy()

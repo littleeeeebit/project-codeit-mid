@@ -19,6 +19,7 @@ from rank_bm25 import BM25Okapi
 from . import chunking
 from .contracts import DocRef, EvidenceUnit, RetrievalResult
 from .ingestion import CODE_RE, load_elements, nfc
+from .postgres import host_path
 from .settings import Settings
 from .store import dumps, get_app_setting, open_db, read_jsonl, set_app_setting, tx, utcnow, write_jsonl_atomic, \
     write_text_atomic
@@ -272,7 +273,7 @@ class KeywordIndex:
             row = conn.execute("SELECT * FROM indexes WHERE index_version = ?", (version,)).fetchone() if version else None
         if row is None or row["state"] != "ready":
             raise RetrievalError("no ready keyword index; run build-keyword")
-        manifest_path = Path(row["manifest_path"])
+        manifest_path = host_path(row["manifest_path"])
         if hashlib.sha256(manifest_path.read_bytes()).hexdigest() != row["manifest_hash"]:
             raise RetrievalError("index manifest hash mismatch")
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

@@ -1,0 +1,21 @@
+# The shared app on the team VM (runbook section 3). One worker on loopback; members reach it through SSH -L.
+# Secrets (RFP_DATABASE_DSN, OPENAI_API_KEY) live only in /etc/bidmate/server.env, root-owned, mode 600.
+[Unit]
+Description=BidMate RFP assistant on 127.0.0.1:8501
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+User=bidmate
+WorkingDirectory=/srv/bidmate/app
+EnvironmentFile=/etc/bidmate/server.env
+ExecStartPre=/srv/bidmate/app/tools/start-postgresql.sh
+ExecStart=/srv/bidmate/venv/bin/python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
+# A stop lets running requests settle (runbook section 4) before the gateway lock is released.
+KillSignal=SIGINT
+TimeoutStopSec=120
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

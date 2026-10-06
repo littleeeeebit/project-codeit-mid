@@ -26,6 +26,7 @@ import numpy as np
 from . import budget
 from .generation import ProviderError, Transport
 from .ingestion import nfc
+from .postgres import host_path
 from .settings import EMBEDDING_MAX_TOKENS_PER_INPUT, EMBEDDING_TOKENIZER, Settings
 from .store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
 from .vector_store import PgDenseIndex as DenseIndex  # the only dense index: verified pgvector sets
@@ -288,7 +289,7 @@ def _keyword_index_row(settings: Settings, index_version: str) -> dict:
 def index_payloads(settings: Settings, index_version: str) -> tuple[dict, list[dict]]:
     """(index row, [{chunk_id, text, payload_hash, tokens}]) in chunk row order, from verified index files."""
     row = _keyword_index_row(settings, index_version)
-    manifest_path = Path(row["manifest_path"])
+    manifest_path = host_path(row["manifest_path"])
     if hashlib.sha256(manifest_path.read_bytes()).hexdigest() != row["manifest_hash"]:
         raise DenseError("keyword index manifest hash mismatch")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

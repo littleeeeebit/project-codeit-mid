@@ -1601,8 +1601,8 @@ def original_download(res: Resources, principal: Principal, doc_id: str, source_
         raise ServiceError("원문 식별자가 올바르지 않습니다.")
     (doc,) = _resolve_scope(res, [DocRef(doc_id, source_hash)])
     with open_db(res.settings.db_path) as conn:
-        path = Path(conn.execute("SELECT original_path FROM sources WHERE source_hash = ?",
-                                 (source_hash,)).fetchone()[0])
+        path = postgres.host_path(conn.execute("SELECT original_path FROM sources WHERE source_hash = ?",
+                                               (source_hash,)).fetchone()[0])
     resolved = path.resolve()
     if resolved.parent != res.settings.files_dir.resolve() or not resolved.is_file():
         raise ServiceError("관리되지 않는 원문 경로입니다.")

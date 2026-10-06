@@ -176,6 +176,20 @@ def recovery_blocked(conn):
         return True
 
 
+def host_path(recorded) -> Path:
+    """A path the database recorded, on this host. Rows keep the absolute path of the host that wrote them, so a
+    database restored on another host maps them through `RFP_PATH_MAP`: `<old prefix>=<new prefix>` pairs joined
+    by `;`, compared with `/` for `\\` (a Windows dump served on Linux). Unmapped paths are returned unchanged."""
+    text = str(recorded)
+    flat = text.replace("\\", "/")
+    for pair in filter(None, os.environ.get("RFP_PATH_MAP", "").split(";")):
+        old, _, new = pair.partition("=")
+        old = old.strip().replace("\\", "/").rstrip("/")
+        if old and new and (flat == old or flat.startswith(old + "/")):
+            return Path(new.strip().rstrip("/") + flat[len(old):])
+    return Path(text)
+
+
 def file_hash(path):
     digest = hashlib.sha256()
     with Path(path).open("rb") as stream:
@@ -188,7 +202,7 @@ def references_valid(references):
     """Every recorded original, extraction and index manifest (with the files it lists) is present and unchanged."""
     try:
         for reference in references:
-            path = Path(reference["path"])
+            path = host_path(reference["path"])
             if not path.is_file() or file_hash(path) != reference["expected_sha256"]:
                 return False
             if reference.get("kind") == "index":
