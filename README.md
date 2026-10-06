@@ -47,7 +47,7 @@ Settings resolve from the repository location, never the working directory. Opti
 | `RFP_RESTORE_DATABASE_DSN` | none | `restore-check` only: an empty isolated database to restore into |
 | `RFP_CONFIG_FILE` | none | JSON with nonsecret `Settings` fields (unknown keys are rejected) |
 | `RFP_HWP_CONVERTER` | env `Scripts\hwp5proc.exe` | HWP → XML converter |
-| `OPENAI_API_KEY` | none | Process environment, then the repository `.env`; never printed. The shared host has none: the key is entered on the 설정 page and held in memory only |
+| `OPENAI_API_KEY` | none | Process environment, then the repository `.env`; never printed. Serves only a browser with no key of its own. The shared host has none: each member enters their own key on the 설정 page, held in memory per browser |
 | `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | none | Langfuse tracing; read like the API key. Any one missing turns tracing off |
 
 Without a key the app still runs: search, filters, evidence browsing and retrieval traces are free; paid generation reports that the key is missing until one is entered on the 설정 page. `provider: "fake"` in the config file never builds a real SDK client.

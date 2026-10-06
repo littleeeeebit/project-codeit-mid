@@ -33,7 +33,7 @@ There is no login (owner decision 2026-09-30, reaffirmed for phase 3 on 2026-10-
 
 ### 3.1 The team host (live since 2026-10-06)
 
-The shared application runs on the team's existing GCP VM `codeit`. It is the only live ledger and the only gateway owner. The API key reaches it only through the 설정 page and lives only in the service's memory (3.3). The owner's Windows server is no longer live (3.4).
+The shared application runs on the team's existing GCP VM `codeit`. It is the only live ledger and the only gateway owner. API keys reach it only through the 설정 page, one per browser, and live only in the service's memory (3.3). The owner's Windows server is no longer live (3.4).
 
 | | |
 | --- | --- |
@@ -98,7 +98,7 @@ The VM serves the owner host's restored database, whose rows keep Windows paths 
 
 The ledger's spent amount ($2.482209 after that answer) is the app's settled attempts ($2.03) plus `external:pr8-pilot-ledger` ($0.448818, imported on 2026-10-02). The OpenAI dashboard showed $2.01 on 2026-10-06. The ledger stays the higher, conservative figure; lowering it is an owner `adjust` with evidence (section 5).
 
-No file on `codeit` holds the API key: not `server.env`, not a `.env`, not the database. The owner enters it on the 설정 page ("OpenAI API 키") through the tunnel. The server first checks it against the serving model with a free model-metadata read, then hands it to the running OpenAI client. It stays in that process's memory only. The page shows whether a key is set, by whom and when, never the key. The audit log records `set_api_key` with the member and model, never the value. A new key replaces the old one for the next call; a call already running finishes with its own. After any restart of `bidmate.service` (or of `codeit`) paid answers report that the key is missing until it is entered again; free pages keep working, and paid admission stays on. The six team members are sudoers on `codeit` and could, as root, read a process's memory. The backstop for that is the provider: use this deployment's own OpenAI project key with a $20 budget, so it can be revoked without touching anything else.
+No file on `codeit` holds an API key: not `server.env`, not a `.env`, not the database. Each member who wants paid answers enters their own key on the 설정 page ("내 OpenAI API 키") through their tunnel. The server first checks it against the serving model with a free model-metadata read. It then keeps it in process memory under a random session ID, which goes back to that browser as an HttpOnly, SameSite=Strict session cookie (`bidmate_key_session`). Every paid stage a request starts, including the background jobs it launches (evaluation, judge runs, dataset drafting), pays with that browser's key. A browser with no key, such as a teammate who has not entered one, is refused before dispatch with "OpenAI API 키가 설정되지 않았습니다"; nothing is reserved or charged. The page shows only whether this browser has a key, who entered it and when. The audit log records `set_api_key` with the member and model, never the value. All spending, whoever's key paid, is recorded in the one shared ledger and counts against the shared $20 limit, per member. Closing the browser drops the cookie; restarting `bidmate.service` (or `codeit`) drops every key. Either way the key must be entered again. Free pages keep working, and paid admission stays on. The six team members are sudoers on `codeit` and could, as root, read a process's memory. The backstop for that is the provider: use this deployment's own OpenAI project key with a $20 budget, so it can be revoked without touching anything else.
 
 ### 3.4 The owner host is no longer live
 
@@ -216,7 +216,7 @@ python -m rfp_assistant.cli check --phase all --provider fake --save # every tes
 
 1. Create the environment and install the pinned dependencies (README, "Environment"). The tested host is Windows with Python 3.12; this repository's cloud checks ran on Linux with Python 3.12.
 2. Place `원본 데이터/data_list.csv` and `원본 데이터/files/` under the repository, or point `RFP_SOURCE_DIR` at them (absolute path). `RFP_DATA_DIR` (absolute) moves the runtime; the default is `.runtime/` in the repository.
-3. API key placement. On the shared host, enter it on the 설정 page; it is held in memory only (3.3). On a personal machine, `OPENAI_API_KEY` in the process environment or the git-ignored `.env` also works. Never put it in `RFP_CONFIG_FILE`, a report, an export, a screenshot or a commit. Members never receive the key; they use the shared application.
+3. API key placement. On the shared host, each member enters their own on the 설정 page; it is held in memory only, per browser (3.3). On a personal machine, `OPENAI_API_KEY` in the process environment or the git-ignored `.env` also works. Never put it in `RFP_CONFIG_FILE`, a report, an export, a screenshot or a commit. Members never receive the key; they use the shared application.
 4. `python -m rfp_assistant.cli init --paid-disabled`, then `manifest`, `ingest`, `build-keyword --include-unreviewed` (README).
 5. Paid generation stays off until `configure-budget` records the dates, the prior use with its evidence, the allowance, the cap and the confirmed rates.
 6. Run `check --phase all --provider fake --save` on the host before the first paid action.
