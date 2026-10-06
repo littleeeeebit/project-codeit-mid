@@ -17,7 +17,8 @@ from decimal import Decimal
 from pathlib import Path
 
 from .contracts import BudgetSnapshot
-from .settings import DEFAULT_RATES, RATE_VERSION, LARGE_RATE_VERSION, LARGE_RATE_CHECKED_AT
+from .settings import (ALLOWED_GENERATION_MODELS, DEFAULT_RATES, LARGE_RATE_CHECKED_AT, LARGE_RATE_VERSION,
+                       RATE_VERSION, SELECTABLE_RATE_SOURCE)
 from .store import OPERATIONAL_ERRORS, dumps, get_app_setting, open_db, set_app_setting, tx, utcnow
 from .postgres import Connection, Row, owner_guard, read_snapshot, require_owner, Target
 
@@ -212,6 +213,30 @@ def register_large_rate(db, actor: str, reason: str):
                      (dumps(rates), LARGE_RATE_VERSION, dumps(history)))
         conn.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?)",
                      (str(uuid.uuid4()), actor, "register_embedding_rate", "budget", reason, dumps(record), utcnow()))
+        _bump(conn)
+    return record
+
+
+def ensure_generation_rate(db, model: str, actor: str) -> dict | None:
+    """Adds this code's price for a selectable answer model the ledger has no rate for, audited. Every recorded
+    rate and the rate version stay as they were, so no price, estimate or fingerprint changes. None when the
+    ledger already prices the model."""
+    if model not in ALLOWED_GENERATION_MODELS:
+        raise BudgetError(f"{model} is not a selectable generation model")
+    with open_db(db) as conn, tx(conn, immediate=True):
+        row = _settings_row(conn)
+        rates = json.loads(row["rates_json"])
+        if model in rates:
+            return None
+        rates[model] = DEFAULT_RATES[model]
+        record = {"at": utcnow(), "actor": actor, "reason": "answer model selected on the settings page",
+                  "model": model, **SELECTABLE_RATE_SOURCE, "rates": rates[model]}
+        history = json.loads(row["history_json"]) + [record]
+        conn.execute("UPDATE budget_settings SET rates_json=?,history_json=?,revision=revision+1 WHERE id=1",
+                     (dumps(rates), dumps(history)))
+        conn.execute("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?)",
+                     (str(uuid.uuid4()), actor, "register_generation_rate", "budget", record["reason"], dumps(record),
+                      utcnow()))
         _bump(conn)
     return record
 

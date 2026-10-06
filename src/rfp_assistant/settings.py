@@ -26,8 +26,14 @@ DEFAULT_RATES: dict[str, dict[str, str]] = {
     "gpt-6-luna": {"input": "0.10", "cached_input": "0.01", "cache_write": "0.125", "output": "0.50"},
     "text-embedding-3-small": {"input": "0.02"},
     "text-embedding-3-large": {"input": "0.13"},
+    "gpt-5-mini": {"input": "0.25", "cached_input": "0.025", "output": "2.00"},
+    "gpt-5-nano": {"input": "0.05", "cached_input": "0.005", "output": "0.40"},
 }
-ALLOWED_GENERATION_MODELS = ("gpt-6-luna",)
+# The team's shared key reaches only gpt-5-mini and gpt-5-nano, so each browser picks its answer model on 설정.
+ALLOWED_GENERATION_MODELS = ("gpt-6-luna", "gpt-5-mini", "gpt-5-nano")
+# Where the gpt-5-mini and gpt-5-nano rates above come from; a ledger that predates them gets them on first selection.
+SELECTABLE_RATE_SOURCE = {"source": "https://developers.openai.com/api/docs/pricing", "tier": "standard",
+                          "checked_at": "2026-10-06"}
 REASONING_EFFORTS = ("none", "low", "medium", "high", "xhigh", "max")
 # Every compared embedding model (models.EMBEDDINGS). What serves is the activated run's model, never this setting:
 # the process value only names the model a maintenance build embeds with.

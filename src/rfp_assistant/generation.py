@@ -192,6 +192,12 @@ class OpenAITransport:
                 self._retired.append(self._sessions[session])
             self._sessions[session] = client
 
+    def check_model(self, model: str) -> str | None:
+        """`check_api_key` for this context's key, which only this transport holds."""
+        with self._lock:
+            client = self._sessions.get(KEY_SESSION.get())
+        return _check(self._openai, client, model) if client is not None else NO_API_KEY
+
     def has_key(self) -> bool:
         with self._lock:
             return KEY_SESSION.get() in self._sessions or self._default is not None
@@ -285,14 +291,18 @@ def check_api_key(api_key: str, model: str, timeout: float) -> str | None:
     import openai
 
     with openai.OpenAI(api_key=api_key, max_retries=0, timeout=timeout) as client:
-        try:
-            client.models.retrieve(model)
-        except openai.AuthenticationError:
-            return "OpenAI가 이 키를 거부했습니다."
-        except (openai.PermissionDeniedError, openai.NotFoundError):
-            return f"이 키로는 {model} 모델을 쓸 수 없습니다."
-        except openai.OpenAIError as exc:
-            return f"OpenAI에 확인하지 못했습니다 ({type(exc).__name__})."
+        return _check(openai, client, model)
+
+
+def _check(openai, client, model: str) -> str | None:
+    try:
+        client.models.retrieve(model)
+    except openai.AuthenticationError:
+        return "OpenAI가 이 키를 거부했습니다."
+    except (openai.PermissionDeniedError, openai.NotFoundError):
+        return f"이 키로는 {model} 모델을 쓸 수 없습니다."
+    except openai.OpenAIError as exc:
+        return f"OpenAI에 확인하지 못했습니다 ({type(exc).__name__})."
     return None
 
 

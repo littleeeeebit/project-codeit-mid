@@ -35,7 +35,7 @@ from .retrieval import DENSE_MODES, Analyzer, KeywordIndex, best_chunk_per_extra
 from .retrieval import retrieve as _retrieve
 from .evaluation import EVAL_VERSION
 from .postgres import Row
-from .settings import ALLOWED_EMBEDDING_MODELS, Settings, read_api_key
+from .settings import ALLOWED_EMBEDDING_MODELS, ALLOWED_GENERATION_MODELS, Settings, read_api_key
 from .store import DATABASE_ERRORS, LockHeld, dumps, init_schema, open_db, tx, utcnow
 
 
@@ -166,7 +166,7 @@ class Resources:
         if self.tracing is None:  # traced with the transport it observes; an injected transport is not
             self.tracing = tracing.Tracing.from_settings(self.settings)
 
-    def set_api_key(self, session: str, key: str, member_id: str) -> None:
+    def set_api_key(self, session: str, key: str, member_id: str, model: str) -> None:
         """A browser session's key from the 설정 page. It lives only in this process's memory: no file, row, log or
         trace holds it, so a restart needs it entered again. Other sessions never use it."""
         if not self._dispatch or self.settings.provider != "openai":
@@ -177,7 +177,11 @@ class Resources:
             if not isinstance(self.transport, generation.OpenAITransport):
                 self._openai_transport(None)
             self.transport.set_key(session, key)
-            self.key_sources[session] = {"set_by": member_id, "set_at": utcnow()}
+            self.key_sources[session] = {"set_by": member_id, "set_at": utcnow(), "model": model}
+
+    def generation_model(self) -> str:
+        """The answer model of this context's browser session (chosen with its key), else the configured one."""
+        return (self.key_sources.get(generation.KEY_SESSION.get()) or {}).get("model") or self.settings.generation_model
 
     def paid_refusal(self) -> str:
         """Why this context cannot dispatch a paid stage now, or "" when it can."""
@@ -662,7 +666,7 @@ def _config_snapshot(res: Resources, request: AnswerRequest) -> dict:
     return {"config_id": request.config_id, "verifier_run_id": request.verifier_run_id or None,
             "index_version": idx.version if idx else None,
             "serving": {k: v for k, v in res.serving().items() if k in ("run_id", "mode", "dense_version")},
-            "prompt_version": generation.PROMPT_VERSION, "model": res.settings.generation_model,
+            "prompt_version": generation.PROMPT_VERSION, "model": res.generation_model(),
             "reasoning_effort": res.settings.generation_reasoning_effort,
             "rate_version": rate_version, "max_output_tokens": res.settings.generation_max_output_tokens,
             "settings": res.settings.fingerprint()}
@@ -781,7 +785,7 @@ def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retriev
             "evidence_tokens": retrieval.evidence_tokens, "prompt_input_tokens": tokens,
             "limitations": retrieval.limitations, "excluded": retrieval.excluded}})
     try:  # an unknown rate leaves the estimate empty; admission then refuses with `unknown_rate`
-        est = budget.estimate(res.settings.db_path, res.settings.generation_model, tokens,
+        est = budget.estimate(res.settings.db_path, res.generation_model(), tokens,
                               res.settings.generation_max_output_tokens)
         qe = retrieval.query_embedding or {}
         if price_query_embedding and qe.get("cache") == "miss" and not qe.get("attempt_id"):
@@ -1259,8 +1263,9 @@ def _metered_chat(res: Resources, principal: Principal, request_id: str, *, stag
     provider response, or `fail(...)`'s outcome when the call was refused or failed; never retries. `record`
     receives the admission, usage and settlement."""
     s = res.settings
+    model = res.generation_model()
     admission = budget.reserve(s.db_path, request_id=request_id, member_id=principal.member_id, stage=stage,
-                               purpose=res.paid_purpose, model=s.generation_model, input_tokens=input_tokens,
+                               purpose=res.paid_purpose, model=model, input_tokens=input_tokens,
                                max_output_tokens=max_output_tokens, count_method=generation.COUNT_METHOD,
                                ceiling_micro_usd=ceiling)
     record["admission"] = admission
@@ -1285,12 +1290,12 @@ def _metered_chat(res: Resources, principal: Principal, request_id: str, *, stag
         # the ledger refused (unresolved unknown billing, maintenance, lost ownership): released, nothing sent
         return fail("budget_blocked", "결제 기록 점검 중이어서 유료 호출을 시작하지 않았습니다. 검색과 원문 열람은 계속 "
                     "사용할 수 있습니다.", error=reason[:300])
-    with tracing.step(step, "generation", model=s.generation_model, input=messages,
+    with tracing.step(step, "generation", model=model, input=messages,
                       model_parameters={"reasoning_effort": s.generation_reasoning_effort,
                                         "max_completion_tokens": max_output_tokens},
                       metadata={"attempt_id": attempt_id, "prompt_version": prompt_version}) as gen:
         try:
-            response = res.transport.chat(model=s.generation_model, messages=messages,
+            response = res.transport.chat(model=model, messages=messages,
                                           response_format=response_format, max_completion_tokens=max_output_tokens,
                                           reasoning_effort=s.generation_reasoning_effort, on_delta=on_delta)
         except generation.ProviderError as exc:
@@ -1670,10 +1675,36 @@ def api_key_status(res: Resources, principal: Principal) -> dict:
     source = res.key_sources.get(generation.KEY_SESSION.get())
     if source is None and res.transport is not None and not res.paid_refusal():
         source = {"set_by": "server environment", "set_at": None}
-    return {"configured": source is not None, **(source or {"set_by": None, "set_at": None})}
+    return {"configured": source is not None, "set_by": (source or {}).get("set_by"),
+            "set_at": (source or {}).get("set_at"), "model": res.generation_model(),
+            "models": list(ALLOWED_GENERATION_MODELS)}
 
 
-def set_api_key(res: Resources, principal: Principal, api_key: str) -> tuple[str, dict]:
+def _selectable(res: Resources, model: str, actor: str) -> None:
+    if model not in ALLOWED_GENERATION_MODELS:
+        raise ServiceError("선택할 수 없는 모델입니다.")
+    try:
+        budget.ensure_generation_rate(res.settings.db_path, model, actor)
+    except (*DATABASE_ERRORS, budget.BudgetError) as exc:
+        raise ServiceError(str(exc) if isinstance(exc, budget.BudgetError) else "ledger_unavailable") from None
+
+
+def set_generation_model(res: Resources, principal: Principal, model: str) -> dict:
+    """This browser's answer model, checked against the key this browser entered (a free metadata read)."""
+    principal = _authorize(res, principal, "budget_admin")
+    session = generation.KEY_SESSION.get()
+    if session not in res.key_sources:
+        raise ServiceError(generation.NO_API_KEY)
+    if problem := res.transport.check_model(model):
+        raise ServiceError(problem)
+    _selectable(res, model, principal.member_id)
+    res.key_sources[session] = {**res.key_sources[session], "model": model}
+    with open_db(res.settings.db_path) as conn, tx(conn, immediate=True):
+        _audit(conn, principal.member_id, "set_generation_model", "openai", "", {"model": model})
+    return api_key_status(res, principal)
+
+
+def set_api_key(res: Resources, principal: Principal, api_key: str, model: str) -> tuple[str, dict]:
     """Checks the key against the serving model (a free metadata read), then gives it to a new browser session,
     whose ID the caller puts in that browser's cookie. Returns (session, status). The audit row records who set a
     key, never its value."""
@@ -1681,15 +1712,18 @@ def set_api_key(res: Resources, principal: Principal, api_key: str) -> tuple[str
     key = api_key.strip()
     if not key or len(key) > 500 or not key.isascii() or any(c.isspace() for c in key):
         raise ServiceError("API 키 형식이 아닙니다.")
-    problem = generation.check_api_key(key, res.settings.generation_model, res.settings.request_timeout_seconds)
+    if model not in ALLOWED_GENERATION_MODELS:
+        raise ServiceError("선택할 수 없는 모델입니다.")
+    problem = generation.check_api_key(key, model, res.settings.request_timeout_seconds)
     if problem:
         raise ServiceError(problem)
+    _selectable(res, model, principal.member_id)
     session = generation.KEY_SESSION.get()
     if session not in res.key_sources:  # only a session this server issued is reused; a browser cannot pick one
         session = secrets.token_urlsafe(32)
-    res.set_api_key(session, key, principal.member_id)
+    res.set_api_key(session, key, principal.member_id, model)
     with open_db(res.settings.db_path) as conn, tx(conn, immediate=True):
-        _audit(conn, principal.member_id, "set_api_key", "openai", "", {"model": res.settings.generation_model})
+        _audit(conn, principal.member_id, "set_api_key", "openai", "", {"model": model})
     token = generation.KEY_SESSION.set(session)
     try:
         return session, api_key_status(res, principal)
@@ -1711,7 +1745,7 @@ def verifier_config(res: Resources, mode: str | None = None, limits: dict | None
            "dense_version": serving.get("dense_version"), "index_version": idx.version if idx else None,
            "limits": {k: narrowed[k] for k in sorted(narrowed)},
            "effective_limits": {k: narrowed.get(k, getattr(s, k)) for k in LIMIT_KEYS},
-           "prompt_version": generation.PROMPT_VERSION, "model": res.settings.generation_model}
+           "prompt_version": generation.PROMPT_VERSION, "model": res.generation_model()}
     if cfg["mode"] not in VERIFIER_MODES:
         raise ServiceError("알 수 없는 검색 방식입니다.")
     cfg["config_id"] = "vc-" + hashlib.sha256(dumps(cfg).encode()).hexdigest()[:12]

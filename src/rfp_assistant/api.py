@@ -112,12 +112,19 @@ class BudgetLimitIn(BaseModel):
 
 class ApiKeyIn(BaseModel):
     api_key: str  # no length constraint here: a validation error would echo the value back; service checks it
+    model: str
+
+
+class ModelIn(BaseModel):
+    model: str
 
 
 class ApiKeyStatus(BaseModel):
     configured: bool
     set_by: str | None
     set_at: str | None
+    model: str
+    models: list[str]
 
 
 class Dated(BaseModel):
@@ -326,10 +333,14 @@ def _routes(app: FastAPI) -> None:
 
     @app.put("/api/settings/api-key", response_model=ApiKeyStatus)
     def api_key(body: ApiKeyIn, res: Res, member: Member, response: Response):
-        session, status = service.set_api_key(res, member, body.api_key)
+        session, status = service.set_api_key(res, member, body.api_key, body.model)
         # Not the key: an unguessable handle to it, sent only back to this server and unreadable by scripts.
         response.set_cookie(KEY_COOKIE, session, httponly=True, samesite="strict", path="/")
         return status
+
+    @app.put("/api/settings/model", response_model=ApiKeyStatus)
+    def generation_model(body: ModelIn, res: Res, member: Member):
+        return service.set_generation_model(res, member, body.model)
 
     @app.get("/api/documents", response_model=list[Document])
     def documents(res: Res, member: Member, query: str = "", institution: str = "", amount_min: int | None = None,
