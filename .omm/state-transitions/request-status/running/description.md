@@ -1,0 +1,1 @@
+Set by `run_queued`, or directly at insert for free and synchronous requests. While a request is running, `_stop_reason` returns None unless `cancel_requested` is set or `res._closed` is true. That check runs both in `_checkpoint` and inside `mark_dispatching`'s transaction.

@@ -1,0 +1,1 @@
+The corpus, `.env` and `.runtime` are gitignored and absent from linked worktrees. A worktree must point `RFP_SOURCE_DIR`/`RFP_DATA_DIR` at the shared runtime, and the budget database must never be copied into a second spendable ledger.

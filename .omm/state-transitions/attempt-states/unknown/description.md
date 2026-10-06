@@ -1,1 +1,0 @@
-Execution may have happened but no usage was recorded: a timeout, a 5xx, a broken stream, a missing usage report, a settlement failure or a restart during dispatch. The cost stays pending against the cap, and on PostgreSQL `mark_dispatching` refuses every new dispatch until the attempt is resolved.

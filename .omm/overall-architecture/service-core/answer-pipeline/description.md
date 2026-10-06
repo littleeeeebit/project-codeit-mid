@@ -1,15 +1,1 @@
-`_execute` opens one Langfuse trace seeded by the request ID and dispatches by mode:
-- `metadata` and `inventory` are free: typed CSV facts and the requirement list from the index.
-- `single`, `compare` and `corpus` go through `_paid_answer`.
-
-`_paid_answer` runs these steps:
-1. Refuses documents that are not parsed or not indexed (`ingestion_unavailable`).
-2. `_checkpoint`.
-3. `_conversation` loads up to 6 earlier turns of the same member and scope, plus up to 8 cited evidence units carried forward.
-4. For a follow-up, `_rewrite`, which makes a paid `query_rewrite` call.
-5. Preparation: `prepare_answer` (single or corpus) or `_prepare_compare` (one retrieval per side with single-document limits), or the frozen verifier run's evidence.
-6. Returns `insufficient_evidence` with no paid call when there is no evidence.
-7. `_metered_chat` (stage `generation`, streaming via `on_delta`).
-8. `generation.validate_answer` against the allowed evidence IDs, the scoped documents and the stored quotes. In compare mode both documents must be represented.
-
-Any exception is turned into a stored outcome by `done(...)` → `_finish`.
+`_execute` opens one Langfuse trace per request (`tracing.run(..., seed=request_id)`) and calls `_execute_traced`. That dispatches metadata and inventory to the free answers and everything else to `_paid_answer`. `_paid_answer` resolves the scope and short-circuits `ingestion_unavailable` when every selected document is unparsed or unindexed. It loads a frozen verifier run when the request has `verifier_run_id`. Before each paid stage it calls `_checkpoint`. A follow-up turn is rewritten by `_rewrite` into a standalone query through `_metered_chat(stage="query_rewrite")`. Next comes `prepare_answer`, or `_prepare_compare` for two documents with per-side single-document limits, or the corpus path with `all_documents=True`. Each runs `retrieve`, then `_with_carried` (the previous answer's cited units, renumbered after the fresh ones), then `_priced` (`generation.build_messages`, exact `count_request_tokens`, `budget.estimate`). It returns `insufficient_evidence` when nothing is packed. Otherwise `_metered_chat(stage="generation", on_delta=streamed)` writes the growing text to `res.partials[request_id]`. `generation.validate_answer` checks evidence IDs, scope, stored quotes and compare-side coverage. A validation failure is `technical_error` (billed, never retried). `done()` then goes through `_finish`, which stores `result_json` and `trace_json` and the billing state derived from the ledger. `answer()` is the synchronous variant used by the CLI, tests and `PinnedResources` evaluation.

@@ -1,0 +1,7 @@
+graph TD
+  gold-queue["Gold review queue\nsrc/rfp_assistant/evaluation/gold.py"] -->|"approved rows to dev.jsonl"| frozen-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  frozen-runs -->|"scored run folders"| compare-matrix["Comparison matrices\nsrc/rfp_assistant/evaluation/compare.py"]
+  compare-matrix -->|"person picks a row"| run-activation["Run activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  run-activation -->|"pinned finalist config"| answer-runs["Answer runs\nsrc/rfp_assistant/service/answers.py"]
+  answer-runs -->|"selected answer run"| sealed-release["Sealed run and release\nsrc/rfp_assistant/evaluation/sealed.py"]
+  gold-queue -->|"held-out positives mutated"| judge-comparison["Judge comparison\nsrc/rfp_assistant/evaluation/judges.py"]

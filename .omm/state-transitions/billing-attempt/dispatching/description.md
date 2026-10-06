@@ -1,0 +1,1 @@
+Written by `mark_dispatching` just before the network call, in the same transaction as the request's stop guard, `owner_guard`, the `paid_admission` check and the global unknown-attempt check. It is the durable marker that the provider may have executed.

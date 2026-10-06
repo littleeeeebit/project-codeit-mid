@@ -1,0 +1,1 @@
+Offline and verifier-triggered measurement that decides what serves. Reviewed gold rows feed frozen retrieval runs. Comparison matrices score every variant on the same populations. A person activates one row. Pinned answer runs, the sealed test run and the release report then evaluate that choice. Nothing activates on its own or on a schedule.

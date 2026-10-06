@@ -1,1 +1,0 @@
-Set by `budget.settle` from the reported usage, exactly once (a repeat returns `duplicate`). A settlement above the reservation freezes paid admission. `service.settle_from_evidence` lets the owner settle an unknown attempt from provider evidence.

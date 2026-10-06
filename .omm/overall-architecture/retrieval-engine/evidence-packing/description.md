@@ -1,7 +1,1 @@
-The packing loop walks the final ranking and admits each chunk as an `EvidenceUnit` with ID `E{n}`, the doc and source hash, the extraction, the element IDs, the quote and the location. A chunk is refused when:
-- it carries a different requirement code than the one asked (`other_requirement_code`);
-- the unit limit is reached (`unit_limit`);
-- its span overlaps a chunk already admitted (`duplicate_span`);
-- it does not fit the token budget (`token_budget`).
-
-The first unit may use `evidence_max_tokens`; later units use `evidence_target_tokens`. The linked sibling pieces of a split element follow their chunk, nearest first, up to `LINKED_EXTRA_UNITS`. A piece left out is reported as `linked_evidence_missing:`.
+The engine walks the final ranking and `admit`s chunks into `EvidenceUnit`s `E1..En` (doc, source hash, extraction, chunk, element IDs, quote, location, token count). It refuses a chunk for `other_requirement_code`, `unit_limit` (`evidence_max_units`), `duplicate_span` or `token_budget`. The first unit may use `evidence_max_tokens`, and later units use `evidence_target_tokens`. Linked sibling pieces of a split element are added nearest first, up to `LINKED_EXTRA_UNITS`; any missing piece is reported as `linked_evidence_missing:`. Out-of-scope rows are excluded defensively. Per-stage timings are recorded in `timings_ms`.

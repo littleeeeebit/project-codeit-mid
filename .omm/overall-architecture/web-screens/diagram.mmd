@@ -1,8 +1,0 @@
-graph TD
-  ask-page["Ask page\nweb/src/components/ask/ask-page.tsx"] -->|"POST ask, poll, cancel"| api-client["Typed API client\nweb/src/lib/api.ts"]
-  document-search["Document search\nweb/src/components/ask/document-search.tsx"] -->|"onToggle selection"| ask-page
-  document-search -->|"GET /api/documents"| api-client
-  ask-page -->|"live owned turn"| answer-stream["Answer stream reader\nweb/src/lib/use-answer-stream.ts"]
-  verify-page["Verify page\nweb/src/components/verify/verify-page.tsx"] -->|"verify, gold, experiments"| api-client
-  dataset-page["Dataset page\nweb/src/components/dataset/dataset-page.tsx"] -->|"drafting and review"| api-client
-  settings-page["Settings page\nweb/src/app/settings/page.tsx"] -->|"key, model, cap"| api-client

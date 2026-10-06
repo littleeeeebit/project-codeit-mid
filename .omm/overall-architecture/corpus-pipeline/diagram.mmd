@@ -1,0 +1,6 @@
+graph TD
+  import-manifest["Manifest import\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"sources and documents rows"| parse-original["HWP and PDF parsing\nsrc/rfp_assistant/corpus/ingestion.py"]
+  ocr-regions["Image OCR\nsrc/rfp_assistant/corpus/ocr.py"] -->|"cached region text merged"| parse-original
+  parse-original -->|"raw elements or quarantine"| assign-revision["Extraction revision\nsrc/rfp_assistant/corpus/ingestion.py"]
+  assign-revision -->|"elements.jsonl, elements rows"| fidelity-check["Fidelity check\nsrc/rfp_assistant/corpus/fidelity.py"]
+  fidelity-check -->|"auto_verified or auto_flagged"| review-status["Review status\nsrc/rfp_assistant/corpus/ingestion.py"]

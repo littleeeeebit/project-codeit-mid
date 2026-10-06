@@ -1,0 +1,15 @@
+created: 2026-10-06T12:37:58.685Z
+updated: 2026-10-06T12:37:58.842Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: evaluation-suite
+children:
+  - answer-runs
+  - compare-matrix
+  - frozen-runs
+  - gold-queue
+  - judge-comparison
+  - run-activation
+  - sealed-release
+parentPath: []

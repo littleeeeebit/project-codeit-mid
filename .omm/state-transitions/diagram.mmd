@@ -1,6 +1,6 @@
 graph TD
-  request-states["Request status\nsrc/rfp_assistant/service/service.py"] -->|"billing_state derived from"| attempt-states["Ledger attempt state\nsrc/rfp_assistant/gateway/budget.py"]
-  source-states["Source parse and review\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"review filter at build"| serving-activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  gold-candidate-states["Gold candidate review\nsrc/rfp_assistant/evaluation/gold.py"] -->|"approved rows score runs"| serving-activation
-  maintenance-run["Maintenance run\nsrc/rfp_assistant/storage/maintenance.py"] -->|"rebuilds, never activates"| serving-activation
-  serving-activation -->|"active_serving per request"| request-states
+  request-status["Request status\nsrc/rfp_assistant/service/service.py"] -->|"stop check guards dispatch"| billing-attempt["Billing attempt\nsrc/rfp_assistant/gateway/budget.py"]
+  billing-attempt -->|"billing_state by precedence"| request-status
+  startup-recovery["Startup recovery\nsrc/rfp_assistant/service/service.py"] -->|"queued, running to interrupted"| request-status
+  startup-recovery -->|"dispatching to unknown"| billing-attempt
+  serving-activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"] -->|"snapshot in trace_json"| request-status

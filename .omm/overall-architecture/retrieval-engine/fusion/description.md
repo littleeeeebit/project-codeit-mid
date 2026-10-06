@@ -1,1 +1,0 @@
-`fuse` applies weighted reciprocal rank fusion (`rrf_fuse`, `weight/(k+rank)`, an ID votes once per list). In `keyword_first` mode the leading `keyword_head` BM25 rows keep their BM25 order, so a dense row can never displace a protected keyword match. The result is cut to `fused_top_k`.

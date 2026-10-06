@@ -1,0 +1,1 @@
+The OCR design is decided: PaddleOCR-VL plus a Gemini fallback. The corpus is digital, so do not test with scans.

@@ -1,1 +1,0 @@
-Claimed by `run_queued`, or created directly by `_create` for free modes and for the synchronous `answer()`. While running, `cancel_request` only sets `cancel_requested`. The next `_checkpoint` or `_dispatch_guard` then raises `_Stop('cancelled')`, and a call already dispatched still settles.

@@ -1,6 +1,6 @@
 created: 2026-10-05 04:06:18.173000+00:00
-updated: 2026-10-06 10:18:12.341000+00:00
-update_count: 16
+updated: 2026-10-06 12:37:56.265000+00:00
+update_count: 18
 last_field: diagram
 kind: nested-class
 title: paid-gateway
@@ -8,23 +8,22 @@ children:
 - answer-validation
 - budget-admission
 - budget-ledger
-- budget-reserve
 - dispatch-guard
 - dispatch-marker
 - gateway-owner
 - langfuse-tracing
-- metered-chat
+- metered-call
 - openai-transport
 - owner-reconciliation
-- settlement
+- provider-transport
 parentPath: []
-prev_diagram: "graph TD\r\n  gateway-owner[\"Gateway advisory lock\\nsrc/rfp_assistant/postgres.py\"\
-  ] -->|\"owner_guard in tx\"| admission[\"Atomic reservation\\nsrc/rfp_assistant/budget.py\"\
-  ]\r\n  admission -->|\"attempt reserved\"| dispatch-marker[\"Dispatch marker\\nsrc/rfp_assistant/budget.py\"\
-  ]\r\n  dispatch-marker -->|\"guarded dispatching\"| provider-transport[\"OpenAI\
-  \ transport\\nsrc/rfp_assistant/generation.py\"]\r\n  gateway-owner -->|\"owner\
-  \ check before call\"| provider-transport\r\n  provider-transport -->|\"usage or\
-  \ error\"| settlement[\"Settle, release, unknown\\nsrc/rfp_assistant/budget.py\"\
-  ]\r\n  startup-recovery[\"Startup recovery\\nsrc/rfp_assistant/budget.py\"] -->|\"\
-  dispatching to unknown\"| settlement\r\n  owner-reconcile[\"Owner reconciliation\\\
-  nsrc/rfp_assistant/budget.py\"] -->|\"unknown to reconciled\"| settlement"
+prev_diagram: "graph TD\r\n  metered-chat[\"Metered chat stage\\nsrc/rfp_assistant/service/service.py\"\
+  ] -->|\"reserve maximum cost\"| budget-reserve[\"Atomic reservation\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  metered-chat -->|\"stop check in tx\"| dispatch-guard[\"Dispatch marker\\\
+  nsrc/rfp_assistant/gateway/budget.py\"]\r\n  budget-reserve -->|\"owner_guard\"\
+  | gateway-owner[\"Gateway advisory lock\\nsrc/rfp_assistant/storage/postgres.py\"\
+  ]\r\n  dispatch-guard -->|\"owner_guard\"| gateway-owner\r\n  metered-chat -->|\"\
+  chat with session key\"| openai-transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"\
+  ]\r\n  openai-transport -->|\"owner check per call\"| gateway-owner\r\n  metered-chat\
+  \ -->|\"usage or failure\"| settlement[\"Settle, release, unknown\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]"

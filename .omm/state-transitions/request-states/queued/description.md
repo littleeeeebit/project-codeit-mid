@@ -1,1 +1,0 @@
-Set by `_create` for paid modes after admission. It leaves this state by being claimed by `run_queued`, by `cancel_request` (stored with a `cancelled` result saying no paid call was made), by `RequestRunner.shutdown` or `recover_requests` (→ `interrupted`), or by `_fail_unscheduled` (→ `failed`).

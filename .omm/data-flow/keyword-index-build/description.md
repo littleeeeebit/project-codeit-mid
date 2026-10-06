@@ -1,10 +1,1 @@
-`build_keyword_index(profile, include_unreviewed, activate)` works as follows:
-1. Selects parsed sources by review status.
-2. Freezes the scope terms (`metadata_term_snapshot`).
-3. Chunks each extraction (`chunking.build_profile`: `structural`, or the fixed baselines).
-4. Tokenizes the payloads with Kiwi.
-5. Derives the version from the hash of the chunker, profile, analyzer, IDF, review scope, extraction list and metadata-term config.
-6. Writes the files to a temporary directory, hashes them into `manifest.json` and renames the directory into place.
-7. Inserts the `indexes`, `chunks` and `requirements` rows in one transaction.
-
-An existing ready version is reused. Old index versions are kept for rollback and issued citations.
+`build_keyword_index` selects parsed sources by review policy, freezes title and institution `scope_terms`, chunks each active extraction through `chunking.build_profile` (structural or fixed profiles), tokenizes with Kiwi, writes the chunks, tokens, requirements and scope-terms files plus a hashed manifest into a temp directory, and renames it to `.runtime/indexes/<version>`. The version is a hash of the config, so identical inputs are reused. It then inserts the `indexes` (ready), `chunks` and `requirements` rows in one transaction. The `requirements` rows feed the free inventory answer.

@@ -1,1 +1,0 @@
-Inserted by `budget.reserve` after every admission check passes. It holds the maximum cost, the rates and the billing scope.

@@ -1,0 +1,1 @@
+The owner approved a dedicated $5 allowance with a $5 hard cap. The ledger carries the external adjustment `external:pr8-pilot-ledger`. The Settings page can change the shared cumulative limit, and spending and reservations are preserved.

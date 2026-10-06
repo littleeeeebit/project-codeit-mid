@@ -1,0 +1,1 @@
+Reached from `mark_unknown` (provider error after a possible execution, a stream failure, missing usage, a settlement exception) or from `budget.recover` at startup (`dispatching` with no surviving worker). The attempt keeps holding its reservation until resolved.

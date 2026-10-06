@@ -1,0 +1,1 @@
+A person picks every activation; the reranker gate is shown, not enforced. An earlier `text-embedding-3-large` run remains activatable for rollback.

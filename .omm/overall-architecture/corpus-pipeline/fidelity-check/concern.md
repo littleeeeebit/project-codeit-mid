@@ -1,0 +1,1 @@
+Printing requires the Windows Hancom Viewer with the default printer set to Microsoft Print to PDF. How `maintain`'s fidelity step behaves on the Linux team VM was not traced.

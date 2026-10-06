@@ -1,8 +1,8 @@
 graph TD
-  resources["Process resources\nsrc/rfp_assistant/service/service.py"] -->|"lazily creates"| request-runner["Request runner\nsrc/rfp_assistant/service/service.py"]
-  resources -->|"reads activation"| active-serving["Active serving config\nsrc/rfp_assistant/service/service.py"]
-  active-serving -->|"index, dense, reranker keys"| model-caches["Index and model caches\nsrc/rfp_assistant/service/service.py"]
-  request-runner -->|"run_queued by request ID"| answer-pipeline["Answer pipeline\nsrc/rfp_assistant/service/service.py"]
-  answer-pipeline -->|"res.index, res.dense"| model-caches
-  answer-pipeline -->|"streamed partial text"| partials-buffer["Partial answer buffer\nsrc/rfp_assistant/service/service.py"]
-  resources -->|"registers and joins"| background-jobs["Background jobs\nsrc/rfp_assistant/service/service.py"]
+  resources["Resources owner\nsrc/rfp_assistant/service/service.py"] -->|"creates on first paid ask"| request-runner["RequestRunner executor\nsrc/rfp_assistant/service/service.py"]
+  request-runner -->|"run_queued(request_id)"| answer-pipeline["Answer pipeline\nsrc/rfp_assistant/service/service.py"]
+  resources -->|"lends index, transport, tracing"| answer-pipeline
+  answer-pipeline -->|"metadata or inventory mode"| free-answers["Free answers\nsrc/rfp_assistant/service/service.py"]
+  verifier-runs["Verifier runs\nsrc/rfp_assistant/service/service.py"] -->|"generate_from_run submits"| request-runner
+  resources -->|"registers and joins threads"| background-jobs["Background jobs\nsrc/rfp_assistant/service/service.py"]
+  background-jobs -->|"PinnedResources answer rows"| answer-pipeline

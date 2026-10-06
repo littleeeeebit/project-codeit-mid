@@ -1,8 +1,7 @@
 graph TD
-  metered-chat["Metered chat stage\nsrc/rfp_assistant/service/service.py"] -->|"reserve maximum cost"| budget-reserve["Atomic reservation\nsrc/rfp_assistant/gateway/budget.py"]
-  metered-chat -->|"stop check in tx"| dispatch-guard["Dispatch marker\nsrc/rfp_assistant/gateway/budget.py"]
-  budget-reserve -->|"owner_guard"| gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
-  dispatch-guard -->|"owner_guard"| gateway-owner
-  metered-chat -->|"chat with session key"| openai-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
-  openai-transport -->|"owner check per call"| gateway-owner
-  metered-chat -->|"usage or failure"| settlement["Settle, release, unknown\nsrc/rfp_assistant/gateway/budget.py"]
+  metered-call["Metered call\nsrc/rfp_assistant/service/service.py"] -->|"reserve max cost"| budget-ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"]
+  metered-call -->|"chat with on_delta"| provider-transport["Provider transport\nsrc/rfp_assistant/gateway/generation.py"]
+  budget-ledger -->|"owner_guard in transaction"| gateway-owner["Gateway owner lock\nsrc/rfp_assistant/storage/postgres.py"]
+  provider-transport -->|"owner check before call"| gateway-owner
+  metered-call -->|"generation span, usage, cost"| langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
+  metered-call -->|"validate structured output"| answer-validation["Answer validation\nsrc/rfp_assistant/gateway/generation.py"]
