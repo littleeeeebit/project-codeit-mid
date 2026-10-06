@@ -1,0 +1,1 @@
+One gateway owner per database. A CLI paid command and the UI server cannot both own it, so stop the UI before running paid CLI commands.

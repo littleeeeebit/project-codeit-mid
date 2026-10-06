@@ -1,0 +1,1 @@
+A failed stage never fails the question. It degrades to K1 and records `fallback` or `<stage>_unavailable` in `limitations`. The screens and traces show these, but the answer still goes out on the weaker retrieval.

@@ -1,0 +1,1 @@
+Maintenance never activates anything. A rebuilt index serves only after a person activates its regression row.

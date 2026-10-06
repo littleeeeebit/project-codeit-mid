@@ -1,1 +1,0 @@
-`step_keyword` rebuilds the serving profile and review scope with `activate=False` and needs an existing activation. `step_embedding` embeds only uncached chunks of the rebuilt index with the activated embedding model through `compare.ensure_dense`. It is free for local models and stops with `NeedsApproval` for paid ones. It is skipped when the activated run is keyword-only.

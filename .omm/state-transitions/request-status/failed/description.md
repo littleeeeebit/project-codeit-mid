@@ -1,0 +1,1 @@
+Written for provider errors, a missing key, validation (`TechnicalError`) failures, rewrite failures, `ServiceError` raised mid-execution, and unschedulable submissions (`_fail_unscheduled`). Billing for a dispatched attempt may still be `unknown`.

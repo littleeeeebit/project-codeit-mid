@@ -1,0 +1,1 @@
+Per the README, `ocr` reads raster image regions with PaddleOCR-VL on the GPU and re-reads flagged regions with Gemini 3.5 Flash-Lite under a $0.50 cap, caching results in `.runtime/ocr/<hash>/`. Ingest calls `ocr.merge` to place cached text as `image_text` elements.

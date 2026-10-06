@@ -1,0 +1,1 @@
+`attempts.state` for every paid call (chat stages, OpenAI embeddings). Open states (reserved, dispatching, unknown) hold their `reserved_micro_usd` against the cap; settled attempts count their `settled_micro_usd`. Every transition happens in a mutex transaction and bumps the ledger revision (`_bump`).

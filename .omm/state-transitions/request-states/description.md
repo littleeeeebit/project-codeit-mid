@@ -1,1 +1,0 @@
-Values: `queued`, `running`, `completed`, `failed`, `cancelled`, `interrupted`. `contracts.TERMINAL_STATUSES` lists the last four. The domain outcome (`answered`, `insufficient_evidence`, `budget_blocked`, `ingestion_unavailable`, `clarification_required`, `technical_error`, …) lives separately in `result_json.status`.

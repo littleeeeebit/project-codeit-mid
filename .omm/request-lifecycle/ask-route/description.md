@@ -1,0 +1,1 @@
+`POST /api/ask` (`AskIn`: scope ≤ 2, mode literal) calls `service.ask(res, member, scope, question, mode, date.today(), previous_request_id)`. `_KeySession` has already bound the browser's key session, model and billing scope into contextvars, and the runner copies them into the worker.

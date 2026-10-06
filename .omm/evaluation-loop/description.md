@@ -1,0 +1,1 @@
+How serving changes: question drafting and human review build the graded datasets, frozen retrieval runs and comparison tables measure every variant, and a named person activates one row. Answer-quality runs and judge comparisons then measure the finalists through the same answer path. Every paid step here is planned for free first and runs only within a consented estimate.

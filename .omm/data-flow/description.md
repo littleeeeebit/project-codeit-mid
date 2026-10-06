@@ -1,1 +1,1 @@
-How corpus data becomes servable evidence. Everything flows forward into immutable, hash-addressed artifacts. Nothing changes what serves until a person activates a run.
+How source bytes become a cited answer. Every artifact is content-addressed and immutable, and old revisions are kept, so issued citations and pinned gold rows keep resolving after re-parses and rebuilds.

@@ -1,0 +1,1 @@
+`budget.reconcile` (owner CLI) records the provider total minus the local settled cost for a closed, non-overlapping interval and project scope, and marks the explicitly covered unknown attempts `reconciled`. Attempts billed to a different `billing_scope` are refused.

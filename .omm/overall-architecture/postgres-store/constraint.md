@@ -1,0 +1,1 @@
+Never run psql through `docker exec` (user memory: an orphaned or failed psql crashed the server). Use psycopg from the host. Artifacts on disk (extractions, index directories) are part of the validated state: `references_valid` hashes them at startup.

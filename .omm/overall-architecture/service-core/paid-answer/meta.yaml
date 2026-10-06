@@ -1,0 +1,9 @@
+created: 2026-10-06T07:57:03.422Z
+updated: 2026-10-06T07:57:03.586Z
+update_count: 2
+last_field: note
+kind: nested-class
+title: paid-answer
+children: []
+parentPath:
+  - service-core

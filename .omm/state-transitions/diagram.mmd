@@ -1,10 +1,12 @@
 graph TD
-  request-states["Request status\nsrc/rfp_assistant/store.py"]
-  attempt-states["Attempt billing state\nsrc/rfp_assistant/budget.py"]
-  process-ownership["Gateway ownership\nsrc/rfp_assistant/postgres.py"]
+  request-status["Request status\nsrc/rfp_assistant/service.py"]
+  attempt-billing["Attempt billing state\nsrc/rfp_assistant/budget.py"]
+  gateway-owner["Gateway ownership\nsrc/rfp_assistant/postgres.py"]
   serving-activation["Serving activation\nsrc/rfp_assistant/evaluation.py"]
-  request-states -->|one per paid stage| attempt-states
-  attempt-states -->|billing_state on finish| request-states
-  process-ownership -->|restart marks interrupted| request-states
-  process-ownership -->|dispatching becomes unknown| attempt-states
-  serving-activation -->|config snapshot per request| request-states
+  source-review["Source review status\nsrc/rfp_assistant/ingestion.py"]
+  gold-candidate["Gold candidate decision\nsrc/rfp_assistant/gold.py"]
+  request-status -->|"stop check in dispatch"| attempt-billing
+  gateway-owner -->|"owner_guard at admission"| attempt-billing
+  gateway-owner -->|"startup recovery"| request-status
+  source-review -->|"gates index sources"| serving-activation
+  gold-candidate -->|"approved rows grade runs"| serving-activation

@@ -1,0 +1,1 @@
+I did not read the evidence-packing code that turns the fused order into `EvidenceUnit`s under the token limits.

@@ -1,8 +1,0 @@
-graph LR
-  backup-restore["Backup and restore check\nsrc/rfp_assistant/maintenance.py"]
-  reparse["Ingest and HWP fidelity\nsrc/rfp_assistant/maintenance.py"]
-  rebuild-index["Keyword and embedding rebuild\nsrc/rfp_assistant/maintenance.py"]
-  regression-report["Regression table and report\nsrc/rfp_assistant/maintenance.py"]
-  backup-restore -->|verified dump| reparse
-  reparse -->|changed sources| rebuild-index
-  rebuild-index -->|rebuilt index version| regression-report

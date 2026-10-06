@@ -1,0 +1,1 @@
+I did not trace the internals. The user memory records a design decision: the corpus is digital, so scans are never used as tests.

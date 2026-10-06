@@ -1,0 +1,1 @@
+`max_retries=0` with a finite timeout. An `AuthenticationError` message is reduced to its type name because it quotes part of the key.

@@ -1,18 +1,17 @@
 graph TD
-  web-screens["Next.js screens\nweb/src/app"]
-  api-layer["FastAPI routes\nsrc/rfp_assistant/api.py"]
-  service-core["Service facade and owner\nsrc/rfp_assistant/service.py"]
-  retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval.py"]
-  paid-gateway["Paid gateway and ledger\nsrc/rfp_assistant/budget.py"]
-  postgresql-store["PostgreSQL 18.6 + pgvector\nsrc/rfp_assistant/postgres.py"]
+  web-screens["Next.js screens\nweb/src/components"]
+  api-routes["FastAPI routes\nsrc/rfp_assistant/api.py"]
+  service-core["Service orchestration\nsrc/rfp_assistant/service.py"]
+  retrieval-engine["Hybrid retrieval\nsrc/rfp_assistant/retrieval.py"]
+  budget-ledger["Budget ledger\nsrc/rfp_assistant/budget.py"]
+  openai-transport["Provider transport\nsrc/rfp_assistant/generation.py"]
+  postgres-store["PostgreSQL and pgvector\nsrc/rfp_assistant/postgres.py"]
   offline-pipelines["Owner CLI pipelines\nsrc/rfp_assistant/cli.py"]
-  langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/tracing.py"]
-  web-screens -->|JSON and SSE| api-layer
-  api-layer -->|one service call| service-core
-  service-core -->|scoped question| retrieval-engine
-  service-core -->|reserve dispatch settle| paid-gateway
-  retrieval-engine -->|chunks and vectors| postgresql-store
-  paid-gateway -->|attempt rows| postgresql-store
-  service-core -->|requests and results| postgresql-store
-  offline-pipelines -->|extractions indexes runs| postgresql-store
-  service-core -.->|observability only| langfuse-tracing
+  web-screens -->|"REST, X-Member, SSE"| api-routes
+  api-routes -->|"one service call each"| service-core
+  service-core -->|"scoped question"| retrieval-engine
+  service-core -->|"reserve, dispatch, settle"| budget-ledger
+  service-core -->|"chat with session key"| openai-transport
+  retrieval-engine -->|"chunks, vector SQL"| postgres-store
+  budget-ledger -->|"attempts rows, lock check"| postgres-store
+  offline-pipelines -->|"ingest, index, activate"| postgres-store

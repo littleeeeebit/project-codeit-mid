@@ -14,8 +14,6 @@ children:
 - langfuse-tracing
 - openai-transport
 - owner-reconciliation
-- provider-transport
-- settlement
 parentPath: []
 prev_diagram: "graph TD\r\n  metered-chat[\"Metered chat stage\\nsrc/rfp_assistant/service.py\"\
   ]\r\n  budget-admission[\"Budget reservation\\nsrc/rfp_assistant/budget.py\"]\r\n\

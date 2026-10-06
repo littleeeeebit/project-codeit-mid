@@ -1,0 +1,17 @@
+graph TD
+  doc-search["Document search\nweb/src/components/ask/document-search.tsx"]
+  ask-page["Ask conversation\nweb/src/components/ask/ask-page.tsx"]
+  answer-stream["Answer stream reader\nweb/src/lib/use-answer-stream.ts"]
+  evidence-pane["Evidence pane\nweb/src/components/ask/answer-parts.tsx"]
+  api-client["Typed API client\nweb/src/lib/api.ts"]
+  verify-page["Verification tabs\nweb/src/components/verify/verify-page.tsx"]
+  dataset-page["Dataset drafting and review\nweb/src/components/dataset/dataset-page.tsx"]
+  settings-page["Key and limit settings\nweb/src/app/settings/page.tsx"]
+  doc-search -->|"doc_id and source_hash"| ask-page
+  ask-page -->|"POST ask, poll status"| api-client
+  ask-page -->|"owned request id"| answer-stream
+  ask-page -->|"clicked citation number"| evidence-pane
+  evidence-pane -->|"GET evidence by id"| api-client
+  verify-page -->|"poll overviews, start jobs"| api-client
+  dataset-page -->|"plan, start, decide"| api-client
+  settings-page -->|"PUT api-key sets cookie"| api-client

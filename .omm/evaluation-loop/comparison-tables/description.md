@@ -1,0 +1,1 @@
+`compare.write_table` writes `.runtime/compare/tables/<matrix>.json|md`. `service.experiments` serves them to 검증 → 실험 비교 with each row's values, facts, estimate and failure count, and an `active` flag for the serving run. `experiment_questions` lists the questions a row failed.

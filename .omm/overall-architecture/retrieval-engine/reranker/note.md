@@ -1,0 +1,1 @@
+I did not trace the reranker internals in `dense.LocalReranker` or `models.py`.

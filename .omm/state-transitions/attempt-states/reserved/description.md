@@ -1,1 +1,0 @@
-Inserted by `budget.reserve` only after every admission check passes. It holds `reserved_micro_usd` (the maximum cost) and frozen `price_json`. Never-dispatched reservations are released on restart (`budget.recover`).

@@ -1,0 +1,1 @@
+One `unknown` attempt anywhere blocks every new PostgreSQL dispatch (`mark_dispatching`). The UI then shows `budget_blocked` (결제 기록 점검 중) for every member until the owner runs `unresolved` and `settle`/`reconcile`.

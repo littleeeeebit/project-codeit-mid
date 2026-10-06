@@ -1,1 +1,0 @@
-The durable marker written by `mark_dispatching` just before the network call, in the same transaction as the stop guard. If the process dies here, the next owner turns it into `unknown`, because the provider may have executed.

@@ -1,17 +1,16 @@
 graph TD
-  ingestion["Manifest ingest and OCR\nsrc/rfp_assistant/ingestion.py"]
-  fidelity-check["HWP fidelity check\nsrc/rfp_assistant/fidelity.py"]
-  keyword-index["Keyword index build\nsrc/rfp_assistant/retrieval.py"]
-  dense-vectors["Embedding sets\nsrc/rfp_assistant/vector_store.py"]
-  gold-dataset["Gold review queue\nsrc/rfp_assistant/gold.py"]
-  evaluation-runs["Frozen runs and compare\nsrc/rfp_assistant/evaluation.py"]
-  activation["activate_decision\nsrc/rfp_assistant/evaluation.py"]
-  ingestion -->|extraction elements| fidelity-check
-  fidelity-check -->|review_status verdict| keyword-index
-  ingestion -->|parsed extractions| keyword-index
-  keyword-index -->|chunk payloads| dense-vectors
-  ingestion -->|source passages| gold-dataset
-  gold-dataset -->|approved dev rows| evaluation-runs
-  keyword-index -->|index version| evaluation-runs
-  dense-vectors -->|dense version| evaluation-runs
-  evaluation-runs -->|person picks run| activation
+  originals["Original RFP files\n원본 데이터/files"]
+  extractions["Extraction artifacts\nsrc/rfp_assistant/ingestion.py"]
+  keyword-indexes["Keyword index versions\nsrc/rfp_assistant/retrieval.py"]
+  vector-sets["pgvector embedding sets\nsrc/rfp_assistant/vector_store.py"]
+  active-run["Active serving pointer\nsrc/rfp_assistant/evaluation.py"]
+  request-records["Request records\nsrc/rfp_assistant/service.py"]
+  evidence-view["Citation and download\nsrc/rfp_assistant/service.py"]
+  originals -->|"sha256, parse HWP or PDF"| extractions
+  extractions -->|"elements into chunks"| keyword-indexes
+  keyword-indexes -->|"chunk payload hashes"| vector-sets
+  keyword-indexes -->|"index_version"| active-run
+  vector-sets -->|"dense_version"| active-run
+  active-run -->|"serving config per request"| request-records
+  request-records -->|"persisted evidence map"| evidence-view
+  originals -->|"hash-checked bytes"| evidence-view

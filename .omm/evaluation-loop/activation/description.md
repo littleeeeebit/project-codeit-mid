@@ -1,0 +1,1 @@
+`service.activate_experiment` requires `decided_by` and calls `evaluation.activate_decision` with `source: 실험 비교`. The switch is one transaction that updates `active_run` and `active_index` and appends to `activations`. The CLI `activate-run --decided-by` or `--decision-file` reaches the same function.

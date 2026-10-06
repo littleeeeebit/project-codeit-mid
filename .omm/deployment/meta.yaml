@@ -1,13 +1,9 @@
-created: 2026-10-06T07:31:43.364Z
-updated: 2026-10-06T07:31:44.182Z
+created: 2026-10-06 07:31:43.364000+00:00
+updated: 2026-10-06 07:31:44.182000+00:00
 update_count: 3
 last_field: note
 git_commit: 80ccafa
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
-  - app-process
-  - member-browser
-  - owner-cli
-  - postgres-container
-  - ssh-forward
-  - systemd-unit
+- app-process
+- systemd-unit

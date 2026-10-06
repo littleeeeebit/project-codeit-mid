@@ -1,39 +1,40 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-06 07:31:33.300000+00:00
-update_count: 14
+updated: 2026-10-06 07:57:11.831000+00:00
+update_count: 16
 last_field: diagram
-git_commit: 80ccafa
+git_commit: a41f33d
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
-- admission
 - answer-validation
 - ask-page
-- ask-submission
+- ask-route
 - cancellation
-- evidence-preparation
+- composer
 - finish-record
-- follow-up-rewrite
-- metered-generation
+- finish-step
+- generate-step
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
 - paid-call
-- screen-follow
+- persist
+- retrieve-step
 - status-poll
 - validation
-- worker-execution
-prev_diagram: "graph TD\r\n  ask-route[\"Ask route\\nsrc/rfp_assistant/api.py\"]\r\
-  \n  request-admission[\"Validate, persist, admit\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  runner-claim[\"Runner claims request\\nsrc/rfp_assistant/service.py\"]\r\n\
-  \  follow-up-rewrite[\"Follow-up rewrite stage\\nsrc/rfp_assistant/generation.py\"\
-  ]\r\n  retrieval-stage[\"Retrieval and pricing\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  generation-stage[\"Streaming generation stage\\nsrc/rfp_assistant/generation.py\"\
-  ]\r\n  answer-validation[\"Answer validation\\nsrc/rfp_assistant/generation.py\"\
-  ]\r\n  outcome-store[\"Outcome and attachment\\nsrc/rfp_assistant/service.py\"]\r\
-  \n  ask-route -->|AnswerRequest with fresh ids| request-admission\r\n  request-admission\
-  \ -->|queued row, request id| runner-claim\r\n  runner-claim -->|follow-up with\
-  \ history| follow-up-rewrite\r\n  runner-claim -->|first turn| retrieval-stage\r\
-  \n  follow-up-rewrite -->|standalone question| retrieval-stage\r\n  retrieval-stage\
-  \ -->|messages and estimate| generation-stage\r\n  retrieval-stage -->|no evidence\
-  \ found| outcome-store\r\n  generation-stage -->|provider response| answer-validation\r\
-  \n  answer-validation -->|AnswerResult| outcome-store"
+- watchers
+- worker
+prev_diagram: "graph TD\r\n  ask-submission[\"Ask page submit\\nweb/src/components/ask/ask-page.tsx\"\
+  ]\r\n  admission[\"submit_answer and _create\\nsrc/rfp_assistant/service.py\"]\r\
+  \n  worker-execution[\"run_queued and _execute\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  follow-up-rewrite[\"Follow-up rewrite\\nsrc/rfp_assistant/service.py\"]\r\
+  \n  evidence-preparation[\"prepare_answer and _priced\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  metered-generation[\"_metered_chat generation\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  answer-validation[\"validate_answer and _finish\\nsrc/rfp_assistant/generation.py\"\
+  ]\r\n  screen-follow[\"Poll and SSE stream\\nweb/src/lib/use-answer-stream.ts\"\
+  ]\r\n  ask-submission -->|POST ask| admission\r\n  admission -->|request_id to executor|\
+  \ worker-execution\r\n  worker-execution -->|has previous turn| follow-up-rewrite\r\
+  \n  follow-up-rewrite -->|standalone question| evidence-preparation\r\n  worker-execution\
+  \ -->|first turn| evidence-preparation\r\n  evidence-preparation -->|messages and\
+  \ estimate| metered-generation\r\n  metered-generation -->|provider response| answer-validation\r\
+  \n  screen-follow -->|status and partials| answer-validation\r\n  ask-submission\
+  \ -->|ownership record| screen-follow"

@@ -1,31 +1,27 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-06 07:31:28.840000+00:00
-update_count: 16
-last_field: diagram
+updated: 2026-10-06 07:57:05.897000+00:00
+update_count: 20
+last_field: note
 kind: nested-class
 title: retrieval-engine
 children:
-- bm25-channel
-- corpus-router
+- corpus-route
 - dense-channel
 - dense-search
-- evidence-packer
-- exact-codes
 - fusion
 - keyword-index
+- lexical
+- query-vector
 - reranker
 parentPath: []
-prev_diagram: "graph TD\r\n  serving-config[\"Activated serving config\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval.py\"]\r\n  corpus-routing[\"\
-  Corpus routing and codes\\nsrc/rfp_assistant/retrieval.py\"]\r\n  lexical-ranking[\"\
-  Kiwi BM25 ranking\\nsrc/rfp_assistant/retrieval.py\"]\r\n  dense-search[\"Dense\
-  \ query and search\\nsrc/rfp_assistant/vector_store.py\"]\r\n  hybrid-fusion[\"\
-  Keyword-first RRF fusion\\nsrc/rfp_assistant/retrieval.py\"]\r\n  reranker[\"Local\
-  \ reranker\\nsrc/rfp_assistant/dense.py\"]\r\n  evidence-packing[\"Evidence packing\\\
-  nsrc/rfp_assistant/retrieval.py\"]\r\n  serving-config -->|active index version|\
-  \ keyword-index\r\n  serving-config -->|embedding model and limits| dense-search\r\
-  \n  keyword-index -->|scope terms, BM25 rows| corpus-routing\r\n  corpus-routing\
-  \ -->|narrowed allowed rows| lexical-ranking\r\n  lexical-ranking -->|BM25 top k|\
-  \ hybrid-fusion\r\n  dense-search -->|cosine top k| hybrid-fusion\r\n  hybrid-fusion\
-  \ -->|fused pool below head| reranker\r\n  reranker -->|reordered pool| evidence-packing\r\
-  \n  hybrid-fusion -->|order without reranker| evidence-packing"
+prev_diagram: "graph TD\r\n  corpus-router[\"Corpus routing\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  exact-codes[\"Requirement code match\\nsrc/rfp_assistant/retrieval.py\"]\r\
+  \n  bm25-channel[\"Kiwi BM25 channel\\nsrc/rfp_assistant/retrieval.py\"]\r\n  dense-channel[\"\
+  Query vector and pgvector\\nsrc/rfp_assistant/vector_store.py\"]\r\n  fusion[\"\
+  Keyword-first RRF\\nsrc/rfp_assistant/retrieval.py\"]\r\n  reranker[\"Local reranker\\\
+  nsrc/rfp_assistant/dense.py\"]\r\n  evidence-packer[\"Evidence packing\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  corpus-router -->|narrowed scope rows| bm25-channel\r\n  corpus-router -->|narrowed\
+  \ scope rows| dense-channel\r\n  bm25-channel -->|lexical ranking| fusion\r\n  dense-channel\
+  \ -->|cosine ranking| fusion\r\n  fusion -->|fused pool| reranker\r\n  exact-codes\
+  \ -->|always first| evidence-packer\r\n  fusion -->|ordered rows| evidence-packer\r\
+  \n  reranker -->|reordered pool| evidence-packer"

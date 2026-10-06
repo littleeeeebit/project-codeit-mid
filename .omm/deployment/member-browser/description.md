@@ -1,1 +1,0 @@
-Loads the static export from the same origin, so `/api/*` calls are same-origin and the httponly key cookie reaches the server. Each member enters their own OpenAI key on 설정. The README says the shared host has no server key, so a browser without a key gets `NO_API_KEY` for paid stages while free search and evidence still work.

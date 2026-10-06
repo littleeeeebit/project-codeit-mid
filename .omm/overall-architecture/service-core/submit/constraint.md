@@ -1,0 +1,1 @@
+`postgres.tx(immediate=True)` takes `SELECT … FROM application_mutex FOR UPDATE`. One global row lock serializes every admission and ledger write. The code marks this as a deliberate `ponytail` simplification.

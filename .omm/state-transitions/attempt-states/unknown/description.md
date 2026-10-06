@@ -1,1 +1,0 @@
-The call may have been billed but no usage was recorded: timeout, connection loss, 5xx, mid-stream failure, missing usage, a settlement write failure, or a dispatching attempt found on restart. It is kept as pending at its reserved amount.

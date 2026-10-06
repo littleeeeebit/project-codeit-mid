@@ -1,0 +1,1 @@
+Set by `run_queued` (`UPDATE … WHERE status='queued' AND cancel_requested=0`). `_stop_reason` returns `interrupted` whenever the status is no longer running or `res._closed` is set, so a request the server marked interrupted can never dispatch again.

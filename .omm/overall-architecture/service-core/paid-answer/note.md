@@ -1,0 +1,1 @@
+When `_metered_chat` refuses admission, the outcome is `budget_blocked` with request status `completed`, because `fail` is called without `request_status`. Provider and validation failures use `failed`.

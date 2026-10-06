@@ -1,0 +1,1 @@
+`.runtime/extracted/<source_hash>/<fingerprint>[/<content_id>]/elements.jsonl` plus `extractions` and `elements` rows: paragraphs, tables, cells and `image_text`, each with source order, location and table structure. `extraction_inputs` holds the reuse key and stats. Ingest reports go to `.runtime/reports/ingest-*.json`.

@@ -1,0 +1,1 @@
+Drafting flow: `/api/drafting/documents` (development-family documents only), `/documents/{doc_id}/elements` and `/slots`, then `/plan` (free maximum cost), `/start` (paid, with `consented_max_micro_usd`), and `/runs/{run_id}/submit`. Review flow: `/api/gold/pending`, `/api/gold/{id}`, and `/api/gold/{id}/decide` with `expected_sha`, a note, and categories for rejects.

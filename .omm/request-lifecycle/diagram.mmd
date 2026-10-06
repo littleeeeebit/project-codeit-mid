@@ -1,18 +1,18 @@
 graph TD
-  ask-submission["Ask page submit\nweb/src/components/ask/ask-page.tsx"]
-  admission["submit_answer and _create\nsrc/rfp_assistant/service.py"]
-  worker-execution["run_queued and _execute\nsrc/rfp_assistant/service.py"]
-  follow-up-rewrite["Follow-up rewrite\nsrc/rfp_assistant/service.py"]
-  evidence-preparation["prepare_answer and _priced\nsrc/rfp_assistant/service.py"]
-  metered-generation["_metered_chat generation\nsrc/rfp_assistant/service.py"]
-  answer-validation["validate_answer and _finish\nsrc/rfp_assistant/generation.py"]
-  screen-follow["Poll and SSE stream\nweb/src/lib/use-answer-stream.ts"]
-  ask-submission -->|POST ask| admission
-  admission -->|request_id to executor| worker-execution
-  worker-execution -->|has previous turn| follow-up-rewrite
-  follow-up-rewrite -->|standalone question| evidence-preparation
-  worker-execution -->|first turn| evidence-preparation
-  evidence-preparation -->|messages and estimate| metered-generation
-  metered-generation -->|provider response| answer-validation
-  screen-follow -->|status and partials| answer-validation
-  ask-submission -->|ownership record| screen-follow
+  composer["Ask composer\nweb/src/components/ask/ask-page.tsx"]
+  ask-route["Ask route\nsrc/rfp_assistant/api.py"]
+  persist["Persist and admit\nsrc/rfp_assistant/service.py"]
+  worker["Executor worker\nsrc/rfp_assistant/service.py"]
+  retrieve-step["Scoped retrieval\nsrc/rfp_assistant/retrieval.py"]
+  generate-step["Metered streaming call\nsrc/rfp_assistant/generation.py"]
+  finish-step["Validate and store\nsrc/rfp_assistant/service.py"]
+  watchers["Status poll and SSE\nweb/src/lib/use-answer-stream.ts"]
+  composer -->|"scope, question, mode"| ask-route
+  ask-route -->|"service.ask"| persist
+  persist -->|"Owned record back"| composer
+  persist -->|"request_id queued"| worker
+  worker -->|"rewrite, then search"| retrieve-step
+  retrieve-step -->|"evidence, priced prompt"| generate-step
+  generate-step -->|"partials via stream"| watchers
+  generate-step -->|"content and usage"| finish-step
+  finish-step -->|"result_json, billing"| watchers

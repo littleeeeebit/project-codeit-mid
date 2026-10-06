@@ -1,0 +1,1 @@
+`/api/requests/{id}/stream` is a synchronous generator. Every 150 ms it calls `service.answer_progress`, which calls `request_status`, one database read per open stream per tick. That is fine for the six-user target, but it scales linearly with open streams.

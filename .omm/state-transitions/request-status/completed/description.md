@@ -1,0 +1,1 @@
+Written by `_finish` for every path that does not pass `request_status="failed"`. This includes `insufficient_evidence`, `ingestion_unavailable` and `budget_blocked` outcomes.

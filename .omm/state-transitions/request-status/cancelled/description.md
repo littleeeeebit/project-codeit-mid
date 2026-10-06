@@ -1,0 +1,1 @@
+Direct from queued in `cancel_request`, with no paid call. From running, `_finish` turns a would-be `completed` into `cancelled` when `cancel_requested` is set, or a `_Stop("cancelled")` from a checkpoint or dispatch guard does so. `abandon_request` cancels only queued requests.

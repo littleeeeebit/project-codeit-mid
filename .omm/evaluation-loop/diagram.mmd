@@ -1,0 +1,15 @@
+graph TD
+  drafting["Question drafting run\nsrc/rfp_assistant/drafting.py"]
+  gold-queue["Review queue\nsrc/rfp_assistant/gold.py"]
+  datasets["Approved datasets\nsrc/rfp_assistant/evaluation.py"]
+  retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation.py"]
+  comparison-tables["Comparison tables\nsrc/rfp_assistant/compare.py"]
+  activation["Person activates a row\nsrc/rfp_assistant/evaluation.py"]
+  answer-eval["Answer and judge runs\nsrc/rfp_assistant/answers.py"]
+  drafting -->|"submit_drafts batch"| gold-queue
+  gold-queue -->|"approval rewrites jsonl"| datasets
+  datasets -->|"graded population"| retrieval-runs
+  retrieval-runs -->|"scores per row"| comparison-tables
+  comparison-tables -->|"activate with name"| activation
+  activation -->|"finalists pinned"| answer-eval
+  datasets -->|"dev questions"| answer-eval

@@ -1,16 +1,14 @@
 graph TD
-  corpus-router["Corpus routing\nsrc/rfp_assistant/retrieval.py"]
-  exact-codes["Requirement code match\nsrc/rfp_assistant/retrieval.py"]
-  bm25-channel["Kiwi BM25 channel\nsrc/rfp_assistant/retrieval.py"]
-  dense-channel["Query vector and pgvector\nsrc/rfp_assistant/vector_store.py"]
-  fusion["Keyword-first RRF\nsrc/rfp_assistant/retrieval.py"]
-  reranker["Local reranker\nsrc/rfp_assistant/dense.py"]
-  evidence-packer["Evidence packing\nsrc/rfp_assistant/retrieval.py"]
-  corpus-router -->|narrowed scope rows| bm25-channel
-  corpus-router -->|narrowed scope rows| dense-channel
-  bm25-channel -->|lexical ranking| fusion
-  dense-channel -->|cosine ranking| fusion
-  fusion -->|fused pool| reranker
-  exact-codes -->|always first| evidence-packer
-  fusion -->|ordered rows| evidence-packer
-  reranker -->|reordered pool| evidence-packer
+  keyword-index["Keyword index loader\nsrc/rfp_assistant/retrieval.py"]
+  corpus-route["Corpus project routing\nsrc/rfp_assistant/retrieval.py"]
+  lexical["Kiwi BM25 ranking\nsrc/rfp_assistant/retrieval.py"]
+  query-vector["Query embedding cache\nsrc/rfp_assistant/dense.py"]
+  dense-search["pgvector search\nsrc/rfp_assistant/vector_store.py"]
+  fusion["Keyword-first fusion\nsrc/rfp_assistant/retrieval.py"]
+  reranker["Optional local reranker\nsrc/rfp_assistant/dense.py"]
+  keyword-index -->|"chunks, BM25, scope terms"| lexical
+  corpus-route -->|"narrowed scope rows"| lexical
+  query-vector -->|"unit query vector"| dense-search
+  lexical -->|"ranked BM25 ids"| fusion
+  dense-search -->|"ranked cosine ids"| fusion
+  fusion -->|"pool in HR mode"| reranker

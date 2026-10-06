@@ -1,9 +1,0 @@
-created: 2026-10-06T07:31:28.990Z
-updated: 2026-10-06T07:31:28.991Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: corpus-router
-children: []
-parentPath:
-  - retrieval-engine

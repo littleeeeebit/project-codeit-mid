@@ -1,0 +1,1 @@
+`RFP_SOURCE_DIR` (default `<repo>/원본 데이터`) holds `data_list.csv` and `files/` (HWP and PDF). `import_manifest` records `documents` (CSV metadata per notice) and `sources` (one per unique `source_hash`). Byte-identical files share one source and one extraction but keep their own metadata. `resolve-metadata` writes `metadata_resolutions` for conflicting fields.

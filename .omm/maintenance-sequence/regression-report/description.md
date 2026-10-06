@@ -1,1 +1,0 @@
-`step_regression` runs `compare.regression` over K1 and the serving configuration on both the served and the rebuilt index. Any non-complete row fails the step. Questions whose pinned evidence was replaced by a reparse make the run `unverified` and are named. The final `report` step adds golden-set counts.

@@ -1,0 +1,1 @@
+Observability only. Admission, reservation and settlement never read it, and a failing Langfuse changes neither answers nor the ledger.

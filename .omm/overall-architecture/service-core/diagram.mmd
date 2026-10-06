@@ -1,13 +1,16 @@
 graph TD
-  resources-owner["Resources owner\nsrc/rfp_assistant/service.py"]
-  key-sessions["Browser key sessions\nsrc/rfp_assistant/generation.py"]
-  request-runner["RequestRunner executor\nsrc/rfp_assistant/service.py"]
-  background-jobs["Drafting eval judge maintenance\nsrc/rfp_assistant/service.py"]
-  serving-config["active_serving and run_settings\nsrc/rfp_assistant/service.py"]
-  partials-buffer["Streamed partial answers\nsrc/rfp_assistant/service.py"]
-  resources-owner -->|creates lazily| request-runner
-  resources-owner -->|joins on close| background-jobs
-  key-sessions -->|session client per call| resources-owner
-  request-runner -->|reads per request| serving-config
-  request-runner -->|on_delta writes| partials-buffer
-  background-jobs -->|same transport and lock| resources-owner
+  resources["Process resources\nsrc/rfp_assistant/service.py"]
+  submit["Admission and idempotency\nsrc/rfp_assistant/service.py"]
+  runner["Bounded request runner\nsrc/rfp_assistant/service.py"]
+  paid-answer["Paid answer pipeline\nsrc/rfp_assistant/service.py"]
+  metered-chat["Metered provider call\nsrc/rfp_assistant/service.py"]
+  answer-check["Answer validation\nsrc/rfp_assistant/generation.py"]
+  background-jobs["Paid background jobs\nsrc/rfp_assistant/service.py"]
+  tracing["Langfuse tracing\nsrc/rfp_assistant/tracing.py"]
+  submit -->|"slot taken, id queued"| runner
+  runner -->|"run_queued claims row"| paid-answer
+  paid-answer -->|"rewrite, then answer"| metered-chat
+  metered-chat -->|"content and usage"| answer-check
+  resources -->|"index, transport, lock"| paid-answer
+  resources -->|"transport, closing flag"| background-jobs
+  paid-answer -->|"spans and scores"| tracing

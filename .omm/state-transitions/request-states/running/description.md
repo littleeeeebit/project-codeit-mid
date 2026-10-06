@@ -1,1 +1,0 @@
-Entered by the `run_queued` claim, or inserted directly as `running` for free modes and for the synchronous `answer()` used by CLI and tests. `_stop_reason` treats any status other than `running` (or `res._closed`) as `interrupted`, so a row flipped by shutdown cannot start another paid stage.

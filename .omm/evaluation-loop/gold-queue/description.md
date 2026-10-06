@@ -1,0 +1,1 @@
+`submit_drafts` refuses a run that is incomplete or already submitted. It calls `evaluation.assign_families` and then `gold.submit(... "dev", drafting.DRAFTER)`, which inserts pending `gold_candidates`. The review screen shows `candidate_spans` (cited quote segments within the element text) and the current validation errors, then calls `gold.decide`.

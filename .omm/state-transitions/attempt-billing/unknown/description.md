@@ -1,0 +1,1 @@
+Set by `mark_unknown` on a non-pre-execution `ProviderError`, an unexpected transport exception, a response without usage, or a failed settlement, and by `budget.recover` for attempts left `dispatching` across a restart. The reserved amount stays held.

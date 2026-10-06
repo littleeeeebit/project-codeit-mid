@@ -1,1 +1,0 @@
-`step_ingest` runs `import_manifest` + `ingest`, fails on any `error` result, and records `ctx.changed_sources` as the sources whose active extraction actually changed. `step_fidelity` checks only HWP extractions with no verdict for the current `FIDELITY_VERSION`.

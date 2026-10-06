@@ -1,1 +1,0 @@
-Set immediately by `cancel_request` on a queued row, with a result saying no paid call happened. For a running row, `_finish` rewrites `completed` to `cancelled` when `cancel_requested` was set, or a `_Stop('cancelled')` reaches it. Attached rendering is refused (`may_attach`).

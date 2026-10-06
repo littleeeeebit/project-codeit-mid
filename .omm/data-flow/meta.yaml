@@ -1,37 +1,36 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-06 07:31:40.024000+00:00
-update_count: 14
+updated: 2026-10-06 07:57:20.695000+00:00
+update_count: 16
 last_field: diagram
-git_commit: 80ccafa
+git_commit: a41f33d
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
 - activation
+- active-run
 - corpus-ingestion
-- dense-vectors
-- evaluation-runs
+- evidence-view
 - extraction
+- extractions
 - fidelity-check
-- gold-dataset
 - index-build
-- ingestion
-- keyword-index
+- keyword-indexes
 - ocr-merge
 - original-corpus
+- originals
+- request-records
 - retrieval-selection
 - run-selection
-prev_diagram: "graph TD\r\n  source-files[\"Original files and CSV\\nsrc/rfp_assistant/ingestion.py\"\
-  ]\r\n  manifest-import[\"Manifest import\\nsrc/rfp_assistant/ingestion.py\"]\r\n\
-  \  ingestion-parse[\"Parse, OCR merge, diagnose\\nsrc/rfp_assistant/ingestion.py\"\
-  ]\r\n  extraction-store[\"Extraction revisions\\nsrc/rfp_assistant/store.py\"]\r\
-  \n  keyword-index-build[\"Keyword index build\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  vector-sets[\"Embedding vector sets\\nsrc/rfp_assistant/vector_store.py\"\
-  ]\r\n  gold-dataset[\"Gold question datasets\\nsrc/rfp_assistant/gold.py\"]\r\n\
-  \  retrieval-runs[\"Frozen retrieval runs\\nsrc/rfp_assistant/evaluation.py\"]\r\
-  \n  serving-pointer[\"Serving activation pointer\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  source-files -->|CSV rows and file hashes| manifest-import\r\n  manifest-import\
-  \ -->|sources and documents rows| ingestion-parse\r\n  ingestion-parse -->|elements\
-  \ and artifact| extraction-store\r\n  extraction-store -->|chunk profiles| keyword-index-build\r\
-  \n  keyword-index-build -->|unique payloads| vector-sets\r\n  keyword-index-build\
-  \ -->|index manifest| retrieval-runs\r\n  vector-sets -->|verified dense matrix|\
-  \ retrieval-runs\r\n  gold-dataset -->|reviewed questions and spans| retrieval-runs\r\
-  \n  retrieval-runs -->|person activates| serving-pointer"
+- vector-sets
+prev_diagram: "graph TD\r\n  ingestion[\"Manifest ingest and OCR\\nsrc/rfp_assistant/ingestion.py\"\
+  ]\r\n  fidelity-check[\"HWP fidelity check\\nsrc/rfp_assistant/fidelity.py\"]\r\n\
+  \  keyword-index[\"Keyword index build\\nsrc/rfp_assistant/retrieval.py\"]\r\n \
+  \ dense-vectors[\"Embedding sets\\nsrc/rfp_assistant/vector_store.py\"]\r\n  gold-dataset[\"\
+  Gold review queue\\nsrc/rfp_assistant/gold.py\"]\r\n  evaluation-runs[\"Frozen runs\
+  \ and compare\\nsrc/rfp_assistant/evaluation.py\"]\r\n  activation[\"activate_decision\\\
+  nsrc/rfp_assistant/evaluation.py\"]\r\n  ingestion -->|extraction elements| fidelity-check\r\
+  \n  fidelity-check -->|review_status verdict| keyword-index\r\n  ingestion -->|parsed\
+  \ extractions| keyword-index\r\n  keyword-index -->|chunk payloads| dense-vectors\r\
+  \n  ingestion -->|source passages| gold-dataset\r\n  gold-dataset -->|approved dev\
+  \ rows| evaluation-runs\r\n  keyword-index -->|index version| evaluation-runs\r\n\
+  \  dense-vectors -->|dense version| evaluation-runs\r\n  evaluation-runs -->|person\
+  \ picks run| activation"

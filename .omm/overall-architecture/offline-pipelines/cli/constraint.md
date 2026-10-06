@@ -1,0 +1,1 @@
+Commands are the owner's interface, and every write takes `--actor` and a reason. Only the CLI administers the budget; the UI changes only the cap and the per-browser key.

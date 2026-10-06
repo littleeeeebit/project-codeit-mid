@@ -1,0 +1,1 @@
+Set by `RequestRunner.shutdown` (queued rows, and running rows if workers did not finish in time) and by `recover_requests` when a new gateway owner starts. Nothing is replayed automatically.

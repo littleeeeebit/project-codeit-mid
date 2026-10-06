@@ -1,0 +1,1 @@
+Pipelines run every variant, but a person picks and activates; nothing activates on its own (plan rule, `0-overview.md`).
