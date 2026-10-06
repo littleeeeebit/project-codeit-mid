@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import tempfile
 import unittest
 from dataclasses import asdict
@@ -17,13 +18,18 @@ from unittest import mock
 from rfp_assistant import cli
 from rfp_assistant import settings as settings_mod
 from rfp_assistant.corpus import ingestion
-from rfp_assistant.evaluation import compare, evaluation, judges
+from rfp_assistant.evaluation import compare, evaluation, judges, release
+from rfp_assistant.gateway import generation
 from rfp_assistant.service import answers, service
 from rfp_assistant.settings import Settings, SettingsError
+from rfp_assistant.storage import store
 from tests import fixtures
+from tests import test_dense, test_release  # their scenarios; module attributes, so their tests are not collected twice
 
 ROOT = Path(__file__).resolve().parents[1]
-CLI_SNAPSHOT = Path(__file__).parent / "snapshots" / "cli_parser.json"
+SNAPSHOTS = Path(__file__).parent / "snapshots"
+CLI_SNAPSHOT = SNAPSHOTS / "cli_parser.json"
+HELP_SHA = "7c15c41ca120a1fc"  # sha256 of every help text at COLUMNS=100, pinned from the original build_parser
 
 
 def rate(k, n, lo_hi):
@@ -158,6 +164,14 @@ class CliTest(unittest.TestCase):
     def test_parser_matches_snapshot(self):
         self.assertEqual(json.loads(json.dumps(parser_shape(), ensure_ascii=False, default=str)),
                          json.loads(CLI_SNAPSHOT.read_text(encoding="utf-8")))
+
+    def test_help_text_is_unchanged(self):
+        """Every help string, root and per subcommand, at a fixed width; the parser snapshot localizes other changes."""
+        with mock.patch.dict(os.environ, {"COLUMNS": "100"}):
+            parser = cli.build_parser()
+            sub = parser._subparsers._group_actions[0]
+            text = "\n\0".join([parser.format_help(), *(sp.format_help() for _, sp in sorted(sub.choices.items()))])
+        self.assertEqual(hashlib.sha256(text.encode()).hexdigest()[:16], HELP_SHA)
 
     def test_every_subcommand_dispatches(self):
         sub = cli.build_parser()._subparsers._group_actions[0]
@@ -396,6 +410,150 @@ class IngestionHelpersTest(unittest.TestCase):
     def test_identity_and_text(self):
         self.assertEqual(ingestion.doc_id_for("기관A_통합 정보시스템.pdf"), "2325c786-bc0e-5646-b409-7f9717850c4d")
         self.assertEqual(ingestion.search_text(" 가  나\n다 "), "가 나 다")
+
+
+class CompareCapCommandTest(unittest.TestCase):
+    def test_stores_the_cap_and_audits_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = fixtures.make_env(Path(tmp))
+            args = argparse.Namespace(usd="1.25", actor="owner", reason="comparison")
+            with mock.patch("builtins.print"):
+                self.assertEqual(cli.cmd_compare_cap(args, env.settings), 0)
+            with store.open_db(env.settings.db_path) as conn:
+                cap = conn.execute("SELECT cap_micro_usd, updated_by, reason FROM external_ledger").fetchall()
+                audit = conn.execute("SELECT actor, action, target, reason, details_json FROM audit_events").fetchall()
+        self.assertEqual([tuple(r) for r in cap], [(1_250_000, "owner", "comparison")])
+        self.assertEqual([tuple(r) for r in audit],
+                         [("owner", "set-external-cap", "gemini", "comparison", '{"cap_micro_usd": 1250000}')])
+
+
+STAMP = re.compile(r"\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(\.\d+)?(\+00:00|Z)?")
+
+
+def pinned_provenance(test: unittest.TestCase) -> None:
+    """Code, metric and hardware fingerprints fixed for the test: they hash the package source, which a refactor
+    changes, and they flow into run identities and reports."""
+    test.enterContext(mock.patch.object(evaluation, "code_fingerprint", return_value={
+        "source_sha256": "c" * 64, "git_revision": "r" * 40, "git_dirty": False}))
+    test.enterContext(mock.patch.object(evaluation, "metric_code_sha256", return_value="m" * 64))
+    test.enterContext(mock.patch.object(evaluation, "hardware", return_value={"machine": "fixture"}))
+
+
+def snapshot(test: unittest.TestCase, name: str, text: str) -> None:
+    path = SNAPSHOTS / f"{name}.txt"
+    if os.environ.get("RFP_WRITE_SNAPSHOTS"):  # only from code whose behaviour is the reference
+        path.write_text(text, encoding="utf-8", newline="\n")
+    with test.subTest(snapshot=name):
+        test.assertEqual(text, path.read_text(encoding="utf-8"))
+
+
+UUID = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
+DIGEST = re.compile(r"\b(?=[0-9a-z]*\d)[0-9a-z]{10,64}\b")  # index versions, run IDs, fingerprints, hashes
+# Timings, and spend: the fake provider prices prompts that carry random request IDs, so cents move between runs.
+MEASURED = re.compile(r'("(?:p50|p95|p95_ms|mean|max|min|cold_wave_ms|wall_ms|total|exact|lexical|dense|fuse|rerank|'
+                      r'pack|ms|infer_ms|queue_ms|elapsed_ms|total_ms|retrieval_ms|generation_ms|[a-z_]*micro_usd|'
+                      r'settled|reserved|used_incl_open|[a-z_]*percent|prompt|evaluation-job[\w-]*)": )-?[0-9.]+'
+                      r'|\b\d+(\.\d+)?(?=(/\d+(\.\d+)?)? ms\b)|(?<=\$)[0-9,]+\.\d+|(?<=\()\d+\.\d+(?=%\))')
+
+
+CONCURRENT = re.compile(r'"question_id": "[^"]*"(?=,\n\s*"ms": )')  # a latency wave lists requests as they finish
+
+
+def mask_p95_columns(text: str) -> str:
+    """The `p95 ms` column of a Markdown table, located from its header."""
+    out, column = [], None
+    for line in text.split("\n"):
+        cells = line.split(" | ")
+        if line.startswith("|") and any(c.strip(" |") == "p95 ms" for c in cells):
+            column = next(i for i, c in enumerate(cells) if c.strip(" |") == "p95 ms")
+        elif not line.startswith("|"):
+            column = None
+        elif column is not None and not line.startswith("| ---") and len(cells) > column:
+            cells[column] = "<ms>" + (" |" if cells[column].endswith(" |") else "")
+            line = " | ".join(cells)
+        out.append(line)
+    return "\n".join(out)
+
+
+def read_outputs(folder: Path, names: tuple[str, ...], root: Path) -> str:
+    """The files joined, with what differs between identical runs made stable: timestamps, the temporary root, and
+    measured timings masked; identifiers derived from the temporary paths renamed in order of first appearance, so
+    the snapshot still shows which ones are the same."""
+    text = "\n\0".join((folder / n).read_text(encoding="utf-8") for n in names)
+    for form in (str(root), str(root).replace("\\", "\\\\"), root.as_posix()):
+        text = text.replace(form, "<tmp>")
+    text = CONCURRENT.sub('"question_id": "<concurrent>"', mask_p95_columns(STAMP.sub("<time>", UUID.sub("<uuid>", text))))
+    text = MEASURED.sub(lambda m: (m.group(1) or "") + "<n>", text)
+    text = re.sub(r'"evaluation-job-\d+": <n>', '"evaluation-job-<k>": <n>', text)  # members are ordered by spend
+    names_seen: dict[str, str] = {}
+    return DIGEST.sub(lambda m: names_seen.setdefault(m.group(), f"<id{len(names_seen) + 1}>"), text)
+
+
+class Phase2ReportTest(unittest.TestCase):
+    """report.md, manifest.json and source-map.json before and after an activation, byte for byte apart from
+    timestamps and the temporary directory's name; snapshots taken from the original write_phase2_report."""
+
+    def render(self, s) -> str:
+        evaluation.write_phase2_report(s)
+        return read_outputs(s.data_dir / "releases" / "phase-2", ("report.md", "manifest.json", "source-map.json"),
+                            s.data_dir.parent)
+
+    def test_outputs_are_unchanged(self):
+        pinned_provenance(self)
+        with tempfile.TemporaryDirectory() as tmp:
+            env = fixtures.make_env(Path(tmp))
+            self.enterContext(fixtures.paid_gateway(env.settings))
+            transport = generation.FakeTransport()
+            test_dense._plan_and_build(env, transport)
+            test_dense._dataset(env)
+            s = env.settings
+            runs = {o["label"]: o["run_id"] for o in evaluation.evaluate_retrieval(
+                s, fixtures.analyzer(), transport, "dev-pilot", ["K0", "K1", "H"], allow_paid_queries=True)}
+            before = self.render(s)
+            decision = Path(tmp) / "decision.json"
+            decision.write_text(json.dumps({"run_id": runs["K1"], "mode": "kiwi_bm25", "decided_by": "owner",
+                                            "finalist_run_id": runs["H"], "rationale": "fixture"}), encoding="utf-8")
+            evaluation.activate_run(s, runs["K1"], decision)
+            after = self.render(s)
+        snapshot(self, "phase2_before", before)
+        snapshot(self, "phase2_after", after)
+
+
+class ReleaseReportTest(unittest.TestCase):
+    """The five release outputs for a draft and for a sealed release, timestamps and measured latencies masked;
+    snapshots taken from the original write_release_report."""
+
+    NAMES = ("report.md", "manifest.json", "coverage.json", "evaluation.json", "budget.json")
+
+    def render(self, s, path: Path) -> str:
+        return read_outputs(path.parent, self.NAMES, s.data_dir.parent)
+
+    def test_a_draft_release(self):
+        pinned_provenance(self)
+        with tempfile.TemporaryDirectory() as tmp:
+            env = fixtures.make_env(Path(tmp))
+            text = self.render(env.settings, release.write_release_report(env.settings, "latest"))
+        snapshot(self, "release_draft", re.sub(r"draft-\d{4}-\d\d-\d\d", "draft-<date>", text))
+
+    def test_a_sealed_release(self):
+        """Every report test_release's sealed scenario writes (sealed, stale check, current check, changed prompt),
+        captured as that scenario writes it, so the scenario lives in one place."""
+        pinned_provenance(self)
+        rendered = []
+        original = release.write_release_report
+
+        def capture(s, release_id=None):
+            path = original(s, release_id)
+            rendered.append(self.render(s, path))
+            return path
+
+        scenario = test_release.ReleaseReportTest("test_the_report_reads_a_sealed_release_without_calling_the_provider")
+        with mock.patch.object(release, "write_release_report", capture):
+            outcome = unittest.TestResult()
+            scenario.run(outcome)
+        self.assertEqual((outcome.errors, outcome.failures), ([], []))
+        self.assertEqual(len(rendered), 4)
+        snapshot(self, "release_sealed", "\n\0\0".join(rendered))
 
 
 class VerifyToolTest(unittest.TestCase):
