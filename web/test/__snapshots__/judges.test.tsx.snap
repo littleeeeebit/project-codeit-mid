@@ -1,0 +1,2842 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the disagreement review > opens on false accepts, filters, searches and pages 1`] = `
+<article
+  class="space-y-8 xl:border-l xl:pl-8"
+>
+  <header
+    class="space-y-2"
+  >
+    <p
+      class="text-sm text-muted-foreground"
+    >
+      인용 하나
+       · 기준 판정 
+      <span
+        class="font-semibold text-bad"
+      >
+        근거 없음
+      </span>
+    </p>
+    <p
+      class="text-lg font-semibold leading-snug [overflow-wrap:anywhere]"
+    >
+      하자보수는 24개월이다
+    </p>
+  </header>
+  <ul
+    class="grid gap-6 sm:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]"
+  >
+    <li
+      class="space-y-1"
+    >
+      <p
+        class="text-sm text-muted-foreground"
+      >
+        Luna
+      </p>
+      <p
+        class="flex flex-wrap items-baseline gap-x-2"
+      >
+        <span
+          class="text-base font-bold text-bad"
+        >
+          근거 없음
+        </span>
+      </p>
+    </li>
+    <li
+      class="space-y-1"
+    >
+      <p
+        class="text-sm text-muted-foreground"
+      >
+        Jev · 영어 다리
+      </p>
+      <p
+        class="flex flex-wrap items-baseline gap-x-2"
+      >
+        <span
+          class="text-base font-bold text-ok"
+        >
+          지지
+        </span>
+        <span
+          class="text-xs text-muted-foreground"
+        >
+          ≠ 기준
+        </span>
+        <span
+          class="text-xs tabular-nums text-muted-foreground"
+        >
+          지지 확률 
+          0.71
+        </span>
+      </p>
+      <p
+        class="text-sm leading-relaxed text-muted-foreground"
+        lang="en"
+      >
+        The passage states it.
+      </p>
+    </li>
+  </ul>
+  <div
+    class="space-y-1"
+  >
+    <p
+      class="text-sm font-semibold"
+    >
+      원문과 Jev가 읽은 영어
+    </p>
+    <dl
+      class="divide-y"
+    >
+      <div
+        class="grid gap-x-6 gap-y-2 py-3 md:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1fr)]"
+      >
+        <dt
+          class="text-sm text-muted-foreground"
+        >
+          주장
+        </dt>
+        <dd
+          class="min-w-0"
+        >
+          <div
+            class="min-w-0 space-y-2 text-sm leading-relaxed"
+          >
+            <p
+              class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+            >
+              하자보수는 24개월이다
+            </p>
+          </div>
+        </dd>
+        <dd
+          class="min-w-0"
+        >
+          <div
+            class="min-w-0 space-y-2 text-sm leading-relaxed"
+            lang="en"
+          >
+            <p
+              class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+            >
+              Warranty is 24 months
+            </p>
+          </div>
+        </dd>
+      </div>
+      <details
+        class="group py-1"
+      >
+        <summary
+          class="flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+        >
+          <span
+            aria-hidden="true"
+            class="transition-transform group-open:rotate-90"
+          >
+            ›
+          </span>
+          근거 인용
+           
+          2
+          개
+        </summary>
+        <div
+          class="grid gap-x-6 gap-y-2 pb-3 md:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1fr)]"
+        >
+          <span
+            class="hidden md:block"
+          />
+          <div
+            class="min-w-0 space-y-2 text-sm leading-relaxed"
+          >
+            <p
+              class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+            >
+              원문 A
+            </p>
+            <p
+              class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+            >
+              원문 B
+            </p>
+          </div>
+          <div
+            class="min-w-0 space-y-2 text-sm leading-relaxed"
+            lang="en"
+          >
+            <p
+              class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+            >
+              Source A
+            </p>
+            <p
+              class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+            >
+              Source B
+            </p>
+          </div>
+        </div>
+      </details>
+    </dl>
+  </div>
+</article>
+`;
+
+exports[`the disagreement review > opens on false accepts, filters, searches and pages 2`] = `
+<article
+  class="space-y-8 xl:border-l xl:pl-8"
+>
+  <header
+    class="space-y-2"
+  >
+    <p
+      class="text-sm text-muted-foreground"
+    >
+      필수 사실
+       · 기준 판정 
+      <span
+        class="font-semibold text-ok"
+      >
+        정확
+      </span>
+    </p>
+    <p
+      class="text-lg font-semibold leading-snug [overflow-wrap:anywhere]"
+    >
+      사업 금액은?
+    </p>
+    <p
+      class="text-sm"
+    >
+      필수 사실 · 
+      1억 3천만원
+    </p>
+    <p
+      class="text-sm"
+    >
+      <span
+        class="font-semibold"
+      >
+        금액을 바꿈
+      </span>
+       · 
+      <span
+        class="line-through"
+      >
+        1억 3천만원
+      </span>
+       → 
+      1억 원
+    </p>
+  </header>
+  <ul
+    class="grid gap-6 sm:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]"
+  >
+    <li
+      class="space-y-1"
+    >
+      <p
+        class="text-sm text-muted-foreground"
+      >
+        Luna
+      </p>
+      <p
+        class="flex flex-wrap items-baseline gap-x-2"
+      >
+        <span
+          class="text-base font-bold text-bad"
+        >
+          값 틀림
+        </span>
+        <span
+          class="text-xs text-muted-foreground"
+        >
+          ≠ 기준
+        </span>
+      </p>
+      <p
+        class="text-xs text-muted-foreground"
+      >
+        코드가 값으로 판정
+      </p>
+    </li>
+    <li
+      class="space-y-1"
+    >
+      <p
+        class="text-sm text-muted-foreground"
+      >
+        Jev · 영어 다리
+      </p>
+      <p
+        class="flex flex-wrap items-baseline gap-x-2"
+      >
+        <span
+          class="text-base font-bold text-muted-foreground"
+        >
+          보류
+        </span>
+        <span
+          class="text-xs text-muted-foreground"
+        >
+          ≠ 기준
+        </span>
+      </p>
+      <p
+        class="text-xs text-muted-foreground"
+      >
+        영어로 옮기지 못해 보내지 않음
+      </p>
+    </li>
+  </ul>
+  <div
+    class="space-y-1"
+  >
+    <p
+      class="text-sm font-semibold"
+    >
+      원문과 Jev가 읽은 영어
+    </p>
+    <p
+      class="text-sm text-warn"
+    >
+      영어 다리 없음 · 
+      protected value changed
+      . 번역이 보호한 값을 바꾸거나 한글을 남겨 Jev에 보내지 않았습니다.
+    </p>
+    <dl
+      class="divide-y"
+    >
+      <div
+        class="grid gap-x-6 gap-y-2 py-3 md:grid-cols-[5rem_minmax(0,1fr)]"
+      >
+        <dt
+          class="text-sm text-muted-foreground"
+        >
+          질문
+        </dt>
+        <dd
+          class="min-w-0"
+        >
+          <div
+            class="min-w-0 space-y-2 text-sm leading-relaxed"
+          >
+            <p
+              class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+            >
+              사업 금액은?
+            </p>
+          </div>
+        </dd>
+      </div>
+      <div
+        class="grid gap-x-6 gap-y-2 py-3 md:grid-cols-[5rem_minmax(0,1fr)]"
+      >
+        <dt
+          class="text-sm text-muted-foreground"
+        >
+          필수 사실
+        </dt>
+        <dd
+          class="min-w-0"
+        >
+          <div
+            class="min-w-0 space-y-2 text-sm leading-relaxed"
+          >
+            <p
+              class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+            >
+              1억 3천만원
+            </p>
+          </div>
+        </dd>
+      </div>
+      <div
+        class="grid gap-x-6 gap-y-2 py-3 md:grid-cols-[5rem_minmax(0,1fr)]"
+      >
+        <dt
+          class="text-sm text-muted-foreground"
+        >
+          조건
+        </dt>
+        <dd
+          class="min-w-0"
+        >
+          <div
+            class="min-w-0 space-y-2 text-sm leading-relaxed"
+          >
+            <p
+              class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+            >
+              부가세 포함
+            </p>
+          </div>
+        </dd>
+      </div>
+    </dl>
+  </div>
+</article>
+`;
+
+exports[`the judge golden set > false accepts per mutation type, overall without unmutated 1`] = `
+<div>
+  <div
+    class="space-y-16"
+  >
+    <div
+      class="space-y-10"
+    >
+      <div
+        aria-label="판정 세트"
+        class="flex flex-wrap gap-2"
+        role="group"
+      >
+        <button
+          aria-pressed="false"
+          class="min-h-11 rounded-full px-4 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-secondary text-foreground hover:bg-secondary/70"
+          type="button"
+        >
+          평가용 기준 · 120개
+        </button>
+        <button
+          aria-pressed="true"
+          class="min-h-11 rounded-full px-4 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-foreground font-semibold text-background"
+          type="button"
+        >
+          판정 골든 세트 · 오답 70 · 정답 20
+        </button>
+      </div>
+      <section
+        aria-labelledby="judge-set-answer"
+        class="space-y-10"
+      >
+        <div
+          class="space-y-3"
+        >
+          <p
+            class="text-sm font-medium text-muted-foreground"
+          >
+            정답을 일부러 틀리게 바꾸면 판정 모델이 알아채나
+          </p>
+          <h3
+            class="sr-only"
+            id="judge-set-answer"
+          >
+            변형 종류별 잘못 통과율
+          </h3>
+          <dl
+            class="grid gap-8 sm:grid-cols-2"
+          >
+            <div
+              class="space-y-1"
+            >
+              <dt
+                class="text-sm text-muted-foreground"
+              >
+                Luna
+                 · 틀린 답을 통과시킨 비율
+              </dt>
+              <dd
+                class="text-5xl font-bold tabular-nums"
+              >
+                3.6%
+              </dd>
+              <dd
+                class="text-sm tabular-nums text-muted-foreground"
+              >
+                판정한 오답 
+                55
+                개 중 
+                2
+                개 · 정답 통과 
+                95.0%
+              </dd>
+            </div>
+            <div
+              class="space-y-1"
+            >
+              <dt
+                class="text-sm text-muted-foreground"
+              >
+                Jev · 영어 다리
+                 · 틀린 답을 통과시킨 비율
+              </dt>
+              <dd
+                class="text-5xl font-bold tabular-nums"
+              >
+                13.0%
+              </dd>
+              <dd
+                class="text-sm tabular-nums text-muted-foreground"
+              >
+                판정한 오답 
+                54
+                개 중 
+                7
+                개 · 정답 통과 
+                90.0%
+              </dd>
+            </div>
+          </dl>
+        </div>
+        <div
+          class="overflow-x-auto rounded-xl border border-input bg-background"
+        >
+          <table
+            class="w-full border-collapse"
+          >
+            <caption
+              class="sr-only"
+            >
+              변형 종류별로 두 판정 모델이 틀린 답을 통과시킨 비율
+            </caption>
+            <thead
+              class="bg-secondary/70"
+            >
+              <tr>
+                <th
+                  class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                  scope="col"
+                >
+                  변형
+                </th>
+                <th
+                  class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                  scope="col"
+                >
+                  항목
+                </th>
+                <th
+                  class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                  scope="col"
+                >
+                  Luna 통과율
+                </th>
+                <th
+                  class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                  scope="col"
+                >
+                  Jev 통과율
+                </th>
+              </tr>
+            </thead>
+            <tbody
+              class="divide-y divide-input"
+            >
+              <tr
+                class=""
+              >
+                <th
+                  class="px-3 py-3 align-top text-sm min-w-24 text-left font-medium"
+                  scope="row"
+                >
+                  금액을 바꿈
+                </th>
+                <td
+                  class="px-3 py-3 align-top text-sm tabular-nums"
+                >
+                  30
+                </td>
+                <td
+                  class="px-3 py-3 align-top text-sm tabular-nums"
+                >
+                  <span
+                    class="font-semibold text-bad"
+                  >
+                    6.7%
+                  </span>
+                  <span
+                    class="block text-xs text-muted-foreground"
+                  >
+                    2
+                    /
+                    30
+                    <span
+                      class="hidden sm:inline"
+                    >
+                       · 
+                      1.0%
+                      –
+                      20.0%
+                    </span>
+                  </span>
+                </td>
+                <td
+                  class="px-3 py-3 align-top text-sm tabular-nums"
+                >
+                  <span
+                    class="font-semibold text-bad"
+                  >
+                    20.0%
+                  </span>
+                  <span
+                    class="block text-xs text-muted-foreground"
+                  >
+                    6
+                    /
+                    30
+                    <span
+                      class="hidden sm:inline"
+                    >
+                       · 
+                      1.0%
+                      –
+                      20.0%
+                    </span>
+                  </span>
+                </td>
+              </tr>
+              <tr
+                class=""
+              >
+                <th
+                  class="px-3 py-3 align-top text-sm min-w-24 text-left font-medium"
+                  scope="row"
+                >
+                  날짜·기간을 옮김
+                </th>
+                <td
+                  class="px-3 py-3 align-top text-sm tabular-nums"
+                >
+                  25
+                </td>
+                <td
+                  class="px-3 py-3 align-top text-sm tabular-nums"
+                >
+                  <span
+                    class="font-semibold"
+                  >
+                    0.0%
+                  </span>
+                  <span
+                    class="block text-xs text-muted-foreground"
+                  >
+                    0
+                    /
+                    25
+                    <span
+                      class="hidden sm:inline"
+                    >
+                       · 
+                      1.0%
+                      –
+                      20.0%
+                    </span>
+                  </span>
+                </td>
+                <td
+                  class="px-3 py-3 align-top text-sm tabular-nums"
+                >
+                  <span
+                    class="font-semibold text-bad"
+                  >
+                    4.2%
+                  </span>
+                  <span
+                    class="block text-xs text-muted-foreground"
+                  >
+                    1
+                    /
+                    24
+                    <span
+                      class="hidden sm:inline"
+                    >
+                       · 
+                      1.0%
+                      –
+                      20.0%
+                    </span>
+                  </span>
+                </td>
+              </tr>
+              <tr
+                class="border-t-2"
+              >
+                <th
+                  class="px-3 py-3 align-top text-sm min-w-24 text-left font-medium"
+                  scope="row"
+                >
+                  변형 안 한 정답
+                </th>
+                <td
+                  class="px-3 py-3 align-top text-sm tabular-nums"
+                >
+                  20
+                </td>
+                <td
+                  class="px-3 py-3 align-top text-sm tabular-nums"
+                >
+                  <span
+                    class="font-semibold"
+                  >
+                    95.0%
+                  </span>
+                  <span
+                    class="block text-xs text-muted-foreground"
+                  >
+                    19
+                    /
+                    20
+                    <span
+                      class="hidden sm:inline"
+                    >
+                       · 
+                      1.0%
+                      –
+                      20.0%
+                    </span>
+                  </span>
+                </td>
+                <td
+                  class="px-3 py-3 align-top text-sm tabular-nums"
+                >
+                  <span
+                    class="font-semibold"
+                  >
+                    90.0%
+                  </span>
+                  <span
+                    class="block text-xs text-muted-foreground"
+                  >
+                    18
+                    /
+                    20
+                    <span
+                      class="hidden sm:inline"
+                    >
+                       · 
+                      1.0%
+                      –
+                      20.0%
+                    </span>
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p
+          class="max-w-3xl text-sm text-muted-foreground"
+        >
+          오답 행은 판정 모델 스스로 통과로 판정한 비율(낮을수록 좋음)이고, 마지막 행은 변형 안 한 정답을 통과시킨 비율(높을수록 좋음)입니다. 보류는 분모에서 뺍니다. 코드가 값으로 판정할 수 있는 항목(
+          3
+          건)도 판정 모델 자신의 답으로 셉니다. Jev는 영어 다리를 거친 판정입니다. 세트 
+          feedface
+          .
+        </p>
+      </section>
+    </div>
+    <section
+      aria-labelledby="judge-review"
+      class="space-y-5"
+    >
+      <h3
+        class="text-lg font-bold"
+        id="judge-review"
+      >
+        판정이 엇갈린 
+        15
+        건
+      </h3>
+      <div
+        class="flex flex-wrap items-center gap-x-4 gap-y-3"
+      >
+        <div
+          aria-label="엇갈림 종류"
+          class="flex flex-wrap gap-2"
+          role="group"
+        >
+          <button
+            aria-pressed="true"
+            class="min-h-9 rounded-full px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-foreground font-semibold text-background"
+            type="button"
+          >
+            틀린 답을 통과시킴
+             
+            <span
+              class="tabular-nums opacity-70"
+            >
+              1
+            </span>
+          </button>
+          <button
+            aria-pressed="false"
+            class="min-h-9 rounded-full px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-secondary text-foreground hover:bg-secondary/70"
+            type="button"
+          >
+            Luna가 기준과 다름
+             
+            <span
+              class="tabular-nums opacity-70"
+            >
+              14
+            </span>
+          </button>
+          <button
+            aria-pressed="false"
+            class="min-h-9 rounded-full px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-secondary text-foreground hover:bg-secondary/70"
+            type="button"
+          >
+            Jev가 기준과 다름
+             
+            <span
+              class="tabular-nums opacity-70"
+            >
+              2
+            </span>
+          </button>
+          <button
+            aria-pressed="false"
+            class="min-h-9 rounded-full px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-secondary text-foreground hover:bg-secondary/70"
+            type="button"
+          >
+            Jev 보류
+             
+            <span
+              class="tabular-nums opacity-70"
+            >
+              1
+            </span>
+          </button>
+          <button
+            aria-pressed="false"
+            class="min-h-9 rounded-full px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-secondary text-foreground hover:bg-secondary/70"
+            type="button"
+          >
+            전체
+             
+            <span
+              class="tabular-nums opacity-70"
+            >
+              15
+            </span>
+          </button>
+        </div>
+        <div
+          class="flex gap-2 xl:ml-auto"
+        >
+          <select
+            aria-label="항목 종류"
+            class="rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 h-9 w-32"
+          >
+            <option
+              value="all"
+            >
+              모든 종류
+            </option>
+            <option
+              value="link"
+            >
+              인용 하나
+            </option>
+            <option
+              value="answer_claim"
+            >
+              답변 주장
+            </option>
+            <option
+              value="claim"
+            >
+              필수 사실
+            </option>
+          </select>
+          <input
+            aria-label="문장에서 찾기"
+            class="rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 h-9 w-44"
+            placeholder="문장에서 찾기"
+            value=""
+          />
+        </div>
+      </div>
+      <div
+        class="grid gap-8 xl:grid-cols-[360px_minmax(0,1fr)]"
+      >
+        <nav
+          aria-label="엇갈린 항목 목록"
+          class="min-w-0"
+        >
+          <ul
+            class="space-y-1"
+          >
+            <li>
+              <button
+                aria-current="true"
+                class="w-full space-y-1.5 rounded-lg px-3 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-accent hover:bg-accent"
+                type="button"
+              >
+                <span
+                  class="line-clamp-2 text-sm [overflow-wrap:anywhere]"
+                >
+                  하자보수는 24개월이다
+                </span>
+                <span
+                  class="block text-xs text-muted-foreground"
+                >
+                  기준 
+                  <span
+                    class="font-semibold text-bad"
+                  >
+                    근거 없음
+                  </span>
+                  <span>
+                     · 
+                    Jev
+                     
+                    <span
+                      class="font-semibold text-ok"
+                    >
+                      지지
+                    </span>
+                  </span>
+                </span>
+              </button>
+            </li>
+          </ul>
+        </nav>
+        <div
+          class="min-w-0 scroll-mt-4 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:self-start xl:overflow-y-auto"
+          id="judge-item"
+        >
+          <article
+            class="space-y-8 xl:border-l xl:pl-8"
+          >
+            <header
+              class="space-y-2"
+            >
+              <p
+                class="text-sm text-muted-foreground"
+              >
+                인용 하나
+                 · 기준 판정 
+                <span
+                  class="font-semibold text-bad"
+                >
+                  근거 없음
+                </span>
+              </p>
+              <p
+                class="text-lg font-semibold leading-snug [overflow-wrap:anywhere]"
+              >
+                하자보수는 24개월이다
+              </p>
+            </header>
+            <ul
+              class="grid gap-6 sm:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]"
+            >
+              <li
+                class="space-y-1"
+              >
+                <p
+                  class="text-sm text-muted-foreground"
+                >
+                  Luna
+                </p>
+                <p
+                  class="flex flex-wrap items-baseline gap-x-2"
+                >
+                  <span
+                    class="text-base font-bold text-bad"
+                  >
+                    근거 없음
+                  </span>
+                </p>
+              </li>
+              <li
+                class="space-y-1"
+              >
+                <p
+                  class="text-sm text-muted-foreground"
+                >
+                  Jev · 영어 다리
+                </p>
+                <p
+                  class="flex flex-wrap items-baseline gap-x-2"
+                >
+                  <span
+                    class="text-base font-bold text-ok"
+                  >
+                    지지
+                  </span>
+                  <span
+                    class="text-xs text-muted-foreground"
+                  >
+                    ≠ 기준
+                  </span>
+                  <span
+                    class="text-xs tabular-nums text-muted-foreground"
+                  >
+                    지지 확률 
+                    0.71
+                  </span>
+                </p>
+                <p
+                  class="text-sm leading-relaxed text-muted-foreground"
+                  lang="en"
+                >
+                  The passage states it.
+                </p>
+              </li>
+            </ul>
+            <div
+              class="space-y-1"
+            >
+              <p
+                class="text-sm font-semibold"
+              >
+                원문과 Jev가 읽은 영어
+              </p>
+              <dl
+                class="divide-y"
+              >
+                <div
+                  class="grid gap-x-6 gap-y-2 py-3 md:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1fr)]"
+                >
+                  <dt
+                    class="text-sm text-muted-foreground"
+                  >
+                    주장
+                  </dt>
+                  <dd
+                    class="min-w-0"
+                  >
+                    <div
+                      class="min-w-0 space-y-2 text-sm leading-relaxed"
+                    >
+                      <p
+                        class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+                      >
+                        하자보수는 24개월이다
+                      </p>
+                    </div>
+                  </dd>
+                  <dd
+                    class="min-w-0"
+                  >
+                    <div
+                      class="min-w-0 space-y-2 text-sm leading-relaxed"
+                      lang="en"
+                    >
+                      <p
+                        class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+                      >
+                        Warranty is 24 months
+                      </p>
+                    </div>
+                  </dd>
+                </div>
+                <details
+                  class="group py-1"
+                >
+                  <summary
+                    class="flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+                  >
+                    <span
+                      aria-hidden="true"
+                      class="transition-transform group-open:rotate-90"
+                    >
+                      ›
+                    </span>
+                    근거 인용
+                     
+                    2
+                    개
+                  </summary>
+                  <div
+                    class="grid gap-x-6 gap-y-2 pb-3 md:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1fr)]"
+                  >
+                    <span
+                      class="hidden md:block"
+                    />
+                    <div
+                      class="min-w-0 space-y-2 text-sm leading-relaxed"
+                    >
+                      <p
+                        class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+                      >
+                        원문 A
+                      </p>
+                      <p
+                        class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+                      >
+                        원문 B
+                      </p>
+                    </div>
+                    <div
+                      class="min-w-0 space-y-2 text-sm leading-relaxed"
+                      lang="en"
+                    >
+                      <p
+                        class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+                      >
+                        Source A
+                      </p>
+                      <p
+                        class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+                      >
+                        Source B
+                      </p>
+                    </div>
+                  </div>
+                </details>
+              </dl>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+    <details
+      class="group border-t pt-4"
+    >
+      <summary
+        class="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+      >
+        <span
+          aria-hidden="true"
+          class="text-muted-foreground transition-transform group-open:rotate-90"
+        >
+          ›
+        </span>
+        <span
+          class="text-base font-semibold"
+        >
+          실행 관리
+        </span>
+        <span
+          class="text-sm text-muted-foreground"
+        >
+          평가 완료 · 골든 세트 완료
+        </span>
+      </summary>
+      <div
+        class="space-y-6 pt-4"
+      >
+        <p
+          class="text-sm text-muted-foreground"
+        >
+          기준 
+          A-ref
+           · 
+          240
+          개 · 보정 
+          120
+           / 평가 
+          120
+           · 원문 대조 표본 
+          30
+        </p>
+        <ul
+          class="divide-y rounded-xl border"
+        >
+          <li
+            class="space-y-3 p-4"
+          >
+            <div
+              class="flex flex-wrap items-center gap-x-3 gap-y-1"
+            >
+              <span
+                class="text-sm font-semibold"
+              >
+                평가
+              </span>
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
+              >
+                <span
+                  aria-hidden="true"
+                  class="size-1.5 rounded-full bg-ok"
+                />
+                완료
+              </span>
+              <span
+                class="font-mono text-xs text-muted-foreground"
+              >
+                J-held_out-0123456789ab
+              </span>
+              <span
+                class="text-xs text-muted-foreground sm:ml-auto"
+              >
+                2026-10-05 08:00
+                 · 번역 묶음 
+                4
+                개
+              </span>
+            </div>
+            <p
+              class="text-xs tabular-nums text-muted-foreground"
+            >
+              Luna 120/120 · Jev · 영어 다리 120/120 · Jev · 한국어 원문 30/30
+            </p>
+          </li>
+          <li
+            class="space-y-3 p-4"
+          >
+            <div
+              class="flex flex-wrap items-center gap-x-3 gap-y-1"
+            >
+              <span
+                class="text-sm font-semibold"
+              >
+                골든 세트
+              </span>
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
+              >
+                <span
+                  aria-hidden="true"
+                  class="size-1.5 rounded-full bg-ok"
+                />
+                완료
+              </span>
+              <span
+                class="font-mono text-xs text-muted-foreground"
+              >
+                J-judge_set-0123456789ab
+              </span>
+              <span
+                class="text-xs text-muted-foreground sm:ml-auto"
+              >
+                2026-10-05 08:00
+                 · 번역 묶음 
+                4
+                개
+              </span>
+            </div>
+            <p
+              class="text-xs tabular-nums text-muted-foreground"
+            >
+              Luna 120/120 · Jev · 영어 다리 120/120 · Jev · 한국어 원문 30/30
+            </p>
+          </li>
+        </ul>
+        <div
+          class="space-y-4"
+        >
+          <div
+            class="flex flex-wrap items-end gap-3"
+          >
+            <div
+              class="space-y-1.5"
+            >
+              <label
+                class="text-[13px] font-semibold"
+                for="judge-part"
+              >
+                실행할 부분
+              </label>
+              <select
+                class="w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 block h-11 sm:w-64"
+                id="judge-part"
+              >
+                <option
+                  value="calibration"
+                >
+                  1. 보정 — Jev 임계값 맞춤
+                </option>
+                <option
+                  disabled=""
+                  value="held_out"
+                >
+                  2. 평가 — 화면에 보고
+                   (보정 먼저)
+                </option>
+                <option
+                  disabled=""
+                  value="judge_set"
+                >
+                  3. 판정 골든 세트 — 변형 오답
+                   (보정 먼저)
+                </option>
+              </select>
+            </div>
+            <button
+              class="group/button inline-flex shrink-0 items-center justify-center rounded-lg border bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"
+              data-size="lg"
+              data-slot="button"
+              data-variant="outline"
+            >
+              비용 추정 
+              <span
+                class="text-ok"
+              >
+                무료
+              </span>
+            </button>
+          </div>
+          <p
+            class="text-xs text-muted-foreground"
+          >
+            추정은 호출 없이 남은 번역·판정 호출의 최대 비용만 계산합니다. 이미 끝난 항목은 다시 부르지 않습니다.
+          </p>
+        </div>
+      </div>
+    </details>
+  </div>
+</div>
+`;
+
+exports[`the verdict > replaceable: three conditions met, the arms side by side, the review 1`] = `
+<div>
+  <div
+    class="space-y-16"
+  >
+    <div
+      class="space-y-10"
+    >
+      <div
+        aria-label="판정 세트"
+        class="flex flex-wrap gap-2"
+        role="group"
+      >
+        <button
+          aria-pressed="true"
+          class="min-h-11 rounded-full px-4 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-foreground font-semibold text-background"
+          type="button"
+        >
+          평가용 기준 · 120개
+        </button>
+        <button
+          aria-pressed="false"
+          class="min-h-11 rounded-full px-4 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-secondary text-foreground hover:bg-secondary/70"
+          type="button"
+        >
+          판정 골든 세트 · 오답 70 · 정답 20
+        </button>
+      </div>
+      <section
+        aria-labelledby="judge-answer"
+        class="space-y-10"
+      >
+        <div
+          class="space-y-3"
+        >
+          <p
+            class="text-sm font-medium text-muted-foreground"
+          >
+            Jev로 Luna 판정을 바꿀 수 있나
+          </p>
+          <h3
+            class="text-5xl font-bold tracking-tight text-ok"
+            id="judge-answer"
+          >
+            교체 가능
+          </h3>
+          <p
+            class="text-lg"
+          >
+            미리 정한 세 조건을 모두 충족했습니다.
+             판정 속도는 Luna의 4배입니다.
+          </p>
+        </div>
+        <dl
+          class="grid gap-8 sm:grid-cols-3"
+        >
+          <div
+            class="space-y-1"
+          >
+            <dt
+              class="text-sm text-muted-foreground"
+            >
+              기준과의 일치도 (카파)
+            </dt>
+            <dd
+              class="flex items-baseline gap-2"
+            >
+              <span
+                class="text-3xl font-bold tabular-nums"
+              >
+                0.790
+              </span>
+              <span
+                class="text-sm font-semibold text-ok"
+              >
+                ✓ 충족
+              </span>
+            </dd>
+            <dd
+              class="text-sm text-muted-foreground tabular-nums"
+            >
+              0.762 이상이어야
+               · Luna 
+              0.812
+            </dd>
+          </div>
+          <div
+            class="space-y-1"
+          >
+            <dt
+              class="text-sm text-muted-foreground"
+            >
+              틀린 답을 통과시킨 수
+            </dt>
+            <dd
+              class="flex items-baseline gap-2"
+            >
+              <span
+                class="text-3xl font-bold tabular-nums"
+              >
+                1건
+              </span>
+              <span
+                class="text-sm font-semibold text-ok"
+              >
+                ✓ 충족
+              </span>
+            </dd>
+            <dd
+              class="text-sm text-muted-foreground tabular-nums"
+            >
+              2건 이하여야
+               · Luna 
+              2건
+            </dd>
+          </div>
+          <div
+            class="space-y-1"
+          >
+            <dt
+              class="text-sm text-muted-foreground"
+            >
+              판정한 비율
+            </dt>
+            <dd
+              class="flex items-baseline gap-2"
+            >
+              <span
+                class="text-3xl font-bold tabular-nums"
+              >
+                95.0%
+              </span>
+              <span
+                class="text-sm font-semibold text-ok"
+              >
+                ✓ 충족
+              </span>
+            </dd>
+            <dd
+              class="text-sm text-muted-foreground tabular-nums"
+            >
+              90.0% 이상이어야
+               · Luna 
+              95.0%
+            </dd>
+          </div>
+        </dl>
+        <details
+          class="group"
+        >
+          <summary
+            class="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+          >
+            <span
+              aria-hidden="true"
+              class="transition-transform group-open:rotate-90"
+            >
+              ›
+            </span>
+            이 답을 얼마나 믿을 수 있나 · 불통과 기준이 18건뿐
+          </summary>
+          <div
+            class="pt-2"
+          >
+            <div
+              class="max-w-3xl space-y-2 text-sm leading-relaxed text-muted-foreground"
+            >
+              <p>
+                기준 세트에서 불통과로 검토된 항목이 
+                18
+                건뿐이라 카파와 잘못 통과는 한두 건에도 크게 움직입니다. 이 결과는 “이 기준에서 Luna보다 나쁘지 않다”는 뜻이지, 검토자를 대신할 만큼 믿을 만하다는 뜻은 아닙니다.
+              </p>
+              <p>
+                규칙 
+                r1
+                은 평가 실행 전에 코드와 docs/rag/judges.md에 정해 두었습니다. 세 조건을 모두 넘어야 교체 가능이고, 어느 쪽이든 판정한 항목이 
+                100
+                개 미만이면 판단 보류입니다.
+              </p>
+              <p>
+                기준: 
+                A-ref
+                의 독립 검토 
+                240
+                개 중 평가용 
+                120
+                개. 보정용 
+                120
+                개는 Jev 임계값을 맞추는 데만 썼습니다.
+              </p>
+            </div>
+          </div>
+        </details>
+      </section>
+    </div>
+    <section
+      aria-labelledby="judge-arms"
+      class="space-y-4"
+    >
+      <h3
+        class="text-lg font-bold"
+        id="judge-arms"
+      >
+        세 판정 모델
+      </h3>
+      <div
+        class="hidden gap-6 border-b pb-2 text-sm text-muted-foreground md:grid md:grid-cols-[minmax(13rem,1.3fr)_repeat(4,minmax(0,1fr))]"
+      >
+        <span />
+        <span>
+          기준과 일치
+        </span>
+        <span>
+          틀린 답 통과
+        </span>
+        <span>
+          한 건 판정 시간
+        </span>
+        <span>
+          비용
+        </span>
+      </div>
+      <ul
+        class="divide-y"
+      >
+        <li
+          class="grid grid-cols-2 gap-x-6 gap-y-4 py-5 md:grid-cols-[minmax(13rem,1.3fr)_repeat(4,minmax(0,1fr))]"
+        >
+          <div
+            class="col-span-2 md:col-span-1"
+          >
+            <p
+              class="text-base font-semibold text-foreground"
+            >
+              Luna
+            </p>
+            <p
+              class="text-sm text-muted-foreground"
+            >
+              gpt-6-luna, 한국어를 그대로 읽음
+            </p>
+          </div>
+          <dl
+            class="min-w-0"
+          >
+            <dt
+              class="text-sm text-muted-foreground md:sr-only"
+            >
+              기준과 일치
+            </dt>
+            <dd
+              class="text-xl font-semibold tabular-nums"
+            >
+              92.1%
+              <div
+                aria-label="95% 구간 85.7%–95.8%"
+                class="relative mt-2 h-1 w-full max-w-36 rounded-full bg-secondary"
+                role="img"
+              >
+                <span
+                  class="absolute inset-y-0 rounded-full bg-primary/30"
+                  style="left: 64.15%; width: 25.34999999999998%;"
+                />
+                <span
+                  class="absolute top-1/2 size-2 -translate-1/2 rounded-full bg-primary"
+                  style="left: 80.275%;"
+                />
+              </div>
+            </dd>
+          </dl>
+          <dl
+            class="min-w-0"
+          >
+            <dt
+              class="text-sm text-muted-foreground md:sr-only"
+            >
+              틀린 답 통과
+            </dt>
+            <dd
+              class="text-xl font-semibold tabular-nums"
+            >
+              2
+              <span
+                class="text-sm font-normal text-muted-foreground"
+              >
+                 / 
+                18
+                건
+              </span>
+            </dd>
+          </dl>
+          <dl
+            class="min-w-0"
+          >
+            <dt
+              class="text-sm text-muted-foreground md:sr-only"
+            >
+              한 건 판정 시간
+            </dt>
+            <dd
+              class="text-xl font-semibold tabular-nums"
+            >
+              2.40초
+            </dd>
+          </dl>
+          <dl
+            class="min-w-0"
+          >
+            <dt
+              class="text-sm text-muted-foreground md:sr-only"
+            >
+              비용
+            </dt>
+            <dd
+              class="text-xl font-semibold tabular-nums"
+            >
+              $0.412
+            </dd>
+          </dl>
+        </li>
+        <li
+          class="grid grid-cols-2 gap-x-6 gap-y-4 py-5 md:grid-cols-[minmax(13rem,1.3fr)_repeat(4,minmax(0,1fr))]"
+        >
+          <div
+            class="col-span-2 md:col-span-1"
+          >
+            <p
+              class="text-base font-semibold text-foreground"
+            >
+              Jev · 영어 다리
+            </p>
+            <p
+              class="text-sm text-muted-foreground"
+            >
+              검사한 영어 번역만 읽음
+            </p>
+          </div>
+          <dl
+            class="min-w-0"
+          >
+            <dt
+              class="text-sm text-muted-foreground md:sr-only"
+            >
+              기준과 일치
+            </dt>
+            <dd
+              class="text-xl font-semibold tabular-nums"
+            >
+              92.1%
+              <div
+                aria-label="95% 구간 85.7%–95.8%"
+                class="relative mt-2 h-1 w-full max-w-36 rounded-full bg-secondary"
+                role="img"
+              >
+                <span
+                  class="absolute inset-y-0 rounded-full bg-primary/30"
+                  style="left: 64.15%; width: 25.34999999999998%;"
+                />
+                <span
+                  class="absolute top-1/2 size-2 -translate-1/2 rounded-full bg-primary"
+                  style="left: 80.275%;"
+                />
+              </div>
+            </dd>
+          </dl>
+          <dl
+            class="min-w-0"
+          >
+            <dt
+              class="text-sm text-muted-foreground md:sr-only"
+            >
+              틀린 답 통과
+            </dt>
+            <dd
+              class="text-xl font-semibold tabular-nums"
+            >
+              1
+              <span
+                class="text-sm font-normal text-muted-foreground"
+              >
+                 / 
+                18
+                건
+              </span>
+            </dd>
+          </dl>
+          <dl
+            class="min-w-0"
+          >
+            <dt
+              class="text-sm text-muted-foreground md:sr-only"
+            >
+              한 건 판정 시간
+            </dt>
+            <dd
+              class="text-xl font-semibold tabular-nums"
+            >
+              0.60초
+            </dd>
+          </dl>
+          <dl
+            class="min-w-0"
+          >
+            <dt
+              class="text-sm text-muted-foreground md:sr-only"
+            >
+              비용
+            </dt>
+            <dd
+              class="text-xl font-semibold tabular-nums"
+            >
+              가격 미제공
+            </dd>
+          </dl>
+        </li>
+        <li
+          class="grid grid-cols-2 gap-x-6 gap-y-4 py-5 md:grid-cols-[minmax(13rem,1.3fr)_repeat(4,minmax(0,1fr))] text-muted-foreground"
+        >
+          <div
+            class="col-span-2 md:col-span-1"
+          >
+            <p
+              class="text-base font-semibold"
+            >
+              Jev · 한국어 원문
+            </p>
+            <p
+              class="text-sm text-muted-foreground"
+            >
+              대조군 · 고정 표본
+               30개
+            </p>
+          </div>
+          <dl
+            class="min-w-0"
+          >
+            <dt
+              class="text-sm text-muted-foreground md:sr-only"
+            >
+              기준과 일치
+            </dt>
+            <dd
+              class="text-xl font-semibold tabular-nums"
+            >
+              92.1%
+              <div
+                aria-label="95% 구간 85.7%–95.8%"
+                class="relative mt-2 h-1 w-full max-w-36 rounded-full bg-secondary"
+                role="img"
+              >
+                <span
+                  class="absolute inset-y-0 rounded-full bg-primary/30"
+                  style="left: 64.15%; width: 25.34999999999998%;"
+                />
+                <span
+                  class="absolute top-1/2 size-2 -translate-1/2 rounded-full bg-primary"
+                  style="left: 80.275%;"
+                />
+              </div>
+            </dd>
+          </dl>
+          <dl
+            class="min-w-0"
+          >
+            <dt
+              class="text-sm text-muted-foreground md:sr-only"
+            >
+              틀린 답 통과
+            </dt>
+            <dd
+              class="text-xl font-semibold tabular-nums"
+            >
+              2
+              <span
+                class="text-sm font-normal text-muted-foreground"
+              >
+                 / 
+                18
+                건
+              </span>
+            </dd>
+          </dl>
+          <dl
+            class="min-w-0"
+          >
+            <dt
+              class="text-sm text-muted-foreground md:sr-only"
+            >
+              한 건 판정 시간
+            </dt>
+            <dd
+              class="text-xl font-semibold tabular-nums"
+            >
+              2.40초
+            </dd>
+          </dl>
+          <dl
+            class="min-w-0"
+          >
+            <dt
+              class="text-sm text-muted-foreground md:sr-only"
+            >
+              비용
+            </dt>
+            <dd
+              class="text-xl font-semibold tabular-nums"
+            >
+              $0.412
+            </dd>
+          </dl>
+        </li>
+      </ul>
+      <details
+        class="group"
+      >
+        <summary
+          class="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+        >
+          <span
+            aria-hidden="true"
+            class="transition-transform group-open:rotate-90"
+          >
+            ›
+          </span>
+          모든 지표 · 혼동 행렬
+        </summary>
+        <div
+          class="pt-2"
+        >
+          <div
+            class="space-y-6"
+          >
+            <div
+              class="overflow-x-auto rounded-xl border border-input bg-background"
+            >
+              <table
+                class="w-full border-collapse"
+              >
+                <caption
+                  class="sr-only"
+                >
+                  세 판정 모델의 평가용 지표 전체
+                </caption>
+                <thead
+                  class="bg-secondary/70"
+                >
+                  <tr>
+                    <th
+                      class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                      scope="col"
+                    >
+                      지표
+                    </th>
+                    <th
+                      class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                      scope="col"
+                    >
+                      Luna
+                    </th>
+                    <th
+                      class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                      scope="col"
+                    >
+                      Jev · 영어 다리
+                    </th>
+                    <th
+                      class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                      scope="col"
+                    >
+                      Jev · 한국어 원문
+                    </th>
+                  </tr>
+                </thead>
+                <tbody
+                  class="divide-y divide-input"
+                >
+                  <tr>
+                    <th
+                      class="px-3 py-3 align-top text-sm text-left font-medium"
+                      scope="row"
+                    >
+                      판정 비율
+                    </th>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      95.0% (114/120)
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      95.0% (114/120)
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      83.3% (25/30)
+                    </td>
+                  </tr>
+                  <tr>
+                    <th
+                      class="px-3 py-3 align-top text-sm text-left font-medium"
+                      scope="row"
+                    >
+                      기준과 일치 · Wilson 95%
+                    </th>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      92.1% (105/114) · 85.7%–95.8%
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      92.1% (105/114) · 85.7%–95.8%
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      92.1% (105/114) · 85.7%–95.8%
+                    </td>
+                  </tr>
+                  <tr>
+                    <th
+                      class="px-3 py-3 align-top text-sm text-left font-medium"
+                      scope="row"
+                    >
+                      카파 (통과·불통과)
+                    </th>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      0.812
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      0.790
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      0.400
+                    </td>
+                  </tr>
+                  <tr>
+                    <th
+                      class="px-3 py-3 align-top text-sm text-left font-medium"
+                      scope="row"
+                    >
+                      틀린 답 통과 / 기준상 불통과
+                    </th>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      2 / 18
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      1 / 18
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      2 / 18
+                    </td>
+                  </tr>
+                  <tr>
+                    <th
+                      class="px-3 py-3 align-top text-sm text-left font-medium"
+                      scope="row"
+                    >
+                      코드가 값으로 판정
+                    </th>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      7건
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      7건
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      7건
+                    </td>
+                  </tr>
+                  <tr>
+                    <th
+                      class="px-3 py-3 align-top text-sm text-left font-medium"
+                      scope="row"
+                    >
+                      비용
+                    </th>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      $0.412 · 120회
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      가격 미제공 · 120회 · 번역 $0.0210
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      $0.412 · 120회
+                    </td>
+                  </tr>
+                  <tr>
+                    <th
+                      class="px-3 py-3 align-top text-sm text-left font-medium"
+                      scope="row"
+                    >
+                      지연 p50 / p95
+                    </th>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      2.40초 / 5.10초
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      0.60초 / 0.90초
+                    </td>
+                    <td
+                      class="px-3 py-3 align-top text-sm tabular-nums"
+                    >
+                      2.40초 / 5.10초
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p
+              class="max-w-3xl text-sm text-muted-foreground"
+            >
+              카파는 통과(지지·근거 있음·정확)와 불통과로 나눠 셉니다. 보류(불확실 구간, 호출 실패, 번역 불가)는 오답이 아니라 미판정입니다. 지연은 한 번에 한 호출씩 잰 값입니다. 임계값 
+              abcdef01
+              .
+            </p>
+            <div
+              class="grid gap-6 xl:grid-cols-3"
+            >
+              <div
+                class="min-w-0 space-y-2"
+              >
+                <p
+                  class="text-sm font-semibold"
+                >
+                  Luna
+                </p>
+                <div
+                  class="overflow-x-auto rounded-xl border border-input bg-background"
+                >
+                  <table
+                    class="w-full border-collapse"
+                  >
+                    <caption
+                      class="sr-only"
+                    >
+                      Luna 인용 하나 혼동 행렬
+                    </caption>
+                    <thead
+                      class="bg-secondary/70"
+                    >
+                      <tr>
+                        <th
+                          class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                          scope="col"
+                        >
+                          인용 하나 · 기준＼판정
+                        </th>
+                        <th
+                          class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                          scope="col"
+                        >
+                          지지
+                        </th>
+                        <th
+                          class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                          scope="col"
+                        >
+                          근거 없음
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      class="divide-y divide-input"
+                    >
+                      <tr>
+                        <th
+                          class="px-3 py-3 align-top text-sm text-left font-semibold"
+                          scope="row"
+                        >
+                          지지
+                        </th>
+                        <td
+                          class="px-3 py-3 align-top text-sm tabular-nums font-bold"
+                        >
+                          50
+                        </td>
+                        <td
+                          class="px-3 py-3 align-top text-sm tabular-nums"
+                        >
+                          2
+                        </td>
+                      </tr>
+                      <tr>
+                        <th
+                          class="px-3 py-3 align-top text-sm text-left font-semibold"
+                          scope="row"
+                        >
+                          근거 없음
+                        </th>
+                        <td
+                          class="px-3 py-3 align-top text-sm tabular-nums"
+                        >
+                          0
+                        </td>
+                        <td
+                          class="px-3 py-3 align-top text-sm tabular-nums font-bold"
+                        >
+                          9
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div
+                class="min-w-0 space-y-2"
+              >
+                <p
+                  class="text-sm font-semibold"
+                >
+                  Jev · 영어 다리
+                </p>
+                <div
+                  class="overflow-x-auto rounded-xl border border-input bg-background"
+                >
+                  <table
+                    class="w-full border-collapse"
+                  >
+                    <caption
+                      class="sr-only"
+                    >
+                      Jev · 영어 다리 인용 하나 혼동 행렬
+                    </caption>
+                    <thead
+                      class="bg-secondary/70"
+                    >
+                      <tr>
+                        <th
+                          class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                          scope="col"
+                        >
+                          인용 하나 · 기준＼판정
+                        </th>
+                        <th
+                          class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                          scope="col"
+                        >
+                          지지
+                        </th>
+                        <th
+                          class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                          scope="col"
+                        >
+                          근거 없음
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      class="divide-y divide-input"
+                    >
+                      <tr>
+                        <th
+                          class="px-3 py-3 align-top text-sm text-left font-semibold"
+                          scope="row"
+                        >
+                          지지
+                        </th>
+                        <td
+                          class="px-3 py-3 align-top text-sm tabular-nums font-bold"
+                        >
+                          50
+                        </td>
+                        <td
+                          class="px-3 py-3 align-top text-sm tabular-nums"
+                        >
+                          2
+                        </td>
+                      </tr>
+                      <tr>
+                        <th
+                          class="px-3 py-3 align-top text-sm text-left font-semibold"
+                          scope="row"
+                        >
+                          근거 없음
+                        </th>
+                        <td
+                          class="px-3 py-3 align-top text-sm tabular-nums"
+                        >
+                          0
+                        </td>
+                        <td
+                          class="px-3 py-3 align-top text-sm tabular-nums font-bold"
+                        >
+                          9
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div
+                class="min-w-0 space-y-2"
+              >
+                <p
+                  class="text-sm font-semibold"
+                >
+                  Jev · 한국어 원문
+                </p>
+                <div
+                  class="overflow-x-auto rounded-xl border border-input bg-background"
+                >
+                  <table
+                    class="w-full border-collapse"
+                  >
+                    <caption
+                      class="sr-only"
+                    >
+                      Jev · 한국어 원문 인용 하나 혼동 행렬
+                    </caption>
+                    <thead
+                      class="bg-secondary/70"
+                    >
+                      <tr>
+                        <th
+                          class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                          scope="col"
+                        >
+                          인용 하나 · 기준＼판정
+                        </th>
+                        <th
+                          class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                          scope="col"
+                        >
+                          지지
+                        </th>
+                        <th
+                          class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                          scope="col"
+                        >
+                          근거 없음
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      class="divide-y divide-input"
+                    >
+                      <tr>
+                        <th
+                          class="px-3 py-3 align-top text-sm text-left font-semibold"
+                          scope="row"
+                        >
+                          지지
+                        </th>
+                        <td
+                          class="px-3 py-3 align-top text-sm tabular-nums font-bold"
+                        >
+                          50
+                        </td>
+                        <td
+                          class="px-3 py-3 align-top text-sm tabular-nums"
+                        >
+                          2
+                        </td>
+                      </tr>
+                      <tr>
+                        <th
+                          class="px-3 py-3 align-top text-sm text-left font-semibold"
+                          scope="row"
+                        >
+                          근거 없음
+                        </th>
+                        <td
+                          class="px-3 py-3 align-top text-sm tabular-nums"
+                        >
+                          0
+                        </td>
+                        <td
+                          class="px-3 py-3 align-top text-sm tabular-nums font-bold"
+                        >
+                          9
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
+    </section>
+    <section
+      aria-labelledby="judge-review"
+      class="space-y-5"
+    >
+      <h3
+        class="text-lg font-bold"
+        id="judge-review"
+      >
+        판정이 엇갈린 
+        15
+        건
+      </h3>
+      <div
+        class="flex flex-wrap items-center gap-x-4 gap-y-3"
+      >
+        <div
+          aria-label="엇갈림 종류"
+          class="flex flex-wrap gap-2"
+          role="group"
+        >
+          <button
+            aria-pressed="true"
+            class="min-h-9 rounded-full px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-foreground font-semibold text-background"
+            type="button"
+          >
+            틀린 답을 통과시킴
+             
+            <span
+              class="tabular-nums opacity-70"
+            >
+              1
+            </span>
+          </button>
+          <button
+            aria-pressed="false"
+            class="min-h-9 rounded-full px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-secondary text-foreground hover:bg-secondary/70"
+            type="button"
+          >
+            Luna가 기준과 다름
+             
+            <span
+              class="tabular-nums opacity-70"
+            >
+              14
+            </span>
+          </button>
+          <button
+            aria-pressed="false"
+            class="min-h-9 rounded-full px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-secondary text-foreground hover:bg-secondary/70"
+            type="button"
+          >
+            Jev가 기준과 다름
+             
+            <span
+              class="tabular-nums opacity-70"
+            >
+              2
+            </span>
+          </button>
+          <button
+            aria-pressed="false"
+            class="min-h-9 rounded-full px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-secondary text-foreground hover:bg-secondary/70"
+            type="button"
+          >
+            Jev 보류
+             
+            <span
+              class="tabular-nums opacity-70"
+            >
+              1
+            </span>
+          </button>
+          <button
+            aria-pressed="false"
+            class="min-h-9 rounded-full px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-secondary text-foreground hover:bg-secondary/70"
+            type="button"
+          >
+            전체
+             
+            <span
+              class="tabular-nums opacity-70"
+            >
+              15
+            </span>
+          </button>
+        </div>
+        <div
+          class="flex gap-2 xl:ml-auto"
+        >
+          <select
+            aria-label="항목 종류"
+            class="rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 h-9 w-32"
+          >
+            <option
+              value="all"
+            >
+              모든 종류
+            </option>
+            <option
+              value="link"
+            >
+              인용 하나
+            </option>
+            <option
+              value="answer_claim"
+            >
+              답변 주장
+            </option>
+            <option
+              value="claim"
+            >
+              필수 사실
+            </option>
+          </select>
+          <input
+            aria-label="문장에서 찾기"
+            class="rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 h-9 w-44"
+            placeholder="문장에서 찾기"
+            value=""
+          />
+        </div>
+      </div>
+      <div
+        class="grid gap-8 xl:grid-cols-[360px_minmax(0,1fr)]"
+      >
+        <nav
+          aria-label="엇갈린 항목 목록"
+          class="min-w-0"
+        >
+          <ul
+            class="space-y-1"
+          >
+            <li>
+              <button
+                aria-current="true"
+                class="w-full space-y-1.5 rounded-lg px-3 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-accent hover:bg-accent"
+                type="button"
+              >
+                <span
+                  class="line-clamp-2 text-sm [overflow-wrap:anywhere]"
+                >
+                  하자보수는 24개월이다
+                </span>
+                <span
+                  class="block text-xs text-muted-foreground"
+                >
+                  기준 
+                  <span
+                    class="font-semibold text-bad"
+                  >
+                    근거 없음
+                  </span>
+                  <span>
+                     · 
+                    Jev
+                     
+                    <span
+                      class="font-semibold text-ok"
+                    >
+                      지지
+                    </span>
+                  </span>
+                </span>
+              </button>
+            </li>
+          </ul>
+        </nav>
+        <div
+          class="min-w-0 scroll-mt-4 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:self-start xl:overflow-y-auto"
+          id="judge-item"
+        >
+          <article
+            class="space-y-8 xl:border-l xl:pl-8"
+          >
+            <header
+              class="space-y-2"
+            >
+              <p
+                class="text-sm text-muted-foreground"
+              >
+                인용 하나
+                 · 기준 판정 
+                <span
+                  class="font-semibold text-bad"
+                >
+                  근거 없음
+                </span>
+              </p>
+              <p
+                class="text-lg font-semibold leading-snug [overflow-wrap:anywhere]"
+              >
+                하자보수는 24개월이다
+              </p>
+            </header>
+            <ul
+              class="grid gap-6 sm:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]"
+            >
+              <li
+                class="space-y-1"
+              >
+                <p
+                  class="text-sm text-muted-foreground"
+                >
+                  Luna
+                </p>
+                <p
+                  class="flex flex-wrap items-baseline gap-x-2"
+                >
+                  <span
+                    class="text-base font-bold text-bad"
+                  >
+                    근거 없음
+                  </span>
+                </p>
+              </li>
+              <li
+                class="space-y-1"
+              >
+                <p
+                  class="text-sm text-muted-foreground"
+                >
+                  Jev · 영어 다리
+                </p>
+                <p
+                  class="flex flex-wrap items-baseline gap-x-2"
+                >
+                  <span
+                    class="text-base font-bold text-ok"
+                  >
+                    지지
+                  </span>
+                  <span
+                    class="text-xs text-muted-foreground"
+                  >
+                    ≠ 기준
+                  </span>
+                  <span
+                    class="text-xs tabular-nums text-muted-foreground"
+                  >
+                    지지 확률 
+                    0.71
+                  </span>
+                </p>
+                <p
+                  class="text-sm leading-relaxed text-muted-foreground"
+                  lang="en"
+                >
+                  The passage states it.
+                </p>
+              </li>
+            </ul>
+            <div
+              class="space-y-1"
+            >
+              <p
+                class="text-sm font-semibold"
+              >
+                원문과 Jev가 읽은 영어
+              </p>
+              <dl
+                class="divide-y"
+              >
+                <div
+                  class="grid gap-x-6 gap-y-2 py-3 md:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1fr)]"
+                >
+                  <dt
+                    class="text-sm text-muted-foreground"
+                  >
+                    주장
+                  </dt>
+                  <dd
+                    class="min-w-0"
+                  >
+                    <div
+                      class="min-w-0 space-y-2 text-sm leading-relaxed"
+                    >
+                      <p
+                        class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+                      >
+                        하자보수는 24개월이다
+                      </p>
+                    </div>
+                  </dd>
+                  <dd
+                    class="min-w-0"
+                  >
+                    <div
+                      class="min-w-0 space-y-2 text-sm leading-relaxed"
+                      lang="en"
+                    >
+                      <p
+                        class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+                      >
+                        Warranty is 24 months
+                      </p>
+                    </div>
+                  </dd>
+                </div>
+                <details
+                  class="group py-1"
+                >
+                  <summary
+                    class="flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+                  >
+                    <span
+                      aria-hidden="true"
+                      class="transition-transform group-open:rotate-90"
+                    >
+                      ›
+                    </span>
+                    근거 인용
+                     
+                    2
+                    개
+                  </summary>
+                  <div
+                    class="grid gap-x-6 gap-y-2 pb-3 md:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1fr)]"
+                  >
+                    <span
+                      class="hidden md:block"
+                    />
+                    <div
+                      class="min-w-0 space-y-2 text-sm leading-relaxed"
+                    >
+                      <p
+                        class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+                      >
+                        원문 A
+                      </p>
+                      <p
+                        class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+                      >
+                        원문 B
+                      </p>
+                    </div>
+                    <div
+                      class="min-w-0 space-y-2 text-sm leading-relaxed"
+                      lang="en"
+                    >
+                      <p
+                        class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+                      >
+                        Source A
+                      </p>
+                      <p
+                        class="whitespace-pre-wrap [overflow-wrap:anywhere]"
+                      >
+                        Source B
+                      </p>
+                    </div>
+                  </div>
+                </details>
+              </dl>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+    <details
+      class="group border-t pt-4"
+    >
+      <summary
+        class="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+      >
+        <span
+          aria-hidden="true"
+          class="text-muted-foreground transition-transform group-open:rotate-90"
+        >
+          ›
+        </span>
+        <span
+          class="text-base font-semibold"
+        >
+          실행 관리
+        </span>
+        <span
+          class="text-sm text-muted-foreground"
+        >
+          평가 완료 · 보정 완료
+        </span>
+      </summary>
+      <div
+        class="space-y-6 pt-4"
+      >
+        <p
+          class="text-sm text-muted-foreground"
+        >
+          기준 
+          A-ref
+           · 
+          240
+          개 · 보정 
+          120
+           / 평가 
+          120
+           · 원문 대조 표본 
+          30
+        </p>
+        <ul
+          class="divide-y rounded-xl border"
+        >
+          <li
+            class="space-y-3 p-4"
+          >
+            <div
+              class="flex flex-wrap items-center gap-x-3 gap-y-1"
+            >
+              <span
+                class="text-sm font-semibold"
+              >
+                평가
+              </span>
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
+              >
+                <span
+                  aria-hidden="true"
+                  class="size-1.5 rounded-full bg-ok"
+                />
+                완료
+              </span>
+              <span
+                class="font-mono text-xs text-muted-foreground"
+              >
+                J-held_out-0123456789ab
+              </span>
+              <span
+                class="text-xs text-muted-foreground sm:ml-auto"
+              >
+                2026-10-05 08:00
+                 · 번역 묶음 
+                4
+                개
+              </span>
+            </div>
+            <p
+              class="text-xs tabular-nums text-muted-foreground"
+            >
+              Luna 120/120 · Jev · 영어 다리 120/120 · Jev · 한국어 원문 30/30
+            </p>
+          </li>
+          <li
+            class="space-y-3 p-4"
+          >
+            <div
+              class="flex flex-wrap items-center gap-x-3 gap-y-1"
+            >
+              <span
+                class="text-sm font-semibold"
+              >
+                보정
+              </span>
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
+              >
+                <span
+                  aria-hidden="true"
+                  class="size-1.5 rounded-full bg-ok"
+                />
+                완료
+              </span>
+              <span
+                class="text-xs text-ok"
+              >
+                임계값 맞춤 완료
+              </span>
+              <span
+                class="font-mono text-xs text-muted-foreground"
+              >
+                J-calibration-0123456789ab
+              </span>
+              <span
+                class="text-xs text-muted-foreground sm:ml-auto"
+              >
+                2026-10-04 08:00
+                 · 번역 묶음 
+                4
+                개
+              </span>
+            </div>
+            <p
+              class="text-xs tabular-nums text-muted-foreground"
+            >
+              Luna 120/120 · Jev · 영어 다리 120/120 · Jev · 한국어 원문 30/30
+            </p>
+          </li>
+        </ul>
+        <div
+          class="space-y-4"
+        >
+          <div
+            class="flex flex-wrap items-end gap-3"
+          >
+            <div
+              class="space-y-1.5"
+            >
+              <label
+                class="text-[13px] font-semibold"
+                for="judge-part"
+              >
+                실행할 부분
+              </label>
+              <select
+                class="w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 block h-11 sm:w-64"
+                id="judge-part"
+              >
+                <option
+                  value="calibration"
+                >
+                  1. 보정 — Jev 임계값 맞춤
+                </option>
+                <option
+                  value="held_out"
+                >
+                  2. 평가 — 화면에 보고
+                </option>
+                <option
+                  value="judge_set"
+                >
+                  3. 판정 골든 세트 — 변형 오답
+                </option>
+              </select>
+            </div>
+            <button
+              class="group/button inline-flex shrink-0 items-center justify-center rounded-lg border bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"
+              data-size="lg"
+              data-slot="button"
+              data-variant="outline"
+            >
+              비용 추정 
+              <span
+                class="text-ok"
+              >
+                무료
+              </span>
+            </button>
+          </div>
+          <p
+            class="text-xs text-muted-foreground"
+          >
+            추정은 호출 없이 남은 번역·판정 호출의 최대 비용만 계산합니다. 이미 끝난 항목은 다시 부르지 않습니다.
+          </p>
+        </div>
+      </div>
+    </details>
+  </div>
+</div>
+`;
