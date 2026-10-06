@@ -157,8 +157,8 @@ def _usage(u) -> dict | None:
             "reasoning_tokens": (getattr(out_details, "reasoning_tokens", 0) or 0) if out_details else 0}
 
 
-# The browser session whose key pays for the work running in this context. The API sets it per request from the
-# session cookie; threads that carry that work on start from a copy of the request's context.
+# The key session whose key pays for the work running in this context. The API sets it per request to the signed-in
+# member's current one; threads that carry that work on start from a copy of the request's context.
 KEY_SESSION: contextvars.ContextVar[str | None] = contextvars.ContextVar("rfp_key_session", default=None)
 # The answer model that session had chosen when the HTTP request began: fixed for that request and all work it
 # starts, so a later change on 설정 never alters a request already submitted.
@@ -169,7 +169,7 @@ NO_API_KEY = "OpenAI API 키가 설정되지 않았습니다. 설정 페이지�
 class OpenAITransport:
     """Hidden SDK retries disabled, finite timeout. One instance is owned by service.Resources.
 
-    Each browser session that entered a key on the 설정 page gets its own client; a call uses the client of
+    Each key a member entered on the 설정 page gets its own client and key session; a call uses the client of
     `KEY_SESSION`. `api_key` (the server environment, used by the CLI and personal machines) serves only a context
     without a session key of its own. With neither, the call is refused before execution: nothing is charged."""
 

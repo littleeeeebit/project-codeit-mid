@@ -1179,13 +1179,11 @@ class EvaluationScreenTest(GoldRetrievalTest):
 
     def setUp(self):
         super().setUp()
-        from fastapi.testclient import TestClient
-
-        from rfp_assistant import api
+        from tests import fake_hub
 
         self.transport = FakeTransport()
         self.res = service.Resources(self.s, transport=self.transport, recover=True)
-        self.client = TestClient(api.create_app(self.res), headers={"X-Member": "person-b"})
+        self.client = fake_hub.client(self.res, "person-b")
         self.client.__enter__()
 
     def tearDown(self):

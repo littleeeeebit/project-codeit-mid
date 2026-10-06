@@ -3,10 +3,6 @@
   "schemas": {
    "ActivateIn": {
     "properties": {
-     "decided_by": {
-      "title": "Decided By",
-      "type": "string"
-     },
      "note": {
       "default": "",
       "title": "Note",
@@ -18,8 +14,7 @@
      }
     },
     "required": [
-     "run_id",
-     "decided_by"
+     "run_id"
     ],
     "title": "ActivateIn",
     "type": "object"
@@ -4102,6 +4097,26 @@
     "title": "MaintenanceStep",
     "type": "object"
    },
+   "Me": {
+    "properties": {
+     "local": {
+      "description": "Local development (BIDMATE_LOCAL_MEMBER): no sign-in, nothing to sign out of",
+      "title": "Local",
+      "type": "boolean"
+     },
+     "name": {
+      "description": "The signed-in JupyterHub username, recorded on everything this member does",
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "local"
+    ],
+    "title": "Me",
+    "type": "object"
+   },
    "MetadataRow": {
     "properties": {
      "field": {
@@ -5924,18 +5939,6 @@
    "post": {
     "description": "Answers are as of today (DESIGN.md: the 기준일 control was removed).",
     "operationId": "ask_api_ask_post",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "requestBody": {
      "content": {
       "application/json": {
@@ -5971,21 +5974,38 @@
     "summary": "Ask"
    }
   },
+  "/api/auth/logout": {
+   "post": {
+    "operationId": "logout_api_auth_logout_post",
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Logout"
+   }
+  },
+  "/api/auth/me": {
+   "get": {
+    "operationId": "me_api_auth_me_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Me"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Me"
+   }
+  },
   "/api/budget": {
    "get": {
     "operationId": "budget_api_budget_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -5996,16 +6016,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Budget"
@@ -6014,18 +6024,6 @@
   "/api/budget/limit": {
    "put": {
     "operationId": "budget_limit_api_budget_limit_put",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "requestBody": {
      "content": {
       "application/json": {
@@ -6150,16 +6148,6 @@
        ],
        "title": "Closing To"
       }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
      }
     ],
     "responses": {
@@ -6195,18 +6183,6 @@
    "get": {
     "description": "Development-family documents only: no sealed source reaches drafting.",
     "operationId": "draft_documents_api_drafting_documents_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -6221,16 +6197,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Draft Documents"
@@ -6256,16 +6222,6 @@
       "schema": {
        "default": "",
        "title": "Contains",
-       "type": "string"
-      }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
        "type": "string"
       }
      }
@@ -6303,18 +6259,6 @@
    "post": {
     "description": "Free: the maximum cost of drafting these slots. Nothing is sent.",
     "operationId": "plan_drafting_api_drafting_plan_post",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "requestBody": {
      "content": {
       "application/json": {
@@ -6353,18 +6297,6 @@
   "/api/drafting/runs": {
    "get": {
     "operationId": "drafting_runs_api_drafting_runs_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -6379,16 +6311,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Drafting Runs"
@@ -6404,16 +6326,6 @@
       "required": true,
       "schema": {
        "title": "Run Id",
-       "type": "string"
-      }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
        "type": "string"
       }
      }
@@ -6487,18 +6399,6 @@
    "post": {
     "description": "Paid: gpt-6-luna drafting through the budget gateway, never above the consented maximum.",
     "operationId": "start_drafting_api_drafting_start_post",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "requestBody": {
      "content": {
       "application/json": {
@@ -6538,18 +6438,6 @@
    "get": {
     "description": "Development candidates only; sealed ones are reviewed through the owner's CLI.",
     "operationId": "gold_pending_api_gold_pending_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -6564,16 +6452,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Gold Pending"
@@ -6582,18 +6460,6 @@
   "/api/gold/recent": {
    "get": {
     "operationId": "gold_recent_api_gold_recent_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -6608,16 +6474,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Gold Recent"
@@ -6655,16 +6511,6 @@
       "required": true,
       "schema": {
        "title": "Candidate Id",
-       "type": "string"
-      }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
        "type": "string"
       }
      }
@@ -6705,16 +6551,6 @@
       "required": true,
       "schema": {
        "title": "Candidate Id",
-       "type": "string"
-      }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
        "type": "string"
       }
      }
@@ -6764,16 +6600,6 @@
       "required": true,
       "schema": {
        "title": "Candidate Id",
-       "type": "string"
-      }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
        "type": "string"
       }
      }
@@ -6854,16 +6680,6 @@
        "title": "Source Hash",
        "type": "string"
       }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
      }
     ],
     "responses": {
@@ -6906,16 +6722,6 @@
        "default": false,
        "title": "All Members",
        "type": "boolean"
-      }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
       }
      }
     ],
@@ -6981,16 +6787,6 @@
        "title": "Target",
        "type": "string"
       }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
      }
     ],
     "responses": {
@@ -7030,16 +6826,6 @@
        "title": "Request Id",
        "type": "string"
       }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
      }
     ],
     "responses": {
@@ -7070,16 +6856,6 @@
       "required": true,
       "schema": {
        "title": "Request Id",
-       "type": "string"
-      }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
        "type": "string"
       }
      }
@@ -7130,16 +6906,6 @@
        "title": "Evidence Id",
        "type": "string"
       }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
      }
     ],
     "responses": {
@@ -7177,16 +6943,6 @@
       "required": true,
       "schema": {
        "title": "Request Id",
-       "type": "string"
-      }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
        "type": "string"
       }
      }
@@ -7241,16 +6997,6 @@
        "title": "Generation Id",
        "type": "string"
       }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
      }
     ],
     "responses": {
@@ -7279,18 +7025,6 @@
   "/api/settings/api-key": {
    "get": {
     "operationId": "api_key_status_api_settings_api_key_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -7301,34 +7035,12 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Api Key Status"
    },
    "put": {
     "operationId": "api_key_api_settings_api_key_put",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "requestBody": {
      "content": {
       "application/json": {
@@ -7367,18 +7079,6 @@
   "/api/settings/model": {
    "put": {
     "operationId": "generation_model_api_settings_model_put",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "requestBody": {
      "content": {
       "application/json": {
@@ -7435,16 +7135,6 @@
        "title": "B",
        "type": "string"
       }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
      }
     ],
     "responses": {
@@ -7475,18 +7165,6 @@
   "/api/verify/corrections": {
    "get": {
     "operationId": "corrections_api_verify_corrections_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -7501,34 +7179,12 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Corrections"
    },
    "post": {
     "operationId": "add_correction_api_verify_corrections_post",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "requestBody": {
      "content": {
       "application/json": {
@@ -7568,18 +7224,6 @@
    "post": {
     "description": "Free: prices the development answers still to generate. Nothing is sent.",
     "operationId": "plan_evaluation_api_verify_evaluation_plan_post",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -7590,16 +7234,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Plan Evaluation"
@@ -7608,18 +7242,6 @@
   "/api/verify/evaluation/start": {
    "post": {
     "operationId": "start_evaluation_api_verify_evaluation_start_post",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "requestBody": {
      "content": {
       "application/json": {
@@ -7659,18 +7281,6 @@
    "get": {
     "description": "Free: every comparison table the runner wrote, and which row serves.",
     "operationId": "experiments_api_verify_experiments_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -7681,16 +7291,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Experiments"
@@ -7698,20 +7298,8 @@
   },
   "/api/verify/experiments/activate": {
    "post": {
-    "description": "Switches what serves to the picked row's run (`activate-run`), recorded with the person's name.",
+    "description": "Switches what serves to the picked row's run (`activate-run`), recorded under the signed-in member.",
     "operationId": "activate_experiment_api_verify_experiments_activate_post",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "requestBody": {
      "content": {
       "application/json": {
@@ -7768,16 +7356,6 @@
        "title": "Index",
        "type": "integer"
       }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
      }
     ],
     "responses": {
@@ -7812,18 +7390,6 @@
   "/api/verify/fidelity": {
    "get": {
     "operationId": "fidelity_api_verify_fidelity_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -7838,16 +7404,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Fidelity"
@@ -7863,16 +7419,6 @@
       "required": true,
       "schema": {
        "title": "Source Hash",
-       "type": "string"
-      }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
        "type": "string"
       }
      }
@@ -7933,16 +7479,6 @@
        "title": "Page",
        "type": "integer"
       }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
      }
     ],
     "responses": {
@@ -7978,16 +7514,6 @@
        "title": "Limit",
        "type": "integer"
       }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
      }
     ],
     "responses": {
@@ -8022,18 +7548,6 @@
   "/api/verify/ingestion": {
    "get": {
     "operationId": "ingestion_api_verify_ingestion_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -8048,16 +7562,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Ingestion"
@@ -8073,16 +7577,6 @@
       "required": true,
       "schema": {
        "title": "Run Id",
-       "type": "string"
-      }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
        "type": "string"
       }
      }
@@ -8120,18 +7614,6 @@
    "post": {
     "description": "Free: prices the translations and Luna judge calls a part still needs, and counts its Jev calls.",
     "operationId": "plan_judges_api_verify_judges_plan_post",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "requestBody": {
      "content": {
       "application/json": {
@@ -8170,18 +7652,6 @@
   "/api/verify/judges/progress": {
    "get": {
     "operationId": "judge_progress_api_verify_judges_progress_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -8192,16 +7662,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Judge Progress"
@@ -8217,16 +7677,6 @@
       "required": true,
       "schema": {
        "title": "Run Id",
-       "type": "string"
-      }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
        "type": "string"
       }
      }
@@ -8260,18 +7710,6 @@
    "post": {
     "description": "Paid: runs the planned part through the gateway (`judge_eval`), never above the estimate.",
     "operationId": "start_judges_api_verify_judges_start_post",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "requestBody": {
      "content": {
       "application/json": {
@@ -8311,18 +7749,6 @@
    "get": {
     "description": "The maintenance sequence's progress, or the last run's report.",
     "operationId": "maintenance_status_api_verify_maintenance_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -8333,16 +7759,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Maintenance Status"
@@ -8352,18 +7768,6 @@
    "post": {
     "description": "Runs backup, restore check, ingest, fidelity, keyword, embedding and regression once, in order; a paid\nembedding stops at its estimate. Activates nothing.",
     "operationId": "start_maintenance_api_verify_maintenance_start_post",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -8374,16 +7778,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Start Maintenance"
@@ -8392,18 +7786,6 @@
   "/api/verify/overview": {
    "get": {
     "operationId": "overview_api_verify_overview_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -8414,16 +7796,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Overview"
@@ -8432,18 +7804,6 @@
   "/api/verify/trace-sources": {
    "get": {
     "operationId": "trace_sources_api_verify_trace_sources_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -8454,16 +7814,6 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Trace Sources"
@@ -8472,18 +7822,6 @@
   "/api/verify/traces": {
    "get": {
     "operationId": "traces_api_verify_traces_get",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "content": {
@@ -8498,34 +7836,12 @@
        }
       },
       "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
      }
     },
     "summary": "Traces"
    },
    "post": {
     "operationId": "run_trace_api_verify_traces_post",
-    "parameters": [
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
-     }
-    ],
     "requestBody": {
      "content": {
       "application/json": {
@@ -8573,16 +7889,6 @@
        "title": "Run Id",
        "type": "string"
       }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
-       "type": "string"
-      }
      }
     ],
     "responses": {
@@ -8620,16 +7926,6 @@
       "required": true,
       "schema": {
        "title": "Run Id",
-       "type": "string"
-      }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
        "type": "string"
       }
      }
@@ -8672,16 +7968,6 @@
       "required": true,
       "schema": {
        "title": "Run Id",
-       "type": "string"
-      }
-     },
-     {
-      "in": "header",
-      "name": "x-member",
-      "required": false,
-      "schema": {
-       "default": "owner",
-       "title": "X-Member",
        "type": "string"
       }
      }

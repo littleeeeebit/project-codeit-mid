@@ -53,7 +53,7 @@ def max_cost(rates: dict, input_tokens: int, max_output_tokens: int) -> int:
 
 
 # The provider project (billing scope) whose key pays for the paid work in this context, or None for the
-# server-environment key. Bound per HTTP request from the browser session (service.bind_request); every attempt
+# server-environment key. Bound per HTTP request from the signed-in member's key (service.bind_request); every attempt
 # records it so a reconciliation subtracts only the attempts billed to the project it reconciles.
 BILLING_SCOPE: contextvars.ContextVar[str | None] = contextvars.ContextVar("rfp_billing_scope", default=None)
 UNSCOPED_CHOICES = ("include", "exclude")

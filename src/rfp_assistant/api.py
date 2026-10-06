@@ -1,23 +1,35 @@
 """HTTP API for the web app in `web/`: one route per `service` function, and nothing else from the package
 (tests/test_api.py checks the imports).
 
-There is no login. The `X-Member` header carries the visitor's typed name, percent-encoded UTF-8, for
-attribution only. Paid work runs on the service's in-process executors, so serve this with exactly one worker:
+Members sign in with their JupyterHub account. BidMate is the hub's OAuth client (the `bidmate` service):
+/api/auth/login sends the browser to the hub's /hub/api/oauth2/authorize, /api/auth/callback checks the state,
+exchanges the code at the hub's token endpoint from this server, reads /hub/api/user and, for a username on
+BIDMATE_ALLOWED_USERS, sets an HttpOnly SameSite=Lax session cookie; /api/auth/logout ends it. Every other /api
+route answers 401 without that session, and the session's hub username is who requests, reviews, corrections and
+audit rows are recorded under. The settings come only from the environment (/etc/bidmate/server.env on `codeit`,
+runbook 3.1): without them every /api call is refused, unless BIDMATE_LOCAL_MEMBER names the one local developer.
+
+On `codeit` this serves http://35.255.64.243:8501 directly. The address is ephemeral: when it changes, update
+BIDMATE_HUB_URL, BIDMATE_OAUTH_REDIRECT_URI and the hub's `oauth_redirect_uri` together (runbook 3.1).
+
+Paid work runs on the service's in-process executors, so serve this with exactly one worker:
 `uvicorn rfp_assistant.api:app --workers 1`.
 """
 
 from __future__ import annotations
 
+import html
 import json
+import secrets
 import time
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 from typing import Annotated, Any, Literal
-from urllib.parse import quote, unquote
+from urllib.parse import quote, urlsplit
 
-from fastapi import Depends, FastAPI, Header, Query, Request
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi import Depends, FastAPI, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -26,8 +38,9 @@ from .service import service
 WEB = Path(__file__).resolve().parents[2] / "web" / "out"
 
 
-def create_app(resources=None) -> FastAPI:
-    """`resources` is for tests; the served app opens the data directory's single owner and closes it on stop."""
+def create_app(resources=None, login=None) -> FastAPI:
+    """`resources` and `login` are for tests; the served app opens the data directory's single owner and closes it
+    on stop, and reads its sign-in settings from the environment."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -40,7 +53,8 @@ def create_app(resources=None) -> FastAPI:
                 app.state.res.close()
 
     app = FastAPI(title="RFP assistant", version="1", lifespan=lifespan)
-    app.add_middleware(_KeySession)
+    app.state.login = login or service.Login.from_env()
+    app.add_middleware(_Session)
 
     @app.exception_handler(service.ServiceError)
     async def _service_error(_: Request, exc: Exception):
@@ -49,6 +63,7 @@ def create_app(resources=None) -> FastAPI:
     for error in service.SHELL_ERRORS:
         if error is not service.ServiceError:
             app.add_exception_handler(error, _forbidden)
+    _auth_routes(app)
     _routes(app)
     _verify_routes(app)
     _dataset_routes(app)  # after /api/gold/recent and friends, which /api/gold/{candidate_id} would shadow
@@ -57,19 +72,37 @@ def create_app(resources=None) -> FastAPI:
     return app
 
 
-KEY_COOKIE = "bidmate_key_session"
+SESSION_COOKIE = "bidmate_session"
+STATE_COOKIE = "bidmate_login_state"
+SIGN_IN = ("/api/auth/login", "/api/auth/callback", "/api/auth/logout")  # the only /api routes open without a session
+SAFE_METHODS = ("GET", "HEAD", "OPTIONS")
 
 
-class _KeySession:
-    """Paid work in a request pays with the key its browser entered on 설정 (the session cookie), or none, with
-    the model and billing project that browser had when the request began."""
+class _Session:
+    """Every /api route except the sign-in ones needs a signed-in member. Their paid work pays with the key that
+    member entered on 설정, with the model and billing project they had when the request began. A state-changing
+    call from another origin is refused: the session cookie is SameSite=Lax, and the hub's notebooks on :8000 count
+    as the same site."""
 
     def __init__(self, app) -> None:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        session = Request(scope).cookies.get(KEY_COOKIE) if scope["type"] == "http" else None
-        reset = service.bind_request(getattr(scope["app"].state, "res", None), session)
+        if scope["type"] != "http" or not scope["path"].startswith("/api/"):
+            return await self.app(scope, receive, send)
+        request, login = Request(scope), scope["app"].state.login
+        origin = request.headers.get("origin")
+        if request.method not in SAFE_METHODS and origin and urlsplit(origin).netloc != request.headers.get("host"):
+            return await JSONResponse({"detail": "다른 사이트에서 보낸 요청은 받지 않습니다."}, 403)(scope, receive, send)
+        if login.problem:
+            return await JSONResponse({"detail": login.problem}, 503)(scope, receive, send)
+        if scope["path"] in SIGN_IN:
+            return await self.app(scope, receive, send)
+        member = login.member(request.cookies.get(SESSION_COOKIE))
+        if member is None:
+            return await JSONResponse({"detail": "로그인이 필요합니다."}, 401)(scope, receive, send)
+        scope.setdefault("state", {})["member"] = member
+        reset = service.bind_request(getattr(scope["app"].state, "res", None), member)
         try:
             await self.app(scope, receive, send)
         finally:
@@ -84,8 +117,8 @@ def _res(request: Request):
     return request.app.state.res
 
 
-def _member(x_member: Annotated[str, Header()] = "owner"):
-    return service.visitor(unquote(x_member))
+def _member(request: Request):
+    return service.visitor(request.state.member)
 
 
 Res = Annotated[object, Depends(_res)]
@@ -93,6 +126,11 @@ Member = Annotated[object, Depends(_member)]
 
 
 # ---------------------------------------------------------------- shapes
+
+
+class Me(BaseModel):
+    name: str = Field(description="The signed-in JupyterHub username, recorded on everything this member does")
+    local: bool = Field(description="Local development (BIDMATE_LOCAL_MEMBER): no sign-in, nothing to sign out of")
 
 
 class Info(BaseModel):
@@ -309,6 +347,63 @@ def _scope(refs: list[ScopeRef]) -> list[tuple[str, str]]:
     return [(r.doc_id, r.source_hash) for r in refs]
 
 
+# ---------------------------------------------------------------- sign-in
+
+
+def _login_page(status: int, message: str) -> HTMLResponse:
+    """What the browser lands on when the hub's answer is refused: the reason and a way to start again."""
+    return HTMLResponse(
+        f'<!doctype html><html lang="ko"><meta charset="utf-8"><title>입찰메이트 로그인</title>'
+        f'<main style="font-family:sans-serif;max-width:32rem;margin:4rem auto;line-height:1.6">'
+        f"<h1>로그인하지 못했습니다</h1><p>{html.escape(message)}</p>"
+        f'<p><a href="/api/auth/login">다시 로그인</a></p></main></html>', status_code=status)
+
+
+def _auth_routes(app: FastAPI) -> None:
+    @app.get("/api/auth/login", include_in_schema=False)  # browser navigations, never fetched by the screens
+    def login(request: Request):
+        """Sends the browser to the hub to sign in. The hub returns only to its one registered address, so a visit
+        through another (an SSH tunnel) moves to that address first; the state cookie must be set there."""
+        sign_in = request.app.state.login
+        if sign_in.local_member:
+            return RedirectResponse("/", 303)
+        home = urlsplit(sign_in.hub.redirect_uri)
+        if request.url.netloc != home.netloc:
+            return RedirectResponse(f"{home.scheme}://{home.netloc}/api/auth/login", 303)
+        state = secrets.token_urlsafe(32)
+        out = RedirectResponse(sign_in.hub.authorize_url(state), 303)
+        out.set_cookie(STATE_COOKIE, state, max_age=600, httponly=True, samesite="lax", path="/api/auth/")
+        return out
+
+    @app.get("/api/auth/callback", include_in_schema=False)
+    def callback(request: Request, code: str = "", state: str = ""):
+        sign_in = request.app.state.login
+        expected = request.cookies.get(STATE_COOKIE, "")
+        if sign_in.local_member:
+            return RedirectResponse("/", 303)
+        if not (code and state and expected and secrets.compare_digest(state.encode(), expected.encode())):
+            out = _login_page(400, "로그인 요청이 만료되었거나 이 브라우저에서 시작되지 않았습니다.")
+        else:
+            try:
+                session = sign_in.sign_in(code)
+            except service.LoginError as exc:
+                out = _login_page(exc.status, str(exc))
+            else:
+                out = RedirectResponse("/", 303)
+                out.set_cookie(SESSION_COOKIE, session, httponly=True, samesite="lax", path="/")
+        out.delete_cookie(STATE_COOKIE, path="/api/auth/")
+        return out
+
+    @app.post("/api/auth/logout", status_code=204)
+    def logout(request: Request, response: Response):
+        request.app.state.login.sign_out(request.cookies.get(SESSION_COOKIE))
+        response.delete_cookie(SESSION_COOKIE, path="/")
+
+    @app.get("/api/auth/me", response_model=Me)
+    def me(request: Request, member: Member):
+        return Me(name=member.member_id, local=bool(request.app.state.login.local_member))
+
+
 # ---------------------------------------------------------------- routes
 
 
@@ -333,11 +428,8 @@ def _routes(app: FastAPI) -> None:
         return service.api_key_status(res, member)
 
     @app.put("/api/settings/api-key", response_model=ApiKeyStatus)
-    def api_key(body: ApiKeyIn, res: Res, member: Member, response: Response):
-        session, status = service.set_api_key(res, member, body.api_key, body.model)
-        # Not the key: an unguessable handle to it, sent only back to this server and unreadable by scripts.
-        response.set_cookie(KEY_COOKIE, session, httponly=True, samesite="strict", path="/")
-        return status
+    def api_key(body: ApiKeyIn, res: Res, member: Member):
+        return service.set_api_key(res, member, body.api_key, body.model)
 
     @app.put("/api/settings/model", response_model=ApiKeyStatus)
     def generation_model(body: ModelIn, res: Res, member: Member):
@@ -1039,7 +1131,6 @@ class ExperimentQuestion(_Read):
 
 class ActivateIn(BaseModel):
     run_id: str
-    decided_by: str
     note: str = ""
 
 
@@ -1145,8 +1236,8 @@ def _verify_routes(app: FastAPI) -> None:
 
     @app.post("/api/verify/experiments/activate", response_model=Activated)
     def activate_experiment(body: ActivateIn, res: Res, member: Member):
-        """Switches what serves to the picked row's run (`activate-run`), recorded with the person's name."""
-        return service.activate_experiment(res, member, body.run_id, body.decided_by, body.note)
+        """Switches what serves to the picked row's run (`activate-run`), recorded under the signed-in member."""
+        return service.activate_experiment(res, member, body.run_id, member.member_id, body.note)
 
     @app.get("/api/verify/fidelity", response_model=list[FidelitySource])
     def fidelity(res: Res, member: Member):

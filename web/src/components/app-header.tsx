@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { cn } from "cn";
 import { api, type Budget, errorText } from "@/lib/api";
 import { usd, WARNING } from "@/lib/format";
-import { useMember, writeMember } from "@/lib/member";
 import { must, usePoll } from "@/lib/use-poll";
+import { Account } from "./sign-in";
 import { StatusBadge } from "./status-badge";
 
 const PAGES = [
@@ -16,7 +16,7 @@ const PAGES = [
   { href: "/settings", label: "설정" },
 ];
 
-/** One bar on every page: navigation, visitor attribution and the shared operating limit. */
+/** One bar on every page: navigation, the signed-in account and the shared operating limit. */
 export function AppHeader() {
   const path = usePathname();
   const budget = usePoll("budget", () => must(api.GET("/api/budget"), errorText), 2000);  // read-only
@@ -40,24 +40,11 @@ export function AppHeader() {
         </nav>
         <div className="ml-auto flex items-center gap-3 sm:gap-5">
           <BudgetMeter data={budget.data} error={budget.error} />
-          <MemberField />
+          <Account />
         </div>
       </div>
       <BudgetWarnings data={budget.data} />
     </header>
-  );
-}
-
-function MemberField() {
-  const name = useMember();
-  return (
-    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-      <label htmlFor="member">이름</label>
-      <input id="member" value={name} maxLength={40} onChange={(e) => writeMember(e.target.value)}
-             aria-describedby="member-hint"
-             className="h-8 w-24 rounded-md border sm:w-28 border-input bg-background px-2 text-base sm:text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" />
-      <span id="member-hint" className="sr-only">사용·검토 기록에 남는 이름입니다. 로그인은 없습니다.</span>
-    </div>
   );
 }
 

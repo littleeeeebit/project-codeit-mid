@@ -1,6 +1,5 @@
 import createClient, { type Middleware } from "openapi-fetch";
 import type { components, paths } from "./api-schema";
-import { readMember } from "./member";
 
 export type Schemas = components["schemas"];
 export type Doc = Schemas["Document"];
@@ -10,23 +9,18 @@ export type Evidence = Schemas["Evidence"];
 export type Budget = Schemas["Budget"];
 export type Owned = Schemas["Owned"];
 
-/** There is no login: the typed name rides along on every call, for attribution only. */
-const member: Middleware = {
-  onRequest({ request }) {
-    if (!request.headers.has("X-Member")) {
-      request.headers.set("X-Member", encodeURIComponent(readMember()));
+/** Every call rides on the session cookie. A 401 after sign-in means the session ended: sign in again. */
+const expired: Middleware = {
+  onResponse({ request, response }) {
+    if (response.status === 401 && !new URL(request.url).pathname.startsWith("/api/auth/")) {
+      window.location.replace("/api/auth/login");  // an API route that leads to the hub; Back skips the dead page
     }
-    return request;
+    return response;
   },
 };
 
 export const api = createClient<paths>({ baseUrl: "" });
-api.use(member);
-
-/** Ownership actions keep the member captured when the request was submitted. */
-export function memberHeaders(name: string): Record<string, string> {
-  return { "X-Member": encodeURIComponent(name) };
-}
+api.use(expired);
 
 /** The service's Korean message for a refused call, or a generic one when the server gave none. */
 export function errorText(error: unknown): string {

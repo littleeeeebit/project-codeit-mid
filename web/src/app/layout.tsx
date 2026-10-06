@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { AppHeader } from "@/components/app-header";
+import { SignedIn } from "@/components/sign-in";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -22,8 +23,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="ko" className={`${pretendard.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <TooltipProvider>
-          <AppHeader />
-          {children}
+          <SignedIn>
+            <AppHeader />
+            {children}
+          </SignedIn>
         </TooltipProvider>
       </body>
     </html>

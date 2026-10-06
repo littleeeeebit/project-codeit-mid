@@ -10,17 +10,12 @@ import unittest
 import uuid
 from dataclasses import asdict, replace
 from pathlib import Path
-from urllib.parse import quote
-
-from fastapi.testclient import TestClient
-
-from rfp_assistant import api
 from rfp_assistant.contracts import AnswerRequest, EvidenceUnit, Principal, RetrievalResult
 from rfp_assistant.gateway import budget, generation
 from rfp_assistant.gateway.generation import FakeTransport, ProviderError, ProviderResponse
 from rfp_assistant.service import service
 from rfp_assistant.storage import store
-from tests import fixtures
+from tests import fake_hub, fixtures
 
 FIRST = "통합 정보시스템 구축 사업은 어떤 사업인가요?"
 FOLLOW = "그 사업의 하자보수 기간은?"
@@ -170,9 +165,9 @@ class FollowUpTest(Base):
                          (json.dumps(asdict(first), ensure_ascii=False), first.request_id))
         order = [c["doc_id"] for c in first.coverage]
         self.transport.responder = generation._echo_first_evidence
-        client = TestClient(api.create_app(self.res))
+        client = fake_hub.client(self.res, "c1")
         with client:
-            follow = client.post("/api/ask", headers={"X-Member": quote("c1")}, json={
+            follow = client.post("/api/ask", json={
                 "scope": [], "question": "두 번째 값은 어느 문서인가요?", "mode": "corpus",
                 "previous_request_id": first.request_id})
         self.assertEqual(follow.status_code, 200, follow.text)
@@ -372,23 +367,22 @@ class StreamingTest(Base):
 
 class StreamRouteTest(Base):
     def test_cancelling_withdraws_the_streamed_text_before_the_held_call_returns(self):
-        client = TestClient(api.create_app(self.res))
-        headers = {"X-Member": quote("c1")}
+        client = fake_hub.client(self.res, "c1")
         with client:
             self.transport.release.clear()
-            owned = client.post("/api/ask", headers=headers, json={
+            owned = client.post("/api/ask", json={
                 "scope": [{"doc_id": self.a.doc_id, "source_hash": self.a.source_hash}], "question": FIRST,
                 "mode": "single"}).json()
             self.assertTrue(self.transport.streamed.wait(10))
             rid = owned["request_id"]
             body = []  # the test client hands over a streamed body only once it ends: read it on a thread
             reader = threading.Thread(target=lambda: body.append(client.get(
-                f"/api/requests/{rid}/stream", headers=headers, params={"generation_id": owned["generation_id"]}).text))
+                f"/api/requests/{rid}/stream", params={"generation_id": owned["generation_id"]}).text))
             reader.start()
             time.sleep(0.5)  # the stream has sent the partial
-            client.post(f"/api/requests/{rid}/cancel", headers=headers)
+            client.post(f"/api/requests/{rid}/cancel")
             time.sleep(0.5)  # and withdrawn it while the provider still holds
-            self.assertEqual(client.get(f"/api/requests/{rid}", headers=headers).json()["view"]["status"], "running")
+            self.assertEqual(client.get(f"/api/requests/{rid}").json()["view"]["status"], "running")
             self.transport.release.set()
             reader.join(10)
             events = body[0].split("\n\n")
@@ -396,25 +390,24 @@ class StreamRouteTest(Base):
             self.assertEqual(events[1:], ["data: null", "event: done\ndata: {}", ""])
 
     def test_the_stream_route_sends_the_partial_answer_then_done(self):
-        client = TestClient(api.create_app(self.res))
-        headers = {"X-Member": quote("c1")}
+        client = fake_hub.client(self.res, "c1")
         with client:
             self.transport.release.clear()
-            owned = client.post("/api/ask", headers=headers, json={
+            owned = client.post("/api/ask", json={
                 "scope": [{"doc_id": self.a.doc_id, "source_hash": self.a.source_hash}], "question": FIRST,
                 "mode": "single"}).json()
             self.assertTrue(self.transport.streamed.wait(10))
             threading.Timer(0.5, self.transport.release.set).start()
-            with client.stream("GET", f"/api/requests/{owned['request_id']}/stream", headers=headers,
+            with client.stream("GET", f"/api/requests/{owned['request_id']}/stream",
                                params={"generation_id": owned["generation_id"]}) as stream:
                 text = "".join(stream.iter_text())
             self.assertIn('"summary": "가짜 제공자 응답입니다."', text)
             self.assertTrue(text.endswith("event: done\ndata: {}\n\n"))
-            follow = client.post("/api/ask", headers=headers, json={
+            follow = client.post("/api/ask", json={
                 "scope": [{"doc_id": self.a.doc_id, "source_hash": self.a.source_hash}], "question": FOLLOW,
                 "mode": "single", "previous_request_id": owned["request_id"]}).json()
             end = time.monotonic() + 10
-            while (view := client.get(f"/api/requests/{follow['request_id']}", headers=headers, params={
+            while (view := client.get(f"/api/requests/{follow['request_id']}", params={
                     "generation_id": follow["generation_id"], "target": follow["target"]}).json())["view"]["status"] \
                     in ("queued", "running"):
                 self.assertLess(time.monotonic(), end)
