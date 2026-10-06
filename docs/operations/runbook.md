@@ -94,7 +94,11 @@ The VM serves the owner host's restored database, whose rows keep Windows paths 
 5. `systemctl enable --now bidmate`. Startup accepted the validated import and its artifact hashes through the path map.
 6. Through `ssh -L` from the owner's PC, 질문하기, 검증 and 데이터셋 만들기 loaded. For the last answered request (`0f380c5a-…`), the cited evidence opened, and its original HWP (4.2 MB) downloaded with a SHA-256 equal to its `source_hash`.
 
-Paid answers stay off until the owner reconciles the provider's usage since the dump (section 5) and runs `sudo /srv/bidmate/app/tools/bidmate-cli.sh paid on --actor <owner> --reason "..."` on `codeit`.
+7. Reconciliation: neither ledger recorded an attempt after the dump (the owner's copy was stopped and set to `paid off`; the VM's only new request was refused by `postgresql_maintenance`). With the service stopped, the owner ran `set-limit --usd 20` (the owner's limit, $20) and `paid on`. A real 질문하기 answer through the tunnel then completed with 2 claims and settled $0.000843.
+
+The ledger's spent amount ($2.482209 after that answer) is the app's settled attempts ($2.03) plus `external:pr8-pilot-ledger` ($0.448818, imported on 2026-10-02). The OpenAI dashboard showed $2.01 on 2026-10-06. The ledger stays the higher, conservative figure; lowering it is an owner `adjust` with evidence (section 5).
+
+The API key exists in one place on `codeit`: `/etc/bidmate/server.env` (root, 600), passed to the service by systemd. On 2026-10-06 a search of `/srv`, `/home`, `/tmp`, `/var/log`, `/etc`, `/root` and `/opt`, the service journal and the PostgreSQL container's configuration found no other copy. The app never sends it to a browser, a log or a trace (Langfuse is off on the VM). The six team members are sudoers on `codeit` and so can read it as root. The backstop for that is the provider: give this deployment its own OpenAI project key with a $20 budget, so it can be revoked without touching anything else.
 
 ### 3.4 The owner host is no longer live
 
