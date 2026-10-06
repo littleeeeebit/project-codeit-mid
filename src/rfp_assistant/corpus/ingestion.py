@@ -1311,7 +1311,3 @@ def load_elements(settings: Settings, extraction_id: str) -> list[dict]:
     if row is None:
         raise IngestionError(f"unknown extraction {extraction_id}")
     return read_jsonl(host_path(row["artifact_path"]))
-
-
-def today_seoul() -> date:
-    return datetime.now(SEOUL).date()

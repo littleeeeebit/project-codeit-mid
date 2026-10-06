@@ -245,8 +245,6 @@ def cmd_compare(args, settings) -> int:
 
 
 def cmd_compare_cap(args, settings) -> int:
-    from decimal import Decimal
-
     from .retrieval import models
 
     cap = int(Decimal(args.usd) * 1_000_000)

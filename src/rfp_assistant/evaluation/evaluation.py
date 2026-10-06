@@ -1450,21 +1450,6 @@ def decision_errors(settings: Settings, run_id: str, decision: dict) -> list[str
     return errors + run_errors(settings, run_id)
 
 
-def _k1_baselines(settings: Settings, config: dict) -> list[str]:
-    """The newest complete current-policy K1 run on the same evaluated population (the comparison baseline)."""
-    base = settings.data_dir / "runs"
-    found = []
-    for d in base.glob("K1-*") if base.exists() else []:
-        try:
-            c, sc = load_run(settings, d.name)
-        except (EvaluationError, json.JSONDecodeError):
-            continue
-        if (c.get("eval_version") == EVAL_VERSION and sc.get("status") == "complete"
-                and c.get("population_sha256") == config.get("population_sha256")):
-            found.append((sc.get("created_at", ""), d.name))
-    return [max(found)[1]] if found else []
-
-
 def serving_config(run_id: str, config: dict) -> dict:
     """The serving configuration a recorded retrieval run describes (what `activate-run` stores and what the
     phase-4 answer evaluation pins)."""

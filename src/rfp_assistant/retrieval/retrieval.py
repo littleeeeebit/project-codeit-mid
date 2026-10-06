@@ -12,7 +12,6 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from importlib import metadata
-from pathlib import Path
 
 from rank_bm25 import BM25Okapi
 
