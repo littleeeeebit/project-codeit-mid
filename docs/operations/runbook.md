@@ -12,7 +12,7 @@ Application startup requires the persisted import validation and rechecks artifa
 
 The cold archives under `.runtime/archive/` (verified PostgreSQL custom-format dumps) are history only; no code reads them. The previous database's files were deleted on 2026-10-05. The Phase 4 pilot runtime lives in the separate PostgreSQL database `bidmate_pilot_archive` with paid admission disabled; never point `RFP_DATABASE_DSN` at it. Rollback is a `restore-check` of the newest verified dump (`postgresql-2026-10-04-r5`, ledger revision 1712) into an empty database (section 12), which leaves paid admission disabled. Before `paid on`, reconcile every record the replaced ledger wrote after the dump's watermark; after new paid writes, take and restore-check a new dump.
 
-The owner approved paid migration work and a $10 shared operating cap on 2026-10-03. The Settings page edits that shared cumulative cap, records visitor name and reason, preserves settled/unknown amounts, and scales current purpose envelopes. It does not change API keys, provider account quotas, paid admission or historical prices. Existing no-login visitors have the budget-admin capability; the limit is shared, not a per-person account. Decreasing below committed spend or purpose reservations is refused. CLI equivalents are `set-limit --usd <amount> --actor <name> --reason <reason>` and `set-envelopes --file <absolute JSON> --actor <name> --reason <reason>`.
+The owner approved paid migration work and a $10 shared operating cap on 2026-10-03. The Settings page edits that shared cumulative cap, records the signed-in member and the reason, preserves settled/unknown amounts, and scales current purpose envelopes. It does not change API keys, provider account quotas, paid admission or historical prices. Every signed-in member has the budget-admin capability; the limit is shared, not a per-person account. Decreasing below committed spend or purpose reservations is refused. CLI equivalents are `set-limit --usd <amount> --actor <name> --reason <reason>` and `set-envelopes --file <absolute JSON> --actor <name> --reason <reason>`.
 
 ## 1. One owner, one data directory
 
@@ -20,35 +20,53 @@ The owner approved paid migration work and a $10 shared operating cap on 2026-10
 - The ledger, requests, audit events and corrections all live in the PostgreSQL application database. Immutable extraction and index artifacts stay under `RFP_DATA_DIR` on a local disk; a network share is outside the contract.
 - The operational config (`RFP_CONFIG_FILE`) holds no secrets. On the shared host no file holds an API key: each member enters theirs on the 설정 page (3.3). On a personal machine, `OPENAI_API_KEY` may stay in the process environment or `.env`.
 
-## 2. Access: no login
+## 2. Access: JupyterHub sign-in
 
-There is no login (owner decision 2026-09-30, reaffirmed for phase 3 on 2026-10-01). Every visitor gets every page: 질문하기, 검증 and 데이터셋 만들기. The name typed in the header's 이름 field (default `owner`) is recorded on requests, attempts, reviews and corrections. Budget administration is owner CLI only (section 5); its `--actor` is recorded on audit events.
+Members sign in with their JupyterHub account (owner decision 2026-10-06, which replaced the no-login decision of 2026-09-30; `.wiki/decisions`). Every allowed member gets every page: 질문하기, 검증 and 데이터셋 만들기. The hub username is recorded on requests, attempts, reviews, corrections and audit events. Budget administration is owner CLI only (section 5); its `--actor` is recorded on audit events.
 
-- Attribution, not authentication. Per-member spend (`budget-status`) is only as accurate as the names people type. Ask each member to use one consistent name.
-- Network reach is the access control. Anyone who can open the page can spend the allowance. Admin actions run from the owner's terminal, require a reason and leave an audit event; there is still no bulk release of unknown billing.
+- The flow. The page's 로그인 goes to `/api/auth/login`, which sends the browser to the hub's `/hub/api/oauth2/authorize` with a random state, also kept in a 10-minute cookie. The member signs in on the hub, if not already signed in there, and the hub returns to `/api/auth/callback`. BidMate checks the state, exchanges the code at the hub's `/hub/api/oauth2/token` from the server (`BIDMATE_HUB_API_URL`, loopback on `codeit`), and reads `/hub/api/user`. A username on `BIDMATE_ALLOWED_USERS` gets a session cookie (`bidmate_session`, HttpOnly, SameSite=Lax, 12 hours). The session lives only in the server's memory, so a restart signs everyone out. The next 로그인 usually needs no password, because the hub remembers its own sign-in.
+- Refusals. A hub user who is not on the allowlist gets 403 and no session. A wrong or missing state gets 400. An unreachable hub gets 502. Every `/api` route except `/api/auth/login`, `/callback` and `/logout` answers 401 without a session, and the screens then send the browser back to sign-in. A state-changing call whose `Origin` is another address (a notebook page on :8000 included) gets 403.
+- Fail-closed. If any of `BIDMATE_HUB_URL`, `BIDMATE_OAUTH_CLIENT_ID`, `BIDMATE_OAUTH_CLIENT_SECRET`, `BIDMATE_OAUTH_REDIRECT_URI` or `BIDMATE_ALLOWED_USERS` is missing, every `/api` call answers 503 with the names of the missing settings. `BIDMATE_LOCAL_MEMBER` (one developer, no sign-in) is for a personal machine only. It must never be in `server.env` or the unit, and setting it next to the hub settings also answers 503.
 - Sealed test rows are never served to the 검증 or 데이터셋 만들기 pages. Only the phase-4 freeze procedure, run by the owner from the CLI, reads `sealed/`.
-- The typed name is kept in that browser (local storage) and sent with every call as the `X-Member` header. Another browser or a cleared storage starts at `owner`; retype it. Running requests still settle on the server, and a reloaded page shows them under "내 최근 요청" for that name.
+- Running requests still settle on the server after a sign-out, and the next sign-in shows them under "내 최근 요청" for that account.
 
 ## 3. Launch
 
 ### 3.1 The team host (live since 2026-10-06)
 
-The shared application runs on the team's existing GCP VM `codeit`. It is the only live ledger and the only gateway owner. API keys reach it only through the 설정 page, one per browser, and live only in the service's memory (3.3). The owner's Windows server is no longer live (3.4).
+The shared application runs on the team's existing GCP VM `codeit`. It is the only live ledger and the only gateway owner. Members reach it at <http://35.255.64.243:8501> and sign in with their JupyterHub account (section 2). API keys reach it only through the 설정 page, one per member account, and live only in the service's memory (3.3). The owner's Windows server is no longer live (3.4).
 
 | | |
 | --- | --- |
 | VM | `codeit` (existing team VM, also JupyterHub), project `sprint-ai-01`, zone `us-central1-c`, Ubuntu 24.04 |
 | Machine | `g2-standard-4` (4 vCPU, 16 GB, one NVIDIA L4), 50 GB boot disk shared with the team |
-| Address | `35.255.64.243`, ephemeral: it changes if `codeit` is stopped and started. Read the new one in the console and update this line. |
-| Listening (BidMate) | uvicorn on `127.0.0.1:8501` (one worker); PostgreSQL 18.6 on `127.0.0.1:55432`. Nothing of BidMate listens on another address. |
+| Address | `35.255.64.243`, ephemeral: it changes if `codeit` is stopped and started. Then follow "When the address changes" below. |
+| Listening (BidMate) | uvicorn on `0.0.0.0:8501` (one worker), served at <http://35.255.64.243:8501> through the already-open 8501 rule; PostgreSQL 18.6 on `127.0.0.1:55432` only. JupyterHub is the team's, on `:8000` (proxy) and `127.0.0.1:8081` (hub). |
 | Paths | checkout `/srv/bidmate/app`, originals `/srv/bidmate/app/원본 데이터`, runtime `/srv/bidmate/app/.runtime`, venv `/srv/bidmate/venv`, backups `/srv/bidmate/backups`, owned by the `bidmate` service user (mode 750) |
-| Secrets | `/etc/bidmate/server.env` (root, mode 600): `RFP_DATABASE_DSN`, `RFP_CONFIG_FILE`, `RFP_SOURCE_DIR`, `RFP_DATA_DIR`, `RFP_PATH_MAP`. No tracked file and no `.env` holds them. There is no `OPENAI_API_KEY` on the VM in any file; Langfuse tracing is off there. |
+| Secrets | `/etc/bidmate/server.env` (root, mode 600): `RFP_DATABASE_DSN`, `RFP_CONFIG_FILE`, `RFP_SOURCE_DIR`, `RFP_DATA_DIR`, `RFP_PATH_MAP`, and the sign-in settings below. No tracked file and no `.env` holds them. There is no `OPENAI_API_KEY` on the VM in any file; Langfuse tracing is off there. |
 
-Firewall. `codeit` sits on the project's shared `default` network, whose rules (owned by the course project, not by BidMate) open tcp:22 and several other ports, 8501 among them, to every instance. BidMate does not rely on them: it binds only to loopback, so the only way in is SSH. Do not change the shared rules for BidMate, and never start it with `--host 0.0.0.0` here: the open 8501 rule would publish spending and administration to the internet.
+Sign-in settings in `server.env` (section 2). They are the only place BidMate reads them from:
+
+```sh
+BIDMATE_HUB_URL=http://35.255.64.243:8000                     # where browsers are sent to sign in
+BIDMATE_HUB_API_URL=http://127.0.0.1:8000                     # where the server exchanges the code
+BIDMATE_OAUTH_CLIENT_ID=service-bidmate
+BIDMATE_OAUTH_CLIENT_SECRET=<the bidmate service's api_token in /root/jupyterhub_config.py>
+BIDMATE_OAUTH_REDIRECT_URI=http://35.255.64.243:8501/api/auth/callback
+BIDMATE_ALLOWED_USERS=spai1302,spai1303,spai1308,spai1316,spai1319,spai1322
+```
+
+The hub side is the `bidmate` entry in `c.JupyterHub.services` of `/root/jupyterhub_config.py`: `oauth_client_id` `service-bidmate`, `api_token` (the client secret above), `oauth_redirect_uri` (the same URI as above) and `oauth_no_confirm`. A `bidmate-users` role in `c.JupyterHub.load_roles` grants the six members `access:services!service=bidmate`; without it the hub refuses them with 403 before BidMate sees them. The hub loads both only at start, and restarting `jupyterhub.service` stops every running notebook server, so pick the time with the team.
+
+When the address changes. Update the hub's `oauth_redirect_uri`, `BIDMATE_HUB_URL` and `BIDMATE_OAUTH_REDIRECT_URI` to the new address together, then restart `jupyterhub.service` (notebooks stop) and `bidmate`. Until then sign-in fails, because the hub returns browsers only to the registered address. Then update the Address line above and the address in README.
+
+Firewall. `codeit` sits on the project's shared `default` network, whose rules (owned by the course project, not by BidMate) open tcp:22 and several other ports, 8000 and 8501 among them, to every instance. BidMate uses the open 8501 rule as it is and changes no rule. It listens on all addresses only because every `/api` route requires a JupyterHub sign-in by an allowlisted member, and without the sign-in settings it refuses every call. Plain HTTP is used, the same as the hub on :8000: the session cookie and the hub's own login cross the network unencrypted.
 
 Machine type. On 2026-10-06, before choosing the host, the owner host's `bidmate_app` had `active_run` = `H-0fffb2a6ec`: hybrid, `text-embedding-3-large` @1536 through the OpenAI API, `reranker: null`. Serving needs no local embedding model or reranker, so a CPU VM would do. The owner chose the existing `codeit` instead; BidMate's venv has no torch and does not use its L4. Activating a local-model row (검증 › 실험 비교) would need torch with CUDA in `/srv/bidmate/venv` and GPU memory left over by the team's notebooks; do neither without the owner.
 
-Reaching it. No login, no Google sign-in. Each member connects with their own existing SSH key and keeps this open while using the app:
+Reaching it. Open <http://35.255.64.243:8501>, press 로그인 (JupyterHub 계정으로 로그인), and sign in with the same username and password as on :8000. The header then shows that username and 로그아웃. Nothing else is needed: no SSH, no key.
+
+The SSH tunnel still reaches the server. Signing in through it moves the browser to the public address first, because the hub returns browsers only to the one address it has registered. The tunnel is therefore no separate way into the screens, only a way to reach the port (an unauthenticated `curl -i http://127.0.0.1:8501/api/info` through it answers 401, as from anywhere):
 
 ```sh
 ssh -i <your private key> -N -L 8501:127.0.0.1:8501 <your username>@35.255.64.243
@@ -56,9 +74,9 @@ ssh -i <your private key> -N -L 8501:127.0.0.1:8501 <your username>@35.255.64.24
 
 `-i` can be dropped only when the key has one of ssh's default names (`~/.ssh/id_ed25519`, `id_rsa`, …); otherwise the server answers `Permission denied (publickey)`. A key that gcloud created is `~/.ssh/google_compute_engine` (the owner's, in PowerShell: `-i "$HOME/.ssh/google_compute_engine"`). Write key paths with forward slashes: chat apps drop a backslash before `.`, and PowerShell then reads `$HOME.ssh` as an empty property, leaving `\google_compute_engine`. If something on the member's PC already uses 8501, forward another local port (`-L 8502:127.0.0.1:8501`) and open that one.
 
-Then open <http://127.0.0.1:8501>: 질문하기, 검증 and 데이터셋 만들기. Whoever can SSH into `codeit` can spend the allowance and use admin pages; that list is the access control. On 2026-10-06 the owner confirmed that a member other than the owner opened all three through their own tunnel and found them working.
+Who can use the screens: hub users on `BIDMATE_ALLOWED_USERS`, the same six as the hub's own `allowed_users`. Other accounts on the hub (it also runs servers for other `spai*` users) get 403. On 2026-10-06 a member other than the owner opened all three pages through their own tunnel, before sign-in existed.
 
-Who can reach it: the project-wide SSH-key metadata of `sprint-ai-01` (`codeit` does not block project keys; OS Login is off). Each member's existing key is installed as their own user (checked 2026-10-06):
+Who can reach the VM over SSH (and so read `server.env` and the CLI): the project-wide SSH-key metadata of `sprint-ai-01` (`codeit` does not block project keys; OS Login is off). Each member's existing key is installed as their own user (checked 2026-10-06):
 
 | User | Key fingerprint |
 | --- | --- |
@@ -73,11 +91,12 @@ All six are in `google-sudoers` on `codeit`, so each can also read `/etc/bidmate
 
 ### 3.2 Linux start path on `codeit`
 
-`tools/infra/start-postgresql.sh` replaces `tools/infra/start-postgresql.ps1`: it creates `.runtime/postgresql.env` (mode 600) once and starts `compose.postgresql.yaml` on loopback port 55432. `tools/infra/bidmate.service` (installed as `/etc/systemd/system/bidmate.service`) runs it before uvicorn on `127.0.0.1:8501 --workers 1` as the `bidmate` user, with `/etc/bidmate/server.env`. It starts at boot and stops with SIGINT (the controlled stop of section 4).
+`tools/infra/start-postgresql.sh` replaces `tools/infra/start-postgresql.ps1`: it creates `.runtime/postgresql.env` (mode 600) once and starts `compose.postgresql.yaml` on loopback port 55432. `tools/infra/bidmate.service` (installed as `/etc/systemd/system/bidmate.service`) runs it before uvicorn on `0.0.0.0:8501 --workers 1` as the `bidmate` user, with `/etc/bidmate/server.env` (which must hold the sign-in settings of 3.1, or every API call is refused). It starts at boot and stops with SIGINT (the controlled stop of section 4).
 
 ```sh
 sudo systemctl status bidmate          # or: restart / stop; logs with journalctl -u bidmate
-sudo ss -ltnp | grep -E ':(8501|55432) '   # 127.0.0.1:8501 python (uvicorn), 127.0.0.1:55432 docker-proxy
+sudo ss -ltnp | grep -E ':(8501|55432) '   # 0.0.0.0:8501 python (uvicorn), 127.0.0.1:55432 docker-proxy
+curl -si http://127.0.0.1:8501/api/info | head -1   # HTTP/1.1 401: sign-in is enforced (503: settings missing)
 sudo /srv/bidmate/app/tools/infra/bidmate-cli.sh budget-status   # any owner CLI command, with the service's environment
 ```
 
@@ -98,13 +117,13 @@ The VM serves the owner host's restored database, whose rows keep Windows paths 
 
 The ledger's spent amount ($2.482209 after that answer) is the app's settled attempts ($2.03) plus `external:pr8-pilot-ledger` ($0.448818, imported on 2026-10-02). The OpenAI dashboard showed $2.01 on 2026-10-06. The ledger stays the higher, conservative figure; lowering it is an owner `adjust` with evidence (section 5).
 
-No file on `codeit` holds an API key: not `server.env`, not a `.env`, not the database. Each member who wants paid answers enters their own key on the 설정 page ("내 OpenAI API 키") through their tunnel. The server first checks it against the serving model with a free model-metadata read. It then keeps it in process memory under a random session ID, which goes back to that browser as an HttpOnly, SameSite=Strict session cookie (`bidmate_key_session`). Every paid stage a request starts, including the background jobs it launches (evaluation, judge runs, dataset drafting), pays with that browser's key. A browser with no key, such as a teammate who has not entered one, is refused before dispatch with "OpenAI API 키가 설정되지 않았습니다"; nothing is reserved or charged. With the key, each browser picks its answer model: `gpt-6-luna` (the configured default), `gpt-5-mini` or `gpt-5-nano`. The team's shared key reaches only the last two. The key is checked against the chosen model, and the model can be changed later without re-entering the key. Answer generation (질문하기 and 검증 answers) uses the browser's model; dataset drafting and evaluation keep `gpt-6-luna`, so a key without it is refused there before dispatch. The first selection of a model the ledger has no rate for adds its standard rate from `settings.DEFAULT_RATES` (OpenAI pricing page, checked 2026-10-06: gpt-5-mini $0.25 input, $0.025 cached, $2.00 output; gpt-5-nano $0.05, $0.005, $0.40 per million tokens), audited as `register_generation_rate`. Existing rates and the rate version stay. A key without embedding access still answers: the query embedding is refused and retrieval falls back to keywords, recorded as the fallback `hybrid->kiwi_bm25:query_vector_unavailable`. The page shows only whether this browser has a key, who entered it and when. The audit log records `set_api_key` with the member and model, never the value. All spending, whoever's key paid, is recorded in the one shared ledger and counts against the shared $20 limit, per member. Closing the browser drops the cookie; restarting `bidmate.service` (or `codeit`) drops every key. Either way the key must be entered again. Free pages keep working, and paid admission stays on. A key change always issues a new session, and each HTTP request fixes its browser's key, answer model and billing project when it begins. Work a request started (its answer, or a background job) keeps those to the end, even if the browser picks another model or key meanwhile.
+No file on `codeit` holds an API key: not `server.env`, not a `.env`, not the database. Each member who wants paid answers enters their own key on the 설정 page ("내 OpenAI API 키") after signing in. The server first checks it against the serving model with a free model-metadata read. It then keeps it in process memory under a random key session that belongs to the signed-in account; no cookie carries it. The same account sees it configured in any browser it signs in from, and no other account sees or uses it. Every paid stage a request starts, including the background jobs it launches (evaluation, judge runs, dataset drafting), pays with the key of the member who sent it. A member with no key, such as a teammate who has not entered one, is refused before dispatch with "OpenAI API 키가 설정되지 않았습니다"; nothing is reserved or charged. With the key, each member picks their answer model: `gpt-6-luna` (the configured default), `gpt-5-mini` or `gpt-5-nano`. The team's shared key reaches only the last two. The key is checked against the chosen model, and the model can be changed later without re-entering the key. Answer generation (질문하기 and 검증 answers) uses the member's model; dataset drafting and evaluation keep `gpt-6-luna`, so a key without it is refused there before dispatch. The first selection of a model the ledger has no rate for adds its standard rate from `settings.DEFAULT_RATES` (OpenAI pricing page, checked 2026-10-06: gpt-5-mini $0.25 input, $0.025 cached, $2.00 output; gpt-5-nano $0.05, $0.005, $0.40 per million tokens), audited as `register_generation_rate`. Existing rates and the rate version stay. A key without embedding access still answers: the query embedding is refused and retrieval falls back to keywords, recorded as the fallback `hybrid->kiwi_bm25:query_vector_unavailable`. The page shows only whether the account has a key, who entered it and when. The audit log records `set_api_key` with the member and model, never the value. All spending, whoever's key paid, is recorded in the one shared ledger and counts against the shared $20 limit, per member. Signing out or closing the browser keeps the key with the account. Restarting `bidmate.service` (or `codeit`) drops every key and every session, and then the key must be entered again. Free pages keep working, and paid admission stays on. A key change always issues a new key session, and each HTTP request fixes its member's key, answer model and billing project when it begins. Work a request started (its answer, or a background job) keeps those to the end, even if the member picks another model or key meanwhile.
 
-Paid CLI work on `codeit` (`run-answers`, `latency-run`, `run-judges`, `maintain`) has no key there, because `server.env` holds none; it is refused before dispatch. The same work runs from the pages: 검증 (evaluation, judge runs, maintenance) and 데이터셋 만들기 use the key of the browser that starts them. A paid CLI run would need the key in that one command's environment; no file may hold it. The six team members are sudoers on `codeit` and could, as root, read a process's memory. The backstop for that is the provider: use this deployment's own OpenAI project key with a $20 budget, so it can be revoked without touching anything else.
+Paid CLI work on `codeit` (`run-answers`, `latency-run`, `run-judges`, `maintain`) has no key there, because `server.env` holds none; it is refused before dispatch. The same work runs from the pages: 검증 (evaluation, judge runs, maintenance) and 데이터셋 만들기 use the key of the member who starts them. A paid CLI run would need the key in that one command's environment; no file may hold it. The six team members are sudoers on `codeit` and could, as root, read a process's memory. The backstop for that is the provider: use this deployment's own OpenAI project key with a $20 budget, so it can be revoked without touching anything else.
 
 ### 3.4 The owner host is no longer live
 
-The Windows server on the owner's `127.0.0.1:8501` was stopped for the dump on 2026-10-06. It must not be started against its `bidmate_app` again: that database's ledger stopped at the dump and would spend a second, independent copy of the allowance. After the VM was verified, `paid off` was recorded on that copy, which also turns off its PostgreSQL paid admission. An accidental start there serves free pages but cannot spend. The copy stays until the owner drops it. Local screen work uses the fixture server or a fake-provider config (README). On the owner's PC, `127.0.0.1:8501` is now the tunnel to `codeit`.
+The Windows server on the owner's `127.0.0.1:8501` was stopped for the dump on 2026-10-06. It must not be started against its `bidmate_app` again: that database's ledger stopped at the dump and would spend a second, independent copy of the allowance. After the VM was verified, `paid off` was recorded on that copy, which also turns off its PostgreSQL paid admission. An accidental start there serves free pages but cannot spend. The copy stays until the owner drops it. Local screen work uses the fixture server or a fake-provider config (README).
 
 ### 3.5 Local development
 
@@ -114,13 +133,14 @@ Local development and single-host use:
 cd web; npm ci; npm run build; cd ..        # once per checkout or screen change: writes web/out
 $env:RFP_CONFIG_FILE = (Resolve-Path docs/history/postgresql-migration/config.example.json).Path
 $env:RFP_DATABASE_DSN = "postgresql://bidmate:<password>@127.0.0.1:55432/bidmate_app"   # password from .runtime/postgresql.env
+$env:BIDMATE_LOCAL_MEMBER = "<your name>"   # no hub here: you are this name, nobody signs in
 python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
 
 The API serves the built screens from `web/out` and the routes under `/api/`, so members need only this one port.
 Never run more than one worker: the process owns the request executor and the database-wide paid-gateway lock.
 
-Never bind to `0.0.0.0`: without a login it exposes spending and administration to everyone on that network. Team access is the SSH forward of 3.1. The phase-3 report (`report --phase 3`) prints the host from `<RFP_DATA_DIR>/releases/phase-3/team-host.json`, which the owner writes on the team host: `{"host", "reach", "tunnel", "members", "recorded_at"}`.
+`BIDMATE_LOCAL_MEMBER` turns sign-in off, so a local run stays on `127.0.0.1`. Without it, and without the hub settings of 3.1, the API refuses every call. Only the team host binds `0.0.0.0`, behind its JupyterHub sign-in. The phase-3 report (`report --phase 3`) prints the host from `<RFP_DATA_DIR>/releases/phase-3/team-host.json`, which the owner writes on the team host: `{"host", "reach", "tunnel", "members", "recorded_at"}`.
 
 Paid generation stays disabled until `configure-budget` records the dates, prior use, allowance and cap (see the README). Fake-provider demonstrations use a config file with `{"provider": "fake"}` and optionally `"fake_delay_seconds": 4`. Such a config never builds a real SDK client.
 
@@ -212,7 +232,7 @@ python -m rfp_assistant.cli check --phase all --provider fake --save # every tes
   - Dataset flows read the configured corpus through an isolated copy. The database is backed up into a temporary runtime and the artifact folders are linked read-only. Requests, verifier runs and fake ledger rows never reach the configured runtime.
   - An incomplete or unavailable corpus is a failed observation that names what is missing. Under the service, a dataset flow without any corpus also fails. Only a manual run outside the service falls back to the fixture corpus, and its observation says so.
 - Provider: every flow uses the fake provider. `OPENAI_API_KEY` is removed from child processes.
-- Browser flows serve the app on `RFP_VERIFY_ORIGIN` (default `http://127.0.0.1:8765`; include it in `allowed_origins`). They drive the app with Playwright (`pip install -e .[verify]`). `RFP_VERIFY_BROWSER_EXECUTABLE` selects a browser binary; otherwise Playwright's Chromium and then the installed Chrome are tried.
+- Browser flows serve the app on `RFP_VERIFY_ORIGIN` (default `http://127.0.0.1:8765`; include it in `allowed_origins`). They drive the app with Playwright (`pip install -e .[verify]`) and sign each browser in through `tests/fake_hub.py`, a stand-in for JupyterHub's OAuth provider whose form takes any allowlisted username. `RFP_VERIFY_BROWSER_EXECUTABLE` selects a browser binary; otherwise Playwright's Chromium and then the installed Chrome are tried.
 - On Windows, `controlled-stop` sends a real `CTRL_C_EVENT` to a hidden console child.
 - The 15 flows cover access, the four answer modes, the request lifecycle, controlled stop, the shared budget, recovery, verifier runs, the repository gates (including `check --phase 4`) and the phase-4 evaluation and release path (`evaluation-release`: its unit tests plus a 31-step CLI walkthrough on a temporary fixture corpus, `tools/verification/release_walkthrough.py`) as commands. Six browser flows cover the consultant answer and evidence, the history, verifier generation, six concurrent named sessions, cap exhaustion with audited owner actions, and keyboard, focus, contrast and narrow layout. `python -B tools/verify.py --list` shows them.
 - The evidence block is printed as the last three lines (one compact JSON line), so it survives the service's 80-line tail.
@@ -221,7 +241,7 @@ python -m rfp_assistant.cli check --phase all --provider fake --save # every tes
 
 1. Create the environment and install the pinned dependencies (README, "Environment"). The tested host is Windows with Python 3.12; this repository's cloud checks ran on Linux with Python 3.12.
 2. Place `원본 데이터/data_list.csv` and `원본 데이터/files/` under the repository, or point `RFP_SOURCE_DIR` at them (absolute path). `RFP_DATA_DIR` (absolute) moves the runtime; the default is `.runtime/` in the repository.
-3. API key placement. On the shared host, each member enters their own on the 설정 page; it is held in memory only, per browser (3.3). On a personal machine, `OPENAI_API_KEY` in the process environment or the git-ignored `.env` also works. Never put it in `RFP_CONFIG_FILE`, a report, an export, a screenshot or a commit. Members never receive the key; they use the shared application.
+3. API key placement. On the shared host, each member enters their own on the 설정 page; it is held in memory only, per member account (3.3). On a personal machine, `OPENAI_API_KEY` in the process environment or the git-ignored `.env` also works. Never put it in `RFP_CONFIG_FILE`, a report, an export, a screenshot or a commit. Members never receive the key; they use the shared application.
 4. `python -m rfp_assistant.cli init --paid-disabled`, then `manifest`, `ingest`, `build-keyword --include-unreviewed` (README).
 5. Paid generation stays off until `configure-budget` records the dates, the prior use with its evidence, the allowance, the cap and the confirmed rates.
 6. Run `check --phase all --provider fake --save` on the host before the first paid action.

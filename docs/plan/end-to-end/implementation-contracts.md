@@ -11,14 +11,14 @@ Use an editable Python package named `rfp_assistant`, installed from a root `pyp
 | `settings.py` | Absolute paths, validated limits, model/rate configuration, configuration fingerprint | Phase 1 |
 | `contracts.py` | Request/result records and strict answer schema | Phase 1 |
 | `store.py` | PostgreSQL connection lifecycle, schema initialization and transactions | Phase 1 |
-| `auth.py` | Principal and capability checks; the no-login visitor principal | Phase 1 |
+| `auth.py` | Principal and capability checks; JupyterHub OAuth sign-in, its allowlist and in-memory sessions | Phase 1 |
 | `ingestion.py` | CSV manifest, converter invocation, HWP/PDF element extraction and review records | Phase 1 |
 | `chunking.py` | Structural chunks, exact requirement inventory, source-span mappings | Phase 1 |
 | `retrieval.py` | Same analyzer at indexing/query time; scope filters, exact codes, ranked results | Phase 1 |
 | `budget.py` | Reservation, settlement, billing recovery, adjustments and snapshots | Phase 1 |
 | `generation.py` | Only runtime SDK call site; embedding/generation gateway, payload counting and output validation | Phase 1 |
 | `service.py` | Role-declaring public functions, resource ownership, request orchestration | Phase 1 |
-| `api.py` | HTTP routes for the screens in `web/`, one `service` function each; the `X-Member` header carries the visitor name; serves the built screens | Phase 1 (as `ui.py` until 2026-10-02) |
+| `api.py` | HTTP routes for the screens in `web/`, one `service` function each; the JupyterHub sign-in routes and the session check on every other `/api` route; serves the built screens | Phase 1 (as `ui.py` until 2026-10-02) |
 | `cli.py` | Explicit local maintenance commands using the same contracts and gateway | Phase 1 |
 | `dense.py` | Hash-keyed embedding cache, matrix construction/scoring, optional local reranking | Phase 2 |
 | `evaluation.py` | Dataset validation, frozen runs, source-span scoring and reports | Phase 1 pilot; Phase 4 expansion |
@@ -189,9 +189,9 @@ When final usage arrives for an explicitly covered `reconciled` attempt, atomica
 
 ## Access and local maintenance
 
-There is no login (owner decision 2026-09-30, reaffirmed 2026-10-01). No accounts, tokens, sessions or login screen exist. The UI builds a `Principal` from the name typed in the sidebar (default `owner`) with every capability; the name attributes requests, attempts, reviews, corrections and audit events and is not authentication. Network reach is the only access control: localhost by default, and any wider exposure is an explicit owner deployment decision that lets everyone who can reach the server spend the allowance and use the admin page.
+Members sign in with their JupyterHub account (owner decision 2026-10-06, which replaced the no-login decision of 2026-09-30). BidMate is the hub's OAuth client and keeps no user table or password: `api.py` runs the authorization-code flow against the hub and keeps an in-memory session for each hub username on `BIDMATE_ALLOWED_USERS`. Every `/api` route except `/api/auth/login`, `/callback` and `/logout` needs that session. The UI builds a `Principal` from the session's hub username with every capability, and that name is recorded on requests, attempts, reviews, corrections and audit events. Without the hub settings the API refuses every call; `BIDMATE_LOCAL_MEMBER` names the one developer of a local run and is never set on the team host.
 
-`Principal` still carries `consultant`, `verifier`, `budget_admin` and `sealed_evaluator` capabilities, and every service entry point checks one, including cached reads and file access. Those checks declare each function's role; in-process callers (CLI jobs, tests) may pass narrower principals, and a later login could reuse them. Protections that do not depend on identity stay mandatory: managed `(doc_id, source_hash)` downloads, sealed rows never served to the verifier page, a reason and an audit event for every owner action, and no bulk release of unknown billing. Labels and cost estimates are not client-controlled authority.
+`Principal` still carries `consultant`, `verifier`, `budget_admin` and `sealed_evaluator` capabilities, and every service entry point checks one, including cached reads and file access. Those checks declare each function's role; in-process callers (CLI jobs, tests) may pass narrower principals. Protections that do not depend on identity stay mandatory: managed `(doc_id, source_hash)` downloads, sealed rows never served to the verifier page, a reason and an audit event for every owner action, and no bulk release of unknown billing. Labels and cost estimates are not client-controlled authority.
 
 Maintenance CLI commands run on the owner-controlled host. Paid CLI work is exclusive maintenance mode: stop the UI, validate the configuration, and reuse the same database, rates and gateway. PostgreSQL holds a dedicated session advisory lock until resource cleanup and refuses a second paid owner across all hosts sharing the database. Lost ownership is terminal and checked again immediately before SDK dispatch. Ordinary team members use verifier actions; no raw-key notebooks or second billing store. CLI fake checks use a temporary data directory and an isolated test database, and never write production state.
 

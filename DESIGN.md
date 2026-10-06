@@ -27,7 +27,7 @@ spacing:
   chat-sidebar-width: 360px
   section-menu-width: 220px
   review-queue-width: 260px
-  input-height: "40px main fields; 32px header name"
+  input-height: "40px main fields; 32px header 로그아웃"
   button-height: "44px answer submission; 28px small controls"
   table-row-min-height: 40px
 rounded: 10px
@@ -56,7 +56,7 @@ Current code checkpoint (2026-10-03): the frontend is now the three Next.js page
 
 | Topic | Options offered | Picked |
 | --- | --- | --- |
-| (a) Navigation and page split | Top menu with the sidebar as document picker; sidebar menu with search in the page; top menu with a two-step chat; a separate 문서 찾기 page | Top menu, and on 질문하기 the sidebar is the document search and picker. The name field and budget meter sit in one row under the menu on every page. |
+| (a) Navigation and page split | Top menu with the sidebar as document picker; sidebar menu with search in the page; top menu with a two-step chat; a separate 문서 찾기 page | Top menu, and on 질문하기 the sidebar is the document search and picker. The signed-in account and budget meter sit in one row under the menu on every page. |
 | (b) Chat answer | Claim list with a right evidence pane; claim cards with inline expanders; claim table with a preview below; chat bubbles with a modal | Claim list (answer 60 %) with a right evidence pane (40 %). Each claim has a number, a kind badge and `근거 E<n>` chips; a chip opens the quote, neighbouring paragraphs, location and original download in the pane. |
 | (c) Verification page | Summary tiles with task tabs; a stage-flow view; a run list with detail; one long page with jump links | Four summary tiles (release decision, development set, sealed set, second reviews waiting) above four tabs: 검색 추적 (with run comparison), 평가·릴리스, 골드·봉인 검토, 원문·수집. |
 | (d) Dataset generation | Three tabs with a three-step draft; review queue first with a draft modal; a source browser with a basket; plan-file upload | Tabs 초안 만들기, 검토 대기 n건, 처리 기록. Drafting is ① documents and source passages, ② type and intent per slot, ③ maximum cost, consent and generation. Valid drafts are sent to the review queue with one button; the queue shows the draft on the left and its evidence spans on the right. |
@@ -79,7 +79,7 @@ Each screen was built three ways on one named axis in the running app, on live d
 
 | Control (before) | Decision |
 | --- | --- |
-| Name field | Keep, in the row under the menu. It attributes requests and reviews and lets the service refuse a drafter's own approval. |
+| Name field | Replaced on 2026-10-06 by the signed-in JupyterHub account and 로그아웃, in the row under the menu. The account attributes requests and reviews and lets the service refuse a drafter's own approval. |
 | Budget meter, cap warnings, paid-off and frozen notices | Keep, in the row under the menu |
 | Budget 상세 expander (tokens, pacing, per-member spend, last reconciliation) | Move to CLI: `budget-status` |
 | Build commit caption | Keep, at the foot of 검증 |
@@ -139,11 +139,11 @@ Every answer opens with a status badge carrying its text label, and each state h
 
 ### Request ownership
 
-There is no login. The typed name lives in browser storage; React state holds the selected scope, mode and owned request `{request_id, generation_id, target}`. `target` hashes the scope, question, mode and date (`service.target_key`). Submitting creates one generation and idempotency ID; read-only polling reuses it and never resubmits. While the owned request is unfinished, the input is disabled. The answer pane renders a request only when `service.may_attach` holds: same request, generation and target, and not cancelled. In a conversation each turn holds its own ownership, and its target also hashes the previous turn's request ID. Changing the selection or scope, or pressing 새 대화, ends the conversation and makes its turns history; it is cancelled only while still queued (`service.abandon_request`), and its billing continues regardless.
+Signing in happens before any page renders: without a session the app shows only its sign-in entry (JupyterHub 계정으로 로그인), and an API 401 later (an expired session) sends the browser back through sign-in. The account comes from `/api/auth/me`; React state holds the selected scope, mode and owned request `{request_id, generation_id, target}`. `target` hashes the scope, question, mode and date (`service.target_key`). Submitting creates one generation and idempotency ID; read-only polling reuses it and never resubmits. While the owned request is unfinished, the input is disabled. The answer pane renders a request only when `service.may_attach` holds: same request, generation and target, and not cancelled. In a conversation each turn holds its own ownership, and its target also hashes the previous turn's request ID. Changing the selection or scope, or pressing 새 대화, ends the conversation and makes its turns history; it is cancelled only while still queued (`service.abandon_request`), and its billing continues regardless.
 
 ### Polling
 
-Read-only client polling: the budget row every 2 s, the owned request every 1 s while unfinished, and a development evaluation or drafting run every 2 s while it runs. A running paid answer is also read from `GET /api/requests/{id}/stream` (server-sent events, read through fetch so the submitting member's header goes with it). It carries only the partial text and a final `done` event, after which the poll fetches the validated outcome at once. None of these polls can submit, embed, generate, index or judge. Finished results update the current component. A failed ledger read shows "최신 아님" and never shows numbers as live.
+Read-only client polling: the budget row every 2 s, the owned request every 1 s while unfinished, and a development evaluation or drafting run every 2 s while it runs. A running paid answer is also read from `GET /api/requests/{id}/stream` (server-sent events, read through fetch so the stream can be aborted). It carries only the partial text and a final `done` event, after which the poll fetches the validated outcome at once. None of these polls can submit, embed, generate, index or judge. Finished results update the current component. A failed ledger read shows "최신 아님" and never shows numbers as live.
 
 ### Shell boundary
 
@@ -401,7 +401,7 @@ The person who decides what serves comes here. Pipelines have already run every 
 - The matrix tabs (K0 · K1, 청킹, 임베딩, 리랭커) are text tabs with a row count. They are not boxed cards; the selected one carries the navy underline.
 - The headline number (36 px bold) is the best value of the first higher-is-better column, followed by the rows that reach it and how the serving row compares.
 - The table carries everything else. Every column header is a 44 px sort button, and the first click sorts the better direction first. In each column the best value among complete rows is bold navy, and screen readers hear "(최고)". The serving row has a 4 px navy left edge and the label 서비스 중. Rows without numbers (실행 실패, 비용 승인 대기) stay below the complete rows, with their reason and, for a priced row, its maximum cost and tokens in one muted line. The row name column is sticky, so a wide table scrolls under it inside its own container.
-- Opening a row scrolls its detail into view below the table. 놓친 질문 lists the questions the row missed, filtered by population (own document or whole corpus). It shows the first 10, then a "show the rest" button. Each item gives the question at 16 px and its flags at 13 px; only 치명 is red. The activation form sits beside the list on wide screens and below it on narrow ones. Its name is prefilled from the header's member name, and the note is optional.
+- Opening a row scrolls its detail into view below the table. 놓친 질문 lists the questions the row missed, filtered by population (own document or whole corpus). It shows the first 10, then a "show the rest" button. Each item gives the question at 16 px and its flags at 13 px; only 치명 is red. The activation form sits beside the list on wide screens and below it on narrow ones. It records the signed-in account, and the note is optional.
 - Model identities (licence, revision, dimensions, size, peak GPU memory, cold load, layer cutoff) and the golden-set counts are folded.
 
 ### Browser measurements
