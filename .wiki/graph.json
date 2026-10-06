@@ -583,19 +583,13 @@
    "b": "docs/rag/project-and-data.md",
    "kind": "reads",
    "cross": true
-  },
-  {
-   "a": ".wiki/rag-research",
-   "b": "프로젝트 개요.md",
-   "kind": "reads",
-   "cross": true
   }
  ],
  "orphans": [],
  "counts": {
-  "docs": 27,
+  "docs": 26,
   "linked": 19,
-  "read": 8,
+  "read": 7,
   "orphans": 0,
   "pages": 2,
   "decisions": 20,

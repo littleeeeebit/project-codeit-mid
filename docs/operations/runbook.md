@@ -44,11 +44,11 @@ The shared application runs on the team's existing GCP VM `codeit`. It is the on
 | Paths | checkout `/srv/bidmate/app`, originals `/srv/bidmate/app/원본 데이터`, runtime `/srv/bidmate/app/.runtime`, venv `/srv/bidmate/venv`, backups `/srv/bidmate/backups`, owned by the `bidmate` service user (mode 750) |
 | Secrets | `/etc/bidmate/server.env` (root, mode 600): `RFP_DATABASE_DSN`, `OPENAI_API_KEY`, `RFP_CONFIG_FILE`, `RFP_SOURCE_DIR`, `RFP_DATA_DIR`, `RFP_PATH_MAP`. No tracked file and no `.env` holds them; Langfuse tracing is off on the VM. |
 
-**Firewall.** `codeit` sits on the project's shared `default` network, whose rules (owned by the course project, not by BidMate) open tcp:22 and several other ports, 8501 among them, to every instance. BidMate does not rely on them: it binds only to loopback, so the only way in is SSH. Do not change the shared rules for BidMate, and never start it with `--host 0.0.0.0` here: the open 8501 rule would publish spending and administration to the internet.
+Firewall. `codeit` sits on the project's shared `default` network, whose rules (owned by the course project, not by BidMate) open tcp:22 and several other ports, 8501 among them, to every instance. BidMate does not rely on them: it binds only to loopback, so the only way in is SSH. Do not change the shared rules for BidMate, and never start it with `--host 0.0.0.0` here: the open 8501 rule would publish spending and administration to the internet.
 
-**Machine type.** On 2026-10-06, before choosing the host, the owner host's `bidmate_app` had `active_run` = `H-0fffb2a6ec`: hybrid, `text-embedding-3-large` @1536 through the OpenAI API, `reranker: null`. Serving needs no local embedding model or reranker, so a CPU VM would do. The owner chose the existing `codeit` instead; BidMate's venv has no torch and does not use its L4. Activating a local-model row (검증 › 실험 비교) would need torch with CUDA in `/srv/bidmate/venv` and GPU memory left over by the team's notebooks; do neither without the owner.
+Machine type. On 2026-10-06, before choosing the host, the owner host's `bidmate_app` had `active_run` = `H-0fffb2a6ec`: hybrid, `text-embedding-3-large` @1536 through the OpenAI API, `reranker: null`. Serving needs no local embedding model or reranker, so a CPU VM would do. The owner chose the existing `codeit` instead; BidMate's venv has no torch and does not use its L4. Activating a local-model row (검증 › 실험 비교) would need torch with CUDA in `/srv/bidmate/venv` and GPU memory left over by the team's notebooks; do neither without the owner.
 
-**Reaching it.** No login, no Google sign-in. Each member connects with their own existing SSH key and keeps this open while using the app:
+Reaching it. No login, no Google sign-in. Each member connects with their own existing SSH key and keeps this open while using the app:
 
 ```sh
 ssh -N -L 8501:127.0.0.1:8501 <your username>@35.255.64.243
