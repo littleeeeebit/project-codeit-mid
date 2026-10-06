@@ -1,1 +1,0 @@
-`run_queued` (service.py:1015) atomically claims `queued → running` only when `cancel_requested = 0`; a request that is not claimed is skipped. It rebuilds the AnswerRequest and the principal from the persisted request_json snapshot, so workers never touch UI state, then calls `_execute`. The finally block always releases the admission slot.

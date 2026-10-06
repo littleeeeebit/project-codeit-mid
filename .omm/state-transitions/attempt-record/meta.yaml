@@ -1,15 +1,9 @@
-created: 2026-10-06T08:48:34.351Z
-updated: 2026-10-06T08:48:34.552Z
+created: 2026-10-06 08:48:34.351000+00:00
+updated: 2026-10-06 08:48:34.552000+00:00
 update_count: 2
 last_field: diagram
 kind: nested-class
 title: attempt-record
 children:
-  - mark-dispatching
-  - mark-unknown
-  - reconcile-attempt
-  - recover-attempts
-  - release-attempt
-  - reserve-attempt
-  - settle-attempt
+- mark-dispatching
 parentPath: []

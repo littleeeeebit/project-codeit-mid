@@ -1,0 +1,1 @@
+`_checkpoint` re-reads the stop reason, then `_metered_chat(stage="generation", on_delta=streamed)` runs. Streamed deltas update `res.partials[request_id]`. On `ProviderError`, refusal or settlement failure the request ends `failed` with the billing state reported. For a verifier-run request, the frozen run's estimate is the reservation ceiling.

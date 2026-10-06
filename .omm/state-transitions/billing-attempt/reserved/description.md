@@ -1,0 +1,1 @@
+Inserted by `budget.reserve` with the maximum cost, priced at the cache-write input rate plus maximum output. Released by a dispatch refusal, by `paid_refusal` (no key), or by restart recovery.

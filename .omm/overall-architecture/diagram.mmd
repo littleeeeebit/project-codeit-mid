@@ -1,18 +1,12 @@
 graph TD
-  webScreens["Web screens\nweb/src/components/ask/ask-page.tsx"]
-  httpApi["HTTP API\nsrc/rfp_assistant/api.py"]
-  serviceLayer["Service orchestration\nsrc/rfp_assistant/service.py"]
-  retrievalEngine["Retrieval engine\nsrc/rfp_assistant/retrieval.py"]
-  budgetLedger["Paid gateway ledger\nsrc/rfp_assistant/budget.py"]
-  providerTransport["Provider transport\nsrc/rfp_assistant/generation.py"]
-  postgresStore["PostgreSQL and pgvector\nsrc/rfp_assistant/postgres.py"]
-  ownerCli["Owner CLI pipelines\nsrc/rfp_assistant/cli.py"]
-  webScreens -->|JSON fetch with X-Member| httpApi
-  httpApi -->|one service call per route| serviceLayer
-  serviceLayer -->|scoped question| retrievalEngine
-  serviceLayer -->|reserve, dispatch, settle| budgetLedger
-  serviceLayer -->|chat with on_delta| providerTransport
-  retrievalEngine -->|BM25 rows, vector search| postgresStore
-  budgetLedger -->|attempt rows, locked tx| postgresStore
-  ownerCli -->|ingest, index, activate| postgresStore
-  ownerCli -->|own Resources instance| serviceLayer
+  web-screens["Next.js screens\nweb/src"] -->|"typed JSON and SSE"| http-api["FastAPI routes\nsrc/rfp_assistant/api.py"]
+  http-api -->|"one service call each"| service-core["Service orchestration\nsrc/rfp_assistant/service.py"]
+  service-core -->|"scoped question"| retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval.py"]
+  service-core -->|"metered paid stages"| paid-gateway["Paid gateway and ledger\nsrc/rfp_assistant/budget.py"]
+  service-core -->|"requests, verifier runs"| postgres-store["PostgreSQL + pgvector\nsrc/rfp_assistant/postgres.py"]
+  retrieval-engine -->|"exact vector search"| postgres-store
+  paid-gateway -->|"attempt rows under mutex"| postgres-store
+  corpus-pipeline["Corpus pipeline\nsrc/rfp_assistant/ingestion.py"] -->|"index manifest, chunks"| retrieval-engine
+  corpus-pipeline -->|"extractions, vectors"| postgres-store
+  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"] -->|"ingest, build, activate"| corpus-pipeline
+  owner-cli -->|"ledger-only admin"| paid-gateway

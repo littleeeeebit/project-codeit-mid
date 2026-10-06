@@ -1,1 +1,0 @@
-`run_queued` runs `UPDATE ... SET status='running' WHERE status='queued' AND cancel_requested=0`. Exactly one claimant wins, and a request cancelled while queued is never claimed.

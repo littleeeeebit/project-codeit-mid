@@ -1,1 +1,0 @@
-`recover_requests` (service.py:1548) runs when a new process claims the gateway (or at close, if job threads survived). Every queued or running request becomes `interrupted` with a note. Nothing is replayed; the user asks again.

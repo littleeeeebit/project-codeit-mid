@@ -1,0 +1,1 @@
+Terminal. The result is stored for history, and `may_attach` never renders it as the current answer.

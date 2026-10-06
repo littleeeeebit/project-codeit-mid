@@ -1,0 +1,1 @@
+`requests.status` together with the `cancel_requested` flag. `TERMINAL_STATUSES` gate conversation continuation. Restart never replays anything.

@@ -1,6 +1,6 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-06 08:48:12.734000+00:00
-update_count: 24
+updated: 2026-10-06 09:08:41.303000+00:00
+update_count: 26
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
@@ -9,19 +9,26 @@ children:
 - corpus-router
 - dense-channel
 - dense-search
+- evidence-packer
 - fusion
 - keyword-index
-- packer
-- query-vector
+- lexical-ranker
+- local-reranker
+- query-embedding
+- rank-fusion
 - reranker
 - serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  keyword-index[\"Loaded keyword index\\nsrc/rfp_assistant/retrieval.py\"\
-  ] -->|rows in scope| corpus-routing[\"Project-name routing\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  corpus-routing -->|allowed rows| lexical-ranking[\"Exact codes and BM25\\\
-  nsrc/rfp_assistant/retrieval.py\"]\r\n  corpus-routing -->|allowed rows| dense-search[\"\
-  pgvector cosine search\\nsrc/rfp_assistant/vector_store.py\"]\r\n  lexical-ranking\
-  \ -->|BM25 order| fusion-and-rerank[\"keyword_first RRF, rerank\\nsrc/rfp_assistant/retrieval.py\"\
-  ]\r\n  dense-search -->|dense order| fusion-and-rerank\r\n  fusion-and-rerank -->|final\
-  \ ranking| evidence-packing[\"Evidence unit packing\\nsrc/rfp_assistant/retrieval.py\"\
-  ]"
+prev_diagram: "graph TD\r\n  servingConfig[\"Activated serving config\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  corpusRouter[\"Corpus project routing\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  keywordIndex[\"Kiwi BM25 index\\nsrc/rfp_assistant/retrieval.py\"]\r\n  queryVector[\"\
+  Query vector cache\\nsrc/rfp_assistant/dense.py\"]\r\n  denseSearch[\"pgvector exact\
+  \ search\\nsrc/rfp_assistant/vector_store.py\"]\r\n  fusion[\"Keyword-first RRF\
+  \ fusion\\nsrc/rfp_assistant/retrieval.py\"]\r\n  reranker[\"Optional local reranker\\\
+  nsrc/rfp_assistant/dense.py\"]\r\n  packer[\"Evidence packer\\nsrc/rfp_assistant/retrieval.py\"\
+  ]\r\n  servingConfig -->|mode, limits, versions| corpusRouter\r\n  corpusRouter\
+  \ -->|narrowed scope rows| keywordIndex\r\n  servingConfig -->|embedding model and\
+  \ dims| queryVector\r\n  queryVector -->|unit vector| denseSearch\r\n  keywordIndex\
+  \ -->|BM25 top 50| fusion\r\n  denseSearch -->|cosine top 50| fusion\r\n  fusion\
+  \ -->|pool below BM25 head| reranker\r\n  fusion -->|fused ranking| packer\r\n \
+  \ reranker -->|reranked pool| packer"

@@ -1,1 +1,0 @@
-See state-transitions/gold-candidate for the decision rules (first decision wins, sha match, drafter and drafting model barred, original inspection required, sealed rows refused through the web).

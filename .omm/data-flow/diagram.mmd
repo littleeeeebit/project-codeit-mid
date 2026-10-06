@@ -1,18 +1,8 @@
 graph TD
-  sourceManifest["CSV manifest and originals\nsrc/rfp_assistant/ingestion.py"]
-  parsing["HWP and PDF parsing\nsrc/rfp_assistant/ingestion.py"]
-  fidelityOcr["Fidelity check and OCR\nsrc/rfp_assistant/fidelity.py"]
-  keywordBuild["Chunking and keyword index\nsrc/rfp_assistant/chunking.py"]
-  embeddingSets["Embedding sets\nsrc/rfp_assistant/dense.py"]
-  frozenRuns["Frozen runs and matrices\nsrc/rfp_assistant/compare.py"]
-  activation["Human activation\nsrc/rfp_assistant/evaluation.py"]
-  maintenanceSeq["Maintenance sequence\nsrc/rfp_assistant/maintenance.py"]
-  sourceManifest -->|documents and sources rows| parsing
-  parsing -->|extraction revision, elements| fidelityOcr
-  fidelityOcr -->|OCR text on next ingest| parsing
-  fidelityOcr -->|review_status filter| keywordBuild
-  keywordBuild -->|index_version, chunks| embeddingSets
-  keywordBuild -->|BM25 index| frozenRuns
-  embeddingSets -->|ready vector set| frozenRuns
-  frozenRuns -->|person picks a row| activation
-  maintenanceSeq -->|reruns stages, no activation| keywordBuild
+  source-originals["Original HWP and PDF\n원본 데이터/files"] -->|"sha256, parse"| extraction-artifacts["Element extractions\n.runtime/extracted"]
+  extraction-artifacts -->|"chunk profile, Kiwi tokens"| keyword-index-files["Keyword index files\n.runtime/indexes"]
+  keyword-index-files -->|"chunk payload hashes"| embedding-sets["pgvector embedding sets\nsrc/rfp_assistant/vector_store.py"]
+  keyword-index-files -->|"packed EvidenceUnit"| request-records["Request rows\nsrc/rfp_assistant/service.py"]
+  embedding-sets -->|"dense ranks"| request-records
+  ledger-records["Ledger attempts\nsrc/rfp_assistant/budget.py"] -->|"billing by request_id"| request-records
+  request-records -->|"evidence map lookup"| evidence-view["Evidence pane\nweb/src/components/ask/answer-parts.tsx"]

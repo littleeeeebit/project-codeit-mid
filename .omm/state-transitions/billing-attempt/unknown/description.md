@@ -1,0 +1,1 @@
+Execution may have happened, so the reservation stays held. While any PostgreSQL attempt is `unknown`, `mark_dispatching` refuses every new dispatch ('unknown PostgreSQL billing must be reconciled before dispatch'), and `build-dense` and paid evaluation queries also stop.

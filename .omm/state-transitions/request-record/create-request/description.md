@@ -1,1 +1,0 @@
-`_create` (service.py:935) inserts paid modes as `queued` and free modes as `running`, keyed by (member_id, idempotency_key) with input_hash and config_hash. `_fail_unscheduled` moves a queued row to `failed` if the executor rejected it.

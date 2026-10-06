@@ -1,0 +1,9 @@
+created: 2026-10-06T09:08:42.927Z
+updated: 2026-10-06T09:08:43.131Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: local-reranker
+children: []
+parentPath:
+  - retrieval-engine

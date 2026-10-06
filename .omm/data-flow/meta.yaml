@@ -1,36 +1,39 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-06 08:48:42.334000+00:00
-update_count: 20
+updated: 2026-10-06 09:09:02.819000+00:00
+update_count: 22
 last_field: diagram
-git_commit: 4a77ef6
+git_commit: cc684cc
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
 - activation
 - corpus-ingestion
 - embedding-sets
+- evidence-view
 - extraction
+- extraction-artifacts
 - fidelity-check
 - fidelity-ocr
 - frozen-runs
 - index-build
-- keyword-build
-- maintenance-seq
+- keyword-index-files
+- ledger-records
 - ocr-merge
 - original-corpus
 - originals
-- parsing
+- request-records
 - retrieval-selection
 - run-selection
-- source-manifest
-prev_diagram: "graph TD\r\n  csv-manifest[\"CSV manifest import\\nsrc/rfp_assistant/ingestion.py\"\
-  ] -->|documents and sources rows| source-parsing[\"HWP and PDF parsing\\nsrc/rfp_assistant/ingestion.py\"\
-  ]\r\n  ocr-merge[\"Image text OCR\\nsrc/rfp_assistant/ocr.py\"] -->|image_text elements|\
-  \ source-parsing\r\n  source-parsing -->|extraction revision| fidelity-check[\"\
-  Hancom print comparison\\nsrc/rfp_assistant/fidelity.py\"]\r\n  source-parsing -->|elements.jsonl|\
-  \ keyword-build[\"Chunk and keyword index\\nsrc/rfp_assistant/retrieval.py\"]\r\n\
-  \  fidelity-check -->|review_status| keyword-build\r\n  keyword-build -->|chunk\
-  \ payloads| embedding-sets[\"pgvector embedding sets\\nsrc/rfp_assistant/dense.py\"\
-  ]\r\n  embedding-sets -->|dense_version| retrieval-runs[\"Frozen runs and matrices\\\
-  nsrc/rfp_assistant/compare.py\"]\r\n  keyword-build -->|index_version| retrieval-runs\r\
-  \n  retrieval-runs -->|person picks a row| serving-activation[\"activate-run\\nsrc/rfp_assistant/evaluation.py\"\
-  ]"
+- source-originals
+prev_diagram: "graph TD\r\n  sourceManifest[\"CSV manifest and originals\\nsrc/rfp_assistant/ingestion.py\"\
+  ]\r\n  parsing[\"HWP and PDF parsing\\nsrc/rfp_assistant/ingestion.py\"]\r\n  fidelityOcr[\"\
+  Fidelity check and OCR\\nsrc/rfp_assistant/fidelity.py\"]\r\n  keywordBuild[\"Chunking\
+  \ and keyword index\\nsrc/rfp_assistant/chunking.py\"]\r\n  embeddingSets[\"Embedding\
+  \ sets\\nsrc/rfp_assistant/dense.py\"]\r\n  frozenRuns[\"Frozen runs and matrices\\\
+  nsrc/rfp_assistant/compare.py\"]\r\n  activation[\"Human activation\\nsrc/rfp_assistant/evaluation.py\"\
+  ]\r\n  maintenanceSeq[\"Maintenance sequence\\nsrc/rfp_assistant/maintenance.py\"\
+  ]\r\n  sourceManifest -->|documents and sources rows| parsing\r\n  parsing -->|extraction\
+  \ revision, elements| fidelityOcr\r\n  fidelityOcr -->|OCR text on next ingest|\
+  \ parsing\r\n  fidelityOcr -->|review_status filter| keywordBuild\r\n  keywordBuild\
+  \ -->|index_version, chunks| embeddingSets\r\n  keywordBuild -->|BM25 index| frozenRuns\r\
+  \n  embeddingSets -->|ready vector set| frozenRuns\r\n  frozenRuns -->|person picks\
+  \ a row| activation\r\n  maintenanceSeq -->|reruns stages, no activation| keywordBuild"

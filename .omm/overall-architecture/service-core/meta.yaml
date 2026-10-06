@@ -1,28 +1,50 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-06 07:57:02.260000+00:00
-update_count: 10
+updated: 2026-10-06T09:08:36.871Z
+update_count: 12
 last_field: diagram
 kind: nested-class
 title: service-core
 children:
-- answer-check
-- background-jobs
-- conversation-context
-- metered-chat
-- paid-answer
-- resources
-- resources-owner
-- serving-config
-- submit
-- tracing
+  - answer-check
+  - answer-pipeline
+  - app-resources
+  - background-jobs
+  - conversation-context
+  - metered-chat
+  - paid-answer
+  - request-runner
+  - resources
+  - resources-owner
+  - serving-config
+  - submit
+  - tracing
+  - verifier-runs
 parentPath: []
-prev_diagram: "graph TD\r\n  resources-owner[\"Resources owner\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  key-sessions[\"Browser key sessions\\nsrc/rfp_assistant/generation.py\"]\r\
-  \n  request-runner[\"RequestRunner executor\\nsrc/rfp_assistant/service.py\"]\r\n\
-  \  background-jobs[\"Drafting eval judge maintenance\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  serving-config[\"active_serving and run_settings\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  partials-buffer[\"Streamed partial answers\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  resources-owner -->|creates lazily| request-runner\r\n  resources-owner -->|joins\
-  \ on close| background-jobs\r\n  key-sessions -->|session client per call| resources-owner\r\
-  \n  request-runner -->|reads per request| serving-config\r\n  request-runner -->|on_delta\
-  \ writes| partials-buffer\r\n  background-jobs -->|same transport and lock| resources-owner"
+prev_diagram: "graph TD\r
+
+  \  resources-owner[\"Resources owner\\nsrc/rfp_assistant/service.py\"]\r
+
+  \  key-sessions[\"Browser key sessions\\nsrc/rfp_assistant/generation.py\"]\r
+
+  \  request-runner[\"RequestRunner executor\\nsrc/rfp_assistant/service.py\"]\r
+
+  \  background-jobs[\"Drafting eval judge
+  maintenance\\nsrc/rfp_assistant/service.py\"]\r
+
+  \  serving-config[\"active_serving and
+  run_settings\\nsrc/rfp_assistant/service.py\"]\r
+
+  \  partials-buffer[\"Streamed partial
+  answers\\nsrc/rfp_assistant/service.py\"]\r
+
+  \  resources-owner -->|creates lazily| request-runner\r
+
+  \  resources-owner -->|joins on close| background-jobs\r
+
+  \  key-sessions -->|session client per call| resources-owner\r
+
+  \  request-runner -->|reads per request| serving-config\r
+
+  \  request-runner -->|on_delta writes| partials-buffer\r
+
+  \  background-jobs -->|same transport and lock| resources-owner"

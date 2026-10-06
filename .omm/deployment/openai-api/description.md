@@ -1,1 +1,0 @@
-Chat Completions for `gpt-6-luna` (strict structured output, `reasoning_effort: low`, default 4,000 max output tokens including reasoning) and embeddings when an OpenAI embedding model serves. Every call is reserved and settled in the ledger. Rates live in `settings.DEFAULT_RATES` and in `budget_settings.rates_json`.

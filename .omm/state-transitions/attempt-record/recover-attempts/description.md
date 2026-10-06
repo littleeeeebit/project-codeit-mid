@@ -1,1 +1,0 @@
-`budget.recover` (budget.py:521) runs under fresh gateway ownership. `dispatching → unknown` (the process may have sent it) and `reserved → released` (never sent). The Gemini `external_attempts` ledger follows the same rule.

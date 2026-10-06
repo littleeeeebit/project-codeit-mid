@@ -1,0 +1,9 @@
+graph TD
+  trace-runs["Verifier traces\nsrc/rfp_assistant/service.py"] -->|"vgen request, interactive"| shared-ledger["Shared ledger envelopes\nsrc/rfp_assistant/budget.py"]
+  drafting-runs["Question drafting\nsrc/rfp_assistant/drafting.py"] -->|"gold_eval reservations"| shared-ledger
+  drafting-runs -->|"valid drafts batch"| gold-review["Gold review queue\nsrc/rfp_assistant/gold.py"]
+  gold-review -->|"approved dev rows"| answer-evaluation["Answer evaluation\nsrc/rfp_assistant/answers.py"]
+  answer-evaluation -->|"gold_eval reservations"| shared-ledger
+  judge-runs["Judge comparison\nsrc/rfp_assistant/judges.py"] -->|"judge_eval reservations"| shared-ledger
+  maintenance-sequence["Maintenance sequence\nsrc/rfp_assistant/maintenance.py"] -->|"regression table"| experiment-activation["Experiment activation\nsrc/rfp_assistant/service.py"]
+  gold-review -->|"scored populations"| experiment-activation

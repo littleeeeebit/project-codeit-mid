@@ -1,0 +1,1 @@
+Validation or ServiceError paths (`clarification_required`), `technical_error` (provider failure, unvalidated output, retrieval failure, settlement failure), and `_fail_unscheduled` for a queued request the executor could not accept.

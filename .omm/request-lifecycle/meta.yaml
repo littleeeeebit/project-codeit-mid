@@ -1,37 +1,39 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-06 08:48:24.084000+00:00
-update_count: 21
+updated: 2026-10-06 09:08:49.162000+00:00
+update_count: 23
 last_field: diagram
-git_commit: 4a77ef6
+git_commit: cc684cc
 git_branch: deploy-gcp-vm-ssh-tunnel
 children:
 - answer-validation
 - ask-page
-- ask-route
-- ask-screen
+- ask-submit
 - cancellation
+- evidence-retrieval
 - finish-record
 - finish-step
-- metered-chat
+- metered-generation
+- outcome-delivery
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
 - paid-call
-- request-runner
+- query-rewrite
+- request-intake
 - status-poll
 - stream-and-poll
-- submit-answer
 - validation
-prev_diagram: "graph TD\r\n  ask-route[\"POST /api/ask\\nsrc/rfp_assistant/api.py\"\
-  ] -->|AnswerRequest with new generation_id| submit-answer[\"Validate and persist\\\
-  nsrc/rfp_assistant/service.py\"]\r\n  submit-answer -->|request_id queued| request-runner[\"\
-  Executor worker\\nsrc/rfp_assistant/service.py\"]\r\n  request-runner -->|follow-up\
-  \ only| follow-up-rewrite[\"Standalone query rewrite\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  request-runner -->|question and scope| evidence-retrieval[\"Retrieve and\
-  \ price\\nsrc/rfp_assistant/service.py\"]\r\n  follow-up-rewrite -->|standalone\
-  \ question| evidence-retrieval\r\n  evidence-retrieval -->|messages and estimate|\
-  \ metered-generation[\"Streamed paid generation\\nsrc/rfp_assistant/service.py\"\
-  ]\r\n  metered-generation -->|provider response| answer-validation[\"Citation validation\
-  \ and finish\\nsrc/rfp_assistant/generation.py\"]\r\n  status-polling[\"Poll, stream,\
-  \ attach\\nweb/src/components/ask/ask-page.tsx\"] -->|reads status and partials|\
-  \ answer-validation"
+- worker-claim
+prev_diagram: "graph TD\r\n  askScreen[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
+  ]\r\n  askRoute[\"POST /api/ask\\nsrc/rfp_assistant/api.py\"]\r\n  submitAnswer[\"\
+  Validate and persist\\nsrc/rfp_assistant/service.py\"]\r\n  requestRunner[\"Executor\
+  \ worker\\nsrc/rfp_assistant/service.py\"]\r\n  paidAnswer[\"Retrieve, rewrite,\
+  \ price\\nsrc/rfp_assistant/service.py\"]\r\n  meteredChat[\"Metered chat call\\\
+  nsrc/rfp_assistant/service.py\"]\r\n  answerValidation[\"Citation validation\\nsrc/rfp_assistant/generation.py\"\
+  ]\r\n  streamAndPoll[\"Stream and status poll\\nweb/src/lib/use-answer-stream.ts\"\
+  ]\r\n  askScreen -->|scope, question, mode| askRoute\r\n  askRoute -->|AnswerRequest,\
+  \ generation_id| submitAnswer\r\n  askRoute -->|Owned request and target| askScreen\r\
+  \n  submitAnswer -->|queued request_id| requestRunner\r\n  requestRunner -->|claimed\
+  \ as running| paidAnswer\r\n  paidAnswer -->|messages and token count| meteredChat\r\
+  \n  meteredChat -->|partials via on_delta| streamAndPoll\r\n  meteredChat -->|ProviderResponse|\
+  \ answerValidation\r\n  answerValidation -->|result_json via _finish| streamAndPoll"

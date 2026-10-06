@@ -1,0 +1,1 @@
+The corpus is digital: OCR design is decided (PaddleOCR-VL plus a Gemini 3.5 Flash-Lite fallback, $0.50 cap), so never test on scans (maintainer memory). Printing needs the Windows default printer set to 'Microsoft Print to PDF', and nothing else may print during a run.

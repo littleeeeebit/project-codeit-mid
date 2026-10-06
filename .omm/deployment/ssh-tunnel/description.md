@@ -1,1 +1,0 @@
-The only access path to the shared host: an SSH `-L 8501` forward to the VM's loopback. The exact command and the member list are in docs/operations/runbook.md §3.1.

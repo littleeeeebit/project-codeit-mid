@@ -1,0 +1,8 @@
+graph TD
+  gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/postgres.py"] -->|"owner_guard in tx"| admission["Atomic reservation\nsrc/rfp_assistant/budget.py"]
+  admission -->|"attempt reserved"| dispatch-marker["Dispatch marker\nsrc/rfp_assistant/budget.py"]
+  dispatch-marker -->|"guarded dispatching"| provider-transport["OpenAI transport\nsrc/rfp_assistant/generation.py"]
+  gateway-owner -->|"owner check before call"| provider-transport
+  provider-transport -->|"usage or error"| settlement["Settle, release, unknown\nsrc/rfp_assistant/budget.py"]
+  startup-recovery["Startup recovery\nsrc/rfp_assistant/budget.py"] -->|"dispatching to unknown"| settlement
+  owner-reconcile["Owner reconciliation\nsrc/rfp_assistant/budget.py"] -->|"unknown to reconciled"| settlement

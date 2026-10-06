@@ -1,1 +1,0 @@
-`mark_unknown` (budget.py:378) moves `dispatching → unknown` on timeouts, connection loss, stream errors, missing usage or a failed settlement. The reservation keeps counting as pending, and the request reports billing `unknown`.

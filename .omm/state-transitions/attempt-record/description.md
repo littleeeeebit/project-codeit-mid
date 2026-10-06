@@ -1,1 +1,0 @@
-Each `attempts` row is one bounded paid call, with stage, purpose, model, reserved_micro_usd, rates and billing_scope frozen at reservation. Every transition is a conditional UPDATE on the expected source state inside `tx(immediate=True)`, followed by a `_bump` of the ledger revision.

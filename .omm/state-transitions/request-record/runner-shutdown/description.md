@@ -1,1 +1,0 @@
-`RequestRunner.shutdown` (service.py:377), during `Resources.close`, marks queued persisted requests `interrupted`, and also running ones if workers did not finish within `shutdown_wait_seconds`. systemd sends SIGINT with TimeoutStopSec=120 so running requests can settle first.

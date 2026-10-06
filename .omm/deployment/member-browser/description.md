@@ -1,1 +1,0 @@
-Loads the static export and calls /api with its typed name in X-Member and its key-session cookie. Langfuse is reached separately at 127.0.0.2:3100 when run locally. That address is deliberately not localhost, because browsers share cookies across ports and a second local Langfuse on 127.0.0.1 would break sign-in.

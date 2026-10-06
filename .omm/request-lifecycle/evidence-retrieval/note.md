@@ -1,0 +1,1 @@
+A paid OpenAI query embedding can be the first paid stage of the request. It runs inside `retrieve` under the same dispatch guard as generation.

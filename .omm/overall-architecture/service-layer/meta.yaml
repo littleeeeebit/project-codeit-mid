@@ -5,7 +5,6 @@ last_field: diagram
 kind: nested-class
 title: service-layer
 children:
-- answer-flow
 - answer-orchestrator
 - answer-pipeline
 - background-jobs

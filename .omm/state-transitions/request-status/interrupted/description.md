@@ -1,0 +1,1 @@
+Set by `RequestRunner.shutdown` (queued, and running if futures are still pending) and by `recover_requests` at the next start. `_finish` keeps an already-interrupted status instead of overwriting it. Any dispatching attempt becomes `unknown` through `budget.recover`.

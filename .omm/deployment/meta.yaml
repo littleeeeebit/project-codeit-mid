@@ -7,13 +7,10 @@ git_branch: deploy-gcp-vm-ssh-tunnel
 children:
 - app-process
 - key-sessions
-- member-browser
 - openai-api
-- postgres-container
 - ssh-tunnel
 - systemd-unit
 - uvicorn-service
-- uvicorn-worker
 prev_diagram: "graph TD\r\n  member-browser[\"Member browser\\nweb/src/lib/member.ts\"\
   ] -->|localhost 8501| ssh-tunnel[\"SSH local forward\\ndocs/operations/runbook.md\"\
   ]\r\n  ssh-tunnel -->|127.0.0.1:8501 on codeit| uvicorn-service[\"systemd uvicorn,\
