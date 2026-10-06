@@ -4,7 +4,7 @@ severity: preference
 triggers: []
 domain: ''
 title: "Members sign in with their JupyterHub account; BidMate serves publicly on codeit:8501"
-pr: null
+pr: 25
 merged: null
 branch: "web-login-jupyterhub-oauth"
 ---
@@ -19,4 +19,4 @@ Rejected. Posting credentials to the hub's login form over loopback: no hub chan
 
 Consequences. The hub accepts exactly one redirect URI per client, so a browser on the SSH tunnel moves to the public address to sign in. The tunnel still reaches the port but is no separate way into the screens. The address is ephemeral: when it changes, the hub's `oauth_redirect_uri`, `BIDMATE_HUB_URL` and `BIDMATE_OAUTH_REDIRECT_URI` change together, and the hub restart stops the team's notebook servers (runbook 3.1). Sessions live in memory, so a BidMate restart signs everyone out, as it already dropped every key.
 
-Source. Branch `web-login-jupyterhub-oauth`
+Source. PR #25 · `web-login-jupyterhub-oauth`
