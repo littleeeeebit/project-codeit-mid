@@ -177,6 +177,7 @@ def write_phase3_report(settings: Settings) -> Path:
         used = {p: budget._purpose_used(conn, p) for p in envelopes}
     snap = budget.snapshot(settings.db_path)
     load_result, browser, smoke = load("load-check.json"), load("browser-results.json"), load("paid-smoke.json")
+    host = load("team-host.json")  # written by the owner on the team host (runbook section 3)
     usd = lambda m: f"${m / 1_000_000:,.6f}"  # noqa: E731
     lines = ["# Phase 3 report", "",
              f"Generated {store.utcnow()} from `{settings.data_dir.name}` state (schema {schema}). Only recorded "
@@ -185,6 +186,9 @@ def write_phase3_report(settings: Settings) -> Path:
              f"- Serving: {service.describe_serving(service.active_serving(settings))}; "
              f"active keyword index `{active_index}`.",
              "- Access: no login (owner decision); the sidebar name only attributes requests and actions.",
+             (f"- Team host: {host['host']}, recorded {host['recorded_at']}. Reach: {host['reach']}. Tunnel: "
+              f"`{host['tunnel']}`. Members: {', '.join(host['members'])}." if host else
+              "- Team host: not recorded (`team-host.json`, runbook section 3)."),
              f"- Executor: {settings.request_workers} workers, {settings.request_admission} admitted unfinished "
              "requests.", "",
              "## Budget", "",
@@ -218,7 +222,8 @@ def write_phase3_report(settings: Settings) -> Path:
     lines.append(f"- {smoke}" if smoke else "- Not run: a real consultant smoke through the gateway needs an explicit "
                                              "owner estimate and approval.")
     lines += ["", "## Open items", "",
-              "- The team host and who may reach it are owner decisions (runbook); without login, network reach is the only access control.",
+              *([] if host else ["- The team host and who may reach it are owner decisions (runbook); without login, "
+                                 "network reach is the only access control."]),
               "- Measured warm/cold latency on the team host and six real browsers remain to be recorded there.", ""]
     path = out / "report.md"
     store.write_text_atomic(path, "\n".join(lines))
