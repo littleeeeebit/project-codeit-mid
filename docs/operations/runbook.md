@@ -33,7 +33,7 @@ There is no login (owner decision 2026-09-30, reaffirmed for phase 3 on 2026-10-
 
 ### 3.1 The team host (live since 2026-10-06)
 
-The shared application runs on the team's existing GCP VM `codeit`. It is the only live ledger, the only gateway owner and the only place the API key lives. The owner's Windows server is no longer live (3.4).
+The shared application runs on the team's existing GCP VM `codeit`. It is the only live ledger and the only gateway owner. The API key reaches it only through the 설정 page and lives only in the service's memory (3.3). The owner's Windows server is no longer live (3.4).
 
 | | |
 | --- | --- |
@@ -42,7 +42,7 @@ The shared application runs on the team's existing GCP VM `codeit`. It is the on
 | Address | `35.255.64.243`, ephemeral: it changes if `codeit` is stopped and started. Read the new one in the console and update this line. |
 | Listening (BidMate) | uvicorn on `127.0.0.1:8501` (one worker); PostgreSQL 18.6 on `127.0.0.1:55432`. Nothing of BidMate listens on another address. |
 | Paths | checkout `/srv/bidmate/app`, originals `/srv/bidmate/app/원본 데이터`, runtime `/srv/bidmate/app/.runtime`, venv `/srv/bidmate/venv`, backups `/srv/bidmate/backups`, owned by the `bidmate` service user (mode 750) |
-| Secrets | `/etc/bidmate/server.env` (root, mode 600): `RFP_DATABASE_DSN`, `OPENAI_API_KEY`, `RFP_CONFIG_FILE`, `RFP_SOURCE_DIR`, `RFP_DATA_DIR`, `RFP_PATH_MAP`. No tracked file and no `.env` holds them; Langfuse tracing is off on the VM. |
+| Secrets | `/etc/bidmate/server.env` (root, mode 600): `RFP_DATABASE_DSN`, `RFP_CONFIG_FILE`, `RFP_SOURCE_DIR`, `RFP_DATA_DIR`, `RFP_PATH_MAP`. No tracked file and no `.env` holds them. There is no `OPENAI_API_KEY` on the VM in any file; Langfuse tracing is off there. |
 
 Firewall. `codeit` sits on the project's shared `default` network, whose rules (owned by the course project, not by BidMate) open tcp:22 and several other ports, 8501 among them, to every instance. BidMate does not rely on them: it binds only to loopback, so the only way in is SSH. Do not change the shared rules for BidMate, and never start it with `--host 0.0.0.0` here: the open 8501 rule would publish spending and administration to the internet.
 
@@ -98,7 +98,7 @@ The VM serves the owner host's restored database, whose rows keep Windows paths 
 
 The ledger's spent amount ($2.482209 after that answer) is the app's settled attempts ($2.03) plus `external:pr8-pilot-ledger` ($0.448818, imported on 2026-10-02). The OpenAI dashboard showed $2.01 on 2026-10-06. The ledger stays the higher, conservative figure; lowering it is an owner `adjust` with evidence (section 5).
 
-The API key exists in one place on `codeit`: `/etc/bidmate/server.env` (root, 600), passed to the service by systemd. On 2026-10-06 a search of `/srv`, `/home`, `/tmp`, `/var/log`, `/etc`, `/root` and `/opt`, the service journal and the PostgreSQL container's configuration found no other copy. The app never sends it to a browser, a log or a trace (Langfuse is off on the VM). The six team members are sudoers on `codeit` and so can read it as root. The backstop for that is the provider: give this deployment its own OpenAI project key with a $20 budget, so it can be revoked without touching anything else.
+No file on `codeit` holds the API key: not `server.env`, not a `.env`, not the database. The owner enters it on the 설정 page ("OpenAI API 키") through the tunnel. The server first checks it against the serving model with a free model-metadata read, then hands it to the running OpenAI client. It stays in that process's memory only. The page shows whether a key is set, by whom and when, never the key. The audit log records `set_api_key` with the member and model, never the value. A new key replaces the old one for the next call; a call already running finishes with its own. After any restart of `bidmate.service` (or of `codeit`) paid answers report that the key is missing until it is entered again; free pages keep working, and paid admission stays on. The six team members are sudoers on `codeit` and could, as root, read a process's memory. The backstop for that is the provider: use this deployment's own OpenAI project key with a $20 budget, so it can be revoked without touching anything else.
 
 ### 3.4 The owner host is no longer live
 
@@ -216,7 +216,7 @@ python -m rfp_assistant.cli check --phase all --provider fake --save # every tes
 
 1. Create the environment and install the pinned dependencies (README, "Environment"). The tested host is Windows with Python 3.12; this repository's cloud checks ran on Linux with Python 3.12.
 2. Place `원본 데이터/data_list.csv` and `원본 데이터/files/` under the repository, or point `RFP_SOURCE_DIR` at them (absolute path). `RFP_DATA_DIR` (absolute) moves the runtime; the default is `.runtime/` in the repository.
-3. API key placement. Put `OPENAI_API_KEY` in the server's process environment, or in the repository's `.env` (git-ignored). Never put it in `RFP_CONFIG_FILE`, a report, an export, a screenshot or a commit. Members never receive the key; they use the shared application.
+3. API key placement. On the shared host, enter it on the 설정 page; it is held in memory only (3.3). On a personal machine, `OPENAI_API_KEY` in the process environment or the git-ignored `.env` also works. Never put it in `RFP_CONFIG_FILE`, a report, an export, a screenshot or a commit. Members never receive the key; they use the shared application.
 4. `python -m rfp_assistant.cli init --paid-disabled`, then `manifest`, `ingest`, `build-keyword --include-unreviewed` (README).
 5. Paid generation stays off until `configure-budget` records the dates, the prior use with its evidence, the allowance, the cap and the confirmed rates.
 6. Run `check --phase all --provider fake --save` on the host before the first paid action.
