@@ -16,7 +16,7 @@ from pathlib import Path
 import psycopg
 from psycopg.rows import dict_row
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 TRACE_FIELDS = ("id", "type", "critical", "question", "metrics", "code_check", "wrong_scope",
                 "ranking", "packed", "fallback", "limitations", "timings_ms", "evidence_tokens")
 CONFIG_FIELDS = ("eval_version", "label", "mode", "dataset", "dataset_sha256", "population_sha256",

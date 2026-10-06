@@ -7,7 +7,7 @@ Every flow uses the fake provider and never needs an API key: OPENAI_API_KEY is 
 Command flows run repository tests and scripts against fixture corpora. Dataset flows (`environments` contains
 `dataset`) use RFP_SOURCE_DIR / RFP_DATA_DIR / RFP_DATABASE_DSN when the service's environment supplies them,
 through an isolated copy: the PostgreSQL database is dumped (pg_dump, a read-only snapshot) and restored into a
-private test database on the server tools/start-postgresql.ps1 runs, and the read-only artifact folders are linked,
+private test database on the server tools/infra/start-postgresql.ps1 runs, and the read-only artifact folders are linked,
 so verifier runs, requests and fake ledger rows never reach the configured runtime. Without them, the fixture corpus
 is used and the observation says so.
 
@@ -546,7 +546,7 @@ def evaluation_release(ctx: Context) -> dict:
     """Unit gates plus the operator's CLI path on a temporary fixture corpus (fake provider, never RFP_DATA_DIR)."""
     gold_answers = ctx.unit("evaluation-tests", ["tests.test_evaluation"])
     release_tests = ctx.unit("release-tests", ["tests.test_release"])
-    code, out = ctx.run("cli-walkthrough", [ctx.python, "-B", "tools/verification/phase4_walkthrough.py",
+    code, out = ctx.run("cli-walkthrough", [ctx.python, "-B", "tools/verification/release_walkthrough.py",
                                             str(ctx.work)], 900)
     try:
         report = json.loads((ctx.work / "phase4-walkthrough.json").read_text(encoding="utf-8"))

@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from rfp_assistant import postgres, store
 from tests import fixtures
 
-spec = importlib.util.spec_from_file_location("phase2_handoff", ROOT / "tools" / "phase2_handoff.py")
+spec = importlib.util.spec_from_file_location("retrieval_snapshot", ROOT / "tools" / "export" / "retrieval_snapshot.py")
 kit = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(kit)
 

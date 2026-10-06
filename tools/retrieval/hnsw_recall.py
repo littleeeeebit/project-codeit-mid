@@ -6,7 +6,7 @@ exact top 20. HNSW may serve only when every group's mean recall@20 is at least 
 Also records EXPLAIN ANALYZE plans and warm p50/p95 latency for one and six concurrent clients. Cached query vectors
 only: nothing is paid.
 
-python tools/check_vector_search.py --out <absolute dir under RFP_DATA_DIR>
+python tools/retrieval/hnsw_recall.py --out <absolute dir under RFP_DATA_DIR>
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from rfp_assistant import dense, evaluation, store, vector_store
 from rfp_assistant.retrieval import KeywordIndex, corpus_scope, scope_rows
 from rfp_assistant.settings import load_settings

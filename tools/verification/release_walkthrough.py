@@ -1,6 +1,6 @@
 """Phase 4 operator walkthrough on a temporary fixture corpus, through the real CLI.
 
-    python -B tools/verification/phase4_walkthrough.py <absolute work dir>
+    python -B tools/verification/release_walkthrough.py <absolute work dir>
 
 Builds the phase-4 fixture corpus (five CSV associations: four PDFs, one unconvertible HWP) under the work
 directory, then runs every phase-4 command as a child process with the fake provider: gold submission and
@@ -24,7 +24,7 @@ sys.path[:0] = [str(REPO / "src"), str(REPO)]
 
 
 def main(work: Path) -> int:
-    from tests import phase4_fixtures as p4
+    from tests import release_fixtures as p4
 
     root = work / "phase4"
     env_fixture = p4.make_env(root, splits={"기관A": "dev", "기관F": "dev", "기관D": "test", "기관E": "test"},

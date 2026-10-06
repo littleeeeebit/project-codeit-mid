@@ -6,7 +6,7 @@ whole-corpus set (unscoped pilot plus needles), it has no critical failure K1 do
 packed complete support are no lower than K1's. Query embeddings are the only paid work and go through the
 authoritative ledger under an explicit ceiling.
 
-python tools/check_large_quality.py --out <absolute dir under RFP_DATA_DIR> [--run --max-cost-usd 0.05]
+python tools/retrieval/fusion_gate.py --out <absolute dir under RFP_DATA_DIR> [--run --max-cost-usd 0.05]
     [--variant rrf:60:1.0 --variant keyword_first:60:1.0 ...]   # fusion:rrf_k:dense_weight
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ from contextlib import closing
 from decimal import Decimal
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from rfp_assistant import budget, dense, evaluation, service, store
 from rfp_assistant.retrieval import KeywordIndex, index_compatibility
 from rfp_assistant.settings import load_settings
@@ -264,7 +264,7 @@ def main():
     if not args.out.is_absolute():
         parser.error("--out must be an absolute private directory")
     settings = load_settings() if args.run else load_settings(provider="fake")
-    repo = Path(__file__).resolve().parents[1]
+    repo = Path(__file__).resolve().parents[2]
     if args.out.is_relative_to(repo) and not args.out.is_relative_to(settings.data_dir):
         parser.error("private comparison artifacts in this checkout must stay inside RFP_DATA_DIR")
     variants = [parse_variant(v) for v in (args.variant or DEFAULT_VARIANTS)]

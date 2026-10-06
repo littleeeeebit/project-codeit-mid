@@ -12,7 +12,7 @@ from rfp_assistant.contracts import Principal
 from rfp_assistant.generation import FakeTransport, ProviderError
 from rfp_assistant.retrieval import KeywordIndex
 from tests import fixtures
-from tests import phase4_fixtures as p4
+from tests import release_fixtures as p4
 
 
 def chunk(element_id: str, start: int, end: int, x: str = "x") -> dict:

@@ -2,7 +2,7 @@
 database per test environment.
 
 Every environment gets its own database, copied from this run's template (pgvector 0.8.6 installed) on the server
-started by tools/start-postgresql.ps1, so advisory locks, the recovery schema and `public` are isolated too. The
+started by tools/infra/start-postgresql.ps1, so advisory locks, the recovery schema and `public` are isolated too. The
 server comes from RFP_POSTGRES_TEST_DSN (any database the test user may create databases from) or, by default, the
 local server's `.runtime/postgresql.env`. Databases opened during a test are dropped after it; the run's template
 and anything opened at class level are dropped at exit.
@@ -47,7 +47,7 @@ def server_dsn() -> str:
             if key.strip() == "BIDMATE_POSTGRES_PASSWORD" and value.strip():
                 return make_conninfo(host="127.0.0.1", port=55432, user="bidmate", password=value.strip(),
                                      dbname="postgres", connect_timeout=5)
-    raise RuntimeError("the tests need PostgreSQL: run tools/start-postgresql.ps1, or set RFP_POSTGRES_TEST_DSN to a "
+    raise RuntimeError("the tests need PostgreSQL: run tools/infra/start-postgresql.ps1, or set RFP_POSTGRES_TEST_DSN to a "
                        "server where the test user may create databases")
 
 

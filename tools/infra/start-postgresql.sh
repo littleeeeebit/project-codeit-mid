@@ -1,7 +1,7 @@
 #!/bin/sh
 # Linux counterpart of start-postgresql.ps1: the pinned server on loopback port 55432. RFP_DATABASE_DSN is left alone.
 set -eu
-repo=$(cd "$(dirname "$0")/.." && pwd)
+repo=$(cd "$(dirname "$0")/../.." && pwd)
 secrets="$repo/.runtime/postgresql.env"
 if [ ! -f "$secrets" ]; then
     mkdir -p "$(dirname "$secrets")"

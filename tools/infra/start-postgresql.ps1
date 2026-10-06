@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$taskRepo = Split-Path -Parent $PSScriptRoot
+$taskRepo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $taskSecrets = Join-Path $taskRepo '.runtime/postgresql.env'
 if (-not (Test-Path -LiteralPath $taskSecrets)) {
     [System.IO.Directory]::CreateDirectory((Split-Path -Parent $taskSecrets)) | Out-Null

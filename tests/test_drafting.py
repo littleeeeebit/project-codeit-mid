@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from rfp_assistant import auth, budget, drafting, evaluation, generation, gold, store
-from tests import fixtures, phase4_fixtures as fx
+from tests import fixtures, release_fixtures as fx
 
 
 class DraftingTest(unittest.TestCase):

@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$Name,
     [Parameter(Mandatory = $true)][string[]]$CliArgs,
-    [string]$OutputDir = (Join-Path $PSScriptRoot '../handoff/phase2/.private'),
+    [string]$OutputDir = (Join-Path $PSScriptRoot '../../docs/history/retrieval-selection-kit/.private'),
     [string]$Python = 'python'
 )
 
@@ -20,7 +20,7 @@ $env:PYTHONIOENCODING = 'utf-8'
 $OutputEncoding = $utf8
 $nativePreference = $ErrorActionPreference
 $previousPythonPath = $env:PYTHONPATH
-$sourcePath = Join-Path (Split-Path $PSScriptRoot -Parent) 'src'
+$sourcePath = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'src'
 $env:PYTHONPATH = $sourcePath
 if ($previousPythonPath) { $env:PYTHONPATH += [IO.Path]::PathSeparator + $previousPythonPath }
 $ErrorActionPreference = 'Continue'

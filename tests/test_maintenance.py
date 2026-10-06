@@ -160,7 +160,7 @@ class SequenceTest(unittest.TestCase):
         # review round 2, F6: the served rows keep the question pinned to the served extraction; the rebuilt rows
         # cannot grade it, and the run says so instead of reporting a verified comparison
         from rfp_assistant import compare
-        from tests import phase4_fixtures as p4
+        from tests import release_fixtures as p4
 
         with mock.patch.object(p4, "family_of", lambda env, key: "family-a"):
             p4.write(self.env, "dev", [p4.warranty_row(self.env)])

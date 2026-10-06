@@ -1,4 +1,4 @@
-# Local Langfuse v4 (4.50.0) for tracing /api/ask and drafting runs. Start it with tools/start-langfuse.ps1, which
+# Local Langfuse v4 (4.50.0) for tracing /api/ask and drafting runs. Start it with tools/infra/start-langfuse.ps1, which
 # generates the secrets into .runtime/langfuse.env and creates the org, project and API keys headlessly.
 # Adapted from github.com/langfuse/langfuse docker-compose.yml; digests resolved 2026-10-04 (linux/amd64).
 # Only the UI and MinIO (browser media URLs) are published, both on loopback; the databases stay internal.
@@ -8,7 +8,7 @@ x-langfuse-env: &langfuse-env
   # Langfuse) would share these session cookies. A cookie name suffix does not help: NextAuth reads every cookie
   # whose name starts with the session cookie name as a chunk, so it breaks the other app's sessions instead.
   NEXTAUTH_URL: http://127.0.0.2:3100
-  DATABASE_URL: postgresql://postgres:${LANGFUSE_POSTGRES_PASSWORD:?Run tools/start-langfuse.ps1 first}@postgres:5432/postgres
+  DATABASE_URL: postgresql://postgres:${LANGFUSE_POSTGRES_PASSWORD:?Run tools/infra/start-langfuse.ps1 first}@postgres:5432/postgres
   SALT: ${LANGFUSE_SALT:?}
   ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?}
   TELEMETRY_ENABLED: "false"

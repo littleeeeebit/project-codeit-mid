@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$taskRepo = Split-Path -Parent $PSScriptRoot
+$taskRepo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $taskSecrets = Join-Path $taskRepo '.runtime/langfuse.env'
 $taskCompose = Join-Path $taskRepo 'compose.langfuse.yaml'
 $taskAppEnv = Join-Path $taskRepo '.env'
