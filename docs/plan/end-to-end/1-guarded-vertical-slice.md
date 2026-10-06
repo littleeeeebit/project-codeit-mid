@@ -16,7 +16,7 @@ In scope: package/install path, validated settings, server identity, source mani
 
 Create the phase-1 modules listed in the [package contract](implementation-contracts.md), root `pyproject.toml`, `app.py`, a dependency lock file generated from the working environment, and root `README.md` with exact setup/launch commands. The converter may use its own environment and requirements file because its old compatibility must not force application dependencies. Record parser licenses, including pyhwp and the chosen PDF parser, before distribution.
 
-Keep meaningful regression checks in `tests/test_ingestion.py`, `tests/test_retrieval.py`, `tests/test_budget.py`, and `tests/test_generation.py`. Use standard `unittest`, temporary directories, real PostgreSQL transactions and a fake provider transport. Tests run on isolated PostgreSQL databases that `tests/fixtures.py` creates per test environment on the server started by `tools/start-postgresql.ps1`, or on the server named by `RFP_POSTGRES_TEST_DSN`; they never touch the application database. Do not add UI snapshot tests or a new test framework solely for this phase.
+Keep meaningful regression checks in `tests/test_ingestion.py`, `tests/test_retrieval.py`, `tests/test_budget.py`, and `tests/test_generation.py`. Use standard `unittest`, temporary directories, real PostgreSQL transactions and a fake provider transport. Tests run on isolated PostgreSQL databases that `tests/fixtures.py` creates per test environment on the server started by `tools/infra/start-postgresql.ps1`, or on the server named by `RFP_POSTGRES_TEST_DSN`; they never touch the application database. Do not add UI snapshot tests or a new test framework solely for this phase.
 
 CLI commands introduced here:
 

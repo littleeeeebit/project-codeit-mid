@@ -7,8 +7,8 @@ BidMate now runs only on PostgreSQL 18.6 + pgvector 0.8.6 (database `bidmate_app
 Operate it as follows:
 
 ```powershell
-./tools/start-postgresql.ps1                       # container with init: true, so the postmaster is not PID 1
-$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.example.json).Path
+./tools/infra/start-postgresql.ps1                       # container with init: true, so the postmaster is not PID 1
+$env:RFP_CONFIG_FILE = (Resolve-Path docs/history/postgresql-migration/config.example.json).Path
 $env:RFP_DATABASE_DSN = "postgresql://bidmate:<password>@127.0.0.1:55432/bidmate_app"   # password from .runtime/postgresql.env
 python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
@@ -35,7 +35,7 @@ All 18,983 active chunk vectors are in pgvector (1,536 dimensions, set `p8d1aa85
 
 ### HNSW against exact search
 
-`python tools/check_vector_search.py --out <RFP_DATA_DIR>/vector-search` builds an HNSW index on the 1,536 vectors. It then compares the HNSW top 20 with the exact top 20 for every frozen pilot (dev, 55 questions) and whole-corpus (33 needles plus the pilot) passage question, on its own scope and over all documents. Nothing in this check is paid.
+`python tools/retrieval/hnsw_recall.py --out <RFP_DATA_DIR>/vector-search` builds an HNSW index on the 1,536 vectors. It then compares the HNSW top 20 with the exact top 20 for every frozen pilot (dev, 55 questions) and whole-corpus (33 needles plus the pilot) passage question, on its own scope and over all documents. Nothing in this check is paid.
 
 Mean recall@20 by `hnsw.ef_search`:
 
@@ -68,7 +68,7 @@ Exact unscoped search costs roughly 0.2 s per All documents question, which is s
 
 ### Fusion gate
 
-`python tools/check_large_quality.py --out <RFP_DATA_DIR>/fusion-gate/final-2 --run --max-cost-usd 0.05 --variant …` compares keyword-only K1 with seven fusion settings on two populations:
+`python tools/retrieval/fusion_gate.py --out <RFP_DATA_DIR>/fusion-gate/final-2 --run --max-cost-usd 0.05 --variant …` compares keyword-only K1 with seven fusion settings on two populations:
 
 - The frozen 55-question pilot (dataset `a3b4d5cc…`) on its own scopes.
 - The 88-question whole-corpus set: the pilot unscoped plus 33 needles.
@@ -94,7 +94,7 @@ The owner asked an All documents question, "한영대학교의 사업에 대해 
 The owner also set 50 candidates per channel and after fusion, asked to measure 10, 15, 20, 25 and 30 evidence units, and asked for the local reranker (`BAAI/bge-reranker-v2-m3`, revision `953dc6f6…`, CUDA fp32) to be measured too. The command was:
 
 ```powershell
-python tools/check_large_quality.py --out <RFP_DATA_DIR>/fusion-gate/depth50-units --run --max-cost-usd 0.05 --variant keyword_first:60:1.0:6 --depth 50 --units 10,15,20,25,30 --rerank-revision 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+python tools/retrieval/fusion_gate.py --out <RFP_DATA_DIR>/fusion-gate/depth50-units --run --max-cost-usd 0.05 --variant keyword_first:60:1.0:6 --depth 50 --units 10,15,20,25,30 --rerank-revision 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
 ```
 
 Each setting is gated against K1 at the same depth and evidence limits. The token budget is 400 tokens per unit, plus 800 for the first unit. Among passing settings, the most complete support wins, then nDCG@5, then fewer units. No query embedding was paid; all vectors were cached.
@@ -214,7 +214,7 @@ Before turning paid admission on, compare the dump's watermark with the ledger b
 
 ### Pilot archive (2026-10-05)
 
-The Phase 4 pilot runtime is a separate ledger from the live one. It holds the evidence behind the [release report](../../docs/operations/release-report.md) and the judge reference. It now lives in its own database, `bidmate_pilot_archive`, on the same server. It is not `bidmate_app` and must never be the `RFP_DATABASE_DSN` of a serving process.
+The Phase 4 pilot runtime is a separate ledger from the live one. It holds the evidence behind the [release report](../../operations/release-report.md) and the judge reference. It now lives in its own database, `bidmate_pilot_archive`, on the same server. It is not `bidmate_app` and must never be the `RFP_DATABASE_DSN` of a serving process.
 
 - Import: the importer from the commit before PR #13 deleted it was run once from a scratch folder outside the repository, then deleted. It read a consistent snapshot of the pilot database (schema 6, SHA256 `fe4796a6…`, write-ahead log included). It imported into a new empty database with pgvector 0.8.6. `migration_import.state` is `complete`, and `database_control.paid_admission` is false. `bidmate_app` was not touched.
 - Parity: 27 tables and 675,140 rows. Every table's row count and canonical per-record digest match the source, checked again after the addition below. The 98 originals and 12 index manifests verify by hash at the archive's current location. The 624 extraction files are present there; the source records no hash for them.
@@ -246,7 +246,7 @@ Both findings were reproduced with a failing test first:
   - The rule is versioned (`ROUTE_RULE = greedy-rare-term-1`) in frozen run configurations, so runs recorded under the old rule are not reused.
   - Over the 91 evaluation and acceptance questions, routing changed for 8 pilot questions (fewer documents), 1 pilot question (now routed) and the generic probe (no longer routed). It did not change for any needle or either owner question.
 
-Retrieval was measured again after the routing change. `tools/check_large_quality.py --variant keyword_first:60:1.0:6 --depth 50 --units 10,15` passed and kept 10 units:
+Retrieval was measured again after the routing change. `tools/retrieval/fusion_gate.py --variant keyword_first:60:1.0:6 --depth 50 --units 10,15` passed and kept 10 units:
 
 | Set | Hybrid | K1 |
 | --- | --- | --- |
@@ -273,7 +273,7 @@ Each finding was reproduced with a failing test first:
 
 - F2 (round 4): an assertion labelled `absence` was dropped whenever its document listed any missing field. An `absence` claim is now dropped only when its whitespace-normalized text equals a `missing_fields` field of its own document. Any other `absence` claim fails with `absence_not_listed`, and every uncited `source_fact` or `inference` still fails with `claim_without_evidence` (`tests.test_generation`). Prompt `grounded-answer-8` stated this.
 - F6 (round 4): startup accepted any allowed embedding identity. `load_settings` now refuses everything but `text-embedding-3-large` at 1,536 dimensions, and activation refuses a run recorded under another identity.
-- F7 (round 5): only the pgvector version was checked. Every connection now refuses a server other than PostgreSQL 18.6 (`server_version_num` 180006): the pool's startup probe and every later pooled connection, the paid gateway's own connection and `restore-check`'s connection to the restore target. Two diagnostic tools open read-only connections of their own, `tools/phase2_handoff.py` and `tools/verify.py`'s `db_rows`. They start nothing and write nothing, so they are left unchecked.
+- F7 (round 5): only the pgvector version was checked. Every connection now refuses a server other than PostgreSQL 18.6 (`server_version_num` 180006): the pool's startup probe and every later pooled connection, the paid gateway's own connection and `restore-check`'s connection to the restore target. Two diagnostic tools open read-only connections of their own, `tools/export/retrieval_snapshot.py` and `tools/verify.py`'s `db_rows`. They start nothing and write nothing, so they are left unchecked.
 - F8 (round 5): `run_errors` did not compare the recorded corpus-routing rule. It now refuses a run whose `limits.corpus_route` differs from the current share, maximum and `ROUTE_RULE`. Activation, answer evaluation, sealed runs and the release status all call `run_errors`, so the superseded `H-af9967ca81` is refused everywhere while the serving `H-0fffb2a6ec` passes. Round 6 showed that an already activated run was still served after a routing change; see below.
 - F8 (round 6): after a routing change and a restart without re-activation, `Resources.serving()` returned the persisted run while retrieval applied the new rule. Every reader of the activation now goes through `service.active_serving`: requests (`Resources.serving()`) and `answers.plan_latency`, which read the stored run directly before. A run whose recorded `limits.corpus_route` differs from `retrieval.corpus_route_record()` is not served. Requests get the unselected keyword default with `fallback_reason` `activated_corpus_route_requires_rerun`, and every retrieval lists `activated_run_stale:corpus_route` until a rerun is activated. `run_errors` and the frozen configuration use the same `corpus_route_record()`. The other readers were already guarded or only report: answer evaluation and the sealed freeze call `run_errors`, `activate-run` keeps history, and `build-keyword` only tests that an activation exists. Round 7 showed that the reports still named the stored activation as serving; see below. The fusion-gate tool keeps working, because it passes its own mode and limits.
 - F8 (round 7): the phase-2, phase-3 and release reports printed the stored `active_run` as "serving", so after a routing change they named the stale hybrid run while requests served the keyword default. All three now print `service.describe_serving(service.active_serving())`. That reads, for example, "keyword default (kiwi_bm25); activated run `H-…` not served: activated_corpus_route_requires_rerun". The phase-2 report lists the stored activation separately as "activated", and both manifests record `serving` beside `active_run`. The other places the same rule applies to:
@@ -283,7 +283,7 @@ Each finding was reproduced with a failing test first:
   - The development answer and sealed evidence must match the current package source hash, which any real routing change alters.
   - The phase-2 selection gate already called `run_errors`.
   - The API and verification status read `Resources.serving()`.
-  - `tools/phase2_handoff.py` exports the raw `active_run` setting under that name, as a database snapshot, without claiming it serves.
+  - `tools/export/retrieval_snapshot.py` exports the raw `active_run` setting under that name, as a database snapshot, without claiming it serves.
 - F9 (round 5): the README named `H-af9967ca81` as the serving run. It now names `H-0fffb2a6ec`, as do the overview and this handover.
 
 Under prompt 8 the owner's comparison failed with `absence_not_listed`. The model wrote "을지대학교 발췌에는 제안서의 제출 부수나 제출 방법에 관한 내용이 확인되지 않습니다" as an `absence` claim while listing no missing field for 을지대학교. Validation was right to refuse it, so the prompt changed instead. `grounded-answer-9` says an absence goes only to a `missing_fields` entry, never to a claim, and that an absence without such an entry fails the whole answer. The same comparison then answered with 8 cited claims ($0.001506), listing 을지대학교's submission count and method as missing.
@@ -328,8 +328,8 @@ conda activate rfp-assistant
 python -m pip install -r requirements.txt
 python -m pip install -e . --no-deps
 docker desktop start
-./tools/start-postgresql.ps1
-$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.example.json).Path
+./tools/infra/start-postgresql.ps1
+$env:RFP_CONFIG_FILE = (Resolve-Path docs/history/postgresql-migration/config.example.json).Path
 ```
 
 The script starts `bidmate-postgresql` on `127.0.0.1:55432` and initializes extension 0.8.6. It generates a secret in ignored `.runtime/postgresql.env`; never paste that file or print the DSN. It leaves `RFP_DATABASE_DSN` unchanged and does not select an application database. The PostgreSQL example configuration uses a fake provider and large/1,536 and is for isolated rehearsal only. Explicitly select the imported target in the import commands below before running maintenance/application commands; an empty or incomplete import is refused before schema initialization. Selecting dimensions does not itself activate a candidate.
@@ -478,7 +478,7 @@ The vectors are genuinely new large-model outputs. All rows pass dimension, fini
 Private receipts are `paid-corpus-estimate.json` (estimate `b7211b494d36`), `paid-corpus-receipt.json`, and `before-paid-corpus-backup.json` under `.runtime/postgresql-migration/`. Do not copy source caches or database files into Git. To reproduce/resume this explicitly authorized pre-cutover path, stop the UI and use the existing maintenance commands with the transitional nonsecret configuration; retain the single live data directory and ledger:
 
 ```powershell
-$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.corpus-before-cutover.example.json).Path
+$env:RFP_CONFIG_FILE = (Resolve-Path docs/history/postgresql-migration/config.corpus-before-cutover.example.json).Path
 python -m rfp_assistant.cli plan-embeddings --index 62bea0c9c27ad3e7
 python -m rfp_assistant.cli build-dense --index 62bea0c9c27ad3e7 --estimate-id <fresh-estimate>
 ```
@@ -595,14 +595,14 @@ Both candidate channels satisfy the allowed nDCG and two-percentage-point suppor
 Implemented comparison commands, with the UI stopped and the explicit pre-cutover configuration:
 
 ```powershell
-$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.corpus-before-cutover.example.json).Path
-python tools/check_large_quality.py --out "$PWD/.runtime/postgresql-migration/cutover/quality-01"
+$env:RFP_CONFIG_FILE = (Resolve-Path docs/history/postgresql-migration/config.corpus-before-cutover.example.json).Path
+python tools/retrieval/fusion_gate.py --out "$PWD/.runtime/postgresql-migration/cutover/quality-01"
 # Explicit ceiling; all reservations must also fit the existing envelopes and cumulative cap.
-python tools/check_large_quality.py --out "$PWD/.runtime/postgresql-migration/cutover/quality-01" --run --max-cost-usd 0.13
+python tools/retrieval/fusion_gate.py --out "$PWD/.runtime/postgresql-migration/cutover/quality-01" --run --max-cost-usd 0.13
 # Verified cached repeat: no additional provider calls, same failed acceptance result.
-python tools/check_large_quality.py --out "$PWD/.runtime/postgresql-migration/cutover/quality-01" --run --max-cost-usd 0
+python tools/retrieval/fusion_gate.py --out "$PWD/.runtime/postgresql-migration/cutover/quality-01" --run --max-cost-usd 0
 # Re-measurement on a compatible, unactivated keyword index (see below).
-python tools/check_large_quality.py --out "$PWD/.runtime/postgresql-migration/cutover/quality-02" --index-version 29f261abafeb1f8c --run --max-cost-usd 0.01
+python tools/retrieval/fusion_gate.py --out "$PWD/.runtime/postgresql-migration/cutover/quality-02" --index-version 29f261abafeb1f8c --run --max-cost-usd 0.01
 python -m unittest tests.test_large_quality -q
 ```
 
@@ -616,7 +616,7 @@ The comparison was re-measured on 2026-10-04 without moving the serving pointer:
 
 - `build-keyword --include-unreviewed --no-activate` built index `29f261abafeb1f8c` (manifest `60ce3b43…`). It has the same review scope and structural profile, 98 sources and 18,983 chunks. The active pointer stays `62bea0c9c27ad3e7`.
 - `plan-embeddings` produced estimate `745bc0f0a4a3`. `build-dense` then embedded 53 uncached payloads (4,620 micro-USD settled) to build ready set `d0973ac11268198d`.
-- `check_large_quality.py --index-version 29f261abafeb1f8c --run --max-cost-usd 0.01` embedded 2 missing reference payloads (96 micro-USD) and needed no new query vectors. The run used the same frozen population (dataset `a3b4d5cc…`, 55 rows).
+- `fusion_gate.py --index-version 29f261abafeb1f8c --run --max-cost-usd 0.01` embedded 2 missing reference payloads (96 micro-USD) and needed no new query vectors. The run used the same frozen population (dataset `a3b4d5cc…`, 55 rows).
 
 The report is in `quality-02`. Both channels still fail acceptance:
 

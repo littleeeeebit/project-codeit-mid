@@ -1,8 +1,8 @@
 # Phase 3 handoff: workflows and operations
 
-This folder records what the Cloud implementation of the [phase 3 plan](../../docs/plan/end-to-end/3-workflows-and-operations.md) built and checked. There is no login (owner decision, reaffirmed 2026-10-01; the plan, contracts, overview and phase 1/4/5 documents were updated to match). All evidence here is **synthetic**: the fake provider, the four-document test fixture corpus and typed visitor names. No paid call was made, no original document or local runtime was used, and $0 was spent.
+This folder records what the Cloud implementation of the [phase 3 plan](../../plan/end-to-end/3-workflows-and-operations.md) built and checked. There is no login (owner decision, reaffirmed 2026-10-01; the plan, contracts, overview and phase 1/4/5 documents were updated to match). All evidence here is **synthetic**: the fake provider, the four-document test fixture corpus and typed visitor names. No paid call was made, no original document or local runtime was used, and $0 was spent.
 
-The authoritative `.runtime/releases/phase-3/report.md` must be produced on the owner host with `report --phase 3` once that host's own checks have run. The [runbook](../../docs/operations/runbook.md) gives the operating procedure.
+The authoritative `.runtime/releases/phase-3/report.md` must be produced on the owner host with `report --phase 3` once that host's own checks have run. The [runbook](../../operations/runbook.md) gives the operating procedure.
 
 ## What changed
 

@@ -6,7 +6,7 @@ Run the commands with the project environment's interpreter from any directory. 
 
 ## PostgreSQL only and Settings limit
 
-Since the 2026-10-04 cutover the application, billing ledger and retrieval sets live only in PostgreSQL 18.6 + pgvector 0.8.6 (the `bidmate_app` database). There is no other backend and no fallback. Start infrastructure with `./tools/start-postgresql.ps1`, then set `RFP_DATABASE_DSN` to the application database. A missing DSN, an unreachable database, a database without a validated import, or an embedding model outside the compared registry (`models.EMBEDDINGS`, at the dimensions it produces) stops startup with a clear message. Serving follows the activated run's embedding: an OpenAI or Gemini model through its API, a local model on the GPU inside the server process. `activate-run` refuses a run whose model is unregistered or whose local revision or prefixes no longer match the registry, which would otherwise serve keyword-only. After a change to corpus routing (`ROUTE_RULE`), the activated run is no longer served. Requests fall back to the keyword default, and every retrieval lists `activated_run_stale:corpus_route` until `evaluate-retrieval` and `activate-run` record a run under the new rule. The cutover evidence (final import, vector parity, HNSW, fusion gate, needle set, paid end-to-end check) is in the [handover](../../handoff/postgresql-pgvector/README.md#postgresql-only-operation-2026-10-04).
+Since the 2026-10-04 cutover the application, billing ledger and retrieval sets live only in PostgreSQL 18.6 + pgvector 0.8.6 (the `bidmate_app` database). There is no other backend and no fallback. Start infrastructure with `./tools/infra/start-postgresql.ps1`, then set `RFP_DATABASE_DSN` to the application database. A missing DSN, an unreachable database, a database without a validated import, or an embedding model outside the compared registry (`models.EMBEDDINGS`, at the dimensions it produces) stops startup with a clear message. Serving follows the activated run's embedding: an OpenAI or Gemini model through its API, a local model on the GPU inside the server process. `activate-run` refuses a run whose model is unregistered or whose local revision or prefixes no longer match the registry, which would otherwise serve keyword-only. After a change to corpus routing (`ROUTE_RULE`), the activated run is no longer served. Requests fall back to the keyword default, and every retrieval lists `activated_run_stale:corpus_route` until `evaluate-retrieval` and `activate-run` record a run under the new rule. The cutover evidence (final import, vector parity, HNSW, fusion gate, needle set, paid end-to-end check) is in the [handover](../../docs/history/postgresql-migration/README.md#postgresql-only-operation-2026-10-04).
 
 Application startup requires the persisted import validation and rechecks artifact hashes. A failed or interrupted validation disables paid admission and blocks startup until validation passes.
 
@@ -73,15 +73,15 @@ All six are in `google-sudoers` on `codeit`, so each can also read `/etc/bidmate
 
 ### 3.2 Linux start path on `codeit`
 
-`tools/start-postgresql.sh` replaces `tools/start-postgresql.ps1`: it creates `.runtime/postgresql.env` (mode 600) once and starts `compose.postgresql.yaml` on loopback port 55432. `tools/bidmate.service` (installed as `/etc/systemd/system/bidmate.service`) runs it before uvicorn on `127.0.0.1:8501 --workers 1` as the `bidmate` user, with `/etc/bidmate/server.env`. It starts at boot and stops with SIGINT (the controlled stop of section 4).
+`tools/infra/start-postgresql.sh` replaces `tools/infra/start-postgresql.ps1`: it creates `.runtime/postgresql.env` (mode 600) once and starts `compose.postgresql.yaml` on loopback port 55432. `tools/infra/bidmate.service` (installed as `/etc/systemd/system/bidmate.service`) runs it before uvicorn on `127.0.0.1:8501 --workers 1` as the `bidmate` user, with `/etc/bidmate/server.env`. It starts at boot and stops with SIGINT (the controlled stop of section 4).
 
 ```sh
 sudo systemctl status bidmate          # or: restart / stop; logs with journalctl -u bidmate
 sudo ss -ltnp | grep -E ':(8501|55432) '   # 127.0.0.1:8501 python (uvicorn), 127.0.0.1:55432 docker-proxy
-sudo /srv/bidmate/app/tools/bidmate-cli.sh budget-status   # any owner CLI command, with the service's environment
+sudo /srv/bidmate/app/tools/infra/bidmate-cli.sh budget-status   # any owner CLI command, with the service's environment
 ```
 
-Deploying a code change: the repository is private, so ship a bundle from the owner host (`git bundle create bidmate.bundle <branch>`, `scp` it to the VM), then on the VM `sudo -u bidmate git -C /srv/bidmate/app pull /tmp/bidmate.bundle <branch>`. Rebuild `web/out` there (`cd web && npm ci && npm run build`) when screens changed, then `sudo systemctl restart bidmate`. Stop the service before any paid CLI job or `backup` (section 1).
+Deploying a code change: the repository is private, so ship a bundle from the owner host (`git bundle create bidmate.bundle <branch>`, `scp` it to the VM), then on the VM `sudo -u bidmate git -C /srv/bidmate/app pull /tmp/bidmate.bundle <branch>`. Rebuild `web/out` there (`cd web && npm ci && npm run build`) when screens changed, then `sudo systemctl restart bidmate`. When `tools/infra/bidmate.service` changed, copy it over `/etc/systemd/system/bidmate.service` and run `sudo systemctl daemon-reload` before the restart; the installed unit is a copy, and a stale `ExecStartPre` path stops the service from starting. Stop the service before any paid CLI job or `backup` (section 1).
 
 The VM serves the owner host's restored database, whose rows keep Windows paths (`C:\Users\dasdk\PycharmProjects\project-codeit-mid\...`). `RFP_PATH_MAP=C:/Users/dasdk/PycharmProjects/project-codeit-mid=/srv/bidmate/app` maps them onto the copied originals and runtime. Every reader of a recorded original, extraction or index path goes through `postgres.host_path`. Paths written on the VM are Linux paths and need no mapping.
 
@@ -112,7 +112,7 @@ Local development and single-host use:
 
 ```powershell
 cd web; npm ci; npm run build; cd ..        # once per checkout or screen change: writes web/out
-$env:RFP_CONFIG_FILE = (Resolve-Path handoff/postgresql-pgvector/config.example.json).Path
+$env:RFP_CONFIG_FILE = (Resolve-Path docs/history/postgresql-migration/config.example.json).Path
 $env:RFP_DATABASE_DSN = "postgresql://bidmate:<password>@127.0.0.1:55432/bidmate_app"   # password from .runtime/postgresql.env
 python -m uvicorn rfp_assistant.api:app --host 127.0.0.1 --port 8501 --workers 1
 ```
@@ -214,7 +214,7 @@ python -m rfp_assistant.cli check --phase all --provider fake --save # every tes
 - Provider: every flow uses the fake provider. `OPENAI_API_KEY` is removed from child processes.
 - Browser flows serve the app on `RFP_VERIFY_ORIGIN` (default `http://127.0.0.1:8765`; include it in `allowed_origins`). They drive the app with Playwright (`pip install -e .[verify]`). `RFP_VERIFY_BROWSER_EXECUTABLE` selects a browser binary; otherwise Playwright's Chromium and then the installed Chrome are tried.
 - On Windows, `controlled-stop` sends a real `CTRL_C_EVENT` to a hidden console child.
-- The 15 flows cover access, the four answer modes, the request lifecycle, controlled stop, the shared budget, recovery, verifier runs, the repository gates (including `check --phase 4`) and the phase-4 evaluation and release path (`evaluation-release`: its unit tests plus a 31-step CLI walkthrough on a temporary fixture corpus, `tools/verification/phase4_walkthrough.py`) as commands. Six browser flows cover the consultant answer and evidence, the history, verifier generation, six concurrent named sessions, cap exhaustion with audited owner actions, and keyboard, focus, contrast and narrow layout. `python -B tools/verify.py --list` shows them.
+- The 15 flows cover access, the four answer modes, the request lifecycle, controlled stop, the shared budget, recovery, verifier runs, the repository gates (including `check --phase 4`) and the phase-4 evaluation and release path (`evaluation-release`: its unit tests plus a 31-step CLI walkthrough on a temporary fixture corpus, `tools/verification/release_walkthrough.py`) as commands. Six browser flows cover the consultant answer and evidence, the history, verifier generation, six concurrent named sessions, cap exhaustion with audited owner actions, and keyboard, focus, contrast and narrow layout. `python -B tools/verify.py --list` shows them.
 - The evidence block is printed as the last three lines (one compact JSON line), so it survives the service's 80-line tail.
 
 ## 9. Setup and the API key
