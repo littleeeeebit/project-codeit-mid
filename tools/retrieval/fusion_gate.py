@@ -153,6 +153,51 @@ def systems_for(settings, variants, units=None, depth=None, reranker=None):
     return out
 
 
+def _query_vectors(settings, transport, populations, job, guard):
+    """One paid query vector per passage row, through the ledger; any unavailable or unknown-billed one stops."""
+    vectors = {}
+    for rows in populations.values():
+        for row in rows:
+            if evaluation.is_passage_row(row):
+                vector, info = dense.query_vector(settings, transport, row["question"], request_id=job,
+                                                  member_id=MEMBER, purpose="gold_eval", allow_paid=True, guard=guard)
+                if vector is None or info.get("billing") == "unknown":
+                    raise RuntimeError(f"query vector unavailable or billing unknown ({info}); stop without retry")
+                vectors[evaluation.row_id(row)] = vector
+    return vectors
+
+
+def _measure(systems, runs, index, analyzer, vectors, candidate, reranker, out):
+    """Every system over every population, each trace written; the aggregates per system and population."""
+    traces, aggregates = {}, {}
+    for label, mode, s, _ in systems:
+        for population, rows, unscoped in runs:
+            traces[population] = evaluation._execute(
+                s, index, analyzer, rows, mode, vectors=vectors,
+                dense=candidate if mode != "kiwi_bm25" else None, unscoped=unscoped,
+                reranker=reranker if mode == "hybrid_rerank" else None,
+                rerank_depth=s.fused_top_k if mode == "hybrid_rerank" else None)
+            store.write_jsonl_atomic(out / f"{label.replace(':', '_')}-{population}.jsonl", traces[population])
+            aggregates[f"{label}/{population}"] = evaluation.aggregate(traces[population], [])
+        whole = traces["pilot-unscoped"] + traces.get("needles", [])
+        aggregates[f"{label}/whole-corpus"] = evaluation.aggregate(whole, [])
+        if "needles" in traces:
+            aggregates[f"{label}/needle-hits"] = needle_hits(traces["needles"])
+    return aggregates
+
+
+def _gates(systems, aggregates):
+    """Each non-baseline system against its K1 baseline, on the scoped pilot and the whole corpus."""
+    gates = {}
+    for label, _, _, base in systems:
+        if base is None:
+            continue
+        gates[label] = {p: gate(aggregates[f"{label}/{p}"], aggregates[f"{base}/{p}"])
+                        for p in ("pilot-scoped", "whole-corpus")}
+        gates[label]["passed"] = all(g["passed"] for g in gates[label].values())
+    return gates
+
+
 def run(settings, resources, out, max_cost_micro, variants, datasets=DATASETS, units=None, depth=None,
         reranker=None):
     plan, populations, index, candidate = prepare(settings, resources.analyzer, datasets)
@@ -169,40 +214,13 @@ def run(settings, resources, out, max_cost_micro, variants, datasets=DATASETS, u
     def guard(conn):  # inside durable dispatch: concurrent reservations and snapshotted prices count
         return "comparison_invocation_cost_ceiling" if job_cost(conn, job) - previous > max_cost_micro else None
 
-    vectors = {}
-    for rows in populations.values():
-        for row in rows:
-            if evaluation.is_passage_row(row):
-                vector, info = dense.query_vector(settings, resources.transport, row["question"], request_id=job,
-                                                  member_id=MEMBER, purpose="gold_eval", allow_paid=True, guard=guard)
-                if vector is None or info.get("billing") == "unknown":
-                    raise RuntimeError(f"query vector unavailable or billing unknown ({info}); stop without retry")
-                vectors[evaluation.row_id(row)] = vector
+    vectors = _query_vectors(settings, resources.transport, populations, job, guard)
     runs = [("pilot-scoped", populations["dev"], False), ("pilot-unscoped", populations["dev"], True)]
     if "corpus" in populations:
         runs.append(("needles", populations["corpus"], True))
     systems = systems_for(settings, variants, units, depth, reranker)
-    traces, aggregates = {}, {}
-    for label, mode, s, _ in systems:
-        for population, rows, unscoped in runs:
-            traces[population] = evaluation._execute(
-                s, index, resources.analyzer, rows, mode, vectors=vectors,
-                dense=candidate if mode != "kiwi_bm25" else None, unscoped=unscoped,
-                reranker=reranker if mode == "hybrid_rerank" else None,
-                rerank_depth=s.fused_top_k if mode == "hybrid_rerank" else None)
-            store.write_jsonl_atomic(out / f"{label.replace(':', '_')}-{population}.jsonl", traces[population])
-            aggregates[f"{label}/{population}"] = evaluation.aggregate(traces[population], [])
-        whole = traces["pilot-unscoped"] + traces.get("needles", [])
-        aggregates[f"{label}/whole-corpus"] = evaluation.aggregate(whole, [])
-        if "needles" in traces:
-            aggregates[f"{label}/needle-hits"] = needle_hits(traces["needles"])
-    gates = {}
-    for label, _, _, base in systems:
-        if base is None:
-            continue
-        gates[label] = {p: gate(aggregates[f"{label}/{p}"], aggregates[f"{base}/{p}"])
-                        for p in ("pilot-scoped", "whole-corpus")}
-        gates[label]["passed"] = all(g["passed"] for g in gates[label].values())
+    aggregates = _measure(systems, runs, index, resources.analyzer, vectors, candidate, reranker, out)
+    gates = _gates(systems, aggregates)
     complete = tuple(datasets) == DATASETS
     passing = [label for label in gates if gates[label]["passed"]]
     limits = {label: s for label, _, s, _ in systems}
