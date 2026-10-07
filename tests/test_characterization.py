@@ -18,6 +18,7 @@ from unittest import mock
 
 from rfp_assistant import cli
 from rfp_assistant import settings as settings_mod
+from rfp_assistant.contracts import AnswerRequest
 from rfp_assistant.corpus import ingestion
 from rfp_assistant.evaluation import compare, evaluation, judges, release
 from rfp_assistant.gateway import generation
@@ -25,7 +26,7 @@ from rfp_assistant.service import answers, ops, service
 from rfp_assistant.settings import Settings, SettingsError
 from rfp_assistant.storage import store
 from tests import fixtures
-from tests import test_dense, test_release  # their scenarios; module attributes, so their tests are not collected twice
+from tests import test_dense, test_release, test_service  # their scenarios; module attributes, so their tests are not collected twice
 
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOTS = Path(__file__).parent / "snapshots"
@@ -774,6 +775,87 @@ class ImportReferenceTest(unittest.TestCase):
             with self.assertRaisesRegex(judges.JudgeError, "^reference files are missing; ask the owner before using "
                                                            "another reference: .*blind-groups.jsonl$"):
                 judges.import_reference(s, archive)
+
+
+class PaidAnswerOutcomeTest(test_service.Base):
+    """The exits of a paid answer the service tests do not reach, each pinned whole: the request's outcome,
+    the request row's status and the attempts it left (amounts vary with the prompt, so only stage and state)."""
+
+    def setUp(self):
+        super().setUp()
+        self.transport.gate.set()
+
+    def outcome(self, request):
+        r = service.answer(self.res, self.env.consultant, request)
+        return {"status": r.status, "summary": r.summary, "error": r.error, "billing_state": r.billing_state,
+                "missing_fields": r.missing_fields, "request": self.request_row(r.request_id)["status"],
+                "attempts": [(a["stage"], a["state"]) for a in self.attempts() if a["request_id"] == r.request_id]}
+
+    def test_every_document_unavailable(self):
+        self.assertEqual(self.outcome(test_service.req(self.e)), {
+            "status": "ingestion_unavailable", "summary": "원문 전체를 확인할 수 없어 답변하지 않습니다. HWP 변환기가 설정되지 "
+            "않았습니다.", "error": None, "billing_state": "none", "missing_fields": [
+                {"doc_id": self.e.doc_id, "field": "document", "reason": "ingestion_unavailable"}],
+            "request": "completed", "attempts": []})
+
+    def test_retrieval_failure(self):
+        with mock.patch.object(service, "prepare_answer", side_effect=RuntimeError("index gone")):
+            self.assertEqual(self.outcome(test_service.req(self.a)), {
+                "status": "technical_error", "summary": "검색 또는 비용 추정에 실패했습니다.",
+                "error": "RuntimeError: index gone", "billing_state": "none", "missing_fields": [],
+                "request": "failed", "attempts": []})
+
+    def test_a_frozen_run_whose_prompt_grew(self):
+        run = service.verifier_trace(self.res, self.env.verifier, test_service.Q, [self.a], "2026-09-30")
+        real = service._frozen_prep
+
+        def grown(*a, **kw):
+            prep = real(*a, **kw)
+            return {**prep, "estimate_micro_usd": prep["estimate_micro_usd"] + 1}
+
+        with mock.patch.object(service, "_frozen_prep", side_effect=grown):
+            r = service.answer(self.res, self.env.verifier, AnswerRequest(
+                "k", "g", test_service.Q, [self.a], as_of="2026-09-30", config_id=run["config"]["config_id"],
+                verifier_run_id=run["run_id"]))
+        self.assertEqual((r.status, r.summary, r.error, self.request_row(r.request_id)["status"], self.attempts(),
+                          self.transport.calls), (
+            "clarification_required", "검증 실행 이후 프롬프트가 바뀌어 동의한 최대 비용을 넘을 수 있습니다. 새 검증 실행을 "
+            "만든 뒤 다시 생성하세요. (유료 호출 없음)", None, "failed", [], []))
+
+    def test_no_paid_connection(self):
+        with mock.patch.object(self.res, "paid_refusal", return_value="no key for this session"):
+            self.assertEqual(self.outcome(test_service.req(self.a)), {
+                "status": "technical_error", "summary": "유료 모델 연결이 설정되지 않았습니다.",
+                "error": "no key for this session", "billing_state": "released", "missing_fields": [],
+                "request": "failed", "attempts": [("generation", "released")]})
+
+    def test_stopped_inside_the_dispatch_transaction(self):
+        with mock.patch.object(service, "_dispatch_guard", return_value=lambda conn: "cancelled"):
+            self.assertEqual(self.outcome(test_service.req(self.a)), {
+                "status": "cancelled", "summary": "요청이 취소되어 다음 유료 단계를 시작하지 않았습니다.", "error": None,
+                "billing_state": "released", "missing_fields": [], "request": "cancelled",
+                "attempts": [("generation", "released")]})
+
+    def test_connection_lost_during_the_call(self):
+        self.transport.responder = lambda m: ConnectionResetError("transport closed")
+        self.assertEqual(self.outcome(test_service.req(self.a)), {
+            "status": "technical_error", "summary": "모델 호출 중 연결이 끊겼습니다. 비용은 확인 전까지 보류로 남습니다.",
+            "error": "ConnectionResetError: transport closed", "billing_state": "unknown", "missing_fields": [],
+            "request": "failed", "attempts": [("generation", "unknown")]})
+
+    def test_provider_returned_no_usage(self):
+        echo = generation.FakeTransport().responder
+        self.transport.responder = lambda m: generation.ProviderResponse(echo(m).content, None, "stop", None, "r-1")
+        self.assertEqual(self.outcome(test_service.req(self.a)), {
+            "status": "answered", "summary": "가짜 제공자 응답입니다.", "error": None, "billing_state": "unknown",
+            "missing_fields": [], "request": "completed", "attempts": [("generation", "unknown")]})
+
+    def test_settlement_failure(self):
+        with mock.patch.object(service.budget, "settle", side_effect=RuntimeError("ledger locked")):
+            self.assertEqual(self.outcome(test_service.req(self.a)), {
+                "status": "technical_error", "summary": "사용량을 기록하지 못했습니다. 비용은 확인 전까지 보류로 남습니다.",
+                "error": "settlement_failed: RuntimeError", "billing_state": "unknown", "missing_fields": [],
+                "request": "failed", "attempts": [("generation", "unknown")]})
 
 
 class VerifyToolTest(unittest.TestCase):
