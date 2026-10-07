@@ -1,1945 +1,544 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`evidence > EvidenceDetail loads the evidence of its request, or shows the refusal 1`] = `
-<div>
-  <div
-    class="space-y-2"
-  >
-    <div
-      class="animate-pulse rounded-md bg-muted h-4 w-2/3"
-      data-slot="skeleton"
-    />
-    <div
-      class="animate-pulse rounded-md bg-muted h-20 w-full"
-      data-slot="skeleton"
-    />
-  </div>
-</div>
+div
+  div
+    div
+    div
 `;
 
 exports[`evidence > an unnumbered quote without context, a long quote folded 1`] = `
-<div>
-  <div
-    class="space-y-5"
-  >
-    <div
-      class="space-y-2"
-    >
-      <h3
-        class="text-lg font-bold"
-      >
-        원문 인용␠
-        <span
-          class="ml-1 text-primary"
-        >
-          E1
-        </span>
-      </h3>
-      <p
-        class="text-base font-semibold"
-      >
-        제목 없음
-      </p>
-      <p
-        class="text-[13px] text-muted-foreground"
-      >
-        HWP · 1장 · 표 3 (쪽 번호 없음: 원문 파일에서 확인)
-         ·␠
-        자동 대조 통과
-      </p>
-    </div>
-    <div
-      class="space-y-3"
-    >
-      <blockquote
-        class="border-l-4 border-primary pl-4 text-base text-foreground"
-      >
-        <div
-          class="space-y-4 whitespace-pre-wrap [overflow-wrap:anywhere] line-clamp-[12]"
-        >
-          <p>
-            가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가
-          </p>
-        </div>
-      </blockquote>
-      <button
-        aria-expanded="false"
-        class="min-h-9 rounded-lg border border-input px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
-        type="button"
-      >
-        인용문 일부 표시 · 전체 펼치기
-      </button>
-    </div>
-    <div
-      class="space-y-3"
-    />
-  </div>
-</div>
+div
+  div
+    div
+      h3
+        "원문 인용 "
+        span "E1"
+      p "제목 없음"
+      p
+        "HWP · 1장 · 표 3 (쪽 번호 없음: 원문 파일에서 확인)"
+        " · "
+        "자동 대조 통과"
+    div
+      blockquote
+        div
+          p "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가"
+      button type="button" aria-expanded="false" "인용문 일부 표시 · 전체 펼치기"
+    div
 `;
 
 exports[`evidence > numbered quote with warnings, surrounding paragraphs and download 1`] = `
-<div>
-  <div
-    class="space-y-5"
-  >
-    <div
-      class="space-y-2"
-    >
-      <h3
-        class="text-lg font-bold"
-      >
-        근거␠
-        <span
-          class="text-primary"
-        >
-          3
-        </span>
-         원문 인용
-      </h3>
-      <p
-        class="text-base font-semibold"
-      >
-        통합 정보시스템 구축
-      </p>
-      <p
-        class="text-[13px] text-muted-foreground"
-      >
-        PDF 12쪽 (인쇄 쪽번호 11) · 제3장 &gt; 하자보수
-         ·␠
-        자동 대조 통과
-      </p>
-    </div>
-    <div
-      class="space-y-2 rounded-lg bg-warn-bg p-3 text-sm"
-    >
-      <p
-        class="flex items-center gap-2 font-semibold"
-      >
-        <svg
-          aria-hidden="true"
-          class="lucide lucide-triangle-alert lucide-alert-triangle size-4 shrink-0 text-warn"
-          fill="none"
-          height="24"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          viewBox="0 0 24 24"
-          width="24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"
-          />
-          <path
-            d="M12 9v4"
-          />
-          <path
-            d="M12 17h.01"
-          />
-        </svg>
-        원문 확인이 필요한 근거
-      </p>
-      <ul
-        class="space-y-2"
-      >
-        <li>
-          그림 속 글자를 OCR로 읽은 근거입니다. 원본 그림을 확인하세요.
-        </li>
-        <li>
-          custom
-        </li>
-      </ul>
-    </div>
-    <div
-      class="space-y-3"
-    >
-      <blockquote
-        class="border-l-4 border-primary pl-4 text-base text-foreground"
-      >
-        <div
-          class="space-y-4 whitespace-pre-wrap [overflow-wrap:anywhere]"
-        >
-          <p>
-            하자보수 기간은 검수 후 12개월로 한다.
-          </p>
-        </div>
-      </blockquote>
-    </div>
-    <div
-      class="space-y-3"
-    >
-      <button
-        aria-expanded="false"
-        class="min-h-9 rounded-lg border border-input px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
-        type="button"
-      >
-        앞뒤 문단 포함 전체 원문 보기
-      </button>
-    </div>
-    <a
-      class="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
-      href="/api/originals/doc-aaaaaaaa/hash-a"
-    >
-      <svg
-        aria-hidden="true"
-        class="lucide lucide-download size-4"
-        fill="none"
-        height="24"
-        stroke="currentColor"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        viewBox="0 0 24 24"
-        width="24"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M12 15V3"
-        />
-        <path
-          d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
-        />
-        <path
-          d="m7 10 5 5 5-5"
-        />
-      </svg>
-      원문 파일 받기
-    </a>
-  </div>
-</div>
+div
+  div
+    div
+      h3
+        "근거 "
+        span "3"
+        " 원문 인용"
+      p "통합 정보시스템 구축"
+      p
+        "PDF 12쪽 (인쇄 쪽번호 11) · 제3장 > 하자보수"
+        " · "
+        "자동 대조 통과"
+    div
+      p
+        svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+        "원문 확인이 필요한 근거"
+      ul
+        li "그림 속 글자를 OCR로 읽은 근거입니다. 원본 그림을 확인하세요."
+        li "custom"
+    div
+      blockquote
+        div
+          p "하자보수 기간은 검수 후 12개월로 한다."
+    div
+      button type="button" aria-expanded="false" "앞뒤 문단 포함 전체 원문 보기"
+    a href="/api/originals/doc-aaaaaaaa/hash-a"
+      svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+      "원문 파일 받기"
 `;
 
 exports[`markers and sentences > a comparison groups sentences under 문서 1 and 문서 2 and badges inferences 1`] = `
-<div>
-  <section
-    aria-label="답변 내용"
-    class="space-y-4"
-  >
-    <div
-      class="space-y-2.5"
-    >
-      <h3
-        class="text-sm font-bold text-muted-foreground"
-      >
-        문서 1
-      </h3>
-      <p
-        class="text-base [overflow-wrap:anywhere]"
-      >
-        A는 12개월
-        <span
-          class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-        >
-          <span
-            class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-          >
-            <span
-              class="text-[0px]"
-            >
-              [
-            </span>
-            1
-            <span
-              class="text-[0px]"
-            >
-              ]
-            </span>
-          </span>
-        </span>
-      </p>
-      <p
-        class="text-base [overflow-wrap:anywhere]"
-      >
-        A는 무상
-      </p>
-    </div>
-    <div
-      class="space-y-2.5"
-    >
-      <h3
-        class="text-sm font-bold text-muted-foreground"
-      >
-        문서 2
-      </h3>
-      <p
-        class="text-base [overflow-wrap:anywhere]"
-      >
-        <span
-          class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-warn-bg text-warn mr-1.5 align-[0.1em]"
-        >
-          <span
-            aria-hidden="true"
-            class="size-1.5 rounded-full bg-warn"
-          />
-          추론
-        </span>
-        B는 6개월
-        <span
-          class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-        >
-          <span
-            class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-          >
-            <span
-              class="text-[0px]"
-            >
-              [
-            </span>
-            2
-            <span
-              class="text-[0px]"
-            >
-              ]
-            </span>
-          </span>
-        </span>
-      </p>
-    </div>
-  </section>
-</div>
+div
+  section aria-label="답변 내용"
+    div
+      h3 "문서 1"
+      p
+        "A는 12개월"
+        span
+          span
+            span "["
+            "1"
+            span "]"
+      p "A는 무상"
+    div
+      h3 "문서 2"
+      p
+        span
+          span aria-hidden="true"
+          "추론"
+        "B는 6개월"
+        span
+          span
+            span "["
+            "2"
+            span "]"
 `;
 
 exports[`markers and sentences > openable markers are buttons that report the clicked evidence 1`] = `
-<div>
-  <span
-    class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-  >
-    <button
-      aria-label="근거 2 원문 보기"
-      aria-pressed="false"
-      class="inline-block h-6 min-w-6 rounded-md px-1 text-center align-[0.1em] text-[13px] leading-6 font-bold tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-accent text-primary hover:bg-primary/15"
-      type="button"
-    >
-      <span
-        class="text-[0px]"
-      >
-        [
-      </span>
-      2
-      <span
-        class="text-[0px]"
-      >
-        ]
-      </span>
-    </button>
-    <button
-      aria-label="근거 1 원문 보기"
-      aria-pressed="true"
-      class="inline-block h-6 min-w-6 rounded-md px-1 text-center align-[0.1em] text-[13px] leading-6 font-bold tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-primary text-primary-foreground"
-      type="button"
-    >
-      <span
-        class="text-[0px]"
-      >
-        [
-      </span>
-      1
-      <span
-        class="text-[0px]"
-      >
-        ]
-      </span>
-    </button>
-  </span>
-</div>
+div
+  span
+    button type="button" aria-pressed="false" aria-label="근거 2 원문 보기"
+      span "["
+      "2"
+      span "]"
+    button type="button" aria-pressed="true" aria-label="근거 1 원문 보기"
+      span "["
+      "1"
+      span "]"
 `;
 
 exports[`markers and sentences > unvalidated markers are plain numbers, and no known ID renders nothing 1`] = `
-<div>
-  <span
-    class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-  >
-    <span
-      class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-    >
-      <span
-        class="text-[0px]"
-      >
-        [
-      </span>
-      1
-      <span
-        class="text-[0px]"
-      >
-        ]
-      </span>
-    </span>
-  </span>
-</div>
+div
+  span
+    span
+      span "["
+      "1"
+      span "]"
 `;
 
 exports[`state head > answered 1`] = `
-<div>
-  <div
-    class="space-y-2"
-  >
-    <span
-      class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
-    >
-      <span
-        aria-hidden="true"
-        class="size-1.5 rounded-full bg-ok"
-      />
-      답변
-    </span>
-    <p
-      class="font-semibold text-foreground [overflow-wrap:anywhere] text-[22px] leading-snug"
-    >
-      하자보수 기간은 12개월입니다.
-      <span
-        class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-      >
-        <span
-          class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-        >
-          <span
-            class="text-[0px]"
-          >
-            [
-          </span>
-          1
-          <span
-            class="text-[0px]"
-          >
-            ]
-          </span>
-        </span>
-        <span
-          class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-        >
-          <span
-            class="text-[0px]"
-          >
-            [
-          </span>
-          2
-          <span
-            class="text-[0px]"
-          >
-            ]
-          </span>
-        </span>
-      </span>
-    </p>
-  </div>
-</div>
+div
+  div
+    span
+      span aria-hidden="true"
+      "답변"
+    p
+      "하자보수 기간은 12개월입니다."
+      span
+        span
+          span "["
+          "1"
+          span "]"
+        span
+          span "["
+          "2"
+          span "]"
 `;
 
 exports[`state head > budget_blocked 1`] = `
-<div>
-  <div
-    class="space-y-2 rounded-xl border border-bad/30 bg-bad-bg p-4"
-  >
-    <span
-      class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-3 py-1 text-sm bg-bad-bg text-bad"
-    >
-      <span
-        aria-hidden="true"
-        class="size-1.5 rounded-full bg-bad"
-      />
-      사용 한도로 차단
-    </span>
-    <p
-      class="text-[15px] text-foreground"
-    >
-      운영 한도에 도달했습니다.
-    </p>
-    <p
-      class="text-sm text-muted-foreground"
-    >
-      검색, 기본 정보, 요구사항 목록, 원문 열람은 계속 무료로 쓸 수 있습니다.
-    </p>
-  </div>
-</div>
+div
+  div
+    span
+      span aria-hidden="true"
+      "사용 한도로 차단"
+    p "운영 한도에 도달했습니다."
+    p "검색, 기본 정보, 요구사항 목록, 원문 열람은 계속 무료로 쓸 수 있습니다."
 `;
 
 exports[`state head > clarification_required 1`] = `
-<div>
-  <div
-    class="space-y-2"
-  >
-    <span
-      class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-3 py-1 text-sm bg-info-bg text-info"
-    >
-      <span
-        aria-hidden="true"
-        class="size-1.5 rounded-full bg-info"
-      />
-      확인 필요
-    </span>
-    <div
-      class="flex gap-3 rounded-xl bg-info-bg p-4 text-foreground"
-    >
-      <svg
-        aria-hidden="true"
-        class="lucide lucide-info mt-0.5 size-5 shrink-0 text-info"
-        fill="none"
-        height="24"
-        stroke="currentColor"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        viewBox="0 0 24 24"
-        width="24"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <circle
-          cx="12"
-          cy="12"
-          r="10"
-        />
-        <path
-          d="M12 16v-4"
-        />
-        <path
-          d="M12 8h.01"
-        />
-      </svg>
-      <div
-        class="space-y-1"
-      >
-        <p
-          class="font-semibold text-lg"
-        >
-          어느 사업인가요?
-        </p>
-        <p
-          class="text-sm"
-        >
-          다음 확인:␠
-          사업명을 알려 주세요.
-        </p>
-      </div>
-    </div>
-  </div>
-</div>
+div
+  div
+    span
+      span aria-hidden="true"
+      "확인 필요"
+    div
+      svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+      div
+        p "어느 사업인가요?"
+        p
+          "다음 확인: "
+          "사업명을 알려 주세요."
 `;
 
 exports[`state head > insufficient_evidence 1`] = `
-<div>
-  <div
-    class="space-y-2"
-  >
-    <span
-      class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-warn-bg text-warn"
-    >
-      <span
-        aria-hidden="true"
-        class="size-1.5 rounded-full bg-warn"
-      />
-      근거 부족
-    </span>
-    <p
-      class="font-semibold text-foreground [overflow-wrap:anywhere] text-[22px] leading-snug"
-    >
-      근거가 부족합니다.
-      <span
-        class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-      >
-        <span
-          class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-        >
-          <span
-            class="text-[0px]"
-          >
-            [
-          </span>
-          1
-          <span
-            class="text-[0px]"
-          >
-            ]
-          </span>
-        </span>
-        <span
-          class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-        >
-          <span
-            class="text-[0px]"
-          >
-            [
-          </span>
-          2
-          <span
-            class="text-[0px]"
-          >
-            ]
-          </span>
-        </span>
-      </span>
-    </p>
-  </div>
-</div>
+div
+  div
+    span
+      span aria-hidden="true"
+      "근거 부족"
+    p
+      "근거가 부족합니다."
+      span
+        span
+          span "["
+          "1"
+          span "]"
+        span
+          span "["
+          "2"
+          span "]"
 `;
 
 exports[`state head > made_up_status 1`] = `
-<div>
-  <div
-    class="space-y-2"
-  >
-    <span
-      class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-neutral-bg text-neutral"
-    >
-      <span
-        aria-hidden="true"
-        class="size-1.5 rounded-full bg-neutral"
-      />
-      made_up_status
-    </span>
-    <p
-      class="font-semibold text-foreground [overflow-wrap:anywhere] text-[22px] leading-snug"
-    >
-      하자보수 기간은 12개월입니다.
-      <span
-        class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-      >
-        <span
-          class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-        >
-          <span
-            class="text-[0px]"
-          >
-            [
-          </span>
-          1
-          <span
-            class="text-[0px]"
-          >
-            ]
-          </span>
-        </span>
-        <span
-          class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-        >
-          <span
-            class="text-[0px]"
-          >
-            [
-          </span>
-          2
-          <span
-            class="text-[0px]"
-          >
-            ]
-          </span>
-        </span>
-      </span>
-    </p>
-  </div>
-</div>
+div
+  div
+    span
+      span aria-hidden="true"
+      "made_up_status"
+    p
+      "하자보수 기간은 12개월입니다."
+      span
+        span
+          span "["
+          "1"
+          span "]"
+        span
+          span "["
+          "2"
+          span "]"
 `;
 
 exports[`state head > technical_error 1`] = `
-<div>
-  <div
-    class="flex gap-3 rounded-xl border border-bad/30 bg-bad-bg p-4 text-bad"
-    role="alert"
-  >
-    <svg
-      aria-hidden="true"
-      class="lucide lucide-octagon-x lucide-x-octagon mt-0.5 size-5 shrink-0"
-      fill="none"
-      height="24"
-      stroke="currentColor"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      stroke-width="2"
-      viewBox="0 0 24 24"
-      width="24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="m15 9-6 6"
-      />
-      <path
-        d="M2.586 16.726A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2h6.624a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586z"
-      />
-      <path
-        d="m9 9 6 6"
-      />
-    </svg>
-    <div
-      class="space-y-1"
-    >
-      <p
-        class="font-semibold"
-      >
-        기술 오류로 답변을 만들지 못했습니다
-      </p>
-      <p
-        class="text-sm"
-      >
-        잠시 후 다시 시도하세요.
-      </p>
-      <p
-        class="font-mono text-xs opacity-80"
-      >
-        사유 코드:␠
-        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-      </p>
-    </div>
-  </div>
-</div>
+div
+  div role="alert"
+    svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+    div
+      p "기술 오류로 답변을 만들지 못했습니다"
+      p "잠시 후 다시 시도하세요."
+      p
+        "사유 코드: "
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 `;
 
 exports[`tables > conflicts list each alternative, with a document column in a comparison 1`] = `
-<div>
-  <section
-    class="space-y-4"
-  >
-    <div
-      class="flex flex-wrap items-baseline justify-between gap-3"
-    >
-      <h3
-        class="text-lg font-bold"
-      >
-        서로 다른 값
-      </h3>
-    </div>
-    <div
-      class="overflow-x-auto rounded-xl border border-input bg-background"
-    >
-      <table
-        class="w-full border-collapse"
-      >
-        <caption
-          class="sr-only"
-        >
-          서로 다른 값
-        </caption>
-        <thead
-          class="bg-secondary/70"
-        >
-          <tr>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              항목
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              값
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              근거
-            </th>
-          </tr>
-        </thead>
-        <tbody
-          class="divide-y divide-input"
-        >
-          <tr>
-            <td
-              class="px-3 py-3 align-top text-sm font-medium"
-            >
-              사업 금액
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm font-semibold"
-            >
-              100
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              <span
-                class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-              >
-                <span
-                  class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-                >
-                  <span
-                    class="text-[0px]"
-                  >
-                    [
-                  </span>
-                  1
-                  <span
-                    class="text-[0px]"
-                  >
-                    ]
-                  </span>
-                </span>
-              </span>
-            </td>
-          </tr>
-          <tr>
-            <td
-              class="px-3 py-3 align-top text-sm font-medium"
-            />
-            <td
-              class="px-3 py-3 align-top text-sm font-semibold"
-            >
-              200
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              <span
-                class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-              >
-                <span
-                  class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-                >
-                  <span
-                    class="text-[0px]"
-                  >
-                    [
-                  </span>
-                  2
-                  <span
-                    class="text-[0px]"
-                  >
-                    ]
-                  </span>
-                </span>
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-</div>
+div
+  section
+    div
+      h3 "서로 다른 값"
+    div
+      table
+        caption "서로 다른 값"
+        thead
+          tr
+            th scope="col" "항목"
+            th scope="col" "값"
+            th scope="col" "근거"
+        tbody
+          tr
+            td "사업 금액"
+            td "100"
+            td
+              span
+                span
+                  span "["
+                  "1"
+                  span "]"
+          tr
+            td
+            td "200"
+            td
+              span
+                span
+                  span "["
+                  "2"
+                  span "]"
 `;
 
 exports[`tables > conflicts list each alternative, with a document column in a comparison 2`] = `
-<div>
-  <section
-    class="space-y-4"
-  >
-    <div
-      class="flex flex-wrap items-baseline justify-between gap-3"
-    >
-      <h3
-        class="text-lg font-bold"
-      >
-        서로 다른 값
-      </h3>
-    </div>
-    <div
-      class="overflow-x-auto rounded-xl border border-input bg-background"
-    >
-      <table
-        class="w-full border-collapse"
-      >
-        <caption
-          class="sr-only"
-        >
-          서로 다른 값
-        </caption>
-        <thead
-          class="bg-secondary/70"
-        >
-          <tr>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              항목
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              문서
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              값
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              근거
-            </th>
-          </tr>
-        </thead>
-        <tbody
-          class="divide-y divide-input"
-        >
-          <tr>
-            <td
-              class="px-3 py-3 align-top text-sm font-medium"
-            >
-              사업 금액
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm whitespace-nowrap"
-            >
-              문서 1
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm font-semibold"
-            >
-              100
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              <span
-                class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-              >
-                <span
-                  class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-                >
-                  <span
-                    class="text-[0px]"
-                  >
-                    [
-                  </span>
-                  1
-                  <span
-                    class="text-[0px]"
-                  >
-                    ]
-                  </span>
-                </span>
-              </span>
-            </td>
-          </tr>
-          <tr>
-            <td
-              class="px-3 py-3 align-top text-sm font-medium"
-            />
-            <td
-              class="px-3 py-3 align-top text-sm whitespace-nowrap"
-            >
-              문서 2
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm font-semibold"
-            >
-              200
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              <span
-                class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-              >
-                <span
-                  class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-                >
-                  <span
-                    class="text-[0px]"
-                  >
-                    [
-                  </span>
-                  2
-                  <span
-                    class="text-[0px]"
-                  >
-                    ]
-                  </span>
-                </span>
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-</div>
+div
+  section
+    div
+      h3 "서로 다른 값"
+    div
+      table
+        caption "서로 다른 값"
+        thead
+          tr
+            th scope="col" "항목"
+            th scope="col" "문서"
+            th scope="col" "값"
+            th scope="col" "근거"
+        tbody
+          tr
+            td "사업 금액"
+            td "문서 1"
+            td "100"
+            td
+              span
+                span
+                  span "["
+                  "1"
+                  span "]"
+          tr
+            td
+            td "문서 2"
+            td "200"
+            td
+              span
+                span
+                  span "["
+                  "2"
+                  span "]"
 `;
 
 exports[`tables > facts for one document: value and state columns 1`] = `
-<div>
-  <section
-    class="space-y-4"
-  >
-    <div
-      class="flex flex-wrap items-baseline justify-between gap-3"
-    >
-      <h3
-        class="text-lg font-bold"
-      >
-        기본 정보
-      </h3>
-      <span
-        class="text-[13px] text-muted-foreground"
-      >
-        CSV 기록 기준 · 충돌과 빈 값은 추정하지 않습니다
-      </span>
-    </div>
-    <div
-      class="overflow-x-auto rounded-xl border border-input bg-background"
-    >
-      <table
-        class="w-full border-collapse"
-      >
-        <caption
-          class="sr-only"
-        >
-          기본 정보
-        </caption>
-        <thead
-          class="bg-secondary/70"
-        >
-          <tr>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              항목
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              값
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              상태
-            </th>
-          </tr>
-        </thead>
-        <tbody
-          class="divide-y divide-input"
-        >
-          <tr>
-            <th
-              class="px-3 py-3 align-top text-sm w-32 text-left font-medium text-muted-foreground"
-              scope="row"
-            >
-              사업명
-            </th>
-            <td
-              class="px-3 py-3 align-top text-sm font-semibold"
-            >
-              통합 정보시스템
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              <span
-                class="text-muted-foreground"
-              >
-                기록됨
-              </span>
-            </td>
-          </tr>
-          <tr>
-            <th
-              class="px-3 py-3 align-top text-sm w-32 text-left font-medium text-muted-foreground"
-              scope="row"
-            >
-              사업 금액
-            </th>
-            <td
-              class="px-3 py-3 align-top text-sm font-semibold"
-            >
-              130,000,000원
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              <span
-                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-warn-bg text-warn ml-2"
-              >
-                <span
-                  aria-hidden="true"
-                  class="size-1.5 rounded-full bg-warn"
-                />
-                0원(검토 필요)
-              </span>
-            </td>
-          </tr>
-          <tr>
-            <th
-              class="px-3 py-3 align-top text-sm w-32 text-left font-medium text-muted-foreground"
-              scope="row"
-            >
-              입찰 마감
-            </th>
-            <td
-              class="px-3 py-3 align-top text-sm font-semibold"
-            >
-              2024-03-20 10:00
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              <span
-                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-info-bg text-info ml-2"
-              >
-                <span
-                  aria-hidden="true"
-                  class="size-1.5 rounded-full bg-info"
-                />
-                검토자 확인값
-              </span>
-            </td>
-          </tr>
-          <tr>
-            <th
-              class="px-3 py-3 align-top text-sm w-32 text-left font-medium text-muted-foreground"
-              scope="row"
-            >
-              발주 기관
-            </th>
-            <td
-              class="px-3 py-3 align-top text-sm font-semibold"
-            >
-              미상
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              <span
-                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-warn-bg text-warn ml-2"
-              >
-                <span
-                  aria-hidden="true"
-                  class="size-1.5 rounded-full bg-warn"
-                />
-                값 없음
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-</div>
+div
+  section
+    div
+      h3 "기본 정보"
+      span "CSV 기록 기준 · 충돌과 빈 값은 추정하지 않습니다"
+    div
+      table
+        caption "기본 정보"
+        thead
+          tr
+            th scope="col" "항목"
+            th scope="col" "값"
+            th scope="col" "상태"
+        tbody
+          tr
+            th scope="row" "사업명"
+            td "통합 정보시스템"
+            td
+              span "기록됨"
+          tr
+            th scope="row" "사업 금액"
+            td "130,000,000원"
+            td
+              span
+                span aria-hidden="true"
+                "0원(검토 필요)"
+          tr
+            th scope="row" "입찰 마감"
+            td "2024-03-20 10:00"
+            td
+              span
+                span aria-hidden="true"
+                "검토자 확인값"
+          tr
+            th scope="row" "발주 기관"
+            td "미상"
+            td
+              span
+                span aria-hidden="true"
+                "값 없음"
 `;
 
 exports[`tables > facts for two documents: one column each, a missing fact as - 1`] = `
-<div>
-  <section
-    class="space-y-4"
-  >
-    <div
-      class="flex flex-wrap items-baseline justify-between gap-3"
-    >
-      <h3
-        class="text-lg font-bold"
-      >
-        기본 정보
-      </h3>
-      <span
-        class="text-[13px] text-muted-foreground"
-      >
-        CSV 기록 기준 · 충돌과 빈 값은 추정하지 않습니다
-      </span>
-    </div>
-    <div
-      class="overflow-x-auto rounded-xl border border-input bg-background"
-    >
-      <table
-        class="w-full border-collapse"
-      >
-        <caption
-          class="sr-only"
-        >
-          기본 정보
-        </caption>
-        <thead
-          class="bg-secondary/70"
-        >
-          <tr>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              항목
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              문서 1
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              문서 2
-            </th>
-          </tr>
-        </thead>
-        <tbody
-          class="divide-y divide-input"
-        >
-          <tr>
-            <th
-              class="px-3 py-3 align-top text-sm w-32 text-left font-medium text-muted-foreground"
-              scope="row"
-            >
-              사업명
-            </th>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              통합 정보시스템
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              B 사업
-              <span
-                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-warn-bg text-warn ml-2"
-              >
-                <span
-                  aria-hidden="true"
-                  class="size-1.5 rounded-full bg-warn"
-                />
-                충돌(원문 확인 필요)
-              </span>
-            </td>
-          </tr>
-          <tr>
-            <th
-              class="px-3 py-3 align-top text-sm w-32 text-left font-medium text-muted-foreground"
-              scope="row"
-            >
-              사업 금액
-            </th>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              130,000,000원
-              <span
-                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-warn-bg text-warn ml-2"
-              >
-                <span
-                  aria-hidden="true"
-                  class="size-1.5 rounded-full bg-warn"
-                />
-                0원(검토 필요)
-              </span>
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              -
-            </td>
-          </tr>
-          <tr>
-            <th
-              class="px-3 py-3 align-top text-sm w-32 text-left font-medium text-muted-foreground"
-              scope="row"
-            >
-              입찰 마감
-            </th>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              2024-03-20 10:00
-              <span
-                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-info-bg text-info ml-2"
-              >
-                <span
-                  aria-hidden="true"
-                  class="size-1.5 rounded-full bg-info"
-                />
-                검토자 확인값
-              </span>
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              -
-            </td>
-          </tr>
-          <tr>
-            <th
-              class="px-3 py-3 align-top text-sm w-32 text-left font-medium text-muted-foreground"
-              scope="row"
-            >
-              발주 기관
-            </th>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              미상
-              <span
-                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-warn-bg text-warn ml-2"
-              >
-                <span
-                  aria-hidden="true"
-                  class="size-1.5 rounded-full bg-warn"
-                />
-                값 없음
-              </span>
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              -
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-</div>
+div
+  section
+    div
+      h3 "기본 정보"
+      span "CSV 기록 기준 · 충돌과 빈 값은 추정하지 않습니다"
+    div
+      table
+        caption "기본 정보"
+        thead
+          tr
+            th scope="col" "항목"
+            th scope="col" "문서 1"
+            th scope="col" "문서 2"
+        tbody
+          tr
+            th scope="row" "사업명"
+            td "통합 정보시스템"
+            td
+              "B 사업"
+              span
+                span aria-hidden="true"
+                "충돌(원문 확인 필요)"
+          tr
+            th scope="row" "사업 금액"
+            td
+              "130,000,000원"
+              span
+                span aria-hidden="true"
+                "0원(검토 필요)"
+            td "-"
+          tr
+            th scope="row" "입찰 마감"
+            td
+              "2024-03-20 10:00"
+              span
+                span aria-hidden="true"
+                "검토자 확인값"
+            td "-"
+          tr
+            th scope="row" "발주 기관"
+            td
+              "미상"
+              span
+                span aria-hidden="true"
+                "값 없음"
+            td "-"
 `;
 
 exports[`tables > missing fields, with a document column in a comparison 1`] = `
-<div>
-  <section
-    class="space-y-4"
-  >
-    <div
-      class="flex flex-wrap items-baseline justify-between gap-3"
-    >
-      <h3
-        class="text-lg font-bold"
-      >
-        확인되지 않은 정보
-      </h3>
-    </div>
-    <div
-      class="overflow-x-auto rounded-xl border border-input bg-background"
-    >
-      <table
-        class="w-full border-collapse"
-      >
-        <caption
-          class="sr-only"
-        >
-          확인되지 않은 정보
-        </caption>
-        <thead
-          class="bg-secondary/70"
-        >
-          <tr>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              항목
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              사유
-            </th>
-          </tr>
-        </thead>
-        <tbody
-          class="divide-y divide-input"
-        >
-          <tr>
-            <td
-              class="px-3 py-3 align-top text-sm font-medium"
-            >
-              입찰 마감
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm whitespace-nowrap"
-            >
-              검색된 근거에 없음
-            </td>
-          </tr>
-          <tr>
-            <td
-              class="px-3 py-3 align-top text-sm font-medium"
-            >
-              custom
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm whitespace-nowrap"
-            >
-              custom_reason
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-</div>
+div
+  section
+    div
+      h3 "확인되지 않은 정보"
+    div
+      table
+        caption "확인되지 않은 정보"
+        thead
+          tr
+            th scope="col" "항목"
+            th scope="col" "사유"
+        tbody
+          tr
+            td "입찰 마감"
+            td "검색된 근거에 없음"
+          tr
+            td "custom"
+            td "custom_reason"
 `;
 
 exports[`tables > missing fields, with a document column in a comparison 2`] = `
-<div>
-  <section
-    class="space-y-4"
-  >
-    <div
-      class="flex flex-wrap items-baseline justify-between gap-3"
-    >
-      <h3
-        class="text-lg font-bold"
-      >
-        확인되지 않은 정보
-      </h3>
-    </div>
-    <div
-      class="overflow-x-auto rounded-xl border border-input bg-background"
-    >
-      <table
-        class="w-full border-collapse"
-      >
-        <caption
-          class="sr-only"
-        >
-          확인되지 않은 정보
-        </caption>
-        <thead
-          class="bg-secondary/70"
-        >
-          <tr>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              항목
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              사유
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              문서
-            </th>
-          </tr>
-        </thead>
-        <tbody
-          class="divide-y divide-input"
-        >
-          <tr>
-            <td
-              class="px-3 py-3 align-top text-sm font-medium"
-            >
-              입찰 마감
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm whitespace-nowrap"
-            >
-              검색된 근거에 없음
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm whitespace-nowrap"
-            >
-              문서 2
-            </td>
-          </tr>
-          <tr>
-            <td
-              class="px-3 py-3 align-top text-sm font-medium"
-            >
-              custom
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm whitespace-nowrap"
-            >
-              custom_reason
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm whitespace-nowrap"
-            >
-              -
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-</div>
+div
+  section
+    div
+      h3 "확인되지 않은 정보"
+    div
+      table
+        caption "확인되지 않은 정보"
+        thead
+          tr
+            th scope="col" "항목"
+            th scope="col" "사유"
+            th scope="col" "문서"
+        tbody
+          tr
+            td "입찰 마감"
+            td "검색된 근거에 없음"
+            td "문서 2"
+          tr
+            td "custom"
+            td "custom_reason"
+            td "-"
 `;
 
 exports[`tables > next action: warning tone when evidence is short, hidden for clarification 1`] = `
-<div>
-  <div
-    class="flex gap-3 rounded-xl p-4 text-sm bg-secondary"
-  >
-    <svg
-      aria-hidden="true"
-      class="lucide lucide-triangle-alert lucide-alert-triangle mt-0.5 size-4 shrink-0 text-muted-foreground"
-      fill="none"
-      height="24"
-      stroke="currentColor"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      stroke-width="2"
-      viewBox="0 0 24 24"
-      width="24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"
-      />
-      <path
-        d="M12 9v4"
-      />
-      <path
-        d="M12 17h.01"
-      />
-    </svg>
-    <p>
-      <span
-        class="font-semibold"
-      >
-        다음 확인
-      </span>
-       ·␠
-      원문을 확인하세요.
-    </p>
-  </div>
-</div>
+div
+  div
+    svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+    p
+      span "다음 확인"
+      " · "
+      "원문을 확인하세요."
 `;
 
 exports[`tables > next action: warning tone when evidence is short, hidden for clarification 2`] = `
-<div>
-  <div
-    class="flex gap-3 rounded-xl p-4 text-sm bg-warn-bg text-foreground"
-  >
-    <svg
-      aria-hidden="true"
-      class="lucide lucide-triangle-alert lucide-alert-triangle mt-0.5 size-4 shrink-0 text-warn"
-      fill="none"
-      height="24"
-      stroke="currentColor"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      stroke-width="2"
-      viewBox="0 0 24 24"
-      width="24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"
-      />
-      <path
-        d="M12 9v4"
-      />
-      <path
-        d="M12 17h.01"
-      />
-    </svg>
-    <p>
-      <span
-        class="font-semibold"
-      >
-        다음 확인
-      </span>
-       ·␠
-      원문 확인
-    </p>
-  </div>
-</div>
+div
+  div
+    svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+    p
+      span "다음 확인"
+      " · "
+      "원문 확인"
 `;
 
 exports[`tables > one group shows no group rows; completeness text hides when the summary carries it 1`] = `
-<div>
-  <section
-    class="space-y-4"
-  >
-    <div
-      class="flex flex-wrap items-baseline justify-between gap-3"
-    >
-      <h3
-        class="text-lg font-bold"
-      >
-        요구사항 1개
-      </h3>
-      <span
-        class="text-[13px] text-muted-foreground"
-      >
-        상세␠
-        0
-         · 요약만␠
-        0
-      </span>
-    </div>
-    <div
-      class="overflow-x-auto rounded-xl border border-input bg-background"
-    >
-      <table
-        class="w-full border-collapse"
-      >
-        <caption
-          class="sr-only"
-        >
-          요구사항 목록
-        </caption>
-        <thead
-          class="bg-secondary/70"
-        >
-          <tr>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              코드
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              이름
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              구분
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              위치
-            </th>
-          </tr>
-        </thead>
-        <tbody
-          class="divide-y divide-input"
-        >
-          <tr
-            class="hover:bg-secondary/50"
-          >
-            <td
-              class="px-3 py-3 align-top w-28 font-mono text-[13px] whitespace-nowrap"
-            >
-              <button
-                aria-label="SFR-001 원문 보기"
-                class="rounded font-semibold text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-                type="button"
-              >
-                SFR-001
-              </button>
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              통합 로그인
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm w-16 whitespace-nowrap"
-            >
-              상세
-            </td>
-            <td
-              class="px-3 py-3 align-top w-24 text-[13px] whitespace-nowrap text-muted-foreground"
-              title="PDF 40쪽"
-            >
-              40쪽
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-</div>
+div
+  section
+    div
+      h3 "요구사항 1개"
+      span
+        "상세 "
+        "0"
+        " · 요약만 "
+        "0"
+    div
+      table
+        caption "요구사항 목록"
+        thead
+          tr
+            th scope="col" "코드"
+            th scope="col" "이름"
+            th scope="col" "구분"
+            th scope="col" "위치"
+        tbody
+          tr
+            td
+              button type="button" aria-label="SFR-001 원문 보기" "SFR-001"
+            td "통합 로그인"
+            td "상세"
+            td title="PDF 40쪽" "40쪽"
 `;
 
 exports[`tables > requirements group by source-form prefix and open their evidence 1`] = `
-<div>
-  <section
-    class="space-y-4"
-  >
-    <div
-      class="flex flex-wrap items-baseline justify-between gap-3"
-    >
-      <h3
-        class="text-lg font-bold"
-      >
-        요구사항 4개
-      </h3>
-      <span
-        class="text-[13px] text-muted-foreground"
-      >
-        상세␠
-        3
-         · 요약만␠
-        1
-      </span>
-    </div>
-    <p
-      class="text-sm text-muted-foreground"
-    >
-      요구사항 4개를 모두 찾았습니다.
-    </p>
-    <p
-      class="flex flex-wrap gap-1.5"
-    >
-      <span
-        class="rounded-md bg-secondary px-2 py-1 text-[13px] font-semibold tabular-nums"
-      >
-        SFR
-␠␠␠␠␠␠␠␠␠
-        <span
-          class="font-normal text-muted-foreground"
-        >
-          2
-        </span>
-      </span>
-      <span
-        class="rounded-md bg-secondary px-2 py-1 text-[13px] font-semibold tabular-nums"
-      >
-        PER
-␠␠␠␠␠␠␠␠␠
-        <span
-          class="font-normal text-muted-foreground"
-        >
-          1
-        </span>
-      </span>
-      <span
-        class="rounded-md bg-secondary px-2 py-1 text-[13px] font-semibold tabular-nums"
-      >
-        기타
-␠␠␠␠␠␠␠␠␠
-        <span
-          class="font-normal text-muted-foreground"
-        >
-          1
-        </span>
-      </span>
-    </p>
-    <div
-      class="overflow-x-auto rounded-xl border border-input bg-background"
-    >
-      <table
-        class="w-full border-collapse"
-      >
-        <caption
-          class="sr-only"
-        >
-          요구사항 목록
-        </caption>
-        <thead
-          class="bg-secondary/70"
-        >
-          <tr>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              코드
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              이름
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              구분
-            </th>
-            <th
-              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
-              scope="col"
-            >
-              위치
-            </th>
-          </tr>
-        </thead>
-        <tbody
-          class="divide-y divide-input"
-        >
-          <tr
-            class="bg-secondary/40"
-          >
-            <th
-              class="px-3 py-1.5 text-left text-[13px] font-bold"
-              colspan="4"
-              scope="rowgroup"
-            >
-              SFR
-␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠
-              <span
-                class="font-normal text-muted-foreground"
-              >
-                2
-                개
-              </span>
-            </th>
-          </tr>
-          <tr
-            class="hover:bg-secondary/50"
-          >
-            <td
-              class="px-3 py-3 align-top w-28 font-mono text-[13px] whitespace-nowrap"
-            >
-              <button
-                aria-label="SFR-001 원문 보기"
-                class="rounded font-semibold text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-                type="button"
-              >
-                SFR-001
-              </button>
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              통합 로그인
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm w-16 whitespace-nowrap"
-            >
-              상세
-            </td>
-            <td
-              class="px-3 py-3 align-top w-24 text-[13px] whitespace-nowrap text-muted-foreground"
-              title="PDF 40쪽"
-            >
-              40쪽
-            </td>
-          </tr>
-          <tr
-            class="hover:bg-secondary/50"
-          >
-            <td
-              class="px-3 py-3 align-top w-28 font-mono text-[13px] whitespace-nowrap"
-            >
-              <button
-                aria-label="SFR-002 원문 보기"
-                class="rounded font-semibold text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-                type="button"
-              >
-                SFR-002
-              </button>
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              권한 관리
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm w-16 whitespace-nowrap"
-            >
-              상세
-            </td>
-            <td
-              class="px-3 py-3 align-top w-24 text-[13px] whitespace-nowrap text-muted-foreground"
-              title="HWP · 4장 > 기능 (쪽 번호 없음: 원문 파일에서 확인)"
-            >
-              기능
-            </td>
-          </tr>
-          <tr
-            class="bg-secondary/40"
-          >
-            <th
-              class="px-3 py-1.5 text-left text-[13px] font-bold"
-              colspan="4"
-              scope="rowgroup"
-            >
-              PER
-␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠
-              <span
-                class="font-normal text-muted-foreground"
-              >
-                1
-                개
-              </span>
-            </th>
-          </tr>
-          <tr
-            class="hover:bg-secondary/50"
-          >
-            <td
-              class="px-3 py-3 align-top w-28 font-mono text-[13px] whitespace-nowrap"
-            >
-              PER_01
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              -
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm w-16 whitespace-nowrap"
-            >
-              <span
-                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-neutral-bg text-neutral"
-              >
-                <span
-                  aria-hidden="true"
-                  class="size-1.5 rounded-full bg-neutral"
-                />
-                요약
-              </span>
-            </td>
-            <td
-              class="px-3 py-3 align-top w-24 text-[13px] whitespace-nowrap text-muted-foreground"
-              title="HWP · 표 54 (쪽 번호 없음: 원문 파일에서 확인)"
-            >
-              표 54
-            </td>
-          </tr>
-          <tr
-            class="bg-secondary/40"
-          >
-            <th
-              class="px-3 py-1.5 text-left text-[13px] font-bold"
-              colspan="4"
-              scope="rowgroup"
-            >
-              기타
-␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠
-              <span
-                class="font-normal text-muted-foreground"
-              >
-                1
-                개
-              </span>
-            </th>
-          </tr>
-          <tr
-            class="hover:bg-secondary/50"
-          >
-            <td
-              class="px-3 py-3 align-top w-28 font-mono text-[13px] whitespace-nowrap"
-            >
-              <button
-                aria-label=" 원문 보기"
-                class="rounded font-semibold text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-                type="button"
-              />
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm"
-            >
-              기타 항목
-            </td>
-            <td
-              class="px-3 py-3 align-top text-sm w-16 whitespace-nowrap"
-            >
-              상세
-            </td>
-            <td
-              class="px-3 py-3 align-top w-24 text-[13px] whitespace-nowrap text-muted-foreground"
-              title="HWP (쪽 번호 없음: 원문 파일에서 확인)"
-            >
-              -
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <p
-      class="text-[13px] text-muted-foreground"
-    >
-      같은 코드의 상세 행이 여러 번 나옵니다:␠
-      SFR-001
-    </p>
-  </section>
-</div>
+div
+  section
+    div
+      h3 "요구사항 4개"
+      span
+        "상세 "
+        "3"
+        " · 요약만 "
+        "1"
+    p "요구사항 4개를 모두 찾았습니다."
+    p
+      span
+        "SFR"
+        " "
+        span "2"
+      span
+        "PER"
+        " "
+        span "1"
+      span
+        "기타"
+        " "
+        span "1"
+    div
+      table
+        caption "요구사항 목록"
+        thead
+          tr
+            th scope="col" "코드"
+            th scope="col" "이름"
+            th scope="col" "구분"
+            th scope="col" "위치"
+        tbody
+          tr
+            th scope="rowgroup" colspan="4"
+              "SFR"
+              " "
+              span
+                "2"
+                "개"
+          tr
+            td
+              button type="button" aria-label="SFR-001 원문 보기" "SFR-001"
+            td "통합 로그인"
+            td "상세"
+            td title="PDF 40쪽" "40쪽"
+          tr
+            td
+              button type="button" aria-label="SFR-002 원문 보기" "SFR-002"
+            td "권한 관리"
+            td "상세"
+            td title="HWP · 4장 > 기능 (쪽 번호 없음: 원문 파일에서 확인)" "기능"
+          tr
+            th scope="rowgroup" colspan="4"
+              "PER"
+              " "
+              span
+                "1"
+                "개"
+          tr
+            td "PER_01"
+            td "-"
+            td
+              span
+                span aria-hidden="true"
+                "요약"
+            td title="HWP · 표 54 (쪽 번호 없음: 원문 파일에서 확인)" "표 54"
+          tr
+            th scope="rowgroup" colspan="4"
+              "기타"
+              " "
+              span
+                "1"
+                "개"
+          tr
+            td
+              button type="button" aria-label=" 원문 보기"
+            td "기타 항목"
+            td "상세"
+            td title="HWP (쪽 번호 없음: 원문 파일에서 확인)" "-"
+    p
+      "같은 코드의 상세 행이 여러 번 나옵니다: "
+      "SFR-001"
 `;

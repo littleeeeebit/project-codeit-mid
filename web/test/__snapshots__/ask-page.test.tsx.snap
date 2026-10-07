@@ -1,1544 +1,341 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`a running turn > a revoked attachment says the result will not be shown 1`] = `
-<article
-  aria-label="질문 1"
-  class="scroll-mt-20 space-y-4"
->
-  <div
-    class="flex justify-end"
-  >
-    <div
-      class="max-w-[85%] space-y-1 rounded-2xl rounded-br-md bg-secondary px-4 py-3"
-    >
-      <p
-        class="text-base [overflow-wrap:anywhere]"
-      >
-        하자보수 기간은?
-      </p>
-    </div>
-  </div>
-  <section
-    aria-busy="true"
-    aria-label="답변"
-  >
-    <div
-      class="space-y-4"
-    >
-      <div
-        aria-live="polite"
-        class="flex flex-wrap items-center gap-3"
-      >
-        <span
-          class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-3 py-1 text-sm bg-neutral-bg text-neutral"
-        >
-          <span
-            aria-hidden="true"
-            class="size-1.5 rounded-full bg-neutral"
-          />
-          취소 요청됨
-        </span>
-        <span
-          class="text-sm text-muted-foreground"
-        >
-          이 요청의 결과는 답변으로 표시하지 않습니다. 진행 중인 호출이 끝나면 비용을 정산합니다.
-        </span>
-      </div>
-    </div>
-  </section>
-</article>
+article aria-label="질문 1"
+  div
+    div
+      p "하자보수 기간은?"
+  section aria-label="답변" aria-busy="true"
+    div
+      div aria-live="polite"
+        span
+          span aria-hidden="true"
+          "취소 요청됨"
+        span "이 요청의 결과는 답변으로 표시하지 않습니다. 진행 중인 호출이 끝나면 비용을 정산합니다."
 `;
 
 exports[`a running turn > streams a provisional answer and can be cancelled 1`] = `
-<article
-  aria-label="질문 1"
-  class="scroll-mt-20 space-y-4"
->
-  <div
-    class="flex justify-end"
-  >
-    <div
-      class="max-w-[85%] space-y-1 rounded-2xl rounded-br-md bg-secondary px-4 py-3"
-    >
-      <p
-        class="text-base [overflow-wrap:anywhere]"
-      >
-        하자보수 기간은?
-      </p>
-    </div>
-  </div>
-  <section
-    aria-busy="true"
-    aria-label="답변"
-  >
-    <div
-      class="space-y-4"
-    >
-      <div
-        aria-live="polite"
-        class="flex flex-wrap items-center gap-3"
-      >
-        <span
-          class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-3 py-1 text-sm bg-neutral-bg text-neutral"
-        >
-          <span
-            aria-hidden="true"
-            class="size-1.5 rounded-full bg-neutral"
-          />
-          작성 중 · 검증 전
-        </span>
-        <span
-          class="text-sm text-muted-foreground"
-        >
-          이 요청의 예약 최대 비용 $0.0250
-        </span>
-        <button
-          class="ml-auto h-8 rounded-lg border px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
-          type="button"
-        >
-          요청 취소
-        </button>
-      </div>
-      <div
-        class="space-y-4 border-l-2 border-dashed border-input pl-4"
-      >
-        <p
-          class="text-[13px] text-muted-foreground"
-        >
-          검증 전 임시 답변입니다. 근거 검증이 끝나면 확정된 답변이나 실패 상태로 바뀝니다.
-        </p>
-        <p
-          class="text-lg leading-relaxed font-semibold [overflow-wrap:anywhere]"
-        >
-          작성 중인 요약
-          <span
-            class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-          >
-            <span
-              class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-            >
-              <span
-                class="text-[0px]"
-              >
-                [
-              </span>
-              1
-              <span
-                class="text-[0px]"
-              >
-                ]
-              </span>
-            </span>
-          </span>
-        </p>
-        <section
-          aria-label="답변 내용"
-          class="space-y-4"
-        >
-          <div
-            class="space-y-2.5"
-          >
-            <p
-              class="text-base [overflow-wrap:anywhere]"
-            >
-              첫 문장
-              <span
-                class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-              >
-                <span
-                  class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-                >
-                  <span
-                    class="text-[0px]"
-                  >
-                    [
-                  </span>
-                  1
-                  <span
-                    class="text-[0px]"
-                  >
-                    ]
-                  </span>
-                </span>
-                <span
-                  class="inline-block h-6 min-w-6 rounded-md bg-secondary px-1 text-center align-[0.1em] text-[13px] leading-6 font-semibold text-muted-foreground tabular-nums"
-                >
-                  <span
-                    class="text-[0px]"
-                  >
-                    [
-                  </span>
-                  2
-                  <span
-                    class="text-[0px]"
-                  >
-                    ]
-                  </span>
-                </span>
-              </span>
-            </p>
-          </div>
-        </section>
-      </div>
-    </div>
-  </section>
-</article>
+article aria-label="질문 1"
+  div
+    div
+      p "하자보수 기간은?"
+  section aria-label="답변" aria-busy="true"
+    div
+      div aria-live="polite"
+        span
+          span aria-hidden="true"
+          "작성 중 · 검증 전"
+        span "이 요청의 예약 최대 비용 $0.0250"
+        button type="button" "요청 취소"
+      div
+        p "검증 전 임시 답변입니다. 근거 검증이 끝나면 확정된 답변이나 실패 상태로 바뀝니다."
+        p
+          "작성 중인 요약"
+          span
+            span
+              span "["
+              "1"
+              span "]"
+        section aria-label="답변 내용"
+          div
+            p
+              "첫 문장"
+              span
+                span
+                  span "["
+                  "1"
+                  span "]"
+                span
+                  span "["
+                  "2"
+                  span "]"
 `;
 
 exports[`asking > an answer, its first citation opened, then a follow-up and 새 대화 1`] = `
-<main
-  class="min-w-0 space-y-8 px-6 py-8 lg:px-10"
->
-  <header
-    class="space-y-1"
-  >
-    <h1
-      class="text-2xl font-bold tracking-tight"
-    >
-      질문하기
-    </h1>
-    <p
-      class="text-sm text-muted-foreground"
-    >
-      제공된 과거 공고(2021-10 ~ 2025-02) 기준입니다. 현재 입찰 가능 여부는 이 자료로 판단할 수 없습니다.
-    </p>
-  </header>
-  <div
-    aria-label="질문 범위"
-    class="group/toggle-group flex flex-row items-center gap-[--spacing(var(--gap))] rounded-lg data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-vertical:flex-col data-vertical:items-stretch w-fit"
-    data-orientation="horizontal"
-    data-slot="toggle-group"
-    data-spacing="0"
-    data-variant="outline"
-    dir="ltr"
-    role="radiogroup"
-    style="outline: none; --gap: 0;"
-    tabindex="0"
-  >
-    <button
-      aria-checked="true"
-      class="shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group/toggle inline-flex items-center justify-center gap-1 rounded-lg font-medium whitespace-nowrap transition-all outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted data-[state=on]:bg-muted dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border border-input bg-transparent hover:bg-muted min-w-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 h-9 px-3 text-sm"
-      data-radix-collection-item=""
-      data-size="default"
-      data-slot="toggle-group-item"
-      data-spacing="0"
-      data-state="on"
-      data-variant="outline"
-      role="radio"
-      tabindex="-1"
-      type="button"
-    >
-      선택한 문서
-    </button>
-    <button
-      aria-checked="false"
-      class="shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group/toggle inline-flex items-center justify-center gap-1 rounded-lg font-medium whitespace-nowrap transition-all outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted data-[state=on]:bg-muted dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border border-input bg-transparent hover:bg-muted min-w-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 h-9 px-3 text-sm"
-      data-radix-collection-item=""
-      data-size="default"
-      data-slot="toggle-group-item"
-      data-spacing="0"
-      data-state="off"
-      data-variant="outline"
-      role="radio"
-      tabindex="-1"
-      type="button"
-    >
-      전체 문서
-    </button>
-  </div>
-  <ul
-    class="grid gap-3 md:grid-cols-2"
-  >
-    <li
-      class="space-y-3 rounded-2xl bg-secondary/60 p-4"
-    >
-      <div
-        class="flex items-start gap-3"
-      >
-        <div
-          class="min-w-0 flex-1"
-        >
-          <p
-            class="text-base font-semibold"
-          >
-            통합 정보시스템 구축
-          </p>
-          <p
-            class="mt-1 text-[13px] text-muted-foreground"
-          >
-            한국교육학술정보원
-             ·␠
-            1억 3,000만원
-             · 공개␠
-            2024-03-02
-             ·␠
-            PDF
-             ·␠
-            자동 대조 통과
-          </p>
-        </div>
-        <button
-          aria-label="통합 정보시스템 구축 선택 해제"
-          class="rounded-md p-1 text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-          type="button"
-        >
-          <svg
-            aria-hidden="true"
-            class="lucide lucide-x size-4"
-            fill="none"
-            height="24"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-            width="24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M18 6 6 18"
-            />
-            <path
-              d="m6 6 12 12"
-            />
-          </svg>
-        </button>
-      </div>
-      <a
-        class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-background px-2.5 text-[13px] font-semibold outline-none hover:bg-background/70 focus-visible:ring-3 focus-visible:ring-ring/50"
-        href="/api/originals/doc-aaaaaaaa/hash-a"
-      >
-        <svg
-          aria-hidden="true"
-          class="lucide lucide-download size-3.5"
-          fill="none"
-          height="24"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          viewBox="0 0 24 24"
-          width="24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M12 15V3"
-          />
-          <path
-            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
-          />
-          <path
-            d="m7 10 5 5 5-5"
-          />
-        </svg>
-        원문 파일 받기
-      </a>
-    </li>
-  </ul>
-  <div
-    class="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
-  >
-    <div
-      class="min-w-0 space-y-8"
-    >
-      <div
-        class="flex items-center justify-between gap-3 border-b pb-3"
-      >
-        <h2
-          class="text-lg font-bold"
-        >
-          대화␠
-          <span
-            class="ml-1 text-sm font-medium text-muted-foreground"
-          >
-            질문␠
-            1
-            개
-          </span>
-        </h2>
-        <button
-          class="h-8 rounded-lg border px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
-          type="button"
-        >
-          새 대화
-        </button>
-      </div>
-      <article
-        aria-label="질문 1"
-        class="scroll-mt-20 space-y-4"
-      >
-        <div
-          class="flex justify-end"
-        >
-          <div
-            class="max-w-[85%] space-y-1 rounded-2xl rounded-br-md bg-secondary px-4 py-3"
-          >
-            <p
-              class="text-base [overflow-wrap:anywhere]"
-            >
-              하자보수 기간은?
-            </p>
-          </div>
-        </div>
-        <section
-          aria-busy="false"
-          aria-label="답변"
-        >
-          <div
-            class="space-y-6"
-          >
-            <div
-              class="space-y-2"
-            >
-              <span
-                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
-              >
-                <span
-                  aria-hidden="true"
-                  class="size-1.5 rounded-full bg-ok"
-                />
-                답변
-              </span>
-              <p
-                class="font-semibold text-foreground [overflow-wrap:anywhere] text-lg leading-relaxed"
-              >
-                하자보수 기간은 12개월입니다.
-                <span
-                  class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-                >
-                  <button
-                    aria-label="근거 1 원문 보기"
-                    aria-pressed="true"
-                    class="inline-block h-6 min-w-6 rounded-md px-1 text-center align-[0.1em] text-[13px] leading-6 font-bold tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-primary text-primary-foreground"
-                    type="button"
-                  >
-                    <span
-                      class="text-[0px]"
-                    >
-                      [
-                    </span>
-                    1
-                    <span
-                      class="text-[0px]"
-                    >
-                      ]
-                    </span>
-                  </button>
-                  <button
-                    aria-label="근거 2 원문 보기"
-                    aria-pressed="false"
-                    class="inline-block h-6 min-w-6 rounded-md px-1 text-center align-[0.1em] text-[13px] leading-6 font-bold tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-accent text-primary hover:bg-primary/15"
-                    type="button"
-                  >
-                    <span
-                      class="text-[0px]"
-                    >
-                      [
-                    </span>
-                    2
-                    <span
-                      class="text-[0px]"
-                    >
-                      ]
-                    </span>
-                  </button>
-                </span>
-              </p>
-            </div>
-            <section
-              aria-label="답변 내용"
-              class="space-y-4"
-            >
-              <div
-                class="space-y-2.5"
-              >
-                <p
-                  class="text-base [overflow-wrap:anywhere]"
-                >
-                  계약 후 12개월 동안 하자를 보수합니다.
-                  <span
-                    class="ml-1 whitespace-nowrap [&>*+*]:ml-0.5"
-                  >
-                    <button
-                      aria-label="근거 2 원문 보기"
-                      aria-pressed="false"
-                      class="inline-block h-6 min-w-6 rounded-md px-1 text-center align-[0.1em] text-[13px] leading-6 font-bold tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-accent text-primary hover:bg-primary/15"
-                      type="button"
-                    >
-                      <span
-                        class="text-[0px]"
-                      >
-                        [
-                      </span>
-                      2
-                      <span
-                        class="text-[0px]"
-                      >
-                        ]
-                      </span>
-                    </button>
-                    <button
-                      aria-label="근거 3 원문 보기"
-                      aria-pressed="false"
-                      class="inline-block h-6 min-w-6 rounded-md px-1 text-center align-[0.1em] text-[13px] leading-6 font-bold tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/50 bg-accent text-primary hover:bg-primary/15"
-                      type="button"
-                    >
-                      <span
-                        class="text-[0px]"
-                      >
-                        [
-                      </span>
-                      3
-                      <span
-                        class="text-[0px]"
-                      >
-                        ]
-                      </span>
-                    </button>
-                  </span>
-                </p>
-                <p
-                  class="text-base [overflow-wrap:anywhere]"
-                >
-                  <span
-                    class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-warn-bg text-warn mr-1.5 align-[0.1em]"
-                  >
-                    <span
-                      aria-hidden="true"
-                      class="size-1.5 rounded-full bg-warn"
-                    />
-                    추론
-                  </span>
-                  무상 보수로 보입니다.
-                </p>
-              </div>
-            </section>
-            <p
-              class="border-t pt-3 text-[13px] text-muted-foreground tabular-nums"
-            >
-              요청␠
-              req-0000
-               ·␠
-              완료
-               ·␠
-              정산됨
-               ·␠
-              정산 $0.0012
-            </p>
-          </div>
-        </section>
-      </article>
-      <form
-        class="rounded-2xl border bg-background sticky bottom-0 z-30 space-y-2 p-3 shadow-[0_-6px_20px_rgb(0_0_0/0.06)]"
-      >
-        <div>
-          <label
-            class="sr-only"
-            for="question"
-          >
-            질문
-          </label>
-          <textarea
-            class="w-full rounded-xl border border-input bg-background p-3 text-[16px] leading-7 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 max-h-40 resize-none [field-sizing:content]"
-            id="question"
-            maxlength="2000"
-            placeholder="이어서 질문하세요"
-            rows="1"
-          />
-        </div>
-        <div
-          class="flex flex-wrap items-center gap-3"
-        >
-          <div
-            aria-label="질문 방식"
-            class="group/toggle-group flex-row items-center gap-[--spacing(var(--gap))] rounded-lg data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-vertical:flex-col data-vertical:items-stretch grid w-full auto-cols-fr grid-flow-col sm:flex sm:w-fit"
-            data-orientation="horizontal"
-            data-slot="toggle-group"
-            data-spacing="0"
-            data-variant="outline"
-            dir="ltr"
-            role="radiogroup"
-            style="outline: none; --gap: 0;"
-            tabindex="0"
-          >
-            <button
-              aria-checked="true"
-              class="shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group/toggle inline-flex items-center justify-center gap-1 rounded-lg font-medium transition-all outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted data-[state=on]:bg-muted dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border border-input bg-transparent hover:bg-muted min-w-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 h-auto flex-wrap px-2 py-1 whitespace-normal sm:flex-nowrap sm:px-3 sm:py-0 sm:whitespace-nowrap min-h-8 text-[13px] sm:h-8"
-              data-radix-collection-item=""
-              data-size="default"
-              data-slot="toggle-group-item"
-              data-spacing="0"
-              data-state="on"
-              data-variant="outline"
-              role="radio"
-              tabindex="-1"
-              type="button"
-            >
-              근거 기반 답변
-              <span
-                class="ml-1.5 text-xs text-warn"
-              >
-                유료
-              </span>
-            </button>
-            <button
-              aria-checked="false"
-              class="shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group/toggle inline-flex items-center justify-center gap-1 rounded-lg font-medium transition-all outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted data-[state=on]:bg-muted dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border border-input bg-transparent hover:bg-muted min-w-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 h-auto flex-wrap px-2 py-1 whitespace-normal sm:flex-nowrap sm:px-3 sm:py-0 sm:whitespace-nowrap min-h-8 text-[13px] sm:h-8"
-              data-radix-collection-item=""
-              data-size="default"
-              data-slot="toggle-group-item"
-              data-spacing="0"
-              data-state="off"
-              data-variant="outline"
-              role="radio"
-              tabindex="-1"
-              type="button"
-            >
-              기본 정보
-              <span
-                class="ml-1.5 text-xs text-ok"
-              >
-                무료
-              </span>
-            </button>
-            <button
-              aria-checked="false"
-              class="shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group/toggle inline-flex items-center justify-center gap-1 rounded-lg font-medium transition-all outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted data-[state=on]:bg-muted dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border border-input bg-transparent hover:bg-muted min-w-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 h-auto flex-wrap px-2 py-1 whitespace-normal sm:flex-nowrap sm:px-3 sm:py-0 sm:whitespace-nowrap min-h-8 text-[13px] sm:h-8"
-              data-radix-collection-item=""
-              data-size="default"
-              data-slot="toggle-group-item"
-              data-spacing="0"
-              data-state="off"
-              data-variant="outline"
-              role="radio"
-              tabindex="-1"
-              type="button"
-            >
-              요구사항 목록
-              <span
-                class="ml-1.5 text-xs text-ok"
-              >
-                무료
-              </span>
-            </button>
-          </div>
-          <button
-            class="rounded-xl bg-primary px-5 text-[15px] font-semibold text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 ml-auto h-10"
-            type="submit"
-          >
-            이어서 질문 · 유료 2회
-          </button>
-        </div>
-      </form>
-    </div>
-    <aside
-      aria-label="대화 근거"
-      class="fixed inset-x-0 bottom-0 z-40 max-h-[80dvh] overflow-y-auto rounded-t-2xl border-t bg-background p-5 shadow-[0_-8px_30px_rgb(0_0_0/0.15)] outline-none lg:sticky lg:inset-auto lg:top-20 lg:z-auto lg:max-h-[calc(100dvh-6rem)] lg:self-start lg:rounded-2xl lg:border lg:shadow-none hidden lg:block"
-      tabindex="-1"
-    >
-      <div
-        class="mb-3 flex min-h-8 items-center justify-between gap-3"
-      >
-        <p
-          class="text-[13px] text-muted-foreground"
-        >
-          질문 1의 근거
-        </p>
-        <button
-          aria-label="근거 닫기"
-          class="rounded-md p-1.5 text-muted-foreground outline-none hover:bg-secondary hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 lg:hidden"
-          type="button"
-        >
-          <svg
-            aria-hidden="true"
-            class="lucide lucide-x size-5"
-            fill="none"
-            height="24"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-            width="24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M18 6 6 18"
-            />
-            <path
-              d="m6 6 12 12"
-            />
-          </svg>
-        </button>
-      </div>
-      <div
-        class="space-y-5"
-      >
-        <div
-          class="space-y-2"
-        >
-          <h3
-            class="text-lg font-bold"
-          >
-            근거␠
-            <span
-              class="text-primary"
-            >
-              1
-            </span>
-             원문 인용
-          </h3>
-          <p
-            class="text-base font-semibold"
-          >
-            통합 정보시스템 구축
-          </p>
-          <p
-            class="text-[13px] text-muted-foreground"
-          >
-            PDF 12쪽 (인쇄 쪽번호 11) · 제3장 &gt; 하자보수
-             ·␠
-            자동 대조 통과
-          </p>
-        </div>
-        <div
-          class="space-y-3"
-        >
-          <blockquote
-            class="border-l-4 border-primary pl-4 text-base text-foreground"
-          >
-            <div
-              class="space-y-4 whitespace-pre-wrap [overflow-wrap:anywhere]"
-            >
-              <p>
-                하자보수 기간은 검수 후 12개월로 한다.
-              </p>
-            </div>
-          </blockquote>
-        </div>
-        <div
-          class="space-y-3"
-        >
-          <button
-            aria-expanded="false"
-            class="min-h-9 rounded-lg border border-input px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
-            type="button"
-          >
-            앞뒤 문단 포함 전체 원문 보기
-          </button>
-        </div>
-        <a
-          class="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
-          href="/api/originals/doc-aaaaaaaa/hash-a"
-        >
-          <svg
-            aria-hidden="true"
-            class="lucide lucide-download size-4"
-            fill="none"
-            height="24"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-            width="24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M12 15V3"
-            />
-            <path
-              d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
-            />
-            <path
-              d="m7 10 5 5 5-5"
-            />
-          </svg>
-          원문 파일 받기
-        </a>
-      </div>
-    </aside>
-  </div>
-  <div
-    class="border-t pt-6"
-    data-slot="collapsible"
-    data-state="closed"
-  >
-    <button
-      aria-expanded="false"
-      class="group flex min-h-9 items-center gap-2 rounded text-lg font-bold outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-      data-slot="collapsible-trigger"
-      data-state="closed"
-      type="button"
-    >
-      내 최근 요청␠
-      <svg
-        aria-hidden="true"
-        class="lucide lucide-chevron-down size-4 transition-transform group-data-[state=open]:rotate-180"
-        fill="none"
-        height="24"
-        stroke="currentColor"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        viewBox="0 0 24 24"
-        width="24"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="m6 9 6 6 6-6"
-        />
-      </svg>
-    </button>
-    <div
-      class="space-y-4 pt-4"
-      data-slot="collapsible-content"
-      data-state="closed"
-      hidden=""
-      id="radix-_r_1j_"
-      style=""
-    />
-  </div>
-</main>
+main
+  header
+    h1 "질문하기"
+    p "제공된 과거 공고(2021-10 ~ 2025-02) 기준입니다. 현재 입찰 가능 여부는 이 자료로 판단할 수 없습니다."
+  div dir="ltr" role="radiogroup" data-variant="outline" aria-label="질문 범위" tabindex="0"
+    button type="button" data-state="on" role="radio" aria-checked="true" data-variant="outline" tabindex="-1" "선택한 문서"
+    button type="button" data-state="off" role="radio" aria-checked="false" data-variant="outline" tabindex="-1" "전체 문서"
+  ul
+    li
+      div
+        div
+          p "통합 정보시스템 구축"
+          p
+            "한국교육학술정보원"
+            " · "
+            "1억 3,000만원"
+            " · 공개 "
+            "2024-03-02"
+            " · "
+            "PDF"
+            " · "
+            "자동 대조 통과"
+        button type="button" aria-label="통합 정보시스템 구축 선택 해제"
+          svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+      a href="/api/originals/doc-aaaaaaaa/hash-a"
+        svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+        "원문 파일 받기"
+  div
+    div
+      div
+        h2
+          "대화 "
+          span
+            "질문 "
+            "1"
+            "개"
+        button type="button" "새 대화"
+      article aria-label="질문 1"
+        div
+          div
+            p "하자보수 기간은?"
+        section aria-label="답변" aria-busy="false"
+          div
+            div
+              span
+                span aria-hidden="true"
+                "답변"
+              p
+                "하자보수 기간은 12개월입니다."
+                span
+                  button type="button" aria-pressed="true" aria-label="근거 1 원문 보기"
+                    span "["
+                    "1"
+                    span "]"
+                  button type="button" aria-pressed="false" aria-label="근거 2 원문 보기"
+                    span "["
+                    "2"
+                    span "]"
+            section aria-label="답변 내용"
+              div
+                p
+                  "계약 후 12개월 동안 하자를 보수합니다."
+                  span
+                    button type="button" aria-pressed="false" aria-label="근거 2 원문 보기"
+                      span "["
+                      "2"
+                      span "]"
+                    button type="button" aria-pressed="false" aria-label="근거 3 원문 보기"
+                      span "["
+                      "3"
+                      span "]"
+                p
+                  span
+                    span aria-hidden="true"
+                    "추론"
+                  "무상 보수로 보입니다."
+            p
+              "요청 "
+              "req-0000"
+              " · "
+              "완료"
+              " · "
+              "정산됨"
+              " · "
+              "정산 $0.0012"
+      form
+        div
+          label for="question" "질문"
+          textarea id="question" rows="1" maxlength="2000" placeholder="이어서 질문하세요"
+        div
+          div dir="ltr" role="radiogroup" data-variant="outline" aria-label="질문 방식" tabindex="0"
+            button type="button" data-state="on" role="radio" aria-checked="true" data-variant="outline" tabindex="-1"
+              "근거 기반 답변"
+              span "유료"
+            button type="button" data-state="off" role="radio" aria-checked="false" data-variant="outline" tabindex="-1"
+              "기본 정보"
+              span "무료"
+            button type="button" data-state="off" role="radio" aria-checked="false" data-variant="outline" tabindex="-1"
+              "요구사항 목록"
+              span "무료"
+          button type="submit" "이어서 질문 · 유료 2회"
+    aside tabindex="-1" aria-label="대화 근거"
+      div
+        p "질문 1의 근거"
+        button type="button" aria-label="근거 닫기"
+          svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+      div
+        div
+          h3
+            "근거 "
+            span "1"
+            " 원문 인용"
+          p "통합 정보시스템 구축"
+          p
+            "PDF 12쪽 (인쇄 쪽번호 11) · 제3장 > 하자보수"
+            " · "
+            "자동 대조 통과"
+        div
+          blockquote
+            div
+              p "하자보수 기간은 검수 후 12개월로 한다."
+        div
+          button type="button" aria-expanded="false" "앞뒤 문단 포함 전체 원문 보기"
+        a href="/api/originals/doc-aaaaaaaa/hash-a"
+          svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+          "원문 파일 받기"
+  div data-state="closed"
+    button type="button" aria-expanded="false" data-state="closed"
+      "내 최근 요청 "
+      svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+    div data-state="closed" id="radix-_r_1j_" hidden
 `;
 
 exports[`selection and modes > nothing selected: the empty state, and the documents to pick from 1`] = `
-<div>
-  <div
-    class="mx-auto grid w-full max-w-[1440px] flex-1 lg:grid-cols-[360px_minmax(0,1fr)]"
-  >
-    <aside
-      class="border-r lg:sticky lg:top-14 lg:h-[calc(100dvh-3.5rem)]"
-    >
-      <div
-        class="flex h-full flex-col"
-      >
-        <form
-          aria-label="문서 찾기"
-          class="space-y-3 border-b p-5"
-          role="search"
-        >
-          <h2
-            class="text-lg font-bold"
-          >
-            문서 찾기
-          </h2>
-          <div
-            class="relative"
-          >
-            <svg
-              aria-hidden="true"
-              class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-              fill="none"
-              height="24"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              viewBox="0 0 24 24"
-              width="24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="m21 21-4.34-4.34"
-              />
-              <circle
-                cx="11"
-                cy="11"
-                r="8"
-              />
-            </svg>
-            <label
-              class="sr-only"
-              for="q"
-            >
-              검색어
-            </label>
-            <input
-              class="h-10 w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none placeholder:text-muted-foreground/80 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 pl-9"
-              id="q"
-              placeholder="사업명, 내용, 요구사항 코드"
-              value=""
-            />
-          </div>
-          <div>
-            <label
-              class="mb-1 block text-[13px] font-medium text-muted-foreground"
-              for="inst"
-            >
-              발주 기관
-            </label>
-            <input
-              class="h-10 w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none placeholder:text-muted-foreground/80 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              id="inst"
-              placeholder="예: 한국교육학술정보원"
-              value=""
-            />
-          </div>
-          <div
-            data-slot="collapsible"
-            data-state="closed"
-          >
-            <button
-              aria-expanded="false"
-              class="group flex min-h-6 items-center gap-1 rounded text-[13px] font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-              data-slot="collapsible-trigger"
-              data-state="closed"
-              type="button"
-            >
-              상세 조건␠
-              <svg
-                aria-hidden="true"
-                class="lucide lucide-chevron-down size-3.5 transition-transform group-data-[state=open]:rotate-180"
-                fill="none"
-                height="24"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-                width="24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="m6 9 6 6 6-6"
-                />
-              </svg>
-            </button>
-            <div
-              class="grid grid-cols-2 gap-2 pt-2"
-              data-slot="collapsible-content"
-              data-state="closed"
-              hidden=""
-              id="radix-_r_0_"
-              style=""
-            />
-          </div>
-          <button
-            class="h-10 w-full rounded-lg bg-foreground text-[15px] font-semibold text-background outline-none hover:bg-foreground/85 focus-visible:ring-3 focus-visible:ring-ring/50"
-            type="submit"
-          >
-            검색
-          </button>
-        </form>
-        <div
-          aria-live="polite"
-          class="flex-1 overflow-y-auto p-3"
-        >
-          <p
-            class="px-2 pb-2 text-[13px] text-muted-foreground"
-          >
-            3
-            건 · 질문할 수 있는 문서가 먼저 나옵니다 · 최대 2개 선택
-          </p>
-          <ul
-            class="space-y-1.5"
-          >
-            <li>
-              <div
-                class="flex gap-3 rounded-xl border p-3 transition-colors border-input hover:bg-secondary/70"
-              >
-                <button
-                  aria-checked="false"
-                  class="peer relative flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-input transition-colors outline-none group-has-disabled/field:opacity-50 group-has-[:focus-visible]/field-label:ring-0 group-has-[:focus-visible]/field-label:not-data-checked:border-input after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 aria-invalid:aria-checked:border-primary dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground group-has-[:focus-visible]/field-label:data-checked:border-primary dark:data-checked:bg-primary mt-0.5"
-                  data-slot="checkbox"
-                  data-state="unchecked"
-                  id="pick-doc-aaaaaaaa"
-                  role="checkbox"
-                  type="button"
-                  value="on"
-                />
-                <label
-                  class="min-w-0 flex-1 space-y-1.5 cursor-pointer"
-                  for="pick-doc-aaaaaaaa"
-                >
-                  <span
-                    class="block text-base font-semibold text-foreground"
-                  >
-                    통합 정보시스템 구축
-                  </span>
-                  <span
-                    class="block text-[13px] text-muted-foreground"
-                  >
-                    한국교육학술정보원
-                     ·␠
-                    1억 3,000만원
-                     · 마감␠
-                    2024-03-20 10:00
-                  </span>
-                  <div
-                    class="flex flex-wrap gap-1"
-                  >
-                    <span
-                      class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
-                    >
-                      <span
-                        aria-hidden="true"
-                        class="size-1.5 rounded-full bg-ok"
-                      />
-                      질문 가능
-                    </span>
-                    <span
-                      class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-neutral-bg text-neutral"
-                    >
-                      <span
-                        aria-hidden="true"
-                        class="size-1.5 rounded-full bg-neutral"
-                      />
-                      자동 대조 통과
-                    </span>
-                  </div>
-                </label>
-              </div>
-            </li>
-            <li>
-              <div
-                class="flex gap-3 rounded-xl border p-3 transition-colors border-input hover:bg-secondary/70"
-              >
-                <button
-                  aria-checked="false"
-                  class="peer relative flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-input transition-colors outline-none group-has-disabled/field:opacity-50 group-has-[:focus-visible]/field-label:ring-0 group-has-[:focus-visible]/field-label:not-data-checked:border-input after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 aria-invalid:aria-checked:border-primary dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground group-has-[:focus-visible]/field-label:data-checked:border-primary dark:data-checked:bg-primary mt-0.5"
-                  data-slot="checkbox"
-                  data-state="unchecked"
-                  id="pick-doc-bbbbbbbb"
-                  role="checkbox"
-                  type="button"
-                  value="on"
-                />
-                <label
-                  class="min-w-0 flex-1 space-y-1.5 cursor-pointer"
-                  for="pick-doc-bbbbbbbb"
-                >
-                  <span
-                    class="block text-base font-semibold text-foreground"
-                  >
-                    학사 행정 고도화
-                  </span>
-                  <span
-                    class="block text-[13px] text-muted-foreground"
-                  >
-                    기관 미상
-                     ·␠
-                    5,230만원
-                     · 마감␠
-                    2024-03-20 10:00
-                  </span>
-                  <div
-                    class="flex flex-wrap gap-1"
-                  >
-                    <span
-                      class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
-                    >
-                      <span
-                        aria-hidden="true"
-                        class="size-1.5 rounded-full bg-ok"
-                      />
-                      질문 가능
-                    </span>
-                    <span
-                      class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-warn-bg text-warn"
-                    >
-                      <span
-                        aria-hidden="true"
-                        class="size-1.5 rounded-full bg-warn"
-                      />
-                      자동 대조: 확인 필요
-                    </span>
-                    <span
-                      class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-warn-bg text-warn"
-                    >
-                      <span
-                        aria-hidden="true"
-                        class="size-1.5 rounded-full bg-warn"
-                      />
-                      기록 충돌:␠
-                      사업 금액
-                    </span>
-                  </div>
-                </label>
-              </div>
-            </li>
-            <li>
-              <div
-                class="flex gap-3 rounded-xl border p-3 transition-colors border-input hover:bg-secondary/70"
-              >
-                <button
-                  aria-checked="false"
-                  class="peer relative flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-input transition-colors outline-none group-has-disabled/field:opacity-50 group-has-[:focus-visible]/field-label:ring-0 group-has-[:focus-visible]/field-label:not-data-checked:border-input after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 aria-invalid:aria-checked:border-primary dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground group-has-[:focus-visible]/field-label:data-checked:border-primary dark:data-checked:bg-primary mt-0.5"
-                  data-slot="checkbox"
-                  data-state="unchecked"
-                  id="pick-doc-cccccccc"
-                  role="checkbox"
-                  type="button"
-                  value="on"
-                />
-                <label
-                  class="min-w-0 flex-1 space-y-1.5 cursor-pointer"
-                  for="pick-doc-cccccccc"
-                >
-                  <span
-                    class="block text-base font-semibold text-foreground"
-                  >
-                    미색인 문서
-                  </span>
-                  <span
-                    class="block text-[13px] text-muted-foreground"
-                  >
-                    한국교육학술정보원
-                     ·␠
-                    1억 3,000만원
-                     · 마감␠
-                    2024-03-20 10:00
-                  </span>
-                  <div
-                    class="flex flex-wrap gap-1"
-                  >
-                    <span
-                      class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-neutral-bg text-neutral"
-                    >
-                      <span
-                        aria-hidden="true"
-                        class="size-1.5 rounded-full bg-neutral"
-                      />
-                      색인 전
-                    </span>
-                    <span
-                      class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-neutral-bg text-neutral"
-                    >
-                      <span
-                        aria-hidden="true"
-                        class="size-1.5 rounded-full bg-neutral"
-                      />
-                      원문 대조 전
-                    </span>
-                  </div>
-                </label>
-              </div>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </aside>
-    <main
-      class="min-w-0 space-y-8 px-6 py-8 lg:px-10"
-    >
-      <header
-        class="space-y-1"
-      >
-        <h1
-          class="text-2xl font-bold tracking-tight"
-        >
-          질문하기
-        </h1>
-        <p
-          class="text-sm text-muted-foreground"
-        >
-          제공된 과거 공고(2021-10 ~ 2025-02) 기준입니다. 현재 입찰 가능 여부는 이 자료로 판단할 수 없습니다.
-        </p>
-      </header>
-      <div
-        aria-label="질문 범위"
-        class="group/toggle-group flex flex-row items-center gap-[--spacing(var(--gap))] rounded-lg data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-vertical:flex-col data-vertical:items-stretch w-fit"
-        data-orientation="horizontal"
-        data-slot="toggle-group"
-        data-spacing="0"
-        data-variant="outline"
-        dir="ltr"
-        role="radiogroup"
-        style="outline: none; --gap: 0;"
-        tabindex="0"
-      >
-        <button
-          aria-checked="true"
-          class="shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group/toggle inline-flex items-center justify-center gap-1 rounded-lg font-medium whitespace-nowrap transition-all outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted data-[state=on]:bg-muted dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border border-input bg-transparent hover:bg-muted min-w-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 h-9 px-3 text-sm"
-          data-radix-collection-item=""
-          data-size="default"
-          data-slot="toggle-group-item"
-          data-spacing="0"
-          data-state="on"
-          data-variant="outline"
-          role="radio"
-          tabindex="-1"
-          type="button"
-        >
-          선택한 문서
-        </button>
-        <button
-          aria-checked="false"
-          class="shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group/toggle inline-flex items-center justify-center gap-1 rounded-lg font-medium whitespace-nowrap transition-all outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted data-[state=on]:bg-muted dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border border-input bg-transparent hover:bg-muted min-w-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 h-9 px-3 text-sm"
-          data-radix-collection-item=""
-          data-size="default"
-          data-slot="toggle-group-item"
-          data-spacing="0"
-          data-state="off"
-          data-variant="outline"
-          role="radio"
-          tabindex="-1"
-          type="button"
-        >
-          전체 문서
-        </button>
-      </div>
-      <div
-        class="rounded-2xl border border-dashed p-10 text-center"
-      >
-        <p
-          class="text-lg font-semibold"
-        >
-          질문할 문서를 고르세요
-        </p>
-        <p
-          class="mt-1 text-sm text-muted-foreground"
-        >
-          하나를 고르면 질문할 수 있고, 두 개를 고르면 비교할 수 있습니다. 문서를 모르면 ‘전체 문서’로 질문하세요.
-        </p>
-      </div>
-      <div
-        class="border-t pt-6"
-        data-slot="collapsible"
-        data-state="closed"
-      >
-        <button
-          aria-expanded="false"
-          class="group flex min-h-9 items-center gap-2 rounded text-lg font-bold outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-          data-slot="collapsible-trigger"
-          data-state="closed"
-          type="button"
-        >
-          내 최근 요청␠
-          <svg
-            aria-hidden="true"
-            class="lucide lucide-chevron-down size-4 transition-transform group-data-[state=open]:rotate-180"
-            fill="none"
-            height="24"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-            width="24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="m6 9 6 6 6-6"
-            />
-          </svg>
-        </button>
-        <div
-          class="space-y-4 pt-4"
-          data-slot="collapsible-content"
-          data-state="closed"
-          hidden=""
-          id="radix-_r_3_"
-          style=""
-        />
-      </div>
-    </main>
-  </div>
-</div>
+div
+  div
+    aside
+      div
+        form role="search" aria-label="문서 찾기"
+          h2 "문서 찾기"
+          div
+            svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+            label for="q" "검색어"
+            input id="q" placeholder="사업명, 내용, 요구사항 코드" value
+          div
+            label for="inst" "발주 기관"
+            input id="inst" placeholder="예: 한국교육학술정보원" value
+          div data-state="closed"
+            button type="button" aria-expanded="false" data-state="closed"
+              "상세 조건 "
+              svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+            div data-state="closed" id="radix-_r_0_" hidden
+          button type="submit" "검색"
+        div aria-live="polite"
+          p
+            "3"
+            "건 · 질문할 수 있는 문서가 먼저 나옵니다 · 최대 2개 선택"
+          ul
+            li
+              div
+                button type="button" role="checkbox" aria-checked="false" data-state="unchecked" value="on" id="pick-doc-aaaaaaaa"
+                label for="pick-doc-aaaaaaaa"
+                  span "통합 정보시스템 구축"
+                  span
+                    "한국교육학술정보원"
+                    " · "
+                    "1억 3,000만원"
+                    " · 마감 "
+                    "2024-03-20 10:00"
+                  div
+                    span
+                      span aria-hidden="true"
+                      "질문 가능"
+                    span
+                      span aria-hidden="true"
+                      "자동 대조 통과"
+            li
+              div
+                button type="button" role="checkbox" aria-checked="false" data-state="unchecked" value="on" id="pick-doc-bbbbbbbb"
+                label for="pick-doc-bbbbbbbb"
+                  span "학사 행정 고도화"
+                  span
+                    "기관 미상"
+                    " · "
+                    "5,230만원"
+                    " · 마감 "
+                    "2024-03-20 10:00"
+                  div
+                    span
+                      span aria-hidden="true"
+                      "질문 가능"
+                    span
+                      span aria-hidden="true"
+                      "자동 대조: 확인 필요"
+                    span
+                      span aria-hidden="true"
+                      "기록 충돌: "
+                      "사업 금액"
+            li
+              div
+                button type="button" role="checkbox" aria-checked="false" data-state="unchecked" value="on" id="pick-doc-cccccccc"
+                label for="pick-doc-cccccccc"
+                  span "미색인 문서"
+                  span
+                    "한국교육학술정보원"
+                    " · "
+                    "1억 3,000만원"
+                    " · 마감 "
+                    "2024-03-20 10:00"
+                  div
+                    span
+                      span aria-hidden="true"
+                      "색인 전"
+                    span
+                      span aria-hidden="true"
+                      "원문 대조 전"
+    main
+      header
+        h1 "질문하기"
+        p "제공된 과거 공고(2021-10 ~ 2025-02) 기준입니다. 현재 입찰 가능 여부는 이 자료로 판단할 수 없습니다."
+      div dir="ltr" role="radiogroup" data-variant="outline" aria-label="질문 범위" tabindex="0"
+        button type="button" data-state="on" role="radio" aria-checked="true" data-variant="outline" tabindex="-1" "선택한 문서"
+        button type="button" data-state="off" role="radio" aria-checked="false" data-variant="outline" tabindex="-1" "전체 문서"
+      div
+        p "질문할 문서를 고르세요"
+        p "하나를 고르면 질문할 수 있고, 두 개를 고르면 비교할 수 있습니다. 문서를 모르면 ‘전체 문서’로 질문하세요."
+      div data-state="closed"
+        button type="button" aria-expanded="false" data-state="closed"
+          "내 최근 요청 "
+          svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+        div data-state="closed" id="radix-_r_3_" hidden
 `;
 
 exports[`selection and modes > one document offers answer, basic information and requirements 1`] = `
-<main
-  class="min-w-0 space-y-8 px-6 py-8 lg:px-10"
->
-  <header
-    class="space-y-1"
-  >
-    <h1
-      class="text-2xl font-bold tracking-tight"
-    >
-      질문하기
-    </h1>
-    <p
-      class="text-sm text-muted-foreground"
-    >
-      제공된 과거 공고(2021-10 ~ 2025-02) 기준입니다. 현재 입찰 가능 여부는 이 자료로 판단할 수 없습니다.
-    </p>
-  </header>
-  <div
-    aria-label="질문 범위"
-    class="group/toggle-group flex flex-row items-center gap-[--spacing(var(--gap))] rounded-lg data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-vertical:flex-col data-vertical:items-stretch w-fit"
-    data-orientation="horizontal"
-    data-slot="toggle-group"
-    data-spacing="0"
-    data-variant="outline"
-    dir="ltr"
-    role="radiogroup"
-    style="outline: none; --gap: 0;"
-    tabindex="0"
-  >
-    <button
-      aria-checked="true"
-      class="shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group/toggle inline-flex items-center justify-center gap-1 rounded-lg font-medium whitespace-nowrap transition-all outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted data-[state=on]:bg-muted dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border border-input bg-transparent hover:bg-muted min-w-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 h-9 px-3 text-sm"
-      data-radix-collection-item=""
-      data-size="default"
-      data-slot="toggle-group-item"
-      data-spacing="0"
-      data-state="on"
-      data-variant="outline"
-      role="radio"
-      tabindex="-1"
-      type="button"
-    >
-      선택한 문서
-    </button>
-    <button
-      aria-checked="false"
-      class="shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group/toggle inline-flex items-center justify-center gap-1 rounded-lg font-medium whitespace-nowrap transition-all outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted data-[state=on]:bg-muted dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border border-input bg-transparent hover:bg-muted min-w-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 h-9 px-3 text-sm"
-      data-radix-collection-item=""
-      data-size="default"
-      data-slot="toggle-group-item"
-      data-spacing="0"
-      data-state="off"
-      data-variant="outline"
-      role="radio"
-      tabindex="-1"
-      type="button"
-    >
-      전체 문서
-    </button>
-  </div>
-  <ul
-    class="grid gap-3 md:grid-cols-2"
-  >
-    <li
-      class="space-y-3 rounded-2xl bg-secondary/60 p-4"
-    >
-      <div
-        class="flex items-start gap-3"
-      >
-        <div
-          class="min-w-0 flex-1"
-        >
-          <p
-            class="text-base font-semibold"
-          >
-            통합 정보시스템 구축
-          </p>
-          <p
-            class="mt-1 text-[13px] text-muted-foreground"
-          >
-            한국교육학술정보원
-             ·␠
-            1억 3,000만원
-             · 공개␠
-            2024-03-02
-             ·␠
-            PDF
-             ·␠
-            자동 대조 통과
-          </p>
-        </div>
-        <button
-          aria-label="통합 정보시스템 구축 선택 해제"
-          class="rounded-md p-1 text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-          type="button"
-        >
-          <svg
-            aria-hidden="true"
-            class="lucide lucide-x size-4"
-            fill="none"
-            height="24"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-            width="24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M18 6 6 18"
-            />
-            <path
-              d="m6 6 12 12"
-            />
-          </svg>
-        </button>
-      </div>
-      <a
-        class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-background px-2.5 text-[13px] font-semibold outline-none hover:bg-background/70 focus-visible:ring-3 focus-visible:ring-ring/50"
-        href="/api/originals/doc-aaaaaaaa/hash-a"
-      >
-        <svg
-          aria-hidden="true"
-          class="lucide lucide-download size-3.5"
-          fill="none"
-          height="24"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          viewBox="0 0 24 24"
-          width="24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M12 15V3"
-          />
-          <path
-            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
-          />
-          <path
-            d="m7 10 5 5 5-5"
-          />
-        </svg>
-        원문 파일 받기
-      </a>
-    </li>
-  </ul>
-  <div
-    class="grid gap-8"
-  >
-    <div
-      class="min-w-0 space-y-8"
-    >
-      <form
-        class="rounded-2xl border bg-background space-y-3 p-4 shadow-[0_1px_2px_rgb(0_0_0/0.04)]"
-      >
-        <div
-          aria-label="질문 방식"
-          class="group/toggle-group flex-row items-center gap-[--spacing(var(--gap))] rounded-lg data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-vertical:flex-col data-vertical:items-stretch grid w-full auto-cols-fr grid-flow-col sm:flex sm:w-fit"
-          data-orientation="horizontal"
-          data-slot="toggle-group"
-          data-spacing="0"
-          data-variant="outline"
-          dir="ltr"
-          role="radiogroup"
-          style="outline: none; --gap: 0;"
-          tabindex="0"
-        >
-          <button
-            aria-checked="true"
-            class="shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group/toggle inline-flex items-center justify-center gap-1 rounded-lg font-medium transition-all outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted data-[state=on]:bg-muted dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border border-input bg-transparent hover:bg-muted min-w-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 h-auto flex-wrap px-2 py-1 whitespace-normal sm:flex-nowrap sm:px-3 sm:py-0 sm:whitespace-nowrap min-h-9 text-sm sm:h-9"
-            data-radix-collection-item=""
-            data-size="default"
-            data-slot="toggle-group-item"
-            data-spacing="0"
-            data-state="on"
-            data-variant="outline"
-            role="radio"
-            tabindex="-1"
-            type="button"
-          >
-            근거 기반 답변
-            <span
-              class="ml-1.5 text-xs text-warn"
-            >
-              유료
-            </span>
-          </button>
-          <button
-            aria-checked="false"
-            class="shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group/toggle inline-flex items-center justify-center gap-1 rounded-lg font-medium transition-all outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted data-[state=on]:bg-muted dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border border-input bg-transparent hover:bg-muted min-w-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 h-auto flex-wrap px-2 py-1 whitespace-normal sm:flex-nowrap sm:px-3 sm:py-0 sm:whitespace-nowrap min-h-9 text-sm sm:h-9"
-            data-radix-collection-item=""
-            data-size="default"
-            data-slot="toggle-group-item"
-            data-spacing="0"
-            data-state="off"
-            data-variant="outline"
-            role="radio"
-            tabindex="-1"
-            type="button"
-          >
-            기본 정보
-            <span
-              class="ml-1.5 text-xs text-ok"
-            >
-              무료
-            </span>
-          </button>
-          <button
-            aria-checked="false"
-            class="shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group/toggle inline-flex items-center justify-center gap-1 rounded-lg font-medium transition-all outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted data-[state=on]:bg-muted dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border border-input bg-transparent hover:bg-muted min-w-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 h-auto flex-wrap px-2 py-1 whitespace-normal sm:flex-nowrap sm:px-3 sm:py-0 sm:whitespace-nowrap min-h-9 text-sm sm:h-9"
-            data-radix-collection-item=""
-            data-size="default"
-            data-slot="toggle-group-item"
-            data-spacing="0"
-            data-state="off"
-            data-variant="outline"
-            role="radio"
-            tabindex="-1"
-            type="button"
-          >
-            요구사항 목록
-            <span
-              class="ml-1.5 text-xs text-ok"
-            >
-              무료
-            </span>
-          </button>
-        </div>
-        <div>
-          <label
-            class="sr-only"
-            for="question"
-          >
-            질문
-          </label>
-          <textarea
-            class="w-full rounded-xl border border-input bg-background p-3 text-[16px] leading-7 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 resize-y"
-            id="question"
-            maxlength="2000"
-            placeholder="예: 하자보수 기간과 조건은 무엇인가요?"
-            rows="3"
-          />
-        </div>
-        <div
-          class="flex flex-wrap items-center gap-3"
-        >
-          <button
-            class="rounded-xl bg-primary px-5 text-[15px] font-semibold text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 h-11"
-            type="submit"
-          >
-            답변 받기 · 유료 1회
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-  <div
-    class="border-t pt-6"
-    data-slot="collapsible"
-    data-state="closed"
-  >
-    <button
-      aria-expanded="false"
-      class="group flex min-h-9 items-center gap-2 rounded text-lg font-bold outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-      data-slot="collapsible-trigger"
-      data-state="closed"
-      type="button"
-    >
-      내 최근 요청␠
-      <svg
-        aria-hidden="true"
-        class="lucide lucide-chevron-down size-4 transition-transform group-data-[state=open]:rotate-180"
-        fill="none"
-        height="24"
-        stroke="currentColor"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        viewBox="0 0 24 24"
-        width="24"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="m6 9 6 6 6-6"
-        />
-      </svg>
-    </button>
-    <div
-      class="space-y-4 pt-4"
-      data-slot="collapsible-content"
-      data-state="closed"
-      hidden=""
-      id="radix-_r_7_"
-      style=""
-    />
-  </div>
-</main>
+main
+  header
+    h1 "질문하기"
+    p "제공된 과거 공고(2021-10 ~ 2025-02) 기준입니다. 현재 입찰 가능 여부는 이 자료로 판단할 수 없습니다."
+  div dir="ltr" role="radiogroup" data-variant="outline" aria-label="질문 범위" tabindex="0"
+    button type="button" data-state="on" role="radio" aria-checked="true" data-variant="outline" tabindex="-1" "선택한 문서"
+    button type="button" data-state="off" role="radio" aria-checked="false" data-variant="outline" tabindex="-1" "전체 문서"
+  ul
+    li
+      div
+        div
+          p "통합 정보시스템 구축"
+          p
+            "한국교육학술정보원"
+            " · "
+            "1억 3,000만원"
+            " · 공개 "
+            "2024-03-02"
+            " · "
+            "PDF"
+            " · "
+            "자동 대조 통과"
+        button type="button" aria-label="통합 정보시스템 구축 선택 해제"
+          svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+      a href="/api/originals/doc-aaaaaaaa/hash-a"
+        svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+        "원문 파일 받기"
+  div
+    div
+      form
+        div dir="ltr" role="radiogroup" data-variant="outline" aria-label="질문 방식" tabindex="0"
+          button type="button" data-state="on" role="radio" aria-checked="true" data-variant="outline" tabindex="-1"
+            "근거 기반 답변"
+            span "유료"
+          button type="button" data-state="off" role="radio" aria-checked="false" data-variant="outline" tabindex="-1"
+            "기본 정보"
+            span "무료"
+          button type="button" data-state="off" role="radio" aria-checked="false" data-variant="outline" tabindex="-1"
+            "요구사항 목록"
+            span "무료"
+        div
+          label for="question" "질문"
+          textarea id="question" rows="3" maxlength="2000" placeholder="예: 하자보수 기간과 조건은 무엇인가요?"
+        div
+          button type="submit" "답변 받기 · 유료 1회"
+  div data-state="closed"
+    button type="button" aria-expanded="false" data-state="closed"
+      "내 최근 요청 "
+      svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+    div data-state="closed" id="radix-_r_7_" hidden
 `;
 
 exports[`selection and modes > two documents offer comparison; their warnings show on the cards 1`] = `
