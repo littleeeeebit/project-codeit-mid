@@ -1104,10 +1104,10 @@ class AnswerRunTest(GoldRetrievalTest):
         est = answers.plan_run(self.s, "embedding-comparison", "dev", runs)
         self.assertEqual((est["run_id"][:2], est["finalists"], est["model"]), ("E-", runs, "gpt-5-mini"))
         low_run_id = est["run_id"]
-        self.s = self.s.with_(generation_reasoning_effort="minimal")
+        self.s = self.s.with_(generation_reasoning_effort="minimal", generation_max_output_tokens=2000)
         est = answers.plan_run(self.s, "embedding-comparison", "dev", runs)
         self.assertNotEqual(est["run_id"], low_run_id)
-        self.assertEqual((est["reasoning_effort"], est["max_output_tokens"]), ("minimal", 4000))
+        self.assertEqual((est["reasoning_effort"], est["max_output_tokens"]), ("minimal", 2000))
         transport = FakeTransport()
         res = service.Resources(self.s, transport=transport, recover=True)
         try:
@@ -1116,7 +1116,7 @@ class AnswerRunTest(GoldRetrievalTest):
             self.assertTrue(chat.call_args_list)
             for call in chat.call_args_list:
                 self.assertEqual((call.kwargs["reasoning_effort"], call.kwargs["max_completion_tokens"]),
-                                 ("minimal", 4000))
+                                 ("minimal", 2000))
         finally:
             res.close()
         self.assertEqual(out["status"], "complete")
@@ -1137,6 +1137,9 @@ class AnswerRunTest(GoldRetrievalTest):
         table = json.loads((compare.compare_dir(self.s) / "tables" / "answer-embedding.json").read_text(encoding="utf-8"))
         self.assertEqual(([r["run_id"] for r in table["rows"]], table["answer_run_id"]), (runs, out["run_id"]))
         self.assertEqual(table["rows"][0]["name"], "K1")
+        self.assertEqual((table["fixed"]["reasoning_effort"], table["fixed"]["max_output_tokens"],
+                          table["fixed"]["answer_questions"], table["fixed"]["development_subset"]),
+                         ("minimal", 2000, est["rows"], False))
         self.assertIn("No row differs significantly" if not table["conclusion"]["significant"] else "significantly",
                       (compare.compare_dir(self.s) / "tables" / "answer-embedding.md").read_text(encoding="utf-8"))
         reader = service.Resources(self.s, transport=None)

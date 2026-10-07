@@ -993,7 +993,11 @@ def write_comparison_table(settings: Settings, config: dict, scores: dict) -> di
             "licence": licence, "research_only": model in RESEARCH_ONLY})
     table = {"version": ANSWER_EVAL_VERSION, "matrix": COMPARISON_TABLE, "title": "임베딩별 gpt-5-mini 답변",
              "answer_run_id": config["run_id"], "model": config["model"], "axes": {"embedding": [r["name"] for r in rows]},
-             "fixed": {"retrieval": "hybrid", "fusion": compare.SERVING_FUSION, "depth": 50, "units": 10},
+             "fixed": {"retrieval": "hybrid", "fusion": compare.SERVING_FUSION, "depth": 50, "units": 10,
+                       "reasoning_effort": config["reasoning_effort"],
+                       "max_output_tokens": config["max_output_tokens"],
+                       "answer_questions": next(iter(scores["finalists"].values()))["of"],
+                       "development_subset": bool(config.get("question_ids"))},
              "base": None, "baseline_k1_run": comparison["baseline"],
              "columns": [{"key": k, "label": label, "better": better} for k, label, better in COMPARISON_COLUMNS],
              "created_at": utcnow(), "populations": {"dev": "development rows on their own documents"},

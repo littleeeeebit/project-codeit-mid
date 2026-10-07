@@ -43,12 +43,13 @@ const AXIS: Record<string, Record<string, string>> = {
   rerank_mode: { whole: "전체 재정렬", below_head: "BM25 상위 6 고정" },
   analyzer: { whitespace: "K0 공백 분리", kiwi: "K1 Kiwi 형태소" },
   embedding: { K1: "K1 키워드만 (기준)" },
+  development_subset: { true: "사용", false: "전체 개발셋" },
 };
 const STATUS: Record<string, string> = { failed: "실행 실패", needs_approval: "비용 승인 대기", not_run: "아직 측정 안 함" };
 const MODE: Record<string, string> = {
   kiwi_bm25: "키워드 Kiwi BM25", keyword: "키워드", dense: "밀집만", hybrid: "하이브리드", hybrid_rerank: "하이브리드 + 재정렬",
 };
-const FIXED: Record<string, string> = { retrieval: "검색", analyzer: "분석기", embedding: "임베딩", fusion: "융합", depth: "후보", units: "근거 단위" };
+const FIXED: Record<string, string> = { retrieval: "검색", analyzer: "분석기", embedding: "임베딩", fusion: "융합", depth: "후보", units: "근거 단위", reasoning_effort: "추론", max_output_tokens: "최대 토큰 (추론 포함)", answer_questions: "비교 질문 수", development_subset: "개발 부분집합" };
 const POP: Record<string, string> = { dev: "개발 질문 · 자기 문서", whole: "전체 문서" };
 
 function fmt(key: string, v: Value): string {
