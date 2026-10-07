@@ -16,7 +16,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from rfp_assistant import cli
+from rfp_assistant import cli, contracts
 from rfp_assistant import settings as settings_mod
 from rfp_assistant.contracts import AnswerRequest
 from rfp_assistant.corpus import ingestion
@@ -476,6 +476,76 @@ class IngestSourceTest(unittest.TestCase):
         self.assertEqual(fp, ingestion.parser_fingerprint("hwp"))
         self.assertEqual(els, [("paragraph", "hwp", "하자보수 �� 기간")])
         self.assertEqual(warnings, [{"code": "replacement_characters", "count": 2}])
+
+
+class ValidateAnswerTest(unittest.TestCase):
+    """generation.validate_answer: each refusal in the order its checks run, and what a valid answer keeps."""
+
+    A, B = "doc-aaaaaaaa-1", "doc-bbbbbbbb-2"
+
+    def evidence(self, eid, doc):
+        return contracts.EvidenceUnit(eid, doc, "h", "x", "c" + eid, ["e"], f"quote {eid}", {}, 3)
+
+    def validate(self, payload=None, response=None, quotes=None, required=None):
+        ev = [self.evidence("E1", self.A), self.evidence("E2", self.B)]
+        content = json.dumps({**self.good(), **(payload or {})}, ensure_ascii=False)
+        response = response or generation.ProviderResponse(content, None, "stop", {}, "r")
+        quotes = {"E1": "quote E1", "E2": "quote E2", **(quotes or {})}
+        return generation.validate_answer(response, ev, {self.A, self.B}, quotes, required_doc_ids=required)
+
+    def good(self):
+        return {"status": "answered", "summary": "기간은 12개월 [E1]", "summary_evidence_ids": ["E1"],
+                "claims": [{"text": "12개월 (E1, E2)", "kind": "source_fact", "doc_id": self.A, "evidence_ids": ["E1"]}],
+                "missing_fields": [], "conflicts": [], "next_action": None}
+
+    def claim(self, **kw):
+        return {"claims": [{"text": "t", "kind": "source_fact", "doc_id": self.A, "evidence_ids": ["E1"], **kw}]}
+
+    def test_refusals(self):
+        missing = lambda **kw: {"missing_fields": [{"doc_id": self.A, "field": "f", "reason": "not_found_in_context",  # noqa: E731
+                                                    **kw}]}
+        cases = [
+            ({"response": generation.ProviderResponse(None, "no", "stop", {}, "r")}, "model_refusal: no"),
+            ({"response": generation.ProviderResponse("{}", None, "length", {}, "r")}, "output_truncated"),
+            ({"response": generation.ProviderResponse("{}", None, "content_filter", {}, "r")},
+             "incomplete_output: finish_reason=content_filter"),
+            ({"response": generation.ProviderResponse("", None, "stop", {}, "r")}, "incomplete_output: finish_reason=stop"),
+            ({"payload": self.claim(kind="absence")}, f"absence_not_listed: {self.A}"),
+            ({"payload": self.claim(doc_id="doc-z")}, "claim_outside_scope: doc-z"),
+            ({"payload": self.claim(evidence_ids=[])}, "claim_without_evidence"),
+            ({"payload": self.claim(evidence_ids=["E9"])}, "unknown_evidence_id: E9"),
+            ({"payload": self.claim(evidence_ids=["E2"])}, "evidence_scope_mismatch: E2 belongs to another document"),
+            ({"quotes": {"E1": "changed"}}, "evidence_quote_mismatch: E1"),
+            ({"payload": self.claim(kind="inference", evidence_ids=["E2"]), "required": {self.A, self.B}},
+             "evidence_scope_mismatch: inference cites nothing of doc-aaaa"),
+            ({"payload": {"conflicts": [{"field": "f", "alternatives": [
+                {"doc_id": self.A, "value": "v", "evidence_ids": []}]}]}}, "conflict_without_evidence"),
+            ({"payload": missing(doc_id="doc-z")}, "missing_field_outside_scope: doc-z"),
+            ({"payload": missing(reason="source_absence_verified")}, "source_absence_claimed_from_retrieval"),
+            ({"payload": {"claims": []}}, "answered_without_claims"),
+            ({"payload": {"summary_evidence_ids": ["E7"]}}, "unknown_evidence_id: E7"),
+            ({"required": {self.A, self.B}}, "comparison_side_missing: doc-bbbb"),
+            ({"payload": {"summary_evidence_ids": []}}, "summary_without_evidence")]
+        for kw, message in cases:
+            with self.subTest(message=message), self.assertRaises(generation.TechnicalError) as caught:
+                self.validate(**kw)
+            self.assertEqual(str(caught.exception), message)
+        with self.assertRaises(generation.TechnicalError) as caught:
+            self.validate(response=generation.ProviderResponse('{"status": "answered"}', None, "stop", {}, "r"))
+        self.assertTrue(str(caught.exception).startswith("schema_invalid: [{'type': 'missing'"))
+
+    def test_a_valid_answer(self):
+        listed = {"claims": self.good()["claims"] + [
+            {"text": " 하자  기간 ", "kind": "absence", "doc_id": self.B, "evidence_ids": []},
+            {"text": "비교", "kind": "inference", "doc_id": self.B, "evidence_ids": ["E1", "E2"]}],
+            "missing_fields": [{"doc_id": self.B, "field": "하자 기간", "reason": "not_found_in_context"}]}
+        payload = self.validate(listed, required={self.A, self.B})
+        self.assertEqual(payload.model_dump(), {
+            "status": "answered", "summary": "기간은 12개월", "summary_evidence_ids": ["E1"],
+            "claims": [{"text": "12개월", "kind": "source_fact", "doc_id": self.A, "evidence_ids": ["E1"]},
+                       {"text": "비교", "kind": "inference", "doc_id": self.B, "evidence_ids": ["E1", "E2"]}],
+            "missing_fields": [{"doc_id": self.B, "field": "하자 기간", "reason": "not_found_in_context"}],
+            "conflicts": [], "next_action": None})
 
 
 class RecoverSourceRefusalTest(unittest.TestCase):
