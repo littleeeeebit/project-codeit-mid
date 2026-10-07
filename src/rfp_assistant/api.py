@@ -432,6 +432,12 @@ def _auth_routes(app: FastAPI) -> None:
 
 
 def _routes(app: FastAPI) -> None:
+    for add_routes in (_account_routes, _ask_routes, _request_routes):
+        add_routes(app)
+
+
+def _account_routes(app: FastAPI) -> None:
+    """Build info, the member's budget, API key and model."""
     @app.get("/api/info", response_model=Info)
     def info(res: Res):
         return Info(build=service.build_head(), today=date.today().isoformat(),
@@ -459,6 +465,9 @@ def _routes(app: FastAPI) -> None:
     def generation_model(body: ModelIn, res: Res, member: Member):
         return service.set_generation_model(res, member, body.model)
 
+
+def _ask_routes(app: FastAPI) -> None:
+    """Documents, asking, and reading or streaming a request."""
     @app.get("/api/documents", response_model=list[Document])
     def documents(res: Res, member: Member, query: str = "", institution: str = "", amount_min: int | None = None,
                   amount_max: int | None = None, closing_from: date | None = None, closing_to: date | None = None):
@@ -505,6 +514,9 @@ def _routes(app: FastAPI) -> None:
         return StreamingResponse(events(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
+
+def _request_routes(app: FastAPI) -> None:
+    """Cancelling, abandoning and exporting a request, its evidence and the originals."""
     @app.post("/api/requests/{request_id}/cancel", response_model=Cancelled)
     def cancel(request_id: str, res: Res, member: Member):
         return Cancelled(status=service.cancel_request(res, member, request_id))
@@ -1168,6 +1180,12 @@ class Activated(_Read):
 
 
 def _verify_routes(app: FastAPI) -> None:
+    for add_routes in (_trace_routes, _evaluation_routes, _operation_routes, _review_routes):
+        add_routes(app)
+
+
+def _trace_routes(app: FastAPI) -> None:
+    """Overview, traces and their comparison."""
     @app.get("/api/verify/overview", response_model=VerifyOverview)
     def overview(res: Res, member: Member):
         return VerifyOverview(evaluation=service.evaluation_overview(res, member),
@@ -1207,6 +1225,9 @@ def _verify_routes(app: FastAPI) -> None:
     def compare(a: str, b: str, res: Res, member: Member):
         return service.compare_verifier_runs(res, member, a, b)
 
+
+def _evaluation_routes(app: FastAPI) -> None:
+    """Answer evaluation and the judge comparison."""
     @app.post("/api/verify/evaluation/plan", response_model=Estimate)
     def plan_evaluation(res: Res, member: Member):
         """Free: prices the development answers still to generate. Nothing is sent."""
@@ -1238,6 +1259,9 @@ def _verify_routes(app: FastAPI) -> None:
     def judge_disagreements(run_id: str, res: Res, member: Member):
         return service.judge_disagreements(res, member, run_id)
 
+
+def _operation_routes(app: FastAPI) -> None:
+    """Maintenance and the experiment tables."""
     @app.get("/api/verify/maintenance", response_model=MaintenanceStatus)
     def maintenance_status(res: Res, member: Member):
         """The maintenance sequence's progress, or the last run's report."""
@@ -1263,6 +1287,9 @@ def _verify_routes(app: FastAPI) -> None:
         """Switches what serves to the picked row's run (`activate-run`), recorded under the signed-in member."""
         return service.activate_experiment(res, member, body.run_id, member.member_id, body.note)
 
+
+def _review_routes(app: FastAPI) -> None:
+    """Fidelity, ingestion, corrections, history and the second gold review."""
     @app.get("/api/verify/fidelity", response_model=list[FidelitySource])
     def fidelity(res: Res, member: Member):
         return service.fidelity_overview(res, member)
