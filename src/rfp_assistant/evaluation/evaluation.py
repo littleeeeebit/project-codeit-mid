@@ -568,6 +568,11 @@ def fragment_target(unit: dict, element: dict, row: int) -> tuple[int, int] | No
     return _quote_range(line, unit["quote"])
 
 
+def _unit_spans(chunk: dict, unit: dict):
+    """The chunk's spans over the evidence unit's element."""
+    return (span for span in chunk["spans"] if span["element_id"] == unit["element_id"])
+
+
 def grade(chunk: dict, unit: dict, element: dict | None) -> int:
     """2: the chunk carries the whole approved evidence; 1: it carries part of the same element around it;
     0: unrelated. Judged on source spans against the reviewer's coordinates (`text_target`, `row_target`,
@@ -575,9 +580,7 @@ def grade(chunk: dict, unit: dict, element: dict | None) -> int:
     if element is None:
         return 0
     best = 0
-    for span in chunk["spans"]:
-        if span["element_id"] != unit["element_id"]:
-            continue
+    for span in _unit_spans(chunk, unit):
         if "rows" in span and span.get("fragment"):
             # One piece of an oversized row: only the characters this piece carries count.
             frag = span["fragment"]
@@ -658,9 +661,7 @@ def coverage(chunk: dict, unit: dict, element: dict | None) -> frozenset | None:
     if element is None:
         return None
     atoms: set = set()
-    for span in chunk["spans"]:
-        if span["element_id"] != unit["element_id"]:
-            continue
+    for span in _unit_spans(chunk, unit):
         if "rows" in span and span.get("fragment"):
             frag = span["fragment"]
             rng = fragment_target(unit, element, frag["row"]) if element.get("table") else None
@@ -1049,7 +1050,6 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
     """Retrieval-only runs on identical source/scope/query versions; no answer generation. Query vectors are
     computed once, cached, and shared by D and H. A run whose configuration is already frozen with scores is
     reused unless `force`."""
-    from ..retrieval import dense as dense_mod
     from ..retrieval.retrieval import RUN_MODES, KeywordIndex, RetrievalError
     from ..storage.store import get_app_setting
 
@@ -1069,16 +1069,59 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
 
     if index_compatibility(index, analyzer):
         raise EvaluationError(index_compatibility(index, analyzer))
-    dense, dense_error = None, None
-    if any(x in ("D", "H") for x in labels):
-        version = _ready_dense_for(settings, index.version)
-        if version is None:
-            dense_error = "no ready dense matrix for this keyword index; run plan-embeddings and build-dense"
-        else:
-            try:
-                dense = dense_mod.DenseIndex.load(settings, version, base=index)
-            except dense_mod.DenseError as exc:
-                dense_error = f"dense matrix failed verification: {exc}"
+    dense, dense_error = _verified_dense(settings, index) if any(x in ("D", "H") for x in labels) else (None, None)
+    vectors, query_info, vector_error = _eval_query_vectors(settings, transport, rows, index, dense, dataset,
+                                                            dataset_sha, member_id, allow_paid_queries)
+    dense_error = vector_error or dense_error
+    stats = profile_stats(index)
+    summaries = []
+    for label in labels:
+        config = _frozen_config(settings, label, dataset, dataset_sha, index, dense, analyzer,
+                                population=(population_identity(rows, skipped), len(rows)),
+                                extra={"ranking_policy": GOLD_RANKING_POLICY}
+                                if any(is_gold_row(r) for r in rows) else None)
+        run_id = f"{label}-{hashlib.sha256(dumps(config).encode()).hexdigest()[:10]}"
+        d = _run_dir(settings, run_id)
+        if (d / "scores.json").exists() and not force:
+            scores = json.loads((d / "scores.json").read_text(encoding="utf-8"))
+            if scores.get("status") == "complete":
+                summaries.append({"run_id": run_id, "label": label, "reused": True, **_headline(scores)})
+                continue
+        if label in ("D", "H") and dense_error:
+            scores = {"status": "blocked", "reason": dense_error, "query_embedding": query_info}
+            _write_run(settings, run_id, config, [], scores)
+            summaries.append({"run_id": run_id, "label": label, "status": "blocked", "reason": dense_error})
+            continue
+        results = _execute(settings, index, analyzer, rows, RUN_MODES[label], dense=dense, vectors=vectors)
+        scores = {"status": "complete", "aggregate": aggregate(results, skipped), "profile_stats": stats,
+                  "query_embedding": query_info if label in ("D", "H") else None, "created_at": utcnow(),
+                  "provenance": {"code": code_fingerprint(), "hardware": hardware(),
+                                 "metric_code_sha256": metric_code_sha256()}}
+        _write_run(settings, run_id, config, results, scores)
+        summaries.append({"run_id": run_id, "label": label, "reused": False, **_headline(scores)})
+    return summaries
+
+
+def _verified_dense(settings: Settings, index) -> tuple[object | None, str | None]:
+    """The ready dense matrix over this keyword index, or why there is none."""
+    from ..retrieval import dense as dense_mod
+
+    version = _ready_dense_for(settings, index.version)
+    if version is None:
+        return None, "no ready dense matrix for this keyword index; run plan-embeddings and build-dense"
+    try:
+        return dense_mod.DenseIndex.load(settings, version, base=index), None
+    except dense_mod.DenseError as exc:
+        return None, f"dense matrix failed verification: {exc}"
+
+
+def _eval_query_vectors(settings: Settings, transport, rows: list[dict], index, dense, dataset: str,
+                        dataset_sha: str, member_id: str, allow_paid_queries: bool) -> tuple[dict, dict, str | None]:
+    """Query vectors for the scored passage rows (cache first, paid only when allowed and no earlier billing is
+    unknown), what they cost, and why D/H cannot run when some are missing."""
+    from ..retrieval import dense as dense_mod
+
+    dense_error = None
     vectors: dict[str, object] = {}
     query_info: dict = {"hits": 0, "paid": 0, "unavailable": 0, "settled_micro_usd": 0, "attempts": []}
     open_attempts = dense_mod.unresolved_attempts(settings, "gold_eval") if allow_paid_queries else []
@@ -1117,33 +1160,7 @@ def evaluate_retrieval(settings: Settings, analyzer, transport, dataset: str, la
             dense_error = (f"{query_info['unavailable']} query vectors unavailable "
                            f"({sorted(set(r for r in query_info.get('reasons', []) if r))}); "
                            "pass --allow-paid-queries with paid mode enabled, or keep K1")
-    stats = profile_stats(index)
-    summaries = []
-    for label in labels:
-        config = _frozen_config(settings, label, dataset, dataset_sha, index, dense, analyzer,
-                                population=(population_identity(rows, skipped), len(rows)),
-                                extra={"ranking_policy": GOLD_RANKING_POLICY}
-                                if any(is_gold_row(r) for r in rows) else None)
-        run_id = f"{label}-{hashlib.sha256(dumps(config).encode()).hexdigest()[:10]}"
-        d = _run_dir(settings, run_id)
-        if (d / "scores.json").exists() and not force:
-            scores = json.loads((d / "scores.json").read_text(encoding="utf-8"))
-            if scores.get("status") == "complete":
-                summaries.append({"run_id": run_id, "label": label, "reused": True, **_headline(scores)})
-                continue
-        if label in ("D", "H") and dense_error:
-            scores = {"status": "blocked", "reason": dense_error, "query_embedding": query_info}
-            _write_run(settings, run_id, config, [], scores)
-            summaries.append({"run_id": run_id, "label": label, "status": "blocked", "reason": dense_error})
-            continue
-        results = _execute(settings, index, analyzer, rows, RUN_MODES[label], dense=dense, vectors=vectors)
-        scores = {"status": "complete", "aggregate": aggregate(results, skipped), "profile_stats": stats,
-                  "query_embedding": query_info if label in ("D", "H") else None, "created_at": utcnow(),
-                  "provenance": {"code": code_fingerprint(), "hardware": hardware(),
-                                 "metric_code_sha256": metric_code_sha256()}}
-        _write_run(settings, run_id, config, results, scores)
-        summaries.append({"run_id": run_id, "label": label, "reused": False, **_headline(scores)})
-    return summaries
+    return vectors, query_info, dense_error
 
 
 def code_fingerprint() -> dict:
@@ -1226,19 +1243,74 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
                    load_info: dict | None = None, index_version: str | None = None, users: int = LOAD_USERS) -> dict:
     """Local-only reranker trial on the frozen H candidate pool: quality at each depth, warm latency alone and
     under `users` concurrent queries, and the promotion gate. A load failure records the bypass."""
-    from concurrent.futures import ThreadPoolExecutor
-
     from ..retrieval import dense as dense_mod
     from ..retrieval.dense import percentile
-    from ..retrieval.retrieval import KeywordIndex
+
+    index, rows, skipped, h_run, h_config, h_scores = _frozen_h(settings, analyzer, dataset, index_version)
+    # Retrieval runs exactly as H was frozen; only the reranker is new. A changed retrieval setting needs a new H.
+    limits = {k: v for k, v in h_config["limits"].items() if k != "corpus_route"}  # a code constant, recorded only
+    trial_settings = settings.with_(**limits, embedding_model=h_config["embedding"]["model"],
+                                    embedding_dimensions=h_config["embedding"]["dims"])
+    h_traces = {t["id"]: t for t in read_jsonl(_run_dir(settings, h_run) / "traces.jsonl")}
+    dense = dense_mod.DenseIndex.load(settings, h_config["dense_version"], base=index)
+    vectors = _cached_query_vectors(trial_settings, rows)
+    if reranker is None:
+        reranker, load_info = dense_mod.load_reranker(settings)
+    load_info = load_info or getattr(reranker, "info", {})
+    report: dict = {"h_run": h_run, "load": load_info, "depths": {}, "created_at": utcnow()}
+    if reranker is None:
+        return _bypass_trial(settings, report, h_run, h_config, depths, load_info)
+    passage = [r for r in rows if is_passage_row(r)]
+    failed = lambda reason, depth=None: _failed_trial(  # noqa: E731
+        settings, report, h_run, h_config, load_info, reason, depth)
+
+    # Warm once, then measure the reranking stage alone and under concurrent load.
+    if passage:
+        warm = _execute(trial_settings, index, analyzer, passage[:1], "hybrid_rerank", dense, vectors, reranker,
+                        max(depths))
+        if _inference_failure(warm):
+            return failed(_inference_failure(warm))
+    base_ndcg = h_scores["aggregate"]["ndcg@5"] or 0.0
+    by_id = {row_id(r): r for r in rows}
+    base_critical = set(critical_failures(list(h_traces.values()), by_id))  # same rule for both sides
+    best = None
+    for depth in depths:
+        results = _execute(trial_settings, index, analyzer, rows, "hybrid_rerank", dense, vectors, reranker, depth)
+        if _inference_failure(results):
+            return failed(_inference_failure(results), depth)
+        _check_frozen_pool(results, h_traces, depth)
+        alone = [r["timings_ms"]["rerank"] for r in results if r.get("timings_ms")]
+        loaded, queue, infer, unranked, under_load = _rerank_under_load(
+            trial_settings, index, analyzer, passage, dense, vectors, reranker, depth, users)
+        if under_load:
+            return failed(f"under {users}-user load: {under_load}", depth)
+        agg = aggregate(results, skipped)
+        gate = _reranker_gate(agg, base_critical, base_ndcg, percentile(loaded, 0.95), percentile(unranked, 0.95),
+                              users)
+        config = {**h_config, "label": "HR", "mode": "hybrid_rerank", "h_run": h_run,
+                  "eval_version": EVAL_VERSION, "reranker": _reranker_record(load_info), "rerank_depth": depth}
+        run_id = f"HR-{hashlib.sha256(dumps(config).encode()).hexdigest()[:10]}"
+        scores = {"status": "complete", "aggregate": agg, "gate": gate, "created_at": utcnow(),
+                  "latency_ms": _trial_latency(results, alone, queue, infer, loaded, unranked), "load": load_info}
+        _write_run(settings, run_id, config, results, scores)
+        report["depths"][depth] = {"run_id": run_id, **gate, "ndcg@5": agg["ndcg@5"]}
+        if gate["passed"] and (best is None or gate["ndcg@5_gain"] > report["depths"][best]["ndcg@5_gain"]):
+            best = depth
+    report["gate"] = {"passed": best is not None, "decision": f"eligible at depth {best}" if best else "bypass",
+                      "best_depth": best}
+    return report
+
+
+def _frozen_h(settings: Settings, analyzer, dataset: str, index_version: str | None) -> tuple:
+    """The index, the evaluated rows and the frozen H run the trial reranks: same dataset bytes, index, evaluated
+    population and analyzer."""
+    from ..retrieval.retrieval import KeywordIndex, analyzer_fingerprint, index_compatibility
     from ..storage.store import get_app_setting
 
     with open_db(settings.db_path) as conn:
         index_version = index_version or get_app_setting(conn, "active_index")
     index = KeywordIndex.load(settings, index_version)
     rows, skipped, dataset_sha = load_eval_rows(settings, dataset, extractions=index.source_extraction)
-    from ..retrieval.retrieval import index_compatibility
-
     if index_compatibility(index, analyzer):
         raise EvaluationError(index_compatibility(index, analyzer))
     # A newer H over another population (e.g. before a source revision was reverted) must not shadow the one
@@ -1250,16 +1322,15 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
     h_config, h_scores = load_run(settings, h_run)
     if h_config.get("population_sha256") != population_identity(rows, skipped):
         raise EvaluationError("the evaluated population changed since the frozen H run; rerun H before the trial")
-    from ..retrieval.retrieval import analyzer_fingerprint
-
     if h_config["analyzer"] != analyzer_fingerprint(analyzer):
         raise EvaluationError("the analyzer differs from the frozen H run; rerun H before the trial")
-    # Retrieval runs exactly as H was frozen; only the reranker is new. A changed retrieval setting needs a new H.
-    limits = {k: v for k, v in h_config["limits"].items() if k != "corpus_route"}  # a code constant, recorded only
-    trial_settings = settings.with_(**limits, embedding_model=h_config["embedding"]["model"],
-                                    embedding_dimensions=h_config["embedding"]["dims"])
-    h_traces = {t["id"]: t for t in read_jsonl(_run_dir(settings, h_run) / "traces.jsonl")}
-    dense = dense_mod.DenseIndex.load(settings, h_config["dense_version"], base=index)
+    return index, rows, skipped, h_run, h_config, h_scores
+
+
+def _cached_query_vectors(trial_settings: Settings, rows: list[dict]) -> dict:
+    """The frozen H query vectors, from the cache only."""
+    from ..retrieval import dense as dense_mod
+
     vectors = {}
     for row in rows:
         if is_passage_row(row):
@@ -1268,109 +1339,100 @@ def trial_reranker(settings: Settings, analyzer, dataset: str, depths: list[int]
             if vec is None:
                 raise EvaluationError("a frozen H query vector is missing from the cache; rerun H")
             vectors[row_id(row)] = vec
-    if reranker is None:
-        reranker, load_info = dense_mod.load_reranker(settings)
-    load_info = load_info or getattr(reranker, "info", {})
-    report: dict = {"h_run": h_run, "load": load_info, "depths": {}, "created_at": utcnow()}
-    if reranker is None:
-        report["gate"] = {"passed": False, "decision": "bypass", "reason": f"reranker unavailable: "
-                                                                           f"{load_info.get('error')}"}
-        run_id = f"HR-trial-{hashlib.sha256(dumps([h_run, depths, load_info]).encode()).hexdigest()[:10]}"
-        _write_run(settings, run_id, {**h_config, "label": "HR", "mode": "hybrid_rerank"},
-                   [], {"status": "blocked", "reason": report["gate"]["reason"], "trial": report})
-        return {"run_id": run_id, **report}
-    passage = [r for r in rows if is_passage_row(r)]
+    return vectors
 
-    def inference_failure(results: list[dict]) -> str | None:
-        return next((r["fallback"] for r in results if (r.get("fallback") or "").startswith("hybrid_rerank->")), None)
 
-    def failed_trial(reason: str, depth=None) -> dict:
-        """An inference error is recorded as a blocked trial with the bypass decision, never as a measurement."""
-        report["gate"] = {"passed": False, "decision": "bypass", "reason": f"reranker inference failed: {reason}",
-                          "depth": depth}
-        run_id = f"HR-failed-{hashlib.sha256(dumps([h_run, depth, reason, utcnow()]).encode()).hexdigest()[:10]}"
-        _write_run(settings, run_id, {**h_config, "label": "HR", "mode": "hybrid_rerank", "h_run": h_run,
-                                      "eval_version": EVAL_VERSION, "rerank_depth": depth,
-                                      "reranker": {k: load_info.get(k) for k in ("model", "revision", "device",
-                                                                                "max_length", "max_concurrency",
-                                                                                "precision")}},
-                   [], {"status": "blocked", "reason": report["gate"]["reason"], "trial": report, "load": load_info})
-        return {"run_id": run_id, **report}
+def _reranker_record(load_info: dict) -> dict:
+    return {k: load_info.get(k) for k in ("model", "revision", "device", "max_length", "max_concurrency", "precision")}
 
-    # Warm once, then measure the reranking stage alone and under concurrent load.
-    if passage:
-        warm = _execute(trial_settings, index, analyzer, passage[:1], "hybrid_rerank", dense, vectors, reranker,
-                        max(depths))
-        if inference_failure(warm):
-            return failed_trial(inference_failure(warm))
-    base_ndcg = h_scores["aggregate"]["ndcg@5"] or 0.0
-    by_id = {row_id(r): r for r in rows}
-    base_critical = set(critical_failures(list(h_traces.values()), by_id))  # same rule for both sides
-    best = None
-    for depth in depths:
-        results = _execute(trial_settings, index, analyzer, rows, "hybrid_rerank", dense, vectors, reranker, depth)
-        if inference_failure(results):
-            return failed_trial(inference_failure(results), depth)
-        for r in results:  # the pool must be exactly the frozen H candidates
-            if r.get("metrics"):
-                frozen = [c["chunk_id"] for c in h_traces[r["id"]]["candidates"] if c["channel"] == "rrf"][:depth]
-                now = [c["chunk_id"] for c in r["candidates"] if c["channel"] == "rrf"][:depth]
-                if frozen != now:
-                    raise EvaluationError(f"H candidates changed for {r['id']}; rerun H before the trial")
-        alone = [r["timings_ms"]["rerank"] for r in results if r.get("timings_ms")]
 
-        def one(row):
-            t0 = time.perf_counter()
-            (r,) = _execute(trial_settings, index, analyzer, [row], "hybrid_rerank", dense, vectors, reranker, depth)
-            timings = r.get("timings_ms") or {}
-            return ((time.perf_counter() - t0) * 1000, timings.get("rerank_queue"), timings.get("rerank_infer"),
-                    inference_failure([r]))
+def _inference_failure(results: list[dict]) -> str | None:
+    return next((r["fallback"] for r in results if (r.get("fallback") or "").startswith("hybrid_rerank->")), None)
 
-        def base(row):
-            t0 = time.perf_counter()
-            _execute(trial_settings, index, analyzer, [row], "hybrid", dense, vectors)
-            return (time.perf_counter() - t0) * 1000
 
-        with ThreadPoolExecutor(max_workers=users) as pool:
-            measured = list(pool.map(one, passage * max(1, users // max(1, len(passage)))))
-            loaded = [m[0] for m in measured]
-            queue = [m[1] for m in measured if m[1] is not None]
-            infer = [m[2] for m in measured if m[2] is not None]
-            unranked = list(pool.map(base, passage * max(1, users // max(1, len(passage)))))
-        under_load = next((m[3] for m in measured if m[3]), None)
-        if under_load:
-            return failed_trial(f"under {users}-user load: {under_load}", depth)
-        agg = aggregate(results, skipped)
-        new_critical = sorted(set(agg["critical_failures"]) - base_critical)
-        added_p95 = round((percentile(loaded, 0.95) or 0) - (percentile(unranked, 0.95) or 0), 1)
-        gain = round((agg["ndcg@5"] or 0.0) - base_ndcg, 4)
-        gate = {"ndcg@5_gain": gain, "required_gain": GATE_NDCG_GAIN, "new_critical_failures": new_critical,
-                "added_p95_ms_under_load": added_p95, "allowed_added_p95_ms": GATE_ADDED_P95_MS, "users": users,
-                "passed": gain >= GATE_NDCG_GAIN and not new_critical and added_p95 <= GATE_ADDED_P95_MS,
-                "pilot_rows": agg["passage_rows"],
-                "note": "pilot-sized sample: review a marginal gain on the larger dev set before final release"}
-        config = {**h_config, "label": "HR", "mode": "hybrid_rerank", "h_run": h_run,
-                  "eval_version": EVAL_VERSION,
-                  "reranker": {k: load_info.get(k) for k in ("model", "revision", "device", "max_length",
-                                                              "max_concurrency", "precision")},
-                  "rerank_depth": depth}
-        run_id = f"HR-{hashlib.sha256(dumps(config).encode()).hexdigest()[:10]}"
-        scores = {"status": "complete", "aggregate": agg, "gate": gate, "created_at": utcnow(),
-                  "latency_ms": {"rerank_alone_p50": percentile(alone, 0.5), "rerank_alone_p95": percentile(alone, 0.95),
-                                 "queue_p95_under_load": percentile(queue, 0.95),
-                                 "infer_p95_under_load": percentile(infer, 0.95),
-                                 "truncated_pairs": sum((r.get("timings_ms") or {}).get("rerank_truncated") or 0
-                                                        for r in results),
-                                 "hr_under_load_p95": percentile(loaded, 0.95),
-                                 "h_under_load_p95": percentile(unranked, 0.95)},
-                  "load": load_info}
-        _write_run(settings, run_id, config, results, scores)
-        report["depths"][depth] = {"run_id": run_id, **gate, "ndcg@5": agg["ndcg@5"]}
-        if gate["passed"] and (best is None or gain > report["depths"][best]["ndcg@5_gain"]):
-            best = depth
-    report["gate"] = {"passed": best is not None, "decision": f"eligible at depth {best}" if best else "bypass",
-                      "best_depth": best}
-    return report
+def _bypass_trial(settings: Settings, report: dict, h_run: str, h_config: dict, depths: list[int],
+                  load_info: dict) -> dict:
+    """The reranker did not load: a blocked trial with the bypass decision."""
+    report["gate"] = {"passed": False, "decision": "bypass", "reason": f"reranker unavailable: "
+                                                                       f"{load_info.get('error')}"}
+    run_id = f"HR-trial-{hashlib.sha256(dumps([h_run, depths, load_info]).encode()).hexdigest()[:10]}"
+    _write_run(settings, run_id, {**h_config, "label": "HR", "mode": "hybrid_rerank"},
+               [], {"status": "blocked", "reason": report["gate"]["reason"], "trial": report})
+    return {"run_id": run_id, **report}
+
+
+def _failed_trial(settings: Settings, report: dict, h_run: str, h_config: dict, load_info: dict, reason: str,
+                  depth=None) -> dict:
+    """An inference error is recorded as a blocked trial with the bypass decision, never as a measurement."""
+    report["gate"] = {"passed": False, "decision": "bypass", "reason": f"reranker inference failed: {reason}",
+                      "depth": depth}
+    run_id = f"HR-failed-{hashlib.sha256(dumps([h_run, depth, reason, utcnow()]).encode()).hexdigest()[:10]}"
+    _write_run(settings, run_id, {**h_config, "label": "HR", "mode": "hybrid_rerank", "h_run": h_run,
+                                  "eval_version": EVAL_VERSION, "rerank_depth": depth,
+                                  "reranker": _reranker_record(load_info)},
+               [], {"status": "blocked", "reason": report["gate"]["reason"], "trial": report, "load": load_info})
+    return {"run_id": run_id, **report}
+
+
+def _check_frozen_pool(results: list[dict], h_traces: dict, depth: int) -> None:
+    """The reranked pool must be exactly the frozen H candidates."""
+    for r in results:
+        if r.get("metrics"):
+            frozen = [c["chunk_id"] for c in h_traces[r["id"]]["candidates"] if c["channel"] == "rrf"][:depth]
+            now = [c["chunk_id"] for c in r["candidates"] if c["channel"] == "rrf"][:depth]
+            if frozen != now:
+                raise EvaluationError(f"H candidates changed for {r['id']}; rerun H before the trial")
+
+
+def _rerank_under_load(trial_settings: Settings, index, analyzer, passage: list[dict], dense, vectors: dict,
+                       reranker, depth: int, users: int) -> tuple[list, list, list, list, str | None]:
+    """HR and H latencies with `users` concurrent queries: HR totals, queue and inference times, H totals, and the
+    first inference failure under load."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(row):
+        t0 = time.perf_counter()
+        (r,) = _execute(trial_settings, index, analyzer, [row], "hybrid_rerank", dense, vectors, reranker, depth)
+        timings = r.get("timings_ms") or {}
+        return ((time.perf_counter() - t0) * 1000, timings.get("rerank_queue"), timings.get("rerank_infer"),
+                _inference_failure([r]))
+
+    def base(row):
+        t0 = time.perf_counter()
+        _execute(trial_settings, index, analyzer, [row], "hybrid", dense, vectors)
+        return (time.perf_counter() - t0) * 1000
+
+    with ThreadPoolExecutor(max_workers=users) as pool:
+        measured = list(pool.map(one, passage * max(1, users // max(1, len(passage)))))
+        loaded = [m[0] for m in measured]
+        queue = [m[1] for m in measured if m[1] is not None]
+        infer = [m[2] for m in measured if m[2] is not None]
+        unranked = list(pool.map(base, passage * max(1, users // max(1, len(passage)))))
+    return loaded, queue, infer, unranked, next((m[3] for m in measured if m[3]), None)
+
+
+def _reranker_gate(agg: dict, base_critical: set, base_ndcg: float, hr_p95: float | None, h_p95: float | None,
+                   users: int) -> dict:
+    new_critical = sorted(set(agg["critical_failures"]) - base_critical)
+    added_p95 = round((hr_p95 or 0) - (h_p95 or 0), 1)
+    gain = round((agg["ndcg@5"] or 0.0) - base_ndcg, 4)
+    return {"ndcg@5_gain": gain, "required_gain": GATE_NDCG_GAIN, "new_critical_failures": new_critical,
+            "added_p95_ms_under_load": added_p95, "allowed_added_p95_ms": GATE_ADDED_P95_MS, "users": users,
+            "passed": gain >= GATE_NDCG_GAIN and not new_critical and added_p95 <= GATE_ADDED_P95_MS,
+            "pilot_rows": agg["passage_rows"],
+            "note": "pilot-sized sample: review a marginal gain on the larger dev set before final release"}
+
+
+def _trial_latency(results: list[dict], alone: list, queue: list, infer: list, loaded: list,
+                   unranked: list) -> dict:
+    from ..retrieval.dense import percentile
+
+    return {"rerank_alone_p50": percentile(alone, 0.5), "rerank_alone_p95": percentile(alone, 0.95),
+            "queue_p95_under_load": percentile(queue, 0.95),
+            "infer_p95_under_load": percentile(infer, 0.95),
+            "truncated_pairs": sum((r.get("timings_ms") or {}).get("rerank_truncated") or 0 for r in results),
+            "hr_under_load_p95": percentile(loaded, 0.95),
+            "h_under_load_p95": percentile(unranked, 0.95)}
 
 
 def run_errors(settings: Settings, run_id: str) -> list[str]:
@@ -1448,21 +1510,6 @@ def decision_errors(settings: Settings, run_id: str, decision: dict) -> list[str
                 errors.append("the finalist must be a complete current-policy run on the same evaluated population")
     # Unlabelled top-5 passages are shown beside the row's nDCG; the person reads them there, so none is required here.
     return errors + run_errors(settings, run_id)
-
-
-def _k1_baselines(settings: Settings, config: dict) -> list[str]:
-    """The newest complete current-policy K1 run on the same evaluated population (the comparison baseline)."""
-    base = settings.data_dir / "runs"
-    found = []
-    for d in base.glob("K1-*") if base.exists() else []:
-        try:
-            c, sc = load_run(settings, d.name)
-        except (EvaluationError, json.JSONDecodeError):
-            continue
-        if (c.get("eval_version") == EVAL_VERSION and sc.get("status") == "complete"
-                and c.get("population_sha256") == config.get("population_sha256")):
-            found.append((sc.get("created_at", ""), d.name))
-    return [max(found)[1]] if found else []
 
 
 def serving_config(run_id: str, config: dict) -> dict:
@@ -1686,6 +1733,42 @@ def write_phase2_report(settings: Settings) -> Path:
                                                      "FROM activations ORDER BY created_at")]
         active_run = get_app_setting(conn, "active_run")
         active_index = get_app_setting(conn, "active_index")
+    runs = _phase2_runs(settings)
+    checked = [c for c in coverage if c["review_status"] in ("sample_checked", "reviewed")]
+    L = ["# Phase 2 report — corpus coverage and retrieval selection", "",
+         f"Generated {utcnow()} from `{settings.data_dir.name}/`. Every figure below is read from recorded state; "
+         "steps that were not run are listed as missing.", ""]
+    L += _phase2_source_lines(manifest, checked, recoveries, identity)
+    L += _phase2_retrieval_lines(families, fam_path, indexes, runs)
+    L += _phase2_spend_lines(spend, used, envelopes)
+    from ..service.service import active_serving
+
+    now = active_serving(settings)  # what requests serve; a stored activation can be refused (routing changed)
+    L += _phase2_selection_lines(now, active_run, activations, active_index)
+    gates, a = _phase2_gates(settings, manifest, checked, recoveries, runs, active_run)
+    L += ["", "## Phase 2 exit gates", "", "| Gate | Met | Evidence |", "| --- | --- | --- |"]
+    L += [f"| {g} | {'yes' if ok else '**no**'} | {ev} |" for g, ok, ev in gates]
+
+    # ---- inputs for phase 3 (and the phase 4 finalist)
+    with open_db(settings.db_path) as conn:
+        source_map = [dict(r) for r in conn.execute(
+            "SELECT d.doc_id, d.active_source_hash AS source_hash, s.active_extraction_id AS extraction_id, "
+            "s.parse_status, s.review_status FROM documents d JOIN sources s ON s.source_hash = d.active_source_hash "
+            "ORDER BY d.csv_row_id")]
+    release = settings.data_dir / "releases" / "phase-2"
+    write_text_atomic(release / "source-map.json", json.dumps(source_map, ensure_ascii=False, indent=1))
+    L += _phase2_inputs_lines(now, active_index, activations, len(source_map), a, gates)
+    path = release / "report.md"
+    write_text_atomic(path, "\n".join(L))
+    write_text_atomic(release / "manifest.json", json.dumps({
+        "release_id": "phase-2", "created_at": utcnow(), "eval_version": EVAL_VERSION, "active_run": a, "serving": now,
+        "active_index": active_index, "gates": [{"gate": g, "met": ok, "evidence": ev} for g, ok, ev in gates],
+        "runs": [r["run_id"] for r in runs]}, ensure_ascii=False, indent=1))
+    return path
+
+
+def _phase2_runs(settings: Settings) -> list[dict]:
+    """Every recorded retrieval run with its headline scores, in run-directory order."""
     runs = []
     base = settings.data_dir / "runs"
     for d in sorted(base.iterdir()) if base.exists() else []:
@@ -1698,12 +1781,12 @@ def write_phase2_report(settings: Settings) -> Path:
                      "dataset_name": config.get("dataset"), "limits": config.get("limits"),
                      "index": config.get("index_version"), **_headline(scores),
                      "gate": (scores.get("gate") or {}).get("passed"), "load": scores.get("load")})
-    checked = [c for c in coverage if c["review_status"] in ("sample_checked", "reviewed")]
-    usd = lambda m: f"${m / 1_000_000:.6f}"  # noqa: E731
-    L = ["# Phase 2 report — corpus coverage and retrieval selection", "",
-         f"Generated {utcnow()} from `{settings.data_dir.name}/`. Every figure below is read from recorded state; "
-         "steps that were not run are listed as missing.", "",
-         "## Manifest and source review", "",
+    return runs
+
+
+def _phase2_source_lines(manifest: dict, checked: list[dict], recoveries: list[dict], identity: list[dict]) -> list[str]:
+    """Manifest and source review, quarantine and recovery, identity and provenance."""
+    L = ["## Manifest and source review", "",
          f"- associations: {manifest['counts']['associations']} ({manifest['counts']['hwp']} HWP, "
          f"{manifest['counts']['pdf']} PDF), unique sources: {manifest['counts']['unique_sources']}",
          f"- parse status: {manifest['parse_status']}", f"- review status: {manifest['review_status']}",
@@ -1734,8 +1817,13 @@ def write_phase2_report(settings: Settings) -> Path:
     for i in conflicts + disagree:
         L.append(f"  - {i['filename']}: conflicts {[c['field'] for c in i['provenance_conflicts']]}, agreement "
                  f"{i['agreement']}, resolutions {list(i['resolutions'])}")
+    return L
+
+
+def _phase2_retrieval_lines(families: dict, fam_path: Path, indexes: list[dict], runs: list[dict]) -> list[str]:
+    """Evaluation families, index versions, retrieval runs and reranker load."""
     fams = families["families"]
-    L += ["", "## Evaluation families", ""]
+    L = ["", "## Evaluation families", ""]
     if not fam_path.exists():
         L.append("- families.json is missing: run `validate-gold` or `gold submit`, which assign families")
     L += [f"- families: {len(fams)} (dev {sum(f['split'] == 'dev' for f in fams.values())}, "
@@ -1760,16 +1848,24 @@ def write_phase2_report(settings: Settings) -> Path:
     loads = [r["load"] for r in runs if r.get("load")]
     L += ["", "## Reranker load and latency", ""]
     L += [f"- {json.dumps(x, ensure_ascii=False)}" for x in loads] or ["- no reranker trial recorded"]
-    L += ["", "## Spend (tracked by this ledger)", "", "| Purpose | Stage | State | Attempts | Settled | Reserved |",
-          "| --- | --- | --- | --- | --- | --- |"]
+    return L
+
+
+def _phase2_spend_lines(spend: list[dict], used: dict, envelopes: dict) -> list[str]:
+    usd = lambda m: f"${m / 1_000_000:.6f}"  # noqa: E731
+    L = ["", "## Spend (tracked by this ledger)", "", "| Purpose | Stage | State | Attempts | Settled | Reserved |",
+         "| --- | --- | --- | --- | --- | --- |"]
     L += [f"| {s['purpose']} | {s['stage']} | {s['state']} | {s['n']} | {usd(s['settled'])} | {usd(s['reserved'])} |"
           for s in spend] or ["| — | — | — | 0 | $0 | $0 |"]
-    L += ["", "Envelopes (used incl. open reservations / envelope): " + ", ".join(
-        f"{k} {usd(used[k])}/{usd(v)}" for k, v in envelopes.items()), "",
-          "## Selection", ""]
-    from ..service.service import active_serving, describe_serving
+    return L + ["", "Envelopes (used incl. open reservations / envelope): " + ", ".join(
+        f"{k} {usd(used[k])}/{usd(v)}" for k, v in envelopes.items()), ""]
 
-    now = active_serving(settings)  # what requests serve; a stored activation can be refused (routing changed)
+
+def _phase2_selection_lines(now: dict, active_run: str | None, activations: list[dict],
+                            active_index: str | None) -> list[str]:
+    from ..service.service import describe_serving
+
+    L = ["## Selection", ""]
     if active_run:
         a = json.loads(active_run)
         L += [f"- activated: run `{a['run_id']}` ({a['label']}, {a['mode']}), keyword index `{a['index_version']}`, "
@@ -1781,8 +1877,30 @@ def write_phase2_report(settings: Settings) -> Path:
     else:
         L += [f"- no `activate-run` decision recorded: serving the keyword default (kiwi_bm25) on index "
               f"`{active_index}`; dense and reranker stay inactive"]
+    return L
 
-    # ---- exit gates: computed from recorded state, never assumed
+
+def _phase2_inputs_lines(now: dict, active_index: str | None, activations: list[dict], mapped: int, a: dict | None,
+                         gates: list[tuple[str, bool, str]]) -> list[str]:
+    """Inputs for phase 3 (and the phase 4 finalist)."""
+    from ..service.service import describe_serving
+
+    previous = [json.loads(x["config_json"])["run_id"] for x in activations[:-1]] if activations else []
+    return ["", "## Inputs for phase 3", "",
+            f"- serving: {describe_serving(now)}, keyword index "
+            f"`{now.get('index_version') or active_index}`, dense `{now.get('dense_version')}`, "
+            f"reranker {now.get('reranker')}, limits {now.get('limits')}",
+            f"- rollback: keyword fallback `kiwi_bm25` always; earlier activations {previous or 'none'}; every earlier "
+            "index directory stays on disk",
+            f"- immutable evidence mapping: `releases/phase-2/source-map.json` ({mapped} associations → "
+            "source hash → active extraction)",
+            f"- phase 4 retrieval finalist: {(a or {}).get('finalist_run_id')}",
+            f"- open gates: {[g for g, ok, _ in gates if not ok] or 'none'}", ""]
+
+
+def _phase2_gates(settings: Settings, manifest: dict, checked: list[dict], recoveries: list[dict], runs: list[dict],
+                  active_run: str | None) -> tuple[list[tuple[str, bool, str]], dict | None]:
+    """The exit gates, computed from recorded state, never assumed, and the stored activation they judged."""
     # Revalidated now (free, no provider): a stored passing report says nothing about today's dataset or sources.
     validation = validate_gold(settings, "dev-pilot") if dataset_path(settings, "dev-pilot").exists() else None
     try:
@@ -1825,35 +1943,7 @@ def write_phase2_report(settings: Settings) -> Path:
          (f"active run {a['run_id']} under policy {a.get('eval_version')} (current {EVAL_VERSION})"
           + (f"; {'; '.join(active_errors)}" if active_errors else "")) if a else "no activate-run decision"),
     ]
-    L += ["", "## Phase 2 exit gates", "", "| Gate | Met | Evidence |", "| --- | --- | --- |"]
-    L += [f"| {g} | {'yes' if ok else '**no**'} | {ev} |" for g, ok, ev in gates]
-
-    # ---- inputs for phase 3 (and the phase 4 finalist)
-    with open_db(settings.db_path) as conn:
-        source_map = [dict(r) for r in conn.execute(
-            "SELECT d.doc_id, d.active_source_hash AS source_hash, s.active_extraction_id AS extraction_id, "
-            "s.parse_status, s.review_status FROM documents d JOIN sources s ON s.source_hash = d.active_source_hash "
-            "ORDER BY d.csv_row_id")]
-    release = settings.data_dir / "releases" / "phase-2"
-    write_text_atomic(release / "source-map.json", json.dumps(source_map, ensure_ascii=False, indent=1))
-    previous = [json.loads(x["config_json"])["run_id"] for x in activations[:-1]] if activations else []
-    L += ["", "## Inputs for phase 3", "",
-          f"- serving: {describe_serving(now)}, keyword index "
-          f"`{now.get('index_version') or active_index}`, dense `{now.get('dense_version')}`, "
-          f"reranker {now.get('reranker')}, limits {now.get('limits')}",
-          f"- rollback: keyword fallback `kiwi_bm25` always; earlier activations {previous or 'none'}; every earlier "
-          "index directory stays on disk",
-          f"- immutable evidence mapping: `releases/phase-2/source-map.json` ({len(source_map)} associations → "
-          "source hash → active extraction)",
-          f"- phase 4 retrieval finalist: {(a or {}).get('finalist_run_id')}",
-          f"- open gates: {[g for g, ok, _ in gates if not ok] or 'none'}", ""]
-    path = release / "report.md"
-    write_text_atomic(path, "\n".join(L))
-    write_text_atomic(release / "manifest.json", json.dumps({
-        "release_id": "phase-2", "created_at": utcnow(), "eval_version": EVAL_VERSION, "active_run": a, "serving": now,
-        "active_index": active_index, "gates": [{"gate": g, "met": ok, "evidence": ev} for g, ok, ev in gates],
-        "runs": [r["run_id"] for r in runs]}, ensure_ascii=False, indent=1))
-    return path
+    return gates, a
 
 
 # ================================================================ phase 4: reviewed gold (schema gold-2)
@@ -2190,6 +2280,21 @@ class GoldChecker:
         return e
 
     def check(self, row: dict, tag: str, *, split: str | None = None, require_review: bool = True) -> list[str]:
+        e = self._check_identity(row, tag, split)
+        if row.get("operational_case") or row.get("question_type") in OPERATIONAL_TYPES:
+            return e + [f"{tag}: converter failures, interrupted calls and ownership races belong to the operational "
+                        "suite, not to gold"]
+        e += self._check_kind(row, tag)
+        scope = row.get("scope")
+        if not isinstance(scope, list) or not 1 <= len(scope) <= 2 or not all(isinstance(s, dict) for s in scope):
+            return e + [f"{tag}: scope names one or two documents"]
+        scoped = self._check_scope(row, tag, scope, e)
+        groups = row.get("evidence_groups") or []
+        by_id = self._check_groups(groups, scoped, tag, e)
+        e += self._check_content(row, tag, scoped, groups, by_id)
+        return e + self._check_review(row, tag, require_review)
+
+    def _check_identity(self, row: dict, tag: str, split: str | None) -> list[str]:
         e: list[str] = []
         if row.get("dataset_version") != GOLD_SCHEMA:
             e.append(f"{tag}: dataset_version must be {GOLD_SCHEMA!r}")
@@ -2202,9 +2307,11 @@ class GoldChecker:
             e.append(f"{tag}: split must be dev or test")
         elif split and row["split"] != split:
             e.append(f"{tag}: a {row['split']} row cannot enter dataset {split}")
-        if row.get("operational_case") or row.get("question_type") in OPERATIONAL_TYPES:
-            return e + [f"{tag}: converter failures, interrupted calls and ownership races belong to the operational "
-                        "suite, not to gold"]
+        return e
+
+    def _check_kind(self, row: dict, tag: str) -> list[str]:
+        """Question type, text, mode, date and the answerability/status pair."""
+        e: list[str] = []
         qtype, mode, answerability = row.get("question_type"), row.get("mode"), row.get("answerability")
         if qtype not in GOLD_TYPES:
             e.append(f"{tag}: unknown question_type {qtype!r}")
@@ -2221,9 +2328,11 @@ class GoldChecker:
             e.append(f"{tag}: answerability must be one of {sorted(EXPECTED_STATUS)}")
         elif row.get("expected_status") not in EXPECTED_STATUS[answerability]:
             e.append(f"{tag}: expected_status for {answerability} must be one of {EXPECTED_STATUS[answerability]}")
-        scope = row.get("scope")
-        if not isinstance(scope, list) or not 1 <= len(scope) <= 2 or not all(isinstance(s, dict) for s in scope):
-            return e + [f"{tag}: scope names one or two documents"]
+        return e
+
+    def _check_scope(self, row: dict, tag: str, scope: list[dict], e: list[str]) -> dict[str, dict]:
+        """The scoped documents by ID, checked against the managed revisions and their families; problems go to `e`."""
+        qtype, mode, answerability = row.get("question_type"), row.get("mode"), row.get("answerability")
         if len({s.get("doc_id") for s in scope}) != len(scope):
             e.append(f"{tag}: the same document is scoped twice")
         if (mode == "compare") != (len(scope) == 2):
@@ -2260,7 +2369,10 @@ class GoldChecker:
                 e.append(f"{tag}: {d[:8]} belongs to a {fam[1]['split']} family")
         if sorted(set(row.get("family_ids") or [])) != sorted(fams):
             e.append(f"{tag}: family_ids must be exactly the scoped documents' assigned families")
-        groups = row.get("evidence_groups") or []
+        return scoped
+
+    def _check_groups(self, groups: list[dict], scoped: dict[str, dict], tag: str, e: list[str]) -> dict[str, dict]:
+        """Evidence groups by ID, each source span checked; problems go to `e`."""
         by_id: dict[str, dict] = {}
         for g in groups:
             gid = g.get("group_id")
@@ -2276,6 +2388,13 @@ class GoldChecker:
                 e.append(f"{tag} {gid}: an evidence group needs at least one source span")
             for i, alt in enumerate(alts, 1):
                 e += self._check_alternative(alt, scoped[g["doc_id"]], f"{tag} {gid}#{i}")
+        return by_id
+
+    def _check_content(self, row: dict, tag: str, scoped: dict[str, dict], groups: list[dict],
+                       by_id: dict[str, dict]) -> list[str]:
+        """Evidence and claims an answerable row needs, metadata expectations, and negative validation."""
+        e: list[str] = []
+        mode, answerability = row.get("mode"), row.get("answerability")
         claims = row.get("required_claims") or []
         if mode != "metadata":
             if answerability == "answerable" and not groups:
@@ -2311,6 +2430,11 @@ class GoldChecker:
                     e.append(f"{tag}: negative_validation needs a rationale")
                 if answerability == "unanswerable" and not nv.get("locations"):
                     e.append(f"{tag}: verified absence lists the original locations inspected")
+        return e
+
+    def _check_review(self, row: dict, tag: str, require_review: bool) -> list[str]:
+        """Drafting provenance, and for gold an independent review against the original."""
+        e: list[str] = []
         review = row.get("review") or {}
         prov = row.get("generation_provenance") or {}
         drafter = str(review.get("drafted_by") or "").strip()
@@ -2344,6 +2468,15 @@ class GoldChecker:
 def _gold_split_rows(settings: Settings, name: str) -> list[dict]:
     path = dataset_path(settings, name)
     return read_jsonl(path) if path.exists() else []
+
+
+def _split_leak(row: dict, tag: str, other_name: str, other: list[dict]) -> list[str]:
+    """The first row of the other split this row repeats or paraphrases, without naming a sealed row."""
+    for o in other:
+        if question_similarity(row.get("question", ""), o.get("question", "")) >= LEAK_SIMILARITY:
+            which = "a sealed row (ID withheld)" if other_name in SEALED_SPLITS else f"row {o.get('question_id')}"
+            return [f"{tag}: repeats or paraphrases {other_name} {which}: leakage"]
+    return []
 
 
 def validate_gold_v2(settings: Settings, name: str) -> dict:
@@ -2384,12 +2517,7 @@ def validate_gold_v2(settings: Settings, name: str) -> dict:
             seen_q.setdefault(key, qid)
             if set(row.get("family_ids") or []) & affected:
                 errs.append(f"{tag}: its family has related revisions in the other split; fix the family map")
-            for o in other:
-                if question_similarity(row.get("question", ""), o.get("question", "")) >= LEAK_SIMILARITY:
-                    which = "a sealed row (ID withheld)" if other_name in SEALED_SPLITS else \
-                        f"row {o.get('question_id')}"
-                    errs.append(f"{tag}: repeats or paraphrases {other_name} {which}: leakage")
-                    break
+            errs += _split_leak(row, tag, other_name, other)
             if errs:
                 rejected[qid] = errs
                 errors += errs

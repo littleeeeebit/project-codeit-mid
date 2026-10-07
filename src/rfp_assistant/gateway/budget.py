@@ -460,31 +460,13 @@ def reconcile(db: Path, actor: str, reconciliation_id: str, interval_start: str,
             raise BudgetError("reconciliation needs a closed interval with start <= end")
         if not evidence.strip() or not scope.strip():
             raise BudgetError("reconciliation needs the provider scope and dated evidence")
-        for attempt_id in covered_attempt_ids:  # only explicitly covered unknown attempts inside the interval
-            a = conn.execute("SELECT state, dispatched_at, price_json FROM attempts WHERE attempt_id = ?",
-                             (attempt_id,)).fetchone()
-            if a is None or a["state"] != "unknown":
-                raise BudgetError(f"covered attempt {attempt_id} is not an unknown attempt")
-            if not a["dispatched_at"] or not interval_start <= a["dispatched_at"] <= interval_end:
-                raise BudgetError(f"covered attempt {attempt_id} was not dispatched inside the interval")
-            # Only this project's evidence can resolve this project's bill.
-            billed_to = json.loads(a["price_json"] or "{}").get("billing_scope")
-            if billed_to != scope if billed_to is not None else unscoped != "include":
-                raise BudgetError(f"covered attempt {attempt_id} is billed to "
-                                  f"{billed_to or 'the server-environment key (unscoped)'}, not to {scope}")
+        _check_covered(conn, covered_attempt_ids, interval_start, interval_end, scope, unscoped)
         overlap = conn.execute(
             "SELECT 1 FROM adjustments WHERE correction_key LIKE 'reconcile:%' AND scope = ? "
             "AND NOT (interval_end < ? OR interval_start > ?)", (scope, interval_start, interval_end)).fetchone()
         if overlap:
             raise BudgetError("reconciliation intervals must not overlap")
-        local = unscoped_total = 0
-        for a in conn.execute("SELECT settled_micro_usd, price_json FROM attempts WHERE state = 'settled' "
-                              "AND finished_at >= ? AND finished_at <= ?", (interval_start, interval_end)):
-            billed_to = json.loads(a["price_json"] or "{}").get("billing_scope")
-            if billed_to is None:
-                unscoped_total += a["settled_micro_usd"]
-            elif billed_to == scope:
-                local += a["settled_micro_usd"]
+        local, unscoped_total = _settled_in(conn, interval_start, interval_end, scope)
         if unscoped_total and unscoped is None:
             raise BudgetError("the interval holds attempts paid with the server-environment key (no recorded "
                               "project); set unscoped_attempts to include or exclude")
@@ -502,6 +484,36 @@ def reconcile(db: Path, actor: str, reconciliation_id: str, interval_start: str,
                          (attempt_id,))
         _bump(conn)
     return True
+
+
+def _check_covered(conn: Connection, covered_attempt_ids: list[str], interval_start: str, interval_end: str,
+                   scope: str, unscoped: str | None) -> None:
+    """Only explicitly covered unknown attempts dispatched inside the interval and billed to this scope."""
+    for attempt_id in covered_attempt_ids:
+        a = conn.execute("SELECT state, dispatched_at, price_json FROM attempts WHERE attempt_id = ?",
+                         (attempt_id,)).fetchone()
+        if a is None or a["state"] != "unknown":
+            raise BudgetError(f"covered attempt {attempt_id} is not an unknown attempt")
+        if not a["dispatched_at"] or not interval_start <= a["dispatched_at"] <= interval_end:
+            raise BudgetError(f"covered attempt {attempt_id} was not dispatched inside the interval")
+        # Only this project's evidence can resolve this project's bill.
+        billed_to = json.loads(a["price_json"] or "{}").get("billing_scope")
+        if billed_to != scope if billed_to is not None else unscoped != "include":
+            raise BudgetError(f"covered attempt {attempt_id} is billed to "
+                              f"{billed_to or 'the server-environment key (unscoped)'}, not to {scope}")
+
+
+def _settled_in(conn: Connection, interval_start: str, interval_end: str, scope: str) -> tuple[int, int]:
+    """(settled cost billed to `scope`, settled cost with no recorded project) finished inside the interval."""
+    local = unscoped_total = 0
+    for a in conn.execute("SELECT settled_micro_usd, price_json FROM attempts WHERE state = 'settled' "
+                          "AND finished_at >= ? AND finished_at <= ?", (interval_start, interval_end)):
+        billed_to = json.loads(a["price_json"] or "{}").get("billing_scope")
+        if billed_to is None:
+            unscoped_total += a["settled_micro_usd"]
+        elif billed_to == scope:
+            local += a["settled_micro_usd"]
+    return local, unscoped_total
 
 
 def _provider_total(conn: Connection, adjustment: Row) -> int | None:

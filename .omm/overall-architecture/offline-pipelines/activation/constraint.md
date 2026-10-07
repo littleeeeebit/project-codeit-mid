@@ -1,0 +1,1 @@
+Nothing activates on its own. A person picks a row from a comparison table, and `decided_by` is required.

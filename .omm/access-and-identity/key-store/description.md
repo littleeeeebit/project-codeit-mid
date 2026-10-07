@@ -1,0 +1,1 @@
+`OpenAITransport._sessions` holds one SDK client per key session. Clients replaced by a later key stay in `_retired` until `close()`, so calls in flight finish on their own client. `has_key()` and `paid_refusal()` report `NO_API_KEY` when neither a session key nor a server key exists. `api_key_status` reports only the caller's own key metadata.

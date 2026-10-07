@@ -1,7 +1,7 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-06 22:40:13.072000+00:00
-update_count: 19
-last_field: concern
+updated: 2026-10-07 04:46:45.134000+00:00
+update_count: 21
+last_field: diagram
 kind: nested-class
 title: service-core
 children:
@@ -9,25 +9,28 @@ children:
 - answer-pipeline
 - app-resources
 - background-jobs
+- conversation
 - conversation-context
-- gold-review
+- free-answer
+- jobs
 - metered-chat
 - paid-answer
-- request-runner
+- partials
 - resources
 - resources-owner
+- runner
 - serving-config
 - submit
 - tracing
-- verifier-runs
 parentPath: []
-prev_diagram: "graph TD\r\n  resources[\"Resources owner\\nsrc/rfp_assistant/service/service.py\"\
-  ] -->|\"creates on first paid ask\"| request-runner[\"RequestRunner executor\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  request-runner -->|\"run_queued(request_id)\"| answer-pipeline[\"Answer pipeline\\\
-  nsrc/rfp_assistant/service/service.py\"]\r\n  resources -->|\"lends index, transport,\
-  \ tracing\"| answer-pipeline\r\n  answer-pipeline -->|\"metadata or inventory mode\"\
-  | free-answers[\"Free answers\\nsrc/rfp_assistant/service/service.py\"]\r\n  verifier-runs[\"\
-  Verifier runs\\nsrc/rfp_assistant/service/service.py\"] -->|\"generate_from_run\
-  \ submits\"| request-runner\r\n  resources -->|\"registers and joins threads\"|\
-  \ background-jobs[\"Background jobs\\nsrc/rfp_assistant/service/service.py\"]\r\n\
-  \  background-jobs -->|\"PinnedResources answer rows\"| answer-pipeline"
+prev_diagram: "graph TD\r\n  resources[\"Process resources\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  request-runner[\"Bounded request executor\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  answer-pipeline[\"Answer execution\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  verifier-runs[\"Frozen verifier runs\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  background-jobs[\"Paid background jobs\\nsrc/rfp_assistant/service/drafting.py\"\
+  ]\r\n  gold-review[\"Gold review queue\\nsrc/rfp_assistant/evaluation/gold.py\"\
+  ]\r\n  resources -->|lazily creates| request-runner\r\n  request-runner -->|run_queued\
+  \ per request id| answer-pipeline\r\n  answer-pipeline -->|index, dense, transport|\
+  \ resources\r\n  verifier-runs -->|generate submits request| request-runner\r\n\
+  \  background-jobs -->|shared transport, joined on close| resources\r\n  background-jobs\
+  \ -->|submit drafts batch| gold-review"

@@ -1,0 +1,1 @@
+`result_json.evidence` is a map from `E<n>` to an `EvidenceUnit`: doc_id, source_hash, extraction_id, chunk_id, element_ids, quote (the chunk body), location and token_count. It is persisted with the request. The model may cite only these IDs. It never supplies URLs, paths or page numbers, and validation compares each quote with the stored chunk.

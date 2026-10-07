@@ -120,7 +120,8 @@ Exactly one worker: paid requests run on the process's own executor and the proc
 work, run the API on 8511 (with `BIDMATE_LOCAL_MEMBER`) and `npm run dev` in `web/` (port 8510, `/api/*` forwarded to `RFP_API_URL`, default
 `http://127.0.0.1:8511`; only with `BIDMATE_LOCAL_MEMBER` does the API accept writes from that :8510 origin). After changing a route or its shapes, regenerate the schema the screens are typed from with
 `python tools/openapi.py`; `tests/test_api.py` fails while it is stale. `npm run lint` and `npm run typecheck` check
-`web/`.
+`web/`; `npm test` runs its characterization tests (vitest, snapshots in `web/test/__snapshots__/`; rewrite them with
+`npx vitest run -u` only for an intended screen change).
 
 For local work, use a branch in the original checkout rather than copying the repository. The original corpus,
 `.env` and runtime are ignored by Git and do not appear in a linked worktree. If a task already requires a

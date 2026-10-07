@@ -240,39 +240,45 @@ class ReleaseReportTest(unittest.TestCase):
             manifest = json.loads((path.parent / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["status"], "limited")
 
+    def _sealed_release(self, root):
+        """K1 activated on the phase-4 fixtures, the development finalists run, both sets frozen, the release frozen
+        and its one sealed run, then a fake latency sample (whose reuse and an eighth user are refused). Returns the
+        settings, the transport, the freeze and the latency sample."""
+        env = p4.make_env(root, splits={"기관A": "dev", "기관F": "dev", "기관D": "test", "기관E": "test"})
+        s = env.settings
+        p4.write(env, "dev", [p4.amount_row(env), p4.deadline_row(env), p4.warranty_row(env),
+                              p4.absent_row(env)])
+        p4.write(env, "test", [p4.row(env, "test-seat", "도서관에서 무엇을 만드는 사업인가요?", "기관D", split="test",
+                                      groups=[p4.group(env, "g1", "기관D", ("%좌석%", p4.SEATS))],
+                                      claims=[p4.claim("c1", ["g1"], {"type": "text", "patterns": ["좌석 예약"]})])])
+        (k1,) = evaluation.evaluate_retrieval(s, fixtures.analyzer(), None, "dev", ["K1"])
+        decision = root / "decision.json"
+        decision.write_text(json.dumps({"run_id": k1["run_id"], "mode": "kiwi_bm25", "decided_by": "owner",
+                                        "rationale": "baseline"}), encoding="utf-8")
+        evaluation.activate_run(s, k1["run_id"], decision)
+        transport = FakeTransport()
+        res = service.Resources(s, transport=transport, recover=True)
+        try:
+            est = answers.plan_run(s, "answer-finalists", "dev", [k1["run_id"]])
+            dev = answers.run_answers(s, res, est["estimate_id"], "owner")
+            evaluation.freeze_dataset(s, "dev", "owner", "dev")
+            evaluation.freeze_dataset(s, "test", "owner", "test")
+            freeze = sealed.freeze_release(s, auth.OWNER_CLI, k1["run_id"], dev["run_id"], "owner", "K1")
+            est = answers.plan_run(s, "sealed", freeze_id=freeze["freeze_id"])
+            answers.run_answers(s, res, est["estimate_id"], "owner")
+            lat = answers.plan_latency(s, waves=2, users=2)
+            latency = answers.latency_run(s, res, lat["estimate_id"], "owner")
+            with self.assertRaisesRegex(answers.AnswerEvalError, "already used"):
+                answers.latency_run(s, res, lat["estimate_id"], "owner")
+            with self.assertRaises(answers.AnswerEvalError):
+                answers.plan_latency(s, waves=1, users=7)
+        finally:
+            res.close()
+        return s, transport, freeze, latency
+
     def test_the_report_reads_a_sealed_release_without_calling_the_provider(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            env = p4.make_env(root, splits={"기관A": "dev", "기관F": "dev", "기관D": "test", "기관E": "test"})
-            s = env.settings
-            p4.write(env, "dev", [p4.amount_row(env), p4.deadline_row(env), p4.warranty_row(env),
-                                  p4.absent_row(env)])
-            p4.write(env, "test", [p4.row(env, "test-seat", "도서관에서 무엇을 만드는 사업인가요?", "기관D", split="test",
-                                          groups=[p4.group(env, "g1", "기관D", ("%좌석%", p4.SEATS))],
-                                          claims=[p4.claim("c1", ["g1"], {"type": "text", "patterns": ["좌석 예약"]})])])
-            (k1,) = evaluation.evaluate_retrieval(s, fixtures.analyzer(), None, "dev", ["K1"])
-            decision = root / "decision.json"
-            decision.write_text(json.dumps({"run_id": k1["run_id"], "mode": "kiwi_bm25", "decided_by": "owner",
-                                            "rationale": "baseline"}), encoding="utf-8")
-            evaluation.activate_run(s, k1["run_id"], decision)
-            transport = FakeTransport()
-            res = service.Resources(s, transport=transport, recover=True)
-            try:
-                est = answers.plan_run(s, "answer-finalists", "dev", [k1["run_id"]])
-                dev = answers.run_answers(s, res, est["estimate_id"], "owner")
-                evaluation.freeze_dataset(s, "dev", "owner", "dev")
-                evaluation.freeze_dataset(s, "test", "owner", "test")
-                freeze = sealed.freeze_release(s, auth.OWNER_CLI, k1["run_id"], dev["run_id"], "owner", "K1")
-                est = answers.plan_run(s, "sealed", freeze_id=freeze["freeze_id"])
-                answers.run_answers(s, res, est["estimate_id"], "owner")
-                lat = answers.plan_latency(s, waves=2, users=2)
-                latency = answers.latency_run(s, res, lat["estimate_id"], "owner")
-                with self.assertRaisesRegex(answers.AnswerEvalError, "already used"):
-                    answers.latency_run(s, res, lat["estimate_id"], "owner")
-                with self.assertRaises(answers.AnswerEvalError):
-                    answers.plan_latency(s, waves=1, users=7)
-            finally:
-                res.close()
+            s, transport, freeze, latency = self._sealed_release(Path(tmp))
             self.assertEqual((latency["provider"], latency["n"], latency["failures"]), ("fake", 4, 0))
             calls = len(transport.calls)
             path = release.write_release_report(s, "latest")

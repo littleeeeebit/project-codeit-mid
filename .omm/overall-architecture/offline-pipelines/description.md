@@ -1,0 +1,1 @@
+These pipelines build what serving reads and pick what it serves. They start from `python -m rfp_assistant.cli <command>` (`cli.py`), and maintenance can also start from 검증 → 유지보수 (`service.start_maintenance`). Every step reuses unchanged inputs and records its outputs, and nothing changes serving until a person activates a run.

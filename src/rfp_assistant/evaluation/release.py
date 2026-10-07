@@ -147,6 +147,10 @@ def _rate(r: dict | None) -> float | None:
     return (r or {}).get("rate")
 
 
+def _usd(m: int | None) -> str:
+    return f"${(m or 0) / 1_000_000:,.6f}"
+
+
 def decide_status(hard: list[tuple[str, bool | None, str]], quality: list[tuple[str, bool | None, str]],
                   evidence_label: str) -> tuple[str, list[str]]:
     """`blocked` when a hard check failed; `limited` when one is unverified, a quality target is missed or
@@ -173,25 +177,12 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
                                                                   f"draft-{utcnow()[:10]}")
     out = settings.data_dir / "releases" / rid
     budget.ensure_budget_row(settings.db_path)
-    with open_db(settings.db_path) as conn:
-        active_run = get_app_setting(conn, "active_run")
-        active_index = get_app_setting(conn, "active_index")
-        envelopes = json.loads(conn.execute("SELECT envelopes_json FROM budget_settings WHERE id = 1").fetchone()[0])
-        used = {p: budget._purpose_used(conn, p) for p in envelopes}
-        spend = [dict(r) for r in conn.execute(
-            "SELECT purpose, stage, state, COUNT(*) AS n, COALESCE(SUM(settled_micro_usd), 0) AS settled, "
-            "COALESCE(SUM(reserved_micro_usd), 0) AS reserved FROM attempts GROUP BY purpose, stage, state")]
-        adjustments = [dict(r) for r in conn.execute(
-            "SELECT correction_key, amount_micro_usd, interval_start, interval_end, scope, created_at FROM adjustments "
-            "ORDER BY created_at")]
-        unresolved = conn.execute("SELECT COUNT(*) FROM attempts WHERE state IN ('reserved', 'dispatching', 'unknown')"
-                                  ).fetchone()[0]
-        history = json.loads(conn.execute("SELECT history_json FROM budget_settings WHERE id = 1").fetchone()[0])
-    active = json.loads(active_run) if active_run else None  # the stored activation; `now` is what requests serve
-    from ..service.service import active_serving, describe_serving
+    db = _ledger_state(settings)
+    active = json.loads(db["active_run"]) if db["active_run"] else None  # the stored activation; `now` is served
+    from ..service.service import active_serving
 
     now = active_serving(settings)
-    snap =budget.snapshot(settings.db_path)
+    snap = budget.snapshot(settings.db_path)
     manifest_rep = ingestion.manifest_report(settings)
     coverage = ingestion.review_coverage(settings)
     identity = ingestion.identity_report(settings)
@@ -210,14 +201,93 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
     walkthrough = _load(out / "walkthrough-results.json")
     restore = [_load(p) for p in sorted((settings.data_dir / "releases" / "restore-checks").glob("*.json"))] \
         if (settings.data_dir / "releases" / "restore-checks").exists() else []
-    lock = REPO_ROOT / "requirements-lock.txt"
-    usd = lambda m: f"${(m or 0) / 1_000_000:,.6f}"  # noqa: E731
 
-    # ---- evidence used for the decision, bound to the current candidate (review round 3, F6). Older results stay
-    # on disk and in the evaluation JSON, but evidence recorded for other code, configuration or data is listed as
-    # stale and never counts as a pass.
+    label, ans, served, lat, all_check, check_stale, stale = _current_evidence(
+        settings, active, now, frozen, validation, sealed_runs, answer_runs, retrieval_runs, latency, checks)
+    hard = _hard_checks(ans, served, snap, db["unresolved"], all_check, check_stale)
+    quality = _quality_targets(ans, served, lat)
+    status, reasons = decide_status(hard, quality, label)
+    reasons += [f"stale evidence not counted: {x}" for x in stale]
+
+    release_manifest = _release_manifest(settings, rid, status, reasons, label, active, now, db, frozen, stale, freeze)
+    coverage_rep = _coverage_report(manifest_rep, human, identity)
+    evaluation_rep = _evaluation_report(validation, frozen, retrieval_runs, answer_runs, sealed_runs, latency, checks)
+    for name, data in (("manifest", release_manifest), ("coverage", coverage_rep), ("evaluation", evaluation_rep),
+                       ("budget", _budget_report(snap, db))):
+        write_text_atomic(out / f"{name}.json", json.dumps(data, ensure_ascii=False, indent=1, default=str))
+
+    L = _decision_lines(settings, rid, release_manifest, now, db["active_index"], coverage_rep, human)
+    L += _dataset_and_run_lines(validation, frozen, retrieval_runs)
+    L += _answer_lines(answer_runs, sealed_runs)
+    L += _measurement_lines(latency, checks, hard, quality)
+    L += _budget_lines(snap, db)
+    L += _walkthrough_and_restore_lines(walkthrough, browser, rid, restore)
+    L.append("")
+    path = out / "report.md"
+    write_text_atomic(path, "\n".join(L))
+    return path
+
+
+def _ledger_state(settings: Settings) -> dict:
+    """The stored activation and the ledger rows the release report reads, from one connection."""
+    with open_db(settings.db_path) as conn:
+        active_run = get_app_setting(conn, "active_run")
+        active_index = get_app_setting(conn, "active_index")
+        envelopes = json.loads(conn.execute("SELECT envelopes_json FROM budget_settings WHERE id = 1").fetchone()[0])
+        used = {p: budget._purpose_used(conn, p) for p in envelopes}
+        spend = [dict(r) for r in conn.execute(
+            "SELECT purpose, stage, state, COUNT(*) AS n, COALESCE(SUM(settled_micro_usd), 0) AS settled, "
+            "COALESCE(SUM(reserved_micro_usd), 0) AS reserved FROM attempts GROUP BY purpose, stage, state")]
+        adjustments = [dict(r) for r in conn.execute(
+            "SELECT correction_key, amount_micro_usd, interval_start, interval_end, scope, created_at FROM adjustments "
+            "ORDER BY created_at")]
+        unresolved = conn.execute("SELECT COUNT(*) FROM attempts WHERE state IN ('reserved', 'dispatching', 'unknown')"
+                                  ).fetchone()[0]
+        history = json.loads(conn.execute("SELECT history_json FROM budget_settings WHERE id = 1").fetchone()[0])
+    return {"active_run": active_run, "active_index": active_index, "envelopes": envelopes, "used": used,
+            "spend": spend, "adjustments": adjustments, "unresolved": unresolved, "history": history}
+
+
+def _current_evidence(settings: Settings, active: dict | None, now: dict, frozen: dict, validation: dict,
+                      sealed_runs: list[dict], answer_runs: list[dict], retrieval_runs: list[dict],
+                      latency: list[dict | None], checks: dict) -> tuple:
+    """Evidence used for the decision, bound to the current candidate (review round 3, F6). Older results stay on
+    disk and in the evaluation JSON, but evidence recorded for other code, configuration or data is listed as stale
+    and never counts as a pass. Returns the evidence label, the answer and served-retrieval scores, the latency
+    sample, the saved check-all and whether it is stale, and the stale list."""
+    from ..service.service import describe_serving
+
     current_code = evaluation.code_fingerprint()["source_sha256"]
     stale: list[str] = []
+    label, ans, served = _answer_evidence(settings, active, frozen, validation, sealed_runs, answer_runs,
+                                          retrieval_runs, current_code, stale)
+    if now.get("fallback_reason"):
+        stale.append(describe_serving(now))
+    lat = None
+    for x in reversed(latency):
+        if not x or x.get("provider") != "real":
+            continue
+        if (x.get("serving") or {}).get("run_id") != now.get("run_id") or \
+                (x.get("code") or {}).get("source_sha256") != current_code:
+            stale.append(f"latency sample {x.get('run_id')}: recorded for another serving run or package source")
+            continue
+        lat = x
+        break
+    all_check = checks.get("check-all")
+    check_stale = bool(all_check) and (all_check.get("code") or {}).get("source_sha256") != current_code
+    if check_stale:
+        stale.append(f"saved check-all: recorded for package source "
+                     f"{(all_check.get('code') or {}).get('source_sha256', '')[:12]}, current {current_code[:12]}")
+    return label, ans, served, lat, all_check, check_stale, stale
+
+
+def _answer_evidence(settings: Settings, active: dict | None, frozen: dict, validation: dict, sealed_runs: list[dict],
+                     answer_runs: list[dict], retrieval_runs: list[dict], current_code: str,
+                     stale: list[str]) -> tuple[str, dict | None, dict]:
+    """The first current sealed run, else the newest current development answer run of the active selection; runs
+    that no longer match are appended to `stale`."""
+    from . import sealed
+
     first_sealed = next((s for s in sealed_runs if s["label"] == "sealed test" and s["status"] == "complete"), None)
     if first_sealed:
         try:
@@ -253,24 +323,12 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
         run = next((r for r in retrieval_runs if r["run_id"] == active["run_id"] and not r.get("blocking")), None)
         served = {"single_evidence": {"hit@20": run.get("hit@20")}, "multi_evidence": {
             "complete@20": run.get("complete@20")}} if run else {}
-    if now.get("fallback_reason"):
-        stale.append(describe_serving(now))
-    lat = None
-    for x in reversed(latency):
-        if not x or x.get("provider") != "real":
-            continue
-        if (x.get("serving") or {}).get("run_id") != now.get("run_id") or \
-                (x.get("code") or {}).get("source_sha256") != current_code:
-            stale.append(f"latency sample {x.get('run_id')}: recorded for another serving run or package source")
-            continue
-        lat = x
-        break
-    all_check = checks.get("check-all")
-    check_stale = bool(all_check) and (all_check.get("code") or {}).get("source_sha256") != current_code
-    if check_stale:
-        stale.append(f"saved check-all: recorded for package source "
-                     f"{(all_check.get('code') or {}).get('source_sha256', '')[:12]}, current {current_code[:12]}")
-    hard = [
+    return label, ans, served
+
+
+def _hard_checks(ans: dict | None, served: dict, snap, unresolved: int, all_check: dict | None,
+                 check_stale: bool) -> list[tuple[str, bool | None, str]]:
+    return [
         ("automated invariants (check --phase all --provider fake)",
          None if check_stale else (all_check or {}).get("ok"),
          ("stale: recorded for other package source; rerun check --phase all --provider fake --save" if check_stale
@@ -288,11 +346,14 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
          else ans["link_validity"]["rate"] == 1.0, "no cited links" if ans is None else
          str(ans["link_validity"])),
         ("admission cap enforced and ledger not frozen", snap.spent_micro_usd + snap.pending_micro_usd
-         <= snap.cap_micro_usd and not snap.frozen_reason, f"committed {usd(snap.spent_micro_usd + snap.pending_micro_usd)}"
-         f" of cap {usd(snap.cap_micro_usd)}; frozen {snap.frozen_reason}"),
+         <= snap.cap_micro_usd and not snap.frozen_reason, f"committed {_usd(snap.spent_micro_usd + snap.pending_micro_usd)}"
+         f" of cap {_usd(snap.cap_micro_usd)}; frozen {snap.frozen_reason}"),
         ("no unresolved billing", True if unresolved == 0 else None, f"{unresolved} open or unknown attempts"),
     ]
-    quality = [
+
+
+def _quality_targets(ans: dict | None, served: dict, lat: dict | None) -> list[tuple[str, bool | None, str]]:
+    return [
         ("single-evidence hit@20 >= 0.90", None if _rate(served.get("single_evidence", {}).get("hit@20")) is None
          else _rate(served["single_evidence"]["hit@20"]) >= TARGETS["single_hit@20"],
          str(served.get("single_evidence", {}).get("hit@20"))),
@@ -314,10 +375,13 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
          else lat["warm_ms"]["p95"] < LATENCY_TARGETS_MS["answer_p95"],
          "no real latency sample" if lat is None else f"warm p95 {lat['warm_ms']['p95']} ms, n={lat['warm_ms']['n']}"),
     ]
-    status, reasons = decide_status(hard, quality, label)
-    reasons += [f"stale evidence not counted: {x}" for x in stale]
 
-    release_manifest = {
+
+def _release_manifest(settings: Settings, rid: str, status: str, reasons: list[str], label: str, active: dict | None,
+                      now: dict, db: dict, frozen: dict, stale: list[str], freeze: dict | None) -> dict:
+    lock = REPO_ROOT / "requirements-lock.txt"
+    history, active_index = db["history"], db["active_index"]
+    return {
         "release_id": rid, "generated_at": utcnow(), "status": status, "reasons": reasons, "evidence_label": label,
         "code": evaluation.code_fingerprint(), "metric_code_sha256": evaluation.metric_code_sha256(),
         "settings_fingerprint": settings.fingerprint(), "model": settings.generation_model,
@@ -329,16 +393,23 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
         "requirements_lock_sha256": _sha_file(lock) if lock.exists() else None, "hardware": evaluation.hardware(),
         "stale_evidence": stale, "freeze": {k: (freeze or {}).get(k) for k in ("freeze_id", "frozen_at", "selected_run_id", "decided_by",
                                                        "post_test")} if freeze else None}
-    coverage_rep = {"counts": manifest_rep["counts"], "parse_status": manifest_rep["parse_status"],
-                    "review_status": manifest_rep["review_status"], "audit_differences": manifest_rep["audit_differences"],
-                    "quarantined": [{k: q[k] for k in ("doc_id", "filename", "reason_code")}
-                                    for q in manifest_rep["quarantined"]],
-                    "human_checked_sources": len(human),
-                    "provenance_conflicts": [{"filename": i["filename"],
-                                              "fields": [c["field"] for c in i["provenance_conflicts"]],
-                                              "resolutions": list(i["resolutions"])}
-                                             for i in identity if i["provenance_conflicts"]]}
-    evaluation_rep = {
+
+
+def _coverage_report(manifest_rep: dict, human: list[dict], identity: list[dict]) -> dict:
+    return {"counts": manifest_rep["counts"], "parse_status": manifest_rep["parse_status"],
+            "review_status": manifest_rep["review_status"], "audit_differences": manifest_rep["audit_differences"],
+            "quarantined": [{k: q[k] for k in ("doc_id", "filename", "reason_code")}
+                            for q in manifest_rep["quarantined"]],
+            "human_checked_sources": len(human),
+            "provenance_conflicts": [{"filename": i["filename"],
+                                      "fields": [c["field"] for c in i["provenance_conflicts"]],
+                                      "resolutions": list(i["resolutions"])}
+                                     for i in identity if i["provenance_conflicts"]]}
+
+
+def _evaluation_report(validation: dict, frozen: dict, retrieval_runs: list[dict], answer_runs: list[dict],
+                       sealed_runs: list[dict], latency: list[dict | None], checks: dict) -> dict:
+    return {
         "validation": {n: None if v is None else {k: v[k] for k in ("ok", "rows", "label", "targets",
                                                                     "metadata_stratum", "answerability",
                                                                     "source_positions")}
@@ -351,21 +422,28 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
                          "stop_reason": a["scores"].get("stop_reason"), "finalists": a["scores"]["finalists"],
                          "selection": a["scores"].get("selection")} for a in answer_runs],
         "sealed_runs": sealed_runs, "latency": latency, "checks": checks}
-    budget_rep = {"snapshot": asdict(snap), "envelopes": {k: {"envelope": v, "used_incl_open": used[k]}
-                                                          for k, v in envelopes.items()},
-                  "attempts": spend, "adjustments": adjustments, "unresolved_attempts": unresolved,
-                  "configuration_history": history}
-    for name, data in (("manifest", release_manifest), ("coverage", coverage_rep), ("evaluation", evaluation_rep),
-                       ("budget", budget_rep)):
-        write_text_atomic(out / f"{name}.json", json.dumps(data, ensure_ascii=False, indent=1, default=str))
+
+
+def _budget_report(snap, db: dict) -> dict:
+    return {"snapshot": asdict(snap), "envelopes": {k: {"envelope": v, "used_incl_open": db["used"][k]}
+                                                    for k, v in db["envelopes"].items()},
+            "attempts": db["spend"], "adjustments": db["adjustments"], "unresolved_attempts": db["unresolved"],
+            "configuration_history": db["history"]}
+
+
+def _decision_lines(settings: Settings, rid: str, release_manifest: dict, now: dict, active_index: str | None,
+                    coverage_rep: dict, human: list[dict]) -> list[str]:
+    """Title, decision, release manifest and coverage."""
+    from ..service.service import describe_serving
 
     L = [f"# Release report {rid}", "",
          f"Generated {release_manifest['generated_at']} from `{settings.data_dir.name}/` state. Every figure is read "
          "from recorded evidence; anything not run is listed as missing. This command never generates an answer.", "",
-         f"## Decision: **{status}**", ""]
-    L += [f"- {r}" for r in reasons] or ["- every hard check and quality target passed on the sealed evaluation"]
+         f"## Decision: **{release_manifest['status']}**", ""]
+    L += [f"- {r}" for r in release_manifest["reasons"]] or [
+        "- every hard check and quality target passed on the sealed evaluation"]
     code = release_manifest["code"]
-    L += ["", "## Release manifest", "",
+    return L + ["", "## Release manifest", "",
           f"- code: Git `{code.get('git_revision') or 'none recorded'}` (uncommitted changes: {code.get('git_dirty')}),"
           f" package source `{code['source_sha256'][:16]}`; metric code `{release_manifest['metric_code_sha256'][:16]}`",
           f"- model {settings.generation_model}, reasoning {settings.generation_reasoning_effort}, output cap "
@@ -384,8 +462,11 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
           f"- parse {coverage_rep['parse_status']}; review {coverage_rep['review_status']}; human-checked sources "
           f"{len(human)} (automatic verdicts are not counted as review)",
           f"- quarantined: {[q['filename'] for q in coverage_rep['quarantined']] or 'none'}",
-          f"- byte-identical associations with conflicting metadata: {len(coverage_rep['provenance_conflicts'])}", "",
-          "## Datasets", ""]
+          f"- byte-identical associations with conflicting metadata: {len(coverage_rep['provenance_conflicts'])}", ""]
+
+
+def _dataset_and_run_lines(validation: dict, frozen: dict, retrieval_runs: list[dict]) -> list[str]:
+    L = ["## Datasets", ""]
     for n in ("dev", "test"):
         v, f = validation[n], frozen[n]
         L.append(f"- `{n}`: " + ("missing" if v is None else
@@ -403,7 +484,11 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
                  f"{r['wrong_scope']} | {(r['latency_ms'] or {}).get('p95')} |")
     if not retrieval_runs:
         L.append("| — | no current-policy run recorded | | | | | | | | |")
-    L += ["", "## Answer evaluation", ""]
+    return L
+
+
+def _answer_lines(answer_runs: list[dict], sealed_runs: list[dict]) -> list[str]:
+    L = ["", "## Answer evaluation", ""]
     for a in answer_runs:
         L.append(f"- development run `{a['run_id']}` ({a['scores']['status']}): see `runs/{a['run_id']}/report.md`")
         for fid, v in a["scores"]["finalists"].items():
@@ -411,12 +496,18 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
                      f"{_rate(v['required_claim_correctness'])} (n={v['required_claim_correctness']['denominator']}), "
                      f"critical wrong {len(v['critical_wrong'])}, citation precision lower bound "
                      f"{_rate(v['citation_precision_lower_bound'])}, negatives {_rate(v['negative_handling'])} "
-                     f"(n={v['negative_handling']['denominator']}), cost {usd(v['cost']['settled_micro_usd'])}")
+                     f"(n={v['negative_handling']['denominator']}), cost {_usd(v['cost']['settled_micro_usd'])}")
     for s in sealed_runs:
         L.append(f"- sealed run `{s['run_id']}` ({s['label']}, {s['status']}) under freeze `{s['freeze_id']}`")
     if not answer_runs and not sealed_runs:
         L.append("- no answer run recorded: `plan-run --dataset dev --action answer-finalists`, then `run-answers`")
-    L += ["", "## Latency", ""]
+    return L
+
+
+def _measurement_lines(latency: list[dict | None], checks: dict, hard: list[tuple[str, bool | None, str]],
+                       quality: list[tuple[str, bool | None, str]]) -> list[str]:
+    """Latency samples, saved checks, and the hard-check and quality-target table."""
+    L = ["", "## Latency", ""]
     L += [f"- {x['provider']} sample `{x['run_id']}`: n={x['n']}, failures {x['failures']}, warm p50/p95 "
           f"{x['warm_ms']['p50']}/{x['warm_ms']['p95']} ms (n={x['warm_ms']['n']}), cold first wave "
           f"{x['cold_wave_ms']} ms, {x['users']} users × {x['waves_run']} waves" for x in latency if x] \
@@ -428,16 +519,25 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
     L += ["", "## Hard checks and quality targets", "", "| Check | Result | Evidence |", "| --- | --- | --- |"]
     L += [f"| {n} | {'pass' if ok else 'unverified' if ok is None else '**fail**'} | {ev} |" for n, ok, ev in hard]
     L += [f"| {n} | {'met' if ok else 'not measured' if ok is None else '**missed**'} | {ev} |" for n, ok, ev in quality]
-    L += ["", "## Budget", "",
-          f"- spent {usd(snap.spent_micro_usd)} of the {usd(snap.allowance_micro_usd)} allowance "
-          f"({snap.spent_percent:.2f}%); pending {usd(snap.pending_micro_usd)} (unknown {usd(snap.unknown_micro_usd)}); "
-          f"cap {usd(snap.cap_micro_usd)}; paid enabled {snap.paid_enabled}; last reconciliation "
-          f"{snap.last_reconciliation or 'never'}; dates {snap.project_start}..{snap.project_end}",
-          "- envelopes (used incl. open / envelope): " + ", ".join(
-              f"{k} {usd(used[k])}/{usd(v)}" for k, v in envelopes.items()),
-          f"- adjustments: {[(a['correction_key'], a['amount_micro_usd']) for a in adjustments] or 'none'}",
-          "- tracked scope: calls through this application's gateway plus recorded adjustments; not provider credit", "",
-          "## Mentor walkthrough", ""]
+    return L
+
+
+def _budget_lines(snap, db: dict) -> list[str]:
+    return ["", "## Budget", "",
+            f"- spent {_usd(snap.spent_micro_usd)} of the {_usd(snap.allowance_micro_usd)} allowance "
+            f"({snap.spent_percent:.2f}%); pending {_usd(snap.pending_micro_usd)} (unknown "
+            f"{_usd(snap.unknown_micro_usd)}); cap {_usd(snap.cap_micro_usd)}; paid enabled {snap.paid_enabled}; "
+            f"last reconciliation {snap.last_reconciliation or 'never'}; dates {snap.project_start}..{snap.project_end}",
+            "- envelopes (used incl. open / envelope): " + ", ".join(
+                f"{k} {_usd(db['used'][k])}/{_usd(v)}" for k, v in db["envelopes"].items()),
+            f"- adjustments: {[(a['correction_key'], a['amount_micro_usd']) for a in db['adjustments']] or 'none'}",
+            "- tracked scope: calls through this application's gateway plus recorded adjustments; not provider credit",
+            ""]
+
+
+def _walkthrough_and_restore_lines(walkthrough: dict | None, browser: dict | None, rid: str,
+                                   restore: list[dict | None]) -> list[str]:
+    L = ["## Mentor walkthrough", ""]
     if walkthrough or browser:
         w = walkthrough or browser
         L += [f"- {w.get('summary', '')}" + ("" if walkthrough else " (phase-3 browser record; repeat on this candidate)")]
@@ -447,11 +547,8 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
                  f"`releases/{rid}/walkthrough-results.json`")
     L += ["", "## Restore drills", ""]
     L += [f"- {r['checked_at']}: {'passed' if r['passed'] else 'FAILED'} — backup `{Path(r['backup']).parent.name}`, "
-          f"spent {usd(r['restored_ledger']['spent_micro_usd'])}, pending {usd(r['restored_ledger']['pending_micro_usd'])}"
-          f", unknown {usd(r['restored_ledger']['unknown_micro_usd'])}, prior use "
-          f"{usd(r['restored_ledger']['prior_use_micro_usd'])}" for r in restore if r] \
+          f"spent {_usd(r['restored_ledger']['spent_micro_usd'])}, pending "
+          f"{_usd(r['restored_ledger']['pending_micro_usd'])}, unknown {_usd(r['restored_ledger']['unknown_micro_usd'])}"
+          f", prior use {_usd(r['restored_ledger']['prior_use_micro_usd'])}" for r in restore if r] \
         or ["- no restore drill recorded (`backup`, then `restore-check`)"]
-    L.append("")
-    path = out / "report.md"
-    write_text_atomic(path, "\n".join(L))
-    return path
+    return L

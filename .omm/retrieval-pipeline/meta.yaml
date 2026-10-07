@@ -1,0 +1,14 @@
+created: 2026-10-07T04:46:59.159Z
+updated: 2026-10-07T04:46:59.549Z
+update_count: 2
+last_field: diagram
+git_commit: 8fe51c5
+git_branch: refactor-3858e4c2-tests
+children:
+  - dense-search
+  - fusion
+  - lexical
+  - pack
+  - rerank
+  - route
+  - scope

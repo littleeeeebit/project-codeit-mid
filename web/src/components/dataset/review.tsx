@@ -60,6 +60,28 @@ function DraftCard({ c }: { c: Candidate }) {
           </Table>
         </Section>
       )}
+      <DraftDocuments c={c} />
+      {Object.keys(c.negative_validation).length > 0 && (
+        <Section title="부재 검증 기록">
+          <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 text-sm">
+            {Object.entries(c.negative_validation).map(([k, v]) => <div key={k} className="contents"><dt className="text-muted-foreground">{k}</dt><dd>{typeof v === "string" ? v : JSON.stringify(v)}</dd></div>)}
+          </dl>
+        </Section>
+      )}
+      {c.metadata.length > 0 && (
+        <Section title="CSV 메타데이터">
+          <dl className="grid grid-cols-[9rem_1fr] gap-x-3 gap-y-1 text-sm">
+            {c.metadata.map((m) => <div key={m.field} className="contents"><dt className="text-muted-foreground">{m.field}</dt><dd className="break-all">{JSON.stringify(m.value)}</dd></div>)}
+          </dl>
+        </Section>
+      )}
+    </div>
+  );
+}
+
+/** The draft's documents: title, review state, cited PDF pages and the original file. */
+function DraftDocuments({ c }: { c: Candidate }) {
+  return (
       <ul className="space-y-2">
         {c.documents.map((d, i) => (
           <li key={i} className="space-y-1.5 rounded-xl border p-3">
@@ -83,21 +105,6 @@ function DraftCard({ c }: { c: Candidate }) {
           </li>
         ))}
       </ul>
-      {Object.keys(c.negative_validation).length > 0 && (
-        <Section title="부재 검증 기록">
-          <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 text-sm">
-            {Object.entries(c.negative_validation).map(([k, v]) => <div key={k} className="contents"><dt className="text-muted-foreground">{k}</dt><dd>{typeof v === "string" ? v : JSON.stringify(v)}</dd></div>)}
-          </dl>
-        </Section>
-      )}
-      {c.metadata.length > 0 && (
-        <Section title="CSV 메타데이터">
-          <dl className="grid grid-cols-[9rem_1fr] gap-x-3 gap-y-1 text-sm">
-            {c.metadata.map((m) => <div key={m.field} className="contents"><dt className="text-muted-foreground">{m.field}</dt><dd className="break-all">{JSON.stringify(m.value)}</dd></div>)}
-          </dl>
-        </Section>
-      )}
-    </div>
   );
 }
 

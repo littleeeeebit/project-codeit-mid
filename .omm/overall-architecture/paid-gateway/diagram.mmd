@@ -1,13 +1,12 @@
 graph TD
-  metered-call["Metered call wrapper\nsrc/rfp_assistant/service/service.py"]
-  budget-ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"]
-  gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
-  openai-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
-  key-sessions["Member key sessions\nsrc/rfp_assistant/service/service.py"]
+  ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"]
+  transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
+  key-sessions["Member key sessions\nsrc/rfp_assistant/gateway/generation.py"]
+  owner-lock["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
   tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
-  metered-call -->|reserve, dispatch, settle| budget-ledger
-  budget-ledger -->|owner_guard in transaction| gateway-owner
-  metered-call -->|chat or embed| openai-transport
-  openai-transport -->|client per KEY_SESSION| key-sessions
-  openai-transport -->|owner check before call| gateway-owner
-  metered-call -->|generation span, usage, cost| tracing
+  fake["Fake transport\nsrc/rfp_assistant/gateway/generation.py"]
+  ledger -->|"require_owner, owner_guard"| owner-lock
+  transport -->|"_check_owner before call"| owner-lock
+  transport -->|"client per KEY_SESSION"| key-sessions
+  tracing -->|"wraps each call"| transport
+  fake -->|"stands in when provider fake"| transport

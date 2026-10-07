@@ -33,12 +33,8 @@ export function FidelityRow({ s, active, onOpen }: { s: Source; active: boolean;
 }
 
 export function FidelityDetail({ s, onConfirmed }: { s: Source; onConfirmed: () => void }) {
-  const [shown, setShown] = useState<number | null>(null);
-  const [selected, setSelected] = useState(0);
   const [note, setNote] = useState("");
   const [state, setState] = useState<{ busy?: boolean; error?: string; done?: boolean }>({});
-  const m = s.metrics;
-  const finding = s.findings[selected];
   const confirm = async (e: React.FormEvent) => {
     e.preventDefault();
     setState({ busy: true });
@@ -50,6 +46,29 @@ export function FidelityDetail({ s, onConfirmed }: { s: Source; onConfirmed: () 
   };
   return (
     <article className="space-y-5">
+      <FidelityHeader s={s} />
+      {s.metrics && (s.findings.length === 0 ? <Empty>자동 대조가 표시한 곳이 없습니다.</Empty> : <FindingsReview s={s} />)}
+
+      {["auto_verified", "auto_flagged"].includes(s.review_status) && !state.done && (
+        <form onSubmit={confirm} className="space-y-3 rounded-2xl bg-secondary/60 p-4">
+          <Field id={`fid-note-${s.source_hash}`} label="메모 (선택)">
+            <input id={`fid-note-${s.source_hash}`} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} className={cn(field, "h-10")} />
+          </Field>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="submit" size="lg" disabled={state.busy}>표시된 곳을 모두 원문과 대조했습니다</Button>
+            <span className="text-[13px] text-muted-foreground">대조 상태와 검토 메모가 수정 기록에 자동으로 남습니다.</span>
+          </div>
+          {state.error && <Notice tone="bad">{state.error}</Notice>}
+        </form>
+      )}
+      {state.done && <Notice tone="ok">표본 대조 완료로 기록했습니다.</Notice>}
+    </article>
+  );
+}
+
+function FidelityHeader({ s }: { s: Source }) {
+  const m = s.metrics;
+  return (
       <header className="space-y-2">
         <StatusBadge tone={REVIEW_TONE[s.review_status] ?? "neutral"} size="md">{label(REVIEW, s.review_status)}</StatusBadge>
         <h3 className="text-lg font-bold leading-snug">{s.filename}</h3>
@@ -65,8 +84,14 @@ export function FidelityDetail({ s, onConfirmed }: { s: Source; onConfirmed: () 
           <details className="text-[13px] text-muted-foreground"><summary className="min-h-8 cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-ring/50">그림 포함 {m.image_pages.length}쪽 · 그림 속 글자는 대조 범위 밖</summary><p className="pt-2">{m.image_pages.join(", ")}</p></details>
         )}
       </header>
+  );
+}
 
-      {m && (s.findings.length === 0 ? <Empty>자동 대조가 표시한 곳이 없습니다.</Empty> : (
+function FindingsReview({ s }: { s: Source }) {
+  const [shown, setShown] = useState<number | null>(null);
+  const [selected, setSelected] = useState(0);
+  const finding = s.findings[selected];
+  return (
         <section aria-label="불일치 검토" className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="text-base font-bold">확인할 위치</h4><span className="text-[13px] text-muted-foreground">한 위치씩 선택해 대조하세요</span></div>
         <ol className="max-h-64 divide-y overflow-y-auto rounded-xl border border-input">
@@ -98,21 +123,5 @@ export function FidelityDetail({ s, onConfirmed }: { s: Source; onConfirmed: () 
           )}
         </div>}
         </section>
-      ))}
-
-      {["auto_verified", "auto_flagged"].includes(s.review_status) && !state.done && (
-        <form onSubmit={confirm} className="space-y-3 rounded-2xl bg-secondary/60 p-4">
-          <Field id={`fid-note-${s.source_hash}`} label="메모 (선택)">
-            <input id={`fid-note-${s.source_hash}`} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} className={cn(field, "h-10")} />
-          </Field>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" size="lg" disabled={state.busy}>표시된 곳을 모두 원문과 대조했습니다</Button>
-            <span className="text-[13px] text-muted-foreground">대조 상태와 검토 메모가 수정 기록에 자동으로 남습니다.</span>
-          </div>
-          {state.error && <Notice tone="bad">{state.error}</Notice>}
-        </form>
-      )}
-      {state.done && <Notice tone="ok">표본 대조 완료로 기록했습니다.</Notice>}
-    </article>
   );
 }

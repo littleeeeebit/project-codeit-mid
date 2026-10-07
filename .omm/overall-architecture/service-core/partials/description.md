@@ -1,0 +1,1 @@
+`Resources.partials[request_id]` holds the raw streamed content that `_generate`'s `on_delta` writes as the OpenAI stream grows. `answer_progress` returns `generation.partial_answer(content)` only while the request is `running`, not cancel-requested, and owned by the caller's `generation_id`. `_finish` removes the entry once the validated outcome is stored.

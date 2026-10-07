@@ -1,0 +1,1 @@
+This summary comes from the README and the function names. fidelity.py and ocr.py were not traced line by line.

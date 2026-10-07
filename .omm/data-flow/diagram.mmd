@@ -1,17 +1,15 @@
 graph TD
-  originals["Originals and CSV manifest\nsrc/rfp_assistant/corpus/ingestion.py"]
-  fidelity-ocr["Fidelity print and OCR\nsrc/rfp_assistant/corpus/fidelity.py"]
+  originals["Originals and CSV\nsrc/rfp_assistant/corpus/ingestion.py"]
   extractions["Extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
-  keyword-build["Keyword index build\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  dense-build["Dense vector sets\nsrc/rfp_assistant/retrieval/dense.py"]
-  retrieval-runs["Frozen runs and matrices\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  cited-evidence["Answers and citations\nsrc/rfp_assistant/service/service.py"]
-  originals -->|manifest, ingest by hash| extractions
-  fidelity-ocr -->|print text, image_text| extractions
-  extractions -->|elements, review status| keyword-build
-  keyword-build -->|chunk payloads| dense-build
-  keyword-build -->|index version| retrieval-runs
-  dense-build -->|dense set version| retrieval-runs
-  retrieval-runs -->|person picks a row| activation
-  activation -->|active_run, active_index| cited-evidence
+  keyword-index["Keyword index artifacts\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  embedding-set["pgvector embedding set\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  activation["Activated serving config\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  evidence-map["Request evidence map\nsrc/rfp_assistant/service/service.py"]
+  citation-pane["Evidence pane and original\nweb/src/components/ask/answer-parts.tsx"]
+  originals -->|"manifest, ingest"| extractions
+  extractions -->|"chunk by profile"| keyword-index
+  keyword-index -->|"payload hashes embedded"| embedding-set
+  keyword-index -->|"active_index pointer"| activation
+  embedding-set -->|"dense_version"| activation
+  activation -->|"serving per request"| evidence-map
+  evidence-map -->|"open_evidence, download"| citation-pane

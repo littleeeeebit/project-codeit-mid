@@ -1,0 +1,1 @@
+Created by `budget.reserve` with the maximum cost (`max_cost`: every input token at the cache-write rate plus the maximum output tokens), the rates snapshot and the member's billing scope in `price_json`. It counts against the cap and the envelope as pending.

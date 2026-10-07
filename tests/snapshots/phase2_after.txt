@@ -1,0 +1,238 @@
+----- report.md -----
+# Phase 2 report — corpus coverage and retrieval selection
+
+Generated <time> from `data/`. Every figure below is read from recorded state; steps that were not run are listed as missing.
+
+## Manifest and source review
+
+- associations: 4 (1 HWP, 3 PDF), unique sources: 3
+- parse status: {'parsed': 3, 'quarantined': 1}
+- review status: {'sample_checked': 3, 'needs_recovery': 1}
+- audit differences: {'associations': (4, 100), 'hwp': (1, 96), 'pdf': (3, 4)}
+- human-checked sources (sample_checked/reviewed): 2; automatic verdicts are not counted as reviewed coverage
+
+| Source | Status | Reviewer | Current revision | Locations | Coverage | Limitations |
+| --- | --- | --- | --- | --- | --- | --- |
+| 기관A_통합 정보시스템.pdf; 기관C_통합 정보시스템 사본.pdf | sample_checked | fixture-reviewer | True | 1 | null | null |
+| 기관D_도서관 좌석 예약.pdf | sample_checked | fixture-reviewer | True | 1 | null | null |
+
+## Quarantine and recovery
+
+- quarantined: 기관E_재난 관리 시스템.hwp — `hwp_converter_missing`
+
+## Identity and provenance
+
+- associations sharing bytes with conflicting metadata: 2
+- CSV institution/title that the original's own cues contradict: 0
+  - 기관A_통합 정보시스템.pdf: conflicts ['institution', 'notice', 'bid_close'], agreement {'institution': None, 'title': True}, resolutions []
+  - 기관C_통합 정보시스템 사본.pdf: conflicts ['institution', 'notice', 'bid_close'], agreement {'institution': None, 'title': True}, resolutions []
+
+## Evaluation families
+
+- families.json is missing: run `validate-gold` or `gold submit`, which assign families
+- families: 0 (dev 0, test 0); multi-document families: 0
+- related documents across splits: none
+
+## Index versions
+
+| Version | Kind/profile | State | Created |
+| --- | --- | --- | --- |
+| `<id1>` | keyword structural (reviewed_only) | ready | <time> |
+| `<id2>` | dense text-embedding-3-small/1536 over <id1> | ready | <time> |
+
+## Retrieval runs (development, retrieval only)
+
+| Run | Label | Profile | Status | hit@20 | complete@20 | nDCG@5 | MRR | packed complete | critical | p95 ms | gate |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `H-<id3>` | H | structural | complete | 1.0 | None | 1.0 | 1.0 | 1.0 | 0 | <ms> | None |
+| `K0-<id4>` | K0 | structural | complete | 1.0 | None | 1.0 | 1.0 | 1.0 | 0 | <ms> | None |
+| `K1-<id5>` | K1 | structural | complete | 1.0 | None | 1.0 | 1.0 | 1.0 | 0 | <ms> | None |
+
+## Reranker load and latency
+
+- no reranker trial recorded
+
+## Spend (tracked by this ledger)
+
+| Purpose | Stage | State | Attempts | Settled | Reserved |
+| --- | --- | --- | --- | --- | --- |
+| gold_eval | embedding | settled | 2 | $<n> | $<n> |
+| embedding | embedding | settled | 1 | $<n> | $<n> |
+
+Envelopes (used incl. open reservations / envelope): embedding $<n>/$<n>, gold_eval $<n>/$<n>, interactive $<n>/$<n>, judge_eval $<n>/$<n>
+
+## Selection
+
+- activated: run `K1-<id5>` (K1, kiwi_bm25), keyword index `<id1>`, dense `None`, reranker None
+- requests serve: run `K1-<id5>` (kiwi_bm25)
+- fallback: kiwi_bm25; retrieval finalist for phase 4: H-<id3>
+  - <time> owner-cli: fixture
+
+## Phase 2 exit gates
+
+| Gate | Met | Evidence |
+| --- | --- | --- |
+| manifest covers every CSV record with a status | yes | 4 associations; audit differences {'associations': (4, 100), 'hwp': (1, 96), 'pdf': (3, 4)} |
+| human-reviewed source coverage recorded | yes | 2 sources sample_checked/reviewed |
+| failed originals recovered or visibly quarantined | yes | 1 quarantined, 0 recovered |
+| independently reviewed dev dataset validates | **no** | revalidated now: rows 4, errors 9 |
+| frozen K0/K1 comparison under the current policy | **no** | pair K0-<id4> / K1-<id5> on index <id1>, but the dataset does not validate |
+| dense decided (run or explicit gap) | yes | D/H runs present |
+| reranker decided (gate measured or explicit gap) | **no** | no current trial: record the owner's D4 decision |
+| selection activated under the current policy | yes | active run K1-<id5> under policy retrieval-eval-4 (current retrieval-eval-4) |
+
+## Inputs for phase 3
+
+- serving: run `K1-<id5>` (kiwi_bm25), keyword index `<id1>`, dense `None`, reranker None, limits {'channel_top_k': 20, 'corpus_route': {'max': 4, 'rule': 'greedy-rare-term-1', 'share': 0.5}, 'dense_search': 'exact', 'dense_weight': 1.0, 'evidence_max_tokens': 5000, 'evidence_max_units': 6, 'evidence_target_tokens': 3000, 'fused_top_k': 20, 'fusion': 'rrf', 'hnsw_ef_search': 100, 'keyword_head': 20, 'rrf_k': 60}
+- rollback: keyword fallback `kiwi_bm25` always; earlier activations none; every earlier index directory stays on disk
+- immutable evidence mapping: `releases/phase-2/source-map.json` (4 associations → source hash → active extraction)
+- phase 4 retrieval finalist: H-<id3>
+- open gates: ['independently reviewed dev dataset validates', 'frozen K0/K1 comparison under the current policy', 'reranker decided (gate measured or explicit gap)']
+
+----- manifest.json -----
+{
+ "release_id": "phase-2",
+ "created_at": "<time>",
+ "eval_version": "retrieval-eval-4",
+ "active_run": {
+  "activated_at": "<time>",
+  "dense_version": null,
+  "embedding": null,
+  "eval_version": "retrieval-eval-4",
+  "fallback_mode": "kiwi_bm25",
+  "finalist_run_id": "H-<id3>",
+  "index_version": "<id1>",
+  "label": "K1",
+  "limits": {
+   "channel_top_k": 20,
+   "corpus_route": {
+    "max": <n>,
+    "rule": "greedy-rare-term-1",
+    "share": 0.5
+   },
+   "dense_search": "exact",
+   "dense_weight": 1.0,
+   "evidence_max_tokens": 5000,
+   "evidence_max_units": 6,
+   "evidence_target_tokens": 3000,
+   "fused_top_k": 20,
+   "fusion": "rrf",
+   "hnsw_ef_search": 100,
+   "keyword_head": 20,
+   "rrf_k": 60
+  },
+  "mode": "kiwi_bm25",
+  "reranker": null,
+  "run_id": "K1-<id5>"
+ },
+ "serving": {
+  "activated_at": "<time>",
+  "dense_version": null,
+  "embedding": null,
+  "eval_version": "retrieval-eval-4",
+  "fallback_mode": "kiwi_bm25",
+  "finalist_run_id": "H-<id3>",
+  "index_version": "<id1>",
+  "label": "K1",
+  "limits": {
+   "channel_top_k": 20,
+   "corpus_route": {
+    "max": <n>,
+    "rule": "greedy-rare-term-1",
+    "share": 0.5
+   },
+   "dense_search": "exact",
+   "dense_weight": 1.0,
+   "evidence_max_tokens": 5000,
+   "evidence_max_units": 6,
+   "evidence_target_tokens": 3000,
+   "fused_top_k": 20,
+   "fusion": "rrf",
+   "hnsw_ef_search": 100,
+   "keyword_head": 20,
+   "rrf_k": 60
+  },
+  "mode": "kiwi_bm25",
+  "reranker": null,
+  "run_id": "K1-<id5>"
+ },
+ "active_index": "<id1>",
+ "gates": [
+  {
+   "gate": "manifest covers every CSV record with a status",
+   "met": true,
+   "evidence": "4 associations; audit differences {'associations': (4, 100), 'hwp': (1, 96), 'pdf': (3, 4)}"
+  },
+  {
+   "gate": "human-reviewed source coverage recorded",
+   "met": true,
+   "evidence": "2 sources sample_checked/reviewed"
+  },
+  {
+   "gate": "failed originals recovered or visibly quarantined",
+   "met": true,
+   "evidence": "1 quarantined, 0 recovered"
+  },
+  {
+   "gate": "independently reviewed dev dataset validates",
+   "met": false,
+   "evidence": "revalidated now: rows 4, errors 9"
+  },
+  {
+   "gate": "frozen K0/K1 comparison under the current policy",
+   "met": false,
+   "evidence": "pair K0-<id4> / K1-<id5> on index <id1>, but the dataset does not validate"
+  },
+  {
+   "gate": "dense decided (run or explicit gap)",
+   "met": true,
+   "evidence": "D/H runs present"
+  },
+  {
+   "gate": "reranker decided (gate measured or explicit gap)",
+   "met": false,
+   "evidence": "no current trial: record the owner's D4 decision"
+  },
+  {
+   "gate": "selection activated under the current policy",
+   "met": true,
+   "evidence": "active run K1-<id5> under policy retrieval-eval-4 (current retrieval-eval-4)"
+  }
+ ],
+ "runs": [
+  "H-<id3>",
+  "K0-<id4>",
+  "K1-<id5>"
+ ]
+}
+----- source-map.json -----
+[
+ {
+  "doc_id": "<uuid>",
+  "source_hash": "<id6>",
+  "extraction_id": "<id7>",
+  "parse_status": "parsed",
+  "review_status": "sample_checked"
+ },
+ {
+  "doc_id": "<uuid>",
+  "source_hash": "<id6>",
+  "extraction_id": "<id7>",
+  "parse_status": "parsed",
+  "review_status": "sample_checked"
+ },
+ {
+  "doc_id": "<uuid>",
+  "source_hash": "<id8>",
+  "extraction_id": "<id9>",
+  "parse_status": "parsed",
+  "review_status": "sample_checked"
+ },
+ {
+  "doc_id": "<uuid>",
+  "source_hash": "<id10>",
+  "extraction_id": null,
+  "parse_status": "quarantined",
+  "review_status": "needs_recovery"
+ }
+]

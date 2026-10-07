@@ -1,0 +1,1 @@
+Set by `reconcile` for explicitly covered unknown attempts that were dispatched inside a closed interval and billed to the same provider project (or unscoped with `include`). The adjustment records the provider total minus the locally settled cost. Overlapping intervals and reused reconciliation IDs with different values are refused.

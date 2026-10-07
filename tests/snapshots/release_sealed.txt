@@ -1,0 +1,1688 @@
+===== run 1 =====
+----- report.md -----
+# Release report F-<id1>
+
+Generated <time> from `data/` state. Every figure is read from recorded evidence; anything not run is listed as missing. This command never generates an answer.
+
+## Decision: **limited**
+
+- hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)
+- quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})
+- quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})
+- quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)
+- evidence is sealed pilot, not a sealed evaluation of reviewed gold
+
+## Release manifest
+
+- code: Git `rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr` (uncommitted changes: False), package source `cccccccccccccccc`; metric code `mmmmmmmmmmmmmmmm`
+- model gpt-6-luna, reasoning low, output cap 4000, prompt grounded-answer-12, rates None, settings `<id2>`
+- serving: run `K1-<id3>` (kiwi_bm25), keyword index `<id4>`, dense `None`, reranker None; fallback kiwi_bm25
+- dependencies: requirements-lock.txt `<id5>`; hardware {'machine': 'fixture'}
+- freeze: {'freeze_id': 'F-<id1>', 'frozen_at': '<time>', 'selected_run_id': 'K1-<id3>', 'decided_by': 'owner', 'post_test': False}
+
+## Coverage
+
+- associations 5 (1 HWP, 4 PDF), unique sources 4; audit differences {'associations': (5, 100), 'hwp': (1, 96)}
+- parse {'parsed': 4, 'quarantined': 1}; review {'sample_checked': 4, 'needs_recovery': 1}; human-checked sources 3 (automatic verdicts are not counted as review)
+- quarantined: ['기관E_재난 관리 시스템.hwp']
+- byte-identical associations with conflicting metadata: 2
+
+## Datasets
+
+- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}; frozen `<id6>` (current True)
+- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}; frozen `<id7>` (current True)
+
+## Retrieval runs (development, retrieval only)
+
+| Run | Mode | Scored | hit@20 single | complete@20 multi | nDCG@5 | MRR | Critical | Wrong scope | p95 ms |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `K1-<id3>` | kiwi_bm25 | 3 | 1.0 (2/2) | 1.0 | 1.0 | 1.0 | [] | 0 | <ms> |
+
+## Answer evaluation
+
+- development run `A-<id8>` (complete): see `runs/A-<id8>/report.md`
+  - `K1-<id3>` (kiwi_bm25) 4/4: claims 0.6667 (n=3), critical wrong 0, citation precision lower bound 1.0, negatives 0.0 (n=1), cost $<n>
+- sealed run `S-<id9>` (sealed test, complete) under freeze `F-<id1>`
+
+## Latency
+
+- fake sample `L-<id10>`: n=4, failures 0, warm p50/p95 <n>/<n> ms (n=2), cold first wave <n> ms, 2 users × 2 waves
+
+## Checks
+
+- no saved check results (`check --phase all --provider fake --save`)
+
+## Hard checks and quality targets
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| automated invariants (check --phase all --provider fake) | unverified | no saved run: check --phase all --provider fake --save |
+| no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases | pass | 0 observed wrong, 0 contested or awaiting blind review |
+| no selected-scope leakage | pass | claims/evidence outside scope 0, wrong-scope candidates 0 |
+| managed evidence links resolve | pass | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
+| admission cap enforced and ledger not frozen | pass | committed $<n> of cap $<n>; frozen None |
+| no unresolved billing | pass | 0 open or unknown attempts |
+| single-evidence hit@20 >= 0.90 | met | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
+| multi-evidence complete coverage@20 >= 0.80 | not measured | {'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None} |
+| required-claim correctness >= 0.90 | met | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
+| citation precision >= 0.95 (unjudged links count as unsupported) | met | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
+| negative/ambiguous handling >= 0.90 | not measured | {'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None} |
+| full-answer p95 < 15 s at six users (real provider) | not measured | no real latency sample |
+
+## Budget
+
+- spent $<n> of the $<n> allowance (<n>%); pending $<n> (unknown $<n>); cap $<n>; paid enabled True; last reconciliation never; dates 2026-09-30..2026-10-28
+- envelopes (used incl. open / envelope): embedding $<n>/$<n>, gold_eval $<n>/$<n>, interactive $<n>/$<n>, judge_eval $<n>/$<n>
+- adjustments: [('prior-use-baseline', 0)]
+- tracked scope: calls through this application's gateway plus recorded adjustments; not provider credit
+
+## Mentor walkthrough
+
+- not recorded for this candidate: follow docs/operations/runbook.md §10.6 and save `releases/F-<id1>/walkthrough-results.json`
+
+## Restore drills
+
+- no restore drill recorded (`backup`, then `restore-check`)
+
+----- manifest.json -----
+{
+ "release_id": "F-<id1>",
+ "generated_at": "<time>",
+ "status": "limited",
+ "reasons": [
+  "hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)",
+  "quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
+  "quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
+  "quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)",
+  "evidence is sealed pilot, not a sealed evaluation of reviewed gold"
+ ],
+ "evidence_label": "sealed pilot",
+ "code": {
+  "source_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "git_revision": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+  "git_dirty": false
+ },
+ "metric_code_sha256": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
+ "settings_fingerprint": "<id2>",
+ "model": "gpt-6-luna",
+ "reasoning_effort": "low",
+ "max_output_tokens": 4000,
+ "prompt_version": "grounded-answer-12",
+ "rate_version": null,
+ "active_run": {
+  "activated_at": "<time>",
+  "dense_version": null,
+  "embedding": null,
+  "eval_version": "retrieval-eval-4",
+  "fallback_mode": "kiwi_bm25",
+  "finalist_run_id": null,
+  "index_version": "<id4>",
+  "label": "K1",
+  "limits": {
+   "channel_top_k": 20,
+   "corpus_route": {
+    "max": <n>,
+    "rule": "greedy-rare-term-1",
+    "share": 0.5
+   },
+   "dense_search": "exact",
+   "dense_weight": 1.0,
+   "evidence_max_tokens": 5000,
+   "evidence_max_units": 6,
+   "evidence_target_tokens": 3000,
+   "fused_top_k": 20,
+   "fusion": "rrf",
+   "hnsw_ef_search": 100,
+   "keyword_head": 20,
+   "rrf_k": 60
+  },
+  "mode": "kiwi_bm25",
+  "reranker": null,
+  "run_id": "K1-<id3>"
+ },
+ "serving": {
+  "activated_at": "<time>",
+  "dense_version": null,
+  "embedding": null,
+  "eval_version": "retrieval-eval-4",
+  "fallback_mode": "kiwi_bm25",
+  "finalist_run_id": null,
+  "index_version": "<id4>",
+  "label": "K1",
+  "limits": {
+   "channel_top_k": 20,
+   "corpus_route": {
+    "max": <n>,
+    "rule": "greedy-rare-term-1",
+    "share": 0.5
+   },
+   "dense_search": "exact",
+   "dense_weight": 1.0,
+   "evidence_max_tokens": 5000,
+   "evidence_max_units": 6,
+   "evidence_target_tokens": 3000,
+   "fused_top_k": 20,
+   "fusion": "rrf",
+   "hnsw_ef_search": 100,
+   "keyword_head": 20,
+   "rrf_k": 60
+  },
+  "mode": "kiwi_bm25",
+  "reranker": null,
+  "run_id": "K1-<id3>"
+ },
+ "active_index": "<id4>",
+ "datasets": {
+  "dev": {
+   "dataset_sha256": "<id11>",
+   "rows": 4,
+   "label": "pilot",
+   "review_log_sha256": "<id12>",
+   "current": true
+  },
+  "test": {
+   "dataset_sha256": "<id13>",
+   "rows": 1,
+   "label": "pilot",
+   "review_log_sha256": "<id12>",
+   "current": true
+  }
+ },
+ "requirements_lock_sha256": "<id14>",
+ "hardware": {
+  "machine": "fixture"
+ },
+ "stale_evidence": [],
+ "freeze": {
+  "freeze_id": "F-<id1>",
+  "frozen_at": "<time>",
+  "selected_run_id": "K1-<id3>",
+  "decided_by": "owner",
+  "post_test": false
+ }
+}
+----- coverage.json -----
+{
+ "counts": {
+  "associations": 5,
+  "hwp": 1,
+  "pdf": 4,
+  "unique_sources": 4
+ },
+ "parse_status": {
+  "parsed": 4,
+  "quarantined": 1
+ },
+ "review_status": {
+  "sample_checked": 4,
+  "needs_recovery": 1
+ },
+ "audit_differences": {
+  "associations": [
+   5,
+   100
+  ],
+  "hwp": [
+   1,
+   96
+  ]
+ },
+ "quarantined": [
+  {
+   "doc_id": "<uuid>",
+   "filename": "기관E_재난 관리 시스템.hwp",
+   "reason_code": "hwp_converter_missing"
+  }
+ ],
+ "human_checked_sources": 3,
+ "provenance_conflicts": [
+  {
+   "filename": "기관A_통합 정보시스템.pdf",
+   "fields": [
+    "institution",
+    "notice",
+    "bid_close"
+   ],
+   "resolutions": []
+  },
+  {
+   "filename": "기관C_통합 정보시스템 사본.pdf",
+   "fields": [
+    "institution",
+    "notice",
+    "bid_close"
+   ],
+   "resolutions": []
+  }
+ ]
+}
+----- evaluation.json -----
+{
+ "validation": {
+  "dev": {
+   "ok": true,
+   "rows": 4,
+   "label": "pilot",
+   "targets": {
+    "direct_fact": {
+     "rows": 1,
+     "target": 12,
+     "met": false
+    },
+    "semantic_paraphrase": {
+     "rows": 1,
+     "target": 9,
+     "met": false
+    },
+    "exact_identifier": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "table_numeric": {
+     "rows": 1,
+     "target": 9,
+     "met": false
+    },
+    "multi_passage": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "cross_document": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "missing_false_premise": {
+     "rows": 1,
+     "target": 6,
+     "met": false
+    },
+    "revision_conflict": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    }
+   },
+   "metadata_stratum": 0,
+   "answerability": {
+    "answerable": 3,
+    "unanswerable": 1,
+    "ambiguous": 0,
+    "conflicting": 0
+   },
+   "source_positions": {
+    "early": 0,
+    "middle": 1,
+    "late": 2,
+    "none": 1
+   },
+   "errors": 0
+  },
+  "test": {
+   "ok": true,
+   "rows": 1,
+   "label": "pilot",
+   "targets": {
+    "direct_fact": {
+     "rows": 1,
+     "target": 12,
+     "met": false
+    },
+    "semantic_paraphrase": {
+     "rows": 0,
+     "target": 9,
+     "met": false
+    },
+    "exact_identifier": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "table_numeric": {
+     "rows": 0,
+     "target": 9,
+     "met": false
+    },
+    "multi_passage": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "cross_document": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "missing_false_premise": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "revision_conflict": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    }
+   },
+   "metadata_stratum": 0,
+   "answerability": {
+    "answerable": 1,
+    "unanswerable": 0,
+    "ambiguous": 0,
+    "conflicting": 0
+   },
+   "source_positions": {
+    "early": 0,
+    "middle": 0,
+    "late": 1,
+    "none": 0
+   },
+   "errors": 0
+  }
+ },
+ "frozen": {
+  "dev": {
+   "dataset": "dev",
+   "schema": "gold-2",
+   "dataset_sha256": "<id11>",
+   "rows": 4,
+   "label": "pilot",
+   "targets": {
+    "direct_fact": {
+     "rows": 1,
+     "target": 12,
+     "met": false
+    },
+    "semantic_paraphrase": {
+     "rows": 1,
+     "target": 9,
+     "met": false
+    },
+    "exact_identifier": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "table_numeric": {
+     "rows": 1,
+     "target": 9,
+     "met": false
+    },
+    "multi_passage": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "cross_document": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "missing_false_premise": {
+     "rows": 1,
+     "target": 6,
+     "met": false
+    },
+    "revision_conflict": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    }
+   },
+   "metadata_stratum": 0,
+   "answerability": {
+    "answerable": 3,
+    "unanswerable": 1,
+    "ambiguous": 0,
+    "conflicting": 0
+   },
+   "source_positions": {
+    "early": 0,
+    "middle": 1,
+    "late": 2,
+    "none": 1
+   },
+   "review_log_sha256": "<id12>",
+   "families_sha256": "<id15>",
+   "frozen_by": "owner",
+   "reason": "dev",
+   "frozen_at": "<time>",
+   "changed": [],
+   "current": true
+  },
+  "test": {
+   "dataset": "test",
+   "schema": "gold-2",
+   "dataset_sha256": "<id13>",
+   "rows": 1,
+   "label": "pilot",
+   "targets": {
+    "direct_fact": {
+     "rows": 1,
+     "target": 12,
+     "met": false
+    },
+    "semantic_paraphrase": {
+     "rows": 0,
+     "target": 9,
+     "met": false
+    },
+    "exact_identifier": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "table_numeric": {
+     "rows": 0,
+     "target": 9,
+     "met": false
+    },
+    "multi_passage": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "cross_document": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "missing_false_premise": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    },
+    "revision_conflict": {
+     "rows": 0,
+     "target": 6,
+     "met": false
+    }
+   },
+   "metadata_stratum": 0,
+   "answerability": {
+    "answerable": 1,
+    "unanswerable": 0,
+    "ambiguous": 0,
+    "conflicting": 0
+   },
+   "source_positions": {
+    "early": 0,
+    "middle": 0,
+    "late": 1,
+    "none": 0
+   },
+   "review_log_sha256": "<id12>",
+   "families_sha256": "<id15>",
+   "frozen_by": "owner",
+   "reason": "test",
+   "frozen_at": "<time>",
+   "changed": [],
+   "current": true
+  }
+ },
+ "retrieval_runs": [
+  {
+   "run_id": "K1-<id3>",
+   "label": "K1",
+   "mode": "kiwi_bm25",
+   "dataset_sha256": "<id11>",
+   "population_size": 4,
+   "scored": 3,
+   "hit@20": {
+    "numerator": 2,
+    "denominator": 2,
+    "rate": 1.0,
+    "wilson95": [
+     0.3424,
+     1.0
+    ]
+   },
+   "complete@20": {
+    "numerator": 1,
+    "denominator": 1,
+    "rate": 1.0,
+    "wilson95": [
+     0.2065,
+     1.0
+    ]
+   },
+   "packed_complete": {
+    "numerator": 3,
+    "denominator": 3,
+    "rate": 1.0,
+    "wilson95": [
+     0.4385,
+     1.0
+    ]
+   },
+   "ndcg@5": 1.0,
+   "mrr": 1.0,
+   "critical_failures": [],
+   "wrong_scope": 0,
+   "latency_ms": {
+    "p50": <n>,
+    "p95": <n>,
+    "n": 3
+   },
+   "query_cost_micro_usd": null,
+   "blocking": []
+  }
+ ],
+ "answer_runs": [
+  {
+   "run_id": "A-<id8>",
+   "label": "development finalists",
+   "status": "complete",
+   "stop_reason": null,
+   "finalists": {
+    "K1-<id3>": {
+     "mode": "kiwi_bm25",
+     "completed": 4,
+     "of": 4,
+     "not_finished": [],
+     "rows": 4,
+     "answerable_rows": 3,
+     "rows_passed": {
+      "numerator": 2,
+      "denominator": 4,
+      "rate": 0.5,
+      "wilson95": [
+       0.15,
+       0.85
+      ]
+     },
+     "rows_failed": [
+      "dev-absent",
+      "dev-amount"
+     ],
+     "gold_groups_not_retrieved": {},
+     "required_claim_correctness": {
+      "numerator": 2,
+      "denominator": 3,
+      "rate": 0.6667,
+      "wilson95": [
+       0.2077,
+       0.9385
+      ]
+     },
+     "question_completeness": {
+      "numerator": 2,
+      "denominator": 3,
+      "rate": 0.6667,
+      "wilson95": [
+       0.2077,
+       0.9385
+      ]
+     },
+     "claims_needing_review": 0,
+     "claim_verdicts": {
+      "correct": 2,
+      "wrong_value": 0,
+      "contested": 0,
+      "incomplete_qualifier": 0,
+      "missing": 1,
+      "needs_review": 0
+     },
+     "critical_wrong": [],
+     "critical_unresolved": [],
+     "citation_precision_judged": {
+      "numerator": 4,
+      "denominator": 4,
+      "rate": 1.0,
+      "wilson95": [
+       0.5101,
+       1.0
+      ]
+     },
+     "citation_precision_lower_bound": {
+      "numerator": 4,
+      "denominator": 4,
+      "rate": 1.0,
+      "wilson95": [
+       0.5101,
+       1.0
+      ]
+     },
+     "links_unjudged": 0,
+     "citation_coverage": {
+      "numerator": 4,
+      "denominator": 4,
+      "rate": 1.0,
+      "wilson95": [
+       0.5101,
+       1.0
+      ]
+     },
+     "unsupported_claim_rate": {
+      "numerator": 0,
+      "denominator": 4,
+      "rate": 0.0,
+      "wilson95": [
+       0.0,
+       0.4899
+      ]
+     },
+     "answer_claims_unjudged": 0,
+     "link_validity": {
+      "numerator": 4,
+      "denominator": 4,
+      "rate": 1.0,
+      "wilson95": [
+       0.5101,
+       1.0
+      ]
+     },
+     "negative_handling": {
+      "numerator": 0,
+      "denominator": 1,
+      "rate": 0.0,
+      "wilson95": [
+       0.0,
+       0.7935
+      ]
+     },
+     "false_answers": [
+      "dev-absent"
+     ],
+     "unnecessary_refusals": {
+      "numerator": 0,
+      "denominator": 3,
+      "rate": 0.0,
+      "wilson95": [
+       0.0,
+       0.5615
+      ]
+     },
+     "metadata_correct": {
+      "numerator": 0,
+      "denominator": 0,
+      "rate": null,
+      "wilson95": null
+     },
+     "technical_outcomes": {},
+     "scope_leaks": 0,
+     "by_type": {
+      "direct_fact": {
+       "numerator": 1,
+       "denominator": 1,
+       "rate": 1.0,
+       "wilson95": [
+        0.2065,
+        1.0
+       ]
+      },
+      "semantic_paraphrase": {
+       "numerator": 1,
+       "denominator": 1,
+       "rate": 1.0,
+       "wilson95": [
+        0.2065,
+        1.0
+       ]
+      },
+      "table_numeric": {
+       "numerator": 0,
+       "denominator": 1,
+       "rate": 0.0,
+       "wilson95": [
+        0.0,
+        0.7935
+       ]
+      }
+     },
+     "cost": {
+      "settled_micro_usd": <n>,
+      "settled_in_earlier_attempts_micro_usd": <n>,
+      "pending_micro_usd": <n>,
+      "unknown_micro_usd": <n>,
+      "reconciled_attempts": 0,
+      "attempts": 4,
+      "retried_rows": 0,
+      "source": "shared ledger, all request keys of the run",
+      "per_question_micro_usd": <n>
+     },
+     "latency_ms": {
+      "p50": <n>,
+      "p95": <n>,
+      "n": 4,
+      "condition": "sequential, single process, one call at a time"
+     },
+     "served_retrieval": {
+      "passage_rows": 3,
+      "single_evidence": {
+       "hit@20": {
+        "numerator": 2,
+        "denominator": 2,
+        "rate": 1.0,
+        "wilson95": [
+         0.3424,
+         1.0
+        ]
+       },
+       "hit@5": {
+        "numerator": 2,
+        "denominator": 2,
+        "rate": 1.0,
+        "wilson95": [
+         0.3424,
+         1.0
+        ]
+       }
+      },
+      "multi_evidence": {
+       "complete@20": {
+        "numerator": 1,
+        "denominator": 1,
+        "rate": 1.0,
+        "wilson95": [
+         0.2065,
+         1.0
+        ]
+       },
+       "recall@20": 1.0
+      },
+      "ndcg@5": 1.0,
+      "mrr": 1.0,
+      "packed_complete": {
+       "numerator": 3,
+       "denominator": 3,
+       "rate": 1.0,
+       "wilson95": [
+        0.4385,
+        1.0
+       ]
+      },
+      "qualifier_losses": 0,
+      "wrong_scope_candidates": 0,
+      "code_checks": {
+       "ok": 0,
+       "n": 0
+      },
+      "critical_failures": [],
+      "missing_in_packed": 0,
+      "latency_ms": {
+       "p50": <n>,
+       "p95": <n>,
+       "n": 3
+      },
+      "fallbacks": [],
+      "by_type": {
+       "direct_fact": {
+        "n": 1,
+        "hit@20": 1.0,
+        "ndcg@5": 1.0,
+        "packed_complete": 1.0
+       },
+       "semantic_paraphrase": {
+        "n": 1,
+        "hit@20": 1.0,
+        "ndcg@5": 1.0,
+        "packed_complete": 1.0
+       },
+       "table_numeric": {
+        "n": 1,
+        "hit@20": 1.0,
+        "ndcg@5": 1.0,
+        "packed_complete": 1.0
+       }
+      },
+      "ndcg_eligible_rows": 3,
+      "<id16>": {
+       "ndcg@5": {
+        "low": 1.0,
+        "high": 1.0,
+        "families": 2,
+        "seed": 20261001,
+        "resamples": 1000,
+        "unit": "source family"
+       },
+       "mrr": {
+        "low": 1.0,
+        "high": 1.0,
+        "families": 2,
+        "seed": 20261001,
+        "resamples": 1000,
+        "unit": "source family"
+       },
+       "recall@20": {
+        "low": 1.0,
+        "high": 1.0,
+        "families": 2,
+        "seed": 20261001,
+        "resamples": 1000,
+        "unit": "source family"
+       }
+      },
+      "not_scored": {
+       "non_passage_rows": 0,
+       "types": [],
+       "skipped": []
+      },
+      "ndcg_pool": {
+       "judged_units": "required evidence groups (predeclared source spans)",
+       "unlabelled_top5_passages": 1,
+       "blind_review_of_unlabelled": "not implemented"
+      }
+     }
+    }
+   },
+   "selection": null
+  }
+ ],
+ "sealed_runs": [
+  {
+   "run_id": "S-<id9>",
+   "label": "sealed test",
+   "freeze_id": "F-<id1>",
+   "status": "complete",
+   "stop_reason": null,
+   "finalists": {
+    "K1-<id3>": {
+     "mode": "kiwi_bm25",
+     "completed": 1,
+     "of": 1,
+     "not_finished": [],
+     "rows": 1,
+     "answerable_rows": 1,
+     "rows_passed": {
+      "numerator": 1,
+      "denominator": 1,
+      "rate": 1.0,
+      "wilson95": [
+       0.2065,
+       1.0
+      ]
+     },
+     "rows_failed": [],
+     "gold_groups_not_retrieved": {},
+     "required_claim_correctness": {
+      "numerator": 1,
+      "denominator": 1,
+      "rate": 1.0,
+      "wilson95": [
+       0.2065,
+       1.0
+      ]
+     },
+     "question_completeness": {
+      "numerator": 1,
+      "denominator": 1,
+      "rate": 1.0,
+      "wilson95": [
+       0.2065,
+       1.0
+      ]
+     },
+     "claims_needing_review": 0,
+     "claim_verdicts": {
+      "correct": 1,
+      "wrong_value": 0,
+      "contested": 0,
+      "incomplete_qualifier": 0,
+      "missing": 0,
+      "needs_review": 0
+     },
+     "critical_wrong": [],
+     "critical_unresolved": [],
+     "citation_precision_judged": {
+      "numerator": 1,
+      "denominator": 1,
+      "rate": 1.0,
+      "wilson95": [
+       0.2065,
+       1.0
+      ]
+     },
+     "citation_precision_lower_bound": {
+      "numerator": 1,
+      "denominator": 1,
+      "rate": 1.0,
+      "wilson95": [
+       0.2065,
+       1.0
+      ]
+     },
+     "links_unjudged": 0,
+     "citation_coverage": {
+      "numerator": 1,
+      "denominator": 1,
+      "rate": 1.0,
+      "wilson95": [
+       0.2065,
+       1.0
+      ]
+     },
+     "unsupported_claim_rate": {
+      "numerator": 0,
+      "denominator": 1,
+      "rate": 0.0,
+      "wilson95": [
+       0.0,
+       0.7935
+      ]
+     },
+     "answer_claims_unjudged": 0,
+     "link_validity": {
+      "numerator": 1,
+      "denominator": 1,
+      "rate": 1.0,
+      "wilson95": [
+       0.2065,
+       1.0
+      ]
+     },
+     "negative_handling": {
+      "numerator": 0,
+      "denominator": 0,
+      "rate": null,
+      "wilson95": null
+     },
+     "false_answers": [],
+     "unnecessary_refusals": {
+      "numerator": 0,
+      "denominator": 1,
+      "rate": 0.0,
+      "wilson95": [
+       0.0,
+       0.7935
+      ]
+     },
+     "metadata_correct": {
+      "numerator": 0,
+      "denominator": 0,
+      "rate": null,
+      "wilson95": null
+     },
+     "technical_outcomes": {},
+     "scope_leaks": 0,
+     "by_type": {
+      "direct_fact": {
+       "numerator": 1,
+       "denominator": 1,
+       "rate": 1.0,
+       "wilson95": [
+        0.2065,
+        1.0
+       ]
+      }
+     },
+     "cost": {
+      "settled_micro_usd": <n>,
+      "settled_in_earlier_attempts_micro_usd": <n>,
+      "pending_micro_usd": <n>,
+      "unknown_micro_usd": <n>,
+      "reconciled_attempts": 0,
+      "attempts": 1,
+      "retried_rows": 0,
+      "source": "shared ledger, all request keys of the run",
+      "per_question_micro_usd": <n>
+     },
+     "latency_ms": {
+      "p50": <n>,
+      "p95": <n>,
+      "n": 1,
+      "condition": "sequential, single process, one call at a time"
+     },
+     "served_retrieval": {
+      "passage_rows": 1,
+      "single_evidence": {
+       "hit@20": {
+        "numerator": 1,
+        "denominator": 1,
+        "rate": 1.0,
+        "wilson95": [
+         0.2065,
+         1.0
+        ]
+       },
+       "hit@5": {
+        "numerator": 1,
+        "denominator": 1,
+        "rate": 1.0,
+        "wilson95": [
+         0.2065,
+         1.0
+        ]
+       }
+      },
+      "multi_evidence": {
+       "complete@20": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson95": null
+       },
+       "recall@20": null
+      },
+      "ndcg@5": 1.0,
+      "mrr": 1.0,
+      "packed_complete": {
+       "numerator": 1,
+       "denominator": 1,
+       "rate": 1.0,
+       "wilson95": [
+        0.2065,
+        1.0
+       ]
+      },
+      "qualifier_losses": 0,
+      "wrong_scope_candidates": 0,
+      "code_checks": {
+       "ok": 0,
+       "n": 0
+      },
+      "critical_failures": [],
+      "missing_in_packed": 0,
+      "latency_ms": {
+       "p50": <n>,
+       "p95": <n>,
+       "n": 1
+      },
+      "fallbacks": [],
+      "by_type": {
+       "direct_fact": {
+        "n": 1,
+        "hit@20": 1.0,
+        "ndcg@5": 1.0,
+        "packed_complete": 1.0
+       }
+      },
+      "ndcg_eligible_rows": 1,
+      "<id16>": {
+       "ndcg@5": null,
+       "mrr": null,
+       "recall@20": null
+      },
+      "not_scored": {
+       "non_passage_rows": 0,
+       "types": [],
+       "skipped": []
+      },
+      "ndcg_pool": {
+       "judged_units": "required evidence groups (predeclared source spans)",
+       "unlabelled_top5_passages": 0,
+       "blind_review_of_unlabelled": "not implemented"
+      }
+     }
+    }
+   },
+   "scored_at": "<time>"
+  }
+ ],
+ "latency": [
+  {
+   "run_id": "L-<id10>",
+   "estimate_id": "<id17>",
+   "actor": "owner",
+   "provider": "fake",
+   "users": 2,
+   "waves_planned": 2,
+   "waves_run": 2,
+   "n": 4,
+   "failures": 0,
+   "all_ms": {
+    "p50": <n>,
+    "p95": <n>,
+    "n": 4
+   },
+   "warm_ms": {
+    "p50": <n>,
+    "p95": <n>,
+    "n": 2,
+    "note": "waves after the first"
+   },
+   "cold_wave_ms": <n>,
+   "waves": [
+    {
+     "wave": 1,
+     "wall_ms": <n>,
+     "requests": [
+      {
+       "question_id": "<concurrent>",
+       "ms": <n>,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "<concurrent>",
+       "ms": <n>,
+       "status": "answered",
+       "billing": "settled"
+      }
+     ]
+    },
+    {
+     "wave": 2,
+     "wall_ms": <n>,
+     "requests": [
+      {
+       "question_id": "<concurrent>",
+       "ms": <n>,
+       "status": "answered",
+       "billing": "settled"
+      },
+      {
+       "question_id": "<concurrent>",
+       "ms": <n>,
+       "status": "answered",
+       "billing": "settled"
+      }
+     ]
+    }
+   ],
+   "serving": {
+    "run_id": "K1-<id3>",
+    "mode": "kiwi_bm25",
+    "index_version": "<id4>"
+   },
+   "hardware": {
+    "machine": "fixture"
+   },
+   "code": {
+    "source_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "git_revision": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+    "git_dirty": false
+   },
+   "recorded_at": "<time>",
+   "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
+  }
+ ],
+ "checks": {}
+}
+----- budget.json -----
+{
+ "snapshot": {
+  "allowance_micro_usd": <n>,
+  "cap_micro_usd": <n>,
+  "spent_micro_usd": <n>,
+  "pending_micro_usd": <n>,
+  "available_micro_usd": <n>,
+  "spent_percent": <n>,
+  "committed_percent": <n>,
+  "paid_enabled": true,
+  "frozen_reason": null,
+  "tokens": {
+   "prompt": <n>,
+   "completion": 540,
+   "cached": 0
+  },
+  "per_member": {
+   "evaluation-job": <n>,
+   "evaluation-job-<k>": <n>,
+   "evaluation-job-<k>": <n>
+  },
+  "open_attempts": 0,
+  "ledger_revision": "28",
+  "tracking_scope": "이 앱의 게이트웨이를 거친 호출과 기록된 조정만 포함합니다. 제공자 잔액이 아닙니다.",
+  "last_reconciliation": null,
+  "project_start": "2026-09-30",
+  "project_end": "2026-10-28",
+  "cap_percent": <n>,
+  "warnings": [],
+  "pacing": {
+   "elapsed_fraction": 0.2857,
+   "expected_micro_usd": <n>,
+   "committed_micro_usd": <n>,
+   "ahead": false,
+   "days_left": 21
+  },
+  "read_at": "<time>",
+  "unknown_micro_usd": <n>
+ },
+ "envelopes": {
+  "embedding": {
+   "envelope": 1000000,
+   "used_incl_open": <n>
+  },
+  "gold_eval": {
+   "envelope": 3000000,
+   "used_incl_open": <n>
+  },
+  "interactive": {
+   "envelope": 12000000,
+   "used_incl_open": <n>
+  },
+  "judge_eval": {
+   "envelope": 0,
+   "used_incl_open": <n>
+  }
+ },
+ "attempts": [
+  {
+   "purpose": "gold_eval",
+   "stage": "generation",
+   "state": "settled",
+   "n": 9,
+   "settled": <n>,
+   "reserved": <n>
+  }
+ ],
+ "adjustments": [
+  {
+   "correction_key": "prior-use-baseline",
+   "amount_micro_usd": <n>,
+   "interval_start": null,
+   "interval_end": null,
+   "scope": "allowance",
+   "created_at": "<time>"
+  }
+ ],
+ "unresolved_attempts": 0,
+ "configuration_history": [
+  {
+   "actor": "owner",
+   "allowance_micro_usd": null,
+   "at": "<time>",
+   "cap_micro_usd": null,
+   "end": "2026-10-28",
+   "paid_enabled": true,
+   "rate_version": "fixture",
+   "start": "2026-09-30"
+  },
+  {
+   "actor": "owner",
+   "at": "<time>",
+   "paid_enabled": true,
+   "reason": "fixture"
+  }
+ ]
+}
+===== run 2 =====
+--- run 1
++++ run 2
+@@ -5,11 +5,12 @@
+
+ ## Decision: **limited**
+
+-- hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)
++- hard check not verified: automated invariants (check --phase all --provider fake) (stale: recorded for other package source; rerun check --phase all --provider fake --save)
+ - quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})
+ - quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})
+ - quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)
+ - evidence is sealed pilot, not a sealed evaluation of reviewed gold
++- stale evidence not counted: saved check-all: recorded for package source ffffffffffff, current cccccccccccc
+
+ ## Release manifest
+
+@@ -49,13 +50,13 @@
+
+ ## Checks
+
+-- no saved check results (`check --phase all --provider fake --save`)
++- `check-all`: passed (243 tests, <time>, code `ffffffffffff`)
+
+ ## Hard checks and quality targets
+
+ | Check | Result | Evidence |
+ | --- | --- | --- |
+-| automated invariants (check --phase all --provider fake) | unverified | no saved run: check --phase all --provider fake --save |
++| automated invariants (check --phase all --provider fake) | unverified | stale: recorded for other package source; rerun check --phase all --provider fake --save |
+ | no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases | pass | 0 observed wrong, 0 contested or awaiting blind review |
+ | no selected-scope leakage | pass | claims/evidence outside scope 0, wrong-scope candidates 0 |
+ | managed evidence links resolve | pass | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
+@@ -89,11 +90,12 @@
+  "generated_at": "<time>",
+  "status": "limited",
+  "reasons": [
+-  "hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)",
++  "hard check not verified: automated invariants (check --phase all --provider fake) (stale: recorded for other package source; rerun check --phase all --provider fake --save)",
+   "quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
+   "quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
+   "quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)",
+-  "evidence is sealed pilot, not a sealed evaluation of reviewed gold"
++  "evidence is sealed pilot, not a sealed evaluation of reviewed gold",
++  "stale evidence not counted: saved check-all: recorded for package source ffffffffffff, current cccccccccccc"
+  ],
+  "evidence_label": "sealed pilot",
+  "code": {
+@@ -191,7 +193,9 @@
+  "hardware": {
+   "machine": "fixture"
+  },
+- "stale_evidence": [],
++ "stale_evidence": [
++  "saved check-all: recorded for package source ffffffffffff, current cccccccccccc"
++ ],
+  "freeze": {
+   "freeze_id": "F-<id1>",
+   "frozen_at": "<time>",
+@@ -1188,7 +1192,17 @@
+    "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
+   }
+  ],
+- "checks": {}
++ "checks": {
++  "check-all": {
++   "phase": "all",
++   "ok": true,
++   "tests_run": 243,
++   "recorded_at": "<time>",
++   "code": {
++    "source_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
++   }
++  }
++ }
+ }
+ ----- budget.json -----
+ {
+===== run 3 =====
+--- run 1
++++ run 3
+@@ -5,7 +5,6 @@
+
+ ## Decision: **limited**
+
+-- hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)
+ - quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})
+ - quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})
+ - quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)
+@@ -49,13 +48,13 @@
+
+ ## Checks
+
+-- no saved check results (`check --phase all --provider fake --save`)
++- `check-all`: passed (243 tests, <time>, code `cccccccccccc`)
+
+ ## Hard checks and quality targets
+
+ | Check | Result | Evidence |
+ | --- | --- | --- |
+-| automated invariants (check --phase all --provider fake) | unverified | no saved run: check --phase all --provider fake --save |
++| automated invariants (check --phase all --provider fake) | pass | 243 tests, recorded <time> |
+ | no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases | pass | 0 observed wrong, 0 contested or awaiting blind review |
+ | no selected-scope leakage | pass | claims/evidence outside scope 0, wrong-scope candidates 0 |
+ | managed evidence links resolve | pass | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
+@@ -89,7 +88,6 @@
+  "generated_at": "<time>",
+  "status": "limited",
+  "reasons": [
+-  "hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)",
+   "quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
+   "quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
+   "quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)",
+@@ -1188,7 +1186,19 @@
+    "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
+   }
+  ],
+- "checks": {}
++ "checks": {
++  "check-all": {
++   "phase": "all",
++   "ok": true,
++   "tests_run": 243,
++   "recorded_at": "<time>",
++   "code": {
++    "source_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
++    "git_revision": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
++    "git_dirty": false
++   }
++  }
++ }
+ }
+ ----- budget.json -----
+ {
+===== run 4 =====
+--- run 1
++++ run 4
+@@ -5,19 +5,24 @@
+
+ ## Decision: **limited**
+
+-- hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)
+-- quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})
+-- quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})
++- hard check not verified: no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases (no answer evaluation)
++- hard check not verified: no selected-scope leakage (no answer evaluation)
++- hard check not verified: managed evidence links resolve (no cited links)
++- quality target not measured: required-claim correctness >= 0.90 (n/a)
++- quality target not measured: citation precision >= 0.95 (unjudged links count as unsupported) (n/a)
++- quality target not measured: negative/ambiguous handling >= 0.90 (n/a)
+ - quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)
+-- evidence is sealed pilot, not a sealed evaluation of reviewed gold
++- evidence is no answer evaluation for the current candidate, not a sealed evaluation of reviewed gold
++- stale evidence not counted: sealed run S-<id2>: prompt_version changed since the freeze
++- stale evidence not counted: development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-12', the candidate uses 'grounded-answer-changed'
+
+ ## Release manifest
+
+ - code: Git `rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr` (uncommitted changes: False), package source `cccccccccccccccc`; metric code `mmmmmmmmmmmmmmmm`
+-- model gpt-6-luna, reasoning low, output cap 4000, prompt grounded-answer-12, rates None, settings `<id2>`
+-- serving: run `K1-<id3>` (kiwi_bm25), keyword index `<id4>`, dense `None`, reranker None; fallback kiwi_bm25
+-- dependencies: requirements-lock.txt `<id5>`; hardware {'machine': 'fixture'}
+-- freeze: {'freeze_id': 'F-<id1>', 'frozen_at': '<time>', 'selected_run_id': 'K1-<id3>', 'decided_by': 'owner', 'post_test': False}
++- model gpt-6-luna, reasoning low, output cap 4000, prompt grounded-answer-changed, rates None, settings `<id4>`
++- serving: run `K1-<id5>` (kiwi_bm25), keyword index `<id6>`, dense `None`, reranker None; fallback kiwi_bm25
++- dependencies: requirements-lock.txt `<id7>`; hardware {'machine': 'fixture'}
++- freeze: {'freeze_id': 'F-<id1>', 'frozen_at': '<time>', 'selected_run_id': 'K1-<id5>', 'decided_by': 'owner', 'post_test': False}
+
+ ## Coverage
+
+@@ -28,20 +33,20 @@
+
+ ## Datasets
+
+-- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}; frozen `<id6>` (current True)
+-- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}; frozen `<id7>` (current True)
++- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}; frozen `<id8>` (current True)
++- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}; frozen `<id9>` (current True)
+
+ ## Retrieval runs (development, retrieval only)
+
+ | Run | Mode | Scored | hit@20 single | complete@20 multi | nDCG@5 | MRR | Critical | Wrong scope | p95 ms |
+ | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+-| `K1-<id3>` | kiwi_bm25 | 3 | 1.0 (2/2) | 1.0 | 1.0 | 1.0 | [] | 0 | <ms> |
++| `K1-<id5>` | kiwi_bm25 | 3 | 1.0 (2/2) | 1.0 | 1.0 | 1.0 | [] | 0 | <ms> |
+
+ ## Answer evaluation
+
+-- development run `A-<id8>` (complete): see `runs/A-<id8>/report.md`
+-  - `K1-<id3>` (kiwi_bm25) 4/4: claims 0.6667 (n=3), critical wrong 0, citation precision lower bound 1.0, negatives 0.0 (n=1), cost $<n>
+-- sealed run `S-<id9>` (sealed test, complete) under freeze `F-<id1>`
++- development run `A-<id3>` (complete): see `runs/A-<id3>/report.md`
++  - `K1-<id5>` (kiwi_bm25) 4/4: claims 0.6667 (n=3), critical wrong 0, citation precision lower bound 1.0, negatives 0.0 (n=1), cost $<n>
++- sealed run `S-<id2>` (sealed test, complete) under freeze `F-<id1>`
+
+ ## Latency
+
+@@ -49,23 +54,23 @@
+
+ ## Checks
+
+-- no saved check results (`check --phase all --provider fake --save`)
++- `check-all`: passed (243 tests, <time>, code `cccccccccccc`)
+
+ ## Hard checks and quality targets
+
+ | Check | Result | Evidence |
+ | --- | --- | --- |
+-| automated invariants (check --phase all --provider fake) | unverified | no saved run: check --phase all --provider fake --save |
+-| no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases | pass | 0 observed wrong, 0 contested or awaiting blind review |
+-| no selected-scope leakage | pass | claims/evidence outside scope 0, wrong-scope candidates 0 |
+-| managed evidence links resolve | pass | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
++| automated invariants (check --phase all --provider fake) | pass | 243 tests, recorded <time> |
++| no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases | unverified | no answer evaluation |
++| no selected-scope leakage | unverified | no answer evaluation |
++| managed evidence links resolve | unverified | no cited links |
+ | admission cap enforced and ledger not frozen | pass | committed $<n> of cap $<n>; frozen None |
+ | no unresolved billing | pass | 0 open or unknown attempts |
+-| single-evidence hit@20 >= 0.90 | met | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
+-| multi-evidence complete coverage@20 >= 0.80 | not measured | {'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None} |
+-| required-claim correctness >= 0.90 | met | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
+-| citation precision >= 0.95 (unjudged links count as unsupported) | met | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
+-| negative/ambiguous handling >= 0.90 | not measured | {'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None} |
++| single-evidence hit@20 >= 0.90 | met | {'numerator': 2, 'denominator': 2, 'rate': 1.0, 'wilson95': [0.3424, 1.0]} |
++| multi-evidence complete coverage@20 >= 0.80 | met | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
++| required-claim correctness >= 0.90 | not measured | n/a |
++| citation precision >= 0.95 (unjudged links count as unsupported) | not measured | n/a |
++| negative/ambiguous handling >= 0.90 | not measured | n/a |
+ | full-answer p95 < 15 s at six users (real provider) | not measured | no real latency sample |
+
+ ## Budget
+@@ -89,24 +94,29 @@
+  "generated_at": "<time>",
+  "status": "limited",
+  "reasons": [
+-  "hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)",
+-  "quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
+-  "quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
++  "hard check not verified: no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases (no answer evaluation)",
++  "hard check not verified: no selected-scope leakage (no answer evaluation)",
++  "hard check not verified: managed evidence links resolve (no cited links)",
++  "quality target not measured: required-claim correctness >= 0.90 (n/a)",
++  "quality target not measured: citation precision >= 0.95 (unjudged links count as unsupported) (n/a)",
++  "quality target not measured: negative/ambiguous handling >= 0.90 (n/a)",
+   "quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)",
+-  "evidence is sealed pilot, not a sealed evaluation of reviewed gold"
++  "evidence is no answer evaluation for the current candidate, not a sealed evaluation of reviewed gold",
++  "stale evidence not counted: sealed run S-<id2>: prompt_version changed since the freeze",
++  "stale evidence not counted: development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-12', the candidate uses 'grounded-answer-changed'"
+  ],
+- "evidence_label": "sealed pilot",
++ "evidence_label": "no answer evaluation for the current candidate",
+  "code": {
+   "source_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+   "git_revision": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+   "git_dirty": false
+  },
+  "metric_code_sha256": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
+- "settings_fingerprint": "<id2>",
++ "settings_fingerprint": "<id4>",
+  "model": "gpt-6-luna",
+  "reasoning_effort": "low",
+  "max_output_tokens": 4000,
+- "prompt_version": "grounded-answer-12",
++ "prompt_version": "grounded-answer-changed",
+  "rate_version": null,
+  "active_run": {
+   "activated_at": "<time>",
+@@ -115,7 +125,7 @@
+   "eval_version": "retrieval-eval-4",
+   "fallback_mode": "kiwi_bm25",
+   "finalist_run_id": null,
+-  "index_version": "<id4>",
++  "index_version": "<id6>",
+   "label": "K1",
+   "limits": {
+    "channel_top_k": 20,
+@@ -137,7 +147,7 @@
+   },
+   "mode": "kiwi_bm25",
+   "reranker": null,
+-  "run_id": "K1-<id3>"
++  "run_id": "K1-<id5>"
+  },
+  "serving": {
+   "activated_at": "<time>",
+@@ -146,7 +156,7 @@
+   "eval_version": "retrieval-eval-4",
+   "fallback_mode": "kiwi_bm25",
+   "finalist_run_id": null,
+-  "index_version": "<id4>",
++  "index_version": "<id6>",
+   "label": "K1",
+   "limits": {
+    "channel_top_k": 20,
+@@ -168,9 +178,9 @@
+   },
+   "mode": "kiwi_bm25",
+   "reranker": null,
+-  "run_id": "K1-<id3>"
++  "run_id": "K1-<id5>"
+  },
+- "active_index": "<id4>",
++ "active_index": "<id6>",
+  "datasets": {
+   "dev": {
+    "dataset_sha256": "<id11>",
+@@ -191,11 +201,14 @@
+  "hardware": {
+   "machine": "fixture"
+  },
+- "stale_evidence": [],
++ "stale_evidence": [
++  "sealed run S-<id2>: prompt_version changed since the freeze",
++  "development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-12', the candidate uses 'grounded-answer-changed'"
++ ],
+  "freeze": {
+   "freeze_id": "F-<id1>",
+   "frozen_at": "<time>",
+-  "selected_run_id": "K1-<id3>",
++  "selected_run_id": "K1-<id5>",
+   "decided_by": "owner",
+   "post_test": false
+  }
+@@ -523,7 +536,7 @@
+  },
+  "retrieval_runs": [
+   {
+-   "run_id": "K1-<id3>",
++   "run_id": "K1-<id5>",
+    "label": "K1",
+    "mode": "kiwi_bm25",
+    "dataset_sha256": "<id11>",
+@@ -571,12 +584,12 @@
+  ],
+  "answer_runs": [
+   {
+-   "run_id": "A-<id8>",
++   "run_id": "A-<id3>",
+    "label": "development finalists",
+    "status": "complete",
+    "stop_reason": null,
+    "finalists": {
+-    "K1-<id3>": {
++    "K1-<id5>": {
+      "mode": "kiwi_bm25",
+      "completed": 4,
+      "of": 4,
+@@ -872,13 +885,13 @@
+  ],
+  "sealed_runs": [
+   {
+-   "run_id": "S-<id9>",
++   "run_id": "S-<id2>",
+    "label": "sealed test",
+    "freeze_id": "F-<id1>",
+    "status": "complete",
+    "stop_reason": null,
+    "finalists": {
+-    "K1-<id3>": {
++    "K1-<id5>": {
+      "mode": "kiwi_bm25",
+      "completed": 1,
+      "of": 1,
+@@ -1172,9 +1185,9 @@
+     }
+    ],
+    "serving": {
+-    "run_id": "K1-<id3>",
++    "run_id": "K1-<id5>",
+     "mode": "kiwi_bm25",
+-    "index_version": "<id4>"
++    "index_version": "<id6>"
+    },
+    "hardware": {
+     "machine": "fixture"
+@@ -1188,7 +1201,19 @@
+    "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
+   }
+  ],
+- "checks": {}
++ "checks": {
++  "check-all": {
++   "phase": "all",
++   "ok": true,
++   "tests_run": 243,
++   "recorded_at": "<time>",
++   "code": {
++    "source_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
++    "git_revision": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
++    "git_dirty": false
++   }
++  }
++ }
+ }
+ ----- budget.json -----
+ {

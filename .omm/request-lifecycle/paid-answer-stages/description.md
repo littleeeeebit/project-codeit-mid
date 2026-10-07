@@ -1,1 +1,0 @@
-`_paid_answer` runs the ordered stages of a paid turn. A `_checkpoint` before each new paid stage raises `_Stop` when the request is cancelled or interrupted or the service is closing. `budget.mark_dispatching` repeats that check atomically through `_dispatch_guard`.

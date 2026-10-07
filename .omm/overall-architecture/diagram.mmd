@@ -1,18 +1,19 @@
 graph TD
-  web-screens["Web screens\nweb/src/lib/api.ts"]
-  api-layer["HTTP API and session gate\nsrc/rfp_assistant/api.py"]
-  jupyterhub["JupyterHub OAuth, external\nsrc/rfp_assistant/service/auth.py"]
-  service-core["Service core and executor\nsrc/rfp_assistant/service/service.py"]
+  web-screens["Next.js screens\nweb/src/components/ask/ask-page.tsx"]
+  api-shell["FastAPI shell\nsrc/rfp_assistant/api.py"]
+  service-core["Service core\nsrc/rfp_assistant/service/service.py"]
   retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  paid-gateway["Paid gateway and ledger\nsrc/rfp_assistant/gateway/budget.py"]
-  storage["PostgreSQL and runtime files\nsrc/rfp_assistant/storage/store.py"]
-  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"]
-  web-screens -->|fetch, SSE, session cookie| api-layer
-  api-layer -->|code exchange, whoami| jupyterhub
-  api-layer -->|one service call per route| service-core
-  service-core -->|scoped retrieval| retrieval-engine
-  service-core -->|reserve, dispatch, settle| paid-gateway
-  retrieval-engine -->|chunks, pgvector search| storage
-  paid-gateway -->|attempt rows| storage
-  service-core -->|requests, runs, audit| storage
-  owner-cli -->|same service and pipelines| service-core
+  paid-gateway["Paid gateway\nsrc/rfp_assistant/gateway/budget.py"]
+  postgresql-store["PostgreSQL and pgvector\nsrc/rfp_assistant/storage/postgres.py"]
+  offline-pipelines["Offline pipelines\nsrc/rfp_assistant/cli.py"]
+  openai-provider["OpenAI provider\nsrc/rfp_assistant/gateway/generation.py"]
+  web-screens -->|"JSON fetch, SSE stream"| api-shell
+  api-shell -->|"one service call per route"| service-core
+  service-core -->|"scoped question"| retrieval-engine
+  service-core -->|"reserve, call, settle"| paid-gateway
+  paid-gateway -->|"chat and embeddings"| openai-provider
+  retrieval-engine -->|"index rows, vector search"| postgresql-store
+  paid-gateway -->|"attempts ledger, advisory lock"| postgresql-store
+  service-core -->|"requests, audit rows"| postgresql-store
+  service-core -->|"starts eval and maintenance jobs"| offline-pipelines
+  offline-pipelines -->|"extractions, indexes, activation"| postgresql-store

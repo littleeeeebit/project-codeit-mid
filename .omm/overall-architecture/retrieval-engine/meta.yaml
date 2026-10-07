@@ -1,7 +1,7 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-06 22:40:14.094000+00:00
-update_count: 32
-last_field: diagram
+updated: 2026-10-07 04:46:47.113000+00:00
+update_count: 33
+last_field: description
 kind: nested-class
 title: retrieval-engine
 children:
@@ -9,11 +9,8 @@ children:
 - corpus-router
 - dense-channel
 - dense-search
-- evidence-packer
 - fusion
-- fusion-rerank
 - keyword-index
-- lexical-ranking
 - local-reranker
 - reranker
 - serving-config

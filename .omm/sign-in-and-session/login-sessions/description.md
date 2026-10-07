@@ -1,1 +1,0 @@
-`Login._sessions` maps a random token to `(username, expiry)` with `SESSION_SECONDS` = 12 h, under a lock, and prunes expired entries on each sign-in. `member(token)` returns the local member unconditionally in local mode. `sign_out` pops the token.

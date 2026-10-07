@@ -195,7 +195,7 @@ class FixedProfileTest(unittest.TestCase):
         els = {"xa": ingestion.finalize_elements(_prose(text, "둘째 문단"), "xa"),
                "xb": ingestion.finalize_elements(_prose("다른 문서"), "xb")}
         by_id = {(x, e["element_id"]): e for x, es in els.items() for e in es}
-        for profile, (size, overlap) in (("fixed-256-32", (256, 32)), ("fixed-512-64", (512, 64))):
+        for profile, (size, _) in (("fixed-256-32", (256, 32)), ("fixed-512-64", (512, 64))):
             chunks = [c for x, es in els.items() for c in chunking.build_profile(es, x, profile)[0]]
             self.assertTrue(all(c["token_count"] <= size for c in chunks))
             for c in chunks:

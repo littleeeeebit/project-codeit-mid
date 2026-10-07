@@ -1,0 +1,1 @@
+The durable marker written by `mark_dispatching` before the network call. It is written only when the request's guard, the gateway ownership, `paid_admission`, and the absence of unknown attempts all pass.
