@@ -29,8 +29,9 @@ DEFAULT_RATES: dict[str, dict[str, str]] = {
     "gpt-5-mini": {"input": "0.25", "cached_input": "0.025", "output": "2.00"},
     "gpt-5-nano": {"input": "0.05", "cached_input": "0.005", "output": "0.40"},
 }
-# The team's shared key reaches only gpt-5-mini and gpt-5-nano, so each browser picks its answer model on 설정.
-ALLOWED_GENERATION_MODELS = ("gpt-6-luna", "gpt-5-mini", "gpt-5-nano")
+# Answer models: the team's shared key reaches only gpt-5-mini and gpt-5-nano, so each browser picks one on 설정.
+# gpt-6-luna keeps its rate above for dataset drafting, the judges and AI review (their own model constants).
+ALLOWED_GENERATION_MODELS = ("gpt-5-mini", "gpt-5-nano")
 # Where the gpt-5-mini and gpt-5-nano rates above come from; a ledger that predates them gets them on first selection.
 SELECTABLE_RATE_SOURCE = {"source": "https://developers.openai.com/api/docs/pricing", "tier": "standard",
                           "checked_at": "2026-10-06"}
@@ -57,7 +58,7 @@ class Settings:
     data_dir: Path
     hwp_converter: Path | None
     provider: str = "openai"  # "openai" or "fake"; fake refuses to build a real SDK client
-    generation_model: str = "gpt-6-luna"
+    generation_model: str = "gpt-5-mini"
     generation_reasoning_effort: str = "low"
     embedding_model: str = "text-embedding-3-large"
     evidence_target_tokens: int = 3000
@@ -170,7 +171,8 @@ def validate(s: Settings) -> None:
     if s.provider not in ("openai", "fake"):
         raise SettingsError("provider must be 'openai' or 'fake'")
     if s.generation_model not in ALLOWED_GENERATION_MODELS or s.generation_model not in DEFAULT_RATES:
-        raise SettingsError(f"generation model {s.generation_model!r} is not allowlisted with a known rate")
+        raise SettingsError(f"generation_model {s.generation_model!r} is not an answer model; allowed: "
+                            f"{', '.join(ALLOWED_GENERATION_MODELS)}")
     if s.embedding_model not in ALLOWED_EMBEDDING_MODELS:
         raise SettingsError(f"embedding model {s.embedding_model!r} is not a compared model")
     if EMBEDDINGS[s.embedding_model].backend != "openai" and s.embedding_dimensions != EMBEDDINGS[s.embedding_model].dims:

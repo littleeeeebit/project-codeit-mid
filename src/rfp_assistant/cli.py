@@ -788,9 +788,10 @@ def _release_commands(sub) -> None:
                    help="judge-comparison: calibration fits Jev thresholds; held_out is the reported part; "
                         "judge_set runs the mutated judge golden set")
     s.add_argument("--dataset", default="dev", help="answer-finalists: the reviewed development split")
-    s.add_argument("--runs", help="answer-finalists: one or two retrieval run IDs (default: active + its finalist)")
+    s.add_argument("--runs", help="answer-finalists: one or two retrieval run IDs (default: active + its finalist); "
+                                  "embedding-comparison: the baseline run first, then every run to compare")
     s.add_argument("--question-id", action="append",
-                   help="answer-finalists: only these development rows (repeat); part of the run identity")
+                   help="development runs: only these rows (repeat); part of the run identity")
     s.add_argument("--freeze-id", help="sealed: the release freeze")
     s.add_argument("--post-test-regression", action="store_true",
                    help="sealed: a further run after the untouched sealed result (needs --reason at run time)")

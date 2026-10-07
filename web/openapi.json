@@ -2593,12 +2593,35 @@
    },
    "ExperimentTable": {
     "properties": {
+     "answer_run_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Answer Run Id"
+     },
      "columns": {
       "items": {
        "$ref": "#/components/schemas/ExperimentColumn"
       },
       "title": "Columns",
       "type": "array"
+     },
+     "conclusion": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Conclusion"
      },
      "created_at": {
       "title": "Created At",
@@ -2612,6 +2635,17 @@
      "matrix": {
       "title": "Matrix",
       "type": "string"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
      },
      "needs_evidence_review": {
       "default": [],

@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 from rfp_assistant.contracts import Principal
-from rfp_assistant.evaluation import evaluation, gold, sealed
+from rfp_assistant.evaluation import compare, evaluation, gold, sealed
 from rfp_assistant.gateway import budget, generation
 from rfp_assistant.gateway.generation import FakeTransport, ProviderError
 from rfp_assistant.retrieval.retrieval import KeywordIndex
@@ -1091,6 +1091,50 @@ class AnswerRunTest(GoldRetrievalTest):
             answers.plan_run(self.s, "answer-finalists", "dev", [self.k1, self.k0, "K1-other"])
         with self.assertRaisesRegex(answers.AnswerEvalError, "development split"):
             answers.plan_run(self.s, "answer-finalists", "test", [self.k1])
+
+    def test_an_embedding_comparison_answers_every_run_paired_against_the_first(self):
+        deeper = evaluation.evaluate_retrieval(self.s.with_(channel_top_k=10, fused_top_k=10), fixtures.analyzer(),
+                                               None, "dev", ["K1"])[0]["run_id"]
+        runs = [self.k1, self.k0, deeper]
+        self.assertEqual(len(set(runs)), 3)
+        with self.assertRaisesRegex(answers.AnswerEvalError, "one or two"):  # release finalists keep their cap
+            answers.plan_run(self.s, "answer-finalists", "dev", runs)
+        with self.assertRaisesRegex(answers.AnswerEvalError, "baseline run first"):
+            answers.plan_run(self.s, "embedding-comparison", "dev", [self.k1])
+        est = answers.plan_run(self.s, "embedding-comparison", "dev", runs)
+        self.assertEqual((est["run_id"][:2], est["finalists"], est["model"]), ("E-", runs, "gpt-5-mini"))
+        res = service.Resources(self.s, transport=FakeTransport(), recover=True)
+        try:
+            out = answers.run_answers(self.s, res, est["estimate_id"], "tester")
+        finally:
+            res.close()
+        self.assertEqual(out["status"], "complete")
+        scores = json.loads((answers.run_dir(self.s, out["run_id"]) / "scores.json").read_text(encoding="utf-8"))
+        self.assertIsNone(scores["selection"])
+        paired = scores["comparison"]
+        self.assertEqual((paired["baseline"], sorted(paired["runs"])), (self.k1, sorted([self.k0, deeper])))
+        passage = scores["finalists"][self.k1]["rows_passed"]["denominator"]
+        for v in paired["runs"].values():
+            self.assertEqual(v["n"], passage)
+            self.assertGreaterEqual(v["p_holm"], v["p_value"])
+        table = json.loads((compare.compare_dir(self.s) / "tables" / "answer-embedding.json").read_text(encoding="utf-8"))
+        self.assertEqual(([r["run_id"] for r in table["rows"]], table["answer_run_id"]), (runs, out["run_id"]))
+        self.assertEqual(table["rows"][0]["name"], "K1")
+        self.assertIn("No row differs significantly" if not table["conclusion"]["significant"] else "significantly",
+                      (compare.compare_dir(self.s) / "tables" / "answer-embedding.md").read_text(encoding="utf-8"))
+        reader = service.Resources(self.s, transport=None)
+        try:
+            listed = service.experiments(reader, self.env.verifier)
+        finally:
+            reader.close()
+        shown = next(t for t in listed["tables"] if t["matrix"] == "answer-embedding")
+        self.assertEqual((shown["answer_run_id"], shown["rows"][1]["run_id"]), (out["run_id"], self.k0))
+
+    def test_paired_statistics(self):
+        self.assertEqual(answers.mcnemar_exact(0, 0), 1.0)
+        self.assertEqual(answers.mcnemar_exact(0, 6), 2 / 64)
+        self.assertEqual(answers.mcnemar_exact(5, 1), 2 * 7 / 64)
+        self.assertEqual(answers.holm({"a": 0.01, "b": 0.04, "c": 0.03}), {"a": 0.03, "c": 0.06, "b": 0.06})
 
     def test_blind_review_sheet_and_import(self):
         transport = FakeTransport()

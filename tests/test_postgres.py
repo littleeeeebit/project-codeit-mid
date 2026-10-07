@@ -93,8 +93,9 @@ class PostgreSQLTests(unittest.TestCase):
         return dense.ensure_job_request(self.settings, "member", key, {"test": key})
 
     def reserve(self, request):
+        # gpt-6-luna's rate is the price unit here (800 cache-write tokens = 100 micro-USD, the whole cap)
         return budget.reserve(self.target, request_id=request, member_id="member", stage="generation",
-                              purpose="interactive", model=self.settings.generation_model, input_tokens=800,
+                              purpose="interactive", model="gpt-6-luna", input_tokens=800,
                               max_output_tokens=0, count_method="test")
 
     def test_closed_paid_admission_cannot_dispatch(self):

@@ -134,7 +134,7 @@ def _retrieval_runs(settings: Settings) -> list[dict]:
     base = settings.data_dir / "runs"
     out = []
     for d in sorted(base.iterdir()) if base.exists() else []:
-        if d.name.startswith(("A-", "L-", "comparisons")) or not (d / "config.json").exists():
+        if d.name.startswith(("A-", "E-", "L-", "comparisons")) or not (d / "config.json").exists():
             continue
         try:
             out.append(evaluation.run_summary(settings, d.name))

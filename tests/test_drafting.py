@@ -216,9 +216,17 @@ class DraftingTest(unittest.TestCase):
             sealed_slot = {**slots[0], 'scope': sealed['scope']}
             with self.assertRaises(gold.GoldError):
                 drafting.source_slots(s, {'slots': [sealed_slot]})
-            s_blocked = s.with_(generation_model='wrong-model')
+            # The answer model never moves drafting: gpt-5-mini answers, gpt-6-luna still drafts and is billed.
+            mini = s.with_(generation_model='gpt-5-mini')
+            luna = generation.FakeTransport(lambda _: generation.ProviderResponse(json.dumps({'drafts': [valid]}),
+                None, 'stop', {'prompt_tokens': 10, 'completion_tokens': 10}, 'test-drafting-3'))
+            drafting.generate(mini, {'slots': slots}, Path(folder) / 'mini', 100000, luna)
+            self.assertEqual(luna.calls[-1]['model'], 'gpt-6-luna')
+            with store.open_db(s.db_path) as conn:
+                billed = {r[0] for r in conn.execute("SELECT model FROM attempts WHERE stage = 'gold_drafting'")}
+            self.assertEqual(billed, {'gpt-6-luna'})
             with self.assertRaises(gold.GoldError):
-                drafting.generate(s_blocked, {'slots': slots}, Path(folder) / 'blocked', 100000, transport)
+                drafting.generate(mini, {'slots': slots}, Path(folder) / 'blocked', 0, transport)
             self.assertEqual(gold.check(s), [])
 
 

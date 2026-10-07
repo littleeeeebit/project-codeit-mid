@@ -343,8 +343,8 @@ def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, tr
 def _draft(settings: Settings, plan: dict, out: Path, max_cost_micro: int, transport, split: str, *, guard=None,
            owner_check=None) -> dict:
     """Five slots per billed request. Cache and settle before validation; never retry or approve automatically."""
-    if settings.generation_model != MODEL or max_cost_micro <= 0:
-        raise gold.GoldError("Generation requires gpt-6-luna and a positive consented cost ceiling")
+    if max_cost_micro <= 0:  # drafting always uses MODEL, whatever the answer model is
+        raise gold.GoldError("Generation requires a positive consented cost ceiling")
     if not out.is_absolute() or out.exists():
         raise gold.GoldError("Choose an absolute new private output directory")
     learned, slots = lessons(settings), source_slots(settings, plan, split)

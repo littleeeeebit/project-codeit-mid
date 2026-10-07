@@ -9,8 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const MODEL_NOTES: Record<string, string> = {
-  "gpt-6-luna": "기본 모델",
-  "gpt-5-mini": "팀 공용 키로 쓸 수 있음",
+  "gpt-5-mini": "기본 · 팀 공용 키로 쓸 수 있음",
   "gpt-5-nano": "팀 공용 키로 쓸 수 있음 · 가장 저렴",
 };
 
@@ -22,7 +21,7 @@ function ModelPick({ model, models, onPick }: { model: string; models: string[];
               className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
         {models.map((m) => <option key={m} value={m}>{m}{MODEL_NOTES[m] ? ` — ${MODEL_NOTES[m]}` : ""}</option>)}
       </select>
-      <p className="text-sm text-muted-foreground">키가 쓸 수 있는 모델이어야 합니다. 저장할 때 OpenAI에 무료로 확인합니다. 데이터셋 만들기와 평가는 이 선택과 관계없이 기본 모델(gpt-6-luna)을 씁니다.</p>
+      <p className="text-sm text-muted-foreground">키가 쓸 수 있는 모델이어야 합니다. 저장할 때 OpenAI에 무료로 확인합니다. 답변 평가는 이 선택과 관계없이 기본 모델(gpt-5-mini)로 답하고, 데이터셋 만들기와 판정 모델 비교는 gpt-6-luna를 씁니다.</p>
     </div>
   );
 }
