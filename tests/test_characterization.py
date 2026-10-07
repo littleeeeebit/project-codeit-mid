@@ -2,6 +2,7 @@
 refactor of these modules can show it changed nothing observable. Values are pinned from the current code."""
 
 import argparse
+import difflib
 import hashlib
 import importlib.util
 import json
@@ -168,8 +169,12 @@ class SettingsTest(unittest.TestCase):
 
 class CliTest(unittest.TestCase):
     def test_parser_matches_snapshot(self):
-        self.assertEqual(json.loads(json.dumps(parser_shape(), ensure_ascii=False, default=str)),
-                         json.loads(CLI_SNAPSHOT.read_text(encoding="utf-8")))
+        shape = json.loads(json.dumps(parser_shape(), ensure_ascii=False, default=str))
+        if os.environ.get("RFP_WRITE_SNAPSHOTS"):  # one argument per line
+            CLI_SNAPSHOT.write_text("{\n" + ",\n".join(
+                f" {json.dumps(name)}: [\n" + ",\n".join(f"  {json.dumps(a, ensure_ascii=False)}" for a in args) + "\n ]"
+                for name, args in shape.items()) + "\n}\n", encoding="utf-8", newline="\n")
+        self.assertEqual(shape, json.loads(CLI_SNAPSHOT.read_text(encoding="utf-8")))
 
     def test_help_text_is_unchanged(self):
         """Every help string, root and per subcommand, at a fixed width; the parser snapshot localizes other changes."""
@@ -885,6 +890,18 @@ def snapshot(test: unittest.TestCase, name: str, text: str) -> None:
         test.assertEqual(text, path.read_text(encoding="utf-8"))
 
 
+def runs(rendered: list[str], against_first: bool = False) -> str:
+    """Several renders in one snapshot, each under its own header; `against_first` keeps the first whole and the
+    others as unified diffs against it, which still fixes every line of them."""
+    parts = []
+    for i, text in enumerate(rendered, 1):
+        if against_first and i > 1:  # a diff's context line for an empty line is a lone space; no rendered line ends in one
+            text = "\n".join(line.rstrip(" ") for line in difflib.unified_diff(
+                rendered[0].splitlines(), text.splitlines(), "run 1", f"run {i}", lineterm=""))
+        parts.append(f"===== run {i} =====\n{text}")
+    return "\n".join(parts)
+
+
 UUID = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
 DIGEST = re.compile(r"\b(?=[0-9a-z]*\d)[0-9a-z]{10,64}\b")  # index versions, run IDs, fingerprints, hashes
 # Timings, and spend: the fake provider prices prompts that carry random request IDs, so cents move between runs.
@@ -917,7 +934,7 @@ def read_outputs(folder: Path, names: tuple[str, ...], root: Path) -> str:
     """The files joined, with what differs between identical runs made stable: timestamps, the temporary root, and
     measured timings masked; identifiers derived from the temporary paths renamed in order of first appearance, so
     the snapshot still shows which ones are the same."""
-    text = "\n\0".join((folder / n).read_text(encoding="utf-8") for n in names)
+    text = "\n".join(f"----- {n} -----\n" + (folder / n).read_text(encoding="utf-8") for n in names)
     for form in (str(root), str(root).replace("\\", "\\\\"), root.as_posix()):
         text = text.replace(form, "<tmp>")
     text = CONCURRENT.sub('"question_id": "<concurrent>"', mask_p95_columns(STAMP.sub("<time>", UUID.sub("<uuid>", text))))
@@ -991,7 +1008,7 @@ class ReleaseReportTest(unittest.TestCase):
             scenario.run(outcome)
         self.assertEqual((outcome.errors, outcome.failures), ([], []))
         self.assertEqual(len(rendered), 4)
-        snapshot(self, "release_sealed", "\n\0\0".join(rendered))
+        snapshot(self, "release_sealed", runs(rendered, against_first=True))
 
 
 class LoadCheckTest(unittest.TestCase):
@@ -1089,7 +1106,7 @@ class Phase3ReportTest(unittest.TestCase):
                 ops.save_json(ops.phase3_dir(env.settings) / name, data)
             path = ops.write_phase3_report(env.settings)
             rendered.append(read_outputs(path.parent, ("report.md",), env.settings.data_dir.parent))
-        snapshot(self, "phase3_report", "\n\0\0".join(rendered))
+        snapshot(self, "phase3_report", runs(rendered))
 
 
 class JudgeRunTest(unittest.TestCase):
@@ -1170,13 +1187,13 @@ class JudgeRunTest(unittest.TestCase):
                 self.assertEqual((result["status"], result["stop_reason"]), ("complete", None))
                 text = re.sub(r'"latency_ms": [0-9.]+', '"latency_ms": <n>', read_outputs(
                     judges.run_dir(s, result["run_id"]), ("results.json", "judgements.jsonl"), s.data_dir.parent))
-                results, log = text.split("\n\0")
+                results, log = text.split("\n----- judgements.jsonl -----\n")
                 firsts = {}  # the judgement log whole by digest, and each arm's first record to read
                 for line in log.splitlines():
                     firsts.setdefault(re.match(r'\{"arm": "(\w+)"', line).group(1), line)
                 rendered.append("\n".join([results, *firsts.values(),
                                            f"judgements.jsonl sha256 {hashlib.sha256(log.encode()).hexdigest()}"]))
-        snapshot(self, "judge_runs", "\n\0\0".join(rendered))
+        snapshot(self, "judge_runs", runs(rendered))
 
 
 class ImportReferenceTest(unittest.TestCase):
