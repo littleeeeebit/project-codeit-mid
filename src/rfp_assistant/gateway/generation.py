@@ -17,13 +17,14 @@ from pydantic import ValidationError
 from ..contracts import AnswerPayload, EvidenceUnit
 from ..retrieval.chunking import count_tokens
 
-PROMPT_VERSION = "grounded-answer-12"  # 4: atomic obligations, per-document citations, conflict action; 5: corpus mode
+PROMPT_VERSION = "grounded-answer-13"  # 4: atomic obligations, per-document citations, conflict action; 5: corpus mode
 # 6: every claim cites evidence; absence goes to missing_fields only; 7: a restated absence is declared kind "absence"
 # 8: an "absence" claim's text is exactly its missing field; 9: absences go only to missing_fields
 # 10: a comparison inference may also cite the other compared document's evidence
 # 11: the summary cites its evidence and each claim is one sentence (sentence-level citations in the chat)
 # 12: a follow-up sees the earlier conversation; restating an earlier answer keeps all of its facts;
 #     an actor owns a function only where the evidence names it; no evidence IDs inside the text
+# 13: validation rejects a conflict answer without conflicts, two alternatives per conflict, or a next action
 COUNT_METHOD = "tiktoken:o200k_base+per_message_4+schema+margin"
 PER_MESSAGE_TOKENS = 4
 
@@ -534,11 +535,30 @@ def _without_listed_absences(payload: AnswerPayload) -> AnswerPayload:
     return payload
 
 
+def status_problem(answer: dict) -> str | None:
+    """Why an answer's status disagrees with its content, else None. Serving validation and offline grading share
+    this rule: a conflict answer names a conflict, gives every conflict two alternatives or more, and says what to do
+    next."""
+    conflicts = answer.get("conflicts") or []
+    if answer.get("status") != "conflicting_evidence":
+        return None
+    if not conflicts:
+        return "conflict_without_conflicts"
+    if any(len(c.get("alternatives") or []) < 2 for c in conflicts):
+        return "conflict_with_one_alternative"
+    if not (answer.get("next_action") or "").strip():
+        return "conflict_without_next_action"
+    return None
+
+
 def validate_answer(response: ProviderResponse, evidence: list[EvidenceUnit], allowed_doc_ids: set[str],
                     stored_quotes: dict[str, str], required_doc_ids: set[str] | None = None) -> AnswerPayload:
     """`required_doc_ids`, given only for a comparison: each of these documents must appear in a claim or a missing
     field, and an inference may also cite them (it compares the sides) as long as it cites its own document too."""
     payload = _without_listed_absences(_parsed_payload(response))
+    problem = status_problem(payload.model_dump())
+    if problem:
+        raise TechnicalError(problem)
     by_id = {e.evidence_id: e for e in evidence}
 
     def check_refs(ids: list[str], doc_id: str, also: set[str] = frozenset()) -> None:

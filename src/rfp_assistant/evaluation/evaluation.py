@@ -2029,7 +2029,7 @@ def extract_dates(text: str) -> set[str]:
             continue
         out.add(day)
         if m.group(5):
-            hour = int(m.group(5)) + (12 if m.group(4) == "오후" and int(m.group(5)) < 12 else 0)
+            hour = int(m.group(5)) % 12 + (12 if m.group(4) == "오후" else 0) if m.group(4) else int(m.group(5))
             minute = int(m.group(6) or 0)
             if hour < 24 and minute < 60:
                 out.add(f"{day}T{hour:02d}:{minute:02d}")
@@ -2328,6 +2328,9 @@ class GoldChecker:
             e.append(f"{tag}: answerability must be one of {sorted(EXPECTED_STATUS)}")
         elif row.get("expected_status") not in EXPECTED_STATUS[answerability]:
             e.append(f"{tag}: expected_status for {answerability} must be one of {EXPECTED_STATUS[answerability]}")
+        elif not isinstance(extra := row.get("accepted_statuses", []), list) or not {*map(str, extra)} <= {
+                *EXPECTED_STATUS[answerability]}:  # statuses beyond expected_status are listed per row, never implied
+            e.append(f"{tag}: accepted_statuses for {answerability} must be a list drawn from {EXPECTED_STATUS[answerability]}")
         return e
 
     def _check_scope(self, row: dict, tag: str, scope: list[dict], e: list[str]) -> dict[str, dict]:

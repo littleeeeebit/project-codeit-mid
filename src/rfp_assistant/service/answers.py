@@ -25,7 +25,7 @@ from ..settings import Settings
 from ..storage.store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
 from . import service
 
-ANSWER_EVAL_VERSION = "answer-eval-1"
+ANSWER_EVAL_VERSION = "answer-eval-2"  # 2: status must match the row's own statuses; claims need whole-claim support
 EVAL_MEMBER = "evaluation-job"  # fixed: resuming under another typed name must find the same idempotency keys
 MAX_FINALISTS = 2
 ESTIMATE_TTL_HOURS = 24
@@ -553,8 +553,9 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
     prefix = f"{record['finalist']}|{row['question_id']}"
     out = {"question_id": row["question_id"], "finalist": record["finalist"], "type": row["question_type"],
            "answerability": row["answerability"], "expected_status": row["expected_status"], "outcome": outcome,
-           "technical": outcome in TECHNICAL, "status_ok": outcome in evaluation.EXPECTED_STATUS[row["answerability"]]
-           and (outcome != "conflicting_evidence" or bool((answer.get("next_action") or "").strip())),
+           "technical": outcome in TECHNICAL,  # only the row's own statuses pass, never its whole answerability class
+           "status_ok": outcome in {row["expected_status"], *(row.get("accepted_statuses") or [])}
+           and (row.get("mode") == "metadata" or generation.status_problem({**answer, "status": outcome}) is None),
            "claims": [], "links": [], "answer_claims": [], "settled_micro_usd": record.get("settled_micro_usd", 0),
            "latency_ms": record.get("latency_ms"), "attempt_no": record.get("attempt_no", 1)}
     scope_docs = {s["doc_id"] for s in row.get("scope") or []}
@@ -598,7 +599,7 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
     for i, ac in enumerate(answer.get("claims") or []):
         links = _claim_links(i, ac, record, chunks, groups, index, prefix, reviews)
         out["links"] += links
-        out["answer_claims"].append(_answer_claim(i, ac, [link["support"] for link in links], prefix, reviews))
+        out["answer_claims"].append(_answer_claim(i, ac, links, prefix, reviews))
     return out
 
 
@@ -615,25 +616,24 @@ def _claim_links(i: int, ac: dict, record: dict, chunks: dict, groups: list[dict
                     if chunk is not None and g["doc_id"] == ev.get("doc_id")), default=0)
         # A gold span in the cited chunk is retrieval relevance, not support for whatever the claim says
         # (review rounds 1-2): only a claim quoted verbatim from its citation is supported without a person.
-        support = "supporting" if ac.get("doc_id") == ev.get("doc_id") and verbatim_support(
-            ac.get("text", ""), ev.get("quote") or "") else "unjudged"
+        verbatim = ac.get("doc_id") == ev.get("doc_id") and verbatim_support(ac.get("text", ""), ev.get("quote") or "")
         item = f"{prefix}|link|{i}|{eid}"
         reviewed = reviews.get(item)
         links.append({"claim_index": i, "evidence_id": eid, "item": item,
-                      "support": (reviewed or {}).get("verdict", support), "valid": bool(validity.get(eid)),
-                      "grade": best})
+                      "support": (reviewed or {}).get("verdict", "supporting" if verbatim else "unjudged"),
+                      "verbatim": verbatim, "valid": bool(validity.get(eid)), "grade": best})
     return links
 
 
-def _answer_claim(i: int, ac: dict, supports: list[str], prefix: str, reviews: dict[str, dict]) -> dict:
-    """Answer claim `i` is supported by a supporting link, unsupported when every link is, else unjudged (None);
-    a review of the claim itself decides over its links."""
+def _answer_claim(i: int, ac: dict, links: list[dict], prefix: str, reviews: dict[str, dict]) -> dict:
+    """Answer claim `i` is supported by a link quoting the whole claim verbatim (a link reviewed as supporting states
+    only some part), unsupported when every link is, else unjudged (None); a review of the claim decides over links."""
     item = f"{prefix}|answer_claim|{i}"
     reviewed = reviews.get(item)
-    supported = True if supports and "supporting" in supports else None
+    supported = True if any(link["verbatim"] and link["support"] == "supporting" for link in links) else None
     if reviewed:
         supported = reviewed["verdict"] == "supported"
-    elif supports and all(s == "unsupported" for s in supports):
+    elif links and all(link["support"] == "unsupported" for link in links):
         supported = False
     return {"index": i, "item": item, "kind": ac.get("kind"), "supported": supported, "doc_id": ac.get("doc_id")}
 
@@ -738,6 +738,15 @@ def aggregate_answers(scored: list[dict]) -> dict:
     }
 
 
+def graded_config(settings: Settings, run_id: str) -> dict:
+    """The run's config, read before anything is written into the run: a run graded under another answer-eval
+    version is refused, so its scores, review key and reviews stay as recorded, never mixed with new rules."""
+    config = json.loads((run_dir(settings, run_id) / "config.json").read_text(encoding="utf-8"))
+    if config.get("eval_version") != ANSWER_EVAL_VERSION:
+        raise AnswerEvalError(f"{run_id} was graded under {config.get('eval_version')}; start a new answer run")
+    return config
+
+
 def load_reviews(settings: Settings, run_id: str) -> dict[str, dict]:
     path = run_dir(settings, run_id) / "review.jsonl"
     latest: dict[str, dict] = {}
@@ -778,7 +787,7 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
     from ..retrieval.retrieval import KeywordIndex
 
     d = run_dir(settings, run_id)
-    config = json.loads((d / "config.json").read_text(encoding="utf-8"))
+    config = graded_config(settings, run_id)
     progress = load_progress(settings, run_id)
     reviews = load_reviews(settings, run_id)
     rows, _, _ = evaluation.load_eval_rows(settings, config["dataset"], sealed=config["dataset"] == "test")
@@ -897,7 +906,7 @@ def export_review_sheet(settings: Settings, run_id: str, out: Path | None = None
     import random
 
     d = run_dir(settings, run_id)
-    config = json.loads((d / "config.json").read_text(encoding="utf-8"))
+    config = graded_config(settings, run_id)  # the sheet's key is written into the run
     scored = read_jsonl(d / "scored.jsonl") if (d / "scored.jsonl").exists() else []
     progress = load_progress(settings, run_id)
     rows, _, _ = evaluation.load_eval_rows(settings, config["dataset"], sealed=config["dataset"] == "test")
@@ -922,8 +931,10 @@ def export_review_sheet(settings: Settings, run_id: str, out: Path | None = None
                 items.append(("link", link["item"], {**base, "claim": base["answer_claims"][link["claim_index"]],
                                                      "cited_quote": ev.get("quote")}))
         for a in s["answer_claims"]:
-            if a["supported"] is None:
-                items.append(("answer_claim", a["item"], {**base, "claim": base["answer_claims"][a["index"]]}))
+            if a["supported"] is None:  # judged on what the claim cites, the same passages the judge sees
+                cited = (answer.get("claims") or [])[a["index"]].get("evidence_ids") or []
+                items.append(("answer_claim", a["item"], {**base, "claim": base["answer_claims"][a["index"]],
+                              "cited_quotes": [(rec.get("evidence") or {}).get(e, {}).get("quote") for e in cited]}))
     random.Random(run_id).shuffle(items)
     sheet = []
     for kind, item, body in items:
@@ -944,6 +955,7 @@ def import_reviews(settings: Settings, run_id: str, path: Path, reviewer: str) -
     """Appends completed blind verdicts; the latest review of an item wins at scoring. Re-scores the run."""
     if not reviewer.strip():
         raise AnswerEvalError("--reviewer is required")
+    graded_config(settings, run_id)  # before the first write: a refused import leaves review.jsonl unchanged
     d = run_dir(settings, run_id)
     key = json.loads((d / "review-key.json").read_text(encoding="utf-8"))
     records, errors = [], []

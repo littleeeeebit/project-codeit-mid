@@ -544,9 +544,9 @@ class ScoreRecordTest(unittest.TestCase):
         reviews = {"F|q|link|1|E2": {"verdict": "unsupported", "reviewer": "r1"},
                    "F|q|answer_claim|2": {"verdict": "unsupported", "reviewer": "r2"},
                    "F|q|claim|c1": {"verdict": "correct", "reviewer": "r3"}}
-        link = lambda i, eid, support, valid=False: {  # noqa: E731
-            "claim_index": i, "evidence_id": eid, "item": f"F|q|link|{i}|{eid}", "support": support, "valid": valid,
-            "grade": 0}
+        link = lambda i, eid, support, valid=False, verbatim=False: {  # noqa: E731
+            "claim_index": i, "evidence_id": eid, "item": f"F|q|link|{i}|{eid}", "support": support,
+            "verbatim": verbatim, "valid": valid, "grade": 0}
         answer_claim = lambda i, kind, supported, doc="d": {  # noqa: E731
             "index": i, "item": f"F|q|answer_claim|{i}", "kind": kind, "supported": supported, "doc_id": doc}
         self.assertEqual(answers.score_record(self.ROW, record, None, reviews), {
@@ -556,7 +556,7 @@ class ScoreRecordTest(unittest.TestCase):
                         "reviewed_by": "r3", "critical_kind": "amount"},
                        {"claim_id": "c2", "item": "F|q|claim|c2", "verdict": "missing", "deterministic": "missing",
                         "reviewed_by": None, "critical_kind": None}],
-            "links": [link(0, "E1", "supporting", True), link(0, "E2", "unjudged"), link(1, "E2", "unsupported"),
+            "links": [link(0, "E1", "supporting", True, True), link(0, "E2", "unjudged"), link(1, "E2", "unsupported"),
                       link(2, "E1", "unjudged", True), link(2, "E3", "unjudged"), link(3, "E3", "unjudged")],
             "answer_claims": [answer_claim(0, "source_fact", True), answer_claim(1, "source_fact", False),
                               answer_claim(2, "inference", False), answer_claim(3, "source_fact", None, "other")],
@@ -785,7 +785,9 @@ class ValidateAnswerTest(unittest.TestCase):
             ({"payload": self.claim(kind="inference", evidence_ids=["E2"]), "required": {self.A, self.B}},
              "evidence_scope_mismatch: inference cites nothing of doc-aaaa"),
             ({"payload": {"conflicts": [{"field": "f", "alternatives": [
-                {"doc_id": self.A, "value": "v", "evidence_ids": []}]}]}}, "conflict_without_evidence"),
+                {"doc_id": self.A, "value": "v", "evidence_ids": []}, {"doc_id": self.A, "value": "w",
+                                                                      "evidence_ids": ["E1"]}]}]}},
+             "conflict_without_evidence"),
             ({"payload": missing(doc_id="doc-z")}, "missing_field_outside_scope: doc-z"),
             ({"payload": missing(reason="source_absence_verified")}, "source_absence_claimed_from_retrieval"),
             ({"payload": {"claims": []}}, "answered_without_claims"),

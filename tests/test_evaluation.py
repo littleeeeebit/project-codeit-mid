@@ -13,6 +13,7 @@ from rfp_assistant.gateway import budget, generation
 from rfp_assistant.gateway.generation import FakeTransport, ProviderError
 from rfp_assistant.retrieval.retrieval import KeywordIndex
 from rfp_assistant.service import answers, auth, service
+from rfp_assistant.settings import Settings
 from rfp_assistant.storage import store
 from tests import fixtures
 from tests import release_fixtures as p4
@@ -46,11 +47,96 @@ class MetricFixtureTest(unittest.TestCase):
     def test_conflict_status_without_a_next_action_does_not_pass_negative_handling(self):
         row = {**gold_row([]), 'question_type': 'cross_document', 'answerability': 'conflicting',
                'expected_status': 'conflicting_evidence', 'mode': 'single', 'scope': [{'doc_id': 'd'}]}
+        conflict = {'field': 'warranty', 'alternatives': [{'doc_id': 'd', 'value': '1년'}, {'doc_id': 'd', 'value': '2년'}]}
         for action in (None, ' ', 'Ask the purchaser which conflicting condition controls'):
-            record = {'finalist': 'F', 'outcome': 'conflicting_evidence', 'answer': {'next_action': action}}
+            record = {'finalist': 'F', 'outcome': 'conflicting_evidence',
+                      'answer': {'next_action': action, 'conflicts': [conflict]}}
             scored = answers.score_record(row, record, None, {})
             self.assertEqual(answers.aggregate_answers([scored])['negative_handling']['numerator'],
                              1 if action and action.strip() else 0)
+
+    def test_conflict_answers_fail_the_shared_status_rule_offline(self):
+        row = {**gold_row([]), 'question_type': 'revision_conflict', 'answerability': 'conflicting',
+               'expected_status': 'conflicting_evidence', 'mode': 'single', 'scope': [{'doc_id': 'd'}]}
+        alt = {'doc_id': 'd', 'value': '1년', 'evidence_ids': ['E1']}
+        action = 'Ask the purchaser which condition controls'
+        for name, conflicts, ok in (('no conflicts', [], False), ('one alternative', [{'field': 'f', 'alternatives': [alt]}], False),
+                                    ('two alternatives', [{'field': 'f', 'alternatives': [alt, alt]}], True)):
+            with self.subTest(name):
+                record = {'finalist': 'F', 'outcome': 'conflicting_evidence',
+                          'answer': {'next_action': action, 'conflicts': conflicts}}
+                self.assertEqual(answers.score_record(row, record, None, {})['status_ok'], ok)
+
+    def test_a_run_graded_under_another_version_is_never_rescored(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            s = Settings(source_dir=Path(tmp), data_dir=Path(tmp), hwp_converter=None)
+            d = answers.run_dir(s, 'A-0123456789ab')
+            d.mkdir(parents=True)
+            (d / 'config.json').write_text(json.dumps({'eval_version': 'answer-eval-1'}), encoding='utf-8')
+            with self.assertRaisesRegex(answers.AnswerEvalError, 'graded under answer-eval-1'):
+                answers.finalize(s, 'A-0123456789ab')
+        self.assertNotEqual(answers.ANSWER_EVAL_VERSION, 'answer-eval-1')
+        self.assertNotEqual(generation.PROMPT_VERSION, 'grounded-answer-12')
+
+    def test_a_whole_claim_review_item_shows_every_passage_the_claim_cites(self):
+        row = {**gold_row([AMOUNT_G]), 'question': '예산은?', 'question_type': 'direct_fact', 'required_claims': [],
+               'answerability': 'answerable', 'expected_status': 'answered', 'mode': 'single', 'scope': [{'doc_id': 'd'}]}
+        quotes = {'E1': '사업 예산은 금 130,000,000원으로 한다.', 'E2': '입찰 참가 자격은 제한하지 않는다.'}
+        rec = {'finalist': 'F', 'question_id': 'q', 'status': 'done', 'outcome': 'answered',
+               'evidence': {e: {'doc_id': 'd', 'chunk_id': e, 'quote': q} for e, q in quotes.items()},
+               'answer': {'claims': [{'text': '예산은 1억 3천만 원이며 누구나 낙찰받는다', 'kind': 'source_fact',
+                                      'doc_id': 'd', 'evidence_ids': ['E1', 'E2']}]}}
+        reviews = {f'F|q|link|0|{e}': {'verdict': 'supporting', 'reviewer': 'r'} for e in quotes}
+        with tempfile.TemporaryDirectory() as tmp:
+            s = Settings(source_dir=Path(tmp), data_dir=Path(tmp), hwp_converter=None)
+            d = answers.run_dir(s, 'A-0123456789ab')
+            d.mkdir(parents=True)
+            store.write_jsonl_atomic(d / 'rows.jsonl', [rec])
+            store.write_jsonl_atomic(d / 'scored.jsonl', [answers.score_record(row, rec, None, reviews)])
+            (d / 'config.json').write_text(json.dumps({'eval_version': answers.ANSWER_EVAL_VERSION, 'dataset': 'dev'}),
+                                           encoding='utf-8')
+            with mock.patch.object(evaluation, 'load_eval_rows', return_value=([row], [], None)):
+                sheet = store.read_jsonl(Path(answers.export_review_sheet(s, 'A-0123456789ab')['sheet']))
+        (item,) = [i for i in sheet if i['kind'] == 'answer_claim']
+        self.assertEqual(item['cited_quotes'], list(quotes.values()))
+
+    def test_status_must_match_the_rows_own_statuses(self):
+        row = {**gold_row([]), 'question_type': 'missing_false_premise', 'answerability': 'unanswerable',
+               'expected_status': 'insufficient_evidence', 'mode': 'single', 'scope': [{'doc_id': 'd'}]}
+        record = {'finalist': 'F', 'outcome': 'clarification_required', 'answer': {}}
+        scored = answers.score_record(row, record, None, {})
+        self.assertEqual((scored['status_ok'], scored['passed']), (False, False))
+        listed = {**row, 'accepted_statuses': ['clarification_required']}
+        scored = answers.score_record(listed, record, None, {})
+        self.assertEqual((scored['status_ok'], scored['passed']), (True, True))
+        check = evaluation.GoldChecker.__new__(evaluation.GoldChecker)._check_kind
+        base = {**row, 'question': 'q?', 'difficulty_reason': 'r', 'as_of_date': '2024-05-01'}
+        self.assertEqual(check({**base, 'accepted_statuses': ['clarification_required']}, 'r'), [])
+        for bad in (['answered'], 'clarification_required', ['conflicting_evidence']):
+            with self.subTest(bad=bad):
+                self.assertTrue(any('accepted_statuses' in e for e in check({**base, 'accepted_statuses': bad}, 'r')))
+        answerable = {**base, 'answerability': 'answerable', 'expected_status': 'answered'}
+        self.assertTrue(any('accepted_statuses' in e for e in check(
+            {**answerable, 'accepted_statuses': ['insufficient_evidence']}, 'r')))
+
+    def test_a_link_supporting_part_of_a_claim_never_supports_the_whole_claim(self):
+        row = {**gold_row([AMOUNT_G]), 'question_type': 'direct_fact', 'answerability': 'answerable',
+               'expected_status': 'answered', 'mode': 'single', 'scope': [{'doc_id': 'd'}]}
+        claim = '예산은 1억 3천만 원이며 누구나 낙찰받는다'
+        record = {'finalist': 'F', 'outcome': 'answered',
+                  'evidence': {'E1': {'doc_id': 'd', 'chunk_id': 'c1', 'quote': '사업 예산은 금 130,000,000원으로 한다.'}},
+                  'answer': {'claims': [{'text': claim, 'kind': 'source_fact', 'doc_id': 'd', 'evidence_ids': ['E1']}]}}
+        reviews = {'F|q|link|0|E1': {'verdict': 'supporting', 'reviewer': 'r1'}}
+        scored = answers.score_record(row, record, None, reviews)
+        self.assertEqual(scored['links'][0]['support'], 'supporting')
+        self.assertIsNot(scored['answer_claims'][0]['supported'], True)
+        agg = answers.aggregate_answers([scored])
+        self.assertEqual((agg['citation_coverage']['numerator'], agg['answer_claims_unjudged']), (0, 1))
+        reviews['F|q|answer_claim|0'] = {'verdict': 'supported', 'reviewer': 'r2'}
+        self.assertIs(answers.score_record(row, record, None, reviews)['answer_claims'][0]['supported'], True)
+        quoted = {**record, 'answer': {'claims': [{'text': '사업 예산은 금 130,000,000원', 'kind': 'source_fact',
+                                                   'doc_id': 'd', 'evidence_ids': ['E1']}]}}
+        self.assertIs(answers.score_record(row, quoted, None, {})['answer_claims'][0]['supported'], True)
 
     def test_two_groups_one_recovered(self):
         row = gold_row([AMOUNT_G, VAT_G])
@@ -460,6 +546,9 @@ class MetricFixtureTest(unittest.TestCase):
         self.assertEqual(evaluation.extract_numbers("1억 3천만 원, 130백만원, 1.3억"), {130000000})
         self.assertIn("2024-06-11T17:00", evaluation.extract_dates("2024. 6. 11.(화) 17:00까지"))
         self.assertIn("2024-06-11T17:00", evaluation.extract_dates("2024년 6월 11일 오후 5시"))
+        self.assertIn("2024-06-11T00:00", evaluation.extract_dates("2024년 6월 11일 오전 12시"))
+        self.assertIn("2024-06-11T12:00", evaluation.extract_dates("2024년 6월 11일 오후 12시"))
+        self.assertNotIn("2024-06-11T12:00", evaluation.extract_dates("2024년 6월 11일 오전 12시"))
 
     def test_family_bootstrap_is_seeded_and_grouped(self):
         results = [{"id": i, "families": [f"f{i % 3}"], "metrics": {"ndcg@5": i % 2}} for i in range(12)]
@@ -1023,6 +1112,17 @@ class AnswerRunTest(GoldRetrievalTest):
         scored = store.read_jsonl(answers.run_dir(self.s, out["run_id"]) / "scored.jsonl")
         verdicts = [c for s in scored for c in s["claims"] if c.get("reviewed_by") == "person-c"]
         self.assertEqual([c["verdict"] for c in verdicts], ["wrong_value"])
+        # A run graded under another version is refused before anything in it is written
+        d = answers.run_dir(self.s, out["run_id"])
+        config = json.loads((d / "config.json").read_text(encoding="utf-8"))
+        (d / "config.json").write_text(json.dumps({**config, "eval_version": "answer-eval-1"}), encoding="utf-8")
+        before = {f: (d / f).read_bytes() for f in ("review.jsonl", "review-key.json", "scores.json")}
+        for call in (lambda: answers.import_reviews(self.s, out["run_id"], path, "person-c"),
+                     lambda: answers.export_review_sheet(self.s, out["run_id"]),
+                     lambda: answers.finalize(self.s, out["run_id"])):
+            with self.assertRaisesRegex(answers.AnswerEvalError, "graded under answer-eval-1"):
+                call()
+        self.assertEqual({f: (d / f).read_bytes() for f in before}, before)
 
 
 class SealedTest(Phase4Case):
