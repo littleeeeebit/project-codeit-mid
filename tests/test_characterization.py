@@ -30,7 +30,7 @@ from rfp_assistant.storage import postgres, postgres_backup, store
 from tests import fixtures
 # Their scenarios, as module attributes, so their tests are not collected twice.
 from tests import (release_fixtures, test_budget, test_dense, test_gold, test_postgresql_recovery, test_release,
-                   test_service)
+                   test_retrieval_snapshot, test_service)
 
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOTS = Path(__file__).parent / "snapshots"
@@ -443,6 +443,41 @@ class RestoreRefusalTest(unittest.TestCase):
             "restore must use a different isolated database", "restore target already has a paid gateway owner",
             "restore target already has a restore owner",
             "restore target contains tables; use an empty isolated database"])
+
+
+class RetrievalSnapshotTest(unittest.TestCase):
+    """tools/export/retrieval_snapshot.snapshot with a review, an index and an active run besides
+    test_retrieval_snapshot's source: every output file whole, without the collection time, commit and host."""
+
+    def test_inventory_files(self):
+        kit = test_retrieval_snapshot.kit
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "runtime").mkdir()
+            db = postgres.Target(fixtures.database())
+            with store.open_db(db) as conn, store.tx(conn):
+                conn.execute("INSERT INTO sources(source_hash, format, original_path, active_extraction_id, "
+                             "parse_status) VALUES ('hash','hwp','PRIVATE_PATH','extraction','parsed')")
+                conn.execute("INSERT INTO documents VALUES ('doc',1,'example.hwp','hash','{}','{}','{}')")
+                conn.execute("INSERT INTO extractions VALUES ('extraction','hash','parser','PRIVATE_PATH','today',NULL)")
+                for i in range(3):
+                    conn.execute("INSERT INTO elements VALUES ('extraction',?,?,'paragraph',NULL,'body','body','{}',"
+                                 "NULL)", (f"e{i}", i))
+                for rid, xid, at in (("r1", "old", "2026-01-01"), ("r2", "extraction", "2026-02-01")):
+                    conn.execute("INSERT INTO reviews VALUES (?, 'hash', ?, 'person-b', 'checked', ?, '{}', ?)",
+                                 (rid, xid, json.dumps(["p1", "p2"]), at))
+                conn.execute("INSERT INTO indexes VALUES ('ix1','m','mh','ss',?, 'ready','2026-03-01')", (json.dumps(
+                    {"kind": "keyword", "profile": "kiwi", "chunker_version": "c3", "secret": "x"}),))
+                conn.execute("INSERT INTO app_settings VALUES ('active_index','ix1')")
+                conn.execute("INSERT INTO app_settings VALUES ('active_run',?)", (json.dumps(
+                    {"mode": "hybrid", "index_version": "ix1", "run_id": "H-1", "activated_at": "t", "api_key": "k"}),))
+            out = root / "out"
+            kit.snapshot(os.environ[db.dsn_env], root / "runtime", out)
+            files = {p.name: json.loads(p.read_text(encoding="utf-8")) for p in sorted(out.iterdir())}
+        for key in ("collected_at", "commit", "host", "packages"):
+            files["manifest.json"].pop(key)
+        files["manifest.json"]["schema_version"] = "<schema>"
+        snapshot(self, "retrieval_snapshot", json.dumps(files, ensure_ascii=False, indent=1, sort_keys=True) + "\n")
 
 
 class ReconcileRefusalTest(unittest.TestCase):
