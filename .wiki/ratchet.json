@@ -73,8 +73,8 @@
     },
     "tools/verify.py": {
       "dup": 0,
-      "lines": 1059,
-      "reason": "gpt5-mini-answer-embedding-comparison: 12 lines select the owner-configured Python before dependency imports, two enable fake-provider admission only on the validated disposable copy, and one applies the supported database timeout after full-corpus restores; duplication allowance remains zero"
+      "lines": 1062,
+      "reason": "gpt5-mini-answer-embedding-comparison: 12 lines select the owner-configured Python before dependency imports, two enable fake-provider admission only on the validated disposable copy, one applies the supported database timeout after full-corpus restores, and three register missing selectable-model prices on that copy through the existing audited helper; duplication allowance remains zero"
     },
     "web/src/components/verify/evaluation.tsx": {
       "dup": 6,

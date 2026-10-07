@@ -314,6 +314,7 @@ def copy_database(source_dsn: str, work: Path) -> str:
     test database. The dump file is removed; the copy is dropped when this process exits."""
     from psycopg.conninfo import conninfo_to_dict
     from rfp_assistant.gateway import budget
+    from rfp_assistant.settings import ALLOWED_GENERATION_MODELS
 
     from rfp_assistant.storage import postgres, postgres_backup
     from tests import fixtures
@@ -327,6 +328,8 @@ def copy_database(source_dsn: str, work: Path) -> str:
     postgres_backup._run("pg_restore", target, ["--no-owner", "--no-privileges", "--exit-on-error",
         "--single-transaction", "--dbname=" + conninfo_to_dict(target.dsn())["dbname"], str(dump)], work, timeout=900)
     budget.set_paid_enabled(target, "verification", True, "fake-provider flows on a disposable corpus copy")
+    for model in ALLOWED_GENERATION_MODELS:
+        budget.ensure_generation_rate(target, model, "verification")
     dump.unlink()
     return target.dsn()
 
