@@ -1,0 +1,2994 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`experiments > sorting by a column and opening a row 1`] = `
+<section
+  aria-labelledby="experiment-row"
+  class="scroll-mt-20 space-y-8 border-t border-input pt-8"
+>
+  <div
+    class="space-y-1"
+  >
+    <p
+      class="text-sm font-medium text-muted-foreground"
+    >
+      K0 · K1
+    </p>
+    <h4
+      class="text-2xl font-bold tracking-tight [overflow-wrap:anywhere]"
+      id="experiment-row"
+    >
+      K0 공백 분리 · 키워드
+    </h4>
+  </div>
+  <div
+    class="grid gap-10 xl:grid-cols-[minmax(0,1fr)_22rem]"
+  >
+    <div
+      class="space-y-4"
+    >
+      <div
+        class="flex flex-wrap items-baseline justify-between gap-3"
+      >
+        <h5
+          class="text-lg font-bold"
+        >
+          놓친 질문␠
+          <span
+            class="tabular-nums"
+          >
+            1
+          </span>
+          건
+        </h5>
+        <label
+          class="flex items-center gap-2 text-sm"
+        >
+          <span
+            class="font-semibold"
+          >
+            범위
+          </span>
+          <select
+            class="rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 h-11 w-auto"
+          >
+            <option
+              value="dev"
+            >
+              개발 질문 · 자기 문서
+               ·␠
+              1
+              건
+            </option>
+            <option
+              value="whole"
+            >
+              전체 문서
+               ·␠
+              1
+              건
+            </option>
+          </select>
+        </label>
+      </div>
+      <ul
+        class="divide-y divide-input"
+      >
+        <li
+          class="space-y-1 py-3"
+        >
+          <p
+            class="text-base"
+          >
+            하자보수 기간은?
+          </p>
+          <p
+            class="text-[13px] text-muted-foreground"
+          >
+            <span
+              class="font-semibold text-bad"
+            >
+              치명
+               ·␠
+            </span>
+            근거 불완전 · 상위 5 밖 · 조건 1개 잘림 · nDCG 0.50
+             · 빠진 근거 g1
+          </p>
+        </li>
+      </ul>
+    </div>
+    <form
+      class="space-y-4"
+    >
+      <h5
+        class="text-lg font-bold"
+      >
+        이 행으로 서비스 전환
+      </h5>
+      <p
+        class="text-sm text-muted-foreground"
+      >
+        다음 질문부터 이 설정으로 검색합니다. 로그인한 계정 이름으로 기록되며, 이전 설정은 활성화 기록에 남아 언제든 되돌릴 수 있습니다.
+      </p>
+      <div
+        class="space-y-1.5"
+      >
+        <label
+          class="text-[13px] font-semibold"
+          for="activate-note"
+        >
+          메모 (선택)
+        </label>
+        <textarea
+          class="w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 py-2"
+          id="activate-note"
+          rows="3"
+        />
+      </div>
+      <button
+        class="group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/80 h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"
+        data-size="lg"
+        data-slot="button"
+        data-variant="default"
+        type="submit"
+      >
+        서비스 전환
+      </button>
+    </form>
+  </div>
+  <details
+    class="group text-sm"
+  >
+    <summary
+      class="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+    >
+      <span
+        aria-hidden="true"
+        class="transition-transform group-open:rotate-90"
+      >
+        ›
+      </span>
+      모델과 실행 정보
+    </summary>
+    <dl
+      class="grid gap-x-8 gap-y-2 pt-3 sm:grid-cols-[auto_minmax(0,1fr)]"
+    >
+      <div
+        class="contents"
+      >
+        <dt
+          class="text-muted-foreground"
+        >
+          라이선스
+        </dt>
+        <dd
+          class="font-mono text-[13px] [overflow-wrap:anywhere]"
+        >
+          MIT
+        </dd>
+      </div>
+      <div
+        class="contents"
+      >
+        <dt
+          class="text-muted-foreground"
+        >
+          가중치 크기
+        </dt>
+        <dd
+          class="font-mono text-[13px] [overflow-wrap:anywhere]"
+        >
+          2.00GB
+        </dd>
+      </div>
+      <div
+        class="contents"
+      >
+        <dt
+          class="text-muted-foreground"
+        >
+          실행
+        </dt>
+        <dd
+          class="font-mono text-[13px]"
+        >
+          R-0
+        </dd>
+      </div>
+    </dl>
+  </details>
+</section>
+`;
+
+exports[`experiments > the matrix as it opens 1`] = `
+<section
+  aria-label="K0 · K1 비교표"
+  class="space-y-6"
+>
+  <div
+    class="space-y-1"
+  >
+    <p
+      class="text-sm font-medium text-muted-foreground"
+    >
+      가장 높은␠
+      nDCG@5
+    </p>
+    <p
+      class="text-4xl font-bold tabular-nums tracking-tight"
+    >
+      0.830
+    </p>
+    <p
+      class="text-base [overflow-wrap:anywhere]"
+    >
+      K1 Kiwi 형태소 · 하이브리드
+      <span
+        class="text-muted-foreground"
+      >
+         · 지금 서비스 중
+      </span>
+    </p>
+  </div>
+  <p
+    class="rounded-xl px-4 py-3 text-sm font-medium bg-warn-bg text-warn"
+  >
+    검증되지 않은 비교입니다. 다시 읽은 원문의 추출본이 바뀌어, 서비스 중인 색인 행이 채점한 질문␠
+    1
+    개가 새 색인 행에서 빠졌습니다. 근거를 다시 검토해야 새 색인 행을 믿을 수 있습니다:␠
+    q7
+  </p>
+  <div
+    class="relative overflow-x-auto rounded-xl border border-input"
+  >
+    <table
+      class="w-full border-collapse text-sm"
+    >
+      <caption
+        class="sr-only"
+      >
+        K0 · K1
+         비교. 열 제목을 누르면 정렬되고, 행을 누르면 실패한 질문과 활성화가 열립니다.
+      </caption>
+      <thead
+        class="bg-secondary/70"
+      >
+        <tr>
+          <th
+            class="sticky left-0 z-10 bg-secondary px-3 py-3 text-left font-semibold"
+            scope="col"
+          >
+            행
+          </th>
+          <th
+            class="px-2 py-1 text-right font-semibold"
+            scope="col"
+          >
+            <button
+              class="inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded px-1 outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50"
+              type="button"
+            >
+              nDCG@5
+              <span
+                aria-hidden="true"
+                class="w-3 text-xs text-muted-foreground"
+              />
+            </button>
+          </th>
+          <th
+            class="px-2 py-1 text-right font-semibold"
+            scope="col"
+          >
+            <button
+              class="inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded px-1 outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50"
+              type="button"
+            >
+              근거 완전
+              <span
+                aria-hidden="true"
+                class="w-3 text-xs text-muted-foreground"
+              />
+            </button>
+          </th>
+          <th
+            class="px-2 py-1 text-right font-semibold"
+            scope="col"
+          >
+            <button
+              class="inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded px-1 outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50"
+              type="button"
+            >
+              검색 p95
+              <span
+                aria-hidden="true"
+                class="w-3 text-xs text-muted-foreground"
+              />
+            </button>
+          </th>
+          <th
+            class="px-2 py-1 text-right font-semibold"
+            scope="col"
+          >
+            <button
+              class="inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded px-1 outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50"
+              type="button"
+            >
+              비용
+              <span
+                aria-hidden="true"
+                class="w-3 text-xs text-muted-foreground"
+              />
+            </button>
+          </th>
+        </tr>
+      </thead>
+      <tbody
+        class="divide-y divide-input"
+      >
+        <tr
+          class="group hover:bg-secondary"
+        >
+          <th
+            class="sticky left-0 z-10 min-w-[15rem] max-w-[20rem] px-3 py-2 text-left font-medium bg-background group-hover:bg-secondary"
+            scope="row"
+          >
+            <button
+              aria-expanded="false"
+              class="min-h-11 w-full text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [overflow-wrap:anywhere]"
+              type="button"
+            >
+              K0 공백 분리 · 키워드
+            </button>
+          </th>
+          <td
+            class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-foreground"
+          >
+            0.610
+          </td>
+          <td
+            class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-foreground"
+          >
+            40.0%
+          </td>
+          <td
+            class="whitespace-nowrap px-3 py-2 text-right tabular-nums font-bold text-primary"
+          >
+            80.0ms
+            <span
+              class="sr-only"
+            >
+               (최고)
+            </span>
+          </td>
+          <td
+            class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-foreground"
+          >
+            무료
+          </td>
+        </tr>
+        <tr
+          class="group hover:bg-secondary border-l-4 border-l-primary"
+        >
+          <th
+            class="sticky left-0 z-10 min-w-[15rem] max-w-[20rem] px-3 py-2 text-left font-medium bg-background group-hover:bg-secondary"
+            scope="row"
+          >
+            <button
+              aria-expanded="false"
+              class="min-h-11 w-full text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [overflow-wrap:anywhere]"
+              type="button"
+            >
+              K1 Kiwi 형태소 · 하이브리드
+              <span
+                class="block text-xs font-semibold text-primary"
+              >
+                서비스 중
+              </span>
+            </button>
+          </th>
+          <td
+            class="whitespace-nowrap px-3 py-2 text-right tabular-nums font-bold text-primary"
+          >
+            0.830
+            <span
+              class="sr-only"
+            >
+               (최고)
+            </span>
+          </td>
+          <td
+            class="whitespace-nowrap px-3 py-2 text-right tabular-nums font-bold text-primary"
+          >
+            55.0%
+            <span
+              class="sr-only"
+            >
+               (최고)
+            </span>
+          </td>
+          <td
+            class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-foreground"
+          >
+            140ms
+          </td>
+          <td
+            class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-foreground"
+          >
+            $0.0123
+          </td>
+        </tr>
+        <tr
+          class="group hover:bg-secondary"
+        >
+          <th
+            class="sticky left-0 z-10 min-w-[15rem] max-w-[20rem] px-3 py-2 text-left font-medium bg-background group-hover:bg-secondary"
+            scope="row"
+          >
+            <button
+              aria-expanded="false"
+              class="min-h-11 w-full text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [overflow-wrap:anywhere]"
+              type="button"
+            >
+              K1 Kiwi 형태소 · 밀집만
+            </button>
+          </th>
+          <td
+            class="px-3 py-2 text-[13px] text-muted-foreground"
+            colspan="4"
+          >
+            <span
+              class="font-semibold text-warn"
+            >
+              비용 승인 대기
+            </span>
+             · 최대 $0.0420, 120,000 토큰
+             · 승인 필요
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p
+    class="text-[13px] text-muted-foreground"
+  >
+    굵은 파란 값이 열마다 가장 좋은 값입니다. 절반이 넘는 행이 같은 값이면 표시하지 않습니다. 개발 질문은 자기 문서 안에서, 전체 문서 열은 개발 질문과 바늘 질문을 모든 문서에서 검색한 결과입니다. 고정값:␠
+    임베딩 m3, 융합 keyword_first:60
+    .
+     융합이 BM25 상위 6개를 제자리에 두므로 하이브리드와 상위 고정 행의 nDCG@5는 K1과 같습니다. 차이는 그 뒤 근거에서 나며, 근거 완전과 치명 실패 열에 보입니다.
+  </p>
+</section>
+`;
+
+exports[`fidelity detail > before the automatic comparison 1`] = `
+<div>
+  <article
+    class="space-y-5"
+  >
+    <header
+      class="space-y-2"
+    >
+      <span
+        class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-3 py-1 text-sm bg-neutral-bg text-neutral"
+      >
+        <span
+          aria-hidden="true"
+          class="size-1.5 rounded-full bg-neutral"
+        />
+        원문 대조 전
+      </span>
+      <h3
+        class="text-lg font-bold leading-snug"
+      >
+        통합 정보시스템.hwp
+      </h3>
+      <p
+        class="rounded-xl px-4 py-3 text-sm font-medium bg-warn-bg text-warn"
+      >
+        아직 자동 대조 전입니다. CLI: python -m rfp_assistant.cli fidelity run
+      </p>
+    </header>
+  </article>
+</div>
+`;
+
+exports[`fidelity detail > the first finding, the print toggle, then the second finding > first finding 1`] = `
+<div>
+  <article
+    class="space-y-5"
+  >
+    <header
+      class="space-y-2"
+    >
+      <span
+        class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-3 py-1 text-sm bg-warn-bg text-warn"
+      >
+        <span
+          aria-hidden="true"
+          class="size-1.5 rounded-full bg-warn"
+        />
+        자동 대조: 확인 필요
+      </span>
+      <h3
+        class="text-lg font-bold leading-snug"
+      >
+        통합 정보시스템.hwp
+      </h3>
+      <dl
+        class="grid grid-cols-2 gap-4 rounded-xl border border-input p-4 text-sm sm:grid-cols-4"
+      >
+        <div>
+          <dt
+            class="text-xs text-muted-foreground"
+          >
+            확인할 곳
+          </dt>
+          <dd
+            class="font-semibold tabular-nums"
+          >
+            2
+          </dd>
+        </div>
+        <div>
+          <dt
+            class="text-xs text-muted-foreground"
+          >
+            전체 쪽
+          </dt>
+          <dd
+            class="font-semibold tabular-nums"
+          >
+            12
+          </dd>
+        </div>
+        <div>
+          <dt
+            class="text-xs text-muted-foreground"
+          >
+            추출에만 있는 글자
+          </dt>
+          <dd
+            class="font-semibold tabular-nums"
+          >
+            40
+          </dd>
+        </div>
+        <div>
+          <dt
+            class="text-xs text-muted-foreground"
+          >
+            인쇄본에만 있는 글자
+          </dt>
+          <dd
+            class="font-semibold tabular-nums"
+          >
+            1,234
+          </dd>
+        </div>
+      </dl>
+      <details
+        class="text-[13px] text-muted-foreground"
+      >
+        <summary
+          class="min-h-8 cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          그림 포함␠
+          2
+          쪽 · 그림 속 글자는 대조 범위 밖
+        </summary>
+        <p
+          class="pt-2"
+        >
+          3, 4
+        </p>
+      </details>
+    </header>
+    <section
+      aria-label="불일치 검토"
+      class="space-y-4"
+    >
+      <div
+        class="flex flex-wrap items-center justify-between gap-2"
+      >
+        <h4
+          class="text-base font-bold"
+        >
+          확인할 위치
+        </h4>
+        <span
+          class="text-[13px] text-muted-foreground"
+        >
+          한 위치씩 선택해 대조하세요
+        </span>
+      </div>
+      <ol
+        class="max-h-64 divide-y overflow-y-auto rounded-xl border border-input"
+      >
+        <li>
+          <button
+            aria-label="불일치 1 · 3쪽"
+            aria-pressed="true"
+            class="grid min-h-12 w-full grid-cols-[2rem_4rem_minmax(0,1fr)_3rem] items-start gap-2 border-l-4 px-3 py-3 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 border-primary bg-accent"
+            type="button"
+          >
+            <span
+              class="text-muted-foreground tabular-nums"
+            >
+              1
+            </span>
+            <span
+              class="font-semibold"
+            >
+              3쪽
+            </span>
+            <span>
+              누락 의심
+              <span
+                class="ml-2 text-warn"
+              >
+                숫자 포함
+              </span>
+            </span>
+            <span
+              class="text-right tabular-nums"
+            >
+              30
+              자
+            </span>
+          </button>
+        </li>
+        <li>
+          <button
+            aria-label="불일치 2 · 쪽 미상"
+            aria-pressed="false"
+            class="grid min-h-12 w-full grid-cols-[2rem_4rem_minmax(0,1fr)_3rem] items-start gap-2 border-l-4 px-3 py-3 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 border-transparent hover:bg-secondary"
+            type="button"
+          >
+            <span
+              class="text-muted-foreground tabular-nums"
+            >
+              2
+            </span>
+            <span
+              class="font-semibold"
+            >
+              쪽 미상
+            </span>
+            <span>
+              추출 차이
+            </span>
+            <span
+              class="text-right tabular-nums"
+            >
+              8
+              자
+            </span>
+          </button>
+        </li>
+      </ol>
+      <div
+        class="overflow-hidden rounded-xl border border-input"
+      >
+        <div
+          class="flex flex-wrap items-center justify-between gap-3 border-b bg-secondary/40 px-4 py-3"
+        >
+          <h4
+            class="text-base font-bold"
+          >
+            1
+             /␠
+            2
+             ·␠
+            3쪽
+          </h4>
+          <button
+            aria-expanded="false"
+            class="group/button inline-flex shrink-0 items-center justify-center rounded-lg border bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 min-h-11"
+            data-size="default"
+            data-slot="button"
+            data-variant="outline"
+          >
+            인쇄본 쪽 보기
+          </button>
+        </div>
+        <div
+          class="space-y-4 p-4"
+        >
+          <div>
+            <p
+              class="mb-2 text-sm font-semibold"
+            >
+              인쇄본에만 있는 부분
+            </p>
+            <p
+              class="text-base whitespace-pre-wrap"
+            >
+              <mark
+                class="rounded bg-cite-bg px-1"
+              >
+                누락 문구
+              </mark>
+            </p>
+          </div>
+          <dl
+            class="flex flex-wrap gap-2 text-sm"
+          >
+            <dt
+              class="font-semibold"
+            >
+              포함된 숫자
+            </dt>
+            <dd>
+              12
+            </dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+    <form
+      class="space-y-3 rounded-2xl bg-secondary/60 p-4"
+    >
+      <div
+        class="space-y-1.5"
+      >
+        <label
+          class="text-[13px] font-semibold"
+          for="fid-note-hash-a"
+        >
+          메모 (선택)
+        </label>
+        <input
+          class="w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 h-10"
+          id="fid-note-hash-a"
+          maxlength="300"
+          value=""
+        />
+      </div>
+      <div
+        class="flex flex-wrap items-center gap-3"
+      >
+        <button
+          class="group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/80 h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"
+          data-size="lg"
+          data-slot="button"
+          data-variant="default"
+          type="submit"
+        >
+          표시된 곳을 모두 원문과 대조했습니다
+        </button>
+        <span
+          class="text-[13px] text-muted-foreground"
+        >
+          대조 상태와 검토 메모가 수정 기록에 자동으로 남습니다.
+        </span>
+      </div>
+    </form>
+  </article>
+</div>
+`;
+
+exports[`fidelity detail > the first finding, the print toggle, then the second finding > second finding 1`] = `
+<section
+  aria-label="불일치 검토"
+  class="space-y-4"
+>
+  <div
+    class="flex flex-wrap items-center justify-between gap-2"
+  >
+    <h4
+      class="text-base font-bold"
+    >
+      확인할 위치
+    </h4>
+    <span
+      class="text-[13px] text-muted-foreground"
+    >
+      한 위치씩 선택해 대조하세요
+    </span>
+  </div>
+  <ol
+    class="max-h-64 divide-y overflow-y-auto rounded-xl border border-input"
+  >
+    <li>
+      <button
+        aria-label="불일치 1 · 3쪽"
+        aria-pressed="false"
+        class="grid min-h-12 w-full grid-cols-[2rem_4rem_minmax(0,1fr)_3rem] items-start gap-2 border-l-4 px-3 py-3 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 border-transparent hover:bg-secondary"
+        type="button"
+      >
+        <span
+          class="text-muted-foreground tabular-nums"
+        >
+          1
+        </span>
+        <span
+          class="font-semibold"
+        >
+          3쪽
+        </span>
+        <span>
+          누락 의심
+          <span
+            class="ml-2 text-warn"
+          >
+            숫자 포함
+          </span>
+        </span>
+        <span
+          class="text-right tabular-nums"
+        >
+          30
+          자
+        </span>
+      </button>
+    </li>
+    <li>
+      <button
+        aria-label="불일치 2 · 쪽 미상"
+        aria-pressed="true"
+        class="grid min-h-12 w-full grid-cols-[2rem_4rem_minmax(0,1fr)_3rem] items-start gap-2 border-l-4 px-3 py-3 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 border-primary bg-accent"
+        type="button"
+      >
+        <span
+          class="text-muted-foreground tabular-nums"
+        >
+          2
+        </span>
+        <span
+          class="font-semibold"
+        >
+          쪽 미상
+        </span>
+        <span>
+          추출 차이
+        </span>
+        <span
+          class="text-right tabular-nums"
+        >
+          8
+          자
+        </span>
+      </button>
+    </li>
+  </ol>
+  <div
+    class="overflow-hidden rounded-xl border border-input"
+  >
+    <div
+      class="flex flex-wrap items-center justify-between gap-3 border-b bg-secondary/40 px-4 py-3"
+    >
+      <h4
+        class="text-base font-bold"
+      >
+        2
+         /␠
+        2
+         ·␠
+        쪽 미상
+      </h4>
+    </div>
+    <div
+      class="space-y-4 p-4"
+    >
+      <div>
+        <p
+          class="mb-2 text-sm font-semibold"
+        >
+          추출에서 다른 부분
+        </p>
+        <p
+          class="text-base whitespace-pre-wrap"
+        >
+          <mark
+            class="rounded bg-cite-bg px-1"
+          >
+            가 / 나
+          </mark>
+        </p>
+      </div>
+      <div>
+        <p
+          class="mb-2 text-sm font-semibold"
+        >
+          추출 원문
+        </p>
+        <blockquote
+          class="border-l-4 border-primary pl-4 text-base leading-relaxed whitespace-pre-wrap"
+        >
+          추출 원문 문단
+        </blockquote>
+      </div>
+      <p
+        class="text-sm text-muted-foreground"
+      >
+        쪽 번호를 찾지 못했습니다. 원본 파일에서 해당 문구를 확인하세요.
+      </p>
+    </div>
+  </div>
+</section>
+`;
+
+exports[`maintenance > a run stopped at the paid embedding, with its regression rows 1`] = `
+<div>
+  <div
+    class="space-y-12"
+  >
+    <section
+      aria-labelledby="maint-answer"
+      class="space-y-6"
+    >
+      <div
+        class="space-y-2"
+      >
+        <p
+          class="text-sm font-medium text-muted-foreground"
+        >
+          마지막 실행 M-1 · owner · 2026-10-06 09:00
+        </p>
+        <h3
+          class="text-4xl font-bold tracking-tight text-warn"
+          id="maint-answer"
+        >
+          새 청크 임베딩에서 멈춤
+        </h3>
+        <p
+          class="text-lg"
+        >
+          비용 승인 필요
+           서비스 중인 검색은␠
+          그대로입니다
+          .
+           외부 호출␠
+          0
+          회.
+        </p>
+      </div>
+      <p
+        class="rounded-xl px-4 py-3 text-sm font-medium bg-warn-bg text-warn"
+      >
+        새 청크 임베딩에 최대␠
+        $0.1235
+        가 듭니다. 승인은 소유자가 CLI로 합니다:
+␠␠␠␠␠␠␠␠␠
+        <code
+          class="font-mono"
+        >
+          compare --approve␠
+          E-9
+           --approved-by 이름
+        </code>
+        . 승인 뒤 다시 실행하면 앞 단계는 재사용하고 이어서 합니다.
+      </p>
+      <div
+        class="flex flex-wrap items-center gap-4"
+      >
+        <button
+          class="group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/80 h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"
+          data-size="lg"
+          data-slot="button"
+          data-variant="default"
+        >
+          유지보수 실행
+        </button>
+        <p
+          class="max-w-2xl text-sm text-muted-foreground"
+        >
+          CLI의␠
+          <code
+            class="font-mono"
+          >
+            maintain
+          </code>
+          과 같은 순서입니다. 바뀐 것이 없으면 모두 재사용하고 호출하지 않습니다. 유료 임베딩은 추정에서 멈추고, 실패한 단계에서 멈추며, 어느 경우에도 서비스 중인 검색은 바꾸지 않습니다. 백업 위치␠
+          D:/backups
+          .
+        </p>
+      </div>
+    </section>
+    <section
+      aria-labelledby="maint-steps"
+      class="space-y-3"
+    >
+      <h3
+        class="text-lg font-bold"
+        id="maint-steps"
+      >
+        단계
+      </h3>
+      <ol
+        class="divide-y"
+      >
+        <li
+          class="grid gap-x-4 gap-y-1 py-3 sm:grid-cols-[2rem_12rem_7rem_minmax(0,1fr)] sm:items-baseline"
+        >
+          <span
+            class="hidden text-sm tabular-nums text-muted-foreground sm:block"
+          >
+            1
+          </span>
+          <span
+            class="font-semibold"
+          >
+            백업
+          </span>
+          <span>
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
+            >
+              <span
+                aria-hidden="true"
+                class="size-1.5 rounded-full bg-ok"
+              />
+              재사용
+            </span>
+          </span>
+          <span
+            class="min-w-0 text-sm [overflow-wrap:anywhere] text-muted-foreground"
+          >
+            데이터가 그대로라 2026-10-05 23:00 백업을 씀
+          </span>
+        </li>
+        <li
+          class="grid gap-x-4 gap-y-1 py-3 sm:grid-cols-[2rem_12rem_7rem_minmax(0,1fr)] sm:items-baseline"
+        >
+          <span
+            class="hidden text-sm tabular-nums text-muted-foreground sm:block"
+          >
+            2
+          </span>
+          <span
+            class="font-semibold"
+          >
+            복원 확인
+          </span>
+          <span>
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
+            >
+              <span
+                aria-hidden="true"
+                class="size-1.5 rounded-full bg-ok"
+              />
+              완료
+            </span>
+          </span>
+          <span
+            class="min-w-0 text-sm [overflow-wrap:anywhere] text-muted-foreground"
+          >
+            검사 9개 통과
+          </span>
+        </li>
+        <li
+          class="grid gap-x-4 gap-y-1 py-3 sm:grid-cols-[2rem_12rem_7rem_minmax(0,1fr)] sm:items-baseline"
+        >
+          <span
+            class="hidden text-sm tabular-nums text-muted-foreground sm:block"
+          >
+            3
+          </span>
+          <span
+            class="font-semibold"
+          >
+            매니페스트·수집
+          </span>
+          <span>
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
+            >
+              <span
+                aria-hidden="true"
+                class="size-1.5 rounded-full bg-ok"
+              />
+              완료
+            </span>
+          </span>
+          <span
+            class="min-w-0 text-sm [overflow-wrap:anywhere] text-muted-foreground"
+          >
+            원문 100개 중 4개 추출이 바뀜: a.hwp, b.pdf, c.pdf 외 1개
+          </span>
+        </li>
+        <li
+          class="grid gap-x-4 gap-y-1 py-3 sm:grid-cols-[2rem_12rem_7rem_minmax(0,1fr)] sm:items-baseline"
+        >
+          <span
+            class="hidden text-sm tabular-nums text-muted-foreground sm:block"
+          >
+            4
+          </span>
+          <span
+            class="font-semibold"
+          >
+            HWP 원문 대조 (바뀐 것만)
+          </span>
+          <span>
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
+            >
+              <span
+                aria-hidden="true"
+                class="size-1.5 rounded-full bg-ok"
+              />
+              완료
+            </span>
+          </span>
+          <span
+            class="min-w-0 text-sm [overflow-wrap:anywhere] text-muted-foreground"
+          >
+            HWP 2개 대조
+          </span>
+        </li>
+        <li
+          class="grid gap-x-4 gap-y-1 py-3 sm:grid-cols-[2rem_12rem_7rem_minmax(0,1fr)] sm:items-baseline"
+        >
+          <span
+            class="hidden text-sm tabular-nums text-muted-foreground sm:block"
+          >
+            5
+          </span>
+          <span
+            class="font-semibold"
+          >
+            키워드 색인
+          </span>
+          <span>
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
+            >
+              <span
+                aria-hidden="true"
+                class="size-1.5 rounded-full bg-ok"
+              />
+              완료
+            </span>
+          </span>
+          <span
+            class="min-w-0 text-sm [overflow-wrap:anywhere] text-muted-foreground"
+          >
+            새 색인 ix-012345678 · 서비스 중 ix-fedcba987 (활성화 전)
+          </span>
+        </li>
+        <li
+          class="grid gap-x-4 gap-y-1 py-3 sm:grid-cols-[2rem_12rem_7rem_minmax(0,1fr)] sm:items-baseline"
+        >
+          <span
+            class="hidden text-sm tabular-nums text-muted-foreground sm:block"
+          >
+            6
+          </span>
+          <span
+            class="font-semibold"
+          >
+            새 청크 임베딩
+          </span>
+          <span>
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-warn-bg text-warn"
+            >
+              <span
+                aria-hidden="true"
+                class="size-1.5 rounded-full bg-warn"
+              />
+              비용 승인 대기
+            </span>
+          </span>
+          <span
+            class="min-w-0 text-sm [overflow-wrap:anywhere] text-muted-foreground"
+          >
+            undefined · 새로 임베딩 0개 · 무료
+          </span>
+        </li>
+        <li
+          class="grid gap-x-4 gap-y-1 py-3 sm:grid-cols-[2rem_12rem_7rem_minmax(0,1fr)] sm:items-baseline"
+        >
+          <span
+            class="hidden text-sm tabular-nums text-muted-foreground sm:block"
+          >
+            7
+          </span>
+          <span
+            class="font-semibold"
+          >
+            회귀 비교표
+          </span>
+          <span>
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
+            >
+              <span
+                aria-hidden="true"
+                class="size-1.5 rounded-full bg-ok"
+              />
+              완료
+            </span>
+          </span>
+          <span
+            class="min-w-0 text-sm [overflow-wrap:anywhere] text-muted-foreground"
+          >
+            1행 · 실험 비교의 '회귀 (유지보수)' 표 · 다시 읽은 원문 때문에 새 색인 행에서 빠진 질문 1개 (근거 재검토 필요)
+          </span>
+        </li>
+        <li
+          class="grid gap-x-4 gap-y-1 py-3 sm:grid-cols-[2rem_12rem_7rem_minmax(0,1fr)] sm:items-baseline"
+        >
+          <span
+            class="hidden text-sm tabular-nums text-muted-foreground sm:block"
+          >
+            8
+          </span>
+          <span
+            class="font-semibold text-muted-foreground"
+          >
+            상태 보고
+          </span>
+          <span>
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-neutral-bg text-neutral"
+            >
+              <span
+                aria-hidden="true"
+                class="size-1.5 rounded-full bg-neutral"
+              />
+              대기
+            </span>
+          </span>
+          <span
+            class="min-w-0 text-sm [overflow-wrap:anywhere] text-muted-foreground"
+          />
+        </li>
+      </ol>
+    </section>
+    <section
+      aria-labelledby="maint-regression"
+      class="space-y-3"
+    >
+      <h3
+        class="text-lg font-bold"
+        id="maint-regression"
+      >
+        회귀 비교
+      </h3>
+      <div
+        class="overflow-x-auto rounded-xl border border-input bg-background"
+      >
+        <table
+          class="w-full border-collapse"
+        >
+          <caption
+            class="sr-only"
+          >
+            유지보수 회귀 비교: 서비스 중인 색인과 다시 만든 색인에서 K1과 서비스 구성
+          </caption>
+          <thead
+            class="bg-secondary/70"
+          >
+            <tr>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                행
+              </th>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                nDCG@5
+              </th>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                근거 완전
+              </th>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                nDCG@5 전체 문서
+              </th>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                바늘 상위 5
+              </th>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                치명 실패
+              </th>
+            </tr>
+          </thead>
+          <tbody
+            class="divide-y divide-input"
+          >
+            <tr>
+              <th
+                class="px-3 py-3 align-top text-sm text-left font-medium"
+                scope="row"
+              >
+                K1
+              </th>
+              <td
+                class="px-3 py-3 align-top text-sm tabular-nums"
+              >
+                0.812
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm tabular-nums"
+              >
+                50.0%
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm tabular-nums"
+              >
+                -
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm tabular-nums"
+              >
+                75.0%
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm tabular-nums"
+              >
+                2
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p
+        class="text-sm text-muted-foreground"
+      >
+        다시 만든 색인으로 바꾸려면 실험 비교의 ‘회귀 (유지보수)’ 표에서 그 행을 열어 활성화하세요.
+      </p>
+    </section>
+  </div>
+</div>
+`;
+
+exports[`maintenance > before any run, and starting one 1`] = `
+<div>
+  <div
+    class="space-y-12"
+  >
+    <section
+      aria-labelledby="maint-answer"
+      class="space-y-6"
+    >
+      <div
+        class="space-y-2"
+      >
+        <p
+          class="text-sm font-medium text-muted-foreground"
+        >
+          아직 실행한 적 없음
+        </p>
+        <h3
+          class="text-4xl font-bold tracking-tight"
+          id="maint-answer"
+        >
+          유지보수 전
+        </h3>
+      </div>
+      <div
+        class="flex flex-wrap items-center gap-4"
+      >
+        <button
+          class="group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/80 h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"
+          data-size="lg"
+          data-slot="button"
+          data-variant="default"
+        >
+          유지보수 실행
+        </button>
+        <p
+          class="max-w-2xl text-sm text-muted-foreground"
+        >
+          CLI의␠
+          <code
+            class="font-mono"
+          >
+            maintain
+          </code>
+          과 같은 순서입니다. 바뀐 것이 없으면 모두 재사용하고 호출하지 않습니다. 유료 임베딩은 추정에서 멈추고, 실패한 단계에서 멈추며, 어느 경우에도 서비스 중인 검색은 바꾸지 않습니다. 백업 위치␠
+          D:/backups
+          .
+        </p>
+      </div>
+    </section>
+  </div>
+</div>
+`;
+
+exports[`second review > renders the claims and evidence, refuses without a verdict and saves one 1`] = `
+<div>
+  <article
+    class="space-y-6"
+  >
+    <header
+      class="space-y-2"
+    >
+      <span
+        class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-3 py-1 text-sm bg-info-bg text-info"
+      >
+        <span
+          aria-hidden="true"
+          class="size-1.5 rounded-full bg-info"
+        />
+        2차 검토 대기
+      </span>
+      <h3
+        class="text-lg font-bold leading-snug"
+      >
+        사업 금액은 얼마인가요?
+      </h3>
+      <p
+        class="font-mono text-xs text-muted-foreground"
+      >
+        dev-amount-r1
+      </p>
+    </header>
+    <section
+      class="space-y-4"
+    >
+      <div
+        class="flex flex-wrap items-baseline justify-between gap-3"
+      >
+        <h3
+          class="text-lg font-bold"
+        >
+          필수 주장 2개
+        </h3>
+      </div>
+      <div
+        class="overflow-x-auto rounded-xl border border-input bg-background"
+      >
+        <table
+          class="w-full border-collapse"
+        >
+          <caption
+            class="sr-only"
+          >
+            필수 주장
+          </caption>
+          <thead
+            class="bg-secondary/70"
+          >
+            <tr>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                주장
+              </th>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                형식
+              </th>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                값
+              </th>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                중요도
+              </th>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                근거 그룹
+              </th>
+            </tr>
+          </thead>
+          <tbody
+            class="divide-y divide-input"
+          >
+            <tr>
+              <td
+                class="px-3 py-3 align-top font-mono text-xs"
+              >
+                c1
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm"
+              >
+                숫자
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm"
+              >
+                130000000 · 원
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm"
+              >
+                <span
+                  class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-warn-bg text-warn"
+                >
+                  <span
+                    aria-hidden="true"
+                    class="size-1.5 rounded-full bg-warn"
+                  />
+                  금액
+                </span>
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm"
+              >
+                g1, g2
+              </td>
+            </tr>
+            <tr>
+              <td
+                class="px-3 py-3 align-top font-mono text-xs"
+              />
+              <td
+                class="px-3 py-3 align-top text-sm"
+              >
+                문구
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm"
+              >
+                부가세 포함
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm"
+              >
+                보통
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm"
+              >
+                g2
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section
+      class="space-y-4"
+    >
+      <div
+        class="flex flex-wrap items-baseline justify-between gap-3"
+      >
+        <h3
+          class="text-lg font-bold"
+        >
+          근거
+        </h3>
+      </div>
+      <ul
+        class="space-y-2"
+      >
+        <li
+          class="rounded-xl border px-4 py-3 text-base leading-relaxed"
+        >
+          <span
+            class="mr-2 text-xs font-semibold text-muted-foreground"
+          >
+            g1
+          </span>
+          사업 금액 1억 3천만원
+        </li>
+        <li
+          class="rounded-xl border px-4 py-3 text-base leading-relaxed"
+        >
+          <span
+            class="mr-2 text-xs font-semibold text-muted-foreground"
+          >
+            g1
+          </span>
+          -
+        </li>
+      </ul>
+    </section>
+    <form
+      class="space-y-4 rounded-2xl bg-secondary/60 p-4"
+    >
+      <fieldset
+        class="space-y-2"
+      >
+        <legend
+          class="text-[13px] font-semibold"
+        >
+          원문과 대조한 결과
+        </legend>
+        <div
+          class="flex gap-4 text-sm"
+        >
+          <label
+            class="flex items-center gap-2"
+          >
+            <input
+              class="size-4 accent-primary"
+              name="second-dev-amount-r1-verdict"
+              type="radio"
+            />
+            동의
+          </label>
+          <label
+            class="flex items-center gap-2"
+          >
+            <input
+              class="size-4 accent-primary"
+              name="second-dev-amount-r1-verdict"
+              type="radio"
+            />
+            동의하지 않음
+          </label>
+        </div>
+      </fieldset>
+      <div
+        class="space-y-1.5"
+      >
+        <label
+          class="text-[13px] font-semibold"
+          for="second-dev-amount-r1-note"
+        >
+          확인 내용 (원문 위치 포함)
+        </label>
+        <textarea
+          class="w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 py-2"
+          id="second-dev-amount-r1-note"
+          required=""
+          rows="3"
+        />
+      </div>
+      <div
+        class="flex flex-wrap items-center gap-3"
+      >
+        <button
+          class="group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/80 h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"
+          data-size="lg"
+          data-slot="button"
+          data-variant="default"
+          type="submit"
+        >
+          2차 검토 저장
+        </button>
+        <span
+          class="text-[13px] text-muted-foreground"
+        >
+          결과와 메모가 수정 기록에 자동으로 남습니다.
+        </span>
+      </div>
+    </form>
+  </article>
+</div>
+`;
+
+exports[`trace form > a dev question fills the form, documents are found and removed, and the trace is sent > a match 1`] = `
+<button
+  class="w-full px-3 py-2 text-left text-sm outline-none hover:bg-secondary/70 focus-visible:bg-accent"
+  type="button"
+>
+  <span
+    class="block text-base font-semibold"
+  >
+    도서관 좌석 예약
+  </span>
+  <span
+    class="text-xs text-muted-foreground"
+  />
+</button>
+`;
+
+exports[`trace form > a dev question fills the form, documents are found and removed, and the trace is sent > from a dev question 1`] = `
+<div>
+  <form
+    class="space-y-4"
+  >
+    <div
+      class="space-y-1.5"
+    >
+      <label
+        class="text-[13px] font-semibold"
+        for="trace-dev"
+      >
+        검토된 개발 질문에서 가져오기 (선택)
+      </label>
+      <select
+        class="w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 h-10"
+        id="trace-dev"
+      >
+        <option
+          value=""
+        >
+          직접 입력
+        </option>
+        <option
+          value="0"
+        >
+          dev-1
+           ·␠
+          하자보수 기간은 얼마인가요?
+        </option>
+      </select>
+    </div>
+    <div
+      class="space-y-1.5"
+    >
+      <label
+        class="text-[13px] font-semibold"
+        for="trace-q"
+      >
+        질문
+      </label>
+      <textarea
+        class="w-full rounded-lg border border-input bg-background px-3 sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 py-2 text-[15px]"
+        id="trace-q"
+        placeholder="예: 하자보수 기간은 얼마인가요?"
+        rows="2"
+      >
+        하자보수 기간은 얼마인가요?
+      </textarea>
+    </div>
+    <div
+      class="space-y-2"
+    >
+      <div
+        class="space-y-1.5"
+      >
+        <label
+          class="text-[13px] font-semibold"
+          for="trace-doc"
+        >
+          문서 (최대 2개 · 2개 고름)
+        </label>
+        <input
+          aria-describedby="trace-doc-hint"
+          autocomplete="off"
+          class="w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 h-10"
+          disabled=""
+          id="trace-doc"
+          value=""
+        />
+        <p
+          class="text-xs text-muted-foreground"
+          id="trace-doc-hint"
+        >
+          사업명이나 기관명 일부를 입력하세요.
+        </p>
+      </div>
+      <ul
+        class="space-y-1.5"
+      >
+        <li
+          class="flex items-center gap-2 rounded-lg bg-secondary/70 px-3 py-2 text-sm"
+        >
+          <span
+            class="rounded bg-foreground px-1.5 text-xs font-bold text-background"
+          >
+            문서␠
+            1
+          </span>
+          <span
+            class="min-w-0 flex-1 text-base"
+          >
+            통합 정보시스템 구축
+          </span>
+          <button
+            aria-label="통합 정보시스템 구축 빼기"
+            class="rounded p-0.5 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-x size-4"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M18 6 6 18"
+              />
+              <path
+                d="m6 6 12 12"
+              />
+            </svg>
+          </button>
+        </li>
+        <li
+          class="flex items-center gap-2 rounded-lg bg-secondary/70 px-3 py-2 text-sm"
+        >
+          <span
+            class="rounded bg-foreground px-1.5 text-xs font-bold text-background"
+          >
+            문서␠
+            2
+          </span>
+          <span
+            class="min-w-0 flex-1 text-base"
+          >
+            학사 행정 고도화
+          </span>
+          <button
+            aria-label="학사 행정 고도화 빼기"
+            class="rounded p-0.5 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-x size-4"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M18 6 6 18"
+              />
+              <path
+                d="m6 6 12 12"
+              />
+            </svg>
+          </button>
+        </li>
+      </ul>
+    </div>
+    <div
+      class="space-y-1.5"
+    >
+      <label
+        class="text-[13px] font-semibold"
+        for="trace-mode"
+      >
+        검색 방식
+      </label>
+      <select
+        aria-describedby="trace-mode-hint"
+        class="w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 h-10"
+        id="trace-mode"
+      >
+        <option
+          value="kiwi_bm25"
+        >
+          키워드(형태소 분석)
+           (현재 운영)
+        </option>
+        <option
+          value="hybrid"
+        >
+          키워드+의미 결합
+        </option>
+      </select>
+      <p
+        class="text-xs text-muted-foreground"
+        id="trace-mode-hint"
+      >
+        의미 검색은 캐시된 질의 벡터만 씁니다(무료). 캐시에 없으면 키워드로 대체됩니다.
+      </p>
+    </div>
+    <button
+      class="group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/80 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 h-10 w-full text-[15px]"
+      data-size="lg"
+      data-slot="button"
+      data-variant="default"
+      type="submit"
+    >
+      검색만 실행 · 무료
+    </button>
+  </form>
+</div>
+`;
+
+exports[`trace run > every stage of a frozen run > stage 1 1`] = `
+<div
+  class="space-y-2"
+>
+  <section
+    class="space-y-4"
+  >
+    <div
+      class="flex flex-wrap items-baseline justify-between gap-3"
+    >
+      <h3
+        class="text-lg font-bold"
+      >
+        수집·검수 · 문서 2개
+      </h3>
+      <span
+        class="text-sm"
+      >
+        사람 대조 완료␠
+        0
+        /
+        2
+      </span>
+    </div>
+    <div
+      class="overflow-x-auto rounded-xl border border-input bg-background"
+    >
+      <table
+        class="w-full border-collapse"
+      >
+        <caption
+          class="sr-only"
+        >
+          수집·검수 상태
+        </caption>
+        <thead
+          class="bg-secondary/70"
+        >
+          <tr>
+            <th
+              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+              scope="col"
+            >
+              파일
+            </th>
+            <th
+              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+              scope="col"
+            >
+              수집
+            </th>
+            <th
+              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+              scope="col"
+            >
+              원문 대조
+            </th>
+            <th
+              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+              scope="col"
+            >
+              사유
+            </th>
+          </tr>
+        </thead>
+        <tbody
+          class="divide-y divide-input"
+        >
+          <tr>
+            <td
+              class="px-3 py-3 align-top text-sm"
+            >
+              a.pdf
+            </td>
+            <td
+              class="px-3 py-3 align-top text-sm"
+            >
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
+              >
+                <span
+                  aria-hidden="true"
+                  class="size-1.5 rounded-full bg-ok"
+                />
+                수집됨
+              </span>
+            </td>
+            <td
+              class="px-3 py-3 align-top text-sm"
+            >
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-ok-bg text-ok"
+              >
+                <span
+                  aria-hidden="true"
+                  class="size-1.5 rounded-full bg-ok"
+                />
+                자동 대조 통과
+              </span>
+            </td>
+            <td
+              class="px-3 py-3 align-top text-sm"
+            >
+              -
+            </td>
+          </tr>
+          <tr>
+            <td
+              class="px-3 py-3 align-top text-sm"
+            >
+              doc-bbbb
+            </td>
+            <td
+              class="px-3 py-3 align-top text-sm"
+            >
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-bad-bg text-bad"
+              >
+                <span
+                  aria-hidden="true"
+                  class="size-1.5 rounded-full bg-bad"
+                />
+                quarantined
+              </span>
+            </td>
+            <td
+              class="px-3 py-3 align-top text-sm"
+            >
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-neutral-bg text-neutral"
+              >
+                <span
+                  aria-hidden="true"
+                  class="size-1.5 rounded-full bg-neutral"
+                />
+                원문 대조 전
+              </span>
+            </td>
+            <td
+              class="px-3 py-3 align-top text-sm"
+            >
+              broken
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+`;
+
+exports[`trace run > every stage of a frozen run > stage 2 1`] = `
+<div
+  class="space-y-2"
+>
+  <section
+    class="space-y-4"
+  >
+    <div
+      class="flex flex-wrap items-baseline justify-between gap-3"
+    >
+      <h3
+        class="text-lg font-bold"
+      >
+        범위·분석
+      </h3>
+    </div>
+    <dl
+      class="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]"
+    >
+      <dt
+        class="text-muted-foreground"
+      >
+        검수 범위
+      </dt>
+      <dd>
+        미검수 원문 포함
+      </dd>
+      <dt
+        class="text-muted-foreground"
+      >
+        질의 토큰
+      </dt>
+      <dd
+        class="flex flex-wrap gap-1"
+      >
+        <span
+          class="rounded bg-secondary px-1.5 text-xs"
+        >
+          하자
+        </span>
+        <span
+          class="rounded bg-secondary px-1.5 text-xs"
+        >
+          보수
+        </span>
+        <span
+          class="rounded bg-secondary px-1.5 text-xs"
+        >
+          기간
+        </span>
+      </dd>
+      <dt
+        class="text-muted-foreground"
+      >
+        요구사항 코드
+      </dt>
+      <dd>
+        SFR-001
+      </dd>
+    </dl>
+  </section>
+</div>
+`;
+
+exports[`trace run > every stage of a frozen run > stage 3 1`] = `
+<div
+  class="space-y-2"
+>
+  <section
+    class="space-y-4"
+  >
+    <div
+      class="flex flex-wrap items-baseline justify-between gap-3"
+    >
+      <h3
+        class="text-lg font-bold"
+      >
+        채널 순위 · 후보 2개
+      </h3>
+    </div>
+    <dl
+      class="grid grid-cols-2 gap-3 text-sm"
+    >
+      <div>
+        <dt
+          class="text-muted-foreground"
+        >
+          요청 방식
+        </dt>
+        <dd
+          class="mt-1 font-semibold"
+        >
+          키워드+의미 결합
+        </dd>
+      </div>
+      <div>
+        <dt
+          class="text-muted-foreground"
+        >
+          실제 방식
+        </dt>
+        <dd
+          class="mt-1 font-semibold"
+        >
+          키워드(형태소 분석)
+        </dd>
+      </div>
+      <div>
+        <dt
+          class="text-muted-foreground"
+        >
+          대체 실행
+        </dt>
+        <dd
+          class="mt-1 font-semibold"
+        >
+          query vector not cached
+        </dd>
+      </div>
+      <div>
+        <dt
+          class="text-muted-foreground"
+        >
+          검색 소요
+        </dt>
+        <dd
+          class="mt-1 font-semibold"
+        >
+          37 ms
+        </dd>
+      </div>
+    </dl>
+    <p
+      class="text-[13px] text-muted-foreground"
+    >
+      점수는 채널 내 순위용 값입니다. 답변 신뢰도가 아닙니다.
+    </p>
+    <div
+      class="overflow-x-auto rounded-xl border border-input bg-background"
+    >
+      <table
+        class="w-full border-collapse"
+      >
+        <caption
+          class="sr-only"
+        >
+          채널 순위
+        </caption>
+        <thead
+          class="bg-secondary/70"
+        >
+          <tr>
+            <th
+              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+              scope="col"
+            >
+              채널
+            </th>
+            <th
+              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+              scope="col"
+            >
+              순위
+            </th>
+            <th
+              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+              scope="col"
+            >
+              점수
+            </th>
+            <th
+              class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+              scope="col"
+            >
+              조각
+            </th>
+          </tr>
+        </thead>
+        <tbody
+          class="divide-y divide-input"
+        >
+          <tr>
+            <td
+              class="px-3 py-3 align-top text-sm"
+            >
+              bm25
+            </td>
+            <td
+              class="px-3 py-3 align-top text-sm tabular-nums"
+            >
+              1
+            </td>
+            <td
+              class="px-3 py-3 align-top text-sm tabular-nums"
+            >
+              7.5
+            </td>
+            <td
+              class="px-3 py-3 align-top font-mono text-xs"
+            >
+              chunk-012345
+            </td>
+          </tr>
+          <tr>
+            <td
+              class="px-3 py-3 align-top text-sm"
+            >
+              dense
+            </td>
+            <td
+              class="px-3 py-3 align-top text-sm tabular-nums"
+            >
+              2
+            </td>
+            <td
+              class="px-3 py-3 align-top text-sm tabular-nums"
+            >
+              -
+            </td>
+            <td
+              class="px-3 py-3 align-top font-mono text-xs"
+            >
+              chunk-fedcba
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <details
+    class="group rounded-xl border"
+  >
+    <summary
+      class="flex cursor-pointer list-none items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      <svg
+        aria-hidden="true"
+        class="lucide lucide-chevron-down size-4 -rotate-90 transition-transform group-open:rotate-0"
+        fill="none"
+        height="24"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="m6 9 6 6 6-6"
+        />
+      </svg>
+      제외된 후보 1개
+    </summary>
+    <div
+      class="border-t p-4"
+    >
+      <div
+        class="overflow-x-auto rounded-xl border border-input bg-background"
+      >
+        <table
+          class="w-full border-collapse"
+        >
+          <caption
+            class="sr-only"
+          >
+            제외된 후보
+          </caption>
+          <thead
+            class="bg-secondary/70"
+          >
+            <tr>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                조각
+              </th>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                사유
+              </th>
+            </tr>
+          </thead>
+          <tbody
+            class="divide-y divide-input"
+          >
+            <tr>
+              <td
+                class="px-3 py-3 align-top font-mono text-xs"
+              >
+                chunk-aaaaaa
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm"
+              >
+                토큰 한도
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+</div>
+`;
+
+exports[`trace run > every stage of a frozen run > stage 4 1`] = `
+<article
+  class="space-y-6"
+>
+  <header
+    class="space-y-3"
+  >
+    <h3
+      class="text-lg font-bold leading-snug"
+    >
+      하자보수 기간은?
+    </h3>
+    <dl
+      class="grid grid-cols-2 gap-3 rounded-xl border border-input p-4 text-sm sm:grid-cols-3"
+    >
+      <div>
+        <dt
+          class="text-[13px] text-muted-foreground"
+        >
+          실행 시각
+        </dt>
+        <dd
+          class="mt-1 font-semibold tabular-nums"
+        >
+          2026-10-06 10:11
+        </dd>
+      </div>
+      <div>
+        <dt
+          class="text-[13px] text-muted-foreground"
+        >
+          실행자
+        </dt>
+        <dd
+          class="mt-1 font-semibold tabular-nums"
+        >
+          verifier
+        </dd>
+      </div>
+      <div>
+        <dt
+          class="text-[13px] text-muted-foreground"
+        >
+          기준일
+        </dt>
+        <dd
+          class="mt-1 font-semibold tabular-nums"
+        >
+          2024-05-01
+        </dd>
+      </div>
+    </dl>
+    <dl
+      class="space-y-2 text-sm"
+    >
+      <dt
+        class="font-semibold"
+      >
+        문서 범위
+      </dt>
+      <dd
+        class="flex gap-2"
+      >
+        <span
+          class="shrink-0 text-muted-foreground"
+        >
+          1
+          .
+        </span>
+        <span
+          class="[overflow-wrap:anywhere]"
+        >
+          a.pdf
+        </span>
+      </dd>
+      <dd
+        class="flex gap-2"
+      >
+        <span
+          class="shrink-0 text-muted-foreground"
+        >
+          2
+          .
+        </span>
+        <span
+          class="[overflow-wrap:anywhere]"
+        >
+          doc-bbbbbbbb
+        </span>
+      </dd>
+    </dl>
+  </header>
+  <ol
+    aria-label="검색 단계"
+    class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5"
+  >
+    <li
+      class="min-w-0"
+    >
+      <button
+        aria-pressed="false"
+        class="h-full min-h-20 w-full rounded-lg border px-3 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 border-input hover:bg-secondary"
+        type="button"
+      >
+        <span
+          class="block text-sm font-semibold"
+        >
+          1
+          .␠
+          수집·검수
+        </span>
+        <span
+          class="mt-2 block text-base font-bold tabular-nums"
+        >
+          1/2 수집
+        </span>
+      </button>
+    </li>
+    <li
+      class="min-w-0"
+    >
+      <button
+        aria-pressed="false"
+        class="h-full min-h-20 w-full rounded-lg border px-3 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 border-input hover:bg-secondary"
+        type="button"
+      >
+        <span
+          class="block text-sm font-semibold"
+        >
+          2
+          .␠
+          범위·분석
+        </span>
+        <span
+          class="mt-2 block text-base font-bold tabular-nums"
+        >
+          3개 토큰
+        </span>
+      </button>
+    </li>
+    <li
+      class="min-w-0"
+    >
+      <button
+        aria-pressed="false"
+        class="h-full min-h-20 w-full rounded-lg border px-3 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 border-input hover:bg-secondary"
+        type="button"
+      >
+        <span
+          class="block text-sm font-semibold"
+        >
+          3
+          .␠
+          채널 순위
+        </span>
+        <span
+          class="mt-2 block text-base font-bold tabular-nums"
+        >
+          2개 후보
+        </span>
+      </button>
+    </li>
+    <li
+      class="min-w-0"
+    >
+      <button
+        aria-pressed="true"
+        class="h-full min-h-20 w-full rounded-lg border px-3 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 border-primary bg-accent text-primary"
+        type="button"
+      >
+        <span
+          class="block text-sm font-semibold"
+        >
+          4
+          .␠
+          선택된 근거
+        </span>
+        <span
+          class="mt-2 block text-base font-bold tabular-nums"
+        >
+          1개 근거
+        </span>
+      </button>
+    </li>
+    <li
+      class="min-w-0"
+    >
+      <button
+        aria-pressed="false"
+        class="h-full min-h-20 w-full rounded-lg border px-3 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 border-input hover:bg-secondary"
+        type="button"
+      >
+        <span
+          class="block text-sm font-semibold"
+        >
+          5
+          .␠
+          답변 생성
+        </span>
+        <span
+          class="mt-2 block text-base font-bold tabular-nums"
+        >
+          유료 · 별도 실행
+        </span>
+      </button>
+    </li>
+  </ol>
+  <section
+    class="space-y-4"
+  >
+    <div
+      class="flex flex-wrap items-baseline justify-between gap-3"
+    >
+      <h3
+        class="text-lg font-bold"
+      >
+        선택된 근거 1개
+      </h3>
+      <span
+        class="inline-flex items-center gap-1.5 rounded-full font-semibold whitespace-nowrap px-2 py-0.5 text-xs bg-warn-bg text-warn"
+      >
+        <span
+          aria-hidden="true"
+          class="size-1.5 rounded-full bg-warn"
+        />
+        제한 사항␠
+        2
+        건
+      </span>
+    </div>
+    <details
+      class="rounded-xl border border-warn/30 bg-warn-bg"
+    >
+      <summary
+        class="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold text-warn outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        검색 제한␠
+        2
+        건 보기
+      </summary>
+      <div
+        class="overflow-x-auto rounded-xl border border-input bg-background"
+      >
+        <table
+          class="w-full border-collapse"
+        >
+          <caption
+            class="sr-only"
+          >
+            검색 제한
+          </caption>
+          <thead
+            class="bg-secondary/70"
+          >
+            <tr>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                대상
+              </th>
+              <th
+                class="px-3 py-3 text-left text-sm font-semibold text-foreground"
+                scope="col"
+              >
+                제한 사항
+              </th>
+            </tr>
+          </thead>
+          <tbody
+            class="divide-y divide-input"
+          >
+            <tr>
+              <td
+                class="px-3 py-3 align-top text-sm min-w-28 max-w-48 [overflow-wrap:anywhere]"
+              >
+                a.pdf
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm"
+              >
+                요구사항 코드 없음 (SFR-001)
+              </td>
+            </tr>
+            <tr>
+              <td
+                class="px-3 py-3 align-top text-sm min-w-28 max-w-48 [overflow-wrap:anywhere]"
+              >
+                전체 검색
+              </td>
+              <td
+                class="px-3 py-3 align-top text-sm"
+              >
+                전체 색인을 기준으로 단어 중요도 계산
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+    <dl
+      class="grid gap-3 sm:grid-cols-2"
+    >
+      <div
+        class="rounded-lg border border-input p-3"
+      >
+        <dt
+          class="text-sm font-semibold"
+        >
+          문서␠
+          1
+           · 근거␠
+          2
+          개
+        </dt>
+        <dd
+          class="mt-2 text-sm [overflow-wrap:anywhere]"
+        >
+          a.pdf
+        </dd>
+      </div>
+      <div
+        class="rounded-lg border border-input p-3"
+      >
+        <dt
+          class="text-sm font-semibold"
+        >
+          문서␠
+          2
+           · 근거␠
+          0
+          개
+        </dt>
+        <dd
+          class="mt-2 text-sm [overflow-wrap:anywhere]"
+        >
+          파일명 없음
+           · 근거 없음
+        </dd>
+      </div>
+    </dl>
+    <ol
+      class="space-y-2"
+    >
+      <li>
+        <details
+          class="group rounded-xl border"
+        >
+          <summary
+            class="cursor-pointer list-none rounded-xl px-4 py-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <span
+              class="flex flex-wrap items-center gap-3"
+            >
+              <span
+                class="rounded-md bg-accent px-2 py-1 text-sm font-bold text-primary"
+              >
+                E1
+              </span>
+              <span
+                class="text-sm font-semibold"
+              >
+                문서 1
+                 ·␠
+                12쪽
+              </span>
+              <span
+                class="ml-auto text-[13px] tabular-nums text-muted-foreground"
+              >
+                20
+                토큰 · 원문 펼치기
+              </span>
+            </span>
+            <span
+              class="mt-2 line-clamp-2 text-base"
+            >
+              하자보수 기간은 12개월로 한다.
+            </span>
+          </summary>
+          <div
+            class="space-y-2 border-t px-4 py-3"
+          >
+            <p
+              class="text-xs text-muted-foreground"
+            >
+              PDF 12쪽 · 제3장
+            </p>
+            <blockquote
+              class="border-l-4 border-primary pl-4 text-base leading-relaxed whitespace-pre-wrap"
+            >
+              하자보수 기간은 12개월로 한다.
+            </blockquote>
+            <details>
+              <summary
+                class="min-h-8 cursor-pointer text-[13px] text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                근거 식별 정보
+              </summary>
+              <dl
+                class="grid gap-2 pt-2 text-[13px] [overflow-wrap:anywhere]"
+              >
+                <div>
+                  <dt
+                    class="text-muted-foreground"
+                  >
+                    조각
+                  </dt>
+                  <dd
+                    class="font-mono"
+                  >
+                    chunk-0123456789abcdef
+                  </dd>
+                </div>
+                <div>
+                  <dt
+                    class="text-muted-foreground"
+                  >
+                    추출
+                  </dt>
+                  <dd
+                    class="font-mono"
+                  >
+                    x1
+                  </dd>
+                </div>
+                <div>
+                  <dt
+                    class="text-muted-foreground"
+                  >
+                    요소
+                  </dt>
+                  <dd
+                    class="font-mono"
+                  >
+                    e1, e2
+                  </dd>
+                </div>
+              </dl>
+            </details>
+          </div>
+        </details>
+      </li>
+    </ol>
+  </section>
+  <div
+    class="space-y-2"
+  />
+  <details
+    class="rounded-xl border border-input"
+  >
+    <summary
+      class="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      실행 식별 정보·내보내기
+    </summary>
+    <dl
+      class="grid gap-3 p-4 text-[13px] [overflow-wrap:anywhere]"
+    >
+      <div>
+        <dt
+          class="text-muted-foreground"
+        >
+          실행
+        </dt>
+        <dd
+          class="font-mono"
+        >
+          T-1
+        </dd>
+      </div>
+      <div>
+        <dt
+          class="text-muted-foreground"
+        >
+          설정
+        </dt>
+        <dd
+          class="font-mono"
+        >
+          cfg-1
+        </dd>
+      </div>
+      <div>
+        <dt
+          class="text-muted-foreground"
+        >
+          색인
+        </dt>
+        <dd
+          class="font-mono"
+        >
+          ix-1
+        </dd>
+      </div>
+    </dl>
+    <div
+      class="flex flex-wrap gap-2 px-4 pb-4"
+    >
+      <a
+        class="group/button inline-flex shrink-0 items-center justify-center rounded-lg border bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"
+        data-size="default"
+        data-slot="button"
+        data-variant="outline"
+        download="T-1.json"
+        href="/api/verify/traces/T-1/export"
+      >
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-download"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M12 15V3"
+          />
+          <path
+            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+          />
+          <path
+            d="m7 10 5 5 5-5"
+          />
+        </svg>
+        실행 내보내기 (JSON)
+      </a>
+    </div>
+  </details>
+  <div
+    hidden=""
+  >
+    <section
+      aria-label="답변 생성"
+      class="space-y-3 rounded-2xl border p-5"
+    >
+      <div
+        class="flex items-baseline justify-between gap-3"
+      >
+        <h3
+          class="text-[15px] font-bold"
+        >
+          5. 답변 생성␠
+          <span
+            class="font-normal text-warn"
+          >
+            유료
+          </span>
+        </h3>
+        <span
+          class="text-xs text-muted-foreground"
+        >
+          최대 예상␠
+          $0.0031
+        </span>
+      </div>
+      <dl
+        class="grid grid-cols-2 gap-3 text-sm"
+      >
+        <div>
+          <dt
+            class="text-muted-foreground"
+          >
+            고정 근거
+          </dt>
+          <dd
+            class="mt-1 font-semibold"
+          >
+            1개
+          </dd>
+        </div>
+        <div>
+          <dt
+            class="text-muted-foreground"
+          >
+            입력 추정
+          </dt>
+          <dd
+            class="mt-1 font-semibold"
+          >
+            900토큰
+          </dd>
+        </div>
+        <div>
+          <dt
+            class="text-muted-foreground"
+          >
+            기준일
+          </dt>
+          <dd
+            class="mt-1 font-semibold"
+          >
+            2024-05-01
+          </dd>
+        </div>
+        <div>
+          <dt
+            class="text-muted-foreground"
+          >
+            실행 횟수
+          </dt>
+          <dd
+            class="mt-1 font-semibold"
+          >
+            1회 · 재검색 없음
+          </dd>
+        </div>
+      </dl>
+      <div
+        class="flex flex-wrap items-center gap-3"
+      >
+        <label
+          class="flex items-center gap-2 text-sm"
+        >
+          <input
+            class="size-4 accent-primary"
+            type="checkbox"
+          />
+          이 범위로 유료 답변 생성을 1회 실행합니다
+        </label>
+        <button
+          class="group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/80 h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"
+          data-size="lg"
+          data-slot="button"
+          data-variant="default"
+          disabled=""
+        >
+          유료 답변 생성
+        </button>
+      </div>
+    </section>
+  </div>
+</article>
+`;

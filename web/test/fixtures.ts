@@ -110,10 +110,11 @@ export function results(over: Partial<Schemas["JudgeResults"]> = {}): Schemas["J
 
 type Route = (opts: { params?: { path?: Record<string, string>; query?: Record<string, unknown> }; body?: unknown }) => unknown;
 
-/** `api.GET`/`api.POST` answering from `routes` by method and path template; a missing route fails the test. A
+/** `api.GET`/`api.POST` (and `api.PUT` when mocked) answering from `routes` by method and path template; a missing route fails the test. A
  *  route returning `{ error }` is a refusal, anything else is the response body. */
-export function stubApi(target: { GET: unknown; POST: unknown }, routes: Record<string, Route>) {
-  for (const method of ["GET", "POST"] as const) {
+export function stubApi(target: { GET: unknown; POST: unknown; PUT?: unknown }, routes: Record<string, Route>) {
+  for (const method of ["GET", "POST", "PUT"] as const) {
+    if (!target[method]) continue;
     vi.mocked(target[method] as (...a: unknown[]) => unknown).mockImplementation(async (path: unknown, opts: unknown) => {
       const route = routes[`${method} ${path}`];
       if (!route) throw new Error(`unexpected ${method} ${path}`);
