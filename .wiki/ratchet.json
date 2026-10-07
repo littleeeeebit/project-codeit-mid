@@ -1,0 +1,94 @@
+{
+  "exclude": [],
+  "files": {
+    "docs/history/workflow-acceptance/browser-scripts/b2.js": {
+      "dup": 12,
+      "lines": 63,
+      "reason": "baseline at adoption"
+    },
+    "docs/history/workflow-acceptance/browser-scripts/b3.js": {
+      "dup": 15,
+      "lines": 60,
+      "reason": "baseline at adoption"
+    },
+    "docs/history/workflow-acceptance/browser-scripts/b4.js": {
+      "dup": 15,
+      "lines": 84,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/api.py": {
+      "dup": 8,
+      "lines": 1547,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/cli.py": {
+      "dup": 0,
+      "lines": 983,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/contracts.py": {
+      "dup": 8,
+      "lines": 212,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/corpus/ingestion.py": {
+      "dup": 0,
+      "lines": 1356,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/evaluation/compare.py": {
+      "dup": 0,
+      "lines": 1032,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/evaluation/evaluation.py": {
+      "dup": 0,
+      "lines": 2624,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/evaluation/gold.py": {
+      "dup": 0,
+      "lines": 903,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/evaluation/judges.py": {
+      "dup": 0,
+      "lines": 1335,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/retrieval/retrieval.py": {
+      "dup": 0,
+      "lines": 824,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/service/answers.py": {
+      "dup": 0,
+      "lines": 1068,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/service/service.py": {
+      "dup": 0,
+      "lines": 3076,
+      "reason": "baseline at adoption"
+    },
+    "tools/verify.py": {
+      "dup": 0,
+      "lines": 1044,
+      "reason": "baseline at adoption"
+    },
+    "web/src/components/verify/evaluation.tsx": {
+      "dup": 6,
+      "lines": 130,
+      "reason": "baseline at adoption"
+    },
+    "web/src/components/verify/judges.tsx": {
+      "dup": 6,
+      "lines": 669,
+      "reason": "baseline at adoption"
+    }
+  },
+  "new_file_max_lines": 800,
+  "reason": "",
+  "test_file_max_lines": 1500,
+  "version": 1
+}
