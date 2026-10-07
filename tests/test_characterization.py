@@ -858,6 +858,24 @@ class PaidAnswerOutcomeTest(test_service.Base):
                 "request": "failed", "attempts": [("generation", "unknown")]})
 
 
+class ClosingRangeTest(test_service.Base):
+    """search_projects with a closing range against a known date: 기관E closes 2024-08-20, 기관A and 기관C conflict,
+    기관D has none."""
+
+    def found(self, filters):
+        names = {r.doc_id: k for k, r in self.env.refs.items()}
+        return {names[i["doc_id"]]: i["filter_undecided"]
+                for i in service.search_projects(self.res, self.env.consultant, filters, "")}
+
+    def test_a_known_date_is_compared_and_unknowns_stay_undecided(self):
+        self.assertEqual(self.found({"closing_from": "2024-08-01"}), {"기관E": []})
+        self.assertEqual(self.found({"closing_from": "2024-08-21"}), {})
+        self.assertEqual(self.found({"closing_to": "2024-08-19", "include_unknown": True}), {
+            "기관A": ["bid_close:conflict"], "기관C": ["bid_close:conflict"], "기관D": ["bid_close:unknown"]})
+        self.assertEqual(self.found({"closing_from": "2024-08-01", "closing_to": "2024-08-31", "parsed_only": True}),
+                         {})
+
+
 class VerifyToolTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
