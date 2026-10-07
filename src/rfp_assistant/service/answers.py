@@ -738,6 +738,15 @@ def aggregate_answers(scored: list[dict]) -> dict:
     }
 
 
+def graded_config(settings: Settings, run_id: str) -> dict:
+    """The run's config, read before anything is written into the run: a run graded under another answer-eval
+    version is refused, so its scores, review key and reviews stay as recorded, never mixed with new rules."""
+    config = json.loads((run_dir(settings, run_id) / "config.json").read_text(encoding="utf-8"))
+    if config.get("eval_version") != ANSWER_EVAL_VERSION:
+        raise AnswerEvalError(f"{run_id} was graded under {config.get('eval_version')}; start a new answer run")
+    return config
+
+
 def load_reviews(settings: Settings, run_id: str) -> dict[str, dict]:
     path = run_dir(settings, run_id) / "review.jsonl"
     latest: dict[str, dict] = {}
@@ -778,9 +787,7 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
     from ..retrieval.retrieval import KeywordIndex
 
     d = run_dir(settings, run_id)
-    config = json.loads((d / "config.json").read_text(encoding="utf-8"))
-    if config.get("eval_version") != ANSWER_EVAL_VERSION:  # its scores stay as recorded, never mixed with new rules
-        raise AnswerEvalError(f"{run_id} was graded under {config.get('eval_version')}; start a new answer run")
+    config = graded_config(settings, run_id)
     progress = load_progress(settings, run_id)
     reviews = load_reviews(settings, run_id)
     rows, _, _ = evaluation.load_eval_rows(settings, config["dataset"], sealed=config["dataset"] == "test")
@@ -899,7 +906,7 @@ def export_review_sheet(settings: Settings, run_id: str, out: Path | None = None
     import random
 
     d = run_dir(settings, run_id)
-    config = json.loads((d / "config.json").read_text(encoding="utf-8"))
+    config = graded_config(settings, run_id)  # the sheet's key is written into the run
     scored = read_jsonl(d / "scored.jsonl") if (d / "scored.jsonl").exists() else []
     progress = load_progress(settings, run_id)
     rows, _, _ = evaluation.load_eval_rows(settings, config["dataset"], sealed=config["dataset"] == "test")
@@ -924,8 +931,10 @@ def export_review_sheet(settings: Settings, run_id: str, out: Path | None = None
                 items.append(("link", link["item"], {**base, "claim": base["answer_claims"][link["claim_index"]],
                                                      "cited_quote": ev.get("quote")}))
         for a in s["answer_claims"]:
-            if a["supported"] is None:
-                items.append(("answer_claim", a["item"], {**base, "claim": base["answer_claims"][a["index"]]}))
+            if a["supported"] is None:  # judged on what the claim cites, the same passages the judge sees
+                cited = (answer.get("claims") or [])[a["index"]].get("evidence_ids") or []
+                items.append(("answer_claim", a["item"], {**base, "claim": base["answer_claims"][a["index"]],
+                              "cited_quotes": [(rec.get("evidence") or {}).get(e, {}).get("quote") for e in cited]}))
     random.Random(run_id).shuffle(items)
     sheet = []
     for kind, item, body in items:
@@ -946,6 +955,7 @@ def import_reviews(settings: Settings, run_id: str, path: Path, reviewer: str) -
     """Appends completed blind verdicts; the latest review of an item wins at scoring. Re-scores the run."""
     if not reviewer.strip():
         raise AnswerEvalError("--reviewer is required")
+    graded_config(settings, run_id)  # before the first write: a refused import leaves review.jsonl unchanged
     d = run_dir(settings, run_id)
     key = json.loads((d / "review-key.json").read_text(encoding="utf-8"))
     records, errors = [], []

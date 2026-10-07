@@ -78,6 +78,28 @@ class MetricFixtureTest(unittest.TestCase):
         self.assertNotEqual(answers.ANSWER_EVAL_VERSION, 'answer-eval-1')
         self.assertNotEqual(generation.PROMPT_VERSION, 'grounded-answer-12')
 
+    def test_a_whole_claim_review_item_shows_every_passage_the_claim_cites(self):
+        row = {**gold_row([AMOUNT_G]), 'question': '예산은?', 'question_type': 'direct_fact', 'required_claims': [],
+               'answerability': 'answerable', 'expected_status': 'answered', 'mode': 'single', 'scope': [{'doc_id': 'd'}]}
+        quotes = {'E1': '사업 예산은 금 130,000,000원으로 한다.', 'E2': '입찰 참가 자격은 제한하지 않는다.'}
+        rec = {'finalist': 'F', 'question_id': 'q', 'status': 'done', 'outcome': 'answered',
+               'evidence': {e: {'doc_id': 'd', 'chunk_id': e, 'quote': q} for e, q in quotes.items()},
+               'answer': {'claims': [{'text': '예산은 1억 3천만 원이며 누구나 낙찰받는다', 'kind': 'source_fact',
+                                      'doc_id': 'd', 'evidence_ids': ['E1', 'E2']}]}}
+        reviews = {f'F|q|link|0|{e}': {'verdict': 'supporting', 'reviewer': 'r'} for e in quotes}
+        with tempfile.TemporaryDirectory() as tmp:
+            s = Settings(source_dir=Path(tmp), data_dir=Path(tmp), hwp_converter=None)
+            d = answers.run_dir(s, 'A-0123456789ab')
+            d.mkdir(parents=True)
+            store.write_jsonl_atomic(d / 'rows.jsonl', [rec])
+            store.write_jsonl_atomic(d / 'scored.jsonl', [answers.score_record(row, rec, None, reviews)])
+            (d / 'config.json').write_text(json.dumps({'eval_version': answers.ANSWER_EVAL_VERSION, 'dataset': 'dev'}),
+                                           encoding='utf-8')
+            with mock.patch.object(evaluation, 'load_eval_rows', return_value=([row], [], None)):
+                sheet = store.read_jsonl(Path(answers.export_review_sheet(s, 'A-0123456789ab')['sheet']))
+        (item,) = [i for i in sheet if i['kind'] == 'answer_claim']
+        self.assertEqual(item['cited_quotes'], list(quotes.values()))
+
     def test_status_must_match_the_rows_own_statuses(self):
         row = {**gold_row([]), 'question_type': 'missing_false_premise', 'answerability': 'unanswerable',
                'expected_status': 'insufficient_evidence', 'mode': 'single', 'scope': [{'doc_id': 'd'}]}
@@ -1090,6 +1112,17 @@ class AnswerRunTest(GoldRetrievalTest):
         scored = store.read_jsonl(answers.run_dir(self.s, out["run_id"]) / "scored.jsonl")
         verdicts = [c for s in scored for c in s["claims"] if c.get("reviewed_by") == "person-c"]
         self.assertEqual([c["verdict"] for c in verdicts], ["wrong_value"])
+        # A run graded under another version is refused before anything in it is written
+        d = answers.run_dir(self.s, out["run_id"])
+        config = json.loads((d / "config.json").read_text(encoding="utf-8"))
+        (d / "config.json").write_text(json.dumps({**config, "eval_version": "answer-eval-1"}), encoding="utf-8")
+        before = {f: (d / f).read_bytes() for f in ("review.jsonl", "review-key.json", "scores.json")}
+        for call in (lambda: answers.import_reviews(self.s, out["run_id"], path, "person-c"),
+                     lambda: answers.export_review_sheet(self.s, out["run_id"]),
+                     lambda: answers.finalize(self.s, out["run_id"])):
+            with self.assertRaisesRegex(answers.AnswerEvalError, "graded under answer-eval-1"):
+                call()
+        self.assertEqual({f: (d / f).read_bytes() for f in before}, before)
 
 
 class SealedTest(Phase4Case):

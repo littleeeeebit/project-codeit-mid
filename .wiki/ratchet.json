@@ -63,8 +63,8 @@
     },
     "src/rfp_assistant/service/answers.py": {
       "dup": 0,
-      "lines": 1070,
-      "reason": "strict-answer-grading: finalize refuses a run graded under another answer-eval version; status_ok uses the row's own statuses"
+      "lines": 1080,
+      "reason": "strict-answer-grading: graded_config refuses a run graded under another answer-eval version before finalize, review export or import writes into it; whole-claim review items carry the claim's cited passages; status_ok uses the row's own statuses"
     },
     "src/rfp_assistant/service/service.py": {
       "dup": 0,
