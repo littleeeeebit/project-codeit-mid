@@ -190,23 +190,26 @@ function More({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
+/** Before a held-out run has finished: whether one is running, and its progress. */
+function NoVerdict({ question, run }: { question: React.ReactNode; run?: Run }) {
+  return (
+    <section aria-labelledby="judge-answer" className="space-y-6">
+      <div className="space-y-2">
+        {question}
+        <h3 id="judge-answer" className="text-4xl font-bold tracking-tight">{run?.running ? "평가 실행 중" : "아직 판정 전"}</h3>
+        <p className="text-lg">{run?.running ? "모든 항목을 판정하면 미리 정한 규칙으로 답합니다."
+          : run ? "평가 실행이 끝나지 않았습니다. 아래 실행 관리에서 남은 항목을 이어서 실행하세요."
+            : "아래 실행 관리에서 보정 → 평가 순서로 실행하세요."}</p>
+      </div>
+      {run?.running && <div className="max-w-3xl"><ArmProgress r={run} /></div>}
+    </section>
+  );
+}
+
 function Verdict({ ov, results, run }: { ov: Overview; results?: Results; run?: Run }) {
   const v = results?.verdict;
   const question = <p className="text-sm font-medium text-muted-foreground">Jev로 Luna 판정을 바꿀 수 있나</p>;
-  if (!v) {
-    return (
-      <section aria-labelledby="judge-answer" className="space-y-6">
-        <div className="space-y-2">
-          {question}
-          <h3 id="judge-answer" className="text-4xl font-bold tracking-tight">{run?.running ? "평가 실행 중" : "아직 판정 전"}</h3>
-          <p className="text-lg">{run?.running ? "모든 항목을 판정하면 미리 정한 규칙으로 답합니다."
-            : run ? "평가 실행이 끝나지 않았습니다. 아래 실행 관리에서 남은 항목을 이어서 실행하세요."
-              : "아래 실행 관리에서 보정 → 평가 순서로 실행하세요."}</p>
-        </div>
-        {run?.running && <div className="max-w-3xl"><ArmProgress r={run} /></div>}
-      </section>
-    );
-  }
+  if (!v) return <NoVerdict question={question} run={run} />;
   const verdict = VERDICT[v.verdict];
   const l = results!.arms.luna, j = results!.arms.jev_bridged;
   const margin = Number(v.rule.kappa_margin ?? 0.05);
