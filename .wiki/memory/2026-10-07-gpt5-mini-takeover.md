@@ -49,3 +49,9 @@ Billing evidence is missing for the timeout. [Runbook section 5](../../docs/oper
 5. Verify the completed table and shared ledger, finish browser evidence, then commit/push and publish the task PR with the final table and run ID. Stop after PR publication; wiki-agent owns any explicitly requested Review Loop.
 
 No spec requirement was dropped or revised at takeover. The final comparison, final table and PR body remain outstanding.
+
+## Direct billing recovery attempt
+
+The user reiterated that every comparison must finish and selected a usage-readable admin key as the recovery source. `OPENAI_ADMIN_KEY` is now configured locally, but read-only requests to both `/v1/organization/usage/completions` and `/v1/organization/costs` return HTTP 403 with missing scope `api.usage.read`. The configured credential does not use the `sk-admin-` format. Do not print or copy its value. Receipts are `.runtime/provider-usage-final-run-oct7.json` and `.runtime/provider-cost-final-run-oct7.json`; both contain only request intervals and provider responses, without credentials.
+
+The provider queries covered the closed interval 2026-10-07 09:45–10:10 UTC. No additional paid model call ran, and the timeout remains unknown. Recovery needs a working organization Admin API key with usage-read access for the organization that paid for the final run, or the previously requested dated export. Merely configuring an ordinary project key under the admin variable does not supply that access. Source: [official OpenAI administration documentation](https://developers.openai.com/api/reference/administration/overview) and [costs API](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage/methods/costs).
