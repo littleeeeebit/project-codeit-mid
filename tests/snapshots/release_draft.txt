@@ -20,7 +20,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 ## Release manifest
 
 - code: Git `rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr` (uncommitted changes: False), package source `cccccccccccccccc`; metric code `mmmmmmmmmmmmmmmm`
-- model gpt-6-luna, reasoning low, output cap 4000, prompt grounded-answer-12, rates None, settings `<id1>`
+- model gpt-6-luna, reasoning low, output cap 4000, prompt grounded-answer-13, rates None, settings `<id1>`
 - serving: keyword default (kiwi_bm25), no activated run, keyword index `<id2>`, dense `None`, reranker None; fallback kiwi_bm25
 - dependencies: requirements-lock.txt `<id3>`; hardware {'machine': 'fixture'}
 - freeze: none (draft release)
@@ -116,7 +116,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
  "model": "gpt-6-luna",
  "reasoning_effort": "low",
  "max_output_tokens": 4000,
- "prompt_version": "grounded-answer-12",
+ "prompt_version": "grounded-answer-13",
  "rate_version": null,
  "active_run": null,
  "serving": {

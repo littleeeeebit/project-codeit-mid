@@ -83,7 +83,7 @@ def sealed_exposures(settings: Settings, test_sha: str) -> list[dict]:
 
 def _selection_problems(settings: Settings, active: dict, answer_run_id: str, dev: dict | None) -> tuple[list, dict | None]:
     """The development answer run must have evaluated this very candidate: the activated serving configuration, the
-    current prompt, model, reasoning and output cap, and the frozen development set."""
+    current prompt, model, reasoning, output cap and answer-grading version, and the frozen development set."""
     from ..service import answers
 
     problems: list[str] = []
@@ -103,7 +103,8 @@ def _selection_problems(settings: Settings, active: dict, answer_run_id: str, de
         problems.append(f"{answer_run_id} answered with another configuration of {run_id} than the activated one")
     for key, now in (("prompt_version", generation.PROMPT_VERSION), ("model", settings.generation_model),
                      ("reasoning_effort", settings.generation_reasoning_effort),
-                     ("max_output_tokens", settings.generation_max_output_tokens)):
+                     ("max_output_tokens", settings.generation_max_output_tokens),
+                     ("eval_version", answers.ANSWER_EVAL_VERSION)):
         if config.get(key) != now:
             problems.append(f"{answer_run_id} used {key} {config.get(key)!r}, the candidate uses {now!r}")
     if dev is None or config.get("dataset_sha256") != dev.get("dataset_sha256"):

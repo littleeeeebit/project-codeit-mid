@@ -15,7 +15,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 ## Release manifest
 
 - code: Git `rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr` (uncommitted changes: False), package source `cccccccccccccccc`; metric code `mmmmmmmmmmmmmmmm`
-- model gpt-6-luna, reasoning low, output cap 4000, prompt grounded-answer-12, rates None, settings `<id2>`
+- model gpt-6-luna, reasoning low, output cap 4000, prompt grounded-answer-13, rates None, settings `<id2>`
 - serving: run `K1-<id3>` (kiwi_bm25), keyword index `<id4>`, dense `None`, reranker None; fallback kiwi_bm25
 - dependencies: requirements-lock.txt `<id5>`; hardware {'machine': 'fixture'}
 - freeze: {'freeze_id': 'F-<id1>', 'frozen_at': '<time>', 'selected_run_id': 'K1-<id3>', 'decided_by': 'owner', 'post_test': False}
@@ -107,7 +107,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
  "model": "gpt-6-luna",
  "reasoning_effort": "low",
  "max_output_tokens": 4000,
- "prompt_version": "grounded-answer-12",
+ "prompt_version": "grounded-answer-13",
  "rate_version": null,
  "active_run": {
   "activated_at": "<time>",
@@ -1550,12 +1550,12 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 -- evidence is sealed pilot, not a sealed evaluation of reviewed gold
 +- evidence is no answer evaluation for the current candidate, not a sealed evaluation of reviewed gold
 +- stale evidence not counted: sealed run S-<id2>: prompt_version changed since the freeze
-+- stale evidence not counted: development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-12', the candidate uses 'grounded-answer-changed'
++- stale evidence not counted: development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-13', the candidate uses 'grounded-answer-changed'
 
  ## Release manifest
 
  - code: Git `rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr` (uncommitted changes: False), package source `cccccccccccccccc`; metric code `mmmmmmmmmmmmmmmm`
--- model gpt-6-luna, reasoning low, output cap 4000, prompt grounded-answer-12, rates None, settings `<id2>`
+-- model gpt-6-luna, reasoning low, output cap 4000, prompt grounded-answer-13, rates None, settings `<id2>`
 -- serving: run `K1-<id3>` (kiwi_bm25), keyword index `<id4>`, dense `None`, reranker None; fallback kiwi_bm25
 -- dependencies: requirements-lock.txt `<id5>`; hardware {'machine': 'fixture'}
 -- freeze: {'freeze_id': 'F-<id1>', 'frozen_at': '<time>', 'selected_run_id': 'K1-<id3>', 'decided_by': 'owner', 'post_test': False}
@@ -1644,7 +1644,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 -  "evidence is sealed pilot, not a sealed evaluation of reviewed gold"
 +  "evidence is no answer evaluation for the current candidate, not a sealed evaluation of reviewed gold",
 +  "stale evidence not counted: sealed run S-<id2>: prompt_version changed since the freeze",
-+  "stale evidence not counted: development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-12', the candidate uses 'grounded-answer-changed'"
++  "stale evidence not counted: development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-13', the candidate uses 'grounded-answer-changed'"
   ],
 - "evidence_label": "sealed pilot",
 + "evidence_label": "no answer evaluation for the current candidate",
@@ -1659,7 +1659,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
   "model": "gpt-6-luna",
   "reasoning_effort": "low",
   "max_output_tokens": 4000,
-- "prompt_version": "grounded-answer-12",
+- "prompt_version": "grounded-answer-13",
 + "prompt_version": "grounded-answer-changed",
   "rate_version": null,
   "active_run": {
@@ -1710,7 +1710,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 - "stale_evidence": [],
 + "stale_evidence": [
 +  "sealed run S-<id2>: prompt_version changed since the freeze",
-+  "development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-12', the candidate uses 'grounded-answer-changed'"
++  "development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-13', the candidate uses 'grounded-answer-changed'"
 + ],
   "freeze": {
    "freeze_id": "F-<id1>",

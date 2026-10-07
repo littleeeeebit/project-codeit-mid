@@ -43,8 +43,8 @@
     },
     "src/rfp_assistant/evaluation/evaluation.py": {
       "dup": 0,
-      "lines": 2624,
-      "reason": "baseline at adoption"
+      "lines": 2627,
+      "reason": "strict-answer-grading: GoldChecker validates a row's accepted_statuses against its answerability"
     },
     "src/rfp_assistant/evaluation/gold.py": {
       "dup": 0,
@@ -63,8 +63,8 @@
     },
     "src/rfp_assistant/service/answers.py": {
       "dup": 0,
-      "lines": 1068,
-      "reason": "baseline at adoption"
+      "lines": 1070,
+      "reason": "strict-answer-grading: finalize refuses a run graded under another answer-eval version; status_ok uses the row's own statuses"
     },
     "src/rfp_assistant/service/service.py": {
       "dup": 0,
