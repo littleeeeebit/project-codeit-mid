@@ -2322,7 +2322,7 @@ def evaluation_overview(res: Resources, principal: Principal) -> dict:
     """What the verifier may see of phase 4: development validation and freeze state, the sealed set's size and
     freeze state only, development answer runs and their scores, and the latest release decision."""
     principal = _authorize(res, principal, "verifier")
-    from ..evaluation import evaluation
+    from ..evaluation import evaluation, release
 
     s = res.settings
     dev = evaluation.dataset_path(s, "dev")
@@ -2343,6 +2343,7 @@ def evaluation_overview(res: Resources, principal: Principal) -> dict:
                          "running": d.name in _EVAL_JOBS and _EVAL_JOBS[d.name].is_alive()})
         except (OSError, json.JSONDecodeError):
             continue
+    runs.sort(key=lambda r: r["config"].get("created_at") or "")  # run IDs are hashes; the last run is the newest
     test = evaluation.frozen_dataset(s, "test")
     releases = []
     for path in (s.data_dir / "releases").glob("*/manifest.json") if (s.data_dir / "releases").exists() else []:
@@ -2355,7 +2356,8 @@ def evaluation_overview(res: Resources, principal: Principal) -> dict:
     return {"dev_validation": validation, "dev_frozen": evaluation.frozen_dataset(s, "dev"),
             "test": {"rows": sealed_rows_count(s), "frozen": bool(test), "current": bool(test and test["current"])},
             "answer_runs": runs,
-            "release": max(releases, key=lambda x: x[0])[1] if releases else None}
+            "release": max(releases, key=lambda x: x[0])[1] if releases else None,
+            "targets": {"rates": release.TARGETS, "latency_ms": release.LATENCY_TARGETS_MS}}
 
 
 def sealed_rows_count(settings: Settings) -> int:

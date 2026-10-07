@@ -104,6 +104,12 @@ def restore_check(settings: Settings, manifest_path: Path, staging: Path | None 
 TARGETS = {"single_hit@20": 0.90, "multi_complete@20": 0.80, "claim_correctness": 0.90,
            "citation_precision": 0.95, "negative_handling": 0.90}
 LATENCY_TARGETS_MS = {"retrieval_p95": 2000, "answer_p95": 15000}
+# Stable keys of the rows `_hard_checks` and `_quality_targets` return, in their order; a quality key is the key of
+# its target in TARGETS or LATENCY_TARGETS_MS. The screen labels and lays out the manifest's checks by these keys.
+HARD_CHECK_KEYS = ("automated_invariants", "critical_wrong", "scope_leakage", "evidence_links", "admission_cap",
+                   "billing_resolved")
+QUALITY_KEYS = ("single_hit@20", "multi_complete@20", "claim_correctness", "citation_precision", "negative_handling",
+                "answer_p95")
 
 
 def _load(path: Path):
@@ -210,6 +216,7 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
     reasons += [f"stale evidence not counted: {x}" for x in stale]
 
     release_manifest = _release_manifest(settings, rid, status, reasons, label, active, now, db, frozen, stale, freeze)
+    release_manifest["checks"] = structured_checks(hard, quality, ans, served, lat)
     coverage_rep = _coverage_report(manifest_rep, human, identity)
     evaluation_rep = _evaluation_report(validation, frozen, retrieval_runs, answer_runs, sealed_runs, latency, checks)
     for name, data in (("manifest", release_manifest), ("coverage", coverage_rep), ("evaluation", evaluation_rep),
@@ -375,6 +382,32 @@ def _quality_targets(ans: dict | None, served: dict, lat: dict | None) -> list[t
          else lat["warm_ms"]["p95"] < LATENCY_TARGETS_MS["answer_p95"],
          "no real latency sample" if lat is None else f"warm p95 {lat['warm_ms']['p95']} ms, n={lat['warm_ms']['n']}"),
     ]
+
+
+def structured_checks(hard: list[tuple[str, bool | None, str]], quality: list[tuple[str, bool | None, str]],
+                      ans: dict | None, served: dict, lat: dict | None) -> list[dict]:
+    """The hard checks and quality targets as rows the screen lays out: stable key, kind, ok (None when not
+    verified or not measured), the evidence string, and value and denominator where a rate or latency sample exists
+    (the latency value is milliseconds)."""
+    measured = {
+        "evidence_links": (ans or {}).get("link_validity"),
+        "single_hit@20": served.get("single_evidence", {}).get("hit@20"),
+        "multi_complete@20": served.get("multi_evidence", {}).get("complete@20"),
+        "claim_correctness": (ans or {}).get("required_claim_correctness"),
+        "citation_precision": (ans or {}).get("citation_precision_lower_bound"),
+        "negative_handling": (ans or {}).get("negative_handling"),
+        "answer_p95": lat and {"rate": lat["warm_ms"]["p95"], "denominator": lat["warm_ms"]["n"]},
+    }
+    rows = []
+    for kind, keys, checks in (("hard", HARD_CHECK_KEYS, hard), ("quality", QUALITY_KEYS, quality)):
+        for key, (_, ok, ev) in zip(keys, checks, strict=True):
+            row = {"key": key, "kind": kind, "ok": ok, "evidence": ev}
+            if isinstance(measured.get(key), dict):
+                row |= {"value": measured[key].get("rate"), "denominator": measured[key].get("denominator")}
+            if key == "citation_precision" and ans:  # the lower bound holds until no citation is left unjudged
+                row["unjudged"] = ans.get("links_unjudged")
+            rows.append(row)
+    return rows
 
 
 def _release_manifest(settings: Settings, rid: str, status: str, reasons: list[str], label: str, active: dict | None,

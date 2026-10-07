@@ -199,7 +199,94 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
   "selected_run_id": "K1-<id3>",
   "decided_by": "owner",
   "post_test": false
- }
+ },
+ "checks": [
+  {
+   "key": "automated_invariants",
+   "kind": "hard",
+   "ok": null,
+   "evidence": "no saved run: check --phase all --provider fake --save"
+  },
+  {
+   "key": "critical_wrong",
+   "kind": "hard",
+   "ok": true,
+   "evidence": "0 observed wrong, 0 contested or awaiting blind review"
+  },
+  {
+   "key": "scope_leakage",
+   "kind": "hard",
+   "ok": true,
+   "evidence": "claims/evidence outside scope 0, wrong-scope candidates 0"
+  },
+  {
+   "key": "evidence_links",
+   "kind": "hard",
+   "ok": true,
+   "evidence": "{'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]}",
+   "value": 1.0,
+   "denominator": 1
+  },
+  {
+   "key": "admission_cap",
+   "kind": "hard",
+   "ok": true,
+   "evidence": "committed $<n> of cap $<n>; frozen None"
+  },
+  {
+   "key": "billing_resolved",
+   "kind": "hard",
+   "ok": true,
+   "evidence": "0 open or unknown attempts"
+  },
+  {
+   "key": "single_hit@20",
+   "kind": "quality",
+   "ok": true,
+   "evidence": "{'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]}",
+   "value": 1.0,
+   "denominator": 1
+  },
+  {
+   "key": "multi_complete@20",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "{'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None}",
+   "value": null,
+   "denominator": 0
+  },
+  {
+   "key": "claim_correctness",
+   "kind": "quality",
+   "ok": true,
+   "evidence": "{'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]}",
+   "value": 1.0,
+   "denominator": 1
+  },
+  {
+   "key": "citation_precision",
+   "kind": "quality",
+   "ok": true,
+   "evidence": "{'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]}",
+   "value": 1.0,
+   "denominator": 1,
+   "unjudged": 0
+  },
+  {
+   "key": "negative_handling",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "{'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None}",
+   "value": null,
+   "denominator": 0
+  },
+  {
+   "key": "answer_p95",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "no real latency sample"
+  }
+ ]
 }
 ----- coverage.json -----
 {
@@ -1348,7 +1435,16 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
   "freeze": {
    "freeze_id": "F-<id1>",
    "frozen_at": "<time>",
-@@ -1188,7 +1192,17 @@
+@@ -204,7 +208,7 @@
+    "key": "automated_invariants",
+    "kind": "hard",
+    "ok": null,
+-   "evidence": "no saved run: check --phase all --provider fake --save"
++   "evidence": "stale: recorded for other package source; rerun check --phase all --provider fake --save"
+   },
+   {
+    "key": "critical_wrong",
+@@ -1275,7 +1279,17 @@
     "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
    }
   ],
@@ -1402,7 +1498,18 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    "quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
    "quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
    "quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)",
-@@ -1188,7 +1186,19 @@
+@@ -203,8 +201,8 @@
+   {
+    "key": "automated_invariants",
+    "kind": "hard",
+-   "ok": null,
+-   "evidence": "no saved run: check --phase all --provider fake --save"
++   "ok": true,
++   "evidence": "243 tests, recorded <time>"
+   },
+   {
+    "key": "critical_wrong",
+@@ -1275,7 +1273,19 @@
     "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
    }
   ],
@@ -1612,8 +1719,103 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 +  "selected_run_id": "K1-<id5>",
    "decided_by": "owner",
    "post_test": false
-  }
-@@ -523,7 +536,7 @@
+  },
+@@ -203,28 +216,26 @@
+   {
+    "key": "automated_invariants",
+    "kind": "hard",
+-   "ok": null,
+-   "evidence": "no saved run: check --phase all --provider fake --save"
++   "ok": true,
++   "evidence": "243 tests, recorded <time>"
+   },
+   {
+    "key": "critical_wrong",
+    "kind": "hard",
+-   "ok": true,
+-   "evidence": "0 observed wrong, 0 contested or awaiting blind review"
++   "ok": null,
++   "evidence": "no answer evaluation"
+   },
+   {
+    "key": "scope_leakage",
+    "kind": "hard",
+-   "ok": true,
+-   "evidence": "claims/evidence outside scope 0, wrong-scope candidates 0"
++   "ok": null,
++   "evidence": "no answer evaluation"
+   },
+   {
+    "key": "evidence_links",
+    "kind": "hard",
+-   "ok": true,
+-   "evidence": "{'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]}",
+-   "value": 1.0,
+-   "denominator": 1
++   "ok": null,
++   "evidence": "no cited links"
+   },
+   {
+    "key": "admission_cap",
+@@ -240,6 +251,14 @@
+   },
+   {
+    "key": "single_hit@20",
++   "kind": "quality",
++   "ok": true,
++   "evidence": "{'numerator': 2, 'denominator': 2, 'rate': 1.0, 'wilson95': [0.3424, 1.0]}",
++   "value": 1.0,
++   "denominator": 2
++  },
++  {
++   "key": "multi_complete@20",
+    "kind": "quality",
+    "ok": true,
+    "evidence": "{'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]}",
+@@ -247,37 +266,22 @@
+    "denominator": 1
+   },
+   {
+-   "key": "multi_complete@20",
++   "key": "claim_correctness",
+    "kind": "quality",
+    "ok": null,
+-   "evidence": "{'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None}",
+-   "value": null,
+-   "denominator": 0
+-  },
+-  {
+-   "key": "claim_correctness",
+-   "kind": "quality",
+-   "ok": true,
+-   "evidence": "{'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]}",
+-   "value": 1.0,
+-   "denominator": 1
++   "evidence": "n/a"
+   },
+   {
+    "key": "citation_precision",
+    "kind": "quality",
+-   "ok": true,
+-   "evidence": "{'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]}",
+-   "value": 1.0,
+-   "denominator": 1,
+-   "unjudged": 0
++   "ok": null,
++   "evidence": "n/a"
+   },
+   {
+    "key": "negative_handling",
+    "kind": "quality",
+    "ok": null,
+-   "evidence": "{'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None}",
+-   "value": null,
+-   "denominator": 0
++   "evidence": "n/a"
+   },
+   {
+    "key": "answer_p95",
+@@ -610,7 +614,7 @@
   },
   "retrieval_runs": [
    {
@@ -1622,7 +1824,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
     "label": "K1",
     "mode": "kiwi_bm25",
     "dataset_sha256": "<id11>",
-@@ -571,12 +584,12 @@
+@@ -658,12 +662,12 @@
   ],
   "answer_runs": [
    {
@@ -1637,7 +1839,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
       "mode": "kiwi_bm25",
       "completed": 4,
       "of": 4,
-@@ -872,13 +885,13 @@
+@@ -959,13 +963,13 @@
   ],
   "sealed_runs": [
    {
@@ -1653,7 +1855,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
       "mode": "kiwi_bm25",
       "completed": 1,
       "of": 1,
-@@ -1172,9 +1185,9 @@
+@@ -1259,9 +1263,9 @@
      }
     ],
     "serving": {
@@ -1665,7 +1867,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
     },
     "hardware": {
      "machine": "fixture"
-@@ -1188,7 +1201,19 @@
+@@ -1275,7 +1279,19 @@
     "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
    }
   ],

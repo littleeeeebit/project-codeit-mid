@@ -414,7 +414,7 @@ export function CompareRuns({ runs }: { runs: Summary[] }) {
       {d && (
         <>
           {!(d.same_question && d.same_scope) && <Notice tone="warn">질문 또는 문서 범위가 다릅니다. 설정 효과만 비교하려면 같은 질문과 범위를 쓰세요.</Notice>}
-          <Table caption="실행 비교" head={["항목", "A", "B"]}>
+          <Table caption="추적 비교" head={["항목", "A", "B"]}>
             {Object.entries(d.config_changes).sort().map(([k, [va, vb]]) => (
               <tr key={k}><td className={cn(td, "font-medium")}>설정 {k}</td><td className={td}>{JSON.stringify(va)}</td><td className={td}>{JSON.stringify(vb)}</td></tr>
             ))}

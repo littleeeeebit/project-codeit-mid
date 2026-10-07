@@ -18,6 +18,7 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from rfp_assistant import api
+from rfp_assistant.evaluation import release
 from rfp_assistant.service import service
 from tests import fake_hub, fixtures
 
@@ -390,6 +391,17 @@ class ApiFlowTest(unittest.TestCase):
         self.assertTrue(cid)
         overview = self.client.get("/api/verify/overview").json()
         self.assertEqual(overview["evaluation"]["answer_runs"], [])
+
+    def test_the_overview_serves_the_release_pass_lines_and_an_older_manifest(self):
+        evaluation = self.client.get("/api/verify/overview").json()["evaluation"]
+        self.assertEqual(evaluation["targets"], {"rates": release.TARGETS, "latency_ms": release.LATENCY_TARGETS_MS})
+        old = self.res.settings.data_dir / "releases" / "draft-2026-10-01"  # written before structured checks
+        old.mkdir(parents=True)
+        (old / "manifest.json").write_text(json.dumps({"release_id": old.name, "status": "limited",
+                                                       "reasons": ["evidence is development pilot"]}),
+                                           encoding="utf-8")
+        got = self.client.get("/api/verify/overview").json()["evaluation"]["release"]
+        self.assertEqual((got["checks"], got["reasons"]), ([], ["evidence is development pilot"]))
 
     def test_a_run_whose_configuration_changed_cannot_generate(self):
         sources = self.client.get("/api/verify/trace-sources").json()

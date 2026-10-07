@@ -239,6 +239,12 @@ class ReleaseReportTest(unittest.TestCase):
                 self.assertTrue((path.parent / f"{name}.json").exists())
             manifest = json.loads((path.parent / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["status"], "limited")
+            checks = {c["key"]: c for c in manifest["checks"]}  # structured rows the screen lays out by key
+            self.assertEqual(list(checks), [*release.HARD_CHECK_KEYS, *release.QUALITY_KEYS])
+            self.assertEqual(set(release.QUALITY_KEYS) - {"answer_p95"}, set(release.TARGETS))
+            self.assertEqual((checks["claim_correctness"]["kind"], checks["claim_correctness"]["ok"]), ("quality", None))
+            self.assertEqual(checks["admission_cap"]["kind"], "hard")
+            self.assertNotIn("value", checks["admission_cap"])
 
     def _sealed_release(self, root):
         """K1 activated on the phase-4 fixtures, the development finalists run, both sets frozen, the release frozen
@@ -308,6 +314,9 @@ class ReleaseReportTest(unittest.TestCase):
             m = manifest()
             self.assertNotIn("automated invariants", " ".join(m["reasons"]))
             self.assertEqual(m["evidence_label"], "sealed pilot")
+            claims = next(c for c in m["checks"] if c["key"] == "claim_correctness")
+            self.assertIsInstance(claims["value"], float)  # a measured rate carries its value and denominator
+            self.assertGreater(claims["denominator"], 0)
             with mock.patch.object(generation, "PROMPT_VERSION", "grounded-answer-changed"):
                 m = manifest()
             self.assertEqual(m["evidence_label"], "no answer evaluation for the current candidate")

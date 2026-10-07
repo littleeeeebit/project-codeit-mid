@@ -149,7 +149,81 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
   "machine": "fixture"
  },
  "stale_evidence": [],
- "freeze": null
+ "freeze": null,
+ "checks": [
+  {
+   "key": "automated_invariants",
+   "kind": "hard",
+   "ok": null,
+   "evidence": "no saved run: check --phase all --provider fake --save"
+  },
+  {
+   "key": "critical_wrong",
+   "kind": "hard",
+   "ok": null,
+   "evidence": "no answer evaluation"
+  },
+  {
+   "key": "scope_leakage",
+   "kind": "hard",
+   "ok": null,
+   "evidence": "no answer evaluation"
+  },
+  {
+   "key": "evidence_links",
+   "kind": "hard",
+   "ok": null,
+   "evidence": "no cited links"
+  },
+  {
+   "key": "admission_cap",
+   "kind": "hard",
+   "ok": true,
+   "evidence": "committed $<n> of cap $<n>; frozen None"
+  },
+  {
+   "key": "billing_resolved",
+   "kind": "hard",
+   "ok": true,
+   "evidence": "0 open or unknown attempts"
+  },
+  {
+   "key": "single_hit@20",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "None"
+  },
+  {
+   "key": "multi_complete@20",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "None"
+  },
+  {
+   "key": "claim_correctness",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "n/a"
+  },
+  {
+   "key": "citation_precision",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "n/a"
+  },
+  {
+   "key": "negative_handling",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "n/a"
+  },
+  {
+   "key": "answer_p95",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "no real latency sample"
+  }
+ ]
 }
 ----- coverage.json -----
 {

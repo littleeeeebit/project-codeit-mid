@@ -556,6 +556,7 @@ class Cost(_Read):
 
 class Latency(_Read):
     p95: float | None = None
+    n: int | None = None
 
 
 class FinalistScores(_Read):
@@ -564,6 +565,8 @@ class FinalistScores(_Read):
     of: int | None = None
     required_claim_correctness: Rate | None = None
     critical_wrong: list = []
+    critical_unresolved: list = []
+    claims_needing_review: int = 0
     citation_precision_lower_bound: Rate | None = None
     links_unjudged: int = 0
     negative_handling: Rate | None = None
@@ -613,10 +616,30 @@ class SealedState(_Read):
     current: bool
 
 
+class ReleaseCheck(_Read):
+    """One hard check or quality target of a release decision; ok is None when not verified or not measured."""
+    key: str
+    kind: Literal["hard", "quality"]
+    ok: bool | None
+    evidence: str
+    value: float | None = None
+    denominator: int | None = None
+    unjudged: int | None = None  # citation precision only: links no person has judged yet
+
+
 class Release(_Read):
     release_id: str
     status: str
+    evidence_label: str | None = None
+    generated_at: str | None = None
     reasons: list[str] = []
+    checks: list[ReleaseCheck] = []  # empty in manifests written before structured checks; read reasons then
+
+
+class Targets(BaseModel):
+    """The release pass lines (release.TARGETS, LATENCY_TARGETS_MS), served so the screen never copies them."""
+    rates: dict[str, float]
+    latency_ms: dict[str, int]
 
 
 class EvaluationOverview(_Read):
@@ -625,6 +648,7 @@ class EvaluationOverview(_Read):
     test: SealedState
     answer_runs: list[AnswerRun]
     release: Release | None
+    targets: Targets
 
 
 class GoldClaim(_Read):
