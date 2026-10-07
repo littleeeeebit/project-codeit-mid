@@ -131,4 +131,21 @@ describe("평가·릴리스", () => {
     expect(row("전체 답변 p95").textContent).toContain("27.6초✗ 미달");
     expect(screen.getByText("실행 정보 · 이전 실행 1개")).toBeTruthy();
   });
+
+  test("a finalist the run stopped before scoring passes nothing", async () => {
+    // answers.finalize writes scores for a finalist with no answer done: completed 0 and empty critical lists
+    const unscored: Schemas["FinalistScores"] = {
+      mode: "hybrid", completed: 0, of: 3, required_claim_correctness: rate(0, 0), critical_wrong: [], critical_unresolved: [],
+      claims_needing_review: 0, citation_precision_lower_bound: rate(0, 0), links_unjudged: 0, negative_handling: rate(0, 0),
+      latency_ms: { p95: null, n: 0 },
+    };
+    await show(evaluation({ answer_runs: [{
+      run_id: "A-stopped", config: { label: "dev", config_id: "A-stopped" }, progress: { done: 0, total: 3 }, running: false,
+      scores: { status: "partial", stop_reason: "budget_blocked", finalists: { "H-1": unscored } },
+    }] }));
+    for (const title of ["필수 주장 정확도", "치명 오류", "인용 정밀도", "부정·모호 질문 처리", "전체 답변 p95"]) {
+      expect(row(title).textContent).not.toContain("충족");
+      expect(row(title).textContent).toContain("미측정");
+    }
+  });
 });

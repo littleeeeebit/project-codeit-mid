@@ -173,9 +173,9 @@ function rateCell(r: Rate | null | undefined, line: number, extra?: string | fal
 const METRICS: { k: string; cell: (f: Finalist, t: Targets) => Cell }[] = [
   { k: "claim_correctness", cell: (f, t) => rateCell(f.required_claim_correctness, t.rates.claim_correctness,
     f.claims_needing_review > 0 && `검토 대기 ${f.claims_needing_review}건`) },
-  { k: "critical_wrong", cell: (f) => ({ value: `${f.critical_wrong.length}건`,
-    ok: f.critical_wrong.length ? false : f.critical_unresolved.length ? null : true,
-    note: f.critical_unresolved.length ? `판정 대기 ${f.critical_unresolved.length}건` : undefined }) },
+  { k: "critical_wrong", cell: (f) => !f.completed ? { value: "-", ok: null, note: "채점된 답변 없음" } : {  // empty lists prove nothing
+    value: `${f.critical_wrong.length}건`, ok: f.critical_wrong.length ? false : f.critical_unresolved.length ? null : true,
+    note: f.critical_unresolved.length ? `판정 대기 ${f.critical_unresolved.length}건` : undefined } },
   { k: "citation_precision", cell: (f, t) => rateCell(f.citation_precision_lower_bound, t.rates.citation_precision,
     `미판정 인용 ${f.links_unjudged}건`) },
   { k: "negative_handling", cell: (f, t) => rateCell(f.negative_handling, t.rates.negative_handling) },
