@@ -312,6 +312,65 @@ class AnswerScoringTest(unittest.TestCase):
                          [True, False, False])
 
 
+class ScoreRecordTest(unittest.TestCase):
+    """answers.score_record without an index: verbatim link support, reviews overriding links, answer claims
+    and required claims, the all-unsupported answer claim, and a metadata row."""
+
+    ROW = {"dataset_version": evaluation.GOLD_SCHEMA, "question_id": "q", "question_type": "fact",
+           "answerability": "answerable", "expected_status": "answered", "mode": "single", "scope": [{"doc_id": "d"}],
+           "evidence_groups": [{"group_id": "g1", "doc_id": "d", "alternatives": [
+               {"element_id": "amount", "quote": "130,000,000원", "extraction_id": "x"}]}],
+           "required_claims": [{"claim_id": "c1", "support_groups": ["g1"], "critical_kind": "amount"},
+                               {"claim_id": "c2", "support_groups": ["g1"]}]}
+
+    def test_links_answer_claims_and_reviews(self):
+        record = {"finalist": "F", "outcome": "answered", "settled_micro_usd": 7, "latency_ms": 12,
+                  "link_validity": {"E1": True},
+                  "evidence": {"E1": {"doc_id": "d", "chunk_id": "c1", "quote": "사업 예산은 금 130,000,000원으로 한다."},
+                               "E2": {"doc_id": "d", "chunk_id": "c2", "quote": "부가가치세 포함"},
+                               "E3": {"doc_id": "other", "chunk_id": "c3", "quote": "금 130,000,000원"}},
+                  "answer": {"next_action": None, "claims": [
+                      {"text": "금 130,000,000원", "kind": "source_fact", "doc_id": "d", "evidence_ids": ["E1", "E2"]},
+                      {"text": "기타", "kind": "source_fact", "doc_id": "d", "evidence_ids": ["E2"]},
+                      {"text": "추론", "kind": "inference", "doc_id": "d", "evidence_ids": ["E1", "E3"]},
+                      {"text": "다른 문서", "kind": "source_fact", "doc_id": "other", "evidence_ids": ["E3"]}]}}
+        reviews = {"F|q|link|1|E2": {"verdict": "unsupported", "reviewer": "r1"},
+                   "F|q|answer_claim|2": {"verdict": "unsupported", "reviewer": "r2"},
+                   "F|q|claim|c1": {"verdict": "correct", "reviewer": "r3"}}
+        link = lambda i, eid, support, valid=False: {  # noqa: E731
+            "claim_index": i, "evidence_id": eid, "item": f"F|q|link|{i}|{eid}", "support": support, "valid": valid,
+            "grade": 0}
+        answer_claim = lambda i, kind, supported, doc="d": {  # noqa: E731
+            "index": i, "item": f"F|q|answer_claim|{i}", "kind": kind, "supported": supported, "doc_id": doc}
+        self.assertEqual(answers.score_record(self.ROW, record, None, reviews), {
+            "question_id": "q", "finalist": "F", "type": "fact", "answerability": "answerable",
+            "expected_status": "answered", "outcome": "answered", "technical": False, "status_ok": True,
+            "claims": [{"claim_id": "c1", "item": "F|q|claim|c1", "verdict": "correct", "deterministic": "missing",
+                        "reviewed_by": "r3", "critical_kind": "amount"},
+                       {"claim_id": "c2", "item": "F|q|claim|c2", "verdict": "missing", "deterministic": "missing",
+                        "reviewed_by": None, "critical_kind": None}],
+            "links": [link(0, "E1", "supporting", True), link(0, "E2", "unjudged"), link(1, "E2", "unsupported"),
+                      link(2, "E1", "unjudged", True), link(2, "E3", "unjudged"), link(3, "E3", "unjudged")],
+            "answer_claims": [answer_claim(0, "source_fact", True), answer_claim(1, "source_fact", False),
+                              answer_claim(2, "inference", False), answer_claim(3, "source_fact", None, "other")],
+            "settled_micro_usd": 7, "latency_ms": 12, "attempt_no": 1, "scope_leaks": 2, "groups": None,
+            "passed": False})
+
+    def test_metadata_row(self):
+        row = {**self.ROW, "mode": "metadata", "expected_states": {"amount_krw": "known", "bid_close": "unknown"}}
+        facts = [{"doc_id": "d", "field": "amount_krw", "state": "known"},
+                 {"doc_id": "d", "field": "bid_close", "state": "unknown"}]
+        good = answers.score_record(row, {"finalist": "F", "outcome": "answered", "answer": {"facts": facts}}, None, {})
+        bad = answers.score_record(row, {"finalist": "F", "outcome": "answered", "answer": {"facts": facts[:1]}},
+                                   None, {})
+        none = answers.score_record(row, {"finalist": "F", "outcome": "answered", "answer": {}}, None, {})
+        self.assertEqual((good, bad["metadata_correct"], none["metadata_correct"]), ({
+            "question_id": "q", "finalist": "F", "type": "fact", "answerability": "answerable",
+            "expected_status": "answered", "outcome": "answered", "technical": False, "status_ok": True, "claims": [],
+            "links": [], "answer_claims": [], "settled_micro_usd": 0, "latency_ms": None, "attempt_no": 1,
+            "scope_leaks": 0, "metadata_correct": True}, False, False))
+
+
 class RunIdentityTest(unittest.TestCase):
     def test_run_dirs(self):
         s = Settings(source_dir=Path("/src"), data_dir=Path("/data"), hwp_converter=None)
