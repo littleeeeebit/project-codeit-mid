@@ -16,6 +16,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+import psycopg
+
 from rfp_assistant import cli, contracts
 from rfp_assistant import settings as settings_mod
 from rfp_assistant.contracts import AnswerRequest
@@ -24,9 +26,11 @@ from rfp_assistant.evaluation import compare, evaluation, gold, judges, release
 from rfp_assistant.gateway import budget, generation
 from rfp_assistant.service import answers, ops, service
 from rfp_assistant.settings import Settings, SettingsError
-from rfp_assistant.storage import store
+from rfp_assistant.storage import postgres, postgres_backup, store
 from tests import fixtures
-from tests import release_fixtures, test_budget, test_dense, test_gold, test_release, test_service  # their scenarios; module attributes, so their tests are not collected twice
+# Their scenarios, as module attributes, so their tests are not collected twice.
+from tests import (release_fixtures, test_budget, test_dense, test_gold, test_postgresql_recovery, test_release,
+                   test_service)
 
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOTS = Path(__file__).parent / "snapshots"
@@ -392,6 +396,53 @@ class GoldSubmitRepinTest(unittest.TestCase):
                           alt["extraction_id"], alt["element_id"] in path_of, row["repinned_from"]), (
             1, "g1-repin", [new], new, True, {"batch_id": "g1", "extractions": {ref.doc_id: self.extraction}}))
         self.assertEqual(gold.repin(s, "g1-again"), {"batch_id": None, "rows": 0})
+
+
+class RestoreRefusalTest(unittest.TestCase):
+    """postgres_backup.restore_check's guards, on test_postgresql_recovery's backup and empty target: each refuses
+    before the recovery fence is written."""
+
+    setUp = test_postgresql_recovery.PostgreSQLRecoveryTest.setUp
+    tearDown = test_postgresql_recovery.PostgreSQLRecoveryTest.tearDown
+
+    def refusal(self, manifest=None) -> str:
+        with self.assertRaises(ValueError) as caught:
+            postgres_backup.restore_check(self.settings, manifest or self.manifest)
+        with psycopg.connect(self.target.dsn(), autocommit=True) as conn:
+            fenced = conn.execute("SELECT 1 FROM pg_namespace WHERE nspname = 'bidmate_recovery'").fetchone()
+        return str(caught.exception) + (" (fenced)" if fenced else "")
+
+    def held(self, lock: int):
+        conn = psycopg.connect(self.target.dsn(), autocommit=True)
+        conn.execute("SELECT pg_advisory_lock(%s)", (lock,))
+        return conn
+
+    def test_guards(self):
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        bad = []
+        for name, changes in (("version", {"backup_version": "postgresql-backup-0"}), ("hash", {"dump_sha256": "0"})):
+            bad.append(self.manifest.parent / f"{name}.json")
+            bad[-1].write_text(json.dumps({**manifest, **changes}), encoding="utf-8")
+        messages = [self.refusal(bad[0]), self.refusal(bad[1])]
+        restore = os.environ["RFP_RESTORE_DATABASE_DSN"]
+        os.environ["RFP_RESTORE_DATABASE_DSN"] = os.environ[self.settings.database_dsn_env]
+        try:
+            with self.assertRaises(ValueError) as caught:
+                postgres_backup.restore_check(self.settings, self.manifest)
+            messages.append(str(caught.exception))
+        finally:
+            os.environ["RFP_RESTORE_DATABASE_DSN"] = restore
+        for lock in (postgres.GATEWAY_LOCK, postgres_backup.RESTORE_LOCK):
+            with self.held(lock):
+                messages.append(self.refusal())
+        with psycopg.connect(self.target.dsn(), autocommit=True) as conn:
+            conn.execute("CREATE TABLE public.stray (id int)")
+        messages.append(self.refusal())
+        self.assertEqual(messages, [
+            "PostgreSQL backup format or dump hash is invalid", "PostgreSQL backup format or dump hash is invalid",
+            "restore must use a different isolated database", "restore target already has a paid gateway owner",
+            "restore target already has a restore owner",
+            "restore target contains tables; use an empty isolated database"])
 
 
 class ReconcileRefusalTest(unittest.TestCase):
