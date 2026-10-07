@@ -20,13 +20,13 @@ from rfp_assistant import cli, contracts
 from rfp_assistant import settings as settings_mod
 from rfp_assistant.contracts import AnswerRequest
 from rfp_assistant.corpus import ingestion
-from rfp_assistant.evaluation import compare, evaluation, judges, release
+from rfp_assistant.evaluation import compare, evaluation, gold, judges, release
 from rfp_assistant.gateway import budget, generation
 from rfp_assistant.service import answers, ops, service
 from rfp_assistant.settings import Settings, SettingsError
 from rfp_assistant.storage import store
 from tests import fixtures
-from tests import test_budget, test_dense, test_release, test_service  # their scenarios; module attributes, so their tests are not collected twice
+from tests import release_fixtures, test_budget, test_dense, test_gold, test_release, test_service  # their scenarios; module attributes, so their tests are not collected twice
 
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOTS = Path(__file__).parent / "snapshots"
@@ -310,6 +310,73 @@ class AnswerScoringTest(unittest.TestCase):
         self.assertEqual([answers.verbatim_support(a, b) for a, b in [("하자 보수 12개월", "계약 후 하자보수12개월 이내"),
                                                                      ("abc", "xabcx"), ("하자보수 6개월", "하자보수 12개월")]],
                          [True, False, False])
+
+
+class GoldSubmitRepinTest(unittest.TestCase):
+    """gold.submit's refusals and row errors, and repin of a pending gold row (the pilot path is in test_gold),
+    on test_gold's corpus: every family in dev, nothing indexed."""
+
+    setUp = test_gold.DevCorpusCase.setUp
+    tearDown = test_gold.DevCorpusCase.tearDown
+    pilot = test_gold.GoldReviewTest.row
+
+    def warranty(self, **kw):
+        r = release_fixtures.warranty_row(self.env, reviewed=False, **kw)
+        r["review"].update(original_inspected=False)
+        return r
+
+    def submit(self, batch, rows, dataset="dev", drafted_by="agent-a", raw=None):
+        path = self.root / f"{batch}-{dataset}.jsonl"
+        if raw is None:
+            store.write_jsonl_atomic(path, rows)
+        else:
+            path.write_bytes(raw)
+        return gold.submit(self.env.settings, path, batch, dataset, drafted_by)
+
+    def refusal(self, *args, **kw):
+        with self.assertRaises(gold.GoldError) as caught:
+            self.submit(*args, **kw)
+        return str(caught.exception)
+
+    def test_refusals_and_row_errors(self):
+        row = self.warranty()
+        self.assertEqual([self.refusal("Bad_ID", [row]), self.refusal("b0", [row], drafted_by=" "),
+                          self.refusal("b0", [], raw=b"\xef\xbb\xbf{}"), self.refusal("b0", [], raw=b"\n\n")], [
+            "batch ids use lowercase letters, digits and hyphens", "--drafted-by is required",
+            "candidate file must be UTF-8 without BOM", "candidate file is empty"])
+        self.assertEqual(self.submit("g1", [row])["rows"], 1)
+        self.assertEqual(self.refusal("g1", [row]), "batch g1 already exists")
+        self.assertEqual(self.refusal("g2", [self.warranty(revision=2), self.warranty(qid="dev-new", revision=3),
+                                              {**self.warranty(), "question": "다른 질문"}]), "\n".join([
+            "row 1 (dev-warranty-r2): an earlier revision of dev-warranty is still pending review",
+            "row 2 (dev-new-r3): a new question starts at revision 1",
+            "row 2 (dev-new-r3): same question already drafted as dev-warranty-r2 (this batch)",
+            "row 3 (dev-warranty-r1): id already used by another candidate",
+            "row 3 (dev-warranty-r1): a correction appends a higher revision of dev-warranty"]))
+        reviewed = {**self.pilot("Bad id", "하자보수 기간은?"), "reviewed_by": "v1"}
+        other = {**self.pilot("p2", "하자보수 기간은?"), "drafted_by": "agent-z"}
+        self.assertEqual(self.refusal("p1", [reviewed, other], dataset="dev-pilot"), "\n".join([
+            "row 1 (Bad id): id must use lowercase letters, digits and hyphens",
+            "row 1 (Bad id): drafts cannot carry a review",
+            "row 2 (p2): drafted_by must equal --drafted-by",
+            "row 2 (p2): same question already drafted as Bad id (this batch)"]))
+
+    def test_repin_moves_a_pending_gold_row(self):
+        s, ref = self.env.settings, self.env.refs["기관A"]
+        self.submit("g1", [self.warranty()])
+        with mock.patch.object(ingestion, "PDF_WALKER_VERSION", "pdf-test-revision"), \
+                mock.patch.object(ingestion, "HWP_WALKER_VERSION", "hwp-test-revision"):
+            new = ingestion.ingest_source(s, ref.source_hash)["extraction_id"]
+        out = gold.repin(s, "g1-repin")
+        row = gold.candidate(s, "dev-warranty-r1")["row"]
+        with store.open_db(s.db_path) as conn:
+            path_of = {r[0]: r[1] for r in conn.execute(
+                "SELECT element_id, location_json FROM elements WHERE extraction_id = ?", (new,))}
+        alt = row["evidence_groups"][0]["alternatives"][0]
+        self.assertEqual((out["rows"], out["batch_id"], [x["extraction_id"] for x in row["scope"]],
+                          alt["extraction_id"], alt["element_id"] in path_of, row["repinned_from"]), (
+            1, "g1-repin", [new], new, True, {"batch_id": "g1", "extractions": {ref.doc_id: self.extraction}}))
+        self.assertEqual(gold.repin(s, "g1-again"), {"batch_id": None, "rows": 0})
 
 
 class ReconcileRefusalTest(unittest.TestCase):
