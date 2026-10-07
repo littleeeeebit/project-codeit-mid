@@ -191,7 +191,8 @@ class Context:
             raise RuntimeError(f"RFP_VERIFY_ORIGIN must be scheme://host:port, got {origin!r}")
         host, port = found.groups()
         config = self.work / "fake-config.json"
-        config.write_text(json.dumps({"provider": "fake", "fake_delay_seconds": delay}), encoding="utf-8")
+        config.write_text(json.dumps({"provider": "fake", "fake_delay_seconds": delay,
+                                      "database_timeout_seconds": 30}), encoding="utf-8")
         from tests import fake_hub  # members sign in through a stand-in for JupyterHub, run in this process
 
         env = {**self.env, "RFP_SOURCE_DIR": corpus["source_dir"], "RFP_DATA_DIR": corpus["data_dir"],
