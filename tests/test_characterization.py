@@ -414,6 +414,111 @@ class IngestionHelpersTest(unittest.TestCase):
         self.assertEqual(ingestion.search_text(" 가  나\n다 "), "가 나 다")
 
 
+class IngestSourceTest(unittest.TestCase):
+    """ingest_source of the fixture's HWP (기관E, no converter) when Hancom's print exists, and when the parse
+    returns replacement characters: the result, the source row and the stored extraction."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.env = fixtures.make_env(Path(self.tmp.name))
+        self.source_hash = self.env.refs["기관E"].source_hash
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def ingest(self):
+        result = ingestion.ingest_source(self.env.settings, self.source_hash, force=True)
+        result.pop("seconds", None)
+        with store.open_db(self.env.settings.db_path) as conn:
+            src = dict(conn.execute("SELECT parse_status, review_status, reason_code, warnings_json, "
+                                    "active_extraction_id FROM sources WHERE source_hash = ?",
+                                    (self.source_hash,)).fetchone())
+            fp = conn.execute("SELECT parser_fingerprint FROM extractions WHERE extraction_id = ?",
+                              (src["active_extraction_id"],)).fetchone()
+            els = [(r["kind"], json.loads(r["location_json"])["format"], r["raw_text"]) for r in conn.execute(
+                "SELECT kind, location_json, raw_text FROM elements WHERE extraction_id = ? ORDER BY source_order",
+                (src["active_extraction_id"],))]
+        warnings = [{k: v for k, v in w.items() if k != "rendering_sha256"} for w in json.loads(src.pop(
+            "warnings_json"))]
+        return result, src, fp and fp[0], els, warnings
+
+    def test_recovered_from_the_native_print(self):
+        import pymupdf
+
+        printed = ingestion.printed_pdf_path(self.env.settings, self.source_hash)
+        printed.parent.mkdir(parents=True, exist_ok=True)
+        with pymupdf.open() as doc:
+            page = doc.new_page()
+            page.insert_text((72, 72), "1. Project overview")
+            page.insert_text((72, 110), "The contractor maintains the system for twelve months.")
+            doc.save(printed)
+        result, src, fp, els, warnings = self.ingest()
+        self.assertEqual(result, {
+            "source_hash": self.source_hash, "status": "parsed", "extraction_id": src["active_extraction_id"],
+            "elements": 2, "tables": 0, "warnings": ["recovered_from_native_print"],
+            "diagnostic_flags": ["short_output", "no_tables"]})
+        self.assertEqual((src["parse_status"], src["review_status"], src["reason_code"]), ("parsed", "unreviewed", None))
+        self.assertEqual(fp, ingestion.parser_fingerprint("pdf") + "-hancom-print")
+        self.assertEqual(els, [("heading", "hwp_print", "1. Project overview"), (
+            "paragraph", "hwp_print", "The contractor maintains the system for twelve months.")])
+        self.assertEqual(warnings, [{"code": "recovered_from_native_print", "detail": "hwp_converter_missing"}])
+
+    def test_replacement_characters_are_a_warning(self):
+        raw = [{"path": "s0/p0", "kind": "paragraph", "parent": None, "raw_text": "하자보수 �� 기간",
+                "location": {"format": "hwp", "section": 0, "path": "s0/p0", "section_path": []}}]
+        with mock.patch.object(ingestion, "parse_hwp", return_value=(raw, [], None)):
+            result, src, fp, els, warnings = self.ingest()
+        self.assertEqual(result, {
+            "source_hash": self.source_hash, "status": "parsed", "extraction_id": src["active_extraction_id"],
+            "elements": 1, "tables": 0, "warnings": ["replacement_characters"],
+            "diagnostic_flags": ["short_output", "no_tables", "replacement_characters"]})
+        self.assertEqual((src["parse_status"], src["review_status"], src["reason_code"]), ("parsed", "unreviewed", None))
+        self.assertEqual(fp, ingestion.parser_fingerprint("hwp"))
+        self.assertEqual(els, [("paragraph", "hwp", "하자보수 �� 기간")])
+        self.assertEqual(warnings, [{"code": "replacement_characters", "count": 2}])
+
+
+class RecoverSourceRefusalTest(unittest.TestCase):
+    """Each refusal of recover_source, in the order its checks run."""
+
+    def test_refusals(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = fixtures.make_env(Path(tmp))
+            e, a = env.refs["기관E"].doc_id, env.refs["기관A"].doc_id
+            folder = Path(tmp).resolve()
+            pdf, hwpx, txt = folder / "c.pdf", folder / "c.hwpx", folder / "c.txt"
+            for f in (pdf, hwpx, txt):
+                f.write_bytes(b"%PDF-1.4")
+            good = {"reviewer": "owner", "method": "hancom print", "compared_locations": ["p1"],
+                    "mapping_limitations": "pages only", "fidelity_passed": True}
+
+            def review(**changes):
+                path = folder / f"review-{len(list(folder.glob('review-*')))}.json"
+                path.write_text(json.dumps({k: v for k, v in {**good, **changes}.items() if v is not None}),
+                                encoding="utf-8")
+                return path
+
+            empty = folder / "empty.json"
+            empty.write_text("[]", encoding="utf-8")
+            cases = [
+                ((e, Path("c.pdf"), review()), "--converted-file must be an absolute path"),
+                ((e, folder / "none.pdf", review()), "converted file not found"),
+                ((e, hwpx, review()), "HWPX recovery is not implemented: convert to PDF, or add an HWPX parser "
+                                      "once a real recovery artifact needs it"),
+                ((e, txt, review()), "recovery artifacts must be PDF"),
+                ((e, pdf, empty), "review file holds no record"),
+                ((e, pdf, review(method="")), "recovery review requires 'method'"),
+                ((e, pdf, review(fidelity_passed="yes")), "recovery review requires fidelity_passed: true|false"),
+                ((e, pdf, review(compared_locations="p1")),
+                 "compared_locations must be a list of the places compared (pages, tables, ...)"),
+                (("no-such-doc", pdf, review()), "unknown doc_id"),
+                ((a, pdf, review()), "only quarantined sources take a recovery artifact")]
+            for args, message in cases:
+                with self.subTest(message=message), self.assertRaises(ingestion.IngestionError) as caught:
+                    ingestion.recover_source(env.settings, *args)
+                self.assertEqual(str(caught.exception), message)
+
+
 class CompareCapCommandTest(unittest.TestCase):
     def test_stores_the_cap_and_audits_it(self):
         with tempfile.TemporaryDirectory() as tmp:
