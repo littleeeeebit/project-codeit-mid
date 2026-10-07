@@ -11,7 +11,7 @@ import re
 import tempfile
 import unittest
 from dataclasses import asdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -997,6 +997,11 @@ class ReleaseReportTest(unittest.TestCase):
 
     NAMES = ("report.md", "manifest.json", "coverage.json", "evaluation.json", "budget.json")
 
+    def setUp(self):
+        original = budget.snapshot
+        self.enterContext(mock.patch.object(budget, "snapshot", side_effect=
+            lambda db, today=None: original(db, today or date(2026, 10, 7))))  # the golden capture's pacing date
+
     def render(self, s, path: Path) -> str:
         return read_outputs(path.parent, self.NAMES, s.data_dir.parent)
 
@@ -1040,6 +1045,18 @@ class LoadCheckTest(unittest.TestCase):
     CHECKS = {"cap_never_exceeded": True, "one_generation_attempt_per_request": True,
               "no_open_reservation_left": True, "all_requests_finished": True, "duplicate_submit_reused_request": True}
 
+    def setUp(self):
+        self.costs = []
+        original = generation._echo_first_evidence
+
+        def echo(messages):
+            response = original(messages)
+            usage = response.usage
+            amount = Decimal("0.25") * usage["prompt_tokens"] + 2 * usage["completion_tokens"]
+            self.costs.append(int(amount.to_integral_value(rounding="ROUND_CEILING")))
+            return response
+        self.enterContext(mock.patch.object(generation, "_echo_first_evidence", side_effect=echo))
+
     def estimate(self, r) -> int:
         """The maximum reservation and the cap built from it. The fixture PDFs' bytes differ in every process (their
         source hashes, and the ids derived from them, with them), which moves the packed prompt by a token now and
@@ -1052,13 +1069,14 @@ class LoadCheckTest(unittest.TestCase):
     def settled(self, r) -> tuple[dict, int]:
         """The attempt states without `released`, and the cost of one answer. A budget-blocked request that
         reserved before losing the race releases its attempt, now and then, so at most one per blocked request;
-        the answer's cost moves with the estimate (432 or 433 micro-USD) and every answer costs the same."""
+        random source IDs change token usage, so exact charges follow the fake response at mini's recorded rates."""
         states = dict(r["attempt_states"])
         self.assertLessEqual(states.pop("released", 0), r["outcomes"].get("completed/budget_blocked", 0))
         answered = r["outcomes"].get("completed/answered", 0)
-        cost = r["spent_micro_usd"] // answered if answered else 432
-        self.assertIn(cost, (432, 433))
-        self.assertEqual(r["spent_micro_usd"], cost * answered)
+        self.assertEqual(len(self.costs), answered)
+        self.assertEqual(r["spent_micro_usd"], sum(self.costs))
+        cost = self.costs[0] if answered else 0
+        self.assertEqual(self.costs, [cost] * answered)
         return states, cost
 
     def test_six_users_under_the_cap(self):

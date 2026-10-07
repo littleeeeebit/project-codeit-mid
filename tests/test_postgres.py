@@ -256,7 +256,7 @@ class PostgreSQLTests(unittest.TestCase):
         environment.update(RFP_DATA_DIR=str(self.root / "startup"), RFP_DATABASE_DSN=self.target.dsn())
         with mock.patch.dict("os.environ", environment, clear=True):
             settings = load_settings()
-            self.assertEqual((settings.embedding_model, settings.embedding_dimensions), ("text-embedding-3-large", 1536))
+            self.assertEqual((settings.embedding_model, settings.embedding_dimensions), ("dragonkue/BGE-m3-ko", 1024))
             for model, dims in (("text-embedding-3-small", 1536), ("nlpai-lab/KURE-v1", 1024),
                                 ("gemini-embedding-001", 3072)):
                 self.assertEqual(load_settings(embedding_model=model, embedding_dimensions=dims).embedding_model, model)
