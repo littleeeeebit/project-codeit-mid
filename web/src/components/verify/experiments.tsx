@@ -257,7 +257,7 @@ function RowDetail({ t, r, onActivated }: { t: Table; r: Row; onActivated: () =>
   const qs = usePoll(r.status === "complete" && misses ? `experiment-q:${t.matrix}:${r.index}` : null, () => must(api.GET(
     "/api/verify/experiments/{matrix}/{index}/questions", { params: { path: { matrix: t.matrix, index: r.index } } }), errorText), null);
   const ref = useRef<HTMLElement>(null);
-  useEffect(() => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }), []);  // the detail opens below the table
+  useEffect(() => { ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, []);  // the detail opens below the table
   return (
     <section ref={ref} aria-labelledby="experiment-row" className="scroll-mt-20 space-y-8 border-t border-input pt-8">
       <div className="space-y-1">
