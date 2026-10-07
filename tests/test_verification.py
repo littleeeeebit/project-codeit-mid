@@ -160,6 +160,7 @@ class DatasetCopyTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"RFP_TEST_COPY_DSN":
                 "dbname=isolated host=localhost"}), mock.patch.object(fixtures, "database", return_value="RFP_TEST_COPY_DSN"), \
+                mock.patch("rfp_assistant.gateway.budget.set_paid_enabled") as enable, \
                 mock.patch.object(postgres_backup.shutil, "which", return_value=sys.executable), \
                 mock.patch.object(postgres_backup.subprocess, "run", return_value=mock.Mock(returncode=0)) as run, \
                 mock.patch.object(Path, "unlink"):
@@ -171,10 +172,14 @@ class DatasetCopyTest(unittest.TestCase):
             self.assertEqual(dump.kwargs["timeout"], 600)
             self.assertEqual(restore.kwargs["timeout"], 900)
             self.assertIn("--single-transaction", restore.args[0])
+            self.assertEqual(enable.call_args.args[0].dsn(), target.dsn())
 
     def test_a_configured_corpus_is_used_through_an_isolated_copy(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = fixtures.make_env(Path(tmp))
+            from rfp_assistant.gateway import budget
+
+            budget.set_paid_enabled(env.settings.db_path, "test", False, "paused source")
             data = env.settings.data_dir
             source_dsn = os.environ[env.settings.database_dsn_env]
             (data / "indexes").mkdir(exist_ok=True)
@@ -191,10 +196,12 @@ class DatasetCopyTest(unittest.TestCase):
                 self.assertEqual(ctx.env["RFP_DATABASE_DSN"], corpus["dsn"])  # what the served app and tools use
                 self.assertNotEqual(corpus["dsn"], source_dsn)
                 with psycopg.connect(corpus["dsn"], autocommit=True) as conn:
+                    self.assertTrue(conn.execute("SELECT paid_admission FROM database_control").fetchone()[0])
                     self.assertEqual(conn.execute("SELECT count(*) FROM documents").fetchone()[0], 4)
                     conn.execute("INSERT INTO audit_events(event_id, actor, action, target, reason, details_json, "
                                  "created_at) VALUES ('e', 'a', 'x', 't', 'r', '{}', 'now')")
                 with psycopg.connect(source_dsn) as conn:
+                    self.assertFalse(conn.execute("SELECT paid_admission FROM database_control").fetchone()[0])
                     self.assertEqual(conn.execute("SELECT COUNT(*) FROM audit_events WHERE event_id = 'e'")
                                      .fetchone()[0], 0)
                 self.assertEqual((copy / "indexes").resolve(), (data / "indexes").resolve())

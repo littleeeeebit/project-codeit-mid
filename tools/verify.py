@@ -258,7 +258,7 @@ class Context:
     def page(self, browser, origin: str):
         page = browser.new_context(viewport={"width": 1400, "height": 1000}, accept_downloads=True).new_page()
         page.on("response", lambda r: self.requests.append(
-            {"method": r.request.method, "url": r.url, "status": r.status}) if r.url.startswith("http") else None)
+            {"method": r.request.method, "url": r.url, "status": r.status}) if r.url.startswith(origin + "/") else None)
         return page
 
     def act(self, action: str, expected: str, fn) -> tuple[bool, str]:
@@ -312,6 +312,7 @@ def copy_database(source_dsn: str, work: Path) -> str:
     """DSN of a private copy of the configured database: pg_dump (one read-only snapshot) restored into a fresh
     test database. The dump file is removed; the copy is dropped when this process exits."""
     from psycopg.conninfo import conninfo_to_dict
+    from rfp_assistant.gateway import budget
 
     from rfp_assistant.storage import postgres, postgres_backup
     from tests import fixtures
@@ -324,6 +325,7 @@ def copy_database(source_dsn: str, work: Path) -> str:
     target = postgres.Target(fixtures.database(ready=False))
     postgres_backup._run("pg_restore", target, ["--no-owner", "--no-privileges", "--exit-on-error",
         "--single-transaction", "--dbname=" + conninfo_to_dict(target.dsn())["dbname"], str(dump)], work, timeout=900)
+    budget.set_paid_enabled(target, "verification", True, "fake-provider flows on a disposable corpus copy")
     dump.unlink()
     return target.dsn()
 
