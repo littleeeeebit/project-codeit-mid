@@ -595,34 +595,47 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
         out["claims"].append({"claim_id": c["claim_id"], "item": item, "verdict": (reviewed or {}).get("verdict", verdict),
                               "deterministic": verdict, "reviewed_by": (reviewed or {}).get("reviewer"),
                               "critical_kind": c.get("critical_kind")})
-    validity = record.get("link_validity") or {}
     for i, ac in enumerate(answer.get("claims") or []):
-        supports = []
-        for eid in ac.get("evidence_ids") or []:
-            ev = (record.get("evidence") or {}).get(eid) or {}
-            chunk = chunks.get(ev.get("chunk_id"))
-            best = max((evaluation.group_grade(chunk, g, index.elements) for g in groups
-                        if chunk is not None and g["doc_id"] == ev.get("doc_id")), default=0)
-            # A gold span in the cited chunk is retrieval relevance, not support for whatever the claim says
-            # (review rounds 1-2): only a claim quoted verbatim from its citation is supported without a person.
-            support = "supporting" if ac.get("doc_id") == ev.get("doc_id") and verbatim_support(
-                ac.get("text", ""), ev.get("quote") or "") else "unjudged"
-            item = f"{prefix}|link|{i}|{eid}"
-            reviewed = reviews.get(item)
-            support = (reviewed or {}).get("verdict", support)
-            supports.append(support)
-            out["links"].append({"claim_index": i, "evidence_id": eid, "item": item, "support": support,
-                                 "valid": bool(validity.get(eid)), "grade": best})
-        item = f"{prefix}|answer_claim|{i}"
-        reviewed = reviews.get(item)
-        supported = True if supports and "supporting" in supports else None
-        if reviewed:
-            supported = reviewed["verdict"] == "supported"
-        elif supports and all(s == "unsupported" for s in supports):
-            supported = False
-        out["answer_claims"].append({"index": i, "item": item, "kind": ac.get("kind"), "supported": supported,
-                                     "doc_id": ac.get("doc_id")})
+        links = _claim_links(i, ac, record, chunks, groups, index, prefix, reviews)
+        out["links"] += links
+        out["answer_claims"].append(_answer_claim(i, ac, [link["support"] for link in links], prefix, reviews))
     return out
+
+
+def _claim_links(i: int, ac: dict, record: dict, chunks: dict, groups: list[dict], index, prefix: str,
+                 reviews: dict[str, dict]) -> list[dict]:
+    """Each citation of answer claim `i`: its support (verbatim, else unjudged, unless reviewed), validity and the
+    best grade its chunk earns against a gold group of the cited document."""
+    validity = record.get("link_validity") or {}
+    links = []
+    for eid in ac.get("evidence_ids") or []:
+        ev = (record.get("evidence") or {}).get(eid) or {}
+        chunk = chunks.get(ev.get("chunk_id"))
+        best = max((evaluation.group_grade(chunk, g, index.elements) for g in groups
+                    if chunk is not None and g["doc_id"] == ev.get("doc_id")), default=0)
+        # A gold span in the cited chunk is retrieval relevance, not support for whatever the claim says
+        # (review rounds 1-2): only a claim quoted verbatim from its citation is supported without a person.
+        support = "supporting" if ac.get("doc_id") == ev.get("doc_id") and verbatim_support(
+            ac.get("text", ""), ev.get("quote") or "") else "unjudged"
+        item = f"{prefix}|link|{i}|{eid}"
+        reviewed = reviews.get(item)
+        links.append({"claim_index": i, "evidence_id": eid, "item": item,
+                      "support": (reviewed or {}).get("verdict", support), "valid": bool(validity.get(eid)),
+                      "grade": best})
+    return links
+
+
+def _answer_claim(i: int, ac: dict, supports: list[str], prefix: str, reviews: dict[str, dict]) -> dict:
+    """Answer claim `i` is supported by a supporting link, unsupported when every link is, else unjudged (None);
+    a review of the claim itself decides over its links."""
+    item = f"{prefix}|answer_claim|{i}"
+    reviewed = reviews.get(item)
+    supported = True if supports and "supporting" in supports else None
+    if reviewed:
+        supported = reviewed["verdict"] == "supported"
+    elif supports and all(s == "unsupported" for s in supports):
+        supported = False
+    return {"index": i, "item": item, "kind": ac.get("kind"), "supported": supported, "doc_id": ac.get("doc_id")}
 
 
 def served_retrieval(settings: Settings, index, row: dict, record: dict) -> dict | None:
