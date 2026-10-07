@@ -179,42 +179,54 @@ function MatrixView({ t, onActivated }: { t: Table; onActivated: () => void }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-input">
-            {rows.map((r) => {
-              const selected = r.index === open;
-              const done = r.status === "complete";
-              return (
-                <tr key={r.index} className={cn(selected ? "bg-accent" : "group hover:bg-secondary", r.active && "border-l-4 border-l-primary")}>
-                  <th scope="row" className={cn("sticky left-0 z-10 min-w-[15rem] max-w-[20rem] px-3 py-2 text-left font-medium", selected ? "bg-accent" : "bg-background group-hover:bg-secondary")}>
-                    <button type="button" aria-expanded={selected} onClick={() => setOpen(selected ? null : r.index)}
-                            className="min-h-11 w-full text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [overflow-wrap:anywhere]">
-                      {rowTitle(t, r)}
-                      {r.active && <span className="block text-xs font-semibold text-primary">서비스 중</span>}
-                    </button>
-                  </th>
-                  {done ? t.columns.map((c) => {
-                    const v = r.values[c.key];
-                    const isBest = c.better && v != null && v === bests[c.key];
-                    return <td key={c.key} className={cn("whitespace-nowrap px-3 py-2 text-right tabular-nums", isBest ? "font-bold text-primary" : "text-foreground")}>
-                      {fmt(c.key, v)}{isBest && <span className="sr-only"> (최고)</span>}
-                    </td>;
-                  }) : (
-                    <td colSpan={t.columns.length} className="px-3 py-2 text-[13px] text-muted-foreground">
-                      <span className="font-semibold text-warn">{STATUS[r.status] ?? r.status}</span>
-                      {r.status === "needs_approval" && r.estimate ? ` · 최대 $${(Number(r.estimate.total_micro_usd) / 1e6).toFixed(4)}, ${Number(r.estimate.corpus_tokens ?? 0).toLocaleString("ko-KR")} 토큰` : ""}
-                      {r.reason ? ` · ${r.reason}` : ""}
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
+            {rows.map((r) => (
+              <MatrixRow key={r.index} t={t} r={r} bests={bests} selected={r.index === open}
+                         onOpen={() => setOpen(r.index === open ? null : r.index)} />
+            ))}
           </tbody>
         </table>
       </div>
-      <p className="text-[13px] text-muted-foreground">굵은 파란 값이 열마다 가장 좋은 값입니다. 절반이 넘는 행이 같은 값이면 표시하지 않습니다. 개발 질문은 자기 문서 안에서, 전체 문서 열은 개발 질문과 바늘 질문을 모든 문서에서 검색한 결과입니다. 고정값: {Object.entries(t.fixed).map(([k, v]) => `${FIXED[k] ?? k} ${AXIS[k]?.[String(v)] ?? MODE[String(v)] ?? String(v)}`).join(", ") || "서비스 설정"}.
-        {t.matrix === "embedding" && " API 모델의 질의 임베딩 시간은 비용 장부에 남은 질문 호출의 왕복 시간입니다."}
-        {String(t.fixed.fusion ?? "").startsWith("keyword_first") && " 융합이 BM25 상위 6개를 제자리에 두므로 하이브리드와 상위 고정 행의 nDCG@5는 K1과 같습니다. 차이는 그 뒤 근거에서 나며, 근거 완전과 치명 실패 열에 보입니다."}</p>
+      <MatrixNotes t={t} />
       {cur && <RowDetail key={cur.index} t={t} r={cur} onActivated={onActivated} />}
     </section>
+  );
+}
+
+function MatrixRow({ t, r, bests, selected, onOpen }: {
+  t: Table; r: Row; bests: Record<string, Value>; selected: boolean; onOpen: () => void;
+}) {
+  const done = r.status === "complete";
+  return (
+    <tr className={cn(selected ? "bg-accent" : "group hover:bg-secondary", r.active && "border-l-4 border-l-primary")}>
+      <th scope="row" className={cn("sticky left-0 z-10 min-w-[15rem] max-w-[20rem] px-3 py-2 text-left font-medium", selected ? "bg-accent" : "bg-background group-hover:bg-secondary")}>
+        <button type="button" aria-expanded={selected} onClick={onOpen}
+                className="min-h-11 w-full text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [overflow-wrap:anywhere]">
+          {rowTitle(t, r)}
+          {r.active && <span className="block text-xs font-semibold text-primary">서비스 중</span>}
+        </button>
+      </th>
+      {done ? t.columns.map((c) => {
+        const v = r.values[c.key];
+        const isBest = c.better && v != null && v === bests[c.key];
+        return <td key={c.key} className={cn("whitespace-nowrap px-3 py-2 text-right tabular-nums", isBest ? "font-bold text-primary" : "text-foreground")}>
+          {fmt(c.key, v)}{isBest && <span className="sr-only"> (최고)</span>}
+        </td>;
+      }) : (
+        <td colSpan={t.columns.length} className="px-3 py-2 text-[13px] text-muted-foreground">
+          <span className="font-semibold text-warn">{STATUS[r.status] ?? r.status}</span>
+          {r.status === "needs_approval" && r.estimate ? ` · 최대 $${(Number(r.estimate.total_micro_usd) / 1e6).toFixed(4)}, ${Number(r.estimate.corpus_tokens ?? 0).toLocaleString("ko-KR")} 토큰` : ""}
+          {r.reason ? ` · ${r.reason}` : ""}
+        </td>
+      )}
+    </tr>
+  );
+}
+
+function MatrixNotes({ t }: { t: Table }) {
+  return (
+    <p className="text-[13px] text-muted-foreground">굵은 파란 값이 열마다 가장 좋은 값입니다. 절반이 넘는 행이 같은 값이면 표시하지 않습니다. 개발 질문은 자기 문서 안에서, 전체 문서 열은 개발 질문과 바늘 질문을 모든 문서에서 검색한 결과입니다. 고정값: {Object.entries(t.fixed).map(([k, v]) => `${FIXED[k] ?? k} ${AXIS[k]?.[String(v)] ?? MODE[String(v)] ?? String(v)}`).join(", ") || "서비스 설정"}.
+      {t.matrix === "embedding" && " API 모델의 질의 임베딩 시간은 비용 장부에 남은 질문 호출의 왕복 시간입니다."}
+      {String(t.fixed.fusion ?? "").startsWith("keyword_first") && " 융합이 BM25 상위 6개를 제자리에 두므로 하이브리드와 상위 고정 행의 nDCG@5는 K1과 같습니다. 차이는 그 뒤 근거에서 나며, 근거 완전과 치명 실패 열에 보입니다."}</p>
   );
 }
 

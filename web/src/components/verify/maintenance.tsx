@@ -120,7 +120,14 @@ export function MaintenanceSection() {
         {state.error && <Notice tone="bad">{state.error}</Notice>}
       </section>
 
-      {run && (
+      {run && <Steps run={run} />}
+      {regression.length > 0 && <RegressionRows rows={regression} />}
+    </div>
+  );
+}
+
+function Steps({ run }: { run: Run }) {
+  return (
         <section aria-labelledby="maint-steps" className="space-y-3">
           <h3 id="maint-steps" className="text-lg font-bold">단계</h3>
           <ol className="divide-y">
@@ -134,9 +141,11 @@ export function MaintenanceSection() {
             ))}
           </ol>
         </section>
-      )}
+  );
+}
 
-      {regression.length > 0 && (
+function RegressionRows({ rows: regression }: { rows: Regression[] }) {
+  return (
         <section aria-labelledby="maint-regression" className="space-y-3">
           <h3 id="maint-regression" className="text-lg font-bold">회귀 비교</h3>
           <Table caption="유지보수 회귀 비교: 서비스 중인 색인과 다시 만든 색인에서 K1과 서비스 구성" head={["행", "nDCG@5", "근거 완전", "nDCG@5 전체 문서", "바늘 상위 5", "치명 실패"]}>
@@ -153,7 +162,5 @@ export function MaintenanceSection() {
           </Table>
           <p className="text-sm text-muted-foreground">다시 만든 색인으로 바꾸려면 실험 비교의 &lsquo;회귀 (유지보수)&rsquo; 표에서 그 행을 열어 활성화하세요.</p>
         </section>
-      )}
-    </div>
   );
 }

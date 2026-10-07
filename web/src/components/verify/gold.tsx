@@ -127,6 +127,31 @@ export function SecondReviewDetail({ w, onDone }: { w: Waiting; onDone: () => vo
         <h3 className="text-lg font-bold leading-snug">{w.question}</h3>
         <p className="font-mono text-xs text-muted-foreground">{w.candidate_id}</p>
       </header>
+      <ClaimsAndEvidence w={w} />
+      <form onSubmit={submit} className="space-y-4 rounded-2xl bg-secondary/60 p-4">
+        <fieldset className="space-y-2">
+          <legend className="text-[13px] font-semibold">원문과 대조한 결과</legend>
+          <div className="flex gap-4 text-sm">
+            {[["동의", true], ["동의하지 않음", false]].map(([t, v]) => (
+              <label key={String(t)} className="flex items-center gap-2">
+                <input type="radio" name={`${id}-verdict`} checked={agreed === v} onChange={() => setAgreed(v as boolean)} className="size-4 accent-primary" />{t}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <Field id={`${id}-note`} label="확인 내용 (원문 위치 포함)">
+          <textarea id={`${id}-note`} rows={3} required value={note} onChange={(e) => setNote(e.target.value)} className={cn(field, "py-2")} />
+        </Field>
+        <div className="flex flex-wrap items-center gap-3"><Button type="submit" size="lg" disabled={state.busy}>2차 검토 저장</Button><span className="text-[13px] text-muted-foreground">결과와 메모가 수정 기록에 자동으로 남습니다.</span></div>
+        {state.error && <Notice tone="bad">{state.error}</Notice>}
+      </form>
+    </article>
+  );
+}
+
+function ClaimsAndEvidence({ w }: { w: Waiting }) {
+  return (
+    <>
       <Section title={`필수 주장 ${w.required_claims.length}개`}>
         <Table caption="필수 주장" head={["주장", "형식", "값", "중요도", "근거 그룹"]}>
           {w.required_claims.map((c, i) => (
@@ -149,23 +174,6 @@ export function SecondReviewDetail({ w, onDone }: { w: Waiting; onDone: () => vo
           )))}
         </ul>
       </Section>
-      <form onSubmit={submit} className="space-y-4 rounded-2xl bg-secondary/60 p-4">
-        <fieldset className="space-y-2">
-          <legend className="text-[13px] font-semibold">원문과 대조한 결과</legend>
-          <div className="flex gap-4 text-sm">
-            {[["동의", true], ["동의하지 않음", false]].map(([t, v]) => (
-              <label key={String(t)} className="flex items-center gap-2">
-                <input type="radio" name={`${id}-verdict`} checked={agreed === v} onChange={() => setAgreed(v as boolean)} className="size-4 accent-primary" />{t}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <Field id={`${id}-note`} label="확인 내용 (원문 위치 포함)">
-          <textarea id={`${id}-note`} rows={3} required value={note} onChange={(e) => setNote(e.target.value)} className={cn(field, "py-2")} />
-        </Field>
-        <div className="flex flex-wrap items-center gap-3"><Button type="submit" size="lg" disabled={state.busy}>2차 검토 저장</Button><span className="text-[13px] text-muted-foreground">결과와 메모가 수정 기록에 자동으로 남습니다.</span></div>
-        {state.error && <Notice tone="bad">{state.error}</Notice>}
-      </form>
-    </article>
+    </>
   );
 }
