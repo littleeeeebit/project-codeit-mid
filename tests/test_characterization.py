@@ -996,7 +996,8 @@ class ReleaseReportTest(unittest.TestCase):
 
 class LoadCheckTest(unittest.TestCase):
     """ops.load_check against the fake provider. How many of six users' requests the cap blocks depends on thread
-    timing, so that run pins the invariants; the three-user run with injected timeouts is pinned whole."""
+    timing, so both runs pin their invariants and the amounts as their derivation from the estimate and the call
+    count; the rest of the injected-timeout run is pinned whole."""
 
     KEYS = ["kind", "synthetic", "users", "requests_per_user", "fake_delay_seconds", "fail_every", "cap_micro_usd",
             "max_reservation_micro_usd", "affordable_at_once", "outcomes", "attempt_states", "provider_calls",
@@ -1005,16 +1006,38 @@ class LoadCheckTest(unittest.TestCase):
     CHECKS = {"cap_never_exceeded": True, "one_generation_attempt_per_request": True,
               "no_open_reservation_left": True, "all_requests_finished": True, "duplicate_submit_reused_request": True}
 
+    def estimate(self, r) -> int:
+        """The maximum reservation and the cap built from it. The fixture PDFs' bytes differ in every process (their
+        source hashes, and the ids derived from them, with them), which moves the packed prompt by a token now and
+        then: the estimate is 2272 micro-USD within a few, the cap is always four of it plus half of one."""
+        est = r["max_reservation_micro_usd"]
+        self.assertLessEqual(abs(est - 2272), 8)
+        self.assertEqual((r["affordable_at_once"], r["cap_micro_usd"]), (4, 4 * est + est // 2))
+        return est
+
+    def settled(self, r) -> tuple[dict, int]:
+        """The attempt states without `released`, and the cost of one answer. A budget-blocked request that
+        reserved before losing the race releases its attempt, now and then, so at most one per blocked request;
+        the answer's cost moves with the estimate (155 or 156 micro-USD) and every answer costs the same."""
+        states = dict(r["attempt_states"])
+        self.assertLessEqual(states.pop("released", 0), r["outcomes"].get("completed/budget_blocked", 0))
+        answered = r["outcomes"].get("completed/answered", 0)
+        cost = r["spent_micro_usd"] // answered if answered else 155
+        self.assertIn(cost, (155, 156))
+        self.assertEqual(r["spent_micro_usd"], cost * answered)
+        return states, cost
+
     def test_six_users_under_the_cap(self):
         r = ops.load_check(users=6, requests_per_user=2, delay_seconds=0.05)
         self.assertEqual(list(r), self.KEYS)
-        self.assertEqual((r["cap_micro_usd"], r["max_reservation_micro_usd"], r["checks"], r["passed"],
-                          r["violations"], r["pending_unknown_micro_usd"]), (10224, 2272, self.CHECKS, True, [], 0))
+        self.estimate(r)
+        self.assertEqual((r["checks"], r["passed"], r["violations"], r["pending_unknown_micro_usd"]),
+                         (self.CHECKS, True, [], 0))
         answered = r["outcomes"].get("completed/answered", 0)
         self.assertLessEqual(set(r["outcomes"]), {"completed/answered", "completed/budget_blocked"})
         self.assertEqual(sum(r["outcomes"].values()), 12)
-        self.assertEqual((r["provider_calls"], r["attempt_states"], r["spent_micro_usd"]),
-                         (answered, {"settled": answered}, 155 * answered))
+        states, _ = self.settled(r)
+        self.assertEqual((r["provider_calls"], states), (answered, {"settled": answered} if answered else {}))
         self.assertEqual((list(r["submit_ms"]), list(r["poll_ms"])), (["p50", "p95"], ["samples", "p50", "p95", "max"]))
         self.assertGreater(r["poll_ms"]["samples"], 0)
 
@@ -1022,13 +1045,24 @@ class LoadCheckTest(unittest.TestCase):
         r = ops.load_check(users=3, requests_per_user=2, delay_seconds=0.05, fail_every=2)
         for k in ("submit_ms", "poll_ms", "wall_seconds"):
             r.pop(k)
+        est = self.estimate(r)
+        # Usually four calls go out; now and then a third blocked request leaves only three. Every second call
+        # times out, so the split follows the call count.
+        calls = r.pop("provider_calls")
+        self.assertIn(calls, (3, 4))
+        failed = calls // 2
+        self.assertEqual(r["outcomes"], {"completed/answered": calls - failed, "completed/budget_blocked": 6 - calls,
+                                         "failed/technical_error": failed})
+        self.assertEqual(r.pop("pending_unknown_micro_usd"), failed * est)  # the timed-out attempts' reservations
+        r["attempt_states"], cost = self.settled(r)
+        self.assertEqual(r.pop("spent_micro_usd"), (calls - failed) * cost)
+        for k in ("cap_micro_usd", "max_reservation_micro_usd", "outcomes"):
+            r.pop(k)
         self.assertEqual(r, {
             "kind": "fake_provider_load_check", "synthetic": True, "users": 3, "requests_per_user": 2,
-            "fake_delay_seconds": 0.05, "fail_every": 2, "cap_micro_usd": 10224, "max_reservation_micro_usd": 2272,
-            "affordable_at_once": 4, "outcomes": {"completed/answered": 2, "completed/budget_blocked": 2,
-                                                  "failed/technical_error": 2},
-            "attempt_states": {"settled": 2, "unknown": 2}, "provider_calls": 4, "spent_micro_usd": 310,
-            "pending_unknown_micro_usd": 4544, "violations": [], "checks": self.CHECKS, "passed": True})
+            "fake_delay_seconds": 0.05, "fail_every": 2, "affordable_at_once": 4,
+            "attempt_states": {"settled": calls - failed, "unknown": failed},
+            "violations": [], "checks": self.CHECKS, "passed": True})
 
 
 class Phase3ReportTest(unittest.TestCase):
