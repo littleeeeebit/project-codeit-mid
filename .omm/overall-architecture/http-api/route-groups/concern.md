@@ -1,0 +1,1 @@
+GET /api/requests/{id}/stream is a synchronous generator. It calls `service.answer_progress` every 150 ms, which is one requests query per tick, and holds a threadpool thread for the whole generation. That is acceptable at the six-member target, but it scales linearly with open streams.

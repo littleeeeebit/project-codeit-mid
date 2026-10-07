@@ -1,0 +1,1 @@
+Settings (설정). GET and PUT /api/settings/api-key save a key with its model; the server checks them with a free model-metadata call. PUT /api/settings/model changes the model. GET /api/budget and PUT /api/budget/limit change the shared cap, with a reason. The key is never returned; the status names who set it and when.

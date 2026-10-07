@@ -1,0 +1,1 @@
+Free modes (metadata, inventory) skip the executor and every paid stage. `submit_answer` creates their row as running and runs `_execute` inline. They read typed CSV values (`metadata_facts`) and the index's `requirements` rows (`requirement_inventory`).

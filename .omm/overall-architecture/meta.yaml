@@ -1,9 +1,9 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-07 04:46:44.285000+00:00
-update_count: 34
+updated: 2026-10-07 06:24:14.903000+00:00
+update_count: 36
 last_field: diagram
-git_commit: 8fe51c5
-git_branch: refactor-3858e4c2-tests
+git_commit: e4bab69
+git_branch: verify-page-criteria-and-roles
 children:
 - api-layer
 - api-routes
@@ -15,7 +15,6 @@ children:
 - http-api
 - langfuse-tracing
 - offline-pipelines
-- openai-provider
 - openai-transport
 - owner-cli
 - paid-gateway
@@ -30,17 +29,19 @@ children:
 - storage
 - web-pages
 - web-screens
-prev_diagram: "graph TD\r\n  web-screens[\"Web screens\\nweb/src/lib/api.ts\"]\r\n\
-  \  api-layer[\"HTTP API and session gate\\nsrc/rfp_assistant/api.py\"]\r\n  jupyterhub[\"\
-  JupyterHub OAuth, external\\nsrc/rfp_assistant/service/auth.py\"]\r\n  service-core[\"\
-  Service core and executor\\nsrc/rfp_assistant/service/service.py\"]\r\n  retrieval-engine[\"\
+prev_diagram: "graph TD\r\n  web-screens[\"Next.js screens\\nweb/src/components/ask/ask-page.tsx\"\
+  ]\r\n  api-shell[\"FastAPI shell\\nsrc/rfp_assistant/api.py\"]\r\n  service-core[\"\
+  Service core\\nsrc/rfp_assistant/service/service.py\"]\r\n  retrieval-engine[\"\
   Retrieval engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  paid-gateway[\"\
-  Paid gateway and ledger\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n  storage[\"\
-  PostgreSQL and runtime files\\nsrc/rfp_assistant/storage/store.py\"]\r\n  owner-cli[\"\
-  Owner CLI\\nsrc/rfp_assistant/cli.py\"]\r\n  web-screens -->|fetch, SSE, session\
-  \ cookie| api-layer\r\n  api-layer -->|code exchange, whoami| jupyterhub\r\n  api-layer\
-  \ -->|one service call per route| service-core\r\n  service-core -->|scoped retrieval|\
-  \ retrieval-engine\r\n  service-core -->|reserve, dispatch, settle| paid-gateway\r\
-  \n  retrieval-engine -->|chunks, pgvector search| storage\r\n  paid-gateway -->|attempt\
-  \ rows| storage\r\n  service-core -->|requests, runs, audit| storage\r\n  owner-cli\
-  \ -->|same service and pipelines| service-core"
+  Paid gateway\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n  postgresql-store[\"PostgreSQL\
+  \ and pgvector\\nsrc/rfp_assistant/storage/postgres.py\"]\r\n  offline-pipelines[\"\
+  Offline pipelines\\nsrc/rfp_assistant/cli.py\"]\r\n  openai-provider[\"OpenAI provider\\\
+  nsrc/rfp_assistant/gateway/generation.py\"]\r\n  web-screens -->|\"JSON fetch, SSE\
+  \ stream\"| api-shell\r\n  api-shell -->|\"one service call per route\"| service-core\r\
+  \n  service-core -->|\"scoped question\"| retrieval-engine\r\n  service-core -->|\"\
+  reserve, call, settle\"| paid-gateway\r\n  paid-gateway -->|\"chat and embeddings\"\
+  | openai-provider\r\n  retrieval-engine -->|\"index rows, vector search\"| postgresql-store\r\
+  \n  paid-gateway -->|\"attempts ledger, advisory lock\"| postgresql-store\r\n  service-core\
+  \ -->|\"requests, audit rows\"| postgresql-store\r\n  service-core -->|\"starts\
+  \ eval and maintenance jobs\"| offline-pipelines\r\n  offline-pipelines -->|\"extractions,\
+  \ indexes, activation\"| postgresql-store"

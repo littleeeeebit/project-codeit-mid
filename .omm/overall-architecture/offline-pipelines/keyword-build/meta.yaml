@@ -1,9 +1,0 @@
-created: 2026-10-07T04:46:50.447Z
-updated: 2026-10-07T04:46:50.449Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: keyword-build
-children: []
-parentPath:
-  - offline-pipelines

@@ -1,6 +1,6 @@
 "use client";
 
-// 실험 비교. Who comes here: the person who picks what serves. Pipelines ran every variant (`compare --matrix`);
+// 검색 구성 비교. Who comes here: the person who picks what serves. Pipelines ran every variant (`compare --matrix`);
 // this page puts their numbers side by side and switches serving to the row they pick. Reading order: what serves
 // now, the matrix, the best value of its first quality column, then the table itself (sortable, best value per
 // column and the serving row marked). Opening a row shows the questions it failed and the activation; model

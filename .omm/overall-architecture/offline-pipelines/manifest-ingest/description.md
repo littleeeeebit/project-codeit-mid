@@ -1,0 +1,5 @@
+`import_manifest` reads `data_list.csv` and hashes every original. Each unique byte hash gets one `sources` row, and each CSV association gets one `documents` row. `ingest`/`ingest_source` parses each unique source once:
+- HWP goes through the pyhwp `hwp5proc` converter. If that fails, it falls back to the text layer of the Hancom print.
+- PDF goes through PyMuPDF.
+- Cached OCR regions are merged as `image_text`.
+`assign_revision` binds the extraction revision to the actual output. A parse failure quarantines the source (`parse_status=quarantined`, `review_status=needs_recovery`). A crashing file is recorded as `error`, and the run continues. Unchanged inputs (`extraction_inputs.input_key`) are reused. The owner-only commands `recover-source`, `import-reviews` and `resolve-metadata` correct sources and metadata.

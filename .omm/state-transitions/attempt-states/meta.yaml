@@ -1,9 +1,14 @@
 created: 2026-10-06 07:31:37.565000+00:00
-updated: 2026-10-06 10:18:26.018000+00:00
-update_count: 4
-last_field: diagram
+updated: 2026-10-07T06:24:29.253Z
+update_count: 7
+last_field: constraint
 kind: nested-class
 title: attempt-states
 children:
-- unknown
+  - dispatching
+  - reconciled
+  - released
+  - reserved
+  - settled
+  - unknown
 parentPath: []

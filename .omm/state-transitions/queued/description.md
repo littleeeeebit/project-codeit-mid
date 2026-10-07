@@ -1,1 +1,0 @@
-Inserted by `_create` for paid modes after admission. It leaves this state by being claimed (`run_queued`), cancelled (`cancel_request`, `abandon_request`), interrupted (`RequestRunner.shutdown`, `recover_requests`), or failed when it never reached the executor (`_fail_unscheduled`). No paid call was ever made from this state.

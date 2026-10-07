@@ -1,9 +1,0 @@
-created: 2026-10-07T04:46:48.500Z
-updated: 2026-10-07T04:46:48.501Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: owner-lock
-children: []
-parentPath:
-  - paid-gateway

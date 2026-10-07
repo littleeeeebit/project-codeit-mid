@@ -1,1 +1,7 @@
-How source material becomes a cited answer. Each stage is content-addressed and kept, so issued citations still resolve after reparses and index rebuilds. `_ordered_elements` falls back to the preserved extraction artifact when a newer index no longer carries an older revision.
+How corpus bytes become cited evidence, and where each form is persisted. Every hop is identified by a hash:
+- source_hash: the original bytes;
+- extraction_id: the parser fingerprint plus the output;
+- index_version: the configuration hash;
+- the dense set version;
+- payload_hash: the normalized text plus model and dimensions;
+- evidence_id: per request.

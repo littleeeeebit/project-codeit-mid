@@ -1,0 +1,19 @@
+graph TD
+  systemd-unit["systemd unit\ntools/infra/bidmate.service"]
+  server-env["Server environment\ntools/infra/bidmate.service"]
+  postgresql-container["PostgreSQL container\ntools/infra/start-postgresql.sh"]
+  bidmate-process["BidMate process\nsrc/rfp_assistant/api.py"]
+  jupyterhub-host["JupyterHub host\nsrc/rfp_assistant/service/auth.py"]
+  member-browser["Member browser\nweb/src/lib/api.ts"]
+  cli-wrapper["Owner CLI wrapper\ntools/infra/bidmate-cli.sh"]
+  local-dev["Local development\nweb/next.config.ts"]
+  systemd-unit -->|"loads env file"| server-env
+  systemd-unit -->|"ExecStartPre starts"| postgresql-container
+  systemd-unit -->|"uvicorn, one worker"| bidmate-process
+  bidmate-process -->|"pooled DSN connections"| postgresql-container
+  member-browser -->|"HTTP :8501"| bidmate-process
+  member-browser -->|"OAuth sign-in"| jupyterhub-host
+  bidmate-process -->|"code exchange, user lookup"| jupyterhub-host
+  cli-wrapper -->|"same env, bidmate user"| server-env
+  cli-wrapper -->|"ledger and pipelines"| postgresql-container
+  local-dev -->|"dev proxy /api to 8511"| bidmate-process

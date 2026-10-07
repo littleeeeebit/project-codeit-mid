@@ -1,22 +1,38 @@
 created: 2026-10-06 07:31:43.364000+00:00
-updated: 2026-10-06 08:48:52.492000+00:00
-update_count: 8
+updated: 2026-10-07T06:24:32.722Z
+update_count: 10
 last_field: diagram
-git_commit: 4a77ef6
-git_branch: deploy-gcp-vm-ssh-tunnel
+git_commit: e4bab69
+git_branch: verify-page-criteria-and-roles
 children:
-- app-process
-- key-sessions
-- openai-api
-- ssh-tunnel
-- systemd-unit
-- uvicorn-service
-prev_diagram: "graph TD\r\n  member-browser[\"Member browser\\nweb/src/lib/member.ts\"\
-  ] -->|localhost 8501| ssh-tunnel[\"SSH local forward\\ndocs/operations/runbook.md\"\
-  ]\r\n  ssh-tunnel -->|127.0.0.1:8501 on codeit| uvicorn-service[\"systemd uvicorn,\
-  \ one worker\\ntools/infra/bidmate.service\"]\r\n  uvicorn-service -->|serves static export|\
-  \ static-web-build[\"Built screens\\nweb/src/app/layout.tsx\"]\r\n  uvicorn-service\
-  \ -->|DSN from server.env| postgres-container[\"PostgreSQL 18.6 + pgvector\\ncompose.postgresql.yaml\"\
-  ]\r\n  member-browser -->|key entry cookie| key-sessions[\"In-memory key sessions\\\
-  nsrc/rfp_assistant/generation.py\"]\r\n  key-sessions -->|per-request contextvars|\
-  \ uvicorn-service"
+  - app-process
+  - bidmate-process
+  - cli-wrapper
+  - jupyterhub-host
+  - key-sessions
+  - local-dev
+  - member-browser
+  - openai-api
+  - postgresql-container
+  - server-env
+  - ssh-tunnel
+  - systemd-unit
+  - uvicorn-service
+prev_diagram: "graph TD\r
+
+  \  member-browser[\"Member browser\\nweb/src/lib/member.ts\"] -->|localhost
+  8501| ssh-tunnel[\"SSH local forward\\ndocs/operations/runbook.md\"]\r
+
+  \  ssh-tunnel -->|127.0.0.1:8501 on codeit| uvicorn-service[\"systemd uvicorn,
+  one worker\\ntools/infra/bidmate.service\"]\r
+
+  \  uvicorn-service -->|serves static export| static-web-build[\"Built
+  screens\\nweb/src/app/layout.tsx\"]\r
+
+  \  uvicorn-service -->|DSN from server.env| postgres-container[\"PostgreSQL
+  18.6 + pgvector\\ncompose.postgresql.yaml\"]\r
+
+  \  member-browser -->|key entry cookie| key-sessions[\"In-memory key
+  sessions\\nsrc/rfp_assistant/generation.py\"]\r
+
+  \  key-sessions -->|per-request contextvars| uvicorn-service"

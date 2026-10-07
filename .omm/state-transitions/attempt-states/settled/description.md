@@ -1,0 +1,1 @@
+The final cost, priced once from the reported usage (uncached, cached, cache-write and output tokens). If the cost exceeds the reservation, `frozen_reason` is set and paid admission closes until someone inspects it.

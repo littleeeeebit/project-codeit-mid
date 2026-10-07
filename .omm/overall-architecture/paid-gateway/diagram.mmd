@@ -1,12 +1,16 @@
 graph TD
-  ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"]
-  transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
-  key-sessions["Member key sessions\nsrc/rfp_assistant/gateway/generation.py"]
-  owner-lock["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
+  budget-ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"]
+  dispatch-guard["Dispatch marker and guard\nsrc/rfp_assistant/gateway/budget.py"]
+  openai-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
+  openai-api["OpenAI API\nsrc/rfp_assistant/gateway/generation.py"]
+  gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
   tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
-  fake["Fake transport\nsrc/rfp_assistant/gateway/generation.py"]
-  ledger -->|"require_owner, owner_guard"| owner-lock
-  transport -->|"_check_owner before call"| owner-lock
-  transport -->|"client per KEY_SESSION"| key-sessions
-  tracing -->|"wraps each call"| transport
-  fake -->|"stands in when provider fake"| transport
+  langfuse["Langfuse stack\ntools/infra/start-langfuse.ps1"]
+  budget-ledger -->|"reserved attempt id"| dispatch-guard
+  dispatch-guard -->|"dispatching committed"| openai-transport
+  openai-transport -->|"chat or embeddings"| openai-api
+  openai-transport -->|"usage or provider error"| budget-ledger
+  gateway-owner -->|"lock check before call"| openai-transport
+  budget-ledger -->|"owner_guard in transaction"| gateway-owner
+  openai-transport -->|"generation span"| tracing
+  tracing -->|"span and score export"| langfuse

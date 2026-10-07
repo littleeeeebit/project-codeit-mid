@@ -1,1 +1,0 @@
-No charge. Sources: the dispatch guard refused (cancelled, interrupted, maintenance, unknown attempts present), a provider 4xx before execution, no API key, or `budget.recover` for reservations that were never dispatched.

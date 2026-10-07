@@ -1,0 +1,1 @@
+`RequestRunner._run` -> `run_queued`. `UPDATE requests SET status='running' WHERE status='queued' AND cancel_requested=0` claims the row exactly once, so a request cancelled while queued never starts. The worker rebuilds `AnswerRequest` and `Principal` from `request_json` and calls `_execute`. It never touches UI state, and it releases the admission slot in `finally`.

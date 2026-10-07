@@ -1,0 +1,1 @@
+An optional external Langfuse v4 stack: Compose project bidmate-langfuse on 127.0.0.2:3100, started by tools/infra/start-langfuse.ps1. It receives spans and scores only. Admission, reservations and settlement never read it, so a stopped stack changes neither answers nor the ledger.

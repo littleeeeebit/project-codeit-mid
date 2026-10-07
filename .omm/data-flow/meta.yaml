@@ -1,42 +1,44 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-07 04:46:57.579000+00:00
-update_count: 30
+updated: 2026-10-07 06:24:31.033000+00:00
+update_count: 32
 last_field: diagram
-git_commit: 8fe51c5
-git_branch: refactor-3858e4c2-tests
+git_commit: e4bab69
+git_branch: verify-page-criteria-and-roles
 children:
 - activation
-- citation-pane
 - corpus-ingestion
 - embedding-set
-- evidence-map
+- evaluation-runs
+- evidence-view
 - extraction
-- extractions
+- extraction-artifacts
 - fidelity-and-ocr
 - fidelity-check
 - fidelity-ocr
 - frozen-runs
+- gold-datasets
 - index-build
-- keyword-index
+- keyword-indexes
 - ocr-merge
 - original-corpus
 - original-files
 - originals
+- request-evidence
 - retrieval-runs
 - retrieval-selection
 - run-selection
 - source-originals
-prev_diagram: "graph TD\r\n  originals[\"Originals and CSV manifest\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  fidelity-ocr[\"Fidelity print and OCR\\nsrc/rfp_assistant/corpus/fidelity.py\"\
+- vector-sets
+prev_diagram: "graph TD\r\n  originals[\"Originals and CSV\\nsrc/rfp_assistant/corpus/ingestion.py\"\
   ]\r\n  extractions[\"Extraction revisions\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  keyword-build[\"Keyword index build\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  dense-build[\"Dense vector sets\\nsrc/rfp_assistant/retrieval/dense.py\"\
-  ]\r\n  retrieval-runs[\"Frozen runs and matrices\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  activation[\"Serving activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  cited-evidence[\"Answers and citations\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  originals -->|manifest, ingest by hash| extractions\r\n  fidelity-ocr -->|print\
-  \ text, image_text| extractions\r\n  extractions -->|elements, review status| keyword-build\r\
-  \n  keyword-build -->|chunk payloads| dense-build\r\n  keyword-build -->|index version|\
-  \ retrieval-runs\r\n  dense-build -->|dense set version| retrieval-runs\r\n  retrieval-runs\
-  \ -->|person picks a row| activation\r\n  activation -->|active_run, active_index|\
-  \ cited-evidence"
+  ]\r\n  keyword-index[\"Keyword index artifacts\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  embedding-set[\"pgvector embedding set\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
+  ]\r\n  activation[\"Activated serving config\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
+  ]\r\n  evidence-map[\"Request evidence map\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  citation-pane[\"Evidence pane and original\\nweb/src/components/ask/answer-parts.tsx\"\
+  ]\r\n  originals -->|\"manifest, ingest\"| extractions\r\n  extractions -->|\"chunk\
+  \ by profile\"| keyword-index\r\n  keyword-index -->|\"payload hashes embedded\"\
+  | embedding-set\r\n  keyword-index -->|\"active_index pointer\"| activation\r\n\
+  \  embedding-set -->|\"dense_version\"| activation\r\n  activation -->|\"serving\
+  \ per request\"| evidence-map\r\n  evidence-map -->|\"open_evidence, download\"\
+  | citation-pane"

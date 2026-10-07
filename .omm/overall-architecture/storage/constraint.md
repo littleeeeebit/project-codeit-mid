@@ -1,0 +1,1 @@
+`init_schema` is idempotent and never resets the ledger. It is at SCHEMA_VERSION 6, runs under an advisory transaction lock, and refuses a newer schema. Startup and every CLI command except check, load-check and restore-check run `require_imported_database`.

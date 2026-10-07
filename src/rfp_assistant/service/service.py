@@ -2322,15 +2322,14 @@ def evaluation_overview(res: Resources, principal: Principal) -> dict:
     """What the verifier may see of phase 4: development validation and freeze state, the sealed set's size and
     freeze state only, development answer runs and their scores, and the latest release decision."""
     principal = _authorize(res, principal, "verifier")
-    from ..evaluation import evaluation
+    from ..evaluation import evaluation, release
 
     s = res.settings
     dev = evaluation.dataset_path(s, "dev")
     validation = json.loads(dev.with_suffix(".validation.json").read_text(encoding="utf-8")) \
         if dev.with_suffix(".validation.json").exists() else None
     runs = []
-    base = s.data_dir / "runs"
-    for d in sorted(base.glob("A-*")) if base.exists() else []:
+    for d in sorted((s.data_dir / "runs").glob("A-*")):  # nothing when the directory does not exist
         try:
             config = json.loads((d / "config.json").read_text(encoding="utf-8"))
             rows_file = d / "rows.jsonl"
@@ -2354,8 +2353,9 @@ def evaluation_overview(res: Resources, principal: Principal) -> dict:
             releases.append((path.stat().st_mtime, data))
     return {"dev_validation": validation, "dev_frozen": evaluation.frozen_dataset(s, "dev"),
             "test": {"rows": sealed_rows_count(s), "frozen": bool(test), "current": bool(test and test["current"])},
-            "answer_runs": runs,
-            "release": max(releases, key=lambda x: x[0])[1] if releases else None}
+            "answer_runs": sorted(runs, key=lambda r: r["config"].get("created_at") or ""),  # IDs are hashes: by time
+            "release": max(releases, key=lambda x: x[0])[1] if releases else None, "targets": {
+                "rates": release.TARGETS, "latency_ms": release.LATENCY_TARGETS_MS}}
 
 
 def sealed_rows_count(settings: Settings) -> int:

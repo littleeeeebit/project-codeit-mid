@@ -1,0 +1,1 @@
+Frozen run directories live under `.runtime/runs/<run_id>/` (config, traces.jsonl, scores.json, report.md), and comparison tables under `.runtime/compare/`. A run is bound to the dataset hash, the evaluated population, the index manifest, the analyzer and the dense version. Activation refuses it once any of those changes (`run_errors`).

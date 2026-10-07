@@ -62,7 +62,7 @@ function summary(s: Step): string {
     case "keyword": return d.same_as_served ? `서비스 중인 색인 ${short(d.index_version)} 그대로` : `새 색인 ${short(d.index_version)} · 서비스 중 ${short(d.served_index_version)} (활성화 전)`;
     case "embedding": return s.status === "skipped" ? "키워드 검색만 서비스 중"
       : s.status === "reused" ? `${d.model} · 새 청크 없음` : `${d.model} · 새로 임베딩 ${n(d.embedded ?? 0)}개 · ${d.cost_usd ? `$${d.cost_usd}` : "무료"}`;
-    case "regression": return `${d.rows?.length ?? 0}행 · 실험 비교의 '회귀 (유지보수)' 표${d.needs_evidence_review?.length
+    case "regression": return `${d.rows?.length ?? 0}행 · 검색 구성 비교의 '회귀 (유지보수)' 표${d.needs_evidence_review?.length
       ? ` · 다시 읽은 원문 때문에 새 색인 행에서 빠진 질문 ${d.needs_evidence_review.length}개 (근거 재검토 필요)` : ""}`;
     case "report": return d.judge_set ? `개발 세트 ${n(d.development_rows)}행 · 판정 골든 세트 오답 ${n(d.judge_set.negatives)} / 정답 ${n(d.judge_set.positives)}` : `개발 세트 ${n(d.development_rows)}행`;
   }
@@ -160,7 +160,7 @@ function RegressionRows({ rows: regression }: { rows: Regression[] }) {
               </tr>
             ))}
           </Table>
-          <p className="text-sm text-muted-foreground">다시 만든 색인으로 바꾸려면 실험 비교의 &lsquo;회귀 (유지보수)&rsquo; 표에서 그 행을 열어 활성화하세요.</p>
+          <p className="text-sm text-muted-foreground">다시 만든 색인으로 바꾸려면 검색 구성 비교의 &lsquo;회귀 (유지보수)&rsquo; 표에서 그 행을 열어 활성화하세요.</p>
         </section>
   );
 }

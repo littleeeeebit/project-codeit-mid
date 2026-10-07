@@ -1,1 +1,0 @@
-Written by `_finish` with any domain status (`answered`-style payload statuses, `insufficient_evidence`, `ingestion_unavailable`, `budget_blocked`) whenever the request ran to its end. The result is attachable only through `may_attach`.

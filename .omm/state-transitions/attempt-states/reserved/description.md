@@ -1,0 +1,1 @@
+Inserted by `budget.reserve` with the maximum cost, after every admission check passed in the same transaction.

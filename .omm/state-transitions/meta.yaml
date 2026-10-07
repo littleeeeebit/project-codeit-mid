@@ -1,32 +1,30 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-07 04:46:54.386000+00:00
-update_count: 30
+updated: 2026-10-07 06:24:27.651000+00:00
+update_count: 32
 last_field: diagram
-git_commit: 8fe51c5
-git_branch: refactor-3858e4c2-tests
+git_commit: e4bab69
+git_branch: verify-page-criteria-and-roles
 children:
+- admission-switches
 - attempt-billing
 - attempt-record
 - attempt-states
 - billing-attempt
 - billing-attempt-states
-- cancelled
-- completed
-- failed
 - gateway-owner
 - gold-candidate
 - gold-candidate-states
-- interrupted
-- queued
+- request-states
 - request-status
-- running
 - serving-activation
 - source-review-states
-prev_diagram: "graph TD\r\n  request-states[\"Request status\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  billing-attempt-states[\"Billing attempt state\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  source-review-states[\"Source parse and review status\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  serving-activation[\"Serving activation pointer\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  request-states -->|cancel blocks next dispatch| billing-attempt-states\r\n\
-  \  billing-attempt-states -->|billing_state rollup| request-states\r\n  source-review-states\
-  \ -->|eligibility for keyword index| serving-activation\r\n  serving-activation\
-  \ -->|config snapshot per request| request-states"
+- source-states
+prev_diagram: "graph TD\r\n  queued[\"queued\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  running[\"running\\nsrc/rfp_assistant/service/service.py\"]\r\n  completed[\"\
+  completed\\nsrc/rfp_assistant/service/service.py\"]\r\n  failed[\"failed\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  cancelled[\"cancelled\\nsrc/rfp_assistant/service/service.py\"]\r\n  interrupted[\"\
+  interrupted\\nsrc/rfp_assistant/service/service.py\"]\r\n  queued -->|\"run_queued\
+  \ claims\"| running\r\n  queued -->|\"cancel_request\"| cancelled\r\n  queued -->|\"\
+  shutdown or restart\"| interrupted\r\n  running -->|\"_finish succeeds\"| completed\r\
+  \n  running -->|\"error or refusal\"| failed\r\n  running -->|\"cancel flag at finish\"\
+  | cancelled\r\n  running -->|\"shutdown or restart\"| interrupted"

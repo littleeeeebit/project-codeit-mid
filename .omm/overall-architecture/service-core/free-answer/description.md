@@ -1,1 +1,0 @@
-`metadata` mode (`_metadata_answer`, `metadata_facts`: typed CSV values with known, unknown, conflict, zero_review or resolved state) and `inventory` mode (`_inventory_answer` → `requirement_inventory`, the requirement rows of the serving index). Neither reaches the gateway. `submit_answer` runs them inline on the HTTP thread and completes them immediately, without the runner.

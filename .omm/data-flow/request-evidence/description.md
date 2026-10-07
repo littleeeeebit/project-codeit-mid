@@ -1,0 +1,1 @@
+`requests.result_json.evidence` is the `EvidenceUnit` map (E1..En) captured at answer time, with exact quotes, element ids, the extraction id and the location; claims may cite only these ids. Units carried from the previous turn are renumbered after the fresh ones. `trace_json` keeps the retrieval candidates, the billing attempts and the configuration snapshot.

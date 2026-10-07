@@ -1,0 +1,1 @@
+Gold rows label evidence groups as source spans (hash, extraction, element, offsets and the exact quote), never as chunk ids, so they survive re-chunking. `gold repin` moves pending rows to a new extraction by element path. Development rows live in `.runtime/datasets/dev.jsonl` and the sealed split under `.runtime/sealed/`; both are rendered from `gold_candidates`.

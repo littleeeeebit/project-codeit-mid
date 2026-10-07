@@ -1,0 +1,1 @@
+`attempts.state` for every paid stage: rewrite, embedding, generation, drafting, evaluation and judges. Open states (reserved, dispatching, unknown) count their reserved amount against the cap and the purpose envelope, and settled attempts count their settled cost. `_billing` derives the request-level billing state from these rows.

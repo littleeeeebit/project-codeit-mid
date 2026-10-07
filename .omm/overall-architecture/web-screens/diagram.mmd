@@ -1,0 +1,15 @@
+graph TD
+  sign-in-gate["Session gate\nweb/src/components/sign-in.tsx"]
+  api-client["Typed API client\nweb/src/lib/api.ts"]
+  ask-page["Ask conversation\nweb/src/components/ask/ask-page.tsx"]
+  verify-page["Verify menu\nweb/src/components/verify/verify-page.tsx"]
+  dataset-page["Dataset builder\nweb/src/components/dataset/dataset-page.tsx"]
+  settings-page["Settings\nweb/src/app/settings/page.tsx"]
+  poll-hooks["Poll and stream hooks\nweb/src/lib/use-poll.ts"]
+  sign-in-gate -->|"binds account name"| api-client
+  ask-page -->|"POST /api/ask, cancel"| api-client
+  ask-page -->|"1 s status, SSE"| poll-hooks
+  poll-hooks -->|"GET request, stream"| api-client
+  verify-page -->|"verify and gold routes"| api-client
+  dataset-page -->|"drafting and decide"| api-client
+  settings-page -->|"key, model, limit"| api-client

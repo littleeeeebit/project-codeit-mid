@@ -1,1 +1,0 @@
-Set by the atomic claim in `run_queued`, or directly by `_create` for free modes and the synchronous `answer()`. While running, `cancel_requested` may be set. `_stop_reason` turns that into a refusal before the next paid stage, and also treats `res._closed`, or a status that is no longer `running`, as interrupted.

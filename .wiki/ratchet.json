@@ -18,8 +18,8 @@
     },
     "src/rfp_assistant/api.py": {
       "dup": 8,
-      "lines": 1547,
-      "reason": "baseline at adoption"
+      "lines": 1571,
+      "reason": "verify-page-criteria-and-roles: response models for structured release checks (ReleaseCheck), the served pass lines (Targets) and the finalist fields 평가·릴리스 reads; api.py is the only module that may declare HTTP models (test_api boundary test)"
     },
     "src/rfp_assistant/cli.py": {
       "dup": 0,
@@ -78,12 +78,12 @@
     },
     "web/src/components/verify/evaluation.tsx": {
       "dup": 6,
-      "lines": 130,
-      "reason": "baseline at adoption"
+      "lines": 87,
+      "reason": "verify-page-criteria-and-roles: verdict, checks and dev run moved to pass-lines.tsx"
     },
     "web/src/components/verify/judges.tsx": {
       "dup": 6,
-      "lines": 669,
+      "lines": 657,
       "reason": "baseline at adoption"
     }
   },

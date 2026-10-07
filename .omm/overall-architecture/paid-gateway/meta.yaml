@@ -1,6 +1,6 @@
 created: 2026-10-05 04:06:18.173000+00:00
-updated: 2026-10-07 04:46:47.594000+00:00
-update_count: 22
+updated: 2026-10-07 06:24:20.903000+00:00
+update_count: 24
 last_field: diagram
 kind: nested-class
 title: paid-gateway
@@ -13,22 +13,21 @@ children:
 - fake
 - gateway-owner
 - key-sessions
+- langfuse
 - langfuse-tracing
 - ledger
+- openai-api
 - openai-transport
-- owner-lock
 - owner-reconciliation
 - tracing
-- transport
 parentPath: []
-prev_diagram: "graph TD\r\n  metered-call[\"Metered call wrapper\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  budget-ledger[\"Budget ledger\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n\
-  \  gateway-owner[\"Gateway advisory lock\\nsrc/rfp_assistant/storage/postgres.py\"\
-  ]\r\n  openai-transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\n  key-sessions[\"Member key sessions\\nsrc/rfp_assistant/service/service.py\"\
+prev_diagram: "graph TD\r\n  ledger[\"Budget ledger\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"\
+  ]\r\n  key-sessions[\"Member key sessions\\nsrc/rfp_assistant/gateway/generation.py\"\
+  ]\r\n  owner-lock[\"Gateway advisory lock\\nsrc/rfp_assistant/storage/postgres.py\"\
   ]\r\n  tracing[\"Langfuse tracing\\nsrc/rfp_assistant/gateway/tracing.py\"]\r\n\
-  \  metered-call -->|reserve, dispatch, settle| budget-ledger\r\n  budget-ledger\
-  \ -->|owner_guard in transaction| gateway-owner\r\n  metered-call -->|chat or embed|\
-  \ openai-transport\r\n  openai-transport -->|client per KEY_SESSION| key-sessions\r\
-  \n  openai-transport -->|owner check before call| gateway-owner\r\n  metered-call\
-  \ -->|generation span, usage, cost| tracing"
+  \  fake[\"Fake transport\\nsrc/rfp_assistant/gateway/generation.py\"]\r\n  ledger\
+  \ -->|\"require_owner, owner_guard\"| owner-lock\r\n  transport -->|\"_check_owner\
+  \ before call\"| owner-lock\r\n  transport -->|\"client per KEY_SESSION\"| key-sessions\r\
+  \n  tracing -->|\"wraps each call\"| transport\r\n  fake -->|\"stands in when provider\
+  \ fake\"| transport"
