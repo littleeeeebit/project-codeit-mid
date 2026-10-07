@@ -89,11 +89,15 @@ class Resources:
                 if self.tracing is not None:
                     self.tracing.close()
             finally:
-                try:
-                    self._release_owner()
-                finally:
-                    self._database_lifecycle.__exit__(None, None, None)
+                self._release_database()
             raise
+
+    def _release_database(self) -> None:
+        """The gateway owner, then this process's hold on the database, even when releasing the owner fails."""
+        try:
+            self._release_owner()
+        finally:
+            self._database_lifecycle.__exit__(None, None, None)
 
     def _release_owner(self) -> None:
         """Owned or borrowed, the gateway owner counts its users and releases the lock with the last one."""
@@ -338,10 +342,7 @@ class Resources:
                 if self.tracing is not None:  # after the workers: flushes every trace they finished
                     self.tracing.close()
         finally:
-            try:
-                self._release_owner()
-            finally:
-                self._database_lifecycle.__exit__(None, None, None)
+            self._release_database()
 
 
 class RequestRunner:

@@ -442,13 +442,18 @@ def build_rewrite_messages(conversation: list[dict], follow_up: str, documents: 
             {"role": "user", "content": json.dumps(request, ensure_ascii=False)}]
 
 
-def validate_rewrite(response: ProviderResponse, max_characters: int) -> str:
+def _complete(response: ProviderResponse) -> None:
+    """A refused, truncated or otherwise unfinished response is a TechnicalError."""
     if response.refusal:
         raise TechnicalError(f"model_refusal: {response.refusal[:200]}")
     if response.finish_reason == "length":
         raise TechnicalError("output_truncated")
     if response.finish_reason not in ("stop", None) or not response.content:
         raise TechnicalError(f"incomplete_output: finish_reason={response.finish_reason}")
+
+
+def validate_rewrite(response: ProviderResponse, max_characters: int) -> str:
+    _complete(response)
     try:
         query = " ".join(str(json.loads(response.content)["query"]).split())
     except (ValueError, KeyError, TypeError):
@@ -505,12 +510,7 @@ def count_request_tokens(messages: list[dict], response_format: dict, margin: in
 
 def _parsed_payload(response: ProviderResponse) -> AnswerPayload:
     """The answer of a complete response; a refusal, truncation or schema violation is a TechnicalError."""
-    if response.refusal:
-        raise TechnicalError(f"model_refusal: {response.refusal[:200]}")
-    if response.finish_reason == "length":
-        raise TechnicalError("output_truncated")
-    if response.finish_reason not in ("stop", None) or not response.content:
-        raise TechnicalError(f"incomplete_output: finish_reason={response.finish_reason}")
+    _complete(response)
     try:
         return AnswerPayload.model_validate_json(response.content)
     except ValidationError as exc:

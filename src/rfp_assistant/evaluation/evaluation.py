@@ -568,6 +568,11 @@ def fragment_target(unit: dict, element: dict, row: int) -> tuple[int, int] | No
     return _quote_range(line, unit["quote"])
 
 
+def _unit_spans(chunk: dict, unit: dict):
+    """The chunk's spans over the evidence unit's element."""
+    return (span for span in chunk["spans"] if span["element_id"] == unit["element_id"])
+
+
 def grade(chunk: dict, unit: dict, element: dict | None) -> int:
     """2: the chunk carries the whole approved evidence; 1: it carries part of the same element around it;
     0: unrelated. Judged on source spans against the reviewer's coordinates (`text_target`, `row_target`,
@@ -575,9 +580,7 @@ def grade(chunk: dict, unit: dict, element: dict | None) -> int:
     if element is None:
         return 0
     best = 0
-    for span in chunk["spans"]:
-        if span["element_id"] != unit["element_id"]:
-            continue
+    for span in _unit_spans(chunk, unit):
         if "rows" in span and span.get("fragment"):
             # One piece of an oversized row: only the characters this piece carries count.
             frag = span["fragment"]
@@ -658,9 +661,7 @@ def coverage(chunk: dict, unit: dict, element: dict | None) -> frozenset | None:
     if element is None:
         return None
     atoms: set = set()
-    for span in chunk["spans"]:
-        if span["element_id"] != unit["element_id"]:
-            continue
+    for span in _unit_spans(chunk, unit):
         if "rows" in span and span.get("fragment"):
             frag = span["fragment"]
             rng = fragment_target(unit, element, frag["row"]) if element.get("table") else None
