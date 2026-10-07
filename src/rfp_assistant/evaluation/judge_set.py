@@ -150,7 +150,7 @@ def mutate_unit(text: str, anchors: set[tuple[Decimal, str]], rng: random.Random
         return None
     value, unit = rng.choice(sorted({(v, u) for v, _, _, u in found}))
     swaps = []
-    for v, s, e, u in found:
+    for v, _, e, u in found:
         if (v, u) == (value, unit):
             at = t.index(u, e)
             swaps.append((at, at + len(u), UNITS[u]))
