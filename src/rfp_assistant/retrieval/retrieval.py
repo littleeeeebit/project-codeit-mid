@@ -12,6 +12,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from importlib import metadata
+from pathlib import Path
 
 from rank_bm25 import BM25Okapi
 
@@ -182,7 +183,18 @@ def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreview
         chunks += c
         inventory += [{**r, "extraction_id": s["active_extraction_id"]} for r in inv]
     tokens = [{"chunk_id": c["chunk_id"], "tokens": analyzer.tokens(c["payload"])} for c in chunks]
+    _write_index_dir(settings, final_dir, version, source_set_hash, sources, config, chunks, tokens, inventory,
+                     scope_terms)
+    _record_index(settings, version, final_dir / "manifest.json", source_set_hash, config, chunks, inventory, activate)
+    return {"index_version": version, "reused": False, "chunks": len(chunks), "requirements": len(inventory),
+            "review_scope": config["review_scope"], "sources": len(sources), "profile": profile,
+            "activated": activate}
 
+
+def _write_index_dir(settings: Settings, final_dir: Path, version: str, source_set_hash: str, sources: list[dict],
+                     config: dict, chunks: list[dict], tokens: list[dict], inventory: list[dict],
+                     scope_terms: dict) -> None:
+    """Writes the index files and their manifest into a temporary directory, then renames it into place."""
     tmp = settings.data_dir / "indexes" / f".tmp-{uuid.uuid4().hex}"
     try:
         write_jsonl_atomic(tmp / "chunks.jsonl", chunks)
@@ -201,7 +213,11 @@ def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreview
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)
         raise
-    manifest_path = final_dir / "manifest.json"
+
+
+def _record_index(settings: Settings, version: str, manifest_path: Path, source_set_hash: str, config: dict,
+                  chunks: list[dict], inventory: list[dict], activate: bool) -> None:
+    """Replaces the index's rows (a ready row, its chunks and requirements) in one transaction."""
     manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
         conn.execute("DELETE FROM chunks WHERE index_version = ?", (version,))
@@ -226,9 +242,6 @@ def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreview
         )
         if activate:
             set_app_setting(conn, "active_index", version)
-    return {"index_version": version, "reused": False, "chunks": len(chunks), "requirements": len(inventory),
-            "review_scope": config["review_scope"], "sources": len(sources), "profile": profile,
-            "activated": activate}
 
 
 # ---------------------------------------------------------------- loaded index
