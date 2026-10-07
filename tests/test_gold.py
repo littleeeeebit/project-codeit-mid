@@ -12,18 +12,26 @@ from tests.fixtures import make_env, make_pdf
 QUOTE = "하자보수 기간은 검수 완료일로부터 12개월로 한다."
 
 
-class GoldReviewTest(unittest.TestCase):
+def dev_families(settings) -> dict:
+    """Assigns the fixture's document families and puts every family in the dev split."""
+    evaluation.assign_families(settings)
+    path = settings.data_dir / "datasets" / "families.json"
+    fams = json.loads(path.read_text(encoding="utf-8"))
+    for f in fams["families"].values():
+        f["split"] = "dev"
+    path.write_text(json.dumps(fams, ensure_ascii=False), encoding="utf-8")
+    return fams
+
+
+class DevCorpusCase(unittest.TestCase):
+    """The fixture corpus without an index, every family in dev, and 기관A's 하자보수 element."""
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         self.env = make_env(self.root, paid=False, index=False)
         s = self.env.settings
-        evaluation.assign_families(s)
-        fam_path = s.data_dir / "datasets" / "families.json"
-        fams = json.loads(fam_path.read_text(encoding="utf-8"))
-        for f in fams["families"].values():
-            f["split"] = "dev"
-        fam_path.write_text(json.dumps(fams, ensure_ascii=False), encoding="utf-8")
+        fams = dev_families(s)
         self.fam_of = {d: k for k, f in fams["families"].items() for d in f["doc_ids"]}
         ref = self.env.refs["기관A"]
         with store.open_db(s.db_path) as conn:
@@ -35,6 +43,8 @@ class GoldReviewTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+
+class GoldReviewTest(DevCorpusCase):
     def row(self, cid: str, question: str) -> dict:
         ref = self.env.refs["기관A"]
         return {"id": cid, "type": "condition", "question": question, "doc_id": ref.doc_id,
@@ -123,32 +133,10 @@ class GoldReviewTest(unittest.TestCase):
 
 
 
-class ValidationApplicabilityTest(unittest.TestCase):
+class ValidationApplicabilityTest(DevCorpusCase):
     """The converter-failure type is mandatory only while a source is actually quarantined."""
 
     PASSAGE = ("late_content", "table_fact", "repeated_code", "condition", "numeric_qualifier")
-
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
-        self.env = make_env(self.root, paid=False, index=False)
-        s = self.env.settings
-        evaluation.assign_families(s)
-        path = s.data_dir / "datasets" / "families.json"
-        fams = json.loads(path.read_text(encoding="utf-8"))
-        for f in fams["families"].values():
-            f["split"] = "dev"
-        path.write_text(json.dumps(fams, ensure_ascii=False), encoding="utf-8")
-        self.fam_of = {d: k for k, f in fams["families"].items() for d in f["doc_ids"]}
-        ref = self.env.refs["기관A"]
-        with store.open_db(s.db_path) as conn:
-            self.extraction = conn.execute("SELECT active_extraction_id FROM sources WHERE source_hash = ?",
-                                           (ref.source_hash,)).fetchone()[0]
-            self.element = conn.execute("SELECT element_id FROM elements WHERE extraction_id = ? AND raw_text LIKE ?",
-                                        (self.extraction, "%하자보수%")).fetchone()[0]
-
-    def tearDown(self):
-        self.tmp.cleanup()
 
     def passage(self, i: int, kind: str) -> dict:
         ref = self.env.refs["기관A"]
@@ -244,12 +232,7 @@ class ExcerptPackTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             env = make_env(Path(tmp), paid=False, index=False)
             s = env.settings
-            evaluation.assign_families(s)
-            path = s.data_dir / "datasets" / "families.json"
-            fams = json.loads(path.read_text(encoding="utf-8"))
-            for f in fams["families"].values():
-                f["split"] = "dev"
-            path.write_text(json.dumps(fams, ensure_ascii=False), encoding="utf-8")
+            dev_families(s)
             with self.assertRaises(gold.GoldError):
                 gold.write_excerpts(s, Path("relative"))
             out = Path(tmp) / "pack"

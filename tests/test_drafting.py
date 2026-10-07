@@ -13,15 +13,20 @@ from rfp_assistant.storage import store
 from tests import fixtures, release_fixtures as fx
 
 
+def amount_slot(env) -> dict:
+    """A drafting slot for the fixture's unreviewed amount question, bound to its evidence."""
+    row = fx.amount_row(env, reviewed=False)
+    return {**{k: row[k] for k in ('question_id', 'revision', 'question_type', 'scope', 'as_of_date')},
+            'intent': 'Budget with tax', 'sources': [
+                {'doc_id': g['doc_id'], 'element_id': g['alternatives'][0]['element_id']}
+                for g in row['evidence_groups']]}
+
+
 class DraftingTest(unittest.TestCase):
     def test_gateway_ownership_and_setup_failure_cleanup(self):
         with tempfile.TemporaryDirectory() as folder:
             env = fx.make_env(Path(folder))
-            row = fx.amount_row(env, reviewed=False)
-            slot = {**{k: row[k] for k in ('question_id', 'revision', 'question_type', 'scope', 'as_of_date')},
-                    'intent': 'Budget with tax', 'sources': [
-                        {'doc_id': g['doc_id'], 'element_id': g['alternatives'][0]['element_id']}
-                        for g in row['evidence_groups']]}
+            slot = amount_slot(env)
             transport = generation.FakeTransport()
             with fixtures.foreign_gateway(env.settings):  # another process owns the paid gateway
                 with self.assertRaisesRegex(gold.GoldError, 'already owns'):
@@ -96,11 +101,7 @@ class DraftingTest(unittest.TestCase):
     def test_uncertain_usage_blocks_the_next_generation_without_replaying(self):
         with tempfile.TemporaryDirectory() as folder:
             env = fx.make_env(Path(folder))
-            row = fx.amount_row(env, reviewed=False)
-            slot = {**{k: row[k] for k in ('question_id', 'revision', 'question_type', 'scope', 'as_of_date')},
-                    'intent': 'Budget with tax', 'sources': [
-                        {'doc_id': g['doc_id'], 'element_id': g['alternatives'][0]['element_id']}
-                        for g in row['evidence_groups']]}
+            slot = amount_slot(env)
             transport = generation.FakeTransport(lambda _: generation.ProviderResponse('{}', None, 'stop', None, 'unknown'))
             with self.assertRaises(gold.GoldError):
                 drafting.generate(env.settings, {'slots': [slot]}, Path(folder)/'blocked', 1, transport)
