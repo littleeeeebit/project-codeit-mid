@@ -1,0 +1,1 @@
+Each extraction revision is stored twice: as `elements.jsonl` under `.runtime/extracted/<source_hash>/<fingerprint>/` (path and SHA-256 in `extractions` and `extraction_inputs`), and as rows in the `elements` table. Old revisions stay, so pinned gold rows, traces and issued citations keep resolving; `_ordered_elements` falls back to `load_elements` for them.

@@ -1,1 +1,0 @@
-`_Session.__call__` in api.py enforces the same-origin rule for writes, the 401, 409 and 428 rules, and the sign-in exemptions. It stores the member in `scope['state']`, and `_member` turns it into a `Principal` through `service.visitor`, with every capability. The hub username is recorded as `member_id` on requests, attempts, gold decisions, corrections and audit rows.

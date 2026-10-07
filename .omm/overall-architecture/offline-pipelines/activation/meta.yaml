@@ -1,7 +1,7 @@
 created: 2026-10-07T04:46:51.187Z
-updated: 2026-10-07T04:46:51.341Z
-update_count: 2
-last_field: constraint
+updated: 2026-10-07T06:24:24.691Z
+update_count: 3
+last_field: description
 kind: nested-class
 title: activation
 children: []

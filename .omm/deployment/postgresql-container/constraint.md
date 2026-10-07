@@ -1,0 +1,1 @@
+Per project memory, never run `docker exec psql` against this container: an orphaned or failed psql crashed the whole server before. Use psycopg from the host.

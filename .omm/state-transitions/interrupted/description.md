@@ -1,1 +1,0 @@
-Set by `RequestRunner.shutdown` during a controlled stop, or by `recover_requests` when a new gateway owner starts (in `Resources._own`). Interrupted work is never replayed. The attempts of a request that was running become unknown through `budget.recover`, and someone must reconcile them.

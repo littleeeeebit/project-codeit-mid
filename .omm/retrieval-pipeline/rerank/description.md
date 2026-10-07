@@ -1,1 +1,0 @@
-Only in `hybrid_rerank`. `_rerank` keeps the protected BM25 head and reranks the rows below it, down to the run's depth, with `LocalReranker` (GPU, pinned revision, `reranker_max_concurrency` 1). An inference error serves the H order and records `hybrid_rerank->hybrid:reranker_error:`. `Resources.reranker()` swaps models by key and frees GPU memory first.

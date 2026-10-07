@@ -1,1 +1,0 @@
-`FakeTransport` (configured with `provider: 'fake'`) never builds an SDK client. It echoes the first evidence unit as a valid answer (`_echo_first_evidence`) and joins the last question for rewrites, optionally after `fake_delay_seconds`. `check --phase N`, `load-check` and the verification flows use it.

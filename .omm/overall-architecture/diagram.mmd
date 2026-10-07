@@ -1,19 +1,20 @@
 graph TD
-  web-screens["Next.js screens\nweb/src/components/ask/ask-page.tsx"]
-  api-shell["FastAPI shell\nsrc/rfp_assistant/api.py"]
+  web-screens["Next.js screens\nweb/src/app/layout.tsx"]
+  http-api["FastAPI wrapper\nsrc/rfp_assistant/api.py"]
   service-core["Service core\nsrc/rfp_assistant/service/service.py"]
   retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval/retrieval.py"]
   paid-gateway["Paid gateway\nsrc/rfp_assistant/gateway/budget.py"]
-  postgresql-store["PostgreSQL and pgvector\nsrc/rfp_assistant/storage/postgres.py"]
-  offline-pipelines["Offline pipelines\nsrc/rfp_assistant/cli.py"]
-  openai-provider["OpenAI provider\nsrc/rfp_assistant/gateway/generation.py"]
-  web-screens -->|"JSON fetch, SSE stream"| api-shell
-  api-shell -->|"one service call per route"| service-core
-  service-core -->|"scoped question"| retrieval-engine
-  service-core -->|"reserve, call, settle"| paid-gateway
-  paid-gateway -->|"chat and embeddings"| openai-provider
-  retrieval-engine -->|"index rows, vector search"| postgresql-store
-  paid-gateway -->|"attempts ledger, advisory lock"| postgresql-store
-  service-core -->|"requests, audit rows"| postgresql-store
-  service-core -->|"starts eval and maintenance jobs"| offline-pipelines
-  offline-pipelines -->|"extractions, indexes, activation"| postgresql-store
+  storage["PostgreSQL and .runtime\nsrc/rfp_assistant/storage/postgres.py"]
+  offline-pipelines["Corpus and evaluation pipelines\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"]
+  web-screens -->|"same-origin /api fetch, SSE"| http-api
+  http-api -->|"one service call per route"| service-core
+  service-core -->|"scoped retrieval"| retrieval-engine
+  service-core -->|"reserve, dispatch, settle"| paid-gateway
+  service-core -->|"requests, audit, catalog"| storage
+  retrieval-engine -->|"index files, pgvector queries"| storage
+  paid-gateway -->|"ledger transactions"| storage
+  service-core -->|"starts background jobs"| offline-pipelines
+  owner-cli -->|"runs pipelines"| offline-pipelines
+  owner-cli -->|"ledger administration"| service-core
+  offline-pipelines -->|"artifacts, runs, activation"| storage

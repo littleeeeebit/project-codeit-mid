@@ -1,14 +1,14 @@
 graph TD
-  queued["queued\nsrc/rfp_assistant/service/service.py"]
-  running["running\nsrc/rfp_assistant/service/service.py"]
-  completed["completed\nsrc/rfp_assistant/service/service.py"]
-  failed["failed\nsrc/rfp_assistant/service/service.py"]
-  cancelled["cancelled\nsrc/rfp_assistant/service/service.py"]
-  interrupted["interrupted\nsrc/rfp_assistant/service/service.py"]
-  queued -->|"run_queued claims"| running
-  queued -->|"cancel_request"| cancelled
-  queued -->|"shutdown or restart"| interrupted
-  running -->|"_finish succeeds"| completed
-  running -->|"error or refusal"| failed
-  running -->|"cancel flag at finish"| cancelled
-  running -->|"shutdown or restart"| interrupted
+  request-states["Request states\nsrc/rfp_assistant/storage/store.py"]
+  attempt-states["Attempt ledger states\nsrc/rfp_assistant/gateway/budget.py"]
+  admission-switches["Paid admission switches\nsrc/rfp_assistant/gateway/budget.py"]
+  source-states["Source parse and review\nsrc/rfp_assistant/corpus/ingestion.py"]
+  gold-candidate-states["Gold candidate review\nsrc/rfp_assistant/evaluation/gold.py"]
+  serving-activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  request-states -->|"each paid stage reserves"| attempt-states
+  attempt-states -->|"aggregate billing_state"| request-states
+  admission-switches -->|"refuse reserve or dispatch"| attempt-states
+  attempt-states -->|"overrun freezes, unknown blocks"| admission-switches
+  source-states -->|"review filter, served extraction"| serving-activation
+  gold-candidate-states -->|"approved rows scored"| serving-activation
+  serving-activation -->|"config snapshot per request"| request-states

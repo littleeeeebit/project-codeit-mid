@@ -1,18 +1,17 @@
 graph TD
-  cli["Owner CLI\nsrc/rfp_assistant/cli.py"]
-  ingestion["Ingestion and revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
-  fidelity["OCR and fidelity checks\nsrc/rfp_assistant/corpus/fidelity.py"]
-  keyword-build["Keyword index build\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  dense-build["Embedding set build\nsrc/rfp_assistant/retrieval/dense.py"]
-  runs["Frozen runs and matrices\nsrc/rfp_assistant/evaluation/compare.py"]
-  activation["Run activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  maintenance["Maintenance sequence\nsrc/rfp_assistant/storage/maintenance.py"]
-  cli -->|"manifest, ingest"| ingestion
-  fidelity -->|"image_text, review status"| ingestion
-  ingestion -->|"parsed active extractions"| keyword-build
-  keyword-build -->|"chunk payloads"| dense-build
-  keyword-build -->|"index version"| runs
-  dense-build -->|"embedding set version"| runs
-  runs -->|"person picks a row"| activation
-  cli -->|"activate-run"| activation
-  maintenance -->|"rebuild then regression"| keyword-build
+  manifest-ingest["Manifest and ingest\nsrc/rfp_assistant/corpus/ingestion.py"]
+  fidelity-ocr["Fidelity check and OCR\nsrc/rfp_assistant/corpus/fidelity.py"]
+  index-build["Keyword and dense builds\nsrc/rfp_assistant/retrieval/dense.py"]
+  retrieval-evaluation["Frozen runs and matrices\nsrc/rfp_assistant/evaluation/compare.py"]
+  activation["Person-picked activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  gold-queue["Gold review queue\nsrc/rfp_assistant/evaluation/gold.py"]
+  answer-release["Answer eval and release\nsrc/rfp_assistant/evaluation/release.py"]
+  maintenance-sequence["Maintenance sequence\nsrc/rfp_assistant/storage/maintenance.py"]
+  manifest-ingest -->|"extraction revisions"| fidelity-ocr
+  fidelity-ocr -->|"review status, OCR text"| index-build
+  index-build -->|"index and vector sets"| retrieval-evaluation
+  gold-queue -->|"approved dev rows"| retrieval-evaluation
+  retrieval-evaluation -->|"current-policy runs"| activation
+  activation -->|"activated run, finalist"| answer-release
+  maintenance-sequence -->|"ordered steps"| manifest-ingest
+  maintenance-sequence -->|"keyword, embedding, regression"| index-build

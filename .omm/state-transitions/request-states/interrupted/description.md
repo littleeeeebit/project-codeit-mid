@@ -1,0 +1,1 @@
+Set by a controlled shutdown (`RequestRunner.shutdown`, `Resources.close`) or by startup recovery. The request is never replayed, and its dispatching attempts become unknown through `budget.recover`.

@@ -1,0 +1,1 @@
+How the code runs on the team VM `codeit` and on a developer machine. Observed from tools/infra, api.py and auth.py. The VM's address and the database layout come from comments and the README.

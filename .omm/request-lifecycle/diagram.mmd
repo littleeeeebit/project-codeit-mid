@@ -1,16 +1,18 @@
 graph TD
-  ask-screen["Ask screen\nweb/src/components/ask/ask-page.tsx"]
-  submit-and-admit["Submit and admit\nsrc/rfp_assistant/service/service.py"]
-  worker-execution["Worker execution\nsrc/rfp_assistant/service/service.py"]
-  metered-call["Metered provider call\nsrc/rfp_assistant/service/service.py"]
-  validate-and-finish["Validate and finish\nsrc/rfp_assistant/gateway/generation.py"]
-  poll-and-stream["Polling and stream\nweb/src/lib/use-answer-stream.ts"]
-  cancel-and-shutdown["Cancel and shutdown\nsrc/rfp_assistant/service/service.py"]
-  ask-screen -->|"POST /api/ask"| submit-and-admit
-  submit-and-admit -->|"request ID to executor"| worker-execution
-  worker-execution -->|"rewrite and generation stages"| metered-call
-  metered-call -->|"provider response"| validate-and-finish
-  metered-call -->|"partial text"| poll-and-stream
-  validate-and-finish -->|"stored outcome"| poll-and-stream
-  ask-screen -->|"cancel or abandon"| cancel-and-shutdown
-  cancel-and-shutdown -->|"stop before next dispatch"| worker-execution
+  compose-turn["Compose turn\nweb/src/components/ask/ask-page.tsx"]
+  admit-and-persist["Validate and persist\nsrc/rfp_assistant/service/service.py"]
+  worker-claim["Executor claim\nsrc/rfp_assistant/service/service.py"]
+  rewrite-follow-up["Follow-up rewrite\nsrc/rfp_assistant/gateway/generation.py"]
+  retrieve-and-price["Retrieve and price\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  generate-and-stream["Generate and stream\nsrc/rfp_assistant/gateway/generation.py"]
+  validate-and-finish["Validate and finish\nsrc/rfp_assistant/service/service.py"]
+  attach-or-history["Attach or keep history\nweb/src/lib/use-answer-stream.ts"]
+  compose-turn -->|"POST /api/ask"| admit-and-persist
+  admit-and-persist -->|"request id to executor"| worker-claim
+  worker-claim -->|"follow-up turns only"| rewrite-follow-up
+  worker-claim -->|"first turn"| retrieve-and-price
+  rewrite-follow-up -->|"standalone question"| retrieve-and-price
+  retrieve-and-price -->|"messages and estimate"| generate-and-stream
+  generate-and-stream -->|"provider response"| validate-and-finish
+  validate-and-finish -->|"result_json stored"| attach-or-history
+  attach-or-history -->|"1 s poll, SSE"| compose-turn

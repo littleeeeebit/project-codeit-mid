@@ -1,15 +1,19 @@
 graph TD
-  originals["Originals and CSV\nsrc/rfp_assistant/corpus/ingestion.py"]
-  extractions["Extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
-  keyword-index["Keyword index artifacts\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  embedding-set["pgvector embedding set\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  activation["Activated serving config\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  evidence-map["Request evidence map\nsrc/rfp_assistant/service/service.py"]
-  citation-pane["Evidence pane and original\nweb/src/components/ask/answer-parts.tsx"]
-  originals -->|"manifest, ingest"| extractions
-  extractions -->|"chunk by profile"| keyword-index
-  keyword-index -->|"payload hashes embedded"| embedding-set
-  keyword-index -->|"active_index pointer"| activation
-  embedding-set -->|"dense_version"| activation
-  activation -->|"serving per request"| evidence-map
-  evidence-map -->|"open_evidence, download"| citation-pane
+  originals["Original HWP and PDF\nsrc/rfp_assistant/corpus/ingestion.py"]
+  extraction-artifacts["Extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
+  keyword-indexes["Keyword index versions\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  vector-sets["pgvector sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  request-evidence["Request evidence map\nsrc/rfp_assistant/service/service.py"]
+  evidence-view["Evidence pane and download\nweb/src/components/ask/answer-parts.tsx"]
+  gold-datasets["Gold datasets\nsrc/rfp_assistant/evaluation/gold.py"]
+  evaluation-runs["Frozen runs and tables\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  originals -->|"manifest hash, parse"| extraction-artifacts
+  extraction-artifacts -->|"chunk, Kiwi tokens"| keyword-indexes
+  keyword-indexes -->|"payload embeddings"| vector-sets
+  keyword-indexes -->|"packed EvidenceUnits"| request-evidence
+  vector-sets -->|"cosine candidates"| request-evidence
+  request-evidence -->|"evidence_id lookup"| evidence-view
+  originals -->|"hash-checked download"| evidence-view
+  extraction-artifacts -->|"pinned element spans"| gold-datasets
+  gold-datasets -->|"frozen scoring population"| evaluation-runs
+  keyword-indexes -->|"manifest-bound runs"| evaluation-runs

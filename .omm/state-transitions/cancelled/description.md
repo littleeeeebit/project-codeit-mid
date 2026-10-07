@@ -1,1 +1,0 @@
-Reached directly from queued, with nothing dispatched. From running it is reached when `_finish` sees `cancel_requested` on a would-be completed result, or when `_Stop('cancelled')` fires at a checkpoint or dispatch guard. The outcome is stored for history, but `may_attach` never renders it as the current answer.

@@ -1,0 +1,1 @@
+Set by `_finish` when execution ran to its end, whatever the domain status. That includes budget_blocked, insufficient_evidence and ingestion_unavailable, which reach `done` with the default request status, completed.

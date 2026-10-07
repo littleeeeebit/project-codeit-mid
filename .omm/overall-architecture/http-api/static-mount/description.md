@@ -1,0 +1,1 @@
+When `web/out` exists, `StaticFiles(directory=WEB, html=True)` serves the exported screens at /. `_Session` passes every non-/api path through without authentication, and the static pages then call /api/auth/me. In development, `next dev` on :8510 serves the screens instead and rewrites /api/*.

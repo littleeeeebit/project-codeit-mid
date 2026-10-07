@@ -1,1 +1,1 @@
-Status of a `requests` row. Every write goes through `tx(immediate=True)`. The browser treats `queued` and `running` as unfinished (`UNFINISHED` in ask-page.tsx), and only terminal rows may continue a conversation (`TERMINAL_STATUSES` in `_conversation`). The parallel billing-attempt states are described under `billing-states`.
+The persisted state machines that change behaviour, and how they gate each other. Every transition is a conditional UPDATE inside `tx(..., immediate=True)`, so concurrent workers, cancellation and shutdown race safely on the row state.

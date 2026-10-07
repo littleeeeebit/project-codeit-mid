@@ -1,1 +1,5 @@
-`src/rfp_assistant/service/service.py` holds every behavior that the screens and the CLI call. The other modules here are `answers.py` (answer evaluation runs), `drafting.py` (gold drafting), `ops.py` (load check and phase-3 report) and `auth.py`. Public functions authorize a `Principal` through `_authorize`, and every signed-in member holds every capability. They then read or write PostgreSQL through `storage.store.open_db` and `tx`, and reach retrieval and the paid gateway through the shared `Resources`.
+`service/service.py` is the only module api.py imports, and every screen action and policy decision lives here (see the comment above `app_resources`). It has three runtime roles:
+- The process owner, `Resources`.
+- The request pipeline: `ask` -> `submit_answer` -> `RequestRunner` -> `run_queued` -> `_execute_traced`.
+- Thin wrappers that delegate Verify and dataset work to the evaluation, gold, drafting, answers, judges and maintenance modules. Paid ones start as daemon threads registered in `Resources._jobs`.
+Authorization is `_authorize(principal, *capabilities)`. Every signed-in member is a `visitor` with all capabilities, so capabilities only narrow in-process callers such as the CLI and tests.

@@ -83,7 +83,7 @@
     },
     "web/src/components/verify/judges.tsx": {
       "dup": 6,
-      "lines": 669,
+      "lines": 657,
       "reason": "baseline at adoption"
     }
   },

@@ -1,1 +1,0 @@
-Written once by `settle`, which prices the reported usage (uncached, cached and cache-write tokens) at the reserved rates. A repeated settle returns `duplicate`. A cost above the reservation freezes all paid work through `frozen_reason`. Settling a `reconciled` attempt adds a negative `late-settlement:` adjustment so the reconciled amount is not counted twice.

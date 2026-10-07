@@ -1,0 +1,1 @@
+`tools/infra/bidmate.service` runs as User bidmate in /srv/bidmate/app, with EnvironmentFile /etc/bidmate/server.env. ExecStartPre runs start-postgresql.sh, and ExecStart runs uvicorn `rfp_assistant.api:app` on 0.0.0.0:8501 with `--workers 1`. KillSignal is SIGINT and TimeoutStopSec 120, so running requests can settle before the gateway lock is released. It restarts on failure.

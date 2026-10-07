@@ -1,0 +1,1 @@
+Set by `_finish` with request_status failed: technical_error, a provider failure, a validation failure, or clarification_required from a `ServiceError`. `_fail_unscheduled` also sets it when the executor rejects a submission. `result_json` explains the reason, and nothing retries.

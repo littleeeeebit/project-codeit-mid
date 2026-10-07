@@ -1,0 +1,1 @@
+`app_settings` is a key/value table with two serving keys. `active_index` names the keyword index version that serves. `active_run` holds the JSON serving configuration written by `evaluation.activate_decision`. They are read on every `Resources.serving()` call. Only `build_keyword_index` (when no run is active) and activation write them.
