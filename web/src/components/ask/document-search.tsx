@@ -47,12 +47,20 @@ export function DocumentSearch({ selected, onToggle }: { selected: Doc[]; onTogg
   const { data, error, loading } = usePoll(key, () => must(api.GET("/api/documents", { params: { query: filters } }), errorText), null);
   const chosen = new Set(selected.map((d) => d.doc_id));
 
-  const num = (v: string) => (v.trim() ? Number(v.replace(/[^0-9]/g, "")) : undefined);
-
   return (
     <div className="flex h-full flex-col">
+      <SearchForm draft={draft} onDraft={setDraft} onSearch={() => { setFilters(draft); setLimit(PAGE); }} />
+      <Results data={data} error={error} loading={loading} limit={limit} selected={selected} chosen={chosen}
+               onToggle={onToggle} onMore={() => setLimit(limit + PAGE)} />
+    </div>
+  );
+}
+
+function SearchForm({ draft, onDraft: setDraft, onSearch }: { draft: Filters; onDraft: (f: Filters) => void; onSearch: () => void }) {
+  const num = (v: string) => (v.trim() ? Number(v.replace(/[^0-9]/g, "")) : undefined);
+  return (
       <form className="space-y-3 border-b p-5" role="search" aria-label="문서 찾기"
-            onSubmit={(e) => { e.preventDefault(); setFilters(draft); setLimit(PAGE); }}>
+            onSubmit={(e) => { e.preventDefault(); onSearch(); }}>
         <h2 className="text-lg font-bold">문서 찾기</h2>
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
@@ -90,7 +98,14 @@ export function DocumentSearch({ selected, onToggle }: { selected: Doc[]; onTogg
           검색
         </button>
       </form>
+  );
+}
 
+function Results({ data, error, loading, limit, selected, chosen, onToggle, onMore }: {
+  data?: Doc[]; error?: string; loading: boolean; limit: number; selected: Doc[]; chosen: Set<string>;
+  onToggle: (d: Doc) => void; onMore: () => void;
+}) {
+  return (
       <div className="flex-1 overflow-y-auto p-3" aria-live="polite">
         {loading && <div className="space-y-2 p-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}</div>}
         {error && <p role="alert" className="p-2 text-sm text-bad">{error}</p>}
@@ -122,7 +137,7 @@ export function DocumentSearch({ selected, onToggle }: { selected: Doc[]; onTogg
               })}
             </ul>
             {data.length > limit && (
-              <button type="button" onClick={() => setLimit(limit + PAGE)}
+              <button type="button" onClick={onMore}
                       className="mt-2 h-10 w-full rounded-lg text-sm font-semibold text-muted-foreground outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50">
                 더 보기 ({data.length - limit}건 남음)
               </button>
@@ -130,6 +145,5 @@ export function DocumentSearch({ selected, onToggle }: { selected: Doc[]; onTogg
           </>
         )}
       </div>
-    </div>
   );
 }
