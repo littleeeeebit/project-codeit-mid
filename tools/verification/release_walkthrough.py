@@ -110,11 +110,15 @@ def _operation_steps(cli, field, root: Path) -> str:
 
 
 def main(work: Path) -> int:
+    from tests import fixtures
+
     root = work / "phase4"
     env_fixture = _fixture_corpus(root)
     (root / "config.json").write_text(json.dumps({"provider": "fake"}), encoding="utf-8")
     env = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY" and not k.startswith("RFP_")}
     env.update(RFP_SOURCE_DIR=str(env_fixture.settings.source_dir), RFP_DATA_DIR=str(env_fixture.settings.data_dir),
+               RFP_DATABASE_DSN=os.environ[env_fixture.settings.database_dsn_env],
+               RFP_RESTORE_DATABASE_DSN=os.environ[fixtures.database(ready=False)],
                RFP_CONFIG_FILE=str(root / "config.json"), PYTHONPATH=os.pathsep.join([str(REPO / "src"), str(REPO)]),
                PYTHONUTF8="1")
     steps: list[dict] = []
