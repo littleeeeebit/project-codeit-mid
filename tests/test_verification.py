@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import venv
 from pathlib import Path
 from typing import Literal
 from unittest import mock
@@ -59,6 +60,32 @@ class Manifest(_Strict):
 
 def fenced(out: str, info: str) -> list[dict]:
     return [json.loads(b) for b in re.findall(rf"```{info}\n(.*?)\n```", out, re.S)]
+
+
+class InterpreterTest(unittest.TestCase):
+    def test_dependency_free_python_dispatches_to_the_owner_environment(self):
+        with tempfile.TemporaryDirectory(prefix="verification python ") as tmp:
+            root = Path(tmp)
+            venv.EnvBuilder(with_pip=False).create(root / "empty")
+            venv.EnvBuilder(with_pip=False, system_site_packages=True).create(root / "owner")
+            executable = "Scripts/python.exe" if os.name == "nt" else "bin/python"
+            empty_python, owner_python = (root / name / executable for name in ("empty", "owner"))
+            env_file = root / ".env"
+            env_file.write_text(f'RFP_VERIFY_PYTHON="{owner_python}"\n', encoding="utf-8")
+            env = {**os.environ, "RFP_VERIFY_ENV_FILE": str(env_file)}
+            probe = subprocess.run([str(empty_python), "-c", "import psycopg"], capture_output=True, timeout=30)
+            self.assertNotEqual(probe.returncode, 0, "the bootstrap interpreter must lack app dependencies")
+            result = subprocess.run([str(empty_python), "-B", str(REPO / "tools/verify.py"), "--list"],
+                                    env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("consultant-answer", result.stdout)
+            self.assertIn("accessibility", result.stdout)
+            for invalid in ("relative/python", str(root / "missing-python")):
+                env_file.write_text(f"RFP_VERIFY_PYTHON={invalid}\n", encoding="utf-8")
+                result = subprocess.run([str(empty_python), "-B", str(REPO / "tools/verify.py"), "--list"],
+                                        env=env, capture_output=True, text=True, encoding="utf-8", timeout=30)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("RFP_VERIFY_PYTHON must name an existing absolute Python executable", result.stderr)
 
 
 class ManifestTest(unittest.TestCase):

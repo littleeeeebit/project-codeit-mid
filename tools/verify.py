@@ -15,6 +15,8 @@ The service supplies WIKI_VERIFICATION_HEAD, WIKI_VERIFICATION_ENVIRONMENT, WIKI
 WIKI_VERIFICATION_BROWSER, and copies the owner's env_file to the checkout's `.env` without exporting it. The
 runner therefore reads the supported keys (CONFIG_KEYS) from `.env` first and from the process environment only
 for keys `.env` does not set; every observation names where its corpus came from. OPENAI_API_KEY is never read.
+RFP_VERIFY_PYTHON selects an absolute owner Python executable before dependencies are imported, independent of
+the hub launcher's PATH; omit it when the launching Python already has the application and verification dependencies.
 Browser flows build the screens in web/ (`npm run build`, so the checked HEAD is what is served; needs Node and
 `npm ci` in web/), serve them with the API through one uvicorn worker on RFP_VERIFY_ORIGIN (default
 http://127.0.0.1:8765), sign each browser in through tests/fake_hub.py (a stand-in for JupyterHub's OAuth provider,
@@ -42,13 +44,42 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-import psycopg
-from psycopg.rows import dict_row
-
 REPO = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(REPO / "src"), str(REPO)]
 CONFIG_KEYS = ("RFP_SOURCE_DIR", "RFP_DATA_DIR", "RFP_DATABASE_DSN", "RFP_VERIFY_ORIGIN", "RFP_VERIFY_BROWSER_EXECUTABLE",
-               "RFP_VERIFY_QUESTION", "RFP_VERIFY_HWP_DOC_ID", "RFP_VERIFY_PDF_DOC_ID")
+               "RFP_VERIFY_QUESTION", "RFP_VERIFY_HWP_DOC_ID", "RFP_VERIFY_PDF_DOC_ID", "RFP_VERIFY_PYTHON")
+
+
+def owner_config(repo: Path | None = None) -> tuple[dict, dict]:
+    """Supported keys from the copied env_file (`.env`), then the process environment. Returns (values, source)."""
+    values, source = {}, {}
+    env_file = Path(os.environ.get("RFP_VERIFY_ENV_FILE") or (repo or REPO) / ".env")  # override: tests, manual runs
+    if env_file.is_file():
+        for line in env_file.read_text(encoding="utf-8-sig").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.removeprefix("export ").partition("=")
+            key, value = key.strip(), value.strip().strip("'\"")
+            if key in CONFIG_KEYS and value:
+                values[key], source[key] = value, ".env"
+    for key in CONFIG_KEYS:
+        if key not in values and os.environ.get(key):
+            values[key], source[key] = os.environ[key], "the process environment"
+    return values, source
+
+
+# Select the owner environment before importing dependencies; the hub may use another Python.
+if __name__ == "__main__" and (configured := owner_config()[0].get("RFP_VERIFY_PYTHON")):
+    python = Path(configured)
+    if not python.is_absolute() or not python.is_file():
+        raise SystemExit("RFP_VERIFY_PYTHON must name an existing absolute Python executable")
+    if not python.samefile(sys.executable):
+        raise SystemExit(subprocess.call([str(python), "-B", str(Path(__file__).resolve()), *sys.argv[1:]]))
+
+import psycopg  # noqa: E402 -- imported only after the owner interpreter is selected
+from psycopg.rows import dict_row  # noqa: E402
+
 TERMINAL = ("completed", "failed", "cancelled", "interrupted")
 MANIFEST = REPO / "verification.json"
 FAKE_QUESTION = "하자보수 기간은 얼마인가요?"
@@ -302,25 +333,6 @@ def db_rows(dsn: str, sql: str, args=()) -> list[dict]:
 
     with psycopg.connect(dsn, row_factory=dict_row, autocommit=True) as conn:
         return conn.execute(bind_sql(sql), args).fetchall()
-
-
-def owner_config(repo: Path | None = None) -> tuple[dict, dict]:
-    """Supported keys from the copied env_file (`.env`), then the process environment. Returns (values, source)."""
-    values, source = {}, {}
-    env_file = Path(os.environ.get("RFP_VERIFY_ENV_FILE") or (repo or REPO) / ".env")  # override: tests, manual runs
-    if env_file.is_file():
-        for line in env_file.read_text(encoding="utf-8-sig").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.removeprefix("export ").partition("=")
-            key, value = key.strip(), value.strip().strip("'\"")
-            if key in CONFIG_KEYS and value:
-                values[key], source[key] = value, ".env"
-    for key in CONFIG_KEYS:
-        if key not in values and os.environ.get(key):
-            values[key], source[key] = os.environ[key], "the process environment"
-    return values, source
 
 
 ATTEMPTS = ("(SELECT string_agg(a.stage || ':' || a.state, ',' ORDER BY a.created_at) FROM attempts a "
