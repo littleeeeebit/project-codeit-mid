@@ -1103,10 +1103,20 @@ class AnswerRunTest(GoldRetrievalTest):
             answers.plan_run(self.s, "embedding-comparison", "dev", [self.k1])
         est = answers.plan_run(self.s, "embedding-comparison", "dev", runs)
         self.assertEqual((est["run_id"][:2], est["finalists"], est["model"]), ("E-", runs, "gpt-5-mini"))
+        low_run_id = est["run_id"]
+        self.s = self.s.with_(generation_reasoning_effort="minimal")
+        est = answers.plan_run(self.s, "embedding-comparison", "dev", runs)
+        self.assertNotEqual(est["run_id"], low_run_id)
+        self.assertEqual((est["reasoning_effort"], est["max_output_tokens"]), ("minimal", 4000))
         transport = FakeTransport()
         res = service.Resources(self.s, transport=transport, recover=True)
         try:
-            out = answers.run_answers(self.s, res, est["estimate_id"], "tester", workers=3)
+            with mock.patch.object(transport, "chat", wraps=transport.chat) as chat:
+                out = answers.run_answers(self.s, res, est["estimate_id"], "tester", workers=3)
+            self.assertTrue(chat.call_args_list)
+            for call in chat.call_args_list:
+                self.assertEqual((call.kwargs["reasoning_effort"], call.kwargs["max_completion_tokens"]),
+                                 ("minimal", 4000))
         finally:
             res.close()
         self.assertEqual(out["status"], "complete")

@@ -319,12 +319,13 @@ def plan_run(settings: Settings, action: str, dataset: str | None = None, run_id
                                                              and p["max_micro_usd"]),
         "rows_remaining": remaining, "max_micro_usd": to_spend, "max_micro_usd_all_rows": total,
         "judge": {"attempts": 0, "max_micro_usd": 0, "note": "no paid judge is planned; review is human and blind"},
-        "model": settings.generation_model, "prompt_version": generation.PROMPT_VERSION,
+        "model": settings.generation_model, "reasoning_effort": settings.generation_reasoning_effort,
+        "prompt_version": generation.PROMPT_VERSION,
         "max_output_tokens": settings.generation_max_output_tokens, "purpose": "gold_eval", **ledger,
         "fits": to_spend <= min(ledger["envelope_remaining_micro_usd"], ledger["available_micro_usd"]),
         "fingerprint": fingerprint, "per_row": per_row, "created_at": now.isoformat(),
         "expires_at": (now + timedelta(hours=ESTIMATE_TTL_HOURS)).isoformat(),
-        "invalidated_by": "a change to the finalists, dataset or population, index, prompt, model, output cap, rates "
+        "invalidated_by": "a change to the finalists, dataset or population, index, prompt, model, reasoning effort, output cap, rates "
                           "or any row's token count; expiry",
     }
     if store:

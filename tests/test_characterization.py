@@ -87,7 +87,7 @@ class SettingsTest(unittest.TestCase):
         self.assertEqual((s.csv_path, s.files_dir), (Path("/src/data_list.csv"), Path("/src/files")))
         self.assertEqual(settings_mod.ALLOWED_GENERATION_MODELS, ("gpt-5-mini", "gpt-5-nano"))
         self.assertIn("gpt-6-luna", settings_mod.DEFAULT_RATES)  # drafting, the judges and AI review still bill it
-        self.assertEqual(settings_mod.REASONING_EFFORTS, ("none", "low", "medium", "high", "xhigh", "max"))
+        self.assertEqual(settings_mod.REASONING_EFFORTS, ("none", "minimal", "low", "medium", "high", "xhigh", "max"))
         self.assertEqual(settings_mod.TRACING_ENV, ("LANGFUSE_HOST", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"))
 
     def test_fingerprint(self):
@@ -137,9 +137,10 @@ class SettingsTest(unittest.TestCase):
                 with self.assertRaisesRegex(SettingsError, "RFP_DATABASE_DSN is required"):
                     settings_mod.load_settings()
             with mock.patch.dict(os.environ, {**base, "RFP_DATABASE_DSN": "x"}, clear=True):
-                s = settings_mod.load_settings(provider="fake")
+                s = settings_mod.load_settings(provider="fake", generation_reasoning_effort="minimal")
                 self.assertEqual((s.data_dir, s.source_dir, s.hwp_converter, s.provider),
                                  (Path(tmp), Path(tmp), Path(tmp, "hwp5proc"), "fake"))
+                self.assertEqual(s.generation_reasoning_effort, "minimal")
 
     def test_validate_messages(self):
         cases = [

@@ -35,7 +35,7 @@ ALLOWED_GENERATION_MODELS = ("gpt-5-mini", "gpt-5-nano")
 # Where the gpt-5-mini and gpt-5-nano rates above come from; a ledger that predates them gets them on first selection.
 SELECTABLE_RATE_SOURCE = {"source": "https://developers.openai.com/api/docs/pricing", "tier": "standard",
                           "checked_at": "2026-10-06"}
-REASONING_EFFORTS = ("none", "low", "medium", "high", "xhigh", "max")
+REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
 # Every compared embedding model (models.EMBEDDINGS). What serves is the activated run's model, never this setting:
 # the process value only names the model a maintenance build embeds with.
 ALLOWED_EMBEDDING_MODELS = tuple(EMBEDDINGS)
