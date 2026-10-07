@@ -700,7 +700,7 @@
   "read": 8,
   "orphans": 1,
   "pages": 2,
-  "decisions": 25,
-  "injectable_decisions": 6
+  "decisions": 28,
+  "injectable_decisions": 7
  }
 }
