@@ -155,6 +155,23 @@ class EvidenceTest(unittest.TestCase):
 
 
 class DatasetCopyTest(unittest.TestCase):
+    def test_only_the_isolated_restore_gets_the_larger_preparation_timeout(self):
+        from rfp_assistant.storage import postgres, postgres_backup
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"RFP_TEST_COPY_DSN":
+                "dbname=isolated host=localhost"}), mock.patch.object(fixtures, "database", return_value="RFP_TEST_COPY_DSN"), \
+                mock.patch.object(postgres_backup.shutil, "which", return_value=sys.executable), \
+                mock.patch.object(postgres_backup.subprocess, "run", return_value=mock.Mock(returncode=0)) as run, \
+                mock.patch.object(Path, "unlink"):
+            target = postgres.Target("RFP_TEST_COPY_DSN")
+            postgres_backup._run("pg_dump", target, [], Path(tmp))
+            self.assertEqual(run.call_args.kwargs["timeout"], 600)
+            verify.copy_database(target.dsn(), Path(tmp))
+            dump, restore = run.call_args_list[-2:]
+            self.assertEqual(dump.kwargs["timeout"], 600)
+            self.assertEqual(restore.kwargs["timeout"], 900)
+            self.assertIn("--single-transaction", restore.args[0])
+
     def test_a_configured_corpus_is_used_through_an_isolated_copy(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = fixtures.make_env(Path(tmp))

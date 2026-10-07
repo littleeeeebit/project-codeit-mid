@@ -323,7 +323,7 @@ def copy_database(source_dsn: str, work: Path) -> str:
         "--file=" + str(dump)], work)
     target = postgres.Target(fixtures.database(ready=False))
     postgres_backup._run("pg_restore", target, ["--no-owner", "--no-privileges", "--exit-on-error",
-                                                "--dbname=" + conninfo_to_dict(target.dsn())["dbname"], str(dump)], work)
+        "--single-transaction", "--dbname=" + conninfo_to_dict(target.dsn())["dbname"], str(dump)], work, timeout=900)
     dump.unlink()
     return target.dsn()
 
