@@ -13,6 +13,7 @@ from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 from rfp_assistant import cli
@@ -618,6 +619,161 @@ class Phase3ReportTest(unittest.TestCase):
             path = ops.write_phase3_report(env.settings)
             rendered.append(read_outputs(path.parent, ("report.md",), env.settings.data_dir.parent))
         snapshot(self, "phase3_report", "\n\0\0".join(rendered))
+
+
+class JudgeRunTest(unittest.TestCase):
+    """judges.run and finalize end to end on a 400-item fake reference (link and claim items): the bridge, the Luna
+    judge through the shared ledger, both Jev arms, the calibration fit, then a scored held-out run. Luna and the
+    bridge answer through a fake transport; Jev is mocked. Every label follows the digit in the item's text."""
+
+    @staticmethod
+    def digit(text: str) -> int:
+        return int(re.search(r"\d", text).group())
+
+    def reference(self, s) -> None:
+        items = []
+        for i in range(400):
+            d, item = i % 5, {"blind_id": f"B{i:04d}", "question": "기간은?", "passages": [f"기간은 {i % 5}개월"]}
+            if i % 2:
+                item.update(kind="claim", required=f"계약기간 {d}개월", conditions=[], answer_summary="요약",
+                            answer_claims=[f"기간 {d}개월"], allowed=["correct", "incomplete_qualifier", "missing"],
+                            reference="correct" if d in (1, 3) else "missing")
+            else:
+                item.update(kind="link", claim=f"계약기간 {d}개월", allowed=["supporting", "unsupported"],
+                            reference="supporting" if d in (1, 3) else "unsupported")
+            items.append(item)
+        body = "".join(json.dumps(i, ensure_ascii=False, sort_keys=True) + "\n" for i in items)
+        out = judges.root(s) / "reference"
+        out.mkdir(parents=True)
+        (out / "reference.jsonl").write_text(body, encoding="utf-8", newline="")
+        (out / "manifest.json").write_text(json.dumps({"run_id": "A-test", "items": 400, "labels": {},
+                                                       "reference_sha256": judges._sha(body)}), encoding="utf-8")
+
+    def responder(self, messages):
+        data, n = json.loads(messages[-1]["content"]), next(self.responses)
+        if messages[0]["content"] == judges.JUDGE_INSTRUCTIONS:
+            d = self.digit(data.get("claim") or data["required"])
+            yes = data["allowed"][0]
+            body = {"verdict": yes if d in (1, 3, 4) else data["allowed"][-1], "reason": f"digit {d}"}
+        else:
+            body = {"segments": [{"id": x["id"], "text": re.sub(r"[가-힣]+", "word", x["text"])}
+                                 for x in data["segments"]]}
+        return generation.ProviderResponse(json.dumps(body, ensure_ascii=False), None, "stop",
+                                           {"prompt_tokens": 50, "completion_tokens": 10, "cached_tokens": 0},
+                                           f"fake-{n}")
+
+    def jev(self, key, model, state, questions, timeout=None):
+        d = self.digit(state.get("claim") or state["required_fact"])
+        answers = {"support": 0.9 if d in (1, 3) else 0.1}
+        if "label" in questions:
+            answers["label"] = {"probabilities": {"incomplete_qualifier": 0.3, "missing": 0.7}}
+        return {"answers": answers, "usage": {"tokens": 1}, "model": model, "cost_usd": 0.0001}
+
+    def test_calibration_then_held_out(self):
+        import itertools
+
+        from rfp_assistant.storage.postgres import gateway_lock
+
+        self.responses = itertools.count(1)
+        rendered = []
+        with tempfile.TemporaryDirectory() as tmp:
+            env = fixtures.make_env(Path(tmp))
+            s = env.settings
+            with store.open_db(s.db_path) as conn:
+                envelopes = json.loads(conn.execute("SELECT envelopes_json FROM budget_settings").fetchone()[0])
+                conn.execute("UPDATE budget_settings SET envelopes_json = ?",
+                             (json.dumps({**envelopes, "judge_eval": 3_000_000}),))
+            self.reference(s)
+            judges.make_split(s)
+            owner = gateway_lock(s.db_path)
+            self.addCleanup(owner.release)
+            patches = [mock.patch.object(judges, "load_estimate", lambda st, e: {"part": e, "max_micro_usd": 5_000_000}),
+                       mock.patch.object(judges, "recheck", lambda st, e: None),
+                       mock.patch.object(judges, "organisations", lambda st: []),
+                       mock.patch.object(judges, "read_api_key", lambda name: "k"),
+                       mock.patch.object(judges, "jev_call", self.jev)]
+            for p in patches:
+                self.enterContext(p)
+            for part in ("calibration", "held_out"):
+                result = judges.run(s, generation.FakeTransport(self.responder), part, "owner")
+                self.assertEqual((result["status"], result["stop_reason"]), ("complete", None))
+                text = re.sub(r'"latency_ms": [0-9.]+', '"latency_ms": <n>', read_outputs(
+                    judges.run_dir(s, result["run_id"]), ("results.json", "judgements.jsonl"), s.data_dir.parent))
+                results, log = text.split("\n\0")
+                firsts = {}  # the judgement log whole by digest, and each arm's first record to read
+                for line in log.splitlines():
+                    firsts.setdefault(re.match(r'\{"arm": "(\w+)"', line).group(1), line)
+                rendered.append("\n".join([results, *firsts.values(),
+                                           f"judgements.jsonl sha256 {hashlib.sha256(log.encode()).hexdigest()}"]))
+        snapshot(self, "judge_runs", "\n\0\0".join(rendered))
+
+
+class ImportReferenceTest(unittest.TestCase):
+    """judges.import_reference on a synthetic 750-item archive in the pilot runtime's layout: the installed
+    reference and manifest, the idempotent second import, and the two refusals (missing files, a receipt that does
+    not match)."""
+
+    def archive(self, root: Path) -> Path:
+        run = root / "runtime" / "runs" / judges.REFERENCE_RUN
+        run.mkdir(parents=True)
+        sheet, key, verdicts, rows = [], {}, [], []
+        for i in range(judges.REFERENCE_ITEMS):
+            b, qid, kind = f"X{i:04d}", f"q-{i // 3}", ("link", "answer_claim", "claim")[i % 3]
+            row = {"blind_id": b, "question": f"질문 {i}", "allowed": ["supporting", "unsupported"]}
+            if kind == "link":
+                row.update(claim=f"주장 {i}", cited_quote=f"인용 {i}" if i % 2 else None)
+                key[b] = f"F1|{qid}|link"
+            elif kind == "answer_claim":
+                row.update(claim=f"답변 주장 {i}")
+                key[b] = f"F1|{qid}|answer_claim|0"
+                rows.append({"finalist": "F1", "question_id": qid, "answer": {"claims": [{"evidence_ids": ["E1", "E9"]}]},
+                             "evidence": {"E1": {"quote": f"근거 {i}"}}})
+            else:
+                row.update(expected=[{"type": "number", "value": i, "unit": "개월"}, {"type": "text", "patterns": ["가", "나"]},
+                                     {"type": "date", "value": "2026-01-02", "time": "10:00"}, {"type": "other"}][i % 4],
+                           qualifiers=[["조건", "단서"]] if i % 2 else None, gold_quotes=[f"정답 {i}"],
+                           answer_summary="요약", answer_claims=["주장"], deterministic="wrong_value" if i % 5 == 0 else None)
+                key[b] = f"F1|{qid}|claim"
+            sheet.append(row)
+            verdicts.append({"blind_id": b, "verdict": row["allowed"][i % 2]})
+        write = lambda path, lines: path.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines),  # noqa: E731
+                                                    encoding="utf-8", newline="")
+        write(run / "review-sheet.jsonl", reversed(sheet))
+        write(run / "review.jsonl", [{"item": key[v["blind_id"]], "verdict": v["verdict"]} for v in verdicts])
+        write(run / "rows.jsonl", rows)
+        (run / "review-key.json").write_text(json.dumps(key), encoding="utf-8")
+        write(root / judges.VERDICTS, verdicts)
+        (root / judges.PACKET).write_text("packet", encoding="utf-8")
+        (root / judges.RECEIPT).write_text(json.dumps({
+            "run_id": judges.REFERENCE_RUN, "items": judges.REFERENCE_ITEMS, "reviewer": "owner",
+            "all_verdicts_imported_literally_once": True, "packet_sha256": judges._sha(b"packet"),
+            "verdict_sha256": judges._sha((root / judges.VERDICTS).read_bytes())}), encoding="utf-8")
+        return root
+
+    def test_import(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = self.archive(Path(tmp) / "archive")
+            s = SimpleNamespace(data_dir=Path(tmp) / "data")
+            first = judges.import_reference(s, archive)
+            self.assertEqual(judges.import_reference(s, archive), {k: v for k, v in first.items() if k != "imported_at"})
+            reference = (judges.root(s) / "reference" / "reference.jsonl").read_text(encoding="utf-8")
+            firsts = {}
+            for line in reference.splitlines():
+                firsts.setdefault(json.loads(line)["kind"], line)
+            text = "\n".join([json.dumps(first, ensure_ascii=False, indent=1, sort_keys=True), *firsts.values(),
+                              f"reference.jsonl sha256 {hashlib.sha256(reference.encode()).hexdigest()}"])
+            snapshot(self, "judge_reference", STAMP.sub("<time>", text.replace(json.dumps(str(archive))[1:-1], "<archive>")))
+
+            (archive / judges.PACKET).write_text("changed", encoding="utf-8")
+            with self.assertRaises(judges.JudgeError) as refused:
+                judges.import_reference(SimpleNamespace(data_dir=Path(tmp) / "other"), archive)
+            self.assertEqual(str(refused.exception), "the reference does not match its receipt; ask the owner before "
+                                                     "using another reference: the blind packet hash differs from the "
+                                                     "receipt")
+            (archive / judges.PACKET).unlink()
+            with self.assertRaisesRegex(judges.JudgeError, "^reference files are missing; ask the owner before using "
+                                                           "another reference: .*blind-groups.jsonl$"):
+                judges.import_reference(s, archive)
 
 
 class VerifyToolTest(unittest.TestCase):

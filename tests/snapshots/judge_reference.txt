@@ -1,0 +1,30 @@
+{
+ "imported_at": "<time>",
+ "items": 750,
+ "labels": {
+  "answer_claim:supporting": 125,
+  "answer_claim:unsupported": 125,
+  "claim:supporting": 125,
+  "claim:unsupported": 125,
+  "link:supporting": 125,
+  "link:unsupported": 125
+ },
+ "note": "Copied read-only from the archived pilot runtime; the archive is never written.",
+ "reference_sha256": "157ca3d9333992abcb29b2b67076887822bb6d384894356d0235a2aaa6aa04c5",
+ "reviewer": "owner",
+ "run_id": "A-9ef59b566d64",
+ "source": "<archive>",
+ "source_sha256": {
+  "key": "c0a485a2fbfac216ea9dc37d19a166f9e90420cda7d1837c2b64fec7e7aed61a",
+  "packet": "7426afc489d0eef99a0b438def226ad139f752350c25cf2c04900281afbb79e0",
+  "receipt": "4d85595f1e366bbf9e4a2e6ef1bc0740af0d2eabe2e22189ad4bcaa8ff25ef70",
+  "reviews": "87d9c6096db9338086d1609a3f670eae449468e666cc1b64f6b6741cfcbaee32",
+  "rows": "55d561f842dd6f3ce3ab8b5a404d4f1a124d5735a7516575431be886d7635796",
+  "sheet": "4b68dd3bffe89ff826f586261cb2f8f767b7c31caad2830570dd72a92fcfd2cc",
+  "verdicts": "f0778a5504dfa8b2995e97a2937b884aec0190902e935635d5d6a3d799ba0b82"
+ }
+}
+{"allowed": ["supporting", "unsupported"], "blind_id": "X0000", "claim": "주장 0", "kind": "link", "passages": [""], "question": "질문 0", "question_id": "q-0", "reference": "supporting"}
+{"allowed": ["supporting", "unsupported"], "blind_id": "X0001", "claim": "답변 주장 1", "kind": "answer_claim", "passages": ["근거 1"], "question": "질문 1", "question_id": "q-0", "reference": "unsupported"}
+{"allowed": ["supporting", "unsupported"], "answer_claims": ["주장"], "answer_summary": "요약", "blind_id": "X0002", "conditions": [], "deterministic": null, "kind": "claim", "passages": ["정답 2"], "question": "질문 2", "question_id": "q-0", "reference": "supporting", "required": "2026-01-02 10:00"}
+reference.jsonl sha256 157ca3d9333992abcb29b2b67076887822bb6d384894356d0235a2aaa6aa04c5
