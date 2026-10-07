@@ -1,0 +1,1 @@
+`auth.Login.from_env` creates exactly one mode: hub sessions, a fixed `BIDMATE_LOCAL_MEMBER`, or `problem`, in which case every `/api` call gets 503. Setting both local and hub settings is refused. `sign_in` admits only usernames on the allowlist and issues a random token valid for 12 hours, kept in memory. `member(token)` resolves it, and `sign_out` removes it.

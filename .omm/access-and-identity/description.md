@@ -1,0 +1,1 @@
+How a browser becomes a recorded member, and how that member's key and model follow their requests into worker threads. The service never sees a password and keeps no user table.

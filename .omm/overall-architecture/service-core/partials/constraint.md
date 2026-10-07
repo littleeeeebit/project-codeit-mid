@@ -1,0 +1,1 @@
+This map exists only in process memory: a second worker would never see another worker's partials.

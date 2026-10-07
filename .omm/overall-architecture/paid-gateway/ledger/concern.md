@@ -1,0 +1,1 @@
+One `unknown` attempt anywhere blocks every PostgreSQL dispatch for all members until the owner reconciles it, because `mark_dispatching` counts `state = 'unknown'`. A process crash during a call produces exactly that through `budget.recover`.

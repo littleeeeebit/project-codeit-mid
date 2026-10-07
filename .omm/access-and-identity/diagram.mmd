@@ -1,0 +1,13 @@
+graph TD
+  browser["Browser screens\nweb/src/lib/api.ts"]
+  hub["JupyterHub OAuth\nsrc/rfp_assistant/service/auth.py"]
+  login["Login sessions\nsrc/rfp_assistant/service/auth.py"]
+  middleware["Session middleware\nsrc/rfp_assistant/api.py"]
+  binding["Request binding\nsrc/rfp_assistant/service/service.py"]
+  key-store["Member key store\nsrc/rfp_assistant/gateway/generation.py"]
+  browser -->|"GET /api/auth/login"| hub
+  hub -->|"code to callback"| login
+  login -->|"HttpOnly session cookie"| browser
+  browser -->|"cookie, account header"| middleware
+  middleware -->|"member name"| binding
+  binding -->|"KEY_SESSION, model, scope"| key-store

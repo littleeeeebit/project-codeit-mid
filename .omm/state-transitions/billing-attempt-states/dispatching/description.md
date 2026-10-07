@@ -1,1 +1,0 @@
-A durable marker written in the same transaction as the request's stop guard, `owner_guard`, the paid_admission check and the zero-unknown check. If the process dies here, startup `budget.recover` turns the attempt into `unknown`.

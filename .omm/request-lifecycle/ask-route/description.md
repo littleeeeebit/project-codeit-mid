@@ -1,1 +1,0 @@
-`api.ask` → `service.ask` mints `generation_id = uuid4`, which also serves as the idempotency key. It sets `as_of = date.today()` (the 기준일 control was removed) and calls `submit_answer`. It returns `target_key(scope, question, mode, as_of, previous)`, a sha256 of what the screen asked, which the poll sends back so the server can decide `attachable`.

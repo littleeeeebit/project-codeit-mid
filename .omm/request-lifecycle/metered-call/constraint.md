@@ -1,0 +1,1 @@
+No automatic retries anywhere. A billed but unusable output still keeps its cost.

@@ -1,0 +1,9 @@
+created: 2026-10-07T04:46:51.187Z
+updated: 2026-10-07T04:46:51.341Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: activation
+children: []
+parentPath:
+  - offline-pipelines

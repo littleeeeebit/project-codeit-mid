@@ -1,0 +1,1 @@
+Written by `_finish` with `request_status='failed'`. Causes: `technical_error` (provider failure, validation failure, settlement failure, retrieval or estimate failure), `clarification_required` from a `ServiceError`, or a consented maximum that was exceeded. `billing_state` still reports any settled or unknown cost.

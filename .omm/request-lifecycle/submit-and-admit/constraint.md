@@ -1,0 +1,1 @@
+A full queue (12 admitted requests) is refused before any row is written or any paid work starts.

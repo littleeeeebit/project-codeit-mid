@@ -1,0 +1,9 @@
+created: 2026-10-07T04:46:49.010Z
+updated: 2026-10-07T04:46:49.190Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: fake
+children: []
+parentPath:
+  - paid-gateway

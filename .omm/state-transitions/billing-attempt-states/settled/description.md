@@ -1,1 +1,0 @@
-`settle` prices the reported prompt, cached, completion and cache-write tokens with the rate snapshot from reservation. It is idempotent: a duplicate returns the stored value. Settling a reconciled attempt adds a negative `late-settlement:` adjustment so nothing is double-counted. A cost above the reservation sets `budget_settings.frozen_reason`.

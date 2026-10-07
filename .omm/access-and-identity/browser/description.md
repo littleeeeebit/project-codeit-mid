@@ -1,0 +1,1 @@
+`sign-in.tsx` calls `GET /api/auth/me` and shows the JupyterHub sign-in link. `api.ts` adds `X-BidMate-Account` (the account the screen loaded as) to every call. On 401 it navigates to `/api/auth/login`, and on a 409 with `X-BidMate-Account-Changed: 1` it reloads, because tabs share one cookie and a sign-in elsewhere would otherwise act for another account silently.

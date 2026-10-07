@@ -1,0 +1,1 @@
+A fixture server on the fake transport cannot show real retrieval or answer quality and must not be used for user acceptance.

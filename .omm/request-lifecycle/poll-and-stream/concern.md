@@ -1,0 +1,1 @@
+Each open stream holds one Starlette threadpool thread and queries `requests` and `attempts` about 7 times a second. This is fine for six members, but it scales linearly with the number of open answer streams.

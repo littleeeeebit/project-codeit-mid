@@ -1,1 +1,0 @@
-Statuses stored in `requests.status`. `RequestView.status` allows queued, running, completed, failed, cancelled and interrupted.

@@ -1,1 +1,1 @@
-How original RFP files become cited evidence. Each stage writes immutable, content-addressed artifacts plus PostgreSQL rows, and later stages pin the exact versions they used, so issued citations stay resolvable after re-parses and re-indexes.
+How source material becomes a cited answer. Each stage is content-addressed and kept, so issued citations still resolve after reparses and index rebuilds. `_ordered_elements` falls back to the preserved extraction artifact when a newer index no longer carries an older revision.

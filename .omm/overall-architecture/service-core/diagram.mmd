@@ -1,13 +1,15 @@
 graph TD
-  resources["Process resources\nsrc/rfp_assistant/service/service.py"]
-  request-runner["Bounded request executor\nsrc/rfp_assistant/service/service.py"]
-  answer-pipeline["Answer execution\nsrc/rfp_assistant/service/service.py"]
-  verifier-runs["Frozen verifier runs\nsrc/rfp_assistant/service/service.py"]
-  background-jobs["Paid background jobs\nsrc/rfp_assistant/service/drafting.py"]
-  gold-review["Gold review queue\nsrc/rfp_assistant/evaluation/gold.py"]
-  resources -->|lazily creates| request-runner
-  request-runner -->|run_queued per request id| answer-pipeline
-  answer-pipeline -->|index, dense, transport| resources
-  verifier-runs -->|generate submits request| request-runner
-  background-jobs -->|shared transport, joined on close| resources
-  background-jobs -->|submit drafts batch| gold-review
+  resources["Process owner Resources\nsrc/rfp_assistant/service/service.py"]
+  runner["Bounded request runner\nsrc/rfp_assistant/service/service.py"]
+  paid-answer["Paid answer path\nsrc/rfp_assistant/service/service.py"]
+  free-answer["Free metadata and inventory\nsrc/rfp_assistant/service/service.py"]
+  conversation["Conversation and rewrite\nsrc/rfp_assistant/service/service.py"]
+  partials["Streamed partials map\nsrc/rfp_assistant/service/service.py"]
+  jobs["Background paid jobs\nsrc/rfp_assistant/service/drafting.py"]
+  resources -->|"lazily creates"| runner
+  runner -->|"run_queued by request ID"| paid-answer
+  paid-answer -->|"follow-up history"| conversation
+  paid-answer -->|"on_delta text"| partials
+  resources -->|"index, dense, reranker"| paid-answer
+  resources -->|"index inventory rows"| free-answer
+  resources -->|"joins on close"| jobs
