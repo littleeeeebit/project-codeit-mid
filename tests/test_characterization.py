@@ -456,10 +456,11 @@ class RetrievalSnapshotTest(unittest.TestCase):
             (root / "runtime").mkdir()
             db = postgres.Target(fixtures.database())
             with store.open_db(db) as conn, store.tx(conn):
-                conn.execute("INSERT INTO sources(source_hash, format, original_path, active_extraction_id, "
-                             "parse_status) VALUES ('hash','hwp','PRIVATE_PATH','extraction','parsed')")
-                conn.execute("INSERT INTO documents VALUES ('doc',1,'example.hwp','hash','{}','{}','{}')")
-                conn.execute("INSERT INTO extractions VALUES ('extraction','hash','parser','PRIVATE_PATH','today',NULL)")
+                for sql in ("INSERT INTO sources(source_hash, format, original_path, active_extraction_id, parse_status)"
+                            " VALUES ('hash','hwp','PRIVATE_PATH','extraction','parsed')",
+                            "INSERT INTO documents VALUES ('doc',1,'example.hwp','hash','{}','{}','{}')",
+                            "INSERT INTO extractions VALUES ('extraction','hash','parser','PRIVATE_PATH','today',NULL)"):
+                    conn.execute(sql)
                 for i in range(3):
                     conn.execute("INSERT INTO elements VALUES ('extraction',?,?,'paragraph',NULL,'body','body','{}',"
                                  "NULL)", (f"e{i}", i))
