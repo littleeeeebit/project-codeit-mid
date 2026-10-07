@@ -1671,6 +1671,42 @@ def write_phase2_report(settings: Settings) -> Path:
                                                      "FROM activations ORDER BY created_at")]
         active_run = get_app_setting(conn, "active_run")
         active_index = get_app_setting(conn, "active_index")
+    runs = _phase2_runs(settings)
+    checked = [c for c in coverage if c["review_status"] in ("sample_checked", "reviewed")]
+    L = ["# Phase 2 report — corpus coverage and retrieval selection", "",
+         f"Generated {utcnow()} from `{settings.data_dir.name}/`. Every figure below is read from recorded state; "
+         "steps that were not run are listed as missing.", ""]
+    L += _phase2_source_lines(manifest, checked, recoveries, identity)
+    L += _phase2_retrieval_lines(families, fam_path, indexes, runs)
+    L += _phase2_spend_lines(spend, used, envelopes)
+    from ..service.service import active_serving
+
+    now = active_serving(settings)  # what requests serve; a stored activation can be refused (routing changed)
+    L += _phase2_selection_lines(now, active_run, activations, active_index)
+    gates, a = _phase2_gates(settings, manifest, checked, recoveries, runs, active_run)
+    L += ["", "## Phase 2 exit gates", "", "| Gate | Met | Evidence |", "| --- | --- | --- |"]
+    L += [f"| {g} | {'yes' if ok else '**no**'} | {ev} |" for g, ok, ev in gates]
+
+    # ---- inputs for phase 3 (and the phase 4 finalist)
+    with open_db(settings.db_path) as conn:
+        source_map = [dict(r) for r in conn.execute(
+            "SELECT d.doc_id, d.active_source_hash AS source_hash, s.active_extraction_id AS extraction_id, "
+            "s.parse_status, s.review_status FROM documents d JOIN sources s ON s.source_hash = d.active_source_hash "
+            "ORDER BY d.csv_row_id")]
+    release = settings.data_dir / "releases" / "phase-2"
+    write_text_atomic(release / "source-map.json", json.dumps(source_map, ensure_ascii=False, indent=1))
+    L += _phase2_inputs_lines(now, active_index, activations, len(source_map), a, gates)
+    path = release / "report.md"
+    write_text_atomic(path, "\n".join(L))
+    write_text_atomic(release / "manifest.json", json.dumps({
+        "release_id": "phase-2", "created_at": utcnow(), "eval_version": EVAL_VERSION, "active_run": a, "serving": now,
+        "active_index": active_index, "gates": [{"gate": g, "met": ok, "evidence": ev} for g, ok, ev in gates],
+        "runs": [r["run_id"] for r in runs]}, ensure_ascii=False, indent=1))
+    return path
+
+
+def _phase2_runs(settings: Settings) -> list[dict]:
+    """Every recorded retrieval run with its headline scores, in run-directory order."""
     runs = []
     base = settings.data_dir / "runs"
     for d in sorted(base.iterdir()) if base.exists() else []:
@@ -1683,12 +1719,12 @@ def write_phase2_report(settings: Settings) -> Path:
                      "dataset_name": config.get("dataset"), "limits": config.get("limits"),
                      "index": config.get("index_version"), **_headline(scores),
                      "gate": (scores.get("gate") or {}).get("passed"), "load": scores.get("load")})
-    checked = [c for c in coverage if c["review_status"] in ("sample_checked", "reviewed")]
-    usd = lambda m: f"${m / 1_000_000:.6f}"  # noqa: E731
-    L = ["# Phase 2 report — corpus coverage and retrieval selection", "",
-         f"Generated {utcnow()} from `{settings.data_dir.name}/`. Every figure below is read from recorded state; "
-         "steps that were not run are listed as missing.", "",
-         "## Manifest and source review", "",
+    return runs
+
+
+def _phase2_source_lines(manifest: dict, checked: list[dict], recoveries: list[dict], identity: list[dict]) -> list[str]:
+    """Manifest and source review, quarantine and recovery, identity and provenance."""
+    L = ["## Manifest and source review", "",
          f"- associations: {manifest['counts']['associations']} ({manifest['counts']['hwp']} HWP, "
          f"{manifest['counts']['pdf']} PDF), unique sources: {manifest['counts']['unique_sources']}",
          f"- parse status: {manifest['parse_status']}", f"- review status: {manifest['review_status']}",
@@ -1719,8 +1755,13 @@ def write_phase2_report(settings: Settings) -> Path:
     for i in conflicts + disagree:
         L.append(f"  - {i['filename']}: conflicts {[c['field'] for c in i['provenance_conflicts']]}, agreement "
                  f"{i['agreement']}, resolutions {list(i['resolutions'])}")
+    return L
+
+
+def _phase2_retrieval_lines(families: dict, fam_path: Path, indexes: list[dict], runs: list[dict]) -> list[str]:
+    """Evaluation families, index versions, retrieval runs and reranker load."""
     fams = families["families"]
-    L += ["", "## Evaluation families", ""]
+    L = ["", "## Evaluation families", ""]
     if not fam_path.exists():
         L.append("- families.json is missing: run `validate-gold` or `gold submit`, which assign families")
     L += [f"- families: {len(fams)} (dev {sum(f['split'] == 'dev' for f in fams.values())}, "
@@ -1745,16 +1786,24 @@ def write_phase2_report(settings: Settings) -> Path:
     loads = [r["load"] for r in runs if r.get("load")]
     L += ["", "## Reranker load and latency", ""]
     L += [f"- {json.dumps(x, ensure_ascii=False)}" for x in loads] or ["- no reranker trial recorded"]
-    L += ["", "## Spend (tracked by this ledger)", "", "| Purpose | Stage | State | Attempts | Settled | Reserved |",
-          "| --- | --- | --- | --- | --- | --- |"]
+    return L
+
+
+def _phase2_spend_lines(spend: list[dict], used: dict, envelopes: dict) -> list[str]:
+    usd = lambda m: f"${m / 1_000_000:.6f}"  # noqa: E731
+    L = ["", "## Spend (tracked by this ledger)", "", "| Purpose | Stage | State | Attempts | Settled | Reserved |",
+         "| --- | --- | --- | --- | --- | --- |"]
     L += [f"| {s['purpose']} | {s['stage']} | {s['state']} | {s['n']} | {usd(s['settled'])} | {usd(s['reserved'])} |"
           for s in spend] or ["| — | — | — | 0 | $0 | $0 |"]
-    L += ["", "Envelopes (used incl. open reservations / envelope): " + ", ".join(
-        f"{k} {usd(used[k])}/{usd(v)}" for k, v in envelopes.items()), "",
-          "## Selection", ""]
-    from ..service.service import active_serving, describe_serving
+    return L + ["", "Envelopes (used incl. open reservations / envelope): " + ", ".join(
+        f"{k} {usd(used[k])}/{usd(v)}" for k, v in envelopes.items()), ""]
 
-    now = active_serving(settings)  # what requests serve; a stored activation can be refused (routing changed)
+
+def _phase2_selection_lines(now: dict, active_run: str | None, activations: list[dict],
+                            active_index: str | None) -> list[str]:
+    from ..service.service import describe_serving
+
+    L = ["## Selection", ""]
     if active_run:
         a = json.loads(active_run)
         L += [f"- activated: run `{a['run_id']}` ({a['label']}, {a['mode']}), keyword index `{a['index_version']}`, "
@@ -1766,8 +1815,30 @@ def write_phase2_report(settings: Settings) -> Path:
     else:
         L += [f"- no `activate-run` decision recorded: serving the keyword default (kiwi_bm25) on index "
               f"`{active_index}`; dense and reranker stay inactive"]
+    return L
 
-    # ---- exit gates: computed from recorded state, never assumed
+
+def _phase2_inputs_lines(now: dict, active_index: str | None, activations: list[dict], mapped: int, a: dict | None,
+                         gates: list[tuple[str, bool, str]]) -> list[str]:
+    """Inputs for phase 3 (and the phase 4 finalist)."""
+    from ..service.service import describe_serving
+
+    previous = [json.loads(x["config_json"])["run_id"] for x in activations[:-1]] if activations else []
+    return ["", "## Inputs for phase 3", "",
+            f"- serving: {describe_serving(now)}, keyword index "
+            f"`{now.get('index_version') or active_index}`, dense `{now.get('dense_version')}`, "
+            f"reranker {now.get('reranker')}, limits {now.get('limits')}",
+            f"- rollback: keyword fallback `kiwi_bm25` always; earlier activations {previous or 'none'}; every earlier "
+            "index directory stays on disk",
+            f"- immutable evidence mapping: `releases/phase-2/source-map.json` ({mapped} associations → "
+            "source hash → active extraction)",
+            f"- phase 4 retrieval finalist: {(a or {}).get('finalist_run_id')}",
+            f"- open gates: {[g for g, ok, _ in gates if not ok] or 'none'}", ""]
+
+
+def _phase2_gates(settings: Settings, manifest: dict, checked: list[dict], recoveries: list[dict], runs: list[dict],
+                  active_run: str | None) -> tuple[list[tuple[str, bool, str]], dict | None]:
+    """The exit gates, computed from recorded state, never assumed, and the stored activation they judged."""
     # Revalidated now (free, no provider): a stored passing report says nothing about today's dataset or sources.
     validation = validate_gold(settings, "dev-pilot") if dataset_path(settings, "dev-pilot").exists() else None
     try:
@@ -1810,35 +1881,7 @@ def write_phase2_report(settings: Settings) -> Path:
          (f"active run {a['run_id']} under policy {a.get('eval_version')} (current {EVAL_VERSION})"
           + (f"; {'; '.join(active_errors)}" if active_errors else "")) if a else "no activate-run decision"),
     ]
-    L += ["", "## Phase 2 exit gates", "", "| Gate | Met | Evidence |", "| --- | --- | --- |"]
-    L += [f"| {g} | {'yes' if ok else '**no**'} | {ev} |" for g, ok, ev in gates]
-
-    # ---- inputs for phase 3 (and the phase 4 finalist)
-    with open_db(settings.db_path) as conn:
-        source_map = [dict(r) for r in conn.execute(
-            "SELECT d.doc_id, d.active_source_hash AS source_hash, s.active_extraction_id AS extraction_id, "
-            "s.parse_status, s.review_status FROM documents d JOIN sources s ON s.source_hash = d.active_source_hash "
-            "ORDER BY d.csv_row_id")]
-    release = settings.data_dir / "releases" / "phase-2"
-    write_text_atomic(release / "source-map.json", json.dumps(source_map, ensure_ascii=False, indent=1))
-    previous = [json.loads(x["config_json"])["run_id"] for x in activations[:-1]] if activations else []
-    L += ["", "## Inputs for phase 3", "",
-          f"- serving: {describe_serving(now)}, keyword index "
-          f"`{now.get('index_version') or active_index}`, dense `{now.get('dense_version')}`, "
-          f"reranker {now.get('reranker')}, limits {now.get('limits')}",
-          f"- rollback: keyword fallback `kiwi_bm25` always; earlier activations {previous or 'none'}; every earlier "
-          "index directory stays on disk",
-          f"- immutable evidence mapping: `releases/phase-2/source-map.json` ({len(source_map)} associations → "
-          "source hash → active extraction)",
-          f"- phase 4 retrieval finalist: {(a or {}).get('finalist_run_id')}",
-          f"- open gates: {[g for g, ok, _ in gates if not ok] or 'none'}", ""]
-    path = release / "report.md"
-    write_text_atomic(path, "\n".join(L))
-    write_text_atomic(release / "manifest.json", json.dumps({
-        "release_id": "phase-2", "created_at": utcnow(), "eval_version": EVAL_VERSION, "active_run": a, "serving": now,
-        "active_index": active_index, "gates": [{"gate": g, "met": ok, "evidence": ev} for g, ok, ev in gates],
-        "runs": [r["run_id"] for r in runs]}, ensure_ascii=False, indent=1))
-    return path
+    return gates, a
 
 
 # ================================================================ phase 4: reviewed gold (schema gold-2)
