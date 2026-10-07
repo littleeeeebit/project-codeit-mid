@@ -161,11 +161,82 @@ def backup(settings, destination, actor, share_owner=False):
     return {"manifest": str(path), "tables": len(tables), "ledger": ledger, "provider_calls": 0}
 
 
-def restore_check(settings, manifest_path, staging=None):
+def _claim_restore_target(raw) -> None:
+    """An empty target this session owns as paid gateway and restorer, fenced as 'restoring'."""
+    postgres.require_server(raw)
+    if raw.execute("SELECT 1 FROM pg_tables WHERE schemaname='public' LIMIT 1").fetchone():
+        raise ValueError("restore target contains tables; use an empty isolated database")
+    if not raw.execute("SELECT pg_try_advisory_lock(%s)", (postgres.GATEWAY_LOCK,)).fetchone()[0]:
+        raise ValueError("restore target already has a paid gateway owner")
+    if not raw.execute("SELECT pg_try_advisory_lock(%s)", (RESTORE_LOCK,)).fetchone()[0]:
+        raise ValueError("restore target already has a restore owner")
+    # Persist outside pg_restore's transaction and exclude from all dumps/restores. A lost
+    # connection or killed process therefore leaves a fence that copied control rows cannot clear.
+    raw.execute("CREATE SCHEMA IF NOT EXISTS bidmate_recovery")
+    raw.execute("CREATE TABLE IF NOT EXISTS bidmate_recovery.control "
+                "(id bigint PRIMARY KEY CHECK(id=1), state text NOT NULL)")
+    raw.execute("INSERT INTO bidmate_recovery.control VALUES (1,'restoring') "
+                "ON CONFLICT(id) DO UPDATE SET state='restoring'")
+
+
+def _restored_report(settings, target, manifest: dict, manifest_path: Path) -> tuple[dict, str]:
+    """The checks of the restored database against its manifest, after a restart recovery, and its snapshot hash."""
     from ..evaluation import release
     from ..gateway import budget
     from ..retrieval.retrieval import KeywordIndex
 
+    with store.database_lifecycle(target), store.open_db(target) as conn:
+        actual = _table_manifest(conn.raw)
+        checks = {"canonical application table parity": actual == manifest["tables"],
+                  "staging paid admission disabled": not conn.execute(
+                      "SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0],
+                  "immutable originals/extractions/indexes": references_valid(manifest["references"])}
+        restored_ledger = release.ledger_summary(target)
+        checks["ledger parity"] = restored_ledger == manifest["ledger"]
+        for rel, expected in manifest["copied"].items():
+            checks[f"mutable file {rel}"] = references_valid([
+                {"path": str(manifest_path.parent / "files" / rel), "expected_sha256": expected}])
+        staged = settings.with_(database_dsn_env=target.dsn_env,
+                                database_pool_max=target.max_connections,
+                                database_timeout_seconds=target.timeout, provider="fake")
+        try:
+            checks["historical evidence index"] = KeywordIndex.load(staged) is not None
+        except Exception:
+            checks["historical evidence index"] = False
+        budget.recover(target)
+        after = release.ledger_summary(target)
+        report = {"restore_check_version": "postgresql-restore-check-1", "passed": all(checks.values()),
+                  "checks": checks, "restored_ledger": restored_ledger, "after_restart_recovery": after,
+                  "provider": "fake", "paid_admission": False, "provider_calls": 0,
+                  "checked_at": store.utcnow(), "backup_dump_sha256": manifest["dump_sha256"],
+                  "receipt": "bidmate_recovery.receipt/1"}
+        snapshot = conn.execute("SELECT snapshot_sha256 FROM migration_import WHERE id=1").fetchone()[0]
+    return report, snapshot
+
+
+def _publish_verified(raw, target, manifest: dict, report: dict, snapshot: str) -> None:
+    """Durably records the validation, the import state, the fence state and the receipt in one transaction, on
+    the session that still owns both locks."""
+    with raw.transaction():
+        raw.execute("SET LOCAL synchronous_commit='on'")
+        if raw.execute("SHOW fsync").fetchone()[0] != "on":
+            raise RuntimeError("durable recovery publication requires PostgreSQL fsync=on")
+        for lock in (postgres.GATEWAY_LOCK, RESTORE_LOCK):
+            held = raw.execute("SELECT EXISTS(SELECT 1 FROM pg_locks WHERE pid=pg_backend_pid() "
+                               "AND locktype='advisory' AND classid=%s AND objid=%s AND granted)",
+                               (lock >> 32, lock & 0xFFFFFFFF)).fetchone()[0]
+            if not held:
+                raise RuntimeError("restore ownership was lost; target remains fenced")
+        control = postgres.Connection(raw, target)
+        record_validation(control, snapshot, manifest["references"], report["passed"])
+        if report["passed"]:
+            control.execute("UPDATE migration_import SET state='complete' WHERE id=1")
+        control.execute("UPDATE bidmate_recovery.control SET state=? WHERE id=1",
+                        ("verified" if report["passed"] else "failed",))
+        _publish_restore_receipt(raw, report)
+
+
+def restore_check(settings, manifest_path, staging=None):
     manifest_path = Path(manifest_path)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     dump = manifest_path.parent / "database.dump"
@@ -180,70 +251,16 @@ def restore_check(settings, manifest_path, staging=None):
         if source_dsn and conninfo_to_dict(target.dsn()) == conninfo_to_dict(source_dsn):
             raise ValueError("restore must use a different isolated database")
     with psycopg.connect(target.dsn(), autocommit=True, connect_timeout=5) as raw:
-        postgres.require_server(raw)
-        if raw.execute("SELECT 1 FROM pg_tables WHERE schemaname='public' LIMIT 1").fetchone():
-            raise ValueError("restore target contains tables; use an empty isolated database")
-        if not raw.execute("SELECT pg_try_advisory_lock(%s)", (postgres.GATEWAY_LOCK,)).fetchone()[0]:
-            raise ValueError("restore target already has a paid gateway owner")
-        if not raw.execute("SELECT pg_try_advisory_lock(%s)", (RESTORE_LOCK,)).fetchone()[0]:
-            raise ValueError("restore target already has a restore owner")
-        # Persist outside pg_restore's transaction and exclude from all dumps/restores. A lost
-        # connection or killed process therefore leaves a fence that copied control rows cannot clear.
-        raw.execute("CREATE SCHEMA IF NOT EXISTS bidmate_recovery")
-        raw.execute("CREATE TABLE IF NOT EXISTS bidmate_recovery.control "
-                    "(id bigint PRIMARY KEY CHECK(id=1), state text NOT NULL)")
-        raw.execute("INSERT INTO bidmate_recovery.control VALUES (1,'restoring') "
-                    "ON CONFLICT(id) DO UPDATE SET state='restoring'")
+        _claim_restore_target(raw)
         try:
             _run("pg_restore", target, ["--no-owner", "--no-privileges", "--exit-on-error", "--single-transaction",
                                        "--exclude-schema=bidmate_recovery",
                                        "--dbname=" + conninfo_to_dict(target.dsn())["dbname"], str(dump)], manifest_path.parent)
             _disable_restored_control(raw)
-            with store.database_lifecycle(target), store.open_db(target) as conn:
-                actual = _table_manifest(conn.raw)
-                checks = {"canonical application table parity": actual == manifest["tables"],
-                          "staging paid admission disabled": not conn.execute(
-                              "SELECT paid_admission FROM database_control WHERE id=1").fetchone()[0],
-                          "immutable originals/extractions/indexes": references_valid(manifest["references"])}
-                restored_ledger = release.ledger_summary(target)
-                checks["ledger parity"] = restored_ledger == manifest["ledger"]
-                for rel, expected in manifest["copied"].items():
-                    checks[f"mutable file {rel}"] = references_valid([
-                        {"path": str(manifest_path.parent / "files" / rel), "expected_sha256": expected}])
-                staged = settings.with_(database_dsn_env=target.dsn_env,
-                                        database_pool_max=target.max_connections,
-                                        database_timeout_seconds=target.timeout, provider="fake")
-                try:
-                    checks["historical evidence index"] = KeywordIndex.load(staged) is not None
-                except Exception:
-                    checks["historical evidence index"] = False
-                budget.recover(target)
-                after = release.ledger_summary(target)
-                report = {"restore_check_version": "postgresql-restore-check-1", "passed": all(checks.values()),
-                          "checks": checks, "restored_ledger": restored_ledger, "after_restart_recovery": after,
-                          "provider": "fake", "paid_admission": False, "provider_calls": 0,
-                          "checked_at": store.utcnow(), "backup_dump_sha256": manifest["dump_sha256"],
-                          "receipt": "bidmate_recovery.receipt/1"}
-                snapshot = conn.execute("SELECT snapshot_sha256 FROM migration_import WHERE id=1").fetchone()[0]
+            report, snapshot = _restored_report(settings, target, manifest, manifest_path)
             # Finish pool shutdown before publishing on the session that still owns both locks.
             # The receipt and readiness become visible together; no filesystem export follows.
-            with raw.transaction():
-                raw.execute("SET LOCAL synchronous_commit='on'")
-                if raw.execute("SHOW fsync").fetchone()[0] != "on":
-                    raise RuntimeError("durable recovery publication requires PostgreSQL fsync=on")
-                for lock in (postgres.GATEWAY_LOCK, RESTORE_LOCK):
-                    held = raw.execute("SELECT EXISTS(SELECT 1 FROM pg_locks WHERE pid=pg_backend_pid() "
-                                       "AND locktype='advisory' AND classid=%s AND objid=%s AND granted)",
-                                       (lock >> 32, lock & 0xFFFFFFFF)).fetchone()[0]
-                    if not held:
-                        raise RuntimeError("restore ownership was lost; target remains fenced")
-                control = postgres.Connection(raw, target)
-                record_validation(control, snapshot, manifest["references"], report["passed"])
-                if report["passed"]:
-                    control.execute("UPDATE migration_import SET state='complete' WHERE id=1")
-                control.execute("UPDATE bidmate_recovery.control SET state=? WHERE id=1",
-                                ("verified" if report["passed"] else "failed",))
-                _publish_restore_receipt(raw, report)
+            _publish_verified(raw, target, manifest, report, snapshot)
             return report
         except BaseException:
             try:
