@@ -2218,6 +2218,21 @@ class GoldChecker:
         return e
 
     def check(self, row: dict, tag: str, *, split: str | None = None, require_review: bool = True) -> list[str]:
+        e = self._check_identity(row, tag, split)
+        if row.get("operational_case") or row.get("question_type") in OPERATIONAL_TYPES:
+            return e + [f"{tag}: converter failures, interrupted calls and ownership races belong to the operational "
+                        "suite, not to gold"]
+        e += self._check_kind(row, tag)
+        scope = row.get("scope")
+        if not isinstance(scope, list) or not 1 <= len(scope) <= 2 or not all(isinstance(s, dict) for s in scope):
+            return e + [f"{tag}: scope names one or two documents"]
+        scoped = self._check_scope(row, tag, scope, e)
+        groups = row.get("evidence_groups") or []
+        by_id = self._check_groups(groups, scoped, tag, e)
+        e += self._check_content(row, tag, scoped, groups, by_id)
+        return e + self._check_review(row, tag, require_review)
+
+    def _check_identity(self, row: dict, tag: str, split: str | None) -> list[str]:
         e: list[str] = []
         if row.get("dataset_version") != GOLD_SCHEMA:
             e.append(f"{tag}: dataset_version must be {GOLD_SCHEMA!r}")
@@ -2230,9 +2245,11 @@ class GoldChecker:
             e.append(f"{tag}: split must be dev or test")
         elif split and row["split"] != split:
             e.append(f"{tag}: a {row['split']} row cannot enter dataset {split}")
-        if row.get("operational_case") or row.get("question_type") in OPERATIONAL_TYPES:
-            return e + [f"{tag}: converter failures, interrupted calls and ownership races belong to the operational "
-                        "suite, not to gold"]
+        return e
+
+    def _check_kind(self, row: dict, tag: str) -> list[str]:
+        """Question type, text, mode, date and the answerability/status pair."""
+        e: list[str] = []
         qtype, mode, answerability = row.get("question_type"), row.get("mode"), row.get("answerability")
         if qtype not in GOLD_TYPES:
             e.append(f"{tag}: unknown question_type {qtype!r}")
@@ -2249,9 +2266,11 @@ class GoldChecker:
             e.append(f"{tag}: answerability must be one of {sorted(EXPECTED_STATUS)}")
         elif row.get("expected_status") not in EXPECTED_STATUS[answerability]:
             e.append(f"{tag}: expected_status for {answerability} must be one of {EXPECTED_STATUS[answerability]}")
-        scope = row.get("scope")
-        if not isinstance(scope, list) or not 1 <= len(scope) <= 2 or not all(isinstance(s, dict) for s in scope):
-            return e + [f"{tag}: scope names one or two documents"]
+        return e
+
+    def _check_scope(self, row: dict, tag: str, scope: list[dict], e: list[str]) -> dict[str, dict]:
+        """The scoped documents by ID, checked against the managed revisions and their families; problems go to `e`."""
+        qtype, mode, answerability = row.get("question_type"), row.get("mode"), row.get("answerability")
         if len({s.get("doc_id") for s in scope}) != len(scope):
             e.append(f"{tag}: the same document is scoped twice")
         if (mode == "compare") != (len(scope) == 2):
@@ -2288,7 +2307,10 @@ class GoldChecker:
                 e.append(f"{tag}: {d[:8]} belongs to a {fam[1]['split']} family")
         if sorted(set(row.get("family_ids") or [])) != sorted(fams):
             e.append(f"{tag}: family_ids must be exactly the scoped documents' assigned families")
-        groups = row.get("evidence_groups") or []
+        return scoped
+
+    def _check_groups(self, groups: list[dict], scoped: dict[str, dict], tag: str, e: list[str]) -> dict[str, dict]:
+        """Evidence groups by ID, each source span checked; problems go to `e`."""
         by_id: dict[str, dict] = {}
         for g in groups:
             gid = g.get("group_id")
@@ -2304,6 +2326,13 @@ class GoldChecker:
                 e.append(f"{tag} {gid}: an evidence group needs at least one source span")
             for i, alt in enumerate(alts, 1):
                 e += self._check_alternative(alt, scoped[g["doc_id"]], f"{tag} {gid}#{i}")
+        return by_id
+
+    def _check_content(self, row: dict, tag: str, scoped: dict[str, dict], groups: list[dict],
+                       by_id: dict[str, dict]) -> list[str]:
+        """Evidence and claims an answerable row needs, metadata expectations, and negative validation."""
+        e: list[str] = []
+        mode, answerability = row.get("mode"), row.get("answerability")
         claims = row.get("required_claims") or []
         if mode != "metadata":
             if answerability == "answerable" and not groups:
@@ -2339,6 +2368,11 @@ class GoldChecker:
                     e.append(f"{tag}: negative_validation needs a rationale")
                 if answerability == "unanswerable" and not nv.get("locations"):
                     e.append(f"{tag}: verified absence lists the original locations inspected")
+        return e
+
+    def _check_review(self, row: dict, tag: str, require_review: bool) -> list[str]:
+        """Drafting provenance, and for gold an independent review against the original."""
+        e: list[str] = []
         review = row.get("review") or {}
         prov = row.get("generation_provenance") or {}
         drafter = str(review.get("drafted_by") or "").strip()
@@ -2372,6 +2406,15 @@ class GoldChecker:
 def _gold_split_rows(settings: Settings, name: str) -> list[dict]:
     path = dataset_path(settings, name)
     return read_jsonl(path) if path.exists() else []
+
+
+def _split_leak(row: dict, tag: str, other_name: str, other: list[dict]) -> list[str]:
+    """The first row of the other split this row repeats or paraphrases, without naming a sealed row."""
+    for o in other:
+        if question_similarity(row.get("question", ""), o.get("question", "")) >= LEAK_SIMILARITY:
+            which = "a sealed row (ID withheld)" if other_name in SEALED_SPLITS else f"row {o.get('question_id')}"
+            return [f"{tag}: repeats or paraphrases {other_name} {which}: leakage"]
+    return []
 
 
 def validate_gold_v2(settings: Settings, name: str) -> dict:
@@ -2412,12 +2455,7 @@ def validate_gold_v2(settings: Settings, name: str) -> dict:
             seen_q.setdefault(key, qid)
             if set(row.get("family_ids") or []) & affected:
                 errs.append(f"{tag}: its family has related revisions in the other split; fix the family map")
-            for o in other:
-                if question_similarity(row.get("question", ""), o.get("question", "")) >= LEAK_SIMILARITY:
-                    which = "a sealed row (ID withheld)" if other_name in SEALED_SPLITS else \
-                        f"row {o.get('question_id')}"
-                    errs.append(f"{tag}: repeats or paraphrases {other_name} {which}: leakage")
-                    break
+            errs += _split_leak(row, tag, other_name, other)
             if errs:
                 rejected[qid] = errs
                 errors += errs
