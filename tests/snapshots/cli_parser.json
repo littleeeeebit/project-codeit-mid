@@ -241,7 +241,8 @@
  "run-answers": [
   {"name": ["--estimate-id"], "dest": "estimate_id", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--actor"], "dest": "actor", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
-  {"name": ["--reason"], "dest": "reason", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"}
+  {"name": ["--reason"], "dest": "reason", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": ["--workers"], "dest": "workers", "default": 1, "required": false, "choices": null, "type": "int", "nargs": null, "action": "_StoreAction"}
  ],
  "run-judges": [
   {"name": ["--estimate-id"], "dest": "estimate_id", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},

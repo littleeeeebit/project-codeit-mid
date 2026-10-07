@@ -458,7 +458,7 @@ def cmd_run_answers(args, settings) -> int:
     try:
         if res.transport is None:
             raise answers.AnswerEvalError(res.provider_note or "no provider transport")
-        result = answers.run_answers(settings, res, args.estimate_id, args.actor, args.reason)
+        result = answers.run_answers(settings, res, args.estimate_id, args.actor, args.reason, workers=args.workers)
     finally:
         res.close()
     _print(result)
@@ -802,6 +802,7 @@ def _release_commands(sub) -> None:
     s.add_argument("--estimate-id", required=True)
     s.add_argument("--actor", required=True)
     s.add_argument("--reason", help="sealed post-test regression: why the sealed set is run again")
+    s.add_argument("--workers", type=int, default=1, help="retrieval runs answered at once (default 1)")
     s = sub.add_parser("latency-run", help="paid: the planned bounded latency sample (stop the UI first)")
     s.add_argument("--estimate-id", required=True)
     s.add_argument("--actor", required=True)

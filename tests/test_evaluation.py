@@ -1103,12 +1103,19 @@ class AnswerRunTest(GoldRetrievalTest):
             answers.plan_run(self.s, "embedding-comparison", "dev", [self.k1])
         est = answers.plan_run(self.s, "embedding-comparison", "dev", runs)
         self.assertEqual((est["run_id"][:2], est["finalists"], est["model"]), ("E-", runs, "gpt-5-mini"))
-        res = service.Resources(self.s, transport=FakeTransport(), recover=True)
+        transport = FakeTransport()
+        res = service.Resources(self.s, transport=transport, recover=True)
         try:
-            out = answers.run_answers(self.s, res, est["estimate_id"], "tester")
+            out = answers.run_answers(self.s, res, est["estimate_id"], "tester", workers=3)
         finally:
             res.close()
         self.assertEqual(out["status"], "complete")
+        progress = answers.load_progress(self.s, out["run_id"])
+        self.assertEqual(len(progress), 3 * est["rows"])  # every run answered every row, concurrently
+        self.assertTrue(all(r["status"] == "done" for r in progress.values()))
+        with store.open_db(self.s.db_path) as conn:
+            self.assertEqual(conn.execute("SELECT count(*) FROM attempts WHERE state = 'settled'").fetchone()[0],
+                             len(transport.calls))  # one settled attempt per provider call, none lost to a race
         scores = json.loads((answers.run_dir(self.s, out["run_id"]) / "scores.json").read_text(encoding="utf-8"))
         self.assertIsNone(scores["selection"])
         paired = scores["comparison"]

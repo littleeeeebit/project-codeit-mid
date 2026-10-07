@@ -31,10 +31,11 @@ const COLUMN: Record<string, string> = {
   licence: "라이선스", recall20_before: "recall@20 전", "dev.recall20": "recall@20 후",
   new_critical_vs_h: "하이브리드에 없던 치명", truncated_pairs: "잘린 쌍", p95_alone_ms: "재정렬 p95 단독",
   p95_loaded_ms: "재정렬 p95 6명 동시", gate: "기존 관문",
-  "answer.pass_rate": "답변 통과율", "answer.claim_support": "주장 근거 지지", "answer.critical": "치명 오류",
+  "answer.pass_rate": "답변 통과율", "answer.claim_correctness": "필수 주장 정확", "answer.claim_support": "주장 근거 지지",
+  "answer.critical": "치명 오류", "answer.rejected": "거부된 답변",
   "vs_k1.pass_diff": "K1 대비 통과율", "vs_k1.p_value": "p값", "vs_k1.p_holm": "p값 Holm 보정", "answer.cost_usd": "답변 비용",
 };
-const RATE = new Set(["dev.support", "whole.support", "needle.top5", "answer.pass_rate", "answer.claim_support"]);
+const RATE = new Set(["dev.support", "whole.support", "needle.top5", "answer.pass_rate", "answer.claim_correctness", "answer.claim_support"]);
 const SCORE = new Set(["dev.ndcg", "whole.ndcg", "dev.recall20", "recall20_before", "vs_k1.p_value", "vs_k1.p_holm"]);
 const MS = new Set(["dev.p95_ms", "query_p50_ms", "query_p95_ms", "p95_alone_ms", "p95_loaded_ms"]);
 const AXIS: Record<string, Record<string, string>> = {
@@ -246,7 +247,7 @@ function MatrixNotes({ t }: { t: Table }) {
   return (
     <p className="text-[13px] text-muted-foreground">굵은 파란 값이 열마다 가장 좋은 값입니다. 절반이 넘는 행이 같은 값이면 표시하지 않습니다. 개발 질문은 자기 문서 안에서, 전체 문서 열은 개발 질문과 바늘 질문을 모든 문서에서 검색한 결과입니다. 고정값: {Object.entries(t.fixed).map(([k, v]) => `${FIXED[k] ?? k} ${AXIS[k]?.[String(v)] ?? MODE[String(v)] ?? String(v)}`).join(", ") || "서비스 설정"}.
       {t.matrix === "embedding" && " API 모델의 질의 임베딩 시간은 비용 장부에 남은 질문 호출의 왕복 시간입니다."}
-      {t.matrix === ANSWERS && ` ${t.model ?? ""}가 각 행의 검색 결과로 같은 개발 질문에 답했습니다 (답변 실행 ${t.answer_run_id ?? "-"}). 통과는 기대 상태이면서, 검색이 가져온 정답 근거를 모두 인용한 답입니다. 주장 근거 지지는 인용이 주장 전체를 뒷받침하는 비율이며 판정되지 않은 주장은 지지되지 않은 것으로 셉니다. p값은 K1과 같은 질문끼리 짝지은 McNemar 정확검정이고, Holm 보정값으로 결론을 냅니다. 검색 근거 완전과 질의 p95는 임베딩 비교표에서 가져왔습니다.`}
+      {t.matrix === ANSWERS && ` ${t.model ?? ""}가 각 행의 검색 결과로 같은 개발 질문에 답했습니다 (답변 실행 ${t.answer_run_id ?? "-"}). 통과는 기대 상태이면서, 검색이 가져온 정답 근거를 모두 인용한 답입니다. 필수 주장 정확은 골드의 금액·날짜·조건 주장을 답이 맞게 말한 비율로, 코드가 판정합니다. 주장 근거 지지는 인용이 주장 전체를 뒷받침하는 비율이며 판정되지 않은 주장은 지지되지 않은 것으로 세므로, 검토 전에는 0에 가깝습니다. 거부된 답변은 서비스 검증이 거절했거나 기술적으로 실패한 답이며 통과하지 못한 것으로 셉니다. p값은 K1과 같은 질문끼리 짝지은 McNemar 정확검정이고, Holm 보정값으로 결론을 냅니다. 검색 근거 완전과 질의 p95는 임베딩 비교표에서 가져왔습니다.`}
       {String(t.fixed.fusion ?? "").startsWith("keyword_first") && " 융합이 BM25 상위 6개를 제자리에 두므로 하이브리드와 상위 고정 행의 nDCG@5는 K1과 같습니다. 차이는 그 뒤 근거에서 나며, 근거 완전과 치명 실패 열에 보입니다."}</p>
   );
 }

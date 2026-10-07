@@ -308,6 +308,20 @@ python -m rfp_assistant.cli import-review --run-id <A-run> --file C:\abs\reviewe
 - Resume by planning and running again: finished rows are kept and never re-sent; a row whose call has unknown billing is skipped until it is settled or reconciled (§5), then runs once more as a recorded new attempt.
 - Deterministic scoring covers typed numbers and dates (with qualifiers such as VAT), negatives and link validity. Text claims, partially supporting citations and unlabelled citations are "needs review" or "unjudged" until the blind sheet is imported. Citation precision is reported twice: over judged links and as a lower bound that counts unjudged links as unsupported.
 
+### 10.3a Embedding comparison by answers (paid)
+
+In hybrid serving, `keyword_first` keeps the first six BM25 results in place, so every embedding has the same nDCG@5, and only answers can separate the embeddings. The comparison answers the development set once per retrieval run, K1 first as the baseline:
+
+```bash
+python -m rfp_assistant.cli plan-run --action embedding-comparison --dataset dev --runs <K1>,<H-…>,<H-…>   # free
+python -m rfp_assistant.cli run-answers --estimate-id <id> --actor owner --workers 6                     # paid
+```
+
+- There is no two-run cap; `answer-finalists` keeps its own. The run is `E-…`, which release and freeze never read.
+- `--workers` answers that many retrieval runs at once, each run's rows in order. With gpt-5-mini at about 25 s per answer, 12 runs × 55 questions take about 5 h with one worker. The first budget refusal, new unknown billing or error stops every worker before its next row.
+- `finalize` writes `.runtime/compare/tables/answer-embedding.{json,md}`; 실험 비교 shows it as 임베딩별 답변. Each row has answer pass rate, required-claim correctness, claim support, critical failures, rejected answers, and its pass-rate difference against the first run. That difference comes with the exact McNemar p-value over the same questions and its Holm adjustment. The table also carries complete support and query p95 from the embedding table, cost and licence. A conclusion line names the rows that differ at the Holm-adjusted 0.05 level, or says that none does. The person activates a row there; the comparison never activates one.
+- On `codeit` it runs as owner CLI work. Stop `bidmate` first, because the CLI must own the gateway. Stopping clears every OpenAI key members entered on 설정. Pass the paying key on stdin into that one process's environment, never into a file. From the owner host, `grep '^OPENAI_API_KEY=' .env | cut -d= -f2- | ssh <you>@codeit 'sudo bash run_paid.sh <estimate-id>'`, where the script runs `IFS= read -r OPENAI_API_KEY; export OPENAI_API_KEY`, sources `/etc/bidmate/server.env` and runs `run-answers` as `bidmate` with `sudo -E`. Start `bidmate` again afterwards.
+
 ### 10.4 Release freeze and the sealed run (paid, once)
 
 ```powershell

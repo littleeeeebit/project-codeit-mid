@@ -10,11 +10,14 @@ whose paid attempt has unknown billing is never replayed, and only rows with con
 
 from __future__ import annotations
 
+import contextvars
 import hashlib
 import json
 import math
+import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -421,38 +424,53 @@ def begin_answers(settings: Settings, estimate_id: str, actor: str, post_test_re
 
 
 def run_answers(settings: Settings, owner: service.Resources, estimate_id: str, actor: str,
-                post_test_reason: str | None = None, begun: dict | None = None) -> dict:
+                post_test_reason: str | None = None, begun: dict | None = None, workers: int = 1) -> dict:
     """Executes a planned answer run (development finalists or the sealed run) with the owner's gateway. Stops on
     the first budget refusal or unknown billing; rerunning the same command (after reconciliation, or with a new
     estimate) resumes only unfinished rows. `begun` is this estimate's `begin_answers`, when the caller already
-    published the run."""
+    published the run. `workers` answers that many retrieval runs at once, each run's rows in order; the ledger
+    admits every reservation on its own, and the first stop reason stops every worker before its next row."""
     if begun is None or begun["estimate_id"] != estimate_id:
         begun = begin_answers(settings, estimate_id, actor, post_test_reason)
     inputs, run_id = begun["inputs"], begun["run_id"]
     progress = load_progress(settings, run_id)
-    stop_reason = None
-    for f in inputs["finalists"]:
+    lock, stops = threading.Lock(), []
+
+    def answer_finalist(f: dict) -> None:
         pinned = PinnedResources(settings, owner.transport, f, owner)
         for row in inputs["rows"]:
-            if owner._closed and not stop_reason:
-                stop_reason = "interrupted: the service is stopping; rerun to resume"
-            if stop_reason:
-                break
             key_base = (f["run_id"], row["question_id"])
-            record = progress.get(key_base)
+            with lock:
+                if owner._closed and not stops:
+                    stops.append("interrupted: the service is stopping; rerun to resume")
+                if stops:
+                    return
+                record = progress.get(key_base)
             if record and record["status"] == "done":
                 continue
             outcome = _answer_row(settings, pinned, run_id, f["run_id"], row, record)
-            progress[key_base] = outcome
-            _save_progress(settings, run_id, progress)
-            if outcome["status"] == "blocked":
-                stop_reason = f"budget_blocked: {outcome.get('reason')}"
-            elif outcome["status"] == "unknown_billing" and (record or {}).get("status") != "unknown_billing":
-                # a new unknown outcome stops spending; a known one is skipped until it is reconciled
-                stop_reason = "unknown_billing: reconcile the attempt before resuming (it is never replayed)"
-        if stop_reason:
-            break
-    return finalize(settings, run_id, stop_reason)
+            with lock:
+                progress[key_base] = outcome
+                _save_progress(settings, run_id, progress)
+                if outcome["status"] == "blocked":
+                    stops.append(f"budget_blocked: {outcome.get('reason')}")
+                elif outcome["status"] == "unknown_billing" and (record or {}).get("status") != "unknown_billing":
+                    # a new unknown outcome stops spending; a known one is skipped until it is reconciled
+                    stops.append("unknown_billing: reconcile the attempt before resuming (it is never replayed)")
+
+    def guarded(f: dict) -> None:
+        try:
+            answer_finalist(f)
+        except BaseException as exc:  # the others stop before their next row; the error still propagates
+            with lock:
+                stops.append(f"error: {type(exc).__name__}")
+            raise
+
+    with ThreadPoolExecutor(max_workers=max(1, workers), thread_name_prefix=f"rfp-answers-{run_id}") as pool:
+        # each worker carries a copy of the caller's context: the member's key session and billing scope
+        for done in [pool.submit(contextvars.copy_context().run, guarded, f) for f in inputs["finalists"]]:
+            done.result()
+    return finalize(settings, run_id, stops[0] if stops else None)
 
 
 def _answer_row(settings: Settings, pinned: PinnedResources, run_id: str, finalist: str, row: dict,
@@ -931,8 +949,9 @@ def conclusion_text(c: dict) -> str:
 
 
 COMPARISON_COLUMNS = [
-    ("answer.pass_rate", "answer pass rate", "high"), ("answer.claim_support", "claim support", "high"),
-    ("answer.critical", "critical failures", "low"), ("vs_k1.pass_diff", "pass rate vs K1", "high"),
+    ("answer.pass_rate", "answer pass rate", "high"), ("answer.claim_correctness", "required-claim correctness", "high"),
+    ("answer.claim_support", "claim support", "high"), ("answer.critical", "critical failures", "low"),
+    ("answer.rejected", "rejected answers", "low"), ("vs_k1.pass_diff", "pass rate vs K1", "high"),
     ("vs_k1.p_value", "p (McNemar)", None), ("vs_k1.p_holm", "p (Holm)", None),
     ("dev.support", "complete support (retrieval)", "high"), ("query_p95_ms", "query p95 ms", "low"),
     ("answer.cost_usd", "answer cost USD", "low"), ("cost_usd", "corpus embed cost USD", "low"),
@@ -963,6 +982,8 @@ def write_comparison_table(settings: Settings, config: dict, scores: dict) -> di
             "reason": None if v["completed"] == v["of"] else f"{v['completed']}/{v['of']} answered",
             "answer": {"pass_rate": v["rows_passed"]["rate"], "passed": v["rows_passed"]["numerator"],
                        "n": v["rows_passed"]["denominator"], "claim_support": v["citation_coverage"]["rate"],
+                       "claim_correctness": v["required_claim_correctness"]["rate"],
+                       "rejected": sum(v["technical_outcomes"].values()),
                        "claims_unjudged": v["answer_claims_unjudged"], "critical": len(v["critical_wrong"]),
                        "cost_usd": round(v["cost"]["settled_micro_usd"] / 1_000_000, 6)},
             "vs_k1": comparison["runs"].get(rid) or {"pass_diff": 0.0},
@@ -998,10 +1019,13 @@ def comparison_md(table: dict) -> str:
                      + f" | `{r['run_id']}` |")
     return "\n".join(lines + [
         "", conclusion_text(table["conclusion"]), "",
-        "Pass: the row's own expected status and every gold group the packed evidence reached is cited. Claim support: "
-        "material answer claims a citation supports whole (verbatim, or by review); unjudged claims count against it. "
-        "Critical failures: required claims with a wrong critical value. Retrieval columns come from the embedding and "
-        "lexical tables. Rows marked research-only may not serve commercially.", ""])
+        "Pass: the row's own expected status and every gold group the packed evidence reached is cited. Required-claim "
+        "correctness: the gold typed claims (amounts, dates, conditions) the answer states correctly, checked "
+        "deterministically. Claim support: material answer claims a citation supports whole (verbatim, or by review); "
+        "unjudged claims count against it, so without a review it stays near zero. Critical failures: required claims "
+        "with a wrong critical value. Rejected answers: answers the service's validation refused or that failed "
+        "technically; they count as not passed. Retrieval columns come from the embedding and lexical tables. Rows "
+        "marked research-only may not serve commercially.", ""])
 
 
 def _fmt(r: dict) -> str:
