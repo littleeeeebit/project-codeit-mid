@@ -21,12 +21,12 @@ from rfp_assistant import settings as settings_mod
 from rfp_assistant.contracts import AnswerRequest
 from rfp_assistant.corpus import ingestion
 from rfp_assistant.evaluation import compare, evaluation, judges, release
-from rfp_assistant.gateway import generation
+from rfp_assistant.gateway import budget, generation
 from rfp_assistant.service import answers, ops, service
 from rfp_assistant.settings import Settings, SettingsError
 from rfp_assistant.storage import store
 from tests import fixtures
-from tests import test_dense, test_release, test_service  # their scenarios; module attributes, so their tests are not collected twice
+from tests import test_budget, test_dense, test_release, test_service  # their scenarios; module attributes, so their tests are not collected twice
 
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOTS = Path(__file__).parent / "snapshots"
@@ -310,6 +310,39 @@ class AnswerScoringTest(unittest.TestCase):
         self.assertEqual([answers.verbatim_support(a, b) for a, b in [("하자 보수 12개월", "계약 후 하자보수12개월 이내"),
                                                                      ("abc", "xabcx"), ("하자보수 6개월", "하자보수 12개월")]],
                          [True, False, False])
+
+
+class ReconcileRefusalTest(unittest.TestCase):
+    """budget.reconcile's refusals the budget tests do not reach, on test_budget's ledger (100 micro-USD cap)."""
+
+    setUp = test_budget.BudgetLedgerTest.setUp
+    tearDown = test_budget.BudgetLedgerTest.tearDown
+    _request = test_budget.BudgetLedgerTest._request
+    reserve = test_budget.BudgetLedgerTest.reserve
+
+    def reconcile(self, rid="r", start="2026-01-01T00:00:00", end="2026-06-30T00:00:00", scope="proj", evidence="e",
+                  covered=(), unscoped=None):
+        return budget.reconcile(self.db, "owner", rid, start, end, 10, scope, evidence, list(covered), unscoped)
+
+    def test_refusals(self):
+        reserved = self.reserve(10)["attempt_id"]
+        cases = [
+            ({"unscoped": "maybe"}, f"unscoped_attempts must be one of {budget.UNSCOPED_CHOICES}"),
+            ({"start": "2026-07-01T00:00:00"}, "reconciliation needs a closed interval with start <= end"),
+            ({"start": ""}, "reconciliation needs a closed interval with start <= end"),
+            ({"evidence": " "}, "reconciliation needs the provider scope and dated evidence"),
+            ({"scope": ""}, "reconciliation needs the provider scope and dated evidence"),
+            ({"covered": ["nope"]}, "covered attempt nope is not an unknown attempt"),
+            ({"covered": [reserved]}, f"covered attempt {reserved} is not an unknown attempt")]
+        for kw, message in cases:
+            with self.subTest(message=message), self.assertRaises(budget.BudgetError) as caught:
+                self.reconcile(**kw)
+            self.assertEqual(str(caught.exception), message)
+        self.assertTrue(self.reconcile("first"))
+        with self.assertRaises(budget.BudgetError) as caught:
+            self.reconcile("second", start="2026-06-01T00:00:00", end="2026-12-31T00:00:00")
+        self.assertEqual(str(caught.exception), "reconciliation intervals must not overlap")
+        self.assertTrue(self.reconcile("other scope", scope="proj_b"))
 
 
 class ScoreRecordTest(unittest.TestCase):
