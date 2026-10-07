@@ -178,12 +178,7 @@ export function AskPage() {
           <ToggleGroupItem value="all" className="h-9 px-3 text-sm">전체 문서</ToggleGroupItem>
         </ToggleGroup>
 
-        {scope === "selected" && selected.length === 0 ? (
-          <div className="rounded-2xl border border-dashed p-10 text-center">
-            <p className="text-lg font-semibold">질문할 문서를 고르세요</p>
-            <p className="mt-1 text-sm text-muted-foreground">하나를 고르면 질문할 수 있고, 두 개를 고르면 비교할 수 있습니다. 문서를 모르면 &lsquo;전체 문서&rsquo;로 질문하세요.</p>
-          </div>
-        ) : (
+        {scope === "selected" && selected.length === 0 ? <NoDocument /> : (
           <>
             {scope === "all" ? (
               <p className="rounded-2xl bg-secondary/60 p-4 text-sm text-muted-foreground">
@@ -209,54 +204,10 @@ export function AskPage() {
                   <TurnView key={t.request_id} turn={t} index={i} latest={i === turns.length - 1} opened={opened}
                             onCite={cite} onStatus={onStatus} />
                 ))}
-                {/* In a conversation the composer sticks to the bottom, so it stays small: question first, then
-                    the modes and the button on one row, and the busy hint in the disabled field. */}
-                <form onSubmit={submit}
-                      className={cn("rounded-2xl border bg-background", follow
-                        ? "sticky bottom-0 z-30 space-y-2 p-3 shadow-[0_-6px_20px_rgb(0_0_0/0.06)]" : "space-y-3 p-4 shadow-[0_1px_2px_rgb(0_0_0/0.04)]")}>
-                  {!follow && modeGroup}
-                  {current.paid && (
-                    <div>
-                      <label htmlFor="question" className="sr-only">질문</label>
-                      <textarea id="question" rows={follow ? 1 : 3} maxLength={2000} value={question} disabled={busy}
-                                onChange={(e) => setQuestion(e.target.value)}
-                                placeholder={busy ? "답변이 끝나면 이어서 질문할 수 있습니다."
-                                  : follow ? "이어서 질문하세요"
-                                  : current.id === "compare" ? "예: 두 사업의 하자보수 조건을 비교해 주세요."
-                                  : current.id === "corpus" ? "예: ○○기관 ○○ 구축 사업의 하자보수 기간은 얼마인가요?" : "예: 하자보수 기간과 조건은 무엇인가요?"}
-                                className={cn("w-full rounded-xl border border-input bg-background p-3 text-[16px] leading-7 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
-                                  follow ? "max-h-40 resize-none [field-sizing:content]" : "resize-y")} />
-                    </div>
-                  )}
-                  <div className="flex flex-wrap items-center gap-3">
-                    {follow && modeGroup}
-                    <button type="submit" disabled={busy}
-                            className={cn("rounded-xl bg-primary px-5 text-[15px] font-semibold text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50",
-                              follow ? "ml-auto h-10" : "h-11")}>
-                      {/* a follow-up pays for rewriting it into a standalone question, then for the answer */}
-                      {follow && current.paid ? "이어서 질문 · 유료 2회" : `${SUBMIT[current.id]}${current.paid ? " · 유료 1회" : ""}`}
-                    </button>
-                    {submitError && <span role="alert" className="text-sm font-medium text-bad">{submitError}</span>}
-                  </div>
-                </form>
+                <Composer follow={follow} modeGroup={modeGroup} current={current} question={question} busy={busy}
+                          submitError={submitError} onQuestion={setQuestion} onSubmit={submit} />
               </div>
-              {follow && (
-                <aside ref={pane} tabIndex={-1} aria-label="대화 근거"
-                       className={cn("fixed inset-x-0 bottom-0 z-40 max-h-[80dvh] overflow-y-auto rounded-t-2xl border-t bg-background p-5 shadow-[0_-8px_30px_rgb(0_0_0/0.15)] outline-none",
-                         "lg:sticky lg:inset-auto lg:top-20 lg:z-auto lg:max-h-[calc(100dvh-6rem)] lg:self-start lg:rounded-2xl lg:border lg:shadow-none",
-                         !sheet && "hidden lg:block")}>
-                  <div className="mb-3 flex min-h-8 items-center justify-between gap-3">
-                    <p className="text-[13px] text-muted-foreground">{opened ? `질문 ${opened.turn + 1}의 근거` : "근거"}</p>
-                    <button type="button" onClick={() => setSheet(false)} aria-label="근거 닫기"
-                            className="rounded-md p-1.5 text-muted-foreground outline-none hover:bg-secondary hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 lg:hidden">
-                      <X className="size-5" aria-hidden />
-                    </button>
-                  </div>
-                  {opened ? <EvidenceDetail key={`${opened.requestId}/${opened.evidenceId}`} requestId={opened.requestId}
-                                            evidenceId={opened.evidenceId} number={opened.number} />
-                    : <p className="text-sm text-muted-foreground">답변 문장 끝의 번호를 누르면 원문 인용과 앞뒤 문단, 원문 파일이 여기에 열립니다.</p>}
-                </aside>
-              )}
+              {follow && <EvidencePane paneRef={pane} sheet={sheet} opened={opened} onClose={() => setSheet(false)} />}
             </div>
           </>
         )}
@@ -264,6 +215,75 @@ export function AskPage() {
         <History refresh={historyKey} />
       </main>
     </div>
+  );
+}
+
+function NoDocument() {
+  return (
+    <div className="rounded-2xl border border-dashed p-10 text-center">
+      <p className="text-lg font-semibold">질문할 문서를 고르세요</p>
+      <p className="mt-1 text-sm text-muted-foreground">하나를 고르면 질문할 수 있고, 두 개를 고르면 비교할 수 있습니다. 문서를 모르면 &lsquo;전체 문서&rsquo;로 질문하세요.</p>
+    </div>
+  );
+}
+
+// In a conversation the composer sticks to the bottom, so it stays small: question first, then the modes and the
+// button on one row, and the busy hint in the disabled field.
+function Composer({ follow, modeGroup, current, question, busy, submitError, onQuestion, onSubmit }: {
+  follow: boolean; modeGroup: React.ReactNode; current: (typeof ALL)[number]; question: string; busy: boolean;
+  submitError: string | null; onQuestion: (q: string) => void; onSubmit: (e: React.FormEvent) => void;
+}) {
+  return (
+    <form onSubmit={onSubmit}
+          className={cn("rounded-2xl border bg-background", follow
+            ? "sticky bottom-0 z-30 space-y-2 p-3 shadow-[0_-6px_20px_rgb(0_0_0/0.06)]" : "space-y-3 p-4 shadow-[0_1px_2px_rgb(0_0_0/0.04)]")}>
+      {!follow && modeGroup}
+      {current.paid && (
+        <div>
+          <label htmlFor="question" className="sr-only">질문</label>
+          <textarea id="question" rows={follow ? 1 : 3} maxLength={2000} value={question} disabled={busy}
+                    onChange={(e) => onQuestion(e.target.value)}
+                    placeholder={busy ? "답변이 끝나면 이어서 질문할 수 있습니다."
+                      : follow ? "이어서 질문하세요"
+                      : current.id === "compare" ? "예: 두 사업의 하자보수 조건을 비교해 주세요."
+                      : current.id === "corpus" ? "예: ○○기관 ○○ 구축 사업의 하자보수 기간은 얼마인가요?" : "예: 하자보수 기간과 조건은 무엇인가요?"}
+                    className={cn("w-full rounded-xl border border-input bg-background p-3 text-[16px] leading-7 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
+                      follow ? "max-h-40 resize-none [field-sizing:content]" : "resize-y")} />
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        {follow && modeGroup}
+        <button type="submit" disabled={busy}
+                className={cn("rounded-xl bg-primary px-5 text-[15px] font-semibold text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50",
+                  follow ? "ml-auto h-10" : "h-11")}>
+          {/* a follow-up pays for rewriting it into a standalone question, then for the answer */}
+          {follow && current.paid ? "이어서 질문 · 유료 2회" : `${SUBMIT[current.id]}${current.paid ? " · 유료 1회" : ""}`}
+        </button>
+        {submitError && <span role="alert" className="text-sm font-medium text-bad">{submitError}</span>}
+      </div>
+    </form>
+  );
+}
+
+function EvidencePane({ paneRef, sheet, opened, onClose }: {
+  paneRef: React.RefObject<HTMLElement | null>; sheet: boolean; opened: Opened | null; onClose: () => void;
+}) {
+  return (
+    <aside ref={paneRef} tabIndex={-1} aria-label="대화 근거"
+           className={cn("fixed inset-x-0 bottom-0 z-40 max-h-[80dvh] overflow-y-auto rounded-t-2xl border-t bg-background p-5 shadow-[0_-8px_30px_rgb(0_0_0/0.15)] outline-none",
+             "lg:sticky lg:inset-auto lg:top-20 lg:z-auto lg:max-h-[calc(100dvh-6rem)] lg:self-start lg:rounded-2xl lg:border lg:shadow-none",
+             !sheet && "hidden lg:block")}>
+      <div className="mb-3 flex min-h-8 items-center justify-between gap-3">
+        <p className="text-[13px] text-muted-foreground">{opened ? `질문 ${opened.turn + 1}의 근거` : "근거"}</p>
+        <button type="button" onClick={onClose} aria-label="근거 닫기"
+                className="rounded-md p-1.5 text-muted-foreground outline-none hover:bg-secondary hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 lg:hidden">
+          <X className="size-5" aria-hidden />
+        </button>
+      </div>
+      {opened ? <EvidenceDetail key={`${opened.requestId}/${opened.evidenceId}`} requestId={opened.requestId}
+                                evidenceId={opened.evidenceId} number={opened.number} />
+        : <p className="text-sm text-muted-foreground">답변 문장 끝의 번호를 누르면 원문 인용과 앞뒤 문단, 원문 파일이 여기에 열립니다.</p>}
+    </aside>
   );
 }
 
