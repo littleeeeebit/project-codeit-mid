@@ -73,8 +73,8 @@
     },
     "tools/verify.py": {
       "dup": 0,
-      "lines": 1044,
-      "reason": "baseline at adoption"
+      "lines": 1056,
+      "reason": "gpt5-mini-answer-embedding-comparison: 12 lines select the owner-configured Python before dependency imports so registered flows work when wiki-agent uses a separate base environment; duplication allowance remains zero"
     },
     "web/src/components/verify/evaluation.tsx": {
       "dup": 6,
