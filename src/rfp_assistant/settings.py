@@ -60,7 +60,7 @@ class Settings:
     provider: str = "openai"  # "openai" or "fake"; fake refuses to build a real SDK client
     generation_model: str = "gpt-5-mini"
     generation_reasoning_effort: str = "low"
-    embedding_model: str = "text-embedding-3-large"
+    embedding_model: str = "dragonkue/BGE-m3-ko"
     evidence_target_tokens: int = 3000
     evidence_max_tokens: int = 5000  # keeps every prompt far below the 272K long-context price tier
     evidence_max_units: int = 6
@@ -68,7 +68,7 @@ class Settings:
     question_max_characters: int = 2000
     retrieval_mode: str = "kiwi_bm25"  # default until `activate-run` records a measured selection
     reranker_enabled: bool = False
-    embedding_dimensions: int = 1536  # owner-selected reduction; activation still requires quality acceptance
+    embedding_dimensions: int = 1024  # native size of the owner's selected BGE-m3-ko baseline
     embedding_batch_inputs: int = 256
     embedding_batch_tokens: int = 100_000
     embedding_estimate_ttl_hours: int = 24

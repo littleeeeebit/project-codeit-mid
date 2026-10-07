@@ -82,11 +82,13 @@ class SettingsTest(unittest.TestCase):
         self.assertEqual((s.provider, s.generation_model, s.generation_reasoning_effort, s.embedding_model,
                           s.retrieval_mode, s.fusion, s.dense_search, s.request_workers, s.request_admission,
                           s.jev_model, s.database_dsn_env),
-                         ("openai", "gpt-5-mini", "low", "text-embedding-3-large", "kiwi_bm25", "rrf", "exact", 6, 12,
+                         ("openai", "gpt-5-mini", "low", "dragonkue/BGE-m3-ko", "kiwi_bm25", "rrf", "exact", 6, 12,
                           "jev-1.13.0", "RFP_DATABASE_DSN"))
         self.assertEqual((s.csv_path, s.files_dir), (Path("/src/data_list.csv"), Path("/src/files")))
         self.assertEqual(settings_mod.ALLOWED_GENERATION_MODELS, ("gpt-5-mini", "gpt-5-nano"))
         self.assertIn("gpt-6-luna", settings_mod.DEFAULT_RATES)  # drafting, the judges and AI review still bill it
+        self.assertEqual(s.embedding_dimensions, 1024)
+        self.assertEqual(s.embedding_dimensions, settings_mod.EMBEDDINGS[s.embedding_model].dims)
         self.assertEqual(settings_mod.REASONING_EFFORTS, ("none", "minimal", "low", "medium", "high", "xhigh", "max"))
         self.assertEqual(settings_mod.TRACING_ENV, ("LANGFUSE_HOST", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"))
 
@@ -157,7 +159,9 @@ class SettingsTest(unittest.TestCase):
             ({"generation_max_output_tokens": 8001}, "generation_max_output_tokens must be within 1..8000"),
             ({"reranker_enabled": True}, "the reranker is enabled only through `activate-run`"),
             ({"retrieval_mode": "hybrid"}, "retrieval_mode is the keyword default"),
-            ({"embedding_dimensions": 4000}, "embedding_dimensions exceeds the model's native size"),
+            ({"embedding_dimensions": 4000}, "dragonkue/BGE-m3-ko produces 1024 dimensions"),
+            ({"embedding_model": "text-embedding-3-large", "embedding_dimensions": 4000},
+             "embedding_dimensions exceeds the model's native size"),
             ({"embedding_batch_inputs": 2049}, "embedding_batch_inputs must be within 1..2048"),
             ({"embedding_batch_tokens": 300_001}, "embedding_batch_tokens must be within 1..300000"),
             ({"reranker_max_concurrency": 2}, "reranker_max_concurrency must be 1"),

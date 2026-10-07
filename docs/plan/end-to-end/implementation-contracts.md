@@ -39,7 +39,7 @@ Resolve defaults from the installed package/repository location, never the proce
 | `allowance_usd`, `operational_cap_usd` | `20`, `16`; prior spending counts against the cap |
 | `project_start`, `project_end` | Required before paid mode; actual dates, not an automatic 28-day forecast |
 | `paid_enabled` | False until prior-use reconciliation and rate checks are recorded |
-| `generation_model`, `embedding_model` | `gpt-5-mini` (allowed answer models `gpt-5-mini`, `gpt-5-nano`; `gpt-6-luna` is refused at load and serves only drafting, judges and AI review), `text-embedding-3-large`; historical small identities retained; owner selected 1,536 dimensions, pending quality acceptance |
+| `generation_model`, `embedding_model` | `gpt-5-mini` (allowed answer models `gpt-5-mini`, `gpt-5-nano`; `gpt-6-luna` is refused at load and serves only drafting, judges and AI review), `dragonkue/BGE-m3-ko` at 1,024 native dimensions; owner selected hybrid row `H-5b2565f606` on 2026-10-07; later retrieval tuning belongs to the retriever owner |
 | `evidence_target_tokens`, `evidence_max_tokens` | `3000`, `5000`, counted after expansion |
 | `generation_max_output_tokens` | `800`; no UI override above the authorized configuration |
 | `question_max_characters` | `2000`; comparison initially limited to two selected documents |

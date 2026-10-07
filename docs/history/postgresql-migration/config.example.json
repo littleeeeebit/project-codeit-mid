@@ -3,6 +3,6 @@
   "database_pool_max": 8,
   "database_timeout_seconds": 5,
   "provider": "openai",
-  "embedding_model": "text-embedding-3-large",
-  "embedding_dimensions": 1536
+  "embedding_model": "dragonkue/BGE-m3-ko",
+  "embedding_dimensions": 1024
 }
