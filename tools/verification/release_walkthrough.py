@@ -48,6 +48,7 @@ def _gold_steps(cli, root: Path) -> None:
     cli("configure budget", "configure-budget", "--start", "2026-09-30", "--end", "2026-10-28", "--prior-use-usd", "0",
         "--prior-use-evidence", "synthetic walkthrough", "--allowance-usd", "5", "--cap-usd", "5", "--confirm-rates",
         "--enable-paid")
+    cli("enable fixture admission", "paid", "on", "--actor", "owner", "--reason", "synthetic fixture walkthrough")
     cli("submit dev batch", "gold", "submit", "--file", str(root / "dev-batch.jsonl"), "--batch", "dev-b1",
         "--dataset", "dev", "--drafted-by", "agent-a")
     cli("submit sealed batch", "gold", "submit", "--file", str(root / "test-batch.jsonl"), "--batch", "test-b1",
@@ -132,6 +133,8 @@ def main(work: Path) -> int:
         steps.append({"step": step, "argv": ["cli", *args], "exit": proc.returncode, "expected_exit": expect,
                       "ok": ok, "seconds": round(time.monotonic() - t0, 2),
                       "tail": out.strip().splitlines()[-1][:200] if out.strip() else ""})
+        if not ok:
+            raise RuntimeError(f"{step}: expected exit {expect}, got {proc.returncode}; {out.strip()[-500:]}")
         return proc.stdout
 
     def field(text: str, key: str):
