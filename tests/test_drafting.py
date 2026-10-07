@@ -142,33 +142,40 @@ class DraftingTest(unittest.TestCase):
         with self.assertRaises(gold.GoldError):
             drafting.materialize(slot, draft, {})
 
+    def _rejected_lookup_and_sealed_row(self, env, folder):
+        """A drafter's own introductory lookup, refused approval, withdrawn with a lesson; and a sealed row a
+        reviewer rejected with a secret note. Returns both rows."""
+        s = env.settings
+        old = fx.amount_row(env, reviewed=False)
+        batch = Path(folder) / "old.jsonl"
+        store.write_jsonl_atomic(batch, [old])
+        gold.submit(s, batch, "old", "dev", "agent-a")
+        c = gold.candidate(s, "dev-amount-r1")
+        with self.assertRaises(gold.GoldError):
+            gold.decide(s, c["candidate_id"], "approve", "agent-a", c["row_sha256"], original_inspected=True)
+        gold.decide(s, c["candidate_id"], "reject", "agent-a", c["row_sha256"], ["too_easy"],
+                    "Withdraw my introductory lookup before API regeneration")
+        with self.assertRaises(gold.GoldError):
+            drafting.lessons(s)
+        gold.infer(s, c["candidate_id"], "agent-a", {"cause": "Introductory lookup", "lesson": "Need a real task",
+                    "drafting_rule": "Retain the amount and its separately stated tax condition"})
+        sealed = fx.row(env, "sealed-hidden", "Hidden question", "기관D", split="test", reviewed=False,
+                        groups=[], claims=[], answerability="unanswerable", expected_status="insufficient_evidence",
+                        negative_validation={"scope_searched": [env.refs['기관D'].doc_id], "methods": ['read'],
+                                             "locations": ['all'], "original_complete": True, "rationale": 'none'})
+        sealed_batch = Path(folder) / "sealed.jsonl"
+        store.write_jsonl_atomic(sealed_batch, [sealed])
+        gold.submit(s, sealed_batch, "sealed", "test", "agent-a")
+        c = gold.candidate(s, "sealed-hidden-r1", include_sealed=True)
+        gold.decide(s, c["candidate_id"], "reject", "person-b", c["row_sha256"], ["other"],
+                    "SEALED SECRET", include_sealed=True)
+        return old, sealed
+
     def test_generation_preserves_roles_and_learns_without_sealed_leakage(self):
         with tempfile.TemporaryDirectory() as folder:
             env = fx.make_env(Path(folder))
             s = env.settings
-            old = fx.amount_row(env, reviewed=False)
-            batch = Path(folder) / "old.jsonl"
-            store.write_jsonl_atomic(batch, [old])
-            gold.submit(s, batch, "old", "dev", "agent-a")
-            c = gold.candidate(s, "dev-amount-r1")
-            with self.assertRaises(gold.GoldError):
-                gold.decide(s, c["candidate_id"], "approve", "agent-a", c["row_sha256"], original_inspected=True)
-            gold.decide(s, c["candidate_id"], "reject", "agent-a", c["row_sha256"], ["too_easy"],
-                        "Withdraw my introductory lookup before API regeneration")
-            with self.assertRaises(gold.GoldError):
-                drafting.lessons(s)
-            gold.infer(s, c["candidate_id"], "agent-a", {"cause": "Introductory lookup", "lesson": "Need a real task",
-                        "drafting_rule": "Retain the amount and its separately stated tax condition"})
-            sealed = fx.row(env, "sealed-hidden", "Hidden question", "기관D", split="test", reviewed=False,
-                            groups=[], claims=[], answerability="unanswerable", expected_status="insufficient_evidence",
-                            negative_validation={"scope_searched": [env.refs['기관D'].doc_id], "methods": ['read'],
-                                                 "locations": ['all'], "original_complete": True, "rationale": 'none'})
-            sealed_batch = Path(folder) / "sealed.jsonl"
-            store.write_jsonl_atomic(sealed_batch, [sealed])
-            gold.submit(s, sealed_batch, "sealed", "test", "agent-a")
-            c = gold.candidate(s, "sealed-hidden-r1", include_sealed=True)
-            gold.decide(s, c["candidate_id"], "reject", "person-b", c["row_sha256"], ["other"],
-                        "SEALED SECRET", include_sealed=True)
+            old, sealed = self._rejected_lookup_and_sealed_row(env, folder)
             slots = [{"question_id": "api-amount", "revision": 1, "question_type": "table_numeric",
                       "intent": "Budget and tax condition", "scope": old["scope"], "as_of_date": old['as_of_date'],
                       "sources": [{"doc_id": g["doc_id"], "element_id": g['alternatives'][0]['element_id']}
