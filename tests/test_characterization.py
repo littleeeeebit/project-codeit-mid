@@ -361,6 +361,21 @@ class GoldSubmitRepinTest(unittest.TestCase):
             "row 2 (p2): drafted_by must equal --drafted-by",
             "row 2 (p2): same question already drafted as Bad id (this batch)"]))
 
+    def test_excerpts_with_codes_rejections_and_an_omission(self):
+        s = self.env.settings
+        with store.open_db(s.db_path) as conn:
+            conn.execute("INSERT INTO elements(extraction_id, element_id, source_order, kind, parent_id, raw_text, "
+                         "search_text, location_json, table_json) VALUES (?, 'req-x', 9999, 'table', NULL, ?, ?, '{}', "
+                         "NULL)", (self.extraction, *["SFR-001 요구사항: 시스템은 월 99.9% 가용성을 12개월 동안 보장해야 "
+                                                      "한다"] * 2))
+        self.submit("p1", [self.pilot("r1", "하자보수 기간은?")], dataset="dev-pilot")
+        gold.decide(s, "r1", "reject", "v1", gold.candidate(s, "r1")["row_sha256"], ["too_easy"], "단서가 질문에 있음")
+        packs = [gold.excerpts(s), gold.excerpts(s, per_category=1, max_chars=2)]
+        for p in packs:
+            p["context"].pop("created_at")
+        text = json.dumps(packs, ensure_ascii=False, indent=1, sort_keys=True) + "\n"
+        snapshot(self, "gold_excerpts", DIGEST.sub("<digest>", text))
+
     def test_repin_moves_a_pending_gold_row(self):
         s, ref = self.env.settings, self.env.refs["기관A"]
         self.submit("g1", [self.warranty()])
