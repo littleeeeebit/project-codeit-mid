@@ -20,7 +20,7 @@ from rfp_assistant import settings as settings_mod
 from rfp_assistant.corpus import ingestion
 from rfp_assistant.evaluation import compare, evaluation, judges, release
 from rfp_assistant.gateway import generation
-from rfp_assistant.service import answers, service
+from rfp_assistant.service import answers, ops, service
 from rfp_assistant.settings import Settings, SettingsError
 from rfp_assistant.storage import store
 from tests import fixtures
@@ -554,6 +554,70 @@ class ReleaseReportTest(unittest.TestCase):
         self.assertEqual((outcome.errors, outcome.failures), ([], []))
         self.assertEqual(len(rendered), 4)
         snapshot(self, "release_sealed", "\n\0\0".join(rendered))
+
+
+class LoadCheckTest(unittest.TestCase):
+    """ops.load_check against the fake provider. How many of six users' requests the cap blocks depends on thread
+    timing, so that run pins the invariants; the three-user run with injected timeouts is pinned whole."""
+
+    KEYS = ["kind", "synthetic", "users", "requests_per_user", "fake_delay_seconds", "fail_every", "cap_micro_usd",
+            "max_reservation_micro_usd", "affordable_at_once", "outcomes", "attempt_states", "provider_calls",
+            "spent_micro_usd", "pending_unknown_micro_usd", "submit_ms", "poll_ms", "wall_seconds", "violations",
+            "checks", "passed"]
+    CHECKS = {"cap_never_exceeded": True, "one_generation_attempt_per_request": True,
+              "no_open_reservation_left": True, "all_requests_finished": True, "duplicate_submit_reused_request": True}
+
+    def test_six_users_under_the_cap(self):
+        r = ops.load_check(users=6, requests_per_user=2, delay_seconds=0.05)
+        self.assertEqual(list(r), self.KEYS)
+        self.assertEqual((r["cap_micro_usd"], r["max_reservation_micro_usd"], r["checks"], r["passed"],
+                          r["violations"], r["pending_unknown_micro_usd"]), (10224, 2272, self.CHECKS, True, [], 0))
+        answered = r["outcomes"].get("completed/answered", 0)
+        self.assertLessEqual(set(r["outcomes"]), {"completed/answered", "completed/budget_blocked"})
+        self.assertEqual(sum(r["outcomes"].values()), 12)
+        self.assertEqual((r["provider_calls"], r["attempt_states"], r["spent_micro_usd"]),
+                         (answered, {"settled": answered}, 155 * answered))
+        self.assertEqual((list(r["submit_ms"]), list(r["poll_ms"])), (["p50", "p95"], ["samples", "p50", "p95", "max"]))
+        self.assertGreater(r["poll_ms"]["samples"], 0)
+
+    def test_injected_timeouts(self):
+        r = ops.load_check(users=3, requests_per_user=2, delay_seconds=0.05, fail_every=2)
+        for k in ("submit_ms", "poll_ms", "wall_seconds"):
+            r.pop(k)
+        self.assertEqual(r, {
+            "kind": "fake_provider_load_check", "synthetic": True, "users": 3, "requests_per_user": 2,
+            "fake_delay_seconds": 0.05, "fail_every": 2, "cap_micro_usd": 10224, "max_reservation_micro_usd": 2272,
+            "affordable_at_once": 4, "outcomes": {"completed/answered": 2, "completed/budget_blocked": 2,
+                                                  "failed/technical_error": 2},
+            "attempt_states": {"settled": 2, "unknown": 2}, "provider_calls": 4, "spent_micro_usd": 310,
+            "pending_unknown_micro_usd": 4544, "violations": [], "checks": self.CHECKS, "passed": True})
+
+
+class Phase3ReportTest(unittest.TestCase):
+    """ops.write_phase3_report with nothing recorded, then with every optional record present."""
+
+    RECORDS = {
+        "load-check.json": {"users": 6, "requests_per_user": 2, "fake_delay_seconds": 0.5, "fail_every": 0,
+                            "passed": True, "checks": {"cap_never_exceeded": True}, "outcomes": {"completed/answered": 12},
+                            "provider_calls": 12, "poll_ms": {"p95": 4.2, "samples": 80}, "submit_ms": {"p95": 9.5}},
+        "browser-results.json": {"summary": "six browsers", "screenshots": ["a.png", "b.png"],
+                                 "steps": [{"step": "ask", "role": "consultant", "viewport": "1280", "outcome": "ok"}]},
+        "paid-smoke.json": {"request_id": "smoke-1", "settled_micro_usd": 1200},
+        "team-host.json": {"host": "codeit", "recorded_at": "2026-10-01", "reach": "tunnel", "tunnel": "ssh -L",
+                           "members": ["a", "b"]},
+    }
+
+    def test_reports(self):
+        rendered = []
+        with tempfile.TemporaryDirectory() as tmp:
+            env = fixtures.make_env(Path(tmp))
+            path = ops.write_phase3_report(env.settings)
+            rendered.append(read_outputs(path.parent, ("report.md",), env.settings.data_dir.parent))
+            for name, data in self.RECORDS.items():
+                ops.save_json(ops.phase3_dir(env.settings) / name, data)
+            path = ops.write_phase3_report(env.settings)
+            rendered.append(read_outputs(path.parent, ("report.md",), env.settings.data_dir.parent))
+        snapshot(self, "phase3_report", "\n\0\0".join(rendered))
 
 
 class VerifyToolTest(unittest.TestCase):
