@@ -384,6 +384,32 @@ def _paragraphs(container: ET.Element):
             yield from _paragraphs(ch)
 
 
+def _plain(p: ET.Element) -> str:
+    """A paragraph's own text, without the tables and boxes it holds."""
+    texts: list[str] = []
+    _collect(p, texts, [], [])
+    return "".join(texts)
+
+
+def _table_cells(tbody: ET.Element | None, path: str) -> tuple[list[dict], list[tuple]]:
+    """Each cell with its paragraphs' and text boxes' text, and the tables nested in the cells (table, path,
+    [row, col]), in source order."""
+    cells, nested = [], []
+    for tr in (tbody.findall("TableRow") if tbody is not None else []):
+        for cell in tr.findall("TableCell"):
+            r, c = int(cell.get("row", 0)), int(cell.get("col", 0))
+            parts = []
+            for pi, p in enumerate(_paragraphs(cell)):
+                texts, tables, boxes = [], [], []
+                _collect(p, texts, tables, boxes)
+                parts.append("".join(texts))
+                parts += [_plain(bp) for box in boxes for bp in _paragraphs(box)]
+                nested += [(t, f"{path}/r{r}c{c}/p{pi}/t{ti}", [r, c]) for ti, t in enumerate(tables)]
+            cells.append({"row": r, "col": c, "rowspan": int(cell.get("rowspan", 1)),
+                          "colspan": int(cell.get("colspan", 1)), "text": "\n".join(parts).strip()})
+    return cells, nested
+
+
 def walk_hwp(root: ET.Element) -> list[dict]:
     """Walk HWP XML in source order. Every text span is owned by exactly one element:
     body paragraph, table cell (nested tables excluded) or nested table."""
@@ -409,31 +435,9 @@ def walk_hwp(root: ET.Element) -> list[dict]:
         table_counter[0] += 1
         ordinal = table_counter[0]
         tbody = tc.find("TableBody")
-        caption = []
         cap = tc.find("TableCaption")
-        if cap is not None:
-            for p in _paragraphs(cap):
-                t: list[str] = []
-                _collect(p, t, [], [])
-                caption.append("".join(t))
-        cells, nested = [], []
-        for tr in (tbody.findall("TableRow") if tbody is not None else []):
-            for cell in tr.findall("TableCell"):
-                r, c = int(cell.get("row", 0)), int(cell.get("col", 0))
-                parts = []
-                for pi, p in enumerate(_paragraphs(cell)):
-                    texts, tables, boxes = [], [], []
-                    _collect(p, texts, tables, boxes)
-                    parts.append("".join(texts))
-                    for box in boxes:
-                        for bp in _paragraphs(box):
-                            bt: list[str] = []
-                            _collect(bp, bt, [], [])
-                            parts.append("".join(bt))
-                    for ti, t in enumerate(tables):
-                        nested.append((t, f"{path}/r{r}c{c}/p{pi}/t{ti}", [r, c]))
-                cells.append({"row": r, "col": c, "rowspan": int(cell.get("rowspan", 1)),
-                              "colspan": int(cell.get("colspan", 1)), "text": "\n".join(parts).strip()})
+        caption = [_plain(p) for p in _paragraphs(cap)] if cap is not None else []
+        cells, nested = _table_cells(tbody, path)
         rows = int(tbody.get("rows", 0)) if tbody is not None else 0
         cols = int(tbody.get("cols", 0)) if tbody is not None else 0
         # One-row title boxes ("Ⅰ | | 사업 안내", "1 | | 사업개요 |") are headings laid out as tables.
@@ -461,9 +465,7 @@ def walk_hwp(root: ET.Element) -> list[dict]:
             emit_paragraph("".join(texts), path, si, None)
             for bi, box in enumerate(boxes):
                 for bpi, bp in enumerate(_paragraphs(box)):
-                    bt: list[str] = []
-                    _collect(bp, bt, [], [])
-                    emit_paragraph("".join(bt), f"{path}/box{bi}/p{bpi}", si, None)
+                    emit_paragraph(_plain(bp), f"{path}/box{bi}/p{bpi}", si, None)
             for ti, t in enumerate(tables):
                 emit_table(t, f"{path}/t{ti}", si, None, None)
     return out
@@ -522,6 +524,41 @@ def parse_hwp(settings: Settings, original: Path) -> tuple[list[dict], list[dict
 # ---------------------------------------------------------------- PDF
 
 
+def _page_labels(page, blocks: list, height: float, column) -> dict[int, str]:
+    """The printed page label of each column: the PDF's own label, else the page number in the footer."""
+    if page.get_label():
+        return {0: page.get_label(), 1: page.get_label()}
+    labels: dict[int, str] = {}
+    for b in blocks:  # printed page numbers sit in the footer, e.g. "-201-"
+        m = FOOTER_PAGE_RE.match(b[4].strip())
+        if m and b[1] > height * 0.85:
+            labels[column(b[0])] = m.group(1)
+    return labels
+
+
+def _page_items(page, blocks: list, column) -> list[tuple]:
+    """The page's tables and the text blocks outside them, in reading order: (column, top, left, kind, object,
+    cells)."""
+    import pymupdf
+
+    tables = page.find_tables().tables
+    items = []
+    for t in tables:
+        grid = t.extract()
+        cells = [{"row": r, "col": c, "rowspan": 1, "colspan": 1, "text": v or "", "merged": v is None}
+                 for r, row in enumerate(grid) for c, v in enumerate(row)]
+        items.append((column(t.bbox[0]), t.bbox[1], t.bbox[0], "table", t, cells))
+    tboxes = [pymupdf.Rect(t.bbox) for t in tables]
+    for b in blocks:
+        rect = pymupdf.Rect(b[:4])
+        center = pymupdf.Point((rect.x0 + rect.x1) / 2, (rect.y0 + rect.y1) / 2)
+        if any(center in tb for tb in tboxes):
+            continue  # owned by the table
+        items.append((column(b[0]), b[1], b[0], "block", b, None))
+    items.sort(key=lambda it: it[:3])
+    return items
+
+
 def parse_pdf(original: Path) -> tuple[list[dict], list[dict], str | None]:
     import pymupdf
 
@@ -544,32 +581,10 @@ def parse_pdf(original: Path) -> tuple[list[dict], list[dict], str | None]:
                 return int(x0 >= width / 2) if two_up else 0
 
             blocks = [b for b in page.get_text("blocks") if b[6] == 0 and b[4].strip()]
-            labels: dict[int, str] = {}
-            if page.get_label():
-                labels = {0: page.get_label(), 1: page.get_label()}
-            else:  # printed page numbers sit in the footer, e.g. "-201-"
-                for b in blocks:
-                    m = FOOTER_PAGE_RE.match(b[4].strip())
-                    if m and b[1] > height * 0.85:
-                        labels[column(b[0])] = m.group(1)
+            labels = _page_labels(page, blocks, height, column)
             if sum(len(b[4].strip()) for b in blocks) < 10:
                 warnings.append({"code": "page_blank_or_image", "page": pno})
-            tables = page.find_tables().tables
-            items = []
-            for t in tables:
-                grid = t.extract()
-                cells = [{"row": r, "col": c, "rowspan": 1, "colspan": 1, "text": v or "", "merged": v is None}
-                         for r, row in enumerate(grid) for c, v in enumerate(row)]
-                items.append((column(t.bbox[0]), t.bbox[1], t.bbox[0], "table", t, cells))
-            tboxes = [pymupdf.Rect(t.bbox) for t in tables]
-            for b in blocks:
-                rect = pymupdf.Rect(b[:4])
-                center = pymupdf.Point((rect.x0 + rect.x1) / 2, (rect.y0 + rect.y1) / 2)
-                if any(center in tb for tb in tboxes):
-                    continue  # owned by the table
-                items.append((column(b[0]), b[1], b[0], "block", b, None))
-            items.sort(key=lambda it: it[:3])
-            for n, (col, _, _, kind, obj, cells) in enumerate(items):
+            for n, (col, _, _, kind, obj, cells) in enumerate(_page_items(page, blocks, column)):
                 path = f"p{pno}/i{n}"
                 label = labels.get(col) or (next(iter(labels.values())) if len(labels) == 1 else None)
                 loc = {"format": "pdf", "page": pno, "page_label": label, "path": path}
@@ -701,42 +716,11 @@ def ingest_source(settings: Settings, source_hash: str, force: bool = False) -> 
         return {"source_hash": source_hash, "status": "recovered", "extraction_id": src["active_extraction_id"]}
     key = input_key(settings, src)
     if not force and prior is not None and prior["input_key"] == key:
-        stats = json.loads(prior["stats_json"])
-        if src["parse_status"] == "quarantined" and not prior["extraction_id"]:
-            return {"source_hash": source_hash, "status": "quarantined", "reason": src["reason_code"], "reused": True}
-        with open_db(settings.db_path) as conn:
-            row = conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?",
-                               (prior["extraction_id"],)).fetchone()
-        artifact = host_path(row["artifact_path"]) if row else None
-        if (src["parse_status"] == "parsed" and src["active_extraction_id"] == prior["extraction_id"]
-                and artifact is not None and artifact.exists() and sha256_file(artifact) == prior["artifact_sha256"]):
-            return {"source_hash": source_hash, "status": "parsed", "extraction_id": prior["extraction_id"],
-                    "reused": True, "diagnostic_flags": stats.get("diagnostics", {}).get("flags", [])}
+        reused = _reused(settings, src, prior)
+        if reused is not None:
+            return reused
     started = time.perf_counter()
-    fp = parser_fingerprint(src["format"])
-    if src["format"] == "hwp":
-        raw, warnings, reason = parse_hwp(settings, original)
-        printed = printed_pdf_path(settings, source_hash)
-        if reason and printed.exists():
-            # pyhwp cannot read it, but Hancom could print it (review print): read the print's text layer instead.
-            # No independent witness remains for this text, so it stays unreviewed.
-            raw, more, failed = parse_pdf(printed)
-            if not failed:
-                for e in raw:
-                    e["location"]["format"] = "hwp_print"
-                warnings += more + [{"code": "recovered_from_native_print", "detail": reason,
-                                     "rendering_sha256": sha256_file(printed)}]
-                reason, fp = None, parser_fingerprint("pdf") + "-hancom-print"
-    else:
-        raw, warnings, reason = parse_pdf(original)
-    rendering = printed_pdf_path(settings, source_hash) if src["format"] == "hwp" else original
-    if not reason and rendering.exists():
-        from .ocr import merge  # ocr imports this module
-
-        raw, more, suffix = merge(settings, source_hash, raw, rendering)
-        warnings += more
-        if suffix:
-            fp = f"{fp}-{suffix}"
+    raw, warnings, reason, fp = _parse_source(settings, src, original)
     seconds = round(time.perf_counter() - started, 2)
     if reason:
         with open_db(settings.db_path) as conn, tx(conn, immediate=True):
@@ -761,13 +745,7 @@ def ingest_source(settings: Settings, source_hash: str, force: bool = False) -> 
             "VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
             (extraction_id, source_hash, fp, str(artifact), utcnow()),
         )
-        conn.execute("DELETE FROM elements WHERE extraction_id = ?", (extraction_id,))
-        conn.executemany(
-            "INSERT INTO elements(extraction_id, element_id, source_order, kind, parent_id, raw_text, search_text, "
-            "location_json, table_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [(extraction_id, e["element_id"], e["source_order"], e["kind"], e["parent_id"], e["raw_text"],
-              e["search_text"], dumps(e["location"]), dumps(e["table"]) if e["table"] else None) for e in elements],
-        )
+        _store_elements(conn, extraction_id, elements)
         # A new revision (parser or output) resets review: parsed does not mean faithful.
         review = src["review_status"] if src["active_extraction_id"] == extraction_id else "unreviewed"
         conn.execute(
@@ -779,6 +757,63 @@ def ingest_source(settings: Settings, source_hash: str, force: bool = False) -> 
             "elements": len(elements), "tables": sum(e["kind"] == "table" for e in elements),
             "warnings": [w["code"] for w in warnings], "seconds": seconds,
             "diagnostic_flags": diagnostics["flags"]}
+
+
+def _reused(settings: Settings, src, prior) -> dict | None:
+    """The recorded outcome of the same input: its quarantine, or its parse while the artifact is intact."""
+    source_hash = src["source_hash"]
+    stats = json.loads(prior["stats_json"])
+    if src["parse_status"] == "quarantined" and not prior["extraction_id"]:
+        return {"source_hash": source_hash, "status": "quarantined", "reason": src["reason_code"], "reused": True}
+    with open_db(settings.db_path) as conn:
+        row = conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?",
+                           (prior["extraction_id"],)).fetchone()
+    artifact = host_path(row["artifact_path"]) if row else None
+    if (src["parse_status"] == "parsed" and src["active_extraction_id"] == prior["extraction_id"]
+            and artifact is not None and artifact.exists() and sha256_file(artifact) == prior["artifact_sha256"]):
+        return {"source_hash": source_hash, "status": "parsed", "extraction_id": prior["extraction_id"],
+                "reused": True, "diagnostic_flags": stats.get("diagnostics", {}).get("flags", [])}
+    return None
+
+
+def _parse_source(settings: Settings, src, original: Path) -> tuple[list[dict], list[dict], str | None, str]:
+    """(elements, warnings, reason_code, parser fingerprint) of an original, with OCR merged into its rendering."""
+    source_hash = src["source_hash"]
+    fp = parser_fingerprint(src["format"])
+    if src["format"] == "hwp":
+        raw, warnings, reason = parse_hwp(settings, original)
+        printed = printed_pdf_path(settings, source_hash)
+        if reason and printed.exists():
+            # pyhwp cannot read it, but Hancom could print it (review print): read the print's text layer instead.
+            # No independent witness remains for this text, so it stays unreviewed.
+            raw, more, failed = parse_pdf(printed)
+            if not failed:
+                for e in raw:
+                    e["location"]["format"] = "hwp_print"
+                warnings += more + [{"code": "recovered_from_native_print", "detail": reason,
+                                     "rendering_sha256": sha256_file(printed)}]
+                reason, fp = None, parser_fingerprint("pdf") + "-hancom-print"
+    else:
+        raw, warnings, reason = parse_pdf(original)
+    rendering = printed_pdf_path(settings, source_hash) if src["format"] == "hwp" else original
+    if not reason and rendering.exists():
+        from .ocr import merge  # ocr imports this module
+
+        raw, more, suffix = merge(settings, source_hash, raw, rendering)
+        warnings += more
+        if suffix:
+            fp = f"{fp}-{suffix}"
+    return raw, warnings, reason, fp
+
+
+def _store_elements(conn, extraction_id: str, elements: list[dict]) -> None:
+    """Replaces an extraction's element rows."""
+    conn.execute("DELETE FROM elements WHERE extraction_id = ?", (extraction_id,))
+    conn.executemany(
+        "INSERT INTO elements(extraction_id, element_id, source_order, kind, parent_id, raw_text, search_text, "
+        "location_json, table_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [(extraction_id, e["element_id"], e["source_order"], e["kind"], e["parent_id"], e["raw_text"],
+          e["search_text"], dumps(e["location"]), dumps(e["table"]) if e["table"] else None) for e in elements])
 
 
 def assign_revision(settings: Settings, source_hash: str, fp: str, raw: list[dict]) -> tuple[str, list[dict], Path]:
@@ -1056,9 +1091,9 @@ def recovered_dir(settings: Settings, source_hash: str) -> Path:
     return settings.data_dir / "recovered" / source_hash
 
 
-def recover_source(settings: Settings, doc_id: str, converted_file: Path, review_file: Path) -> dict:
-    """Registers an owner-approved conversion (PDF) of a quarantined original as another extraction revision.
-    The original and its failure stay recorded; a failed fidelity comparison keeps the quarantine."""
+def _recovery_review(converted_file: Path, review_file: Path) -> dict:
+    """The owner's review of a recovery artifact, once the artifact is an absolute, existing PDF and the review
+    names who compared what, how and with which result."""
     if not converted_file.is_absolute():
         raise IngestionError("--converted-file must be an absolute path")
     if not converted_file.is_file():
@@ -1079,6 +1114,25 @@ def recover_source(settings: Settings, doc_id: str, converted_file: Path, review
         raise IngestionError("recovery review requires fidelity_passed: true|false")
     if not isinstance(review["compared_locations"], list):
         raise IngestionError("compared_locations must be a list of the places compared (pages, tables, ...)")
+    return review
+
+
+def _managed_copy(settings: Settings, source_hash: str, converted_file: Path) -> tuple[str, Path]:
+    """(hash, path) of the recovery artifact's copy under the source's recovered folder, verified."""
+    converted_hash = sha256_file(converted_file)
+    managed = recovered_dir(settings, source_hash) / f"{converted_hash}.pdf"
+    if not managed.exists():
+        managed.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(converted_file, managed)
+    if sha256_file(managed) != converted_hash:
+        raise IngestionError("managed copy of the converted file does not match its hash")
+    return converted_hash, managed
+
+
+def recover_source(settings: Settings, doc_id: str, converted_file: Path, review_file: Path) -> dict:
+    """Registers an owner-approved conversion (PDF) of a quarantined original as another extraction revision.
+    The original and its failure stay recorded; a failed fidelity comparison keeps the quarantine."""
+    review = _recovery_review(converted_file, review_file)
     with open_db(settings.db_path) as conn:
         doc = conn.execute("SELECT active_source_hash FROM documents WHERE doc_id = ?", (doc_id,)).fetchone()
         if doc is None:
@@ -1089,13 +1143,7 @@ def recover_source(settings: Settings, doc_id: str, converted_file: Path, review
         raise IngestionError("only quarantined sources take a recovery artifact")
     if sha256_file(host_path(src["original_path"])) != source_hash:
         raise IngestionError("original bytes changed; rerun manifest")
-    converted_hash = sha256_file(converted_file)
-    managed = recovered_dir(settings, source_hash) / f"{converted_hash}.pdf"
-    if not managed.exists():
-        managed.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(converted_file, managed)
-    if sha256_file(managed) != converted_hash:
-        raise IngestionError("managed copy of the converted file does not match its hash")
+    converted_hash, managed = _managed_copy(settings, source_hash, converted_file)
     previous = {"reason_code": src["reason_code"], "warnings": json.loads(src["warnings_json"])}
     recovery = {"original_hash": source_hash, "converted_hash": converted_hash, "converted_path": str(managed),
                 "method": review["method"], "reviewer": review["reviewer"],
@@ -1121,12 +1169,7 @@ def recover_source(settings: Settings, doc_id: str, converted_file: Path, review
             "INSERT INTO extractions(extraction_id, source_hash, parser_fingerprint, artifact_path, "
             "created_at, recovery_json) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
             (extraction_id, source_hash, fp, str(artifact), utcnow(), dumps(recovery)))
-        conn.execute("DELETE FROM elements WHERE extraction_id = ?", (extraction_id,))
-        conn.executemany(
-            "INSERT INTO elements(extraction_id, element_id, source_order, kind, parent_id, raw_text, search_text, "
-            "location_json, table_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [(extraction_id, e["element_id"], e["source_order"], e["kind"], e["parent_id"], e["raw_text"],
-              e["search_text"], dumps(e["location"]), dumps(e["table"]) if e["table"] else None) for e in elements])
+        _store_elements(conn, extraction_id, elements)
         conn.execute(
             "UPDATE sources SET parse_status = 'parsed', active_extraction_id = ?, reason_code = NULL, "
             "review_status = 'unreviewed', warnings_json = ? WHERE source_hash = ?",
