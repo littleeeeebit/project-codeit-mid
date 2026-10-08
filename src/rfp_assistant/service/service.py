@@ -24,7 +24,7 @@ from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
-from . import auth
+from . import auth, update
 from ..gateway import budget, generation, tracing
 from ..corpus import fidelity
 from ..evaluation import gold
@@ -2643,6 +2643,64 @@ def build_head() -> str:
         return "unknown"
     head = out.stdout.strip()
     return head if out.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", head) else "unknown"
+
+
+# ---------------------------------------------------------------- updating to GitHub main (update.py, runbook 3.2)
+
+UpdateWatch = update.UpdateWatch
+
+
+def open_paid_work(res: Resources) -> dict:
+    """Whether a restart now would cut off paid work: an open reservation or attempt in the ledger, a queued or
+    running request, or a live background job (drafting, evaluation, judge run, maintenance)."""
+    try:
+        snap = budget.snapshot(res.settings.db_path)
+        with open_db(res.settings.db_path) as conn:
+            active = conn.execute("SELECT COUNT(*) FROM requests WHERE status IN ('queued', 'running')").fetchone()[0]
+    except (*DATABASE_ERRORS, budget.BudgetError) as exc:
+        raise ServiceError(f"ledger_unavailable: {type(exc).__name__}") from None
+    with res._runner_lock:
+        jobs = sum(1 for t in res._jobs if t.is_alive())
+    reasons = []
+    if active:
+        reasons.append(f"질문 {active}건 실행 중")
+    if jobs:
+        reasons.append(f"백그라운드 작업 {jobs}건 실행 중")
+    if snap.unknown_micro_usd:
+        reasons.append("결과를 모르는 유료 호출이 정산을 기다리는 중")
+    elif snap.open_attempts or snap.pending_micro_usd > 0:
+        reasons.append(f"유료 호출 {snap.open_attempts}건 진행 중")
+    return {"open": bool(reasons), "pending_micro_usd": snap.pending_micro_usd, "open_attempts": snap.open_attempts,
+            "active_requests": active, "background_jobs": jobs,
+            "reason": ("진행 중인 유료 작업이 끝나면 업데이트할 수 있습니다: " + ", ".join(reasons)) if reasons else None}
+
+
+def update_status(res: Resources, principal: Principal, watch: update.UpdateWatch) -> dict:
+    """What the header's update banner shows. Every signed-in member may read and request it."""
+    _authorize(res, principal, "consultant", "verifier", "budget_admin")
+    check = watch.check
+    return {"configured": watch.configured, "running_commit": watch.running, "latest_commit": check.latest,
+            "ahead_by": check.ahead_by, "commits": check.commits,
+            "available": watch.configured and check.available, "checked_at": check.checked_at, "note": check.note,
+            "paid_work": open_paid_work(res), "in_progress": watch.in_progress(), "last_result": watch.last_result()}
+
+
+def request_update(res: Resources, principal: Principal, watch: update.UpdateWatch) -> dict:
+    """Asks the root updater to move this server to the latest main. It takes no branch or commit: the updater
+    fetches origin/main itself. Refused while paid work is open, so a restart never cuts one off."""
+    principal = _authorize(res, principal, "consultant", "verifier", "budget_admin")
+    if not watch.configured:
+        raise ServiceError("이 서버에는 업데이트 장치가 설치되어 있지 않습니다.")
+    if watch.in_progress():
+        raise ServiceError("업데이트가 이미 진행 중입니다.")
+    work = open_paid_work(res)
+    if work["open"]:
+        raise ServiceError(work["reason"])
+    watch.write_request(principal.member_id)
+    with open_db(res.settings.db_path) as conn, tx(conn):
+        _audit(conn, principal.member_id, "request_update", "main", "header update button",
+               {"running_commit": watch.running, "latest_commit": watch.check.latest})
+    return update_status(res, principal, watch)
 
 
 def target_key(scope: list[tuple[str, str]], question: str, mode: str, as_of: str, previous: str = "") -> str:

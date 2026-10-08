@@ -1,0 +1,12 @@
+# Runs the root-owned copy of tools/infra/update.sh: latest GitHub main, rebuild, restart bidmate, health check,
+# rollback on failure (runbook 3.2). Started by bidmate-update.path, never enabled on its own.
+# Installed as /etc/systemd/system/bidmate-update.service.
+[Unit]
+Description=Update BidMate to the latest GitHub main
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/bidmate-update
+# A restart waits up to TimeoutStopSec (120 s) for running work, npm ci and the build take minutes.
+TimeoutStartSec=30min

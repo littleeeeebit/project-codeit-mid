@@ -8,6 +8,7 @@ import { usd, WARNING } from "@/lib/format";
 import { must, usePoll } from "@/lib/use-poll";
 import { Account } from "./sign-in";
 import { StatusBadge } from "./status-badge";
+import { UpdateBanner } from "./update-banner";
 
 const PAGES = [
   { href: "/", label: "질문하기" },
@@ -16,7 +17,7 @@ const PAGES = [
   { href: "/settings", label: "설정" },
 ];
 
-/** One bar on every page: navigation, the signed-in account and the shared operating limit. */
+/** One bar on every page: navigation, the signed-in account, the shared operating limit and a newer GitHub main. */
 export function AppHeader() {
   const path = usePathname();
   const budget = usePoll("budget", () => must(api.GET("/api/budget"), errorText), 2000);  // read-only
@@ -44,6 +45,7 @@ export function AppHeader() {
         </div>
       </div>
       <BudgetWarnings data={budget.data} />
+      <UpdateBanner />
     </header>
   );
 }

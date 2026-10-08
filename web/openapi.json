@@ -1133,6 +1133,24 @@
     "title": "Claim",
     "type": "object"
    },
+   "CommitTitle": {
+    "properties": {
+     "sha": {
+      "title": "Sha",
+      "type": "string"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "sha",
+     "title"
+    ],
+    "title": "CommitTitle",
+    "type": "object"
+   },
    "Comparison": {
     "properties": {
      "config_changes": {
@@ -4293,6 +4311,54 @@
     "title": "PaidPlan",
     "type": "object"
    },
+   "PaidWork": {
+    "properties": {
+     "active_requests": {
+      "description": "Queued or running requests",
+      "title": "Active Requests",
+      "type": "integer"
+     },
+     "background_jobs": {
+      "description": "Running drafting, evaluation, judge or maintenance jobs",
+      "title": "Background Jobs",
+      "type": "integer"
+     },
+     "open": {
+      "description": "An update is refused while true: a restart would cut this work off",
+      "title": "Open",
+      "type": "boolean"
+     },
+     "open_attempts": {
+      "title": "Open Attempts",
+      "type": "integer"
+     },
+     "pending_micro_usd": {
+      "title": "Pending Micro Usd",
+      "type": "integer"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     }
+    },
+    "required": [
+     "open",
+     "pending_micro_usd",
+     "open_attempts",
+     "active_requests",
+     "background_jobs",
+     "reason"
+    ],
+    "title": "PaidWork",
+    "type": "object"
+   },
    "PdfPages": {
     "properties": {
      "group_id": {
@@ -5713,6 +5779,177 @@
     "title": "TraceSummary",
     "type": "object"
    },
+   "UpdateResult": {
+    "properties": {
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     },
+     "from_commit": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "From Commit"
+     },
+     "message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Message"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "state": {
+      "description": "running, succeeded, up_to_date, failed (nothing changed), rolled_back, rollback_failed or interrupted",
+      "title": "State",
+      "type": "string"
+     },
+     "to_commit": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "To Commit"
+     }
+    },
+    "required": [
+     "state",
+     "from_commit",
+     "to_commit",
+     "started_at",
+     "finished_at",
+     "message"
+    ],
+    "title": "UpdateResult",
+    "type": "object"
+   },
+   "UpdateStatus": {
+    "properties": {
+     "ahead_by": {
+      "title": "Ahead By",
+      "type": "integer"
+     },
+     "available": {
+      "title": "Available",
+      "type": "boolean"
+     },
+     "checked_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Checked At"
+     },
+     "commits": {
+      "description": "Titles of the commits from the running one to main, oldest first",
+      "items": {
+       "$ref": "#/components/schemas/CommitTitle"
+      },
+      "title": "Commits",
+      "type": "array"
+     },
+     "configured": {
+      "description": "The root updater's request and state paths are set (runbook 3.2)",
+      "title": "Configured",
+      "type": "boolean"
+     },
+     "in_progress": {
+      "description": "A request is waiting for the updater, or it is running",
+      "title": "In Progress",
+      "type": "boolean"
+     },
+     "last_result": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/UpdateResult"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "latest_commit": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "GitHub main's head at the last check",
+      "title": "Latest Commit"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Why no update is offered although main differs, or why the check failed",
+      "title": "Note"
+     },
+     "paid_work": {
+      "$ref": "#/components/schemas/PaidWork"
+     },
+     "running_commit": {
+      "title": "Running Commit",
+      "type": "string"
+     }
+    },
+    "required": [
+     "configured",
+     "running_commit",
+     "latest_commit",
+     "ahead_by",
+     "commits",
+     "available",
+     "checked_at",
+     "note",
+     "paid_work",
+     "in_progress",
+     "last_result"
+    ],
+    "title": "UpdateStatus",
+    "type": "object"
+   },
    "Usd": {
     "properties": {
      "calls": {
@@ -7112,6 +7349,43 @@
      }
     },
     "summary": "Generation Model"
+   }
+  },
+  "/api/update": {
+   "post": {
+    "description": "Takes no input: the updater only ever moves to the latest origin/main.",
+    "operationId": "request_update_api_update_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UpdateStatus"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Request Update"
+   }
+  },
+  "/api/update/status": {
+   "get": {
+    "operationId": "update_status_api_update_status_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UpdateStatus"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Update Status"
    }
   },
   "/api/verify/compare": {

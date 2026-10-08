@@ -55,7 +55,8 @@ FAKE_QUESTION = "하자보수 기간은 얼마인가요?"
 DATASET_QUESTION = "하자보수 기간과 유지보수 조건을 비교해 주세요."
 READ_ONLY_DIRS = ("indexes", "extracted", "recovered", "reviews", "ocr", "datasets")  # linked, never written here
 # Every hub user a browser flow signs in as: the served app's allowlist (BIDMATE_ALLOWED_USERS) on the fake hub.
-MEMBERS = [f"verify-{os.getpid()}", *(f"verify-{kind}-{os.getpid()}" for kind in ("history", "verifier", "cap", "a11y")),
+MEMBERS = [f"verify-{os.getpid()}",
+           *(f"verify-{kind}-{os.getpid()}" for kind in ("history", "verifier", "cap", "a11y", "update")),
            *(f"verify-six-{i}-{os.getpid()}" for i in range(1, 7))]
 FLOWS: dict = {}
 
@@ -153,7 +154,7 @@ class Context:
 
     # -------------------------------------------------------------- served app
 
-    def serve(self, corpus: dict, delay: float = 1.0) -> str:
+    def serve(self, corpus: dict, delay: float = 1.0, extra: dict | None = None) -> str:
         origin = (self.config.get("RFP_VERIFY_ORIGIN") or "http://127.0.0.1:8765").rstrip("/")
         found = re.match(r"https?://([^:/]+):(\d+)$", origin)
         if not found:
@@ -164,7 +165,8 @@ class Context:
         from tests import fake_hub  # members sign in through a stand-in for JupyterHub, run in this process
 
         env = {**self.env, "RFP_SOURCE_DIR": corpus["source_dir"], "RFP_DATA_DIR": corpus["data_dir"],
-               "RFP_CONFIG_FILE": str(config), **fake_hub.hub().env(f"{origin}/api/auth/callback", MEMBERS)}
+               "RFP_CONFIG_FILE": str(config), **fake_hub.hub().env(f"{origin}/api/auth/callback", MEMBERS),
+               **(extra or {})}
         npm = shutil.which("npm")
         if npm is None:
             raise RuntimeError("browser flows need Node.js: npm is not on PATH (then `npm ci` in web/)")
@@ -577,11 +579,11 @@ def evaluation_release(ctx: Context) -> dict:
 # ---------------------------------------------------------------- browser flows
 
 
-def with_browser(ctx: Context, body, delay: float = 1.0) -> dict:
+def with_browser(ctx: Context, body, delay: float = 1.0, extra: dict | None = None) -> dict:
     from playwright.sync_api import sync_playwright
 
     corpus = ctx.dataset()
-    origin = ctx.serve(corpus, delay)
+    origin = ctx.serve(corpus, delay, extra)
     with sync_playwright() as p:
         browser = ctx.browser(p)
         try:
@@ -967,6 +969,149 @@ def accessibility(ctx: Context) -> dict:
         layout = ctx.act("narrow the three pages to 390 px", "no horizontal scroll and text status", narrow)
         return {"keyboard-only": keys, "focus-visible": ring, "contrast": readable, "narrow-layout": layout}
     return with_browser(ctx, body)
+
+
+UPDATE_TITLES = ("검증 화면 결론 먼저", "업데이트 버튼 추가")
+
+
+def fake_github(running: str, latest: str):
+    """A stand-in for the two unauthenticated GitHub routes the update check reads, on a loopback port: main's head
+    is `latest`, two commits ahead of `running`."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    repo = "littleeeeebit/project-codeit-mid"
+    shas = [hashlib.sha1(b"update-banner-middle").hexdigest(), latest]
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args) -> None:
+            pass
+
+        def do_GET(self) -> None:
+            if self.path == f"/repos/{repo}/commits/main":
+                body, kind = latest.encode(), "text/plain"
+            elif self.path == f"/repos/{repo}/compare/{running}...{latest}":
+                body, kind = json.dumps({"status": "ahead", "ahead_by": 2, "behind_by": 0, "commits": [
+                    {"sha": s, "commit": {"message": t}} for s, t in zip(shas, UPDATE_TITLES)]}).encode(), "application/json"
+            else:
+                self.send_response(404)
+                return self.end_headers()
+            self.send_response(200)
+            self.send_header("Content-Type", kind)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def button_state(button) -> tuple[bool, float]:
+    return button.is_disabled(), float(button.evaluate("e => getComputedStyle(e).opacity"))
+
+
+def wait_button(button, disabled: bool, timeout_s: float) -> tuple[bool, float]:
+    deadline = time.monotonic() + timeout_s
+    state = button_state(button)
+    while state[0] != disabled and time.monotonic() < deadline:
+        time.sleep(0.5)
+        state = button_state(button)
+    return state
+
+
+@flow("update-banner")
+def update_banner(ctx: Context) -> dict:
+    running, latest = git_head(), hashlib.sha1(b"update-banner-latest").hexdigest()
+    github = fake_github(running, latest)
+    marker, state = ctx.work / "update-request" / "requested", ctx.work / "update-state"
+    state.mkdir()
+    extra = {"BIDMATE_UPDATE_REQUEST": str(marker), "BIDMATE_UPDATE_STATE_DIR": str(state),
+             "BIDMATE_UPDATE_GITHUB_API": f"http://127.0.0.1:{github.server_address[1]}"}
+
+    def body(ctx, browser, origin, corpus):
+        page = ctx.page(browser, origin)
+        member = f"verify-update-{os.getpid()}"
+        ctx.open_app(page, origin, member)
+        banner = page.get_by_test_id("update-banner")
+        button = banner.get_by_role("button", name="업데이트", exact=True)
+        updates = lambda: [r for r in ctx.requests if r["method"] == "POST" and r["url"].endswith("/api/update")]  # noqa: E731
+
+        def shown():
+            banner.get_by_text("새 버전").wait_for(timeout=30000)
+            banner.get_by_text("바뀐 내용").click()
+            titles = [t for t in UPDATE_TITLES if banner.get_by_text(t).count() == 1]
+            disabled, opacity = button_state(button)
+            text = banner.inner_text()
+            ok = (len(titles) == 2 and not disabled and opacity == 1 and "새 커밋 2개" in text
+                  and running[:7] in text and latest[:7] in text)
+            return ok, (f"banner with {len(titles)} commit titles, {running[:7]} -> {latest[:7]} shown "
+                        f"{running[:7] in text and latest[:7] in text}; button disabled {disabled}, opacity {opacity}")
+        out = {"banner-shown": ctx.act("open any page with a newer main", "the banner with the commits", shown)}
+
+        def faded():
+            pick_first_document(page)
+            ask(page, corpus["question"])  # the fake provider answers after 20 s: paid work stays open meanwhile
+            busy, busy_opacity = wait_button(button, True, 25)
+            reason = banner.get_by_text(re.compile("진행 중인 유료 작업이 끝나면 업데이트할 수 있습니다")).count() == 1
+            row = wait_request(corpus["dsn"], "r.member_id = ?", (member,), 120)
+            idle, idle_opacity = wait_button(button, False, 30)
+            ok = busy and busy_opacity < 1 and reason and row is not None and not idle and idle_opacity == 1
+            return ok, (f"while the question ran: disabled {busy}, opacity {busy_opacity}, reason shown {reason}; "
+                        f"request {row['status'] if row else 'not finished'}; afterwards disabled {idle}, "
+                        f"opacity {idle_opacity}")
+        out["faded-while-paid"] = ctx.act("ask a paid question while the banner shows", "button faded, then back",
+                                          faded)
+
+        dialog = page.get_by_role("alertdialog")
+
+        def cancel():
+            button.click()
+            dialog.wait_for(timeout=10000)
+            text = dialog.inner_text()
+            warned = "다시 시작" in text and "로그아웃" in text and "API 키" in text
+            dialog.get_by_role("button", name="취소").click()
+            dialog.wait_for(state="hidden", timeout=10000)
+            page.wait_for_timeout(1000)
+            ok = warned and not marker.exists() and not updates()
+            return ok, (f"dialog warned of restart, sign-out and API keys {warned}; after 취소 marker "
+                        f"{marker.exists()}, POST /api/update sent {len(updates())}")
+        out["cancel-does-nothing"] = ctx.act("press 업데이트, then 취소", "nothing sent", cancel)
+
+        def confirm():
+            button.click()
+            dialog.wait_for(timeout=10000)
+            dialog.get_by_role("button", name="업데이트", exact=True).click()
+            deadline = time.monotonic() + 15
+            while not marker.exists() and time.monotonic() < deadline:
+                time.sleep(0.2)
+            written = json.loads(marker.read_text(encoding="utf-8")) if marker.exists() else {}
+            waiting = wait_text(page, "서버를 main의 최신 커밋으로 바꾸고 다시 시작하고 있습니다", 15000)
+            ok = (set(written) == {"requested_by", "requested_at", "running_commit"} and written["requested_by"] == member
+                  and written["running_commit"] == running and len(updates()) == 1 and waiting)
+            return ok, (f"marker {sorted(written)} by {written.get('requested_by')}; POST /api/update sent "
+                        f"{len(updates())}; updating state shown {waiting}")
+        out["confirm-requests"] = ctx.act("press 업데이트, then confirm", "only the marker is written", confirm)
+
+        def rolled_back():
+            # What tools/infra/update.sh leaves when the new version failed its health check.
+            now = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
+            (state / "result.json").write_text(json.dumps({
+                "state": "rolled_back", "from_commit": running, "to_commit": latest, "started_at": now,
+                "finished_at": now, "message": "새 버전이 응답하지 않았습니다. 이전 커밋으로 되돌렸습니다."}), encoding="utf-8")
+            marker.unlink()
+            waiter = wait_text(page, "새 버전이 응답하지 않았습니다", 20000)
+            visitor = ctx.page(browser, origin)
+            ctx.open_app(visitor, origin, member)
+            later = wait_text(visitor, "지난 업데이트가 실패해 이전 버전으로 되돌렸습니다", 30000)
+            return waiter and later, f"waiting page shows the result {waiter}; the next visitor sees it {later}"
+        out["rolled-back-shown"] = ctx.act("the updater rolls back", "the result reaches the next visitor",
+                                           rolled_back)
+        return out
+    try:
+        return with_browser(ctx, body, delay=20, extra=extra)
+    finally:
+        github.shutdown()
 
 
 # ---------------------------------------------------------------- evidence
