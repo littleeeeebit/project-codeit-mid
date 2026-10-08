@@ -127,6 +127,18 @@ def project(records: list[dict], field: str, dataset_hash: str) -> tuple[str, li
 
 def preview(records: list[dict], field: str, dataset_hash: str) -> dict:
     extraction, elements = project(records, field, dataset_hash)
+    heading_tokens = {tuple(e["location"]["section_path"]): None for e in elements}
+    heading_tokens = {path: chunking.count_tokens(chunking._heading(list(path))) for path in heading_tokens}
+    oversized = [{"record_id": e["location"]["record_id"], "tokens": heading_tokens[tuple(e["location"]["section_path"])]}
+                 for e in elements if heading_tokens[tuple(e["location"]["section_path"])] >=
+                 chunking.HARD_TOKENS - 8 - chunking.OVERLAP_TOKENS]
+    if oversized:
+        # With a window no larger than its overlap, step=1 also creates quadratic sibling links on long records.
+        # Report incompatible headings before calling the unchanged production chunker.
+        return {"source_hash": records[0]["sha256"], "field": field, "records": len(records),
+                "projected_elements": len(elements), "chunks": 0, "requirements": 0, "max_tokens": None,
+                "errors": [{"kind": "heading_exceeds_chunk_budget" if item["tokens"] >= chunking.HARD_TOKENS - 8
+                            else "heading_leaves_no_overlap_budget", **item} for item in oversized]}
     try:
         chunks, inventory = chunking.build_chunks(elements, extraction)
     except (IndexError, ValueError) as error:
@@ -242,8 +254,12 @@ def run(package: Path, source: Path, runtime: Path, baseline_index: str, output:
     for name in ("manifest/final_dataset_manifest.json", "metadata/provenance.json"):
         paths.update(external_paths(json.loads((package / name).read_text(encoding="utf-8")), name))
     print("Original hashes and aliases verified; testing both text projections.", flush=True)
-    previews = [preview(rows, field, final["SHA256"]) for field in ("clean_text", "search_text")
-                for rows in by_source.values()]
+    previews = []
+    for field in ("clean_text", "search_text"):
+        for number, rows in enumerate(by_source.values(), 1):
+            previews.append(preview(rows, field, final["SHA256"]))
+            if number % 10 == 0:
+                print(f"Chunk preview {field}: {number}/{len(by_source)} originals.", flush=True)
     quotes = {}
     for name in ("dev", "corpus"):
         rows = read_jsonl(runtime / "datasets" / f"{name}.jsonl")

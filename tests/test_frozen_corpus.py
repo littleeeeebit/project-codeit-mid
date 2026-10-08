@@ -47,8 +47,8 @@ class FrozenCorpusTest(unittest.TestCase):
             validate_records([{**row, "raw_end": 1}], [{"doc_id": "hash-id", "sha256": "hash"}])
         oversized = {**row, "heading_path": ["사업 요구사항 " * 1000]}
         result = preview([oversized], "clean_text", "dataset")
-        self.assertEqual(result["errors"][0]["kind"], "chunker_exception")
-        self.assertEqual(result["oversized_headings"][0]["record_id"], row["record_id"])
+        self.assertEqual(result["errors"][0]["kind"], "heading_exceeds_chunk_budget")
+        self.assertEqual(result["errors"][0]["record_id"], row["record_id"])
 
     def test_quote_diagnostic_requires_whole_quote_in_the_correct_original(self):
         rows = [{"question_id": "q", "evidence_groups": [
