@@ -1,7 +1,1 @@
-How corpus bytes become cited evidence, and where each form is persisted. Every hop is identified by a hash:
-- source_hash: the original bytes;
-- extraction_id: the parser fingerprint plus the output;
-- index_version: the configuration hash;
-- the dense set version;
-- payload_hash: the normalized text plus model and dimensions;
-- evidence_id: per request.
+Document identity, original content, extraction revision, index version, embedding set and measured run are distinct identities. Candidate creation does not change serving selection. Requests use the activated artifacts and persist their own evidence map, so later corpus changes can be reported without rewriting issued citations.

@@ -1,0 +1,10 @@
+created: 2026-10-08T21:41:54.163Z
+updated: 2026-10-08T21:41:54.282Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: ocr
+children: []
+parentPath:
+  - workflows
+  - corpus

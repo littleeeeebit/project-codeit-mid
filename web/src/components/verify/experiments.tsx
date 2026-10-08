@@ -20,41 +20,52 @@ type Column = Schemas["ExperimentColumn"];
 type Question = Schemas["ExperimentQuestion"];
 type Value = Row["values"][string];
 
-const MATRIX: Record<string, string> = { lexical: "K0 · K1", chunking: "청킹", embedding: "임베딩", reranker: "리랭커", regression: "회귀 (유지보수)" };
+const MATRIX: Record<string, string> = { lexical: "K0 · K1", chunking: "청킹", embedding: "임베딩", reranker: "리랭커", regression: "회귀 (유지보수)", "answer-embedding": "임베딩별 답변" };
+const ANSWERS = "answer-embedding";  // answers per retrieval run, paired against K1; no per-question retrieval misses
 const COLUMN: Record<string, string> = {
   "dev.ndcg": "nDCG@5", "dev.support": "근거 완전", "whole.ndcg": "nDCG@5 전체 문서", "whole.support": "근거 완전 전체 문서",
   "needle.top5": "바늘 상위 5", "dev.critical": "치명 실패", "whole.critical": "치명 실패 전체 문서",
   "dev.qualifier_losses": "조건 손실", "dev.p95_ms": "검색 p95", chunks: "청크 수", duplicated_tokens: "중복 토큰",
   new_critical_vs_k1: "K1에 없던 치명", truncated_chunks: "잘린 청크", query_p50_ms: "질의 임베딩 p50",
-  query_p95_ms: "질의 임베딩 p95", corpus_seconds: "코퍼스 임베딩", storage_mb: "벡터 저장", cost_usd: "비용",
+  query_p95_ms: "질의 임베딩 p95", corpus_seconds: "코퍼스 임베딩", storage_mb: "벡터 저장", cost_usd: "임베딩 비용",
   licence: "라이선스", recall20_before: "recall@20 전", "dev.recall20": "recall@20 후",
   new_critical_vs_h: "하이브리드에 없던 치명", truncated_pairs: "잘린 쌍", p95_alone_ms: "재정렬 p95 단독",
   p95_loaded_ms: "재정렬 p95 6명 동시", gate: "기존 관문",
+  "answer.pass_rate": "답변 통과율", "answer.claim_correctness": "필수 주장 정확", "answer.claim_support": "주장 근거 지지",
+  "answer.critical": "치명 오류", "answer.rejected": "거부된 답변",
+  "vs_k1.pass_diff": "K1 대비 통과율", "vs_k1.p_value": "p값", "vs_k1.p_holm": "p값 Holm 보정", "answer.cost_usd": "답변 비용",
+  "retrieval.mode": "검색", "retrieval.fusion": "융합", "retrieval.depth": "후보 깊이",
+  "retrieval.fused_depth": "융합 깊이", "retrieval.units": "근거 단위",
+  "retrieval.evidence_max_tokens": "근거 토큰 상한", "retrieval.reranker": "리랭커",
 };
-const RATE = new Set(["dev.support", "whole.support", "needle.top5"]);
-const SCORE = new Set(["dev.ndcg", "whole.ndcg", "dev.recall20", "recall20_before"]);
+const RATE = new Set(["dev.support", "whole.support", "needle.top5", "answer.pass_rate", "answer.claim_correctness", "answer.claim_support"]);
+const SCORE = new Set(["dev.ndcg", "whole.ndcg", "dev.recall20", "recall20_before", "vs_k1.p_value", "vs_k1.p_holm"]);
 const MS = new Set(["dev.p95_ms", "query_p50_ms", "query_p95_ms", "p95_alone_ms", "p95_loaded_ms"]);
 const AXIS: Record<string, Record<string, string>> = {
   retrieval: { dense: "밀집만", hybrid: "하이브리드", keyword: "키워드", hybrid_rerank: "재정렬" },
   rerank_mode: { whole: "전체 재정렬", below_head: "BM25 상위 6 고정" },
   analyzer: { whitespace: "K0 공백 분리", kiwi: "K1 Kiwi 형태소" },
+  embedding: { K1: "K1 키워드만 (기준)" },
+  development_subset: { true: "사용", false: "전체 개발셋" },
 };
 const STATUS: Record<string, string> = { failed: "실행 실패", needs_approval: "비용 승인 대기", not_run: "아직 측정 안 함" };
 const MODE: Record<string, string> = {
   kiwi_bm25: "키워드 Kiwi BM25", keyword: "키워드", dense: "밀집만", hybrid: "하이브리드", hybrid_rerank: "하이브리드 + 재정렬",
 };
-const FIXED: Record<string, string> = { retrieval: "검색", analyzer: "분석기", embedding: "임베딩", fusion: "융합", depth: "후보", units: "근거 단위" };
+const FIXED: Record<string, string> = { retrieval: "검색", analyzer: "분석기", embedding: "임베딩", fusion: "융합", depth: "후보", fused_depth: "융합 깊이", units: "근거 단위", evidence_max_tokens: "근거 토큰 상한", reranker: "리랭커", reasoning_effort: "추론", max_output_tokens: "최대 토큰 (추론 포함)", answer_questions: "비교 질문 수", development_subset: "개발 부분집합" };
 const POP: Record<string, string> = { dev: "개발 질문 · 자기 문서", whole: "전체 문서" };
 
 function fmt(key: string, v: Value): string {
   if (v == null) return "-";
-  if (typeof v === "string") return key === "gate" ? (v === "pass" ? "통과" : "미달") : v;
+  if (key === "retrieval.mode") return MODE[String(v)] ?? String(v);
+  if (typeof v === "string") return key === "gate" ? (v === "pass" ? "통과" : "미달") : v.replace("(research-only)", "(연구용만)");
   if (RATE.has(key)) return `${(v * 100).toFixed(1)}%`;
+  if (key === "vs_k1.pass_diff") return `${v > 0 ? "+" : ""}${(v * 100).toFixed(1)}%p`;
   if (SCORE.has(key)) return v.toFixed(3);
   if (MS.has(key)) return `${v.toFixed(v < 100 ? 1 : 0)}ms`;
   if (key === "corpus_seconds") return v < 120 ? `${v.toFixed(0)}초` : `${(v / 60).toFixed(1)}분`;
   if (key === "storage_mb") return `${v.toFixed(0)}MB`;
-  if (key === "cost_usd") return v === 0 ? "무료" : `$${v.toFixed(4)}`;
+  if (key === "cost_usd" || key === "answer.cost_usd") return v === 0 ? "무료" : `$${v.toFixed(4)}`;
   return v.toLocaleString("ko-KR");
 }
 
@@ -117,6 +128,7 @@ export function ExperimentsSection() {
 }
 
 function Headline({ t }: { t: Table }) {
+  if (t.conclusion?.complete === false) return <p className="text-base font-semibold">{conclusionText(t.conclusion as Conclusion)}</p>;
   const lead = t.columns.find((c) => c.better === "high");
   if (!lead) return null;
   const { value: topValue, rows: winners } = top(t, lead);
@@ -130,8 +142,24 @@ function Headline({ t }: { t: Table }) {
         {serving && !winners.includes(serving) && <span className="text-muted-foreground"> · 서비스 중인 행은 {fmt(lead.key, serving.values[lead.key])}</span>}
         {serving && winners.includes(serving) && <span className="text-muted-foreground"> · 지금 서비스 중</span>}
       </p>
+      {t.conclusion && <p className="text-base font-semibold">{conclusionText(t.conclusion as Conclusion)}</p>}
     </div>
   );
+}
+
+type Conclusion = { complete?: boolean; best: string[]; best_pass_rate: number | null; alpha: number; baseline: string | null;
+  significant: { name: string; pass_diff: number; p_holm: number }[] };
+const named = (n: string | null) => AXIS.embedding[n ?? ""] ?? n ?? "기준";
+
+/** The answer table's verdict: K1 against every run, paired on the same questions and Holm-adjusted. */
+function conclusionText(c: Conclusion): string {
+  if (c.complete === false) return "비교가 완료되지 않아 순위와 유의성 결론을 내릴 수 없습니다.";
+  if (c.best_pass_rate == null) return "끝난 행이 없어 결론이 없습니다.";
+  const how = `McNemar 정확검정, Holm 보정, 유의수준 ${c.alpha}`;
+  if (!c.significant.length) return `${named(c.baseline)}과 통과율이 유의하게 다른 행은 없습니다 (${how}).`;
+  const side = (up: boolean) => c.significant.filter((s) => (s.pass_diff > 0) === up).map((s) => named(s.name)).join(", ");
+  return [side(true) && `${side(true)}: ${named(c.baseline)}보다 통과율이 유의하게 높음`,
+    side(false) && `${side(false)}: ${named(c.baseline)}보다 유의하게 낮음`].filter(Boolean).join(" · ") + ` (${how}).`;
 }
 
 function MatrixView({ t, onActivated }: { t: Table; onActivated: () => void }) {
@@ -226,15 +254,17 @@ function MatrixNotes({ t }: { t: Table }) {
   return (
     <p className="text-[13px] text-muted-foreground">굵은 파란 값이 열마다 가장 좋은 값입니다. 절반이 넘는 행이 같은 값이면 표시하지 않습니다. 개발 질문은 자기 문서 안에서, 전체 문서 열은 개발 질문과 바늘 질문을 모든 문서에서 검색한 결과입니다. 고정값: {Object.entries(t.fixed).map(([k, v]) => `${FIXED[k] ?? k} ${AXIS[k]?.[String(v)] ?? MODE[String(v)] ?? String(v)}`).join(", ") || "서비스 설정"}.
       {t.matrix === "embedding" && " API 모델의 질의 임베딩 시간은 비용 장부에 남은 질문 호출의 왕복 시간입니다."}
+      {t.matrix === ANSWERS && ` ${t.model ?? ""}가 각 행의 검색 결과로 같은 개발 질문에 답했습니다 (답변 실행 ${t.answer_run_id ?? "-"}). 통과는 기대 상태이면서, 검색이 가져온 정답 근거를 모두 인용한 답입니다. 필수 주장 정확은 골드의 금액·날짜·조건 주장을 답이 맞게 말한 비율로, 코드가 판정합니다. 주장 근거 지지는 인용이 주장 전체를 뒷받침하는 비율이며 판정되지 않은 주장은 지지되지 않은 것으로 세므로, 검토 전에는 0에 가깝습니다. 거부된 답변은 서비스 검증이 거절했거나 기술적으로 실패한 답이며 통과하지 못한 것으로 셉니다. p값은 K1과 같은 질문끼리 짝지은 McNemar 정확검정이고, Holm 보정값으로 결론을 냅니다. 검색 근거 완전과 질의 p95는 임베딩 비교표에서 가져왔습니다.`}
       {String(t.fixed.fusion ?? "").startsWith("keyword_first") && " 융합이 BM25 상위 6개를 제자리에 두므로 하이브리드와 상위 고정 행의 nDCG@5는 K1과 같습니다. 차이는 그 뒤 근거에서 나며, 근거 완전과 치명 실패 열에 보입니다."}</p>
   );
 }
 
 function RowDetail({ t, r, onActivated }: { t: Table; r: Row; onActivated: () => void }) {
-  const qs = usePoll(r.status === "complete" ? `experiment-q:${t.matrix}:${r.index}` : null, () => must(api.GET(
+  const misses = t.matrix !== ANSWERS;
+  const qs = usePoll(r.status === "complete" && misses ? `experiment-q:${t.matrix}:${r.index}` : null, () => must(api.GET(
     "/api/verify/experiments/{matrix}/{index}/questions", { params: { path: { matrix: t.matrix, index: r.index } } }), errorText), null);
   const ref = useRef<HTMLElement>(null);
-  useEffect(() => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }), []);  // the detail opens below the table
+  useEffect(() => { ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, []);  // the detail opens below the table
   return (
     <section ref={ref} aria-labelledby="experiment-row" className="scroll-mt-20 space-y-8 border-t border-input pt-8">
       <div className="space-y-1">
@@ -244,7 +274,7 @@ function RowDetail({ t, r, onActivated }: { t: Table; r: Row; onActivated: () =>
       </div>
       {r.status === "complete" && (
         <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <Failures q={qs} />
+          {misses ? <Failures q={qs} /> : <div />}
           <Activate r={r} onActivated={onActivated} />
         </div>
       )}

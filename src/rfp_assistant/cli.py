@@ -458,7 +458,7 @@ def cmd_run_answers(args, settings) -> int:
     try:
         if res.transport is None:
             raise answers.AnswerEvalError(res.provider_note or "no provider transport")
-        result = answers.run_answers(settings, res, args.estimate_id, args.actor, args.reason)
+        result = answers.run_answers(settings, res, args.estimate_id, args.actor, args.reason, workers=args.workers)
     finally:
         res.close()
     _print(result)
@@ -788,9 +788,10 @@ def _release_commands(sub) -> None:
                    help="judge-comparison: calibration fits Jev thresholds; held_out is the reported part; "
                         "judge_set runs the mutated judge golden set")
     s.add_argument("--dataset", default="dev", help="answer-finalists: the reviewed development split")
-    s.add_argument("--runs", help="answer-finalists: one or two retrieval run IDs (default: active + its finalist)")
+    s.add_argument("--runs", help="answer-finalists: one or two retrieval run IDs (default: active + its finalist); "
+                                  "embedding-comparison: the baseline run first, then every run to compare")
     s.add_argument("--question-id", action="append",
-                   help="answer-finalists: only these development rows (repeat); part of the run identity")
+                   help="development runs: only these rows (repeat); part of the run identity")
     s.add_argument("--freeze-id", help="sealed: the release freeze")
     s.add_argument("--post-test-regression", action="store_true",
                    help="sealed: a further run after the untouched sealed result (needs --reason at run time)")
@@ -801,6 +802,7 @@ def _release_commands(sub) -> None:
     s.add_argument("--estimate-id", required=True)
     s.add_argument("--actor", required=True)
     s.add_argument("--reason", help="sealed post-test regression: why the sealed set is run again")
+    s.add_argument("--workers", type=int, default=1, help="retrieval runs answered at once (default 1)")
     s = sub.add_parser("latency-run", help="paid: the planned bounded latency sample (stop the UI first)")
     s.add_argument("--estimate-id", required=True)
     s.add_argument("--actor", required=True)

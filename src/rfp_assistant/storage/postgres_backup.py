@@ -80,7 +80,7 @@ def references(conn):
 SESSION_OPTIONS = {"pg_restore": "-c max_parallel_maintenance_workers=0"}
 
 
-def _run(program, target, args, log_dir):
+def _run(program, target, args, log_dir, *, timeout=600):
     binary = shutil.which(program)
     if not binary:
         directory = Path(os.environ.get("RFP_PG_BIN", "C:/Program Files/PostgreSQL/18/bin"))
@@ -97,7 +97,7 @@ def _run(program, target, args, log_dir):
             environment[mapping[key]] = value
     if program in SESSION_OPTIONS:
         environment["PGOPTIONS"] = f"{environment.get('PGOPTIONS', '')} {SESSION_OPTIONS[program]}".strip()
-    result = subprocess.run([binary, *args], env=environment, capture_output=True, timeout=600)
+    result = subprocess.run([binary, *args], env=environment, capture_output=True, timeout=timeout)
     if result.returncode:
         store.write_bytes_atomic(log_dir / f"{program}-failure.log", result.stderr)
         raise RuntimeError(f"{program} failed; inspect the private {program}-failure.log")

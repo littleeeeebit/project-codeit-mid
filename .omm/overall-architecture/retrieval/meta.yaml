@@ -1,0 +1,13 @@
+created: 2026-10-08T21:41:51.990Z
+updated: 2026-10-08T21:41:52.116Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: retrieval
+children:
+  - dense
+  - fusion
+  - lexical
+  - packing
+  - scope
+parentPath: []

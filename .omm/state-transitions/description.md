@@ -1,1 +1,1 @@
-The persisted state machines that change behaviour, and how they gate each other. Every transition is a conditional UPDATE inside `tx(..., immediate=True)`, so concurrent workers, cancellation and shutdown race safely on the row state.
+Request execution state is persisted independently of answer status and billing status. A completed request can hold an abstention or budget-blocked answer; a failed request can still have settled charges. Cancelled and interrupted requests can retain a late outcome without becoming running again.

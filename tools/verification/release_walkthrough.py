@@ -48,6 +48,7 @@ def _gold_steps(cli, root: Path) -> None:
     cli("configure budget", "configure-budget", "--start", "2026-09-30", "--end", "2026-10-28", "--prior-use-usd", "0",
         "--prior-use-evidence", "synthetic walkthrough", "--allowance-usd", "5", "--cap-usd", "5", "--confirm-rates",
         "--enable-paid")
+    cli("enable fixture admission", "paid", "on", "--actor", "owner", "--reason", "synthetic fixture walkthrough")
     cli("submit dev batch", "gold", "submit", "--file", str(root / "dev-batch.jsonl"), "--batch", "dev-b1",
         "--dataset", "dev", "--drafted-by", "agent-a")
     cli("submit sealed batch", "gold", "submit", "--file", str(root / "test-batch.jsonl"), "--batch", "test-b1",
@@ -110,11 +111,15 @@ def _operation_steps(cli, field, root: Path) -> str:
 
 
 def main(work: Path) -> int:
+    from tests import fixtures
+
     root = work / "phase4"
     env_fixture = _fixture_corpus(root)
     (root / "config.json").write_text(json.dumps({"provider": "fake"}), encoding="utf-8")
     env = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY" and not k.startswith("RFP_")}
     env.update(RFP_SOURCE_DIR=str(env_fixture.settings.source_dir), RFP_DATA_DIR=str(env_fixture.settings.data_dir),
+               RFP_DATABASE_DSN=os.environ[env_fixture.settings.database_dsn_env],
+               RFP_RESTORE_DATABASE_DSN=os.environ[fixtures.database(ready=False)],
                RFP_CONFIG_FILE=str(root / "config.json"), PYTHONPATH=os.pathsep.join([str(REPO / "src"), str(REPO)]),
                PYTHONUTF8="1")
     steps: list[dict] = []
@@ -128,6 +133,8 @@ def main(work: Path) -> int:
         steps.append({"step": step, "argv": ["cli", *args], "exit": proc.returncode, "expected_exit": expect,
                       "ok": ok, "seconds": round(time.monotonic() - t0, 2),
                       "tail": out.strip().splitlines()[-1][:200] if out.strip() else ""})
+        if not ok:
+            raise RuntimeError(f"{step}: expected exit {expect}, got {proc.returncode}; {out.strip()[-500:]}")
         return proc.stdout
 
     def field(text: str, key: str):

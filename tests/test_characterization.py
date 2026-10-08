@@ -36,7 +36,7 @@ from tests import (release_fixtures, test_budget, test_dense, test_gold, test_po
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOTS = Path(__file__).parent / "snapshots"
 CLI_SNAPSHOT = SNAPSHOTS / "cli_parser.json"
-HELP_SHA = "7c15c41ca120a1fc"  # sha256 of every help text at COLUMNS=100, pinned from the original build_parser
+HELP_SHA = "fd18d84f8d8df272"  # sha256 of every help text at COLUMNS=100; repinned for embedding-comparison, --workers
 
 
 def rate(k, n, lo_hi):
@@ -82,11 +82,14 @@ class SettingsTest(unittest.TestCase):
         self.assertEqual((s.provider, s.generation_model, s.generation_reasoning_effort, s.embedding_model,
                           s.retrieval_mode, s.fusion, s.dense_search, s.request_workers, s.request_admission,
                           s.jev_model, s.database_dsn_env),
-                         ("openai", "gpt-6-luna", "low", "text-embedding-3-large", "kiwi_bm25", "rrf", "exact", 6, 12,
+                         ("openai", "gpt-5-mini", "low", "dragonkue/BGE-m3-ko", "kiwi_bm25", "rrf", "exact", 6, 12,
                           "jev-1.13.0", "RFP_DATABASE_DSN"))
         self.assertEqual((s.csv_path, s.files_dir), (Path("/src/data_list.csv"), Path("/src/files")))
-        self.assertEqual(settings_mod.ALLOWED_GENERATION_MODELS, ("gpt-6-luna", "gpt-5-mini", "gpt-5-nano"))
-        self.assertEqual(settings_mod.REASONING_EFFORTS, ("none", "low", "medium", "high", "xhigh", "max"))
+        self.assertEqual(settings_mod.ALLOWED_GENERATION_MODELS, ("gpt-5-mini", "gpt-5-nano"))
+        self.assertIn("gpt-6-luna", settings_mod.DEFAULT_RATES)  # drafting, the judges and AI review still bill it
+        self.assertEqual(s.embedding_dimensions, 1024)
+        self.assertEqual(s.embedding_dimensions, settings_mod.EMBEDDINGS[s.embedding_model].dims)
+        self.assertEqual(settings_mod.REASONING_EFFORTS, ("none", "minimal", "low", "medium", "high", "xhigh", "max"))
         self.assertEqual(settings_mod.TRACING_ENV, ("LANGFUSE_HOST", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"))
 
     def test_fingerprint(self):
@@ -94,7 +97,7 @@ class SettingsTest(unittest.TestCase):
         data = {k: str(v) if isinstance(v, Path) else v for k, v in asdict(s).items()}
         expected = hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]
         self.assertEqual(s.fingerprint(), expected)
-        self.assertNotEqual(s.with_(generation_model="gpt-5-mini").fingerprint(), s.fingerprint())
+        self.assertNotEqual(s.with_(generation_model="gpt-5-nano").fingerprint(), s.fingerprint())
         self.assertEqual(s.with_().fingerprint(), s.fingerprint())
 
     def test_rate_card(self):
@@ -126,19 +129,29 @@ class SettingsTest(unittest.TestCase):
             with mock.patch.dict(os.environ, {**base, "RFP_CONFIG_FILE": str(cfg)}, clear=True):
                 with self.assertRaisesRegex(SettingsError, r"unknown configuration keys: \['bogus'\]"):
                     settings_mod.load_settings()
+            cfg.write_text(json.dumps({"generation_model": "gpt-6-luna"}), encoding="utf-8")
+            with mock.patch.dict(os.environ, {**base, "RFP_CONFIG_FILE": str(cfg), "RFP_DATABASE_DSN": "x"},
+                                 clear=True):
+                with self.assertRaisesRegex(SettingsError, "generation_model 'gpt-6-luna' is not an answer model; "
+                                                           "allowed: gpt-5-mini, gpt-5-nano"):
+                    settings_mod.load_settings()
             with mock.patch.dict(os.environ, base, clear=True):
                 with self.assertRaisesRegex(SettingsError, "RFP_DATABASE_DSN is required"):
                     settings_mod.load_settings()
             with mock.patch.dict(os.environ, {**base, "RFP_DATABASE_DSN": "x"}, clear=True):
-                s = settings_mod.load_settings(provider="fake")
+                s = settings_mod.load_settings(provider="fake", generation_reasoning_effort="minimal")
                 self.assertEqual((s.data_dir, s.source_dir, s.hwp_converter, s.provider),
                                  (Path(tmp), Path(tmp), Path(tmp, "hwp5proc"), "fake"))
+                self.assertEqual(s.generation_reasoning_effort, "minimal")
 
     def test_validate_messages(self):
         cases = [
             ({"database_pool_max": 0}, "database pool maximum must be 1..16"),
             ({"provider": "x"}, "provider must be 'openai' or 'fake'"),
-            ({"generation_model": "gpt-4"}, "generation model 'gpt-4' is not allowlisted"),
+            ({"generation_model": "gpt-4"}, "generation_model 'gpt-4' is not an answer model; allowed: gpt-5-mini, "
+                                            "gpt-5-nano"),
+            ({"generation_model": "gpt-6-luna"}, "generation_model 'gpt-6-luna' is not an answer model; allowed: "
+                                                 "gpt-5-mini, gpt-5-nano"),
             ({"embedding_model": "x"}, "embedding model 'x' is not a compared model"),
             ({"reranker_model": "x"}, "reranker 'x' is not a compared model"),
             ({"evidence_target_tokens": 6000}, "evidence target must be positive"),
@@ -146,7 +159,9 @@ class SettingsTest(unittest.TestCase):
             ({"generation_max_output_tokens": 8001}, "generation_max_output_tokens must be within 1..8000"),
             ({"reranker_enabled": True}, "the reranker is enabled only through `activate-run`"),
             ({"retrieval_mode": "hybrid"}, "retrieval_mode is the keyword default"),
-            ({"embedding_dimensions": 4000}, "embedding_dimensions exceeds the model's native size"),
+            ({"embedding_dimensions": 4000}, "dragonkue/BGE-m3-ko produces 1024 dimensions"),
+            ({"embedding_model": "text-embedding-3-large", "embedding_dimensions": 4000},
+             "embedding_dimensions exceeds the model's native size"),
             ({"embedding_batch_inputs": 2049}, "embedding_batch_inputs must be within 1..2048"),
             ({"embedding_batch_tokens": 300_001}, "embedding_batch_tokens must be within 1..300000"),
             ({"reranker_max_concurrency": 2}, "reranker_max_concurrency must be 1"),
@@ -1031,25 +1046,38 @@ class LoadCheckTest(unittest.TestCase):
     CHECKS = {"cap_never_exceeded": True, "one_generation_attempt_per_request": True,
               "no_open_reservation_left": True, "all_requests_finished": True, "duplicate_submit_reused_request": True}
 
+    def setUp(self):
+        self.costs = []
+        original = generation._echo_first_evidence
+
+        def echo(messages):
+            response = original(messages)
+            usage = response.usage
+            amount = Decimal("0.25") * usage["prompt_tokens"] + 2 * usage["completion_tokens"]
+            self.costs.append(int(amount.to_integral_value(rounding="ROUND_CEILING")))
+            return response
+        self.enterContext(mock.patch.object(generation, "_echo_first_evidence", side_effect=echo))
+
     def estimate(self, r) -> int:
         """The maximum reservation and the cap built from it. The fixture PDFs' bytes differ in every process (their
         source hashes, and the ids derived from them, with them), which moves the packed prompt by a token now and
-        then: the estimate is 2272 micro-USD within a few, the cap is always four of it plus half of one."""
+        then: the estimate is 8544 micro-USD (gpt-5-mini) within a few, the cap is always four of it plus half of one."""
         est = r["max_reservation_micro_usd"]
-        self.assertLessEqual(abs(est - 2272), 8)
+        self.assertLessEqual(abs(est - 8544), 8)
         self.assertEqual((r["affordable_at_once"], r["cap_micro_usd"]), (4, 4 * est + est // 2))
         return est
 
     def settled(self, r) -> tuple[dict, int]:
         """The attempt states without `released`, and the cost of one answer. A budget-blocked request that
         reserved before losing the race releases its attempt, now and then, so at most one per blocked request;
-        the answer's cost moves with the estimate (155 or 156 micro-USD) and every answer costs the same."""
+        random source IDs change token usage, so exact charges follow the fake response at mini's recorded rates."""
         states = dict(r["attempt_states"])
         self.assertLessEqual(states.pop("released", 0), r["outcomes"].get("completed/budget_blocked", 0))
         answered = r["outcomes"].get("completed/answered", 0)
-        cost = r["spent_micro_usd"] // answered if answered else 155
-        self.assertIn(cost, (155, 156))
-        self.assertEqual(r["spent_micro_usd"], cost * answered)
+        self.assertEqual(len(self.costs), answered)
+        self.assertEqual(r["spent_micro_usd"], sum(self.costs))
+        cost = self.costs[0] if answered else 0
+        self.assertEqual(self.costs, [cost] * answered)
         return states, cost
 
     def test_six_users_under_the_cap(self):

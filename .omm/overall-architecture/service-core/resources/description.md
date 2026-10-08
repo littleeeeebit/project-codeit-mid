@@ -1,6 +1,0 @@
-`Resources.__init__` enters the pool lifecycle, requires a validated import, runs `init_schema` and `budget.ensure_budget_row`, and then, when `dispatch` is true, claims or borrows the `GatewayOwner`. With `recover`, it runs `recover_requests` and `budget.recover`. It builds `FakeTransport` for provider 'fake', or an `OpenAITransport` when OPENAI_API_KEY is readable; otherwise it records `NO_API_KEY`. Members add keys later through `set_api_key`; each entry gets a new key session and lives in memory only. It lazily caches four things:
-- the keyword index; `index()` reloads when `active_index` changes;
-- the pgvector set; `dense()` remembers a failed verification in `_dense_failed`, and retrieval falls back to keywords;
-- the reranker;
-- the Kiwi `shared_analyzer`.
-`retire_inactive` unloads GPU models the activated configuration no longer uses. `close()` refuses new work and waits `shutdown_wait_seconds` for the runner and jobs. If jobs are still alive, it reruns recovery. It then closes the transport and tracing and releases the lock. It is registered through threading's atexit hook, so on SIGINT it runs before the executor join.

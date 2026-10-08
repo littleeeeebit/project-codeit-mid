@@ -1,30 +1,37 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-07 06:24:27.651000+00:00
-update_count: 32
+updated: 2026-10-08 21:42:00.555000+00:00
+update_count: 34
 last_field: diagram
-git_commit: e4bab69
-git_branch: verify-page-criteria-and-roles
+git_commit: 86d9b1f
+git_branch: gpt5-mini-answer-embedding-comparison
 children:
-- admission-switches
 - attempt-billing
 - attempt-record
 - attempt-states
 - billing-attempt
 - billing-attempt-states
+- cancelled
+- completed
+- failed
 - gateway-owner
 - gold-candidate
 - gold-candidate-states
-- request-states
+- interrupted
+- queued
 - request-status
+- running
 - serving-activation
 - source-review-states
-- source-states
-prev_diagram: "graph TD\r\n  queued[\"queued\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  running[\"running\\nsrc/rfp_assistant/service/service.py\"]\r\n  completed[\"\
-  completed\\nsrc/rfp_assistant/service/service.py\"]\r\n  failed[\"failed\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  cancelled[\"cancelled\\nsrc/rfp_assistant/service/service.py\"]\r\n  interrupted[\"\
-  interrupted\\nsrc/rfp_assistant/service/service.py\"]\r\n  queued -->|\"run_queued\
-  \ claims\"| running\r\n  queued -->|\"cancel_request\"| cancelled\r\n  queued -->|\"\
-  shutdown or restart\"| interrupted\r\n  running -->|\"_finish succeeds\"| completed\r\
-  \n  running -->|\"error or refusal\"| failed\r\n  running -->|\"cancel flag at finish\"\
-  | cancelled\r\n  running -->|\"shutdown or restart\"| interrupted"
+prev_diagram: "graph TD\r\n  request-states[\"Request states\\nsrc/rfp_assistant/storage/store.py\"\
+  ]\r\n  attempt-states[\"Attempt ledger states\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  admission-switches[\"Paid admission switches\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  source-states[\"Source parse and review\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  gold-candidate-states[\"Gold candidate review\\nsrc/rfp_assistant/evaluation/gold.py\"\
+  ]\r\n  serving-activation[\"Serving activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
+  ]\r\n  request-states -->|\"each paid stage reserves\"| attempt-states\r\n  attempt-states\
+  \ -->|\"aggregate billing_state\"| request-states\r\n  admission-switches -->|\"\
+  refuse reserve or dispatch\"| attempt-states\r\n  attempt-states -->|\"overrun freezes,\
+  \ unknown blocks\"| admission-switches\r\n  source-states -->|\"review filter, served\
+  \ extraction\"| serving-activation\r\n  gold-candidate-states -->|\"approved rows\
+  \ scored\"| serving-activation\r\n  serving-activation -->|\"config snapshot per\
+  \ request\"| request-states"

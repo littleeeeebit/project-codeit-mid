@@ -18,13 +18,13 @@
     },
     "src/rfp_assistant/api.py": {
       "dup": 8,
-      "lines": 1571,
-      "reason": "verify-page-criteria-and-roles: response models for structured release checks (ReleaseCheck), the served pass lines (Targets) and the finalist fields 평가·릴리스 reads; api.py is the only module that may declare HTTP models (test_api boundary test)"
+      "lines": 1574,
+      "reason": "gpt5-mini-answer-embedding-comparison: three optional ExperimentTable response fields expose the answer run ID, model and paired conclusion; HTTP response models remain in api.py under the existing API boundary test, including the previous structured release-check fields"
     },
     "src/rfp_assistant/cli.py": {
       "dup": 0,
-      "lines": 983,
-      "reason": "baseline at adoption"
+      "lines": 985,
+      "reason": "gpt5-mini-answer-embedding-comparison: the existing answer-run command accepts bounded workers and documents baseline-first comparison runs while preserving the release-finalist limit"
     },
     "src/rfp_assistant/contracts.py": {
       "dup": 8,
@@ -63,18 +63,18 @@
     },
     "src/rfp_assistant/service/answers.py": {
       "dup": 0,
-      "lines": 1080,
-      "reason": "strict-answer-grading: graded_config refuses a run graded under another answer-eval version before finalize, review export or import writes into it; whole-claim review items carry the claim's cited passages; status_ok uses the row's own statuses"
+      "lines": 1289,
+      "reason": "gpt5-mini-answer-embedding-comparison review round 1 F2/F3: 18 net measured lines retain the planned Holm family, withhold partial-population verdicts, and publish recorded per-row retrieval limits with only shared values marked fixed; focused statistical and comparison integration regressions cover these repairs; duplication allowance remains zero"
     },
     "src/rfp_assistant/service/service.py": {
       "dup": 0,
-      "lines": 3076,
-      "reason": "baseline at adoption"
+      "lines": 3077,
+      "reason": "gpt5-mini-answer-embedding-comparison: the existing experiments listing forwards answer_run_id, model and conclusion from the generated table so the comparison screen can display the measured result"
     },
     "tools/verify.py": {
       "dup": 0,
-      "lines": 1044,
-      "reason": "baseline at adoption"
+      "lines": 1062,
+      "reason": "gpt5-mini-answer-embedding-comparison: 12 lines select the owner-configured Python before dependency imports, two enable fake-provider admission only on the validated disposable copy, one applies the supported database timeout after full-corpus restores, and three register missing selectable-model prices on that copy through the existing audited helper; duplication allowance remains zero"
     },
     "web/src/components/verify/evaluation.tsx": {
       "dup": 6,

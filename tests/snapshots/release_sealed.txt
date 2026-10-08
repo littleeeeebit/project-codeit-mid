@@ -15,7 +15,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 ## Release manifest
 
 - code: Git `rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr` (uncommitted changes: False), package source `cccccccccccccccc`; metric code `mmmmmmmmmmmmmmmm`
-- model gpt-6-luna, reasoning low, output cap 4000, prompt grounded-answer-13, rates None, settings `<id2>`
+- model gpt-5-mini, reasoning low, output cap 4000, prompt grounded-answer-13, rates None, settings `<id2>`
 - serving: run `K1-<id3>` (kiwi_bm25), keyword index `<id4>`, dense `None`, reranker None; fallback kiwi_bm25
 - dependencies: requirements-lock.txt `<id5>`; hardware {'machine': 'fixture'}
 - freeze: {'freeze_id': 'F-<id1>', 'frozen_at': '<time>', 'selected_run_id': 'K1-<id3>', 'decided_by': 'owner', 'post_test': False}
@@ -104,7 +104,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
  },
  "metric_code_sha256": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
  "settings_fingerprint": "<id2>",
- "model": "gpt-6-luna",
+ "model": "gpt-5-mini",
  "reasoning_effort": "low",
  "max_output_tokens": 4000,
  "prompt_version": "grounded-answer-13",
@@ -1555,11 +1555,11 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
  ## Release manifest
 
  - code: Git `rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr` (uncommitted changes: False), package source `cccccccccccccccc`; metric code `mmmmmmmmmmmmmmmm`
--- model gpt-6-luna, reasoning low, output cap 4000, prompt grounded-answer-13, rates None, settings `<id2>`
+-- model gpt-5-mini, reasoning low, output cap 4000, prompt grounded-answer-13, rates None, settings `<id2>`
 -- serving: run `K1-<id3>` (kiwi_bm25), keyword index `<id4>`, dense `None`, reranker None; fallback kiwi_bm25
 -- dependencies: requirements-lock.txt `<id5>`; hardware {'machine': 'fixture'}
 -- freeze: {'freeze_id': 'F-<id1>', 'frozen_at': '<time>', 'selected_run_id': 'K1-<id3>', 'decided_by': 'owner', 'post_test': False}
-+- model gpt-6-luna, reasoning low, output cap 4000, prompt grounded-answer-changed, rates None, settings `<id4>`
++- model gpt-5-mini, reasoning low, output cap 4000, prompt grounded-answer-changed, rates None, settings `<id4>`
 +- serving: run `K1-<id5>` (kiwi_bm25), keyword index `<id6>`, dense `None`, reranker None; fallback kiwi_bm25
 +- dependencies: requirements-lock.txt `<id7>`; hardware {'machine': 'fixture'}
 +- freeze: {'freeze_id': 'F-<id1>', 'frozen_at': '<time>', 'selected_run_id': 'K1-<id5>', 'decided_by': 'owner', 'post_test': False}
@@ -1656,7 +1656,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
   "metric_code_sha256": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
 - "settings_fingerprint": "<id2>",
 + "settings_fingerprint": "<id4>",
-  "model": "gpt-6-luna",
+  "model": "gpt-5-mini",
   "reasoning_effort": "low",
   "max_output_tokens": 4000,
 - "prompt_version": "grounded-answer-13",

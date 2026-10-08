@@ -1,1 +1,0 @@
-`SignedIn` (sign-in.tsx) calls GET /api/auth/me. On success it binds the account name for every later call. On 401 it shows a link to /api/auth/login, a full-page navigation to the hub that is never fetched. Logout POSTs /api/auth/logout. `app-header.tsx` also reads GET /api/budget to show the shared ledger.

@@ -1,0 +1,1 @@
+_Session fixes identity and credential context. _validate_request() and _conversation() check inputs before _create() persists request_json and config identity. Existing identical member/idempotency keys return their original request. Metadata and inventory execute inline; paid requests require an available semaphore slot before queued insertion.

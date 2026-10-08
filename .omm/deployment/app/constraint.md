@@ -1,0 +1,1 @@
+The unit documents that server.env contains database, path and hub configuration but no shared OPENAI_API_KEY. Members enter their own keys through Settings.

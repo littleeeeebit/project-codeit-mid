@@ -1,0 +1,1 @@
+The default executor has six workers and twelve admitted unfinished requests. Paid CLI Resources must share this process's owner or acquire exclusive ownership; another serving process prevents a second gateway owner.

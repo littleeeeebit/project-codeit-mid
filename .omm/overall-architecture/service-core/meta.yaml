@@ -10,16 +10,13 @@ children:
 - app-resources
 - background-jobs
 - conversation-context
-- execute-request
 - metered-chat
 - paid-answer
 - partials
-- request-runner
 - resources
 - resources-owner
 - serving-config
 - submit
-- submit-answer
 - tracing
 parentPath: []
 prev_diagram: "graph TD\r\n  resources[\"Process owner Resources\\nsrc/rfp_assistant/service/service.py\"\

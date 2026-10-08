@@ -1,1 +1,0 @@
-The hub on :8000 of the same VM, with the OAuth service `bidmate` registered; its `oauth_redirect_uri` must equal BIDMATE_OAUTH_REDIRECT_URI. The api.py docstring warns that the VM address is ephemeral: the hub URL, the redirect URI and the hub's registration must change together.

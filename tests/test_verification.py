@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import venv
 from pathlib import Path
 from typing import Literal
 from unittest import mock
@@ -59,6 +60,46 @@ class Manifest(_Strict):
 
 def fenced(out: str, info: str) -> list[dict]:
     return [json.loads(b) for b in re.findall(rf"```{info}\n(.*?)\n```", out, re.S)]
+
+
+class InterpreterTest(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "POSIX virtual environments share a symlinked executable")
+    def test_symlinked_environments_dispatch_to_the_owner_environment(self):
+        self.assert_dispatches(symlinks=True)
+
+    def test_dependency_free_python_dispatches_to_the_owner_environment(self):
+        self.assert_dispatches(symlinks=False)
+
+    def assert_dispatches(self, symlinks):
+        with tempfile.TemporaryDirectory(prefix="verification python ") as tmp:
+            root = Path(tmp)
+            for name in ("empty", "owner"):
+                venv.EnvBuilder(with_pip=False, symlinks=symlinks).create(root / name)
+            executable = "Scripts/python.exe" if os.name == "nt" else "bin/python"
+            empty_python, owner_python = (root / name / executable for name in ("empty", "owner"))
+            library = Path(subprocess.check_output([str(owner_python), "-c",
+                           "import sysconfig; print(sysconfig.get_path('purelib'))"], text=True).strip())
+            (library / "application.pth").write_text("\n".join(p for p in sys.path
+                                                     if p.endswith(("site-packages", "dist-packages"))) + "\n",
+                                                     encoding="utf-8")
+            if symlinks:
+                self.assertTrue(empty_python.samefile(owner_python))
+            env_file = root / ".env"
+            env_file.write_text(f'RFP_VERIFY_PYTHON="{owner_python}"\n', encoding="utf-8")
+            env = {**os.environ, "RFP_VERIFY_ENV_FILE": str(env_file)}
+            probe = subprocess.run([str(empty_python), "-c", "import psycopg"], capture_output=True, timeout=30)
+            self.assertNotEqual(probe.returncode, 0, "the bootstrap interpreter must lack app dependencies")
+            result = subprocess.run([str(empty_python), "-B", str(REPO / "tools/verify.py"), "--list"],
+                                    env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("consultant-answer", result.stdout)
+            self.assertIn("accessibility", result.stdout)
+            for invalid in ("relative/python", str(root / "missing-python")):
+                env_file.write_text(f"RFP_VERIFY_PYTHON={invalid}\n", encoding="utf-8")
+                result = subprocess.run([str(empty_python), "-B", str(REPO / "tools/verify.py"), "--list"],
+                                        env=env, capture_output=True, text=True, encoding="utf-8", timeout=30)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("RFP_VERIFY_PYTHON must name an existing absolute Python executable", result.stderr)
 
 
 class ManifestTest(unittest.TestCase):
@@ -128,11 +169,38 @@ class EvidenceTest(unittest.TestCase):
 
 
 class DatasetCopyTest(unittest.TestCase):
+    def test_only_the_isolated_restore_gets_the_larger_preparation_timeout(self):
+        from rfp_assistant.storage import postgres, postgres_backup
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"RFP_TEST_COPY_DSN":
+                "dbname=isolated host=localhost"}), mock.patch.object(fixtures, "database", return_value="RFP_TEST_COPY_DSN"), \
+                mock.patch("rfp_assistant.gateway.budget.set_paid_enabled") as enable, \
+                mock.patch("rfp_assistant.gateway.budget.ensure_generation_rate"), \
+                mock.patch.object(postgres_backup.shutil, "which", return_value=sys.executable), \
+                mock.patch.object(postgres_backup.subprocess, "run", return_value=mock.Mock(returncode=0)) as run, \
+                mock.patch.object(Path, "unlink"):
+            target = postgres.Target("RFP_TEST_COPY_DSN")
+            postgres_backup._run("pg_dump", target, [], Path(tmp))
+            self.assertEqual(run.call_args.kwargs["timeout"], 600)
+            verify.copy_database(target.dsn(), Path(tmp))
+            dump, restore = run.call_args_list[-2:]
+            self.assertEqual(dump.kwargs["timeout"], 600)
+            self.assertEqual(restore.kwargs["timeout"], 900)
+            self.assertIn("--single-transaction", restore.args[0])
+            self.assertEqual(enable.call_args.args[0].dsn(), target.dsn())
+
     def test_a_configured_corpus_is_used_through_an_isolated_copy(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = fixtures.make_env(Path(tmp))
+            from rfp_assistant.gateway import budget
+            from rfp_assistant.settings import ALLOWED_GENERATION_MODELS, DEFAULT_RATES
+
+            budget.set_paid_enabled(env.settings.db_path, "test", False, "paused source")
             data = env.settings.data_dir
             source_dsn = os.environ[env.settings.database_dsn_env]
+            with psycopg.connect(source_dsn, autocommit=True) as conn:
+                legacy_rates = {k: v for k, v in DEFAULT_RATES.items() if k not in ALLOWED_GENERATION_MODELS}
+                conn.execute("UPDATE budget_settings SET rates_json = %s", (json.dumps(legacy_rates),))
             (data / "indexes").mkdir(exist_ok=True)
             with mock.patch.dict(os.environ, {"RFP_SOURCE_DIR": str(env.settings.source_dir),
                                               "RFP_DATA_DIR": str(data),  # not a checkout .env that may exist
@@ -147,10 +215,19 @@ class DatasetCopyTest(unittest.TestCase):
                 self.assertEqual(ctx.env["RFP_DATABASE_DSN"], corpus["dsn"])  # what the served app and tools use
                 self.assertNotEqual(corpus["dsn"], source_dsn)
                 with psycopg.connect(corpus["dsn"], autocommit=True) as conn:
+                    self.assertTrue(conn.execute("SELECT paid_admission FROM database_control").fetchone()[0])
+                    rates, version = conn.execute("SELECT rates_json, rate_version FROM budget_settings").fetchone()
+                    self.assertEqual(json.loads(rates), DEFAULT_RATES)
+                    self.assertEqual(version, "fixture")
                     self.assertEqual(conn.execute("SELECT count(*) FROM documents").fetchone()[0], 4)
                     conn.execute("INSERT INTO audit_events(event_id, actor, action, target, reason, details_json, "
                                  "created_at) VALUES ('e', 'a', 'x', 't', 'r', '{}', 'now')")
                 with psycopg.connect(source_dsn) as conn:
+                    self.assertFalse(conn.execute("SELECT paid_admission FROM database_control").fetchone()[0])
+                    self.assertEqual(json.loads(conn.execute("SELECT rates_json FROM budget_settings").fetchone()[0]),
+                                     legacy_rates)
+                    self.assertEqual(conn.execute("SELECT count(*) FROM audit_events WHERE action = "
+                                                  "'register_generation_rate'").fetchone()[0], 0)
                     self.assertEqual(conn.execute("SELECT COUNT(*) FROM audit_events WHERE event_id = 'e'")
                                      .fetchone()[0], 0)
                 self.assertEqual((copy / "indexes").resolve(), (data / "indexes").resolve())

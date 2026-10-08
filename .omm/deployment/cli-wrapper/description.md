@@ -1,1 +1,0 @@
-`tools/infra/bidmate-cli.sh` sources server.env and runs `python -m rfp_assistant.cli` as the bidmate user. Paid CLI commands need the service stopped first, because the service holds the gateway lock. Ledger-only commands run beside it.

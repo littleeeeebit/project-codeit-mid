@@ -1,1 +1,0 @@
-A durable marker that `mark_dispatching` commits before the network call, together with the stop check. The attempt still holds its reservation. If the process dies in this state, startup recovery turns it into unknown.

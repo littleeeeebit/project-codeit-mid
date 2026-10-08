@@ -1,5 +1,0 @@
-`sources.parse_status` goes from pending to parsed (`ingest_source`), or to quarantined on a parse failure, with review_status needs_recovery. `recover-source` can register a new parsed revision. `review_status` changes as follows:
-- A new extraction revision resets it to unreviewed.
-- The fidelity check sets auto_verified or auto_flagged.
-- People record sample_checked or reviewed, which automatic checks never overwrite.
-`build-keyword --reviewed-only` admits auto_verified, sample_checked and reviewed. The operating index also admits unreviewed and auto_flagged sources, labelled `index_includes_unreviewed_sources` in every trace. Until a new index is activated, serving reads each source through the extraction its active index holds (`_doc_rows` with `KeywordIndex.source_extraction`), not through `active_extraction_id`.

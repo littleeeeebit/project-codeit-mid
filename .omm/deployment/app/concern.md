@@ -1,0 +1,1 @@
+All allowlisted members receive budget_admin and owner-like application capabilities. PUT /api/budget/limit can therefore raise the shared cap from Settings. The prior maintainer note about owner-CLI-only budget administration remains a policy/documentation inconsistency; authentication narrows access but does not implement role separation.

@@ -1,1 +1,0 @@
-Never executed, so it costs nothing. Causes: dispatch refused (cancelled, interrupted, maintenance, ownership lost, unknown billing pending), no provider key, a 4xx pre-execution rejection, or never dispatched before a restart.

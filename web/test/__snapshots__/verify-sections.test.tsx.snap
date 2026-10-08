@@ -94,7 +94,7 @@ section aria-label="K0 · K1 비교표"
               span aria-hidden="true"
           th scope="col"
             button type="button"
-              "비용"
+              "임베딩 비용"
               span aria-hidden="true"
       tbody
         tr

@@ -1,1 +1,0 @@
-`embedding_payloads` caches every corpus and query vector by payload hash. `embedding_sets` and `embedding_set_rows` map a dense version's row_order to the chunk ids of exactly one keyword index. Vectors are checked for checksum and unit norm on write and on load.

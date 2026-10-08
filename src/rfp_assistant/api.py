@@ -1157,6 +1157,9 @@ class ExperimentTable(_Read):
     populations: dict[str, str]
     needs_evidence_review: list[str] = []
     rows: list[ExperimentRow]
+    answer_run_id: str | None = None  # the answer-embedding table: its answer run, model and conclusion
+    model: str | None = None
+    conclusion: dict[str, Any] | None = None
 
 
 class ServingDetail(_Read):

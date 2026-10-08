@@ -1,4 +1,0 @@
-`_validated` -> `generation.validate_answer` checks every claim, summary and conflict citation against the allowed evidence ids, the scope, and the stored chunk quote (`_stored_quote`). For compare, it also checks that every represented document is covered. A failure ends the request as technical_error, with the raw output kept in the trace. `_finish` then:
-- computes the billing state from the request's attempts, with precedence unknown > pending > reconciled > settled > released;
-- keeps a status already set to interrupted or cancelled, and turns completed into cancelled when a cancel was requested;
-- stores `trace_json` and `result_json`, and drops the partial.

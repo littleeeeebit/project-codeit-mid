@@ -1,1 +1,0 @@
-`run_queued` sets running; free modes and the synchronous `answer()` insert it directly. While a request runs, `cancel_requested` may be set. `_stop_reason` turns that into `_Stop` at the next checkpoint, or into a refused dispatch.

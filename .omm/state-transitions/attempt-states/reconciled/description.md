@@ -1,1 +1,0 @@
-Covered by an owner reconciliation of a dated provider interval billed to the same project scope. The provider total minus the local settled cost is recorded as an adjustment, and the attempt stops holding a reservation. A late settlement adds a compensating negative adjustment.

@@ -1,1 +1,0 @@
-Each index version is a directory under `.runtime/indexes/<index_version>/` plus its rows in `indexes`, `chunks` and `requirements`. A chunk carries its spans (element ids and offsets), the payload text, a token count, a chunk type and a requirement key. `scope-terms.json` freezes the title and institution terms. `KeywordIndex.load` reads the whole index into memory.

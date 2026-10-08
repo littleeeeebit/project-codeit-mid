@@ -1,4 +1,0 @@
-`OpenAITransport` keeps one client per member key session (`set_key`), an optional server-environment default client, and replaced clients until `close`. `chat` streams when `on_delta` is given (`stream_options.include_usage`), and `_drain` accumulates the content. Errors are classified by whether the model can have executed:
-- 4xx rejections (authentication, permission, bad request, not found, rate limit, unprocessable) raise `ProviderError(pre_execution=True)`.
-- Timeouts, connection loss, 5xx, and any failure after the stream started raise `pre_execution=False`.
-`_check_owner` runs `GatewayOwner.check` before every call. `FakeTransport` replaces this class for provider 'fake' (tests, checks and local UI work).

@@ -2562,7 +2562,8 @@ def experiments(res: Resources, principal: Principal) -> dict:
                          "active": bool(r.get("run_id")) and r.get("run_id") == active.get("run_id")})
         tables.append({"matrix": t["matrix"], "title": t["title"], "created_at": t["created_at"],
                        "columns": t["columns"], "fixed": t.get("fixed") or {}, "populations": t["populations"],
-                       "needs_evidence_review": t.get("needs_evidence_review") or [], "rows": rows})
+                       "needs_evidence_review": t.get("needs_evidence_review") or [], "rows": rows,
+                       **{k: t.get(k) for k in ("answer_run_id", "model", "conclusion")}})
     golden = compare.compare_dir(res.settings) / "golden-counts.json"
     reranker = active.get("reranker") or {}
     serving_detail = {"mode": active.get("mode"), "embedding": (active.get("embedding") or {}).get("model"),

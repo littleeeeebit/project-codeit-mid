@@ -1,1 +1,0 @@
-`_create` inserts a paid-mode request as queued, holding an admission slot. It leaves this state through the `run_queued` claim, through `cancel_request` (which stores a cancelled result with no paid call), through `_fail_unscheduled`, or as interrupted through `RequestRunner.shutdown` or the startup `recover_requests`.

@@ -1,0 +1,1 @@
+A maintenance run that needs a new native HWP print depends on the Windows rendering environment. The supplied Linux service cannot create that rendering through the Windows-only print_hwp() implementation.

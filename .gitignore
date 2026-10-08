@@ -14,6 +14,7 @@
 /.venv/
 /.venv-converter/
 /.runtime/
+/.runtime.zip
 /.runtime-backups/
 /models/
 __pycache__/

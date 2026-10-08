@@ -1,0 +1,1 @@
+The browser exposes development candidates only. A requesting member cannot approve their own generated draft through the service boundary; the drafter/model cannot approve it through gold.decide(). Second reviewers must differ from drafter and first reviewer.
