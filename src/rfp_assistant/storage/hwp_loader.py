@@ -1,5 +1,6 @@
 """Read-only HWP/HWPX adapter. Loader order is NOT native document order."""
 from collections.abc import Mapping
+from importlib import import_module
 from pathlib import Path
 
 
@@ -21,6 +22,9 @@ def load_hwp_hwpx(original: Path) -> tuple[list[dict], list[dict], str | None]:
     if not original.is_file():
         raise FileNotFoundError(original)
     from langchain_hwp_hwpx import HwpHwpxLoader
+    # The loader wraps its lazy parser import in HwpHwpxLoaderError. Check the
+    # required parser here so an environment failure is not a document failure.
+    import_module("hwp_hwpx_parser")
 
     try:
         documents = HwpHwpxLoader(

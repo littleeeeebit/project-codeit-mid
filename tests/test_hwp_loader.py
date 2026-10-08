@@ -1,3 +1,4 @@
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -87,3 +88,12 @@ class LoaderTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(FileNotFoundError):
                 load_hwp_hwpx(Path(directory) / 'missing.hwp')
+
+    def test_missing_parser_dependency_propagates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'example.hwp'
+            path.write_bytes(b'fixture')
+            # Exercise the actual loader import path, not a mocked load failure.
+            with patch.dict(sys.modules, {'hwp_hwpx_parser': None}):
+                with self.assertRaises(ImportError):
+                    load_hwp_hwpx(path)

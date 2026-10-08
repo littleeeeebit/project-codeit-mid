@@ -8,7 +8,7 @@ The loader returns grouped body, tables and notes rather than native interleaved
 Invalid extension/missing file/dependency import errors propagate. Loader execution errors return `hwp_loader_failed`; malformed results or conversion errors return `hwp_loader_result_invalid` with no partial output. Empty/whitespace-only output returns `hwp_empty_output`. Metadata must be a mapping with string keys; an empty mapping is retained.
 
 ## Validation
-- Adapter unit tests: 9/9 passed, including 11 malformed-result subcases.
+- Adapter unit tests: 10/10 passed, including 11 malformed-result subcases and missing-parser dependency propagation.
 - `git diff --check`: passed.
 - Real HWP comparison artifacts remain separately preserved. Nong-eochon sample: legacy XML conversion produced invalid/empty output; loader extracted 176 elements including 174 tables. Robot-industry sample: legacy 466 elements / 79 tables / 51,787 characters; loader 80 elements / 79 tables / 96,333 characters. Both returned zero replacement characters in the latter sample. Increased text volume is not proof of correctness: body/table duplication and ordering remain concerns. Comparison isolated the existing XML walker; legacy binary equation-script injection was not exercised.
 - **Actual HWPX document tests were NOT executed**: no real HWPX sample was found in the inspected project/source paths. Mock HWPX tests do not establish real-document fidelity.
@@ -17,4 +17,4 @@ Invalid extension/missing file/dependency import errors propagate. Loader execut
 ## Dependency lock
 README describes `requirements-lock.txt` as the full installed-package snapshot. Added 15 missing loader/transitive pins from the existing macOS rfp-rag environment and checked 58 active dependency edges against locked versions. Existing pins were retained. This is an incremental addition, not a full refreeze. Full Windows/CUDA environment installation and cross-platform resolution were NOT tested.
 
-GitHub push and PR creation are pending user authorization. Existing user changes are excluded from this commit.
+PR #30 is open against main. The branch is pushed; this follow-up fixes a reproduced dependency-import classification defect. Existing user changes are excluded. The PR must not be merged as part of this task.
