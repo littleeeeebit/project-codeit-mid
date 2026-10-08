@@ -74,7 +74,7 @@ if __name__ == "__main__" and (configured := owner_config()[0].get("RFP_VERIFY_P
     python = Path(configured)
     if not python.is_absolute() or not python.is_file():
         raise SystemExit("RFP_VERIFY_PYTHON must name an existing absolute Python executable")
-    if not python.samefile(sys.executable):
+    if os.path.normcase(os.path.abspath(python)) != os.path.normcase(os.path.abspath(sys.executable)):
         raise SystemExit(subprocess.call([str(python), "-B", str(Path(__file__).resolve()), *sys.argv[1:]]))
 
 import psycopg  # noqa: E402 -- imported only after the owner interpreter is selected

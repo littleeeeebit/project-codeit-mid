@@ -34,6 +34,9 @@ const COLUMN: Record<string, string> = {
   "answer.pass_rate": "답변 통과율", "answer.claim_correctness": "필수 주장 정확", "answer.claim_support": "주장 근거 지지",
   "answer.critical": "치명 오류", "answer.rejected": "거부된 답변",
   "vs_k1.pass_diff": "K1 대비 통과율", "vs_k1.p_value": "p값", "vs_k1.p_holm": "p값 Holm 보정", "answer.cost_usd": "답변 비용",
+  "retrieval.mode": "검색", "retrieval.fusion": "융합", "retrieval.depth": "후보 깊이",
+  "retrieval.fused_depth": "융합 깊이", "retrieval.units": "근거 단위",
+  "retrieval.evidence_max_tokens": "근거 토큰 상한", "retrieval.reranker": "리랭커",
 };
 const RATE = new Set(["dev.support", "whole.support", "needle.top5", "answer.pass_rate", "answer.claim_correctness", "answer.claim_support"]);
 const SCORE = new Set(["dev.ndcg", "whole.ndcg", "dev.recall20", "recall20_before", "vs_k1.p_value", "vs_k1.p_holm"]);
@@ -49,11 +52,12 @@ const STATUS: Record<string, string> = { failed: "실행 실패", needs_approval
 const MODE: Record<string, string> = {
   kiwi_bm25: "키워드 Kiwi BM25", keyword: "키워드", dense: "밀집만", hybrid: "하이브리드", hybrid_rerank: "하이브리드 + 재정렬",
 };
-const FIXED: Record<string, string> = { retrieval: "검색", analyzer: "분석기", embedding: "임베딩", fusion: "융합", depth: "후보", units: "근거 단위", reasoning_effort: "추론", max_output_tokens: "최대 토큰 (추론 포함)", answer_questions: "비교 질문 수", development_subset: "개발 부분집합" };
+const FIXED: Record<string, string> = { retrieval: "검색", analyzer: "분석기", embedding: "임베딩", fusion: "융합", depth: "후보", fused_depth: "융합 깊이", units: "근거 단위", evidence_max_tokens: "근거 토큰 상한", reranker: "리랭커", reasoning_effort: "추론", max_output_tokens: "최대 토큰 (추론 포함)", answer_questions: "비교 질문 수", development_subset: "개발 부분집합" };
 const POP: Record<string, string> = { dev: "개발 질문 · 자기 문서", whole: "전체 문서" };
 
 function fmt(key: string, v: Value): string {
   if (v == null) return "-";
+  if (key === "retrieval.mode") return MODE[String(v)] ?? String(v);
   if (typeof v === "string") return key === "gate" ? (v === "pass" ? "통과" : "미달") : v.replace("(research-only)", "(연구용만)");
   if (RATE.has(key)) return `${(v * 100).toFixed(1)}%`;
   if (key === "vs_k1.pass_diff") return `${v > 0 ? "+" : ""}${(v * 100).toFixed(1)}%p`;
@@ -124,6 +128,7 @@ export function ExperimentsSection() {
 }
 
 function Headline({ t }: { t: Table }) {
+  if (t.conclusion?.complete === false) return <p className="text-base font-semibold">{conclusionText(t.conclusion as Conclusion)}</p>;
   const lead = t.columns.find((c) => c.better === "high");
   if (!lead) return null;
   const { value: topValue, rows: winners } = top(t, lead);
@@ -142,12 +147,13 @@ function Headline({ t }: { t: Table }) {
   );
 }
 
-type Conclusion = { best: string[]; best_pass_rate: number | null; alpha: number; baseline: string | null;
+type Conclusion = { complete?: boolean; best: string[]; best_pass_rate: number | null; alpha: number; baseline: string | null;
   significant: { name: string; pass_diff: number; p_holm: number }[] };
 const named = (n: string | null) => AXIS.embedding[n ?? ""] ?? n ?? "기준";
 
 /** The answer table's verdict: K1 against every run, paired on the same questions and Holm-adjusted. */
 function conclusionText(c: Conclusion): string {
+  if (c.complete === false) return "비교가 완료되지 않아 순위와 유의성 결론을 내릴 수 없습니다.";
   if (c.best_pass_rate == null) return "끝난 행이 없어 결론이 없습니다.";
   const how = `McNemar 정확검정, Holm 보정, 유의수준 ${c.alpha}`;
   if (!c.significant.length) return `${named(c.baseline)}과 통과율이 유의하게 다른 행은 없습니다 (${how}).`;

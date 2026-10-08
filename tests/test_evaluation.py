@@ -1137,6 +1137,15 @@ class AnswerRunTest(GoldRetrievalTest):
         table = json.loads((compare.compare_dir(self.s) / "tables" / "answer-embedding.json").read_text(encoding="utf-8"))
         self.assertEqual(([r["run_id"] for r in table["rows"]], table["answer_run_id"]), (runs, out["run_id"]))
         self.assertEqual(table["rows"][0]["name"], "K1")
+        self.assertNotIn("depth", table["fixed"])
+        self.assertNotIn("retrieval", table["fixed"])
+        self.assertEqual(table["rows"][2]["retrieval"]["depth"], 10)
+        self.assertEqual(table["rows"][2]["retrieval"]["mode"], "kiwi_bm25")
+        config = json.loads((answers.run_dir(self.s, out["run_id"]) / "config.json").read_text(encoding="utf-8"))
+        for row, finalist in zip(table["rows"], config["finalists"]):
+            self.assertEqual(row["retrieval"]["limits"], finalist["limits"])
+            self.assertEqual(row["retrieval"]["reranker_config"], finalist["reranker"])
+        self.assertEqual(table["fixed"]["units"], config["finalists"][0]["limits"]["evidence_max_units"])
         self.assertEqual((table["fixed"]["reasoning_effort"], table["fixed"]["max_output_tokens"],
                           table["fixed"]["answer_questions"], table["fixed"]["development_subset"]),
                          ("minimal", 2000, est["rows"], False))
@@ -1149,6 +1158,18 @@ class AnswerRunTest(GoldRetrievalTest):
             reader.close()
         shown = next(t for t in listed["tables"] if t["matrix"] == "answer-embedding")
         self.assertEqual((shown["answer_run_id"], shown["rows"][1]["run_id"]), (out["run_id"], self.k0))
+        self.assertEqual(shown["rows"][2]["values"]["retrieval.depth"], 10)
+        self.assertEqual(shown["rows"][2]["values"]["retrieval.mode"], "kiwi_bm25")
+        d = answers.run_dir(self.s, out["run_id"])
+        store.write_jsonl_atomic(d / "rows.jsonl", [r for r in progress.values() if r["finalist"] != deeper])
+        self.assertEqual(answers.finalize(self.s, out["run_id"])["status"], "partial")
+        partial = json.loads((d / "scores.json").read_text(encoding="utf-8"))
+        self.assertEqual(partial["comparison"]["runs"][deeper]["p_value"], 1.0)
+        self.assertEqual(partial["comparison"]["runs"][deeper]["n"], 0)
+        table = json.loads((compare.compare_dir(self.s) / "tables" / "answer-embedding.json").read_text(encoding="utf-8"))
+        self.assertFalse(table["conclusion"]["complete"])
+        self.assertEqual(table["conclusion"]["significant"], [])
+        self.assertIn("incomplete", (compare.compare_dir(self.s) / "tables" / "answer-embedding.md").read_text(encoding="utf-8"))
 
     def test_paired_statistics(self):
         self.assertEqual(answers.mcnemar_exact(0, 0), 1.0)
@@ -1187,6 +1208,46 @@ class AnswerRunTest(GoldRetrievalTest):
             with self.assertRaisesRegex(answers.AnswerEvalError, "graded under answer-eval-1"):
                 call()
         self.assertEqual({f: (d / f).read_bytes() for f in before}, before)
+
+
+class ComparisonStatisticsTest(unittest.TestCase):
+    def test_holm_retains_all_eleven_planned_hypotheses(self):
+        runs = ["K1", *[f"C{i}" for i in range(1, 12)]]
+        scored = [{"finalist": f, "question_id": str(q), "passed": f == "C1"}
+                  for f in ("K1", "C1") for q in range(6)]
+        paired = answers.paired_against_baseline("K1", scored, runs)
+        self.assertEqual(set(paired["runs"]), set(runs[1:]))
+        self.assertEqual(paired["runs"]["C1"]["p_holm"], round(11 * 2 / 64, 4))
+        self.assertEqual(paired["runs"]["C1"]["p_holm"], 0.3438)
+        for run in runs[2:]:
+            self.assertEqual(paired["runs"][run], {"n": 0, "baseline_only": 0, "run_only": 0,
+                                                   "pass_diff": None, "p_value": 1.0, "p_holm": 1.0})
+        empty = answers.paired_against_baseline("K1", [], runs)
+        self.assertEqual(len(empty["runs"]), 11)
+        self.assertTrue(all(v["p_holm"] == 1.0 for v in empty["runs"].values()))
+
+    def test_complete_population_can_report_significance(self):
+        rows = [{"run_id": f, "name": f, "status": "complete", "answer": {"pass_rate": rate}}
+                for f, rate in (("K1", 0.0), ("C1", 1.0))]
+        scored = [{"finalist": f, "question_id": str(q), "passed": f == "C1"}
+                  for f in ("K1", "C1") for q in range(6)]
+        c = answers.conclusion(rows, answers.paired_against_baseline("K1", scored, ["K1", "C1"]))
+        self.assertTrue(c["complete"])
+        self.assertEqual(c["best"], ["C1"])
+        self.assertEqual(len(c["significant"]), 1)
+        self.assertIn("pass significantly more", answers.conclusion_text(c))
+
+    def test_partial_population_withholds_a_definitive_conclusion(self):
+        rows = [{"run_id": "K1", "name": "K1", "status": "complete", "answer": {"pass_rate": 0.0}},
+                {"run_id": "C1", "name": "C1", "status": "complete", "answer": {"pass_rate": 1.0}},
+                {"run_id": "C2", "name": "C2", "status": "partial", "answer": {"pass_rate": None}}]
+        scored = [{"finalist": f, "question_id": str(q), "passed": f == "C1"}
+                  for f in ("K1", "C1") for q in range(6)]
+        paired = answers.paired_against_baseline("K1", scored, [r["run_id"] for r in rows])
+        c = answers.conclusion(rows, paired)
+        self.assertEqual(c["significant"], [])
+        self.assertIsNone(c["best_pass_rate"])
+        self.assertIn("incomplete", answers.conclusion_text(c))
 
 
 class SealedTest(Phase4Case):

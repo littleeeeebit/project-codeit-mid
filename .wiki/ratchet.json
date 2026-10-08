@@ -63,8 +63,8 @@
     },
     "src/rfp_assistant/service/answers.py": {
       "dup": 0,
-      "lines": 1271,
-      "reason": "gpt5-mini-answer-embedding-comparison: adds estimated multi-run development comparisons, bounded parallel answering with synchronized progress, exact paired McNemar/Holm statistics and the single embedding-answer table with subset/effort/cap labels; retains strict answer-eval version checks, whole-claim evidence and per-row expected statuses; comparison integration and paired-statistics tests cover these required additions"
+      "lines": 1289,
+      "reason": "gpt5-mini-answer-embedding-comparison review round 1 F2/F3: 18 net measured lines retain the planned Holm family, withhold partial-population verdicts, and publish recorded per-row retrieval limits with only shared values marked fixed; focused statistical and comparison integration regressions cover these repairs; duplication allowance remains zero"
     },
     "src/rfp_assistant/service/service.py": {
       "dup": 0,

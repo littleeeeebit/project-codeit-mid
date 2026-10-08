@@ -854,7 +854,8 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
               and config["action"] == "answer-finalists" else None,
               "scored_at": utcnow()}
     if config["action"] == "embedding-comparison":
-        scores["comparison"] = paired_against_baseline(config["finalists"][0]["run_id"], all_scored)
+        scores["comparison"] = paired_against_baseline(config["finalists"][0]["run_id"], all_scored,
+                                                      [f["run_id"] for f in config["finalists"]])
     write_text_atomic(d / "scores.json", json.dumps(scores, ensure_ascii=False, indent=1))
     write_jsonl_atomic(d / "scored.jsonl", all_scored)
     write_text_atomic(d / "report.md", answer_report_md(config, scores))
@@ -902,13 +903,13 @@ def holm(pvalues: dict[str, float]) -> dict[str, float]:
     return out
 
 
-def paired_against_baseline(baseline: str, scored: list[dict]) -> dict:
+def paired_against_baseline(baseline: str, scored: list[dict], run_ids: list[str]) -> dict:
     """Each run's answer pass rate against the baseline run's on the same questions (both answered, passage rows):
-    the difference, the discordant pairs and the exact McNemar p-value, Holm-adjusted over the runs."""
+    the difference, the discordant pairs and the exact McNemar p-value, Holm-adjusted over every planned run."""
     passed = {(s["finalist"], s["question_id"]): bool(s.get("passed")) for s in scored if "metadata_correct" not in s}
     base = {q: ok for (f, q), ok in passed.items() if f == baseline}
     per = {}
-    for run in dict.fromkeys(f for f, _ in passed):
+    for run in dict.fromkeys(run_ids):
         if run == baseline:
             continue
         common = [q for (f, q) in passed if f == run and q in base]
@@ -916,26 +917,30 @@ def paired_against_baseline(baseline: str, scored: list[dict]) -> dict:
         c = sum(passed[(run, q)] and not base[q] for q in common)
         per[run] = {"n": len(common), "baseline_only": b, "run_only": c,
                     "pass_diff": round((c - b) / len(common), 4) if common else None,
-                    "p_value": round(mcnemar_exact(b, c), 4)}
+                    "p_value": mcnemar_exact(b, c)}
     for run, p in holm({r: v["p_value"] for r, v in per.items()}).items():
         per[run]["p_holm"] = round(p, 4)
+        per[run]["p_value"] = round(per[run]["p_value"], 4)
     return {"baseline": baseline, "test": "exact McNemar on per-question pass, Holm-adjusted", "alpha": ALPHA,
             "runs": per}
 
 
 def conclusion(rows: list[dict], comparison: dict) -> dict:
     """The highest pass rate, and which runs differ from the baseline at the Holm-adjusted level."""
-    done = [r for r in rows if r["status"] == "complete"]
+    complete = bool(rows) and all(r["status"] == "complete" for r in rows)
+    done = rows if complete else []
     top = max((r["answer"]["pass_rate"] for r in done if r["answer"]["pass_rate"] is not None), default=None)
     per = comparison["runs"]
     significant = [{"name": r["name"], "pass_diff": per[r["run_id"]]["pass_diff"], "p_holm": per[r["run_id"]]["p_holm"]}
                    for r in done if r["run_id"] in per and per[r["run_id"]]["p_holm"] < comparison["alpha"]]
-    return {"best": [r["name"] for r in done if top is not None and r["answer"]["pass_rate"] == top],
+    return {"complete": complete, "best": [r["name"] for r in done if top is not None and r["answer"]["pass_rate"] == top],
             "best_pass_rate": top, "significant": significant, "alpha": comparison["alpha"],
             "baseline": next((r["name"] for r in rows if r["run_id"] == comparison["baseline"]), None)}
 
 
 def conclusion_text(c: dict) -> str:
+    if c.get("complete") is False:
+        return "The planned comparison is incomplete; no ranking or significance conclusion is available."
     if c["best_pass_rate"] is None:
         return "No row finished; nothing to conclude."
     lead = f"Highest answer pass rate: {', '.join(c['best'])} ({c['best_pass_rate']:.1%})."
@@ -956,7 +961,10 @@ COMPARISON_COLUMNS = [
     ("vs_k1.p_value", "p (McNemar)", None), ("vs_k1.p_holm", "p (Holm)", None),
     ("dev.support", "complete support (retrieval)", "high"), ("query_p95_ms", "query p95 ms", "low"),
     ("answer.cost_usd", "answer cost USD", "low"), ("cost_usd", "corpus embed cost USD", "low"),
-    ("licence", "licence", None)]
+    ("licence", "licence", None), ("retrieval.mode", "retrieval", None),
+    ("retrieval.fusion", "fusion", None), ("retrieval.depth", "candidate depth", None),
+    ("retrieval.fused_depth", "fused depth", None), ("retrieval.units", "evidence units", None),
+    ("retrieval.evidence_max_tokens", "evidence token ceiling", None), ("retrieval.reranker", "reranker", None)]
 
 
 def write_comparison_table(settings: Settings, config: dict, scores: dict) -> dict:
@@ -977,6 +985,9 @@ def write_comparison_table(settings: Settings, config: dict, scores: dict) -> di
         if model in RESEARCH_ONLY:
             licence = f"{licence} (research-only)"
         name = model or "K1"
+        limits = f.get("limits") or {}
+        fusion = (f"{limits.get('fusion')}:{limits.get('rrf_k')}:{limits.get('dense_weight')}:{limits.get('keyword_head')}"
+                  if f["mode"] in ("hybrid", "hybrid_rerank") else None)
         rows.append({
             "name": name, "axes": {"embedding": name}, "run_id": rid, "label": f["mode"],
             "status": "complete" if v["completed"] == v["of"] else "partial",
@@ -988,12 +999,19 @@ def write_comparison_table(settings: Settings, config: dict, scores: dict) -> di
                        "claims_unjudged": v["answer_claims_unjudged"], "critical": len(v["critical_wrong"]),
                        "cost_usd": round(v["cost"]["settled_micro_usd"] / 1_000_000, 6)},
             "vs_k1": comparison["runs"].get(rid) or {"pass_diff": 0.0},
+            "retrieval": {"mode": f["mode"], "fusion": fusion, "depth": limits.get("channel_top_k"),
+                          "fused_depth": limits.get("fused_top_k"), "units": limits.get("evidence_max_units"),
+                          "evidence_max_tokens": limits.get("evidence_max_tokens"),
+                          "reranker": (f.get("reranker") or {}).get("model"),
+                          "limits": limits, "reranker_config": f.get("reranker")},
             "dev": {"support": (known.get("dev") or {}).get("support")},
             "query_p95_ms": known.get("query_p95_ms"), "cost_usd": known.get("cost_usd", 0.0 if model is None else None),
             "licence": licence, "research_only": model in RESEARCH_ONLY})
     table = {"version": ANSWER_EVAL_VERSION, "matrix": COMPARISON_TABLE, "title": "임베딩별 gpt-5-mini 답변",
              "answer_run_id": config["run_id"], "model": config["model"], "axes": {"embedding": [r["name"] for r in rows]},
-             "fixed": {"retrieval": "hybrid", "fusion": compare.SERVING_FUSION, "depth": 50, "units": 10,
+             "fixed": {**{("retrieval" if k == "mode" else k): rows[0]["retrieval"][k]
+                          for k in ("mode", "fusion", "depth", "fused_depth", "units", "evidence_max_tokens", "reranker")
+                          if all(r["retrieval"][k] == rows[0]["retrieval"][k] for r in rows)},
                        "reasoning_effort": config["reasoning_effort"],
                        "max_output_tokens": config["max_output_tokens"],
                        "answer_questions": next(iter(scores["finalists"].values()))["of"],

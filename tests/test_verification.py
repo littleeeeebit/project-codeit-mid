@@ -63,13 +63,27 @@ def fenced(out: str, info: str) -> list[dict]:
 
 
 class InterpreterTest(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "POSIX virtual environments share a symlinked executable")
+    def test_symlinked_environments_dispatch_to_the_owner_environment(self):
+        self.assert_dispatches(symlinks=True)
+
     def test_dependency_free_python_dispatches_to_the_owner_environment(self):
+        self.assert_dispatches(symlinks=False)
+
+    def assert_dispatches(self, symlinks):
         with tempfile.TemporaryDirectory(prefix="verification python ") as tmp:
             root = Path(tmp)
-            venv.EnvBuilder(with_pip=False).create(root / "empty")
-            venv.EnvBuilder(with_pip=False, system_site_packages=True).create(root / "owner")
+            for name in ("empty", "owner"):
+                venv.EnvBuilder(with_pip=False, symlinks=symlinks).create(root / name)
             executable = "Scripts/python.exe" if os.name == "nt" else "bin/python"
             empty_python, owner_python = (root / name / executable for name in ("empty", "owner"))
+            library = Path(subprocess.check_output([str(owner_python), "-c",
+                           "import sysconfig; print(sysconfig.get_path('purelib'))"], text=True).strip())
+            (library / "application.pth").write_text("\n".join(p for p in sys.path
+                                                     if p.endswith(("site-packages", "dist-packages"))) + "\n",
+                                                     encoding="utf-8")
+            if symlinks:
+                self.assertTrue(empty_python.samefile(owner_python))
             env_file = root / ".env"
             env_file.write_text(f'RFP_VERIFY_PYTHON="{owner_python}"\n', encoding="utf-8")
             env = {**os.environ, "RFP_VERIFY_ENV_FILE": str(env_file)}
