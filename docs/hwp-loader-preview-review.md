@@ -8,7 +8,11 @@ The loader returns grouped body, tables and notes rather than native interleaved
 Invalid extension/missing file/dependency import errors propagate. Loader execution errors return `hwp_loader_failed`; malformed results or conversion errors return `hwp_loader_result_invalid` with no partial output. Empty/whitespace-only output returns `hwp_empty_output`. Metadata must be a mapping with string keys; an empty mapping is retained.
 
 ## Validation
-Code head under test: `194fa37` (`git rev-parse HEAD` = `194fa377f59187963607609c8d62e0013027c8a1`). Later commits on this branch change only this document; `git diff 194fa37 HEAD -- src tests requirements.txt requirements-lock.txt pyproject.toml` is empty.
+Code head under test: merge commit `ff14f34` (this branch at `761f862` + `main` at `1e59660`). Later commits on this branch change only this document; `git diff ff14f34 HEAD -- src tests requirements.txt requirements-lock.txt pyproject.toml` is empty.
+
+- At `ff14f34`, in conda `rfp-assistant` (Python 3.12, Windows): `PYTHONPATH=src python -m unittest tests.test_hwp_loader` → `Ran 10 tests` / `OK`. Full suite without a PostgreSQL server: 530 tests (main's 520 + these 10), 332 errors all `the tests need PostgreSQL`, 3 failures (`test_characterization.ReleaseReportTest.test_a_sealed_release`, `test_release.CheckCommandTest.test_unknown_phase_is_refused`, `test_verification.EvidenceTest.test_a_flow_prints_exactly_one_local_evidence_block_last`). `main` at `1e59660` gives the same 3 failures and 332 errors in the same environment. `debt.py check --base main`: exit 0, no findings.
+
+The results below were recorded at `194fa37`, before the merge.
 
 - Adapter unit tests at `194fa37`, in the README's tested environment (conda `rfp-assistant`, Python 3.12, Windows): `PYTHONPATH=src python -m unittest tests.test_hwp_loader -v` → `Ran 10 tests` / `OK`, including 11 malformed-result subcases and missing-parser dependency propagation. Before the loader was installed there, the same command failed with 18 errors (`No module named 'langchain_hwp_hwpx'`).
 - Full suite at `194fa37` in the same environment without a PostgreSQL server: 445 tests, 303 errors all `the tests need PostgreSQL`, 2 failures (`test_release.CheckCommandTest.test_unknown_phase_is_refused`, `test_verification.EvidenceTest.test_a_flow_prints_exactly_one_local_evidence_block_last`). `main` fails the same two (plus one more) in the same environment, so neither comes from this change.
