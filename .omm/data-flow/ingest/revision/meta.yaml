@@ -1,9 +1,0 @@
-created: 2026-10-08T22:02:25.858Z
-updated: 2026-10-08T22:02:25.859Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: revision
-children: []
-parentPath:
-  - ingest

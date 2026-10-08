@@ -89,11 +89,15 @@ class Resources:
                 if self.tracing is not None:
                     self.tracing.close()
             finally:
-                try:
-                    self._release_owner()
-                finally:
-                    self._database_lifecycle.__exit__(None, None, None)
+                self._release_database()
             raise
+
+    def _release_database(self) -> None:
+        """The gateway owner, then this process's hold on the database, even when releasing the owner fails."""
+        try:
+            self._release_owner()
+        finally:
+            self._database_lifecycle.__exit__(None, None, None)
 
     def _release_owner(self) -> None:
         """Owned or borrowed, the gateway owner counts its users and releases the lock with the last one."""
@@ -338,10 +342,7 @@ class Resources:
                 if self.tracing is not None:  # after the workers: flushes every trace they finished
                     self.tracing.close()
         finally:
-            try:
-                self._release_owner()
-            finally:
-                self._database_lifecycle.__exit__(None, None, None)
+            self._release_database()
 
 
 class RequestRunner:
@@ -510,42 +511,47 @@ def _indexed(res: Resources, extraction_id: str | None) -> bool:
     return bool(idx and extraction_id and extraction_id in idx.rows_by_extraction)
 
 
-def search_projects(res: Resources, principal: Principal, filters: dict, query: str, limit: int = 20) -> list[dict]:
-    """Free route: metadata filters plus keyword snippets. Never calls a paid model."""
-    principal = _authorize(res, principal, "consultant", "verifier")
-    docs = _doc_rows(res)
+def _filtered(d: dict, filters: dict) -> list[str] | None:
+    """The range filters a document's unknown or conflicting values left undecided, or None when the filters
+    exclude it."""
     inst = nfc(filters.get("institution") or "").strip()
     amount_min, amount_max = filters.get("amount_min"), filters.get("amount_max")
     close_from, close_to = filters.get("closing_from"), filters.get("closing_to")
-    parsed_only = filters.get("parsed_only", False)
-    include_unknown = filters.get("include_unknown", False)
+    m = d["effective"]  # the competing CSV values stay visible in the result
+    conflicts = {c["field"] for c in d["quality"].get("provenance_conflicts", [])} - set(d["resolutions"])
+    if inst and inst not in (m["institution"] or ""):
+        return None
+    undecided = []  # a range filter never treats an unknown or conflicting value as satisfied
+    if amount_min is not None or amount_max is not None:
+        if m["amount_krw"] is None or "amount_krw" in conflicts:
+            undecided.append("amount_krw:" + ("conflict" if "amount_krw" in conflicts else "unknown"))
+        elif (amount_min is not None and m["amount_krw"] < amount_min) or \
+                (amount_max is not None and m["amount_krw"] > amount_max):
+            return None
+    if close_from or close_to:
+        if m["bid_close"] is None or "bid_close" in conflicts:
+            undecided.append("bid_close:" + ("conflict" if "bid_close" in conflicts else "unknown"))
+        else:
+            day = m["bid_close"]["value"][:10]
+            if (close_from and day < close_from) or (close_to and day > close_to):
+                return None
+    if undecided and not filters.get("include_unknown", False):
+        return None
+    if filters.get("parsed_only", False) and d["parse_status"] != "parsed":
+        return None
+    return undecided
+
+
+def search_projects(res: Resources, principal: Principal, filters: dict, query: str, limit: int = 20) -> list[dict]:
+    """Free route: metadata filters plus keyword snippets. Never calls a paid model."""
+    principal = _authorize(res, principal, "consultant", "verifier")
     items = []
     notes: dict[str, list[str]] = {}
-    for d in docs:
-        m = d["effective"]  # the competing CSV values stay visible in the result
-        conflicts = {c["field"] for c in d["quality"].get("provenance_conflicts", [])} - set(d["resolutions"])
-        if inst and inst not in (m["institution"] or ""):
-            continue
-        undecided = []  # a range filter never treats an unknown or conflicting value as satisfied
-        if amount_min is not None or amount_max is not None:
-            if m["amount_krw"] is None or "amount_krw" in conflicts:
-                undecided.append("amount_krw:" + ("conflict" if "amount_krw" in conflicts else "unknown"))
-            elif (amount_min is not None and m["amount_krw"] < amount_min) or \
-                    (amount_max is not None and m["amount_krw"] > amount_max):
-                continue
-        if close_from or close_to:
-            if m["bid_close"] is None or "bid_close" in conflicts:
-                undecided.append("bid_close:" + ("conflict" if "bid_close" in conflicts else "unknown"))
-            else:
-                day = m["bid_close"]["value"][:10]
-                if (close_from and day < close_from) or (close_to and day > close_to):
-                    continue
-        if undecided and not include_unknown:
-            continue
-        if parsed_only and d["parse_status"] != "parsed":
-            continue
-        notes[d["doc_id"]] = undecided
-        items.append(d)
+    for d in _doc_rows(res):
+        undecided = _filtered(d, filters)
+        if undecided is not None:
+            notes[d["doc_id"]] = undecided
+            items.append(d)
     q = nfc(query or "").strip()
     snippets: dict[str, tuple[float, str]] = {}
     idx = res.index()
@@ -1130,7 +1136,6 @@ def _trace_outcome(root: tracing.Step, result: AnswerResult, trace: dict) -> Non
 
 def _paid_answer(res: Resources, principal: Principal, request_id: str, request: AnswerRequest, question: str,
                  trace: dict, done) -> AnswerResult:
-    s = res.settings
     docs = [] if request.mode == "corpus" else _resolve_scope(res, request.scope)
     unavailable = [d for d in docs if d["parse_status"] != "parsed" or not _indexed(res, d["active_extraction_id"])]
     missing_unavailable = [{"doc_id": d["doc_id"], "field": "document", "reason": "ingestion_unavailable"}
@@ -1152,38 +1157,19 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
         done = functools.partial(done, standalone_question=question)
         principal = _checkpoint(res, request_id, principal)
     try:
-        if frozen is not None:
-            prep = _frozen_prep(res, question, request, docs, frozen)
-        elif request.mode == "compare":
-            prep = _prepare_compare(res, principal, question, docs, request.as_of, request_id,
-                                    conversation=history, carried=carried)
-        elif request.mode == "corpus":
-            prep = prepare_answer(res, principal, question, [], request.as_of, request_id=request_id,
-                                  allow_paid=True, all_documents=True, conversation=history, carried=carried)
-            docs = prep["docs"]
-        else:
-            prep = prepare_answer(res, principal, question, request.scope, request.as_of, request_id=request_id,
-                                  allow_paid=True, conversation=history, carried=carried)
+        prep, docs = _prepare_paid(res, principal, request_id, request, question, docs, frozen, history, carried)
     except _Stop:
         raise
     except Exception as exc:  # noqa: BLE001
         return done("technical_error", "검색 또는 비용 추정에 실패했습니다.", request_status="failed",
                     error=f"{type(exc).__name__}: {exc}"[:300])
-    if frozen is not None and (prep["estimate_micro_usd"] is None or frozen["estimate_micro_usd"] is None
-                               or prep["estimate_micro_usd"] > frozen["estimate_micro_usd"]):
-        # e.g. a metadata resolution recorded since lengthened the prompt: the consented maximum no longer holds
+    if _above_consented(prep, frozen):
         return done("clarification_required", "검증 실행 이후 프롬프트가 바뀌어 동의한 최대 비용을 넘을 수 있습니다. "
                     "새 검증 실행을 만든 뒤 다시 생성하세요. (유료 호출 없음)", request_status="failed")
     retrieval: RetrievalResult = prep["retrieval"]
-    trace["retrieval"] = asdict(retrieval)
-    if carried:
-        chunks = {e.chunk_id for e in carried}
-        trace["carried_evidence_ids"] = [e.evidence_id for e in retrieval.evidence if e.chunk_id in chunks]
-    trace["input_tokens_estimate"] = prep["input_tokens"]
+    _trace_retrieval(trace, prep, carried)
     coverage = prep.get("coverage") or [{"doc_id": d["doc_id"], "evidence": len(retrieval.evidence)} for d in docs]
-    server_missing = missing_unavailable + [
-        {"doc_id": c["doc_id"], "field": "answer", "reason": "not_found_in_context"}
-        for c in coverage if c.get("evidence") == 0 and c["doc_id"] not in {d["doc_id"] for d in unavailable}]
+    server_missing = missing_unavailable + _not_found(coverage, unavailable)
     evidence_map = _evidence_map(retrieval.evidence)
     common = {"coverage": coverage, "limitations": retrieval.limitations}
     if not retrieval.evidence:
@@ -1191,49 +1177,102 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
         return done("insufficient_evidence", f"{where}에서 질문과 관련된 근거를 찾지 못했습니다.",
                     missing_fields=server_missing, **common)
     principal = _checkpoint(res, request_id, principal)
-
-    def streamed(content: str) -> None:  # read by `answer_progress` until `_finish` stores the validated outcome
-        res.partials[request_id] = content
-
-    response = _metered_chat(
-        res, principal, request_id, stage="generation", step="generate-answer",
-        prompt_version=generation.PROMPT_VERSION, messages=prep["messages"],
-        response_format=prep["response_format"], input_tokens=prep["input_tokens"],
-        max_output_tokens=s.generation_max_output_tokens, record=trace,
-        fail=functools.partial(done, evidence=evidence_map, **common),
-        ceiling=frozen["estimate_micro_usd"] if frozen is not None else None, on_delta=streamed)
+    response = _generate(res, principal, request_id, prep, trace, frozen,
+                         fail=functools.partial(done, evidence=evidence_map, **common))
     if isinstance(response, AnswerResult):
         return response
-    stored = {e.evidence_id: _stored_quote(res, e) for e in retrieval.evidence}
     represented = {c["doc_id"] for c in coverage if c.get("evidence")}
     try:
-        with tracing.step("validate-answer", "guardrail", input={
-                "allowed_evidence_ids": [e.evidence_id for e in retrieval.evidence],
-                "allowed_doc_ids": sorted(d["doc_id"] for d in docs)}) as check:
-            try:
-                payload = generation.validate_answer(response, retrieval.evidence, {d["doc_id"] for d in docs},
-                                                     stored, required_doc_ids=represented
-                                                     if request.mode == "compare" else None)
-            except generation.TechnicalError as exc:
-                check.update(output={"passed": False, "error": str(exc)[:300]}, level="ERROR",
-                             status_message=str(exc)[:300])
-                if str(exc).startswith(CITATION_ERRORS):
-                    check.score_trace("citation_valid", 0.0, "BOOLEAN")
-                raise
-            check.update(lambda: {"output": {"passed": True, "status": payload.status, "cited_evidence_ids": sorted(
-                {i for c in payload.claims for i in c.evidence_ids} | set(payload.summary_evidence_ids))}})
-            check.score_trace("citation_valid", 1.0, "BOOLEAN")
+        payload = _validated(res, response, retrieval, docs, represented if request.mode == "compare" else None)
     except generation.TechnicalError as exc:
         trace["raw_output"] = (response.content or "")[:4000]
         return done("technical_error", "모델 응답을 검증하지 못했습니다. 비용은 기록되었으며 자동 재시도는 하지 않습니다.",
                     request_status="failed", evidence=evidence_map, error=str(exc)[:300], **common)
+    return done(payload.status, payload.summary, claims=[c.model_dump() for c in payload.claims],
+                missing_fields=_merged_missing(payload, server_missing),
+                conflicts=[c.model_dump() for c in payload.conflicts], next_action=payload.next_action,
+                evidence=evidence_map, summary_evidence_ids=payload.summary_evidence_ids, **common)
+
+
+def _prepare_paid(res: Resources, principal: Principal, request_id: str, request: AnswerRequest, question: str,
+                  docs: list[dict], frozen: dict | None, history: list[dict], carried: list) -> tuple[dict, list[dict]]:
+    """The prompt and its estimate for the request's mode; a corpus question returns the documents it searched."""
+    if frozen is not None:
+        return _frozen_prep(res, question, request, docs, frozen), docs
+    if request.mode == "compare":
+        return _prepare_compare(res, principal, question, docs, request.as_of, request_id,
+                                conversation=history, carried=carried), docs
+    if request.mode == "corpus":
+        prep = prepare_answer(res, principal, question, [], request.as_of, request_id=request_id,
+                              allow_paid=True, all_documents=True, conversation=history, carried=carried)
+        return prep, prep["docs"]
+    return prepare_answer(res, principal, question, request.scope, request.as_of, request_id=request_id,
+                          allow_paid=True, conversation=history, carried=carried), docs
+
+
+def _above_consented(prep: dict, frozen: dict | None) -> bool:
+    """A frozen run's prompt may now cost more than the estimate consented to, e.g. a metadata resolution recorded
+    since lengthened it: the consented maximum no longer holds."""
+    return frozen is not None and (prep["estimate_micro_usd"] is None or frozen["estimate_micro_usd"] is None
+                                   or prep["estimate_micro_usd"] > frozen["estimate_micro_usd"])
+
+
+def _not_found(coverage: list[dict], unavailable: list[dict]) -> list[dict]:
+    """Each available document the retrieval found no evidence in."""
+    return [{"doc_id": c["doc_id"], "field": "answer", "reason": "not_found_in_context"}
+            for c in coverage if c.get("evidence") == 0 and c["doc_id"] not in {d["doc_id"] for d in unavailable}]
+
+
+def _trace_retrieval(trace: dict, prep: dict, carried: list) -> None:
+    retrieval: RetrievalResult = prep["retrieval"]
+    trace["retrieval"] = asdict(retrieval)
+    if carried:
+        chunks = {e.chunk_id for e in carried}
+        trace["carried_evidence_ids"] = [e.evidence_id for e in retrieval.evidence if e.chunk_id in chunks]
+    trace["input_tokens_estimate"] = prep["input_tokens"]
+
+
+def _generate(res: Resources, principal: Principal, request_id: str, prep: dict, trace: dict, frozen: dict | None,
+              fail):
+    """The answer call, streamed into `res.partials`; a frozen run may not reserve above its consented estimate."""
+
+    def streamed(content: str) -> None:  # read by `answer_progress` until `_finish` stores the validated outcome
+        res.partials[request_id] = content
+
+    return _metered_chat(
+        res, principal, request_id, stage="generation", step="generate-answer",
+        prompt_version=generation.PROMPT_VERSION, messages=prep["messages"],
+        response_format=prep["response_format"], input_tokens=prep["input_tokens"],
+        max_output_tokens=res.settings.generation_max_output_tokens, record=trace, fail=fail,
+        ceiling=frozen["estimate_micro_usd"] if frozen is not None else None, on_delta=streamed)
+
+
+def _validated(res: Resources, response, retrieval: RetrievalResult, docs: list[dict], required_doc_ids):
+    """The answer checked against the evidence it may cite, traced as the guardrail step; raises TechnicalError."""
+    stored = {e.evidence_id: _stored_quote(res, e) for e in retrieval.evidence}
+    with tracing.step("validate-answer", "guardrail", input={
+            "allowed_evidence_ids": [e.evidence_id for e in retrieval.evidence],
+            "allowed_doc_ids": sorted(d["doc_id"] for d in docs)}) as check:
+        try:
+            payload = generation.validate_answer(response, retrieval.evidence, {d["doc_id"] for d in docs},
+                                                 stored, required_doc_ids=required_doc_ids)
+        except generation.TechnicalError as exc:
+            check.update(output={"passed": False, "error": str(exc)[:300]}, level="ERROR",
+                         status_message=str(exc)[:300])
+            if str(exc).startswith(CITATION_ERRORS):
+                check.score_trace("citation_valid", 0.0, "BOOLEAN")
+            raise
+        check.update(lambda: {"output": {"passed": True, "status": payload.status, "cited_evidence_ids": sorted(
+            {i for c in payload.claims for i in c.evidence_ids} | set(payload.summary_evidence_ids))}})
+        check.score_trace("citation_valid", 1.0, "BOOLEAN")
+    return payload
+
+
+def _merged_missing(payload, server_missing: list[dict]) -> list[dict]:
+    """The model's missing fields, then the server's for any document and field the model did not name."""
     missing = [m.model_dump() for m in payload.missing_fields]
     seen = {(m["doc_id"], m["field"]) for m in missing}
-    missing += [m for m in server_missing if (m["doc_id"], m["field"]) not in seen]
-    return done(payload.status, payload.summary, claims=[c.model_dump() for c in payload.claims],
-                missing_fields=missing, conflicts=[c.model_dump() for c in payload.conflicts],
-                next_action=payload.next_action, evidence=evidence_map,
-                summary_evidence_ids=payload.summary_evidence_ids, **common)
+    return missing + [m for m in server_missing if (m["doc_id"], m["field"]) not in seen]
 
 
 REWRITE_MAX_OUTPUT_TOKENS = 1500  # reasoning included; the output is one question
@@ -1298,6 +1337,16 @@ def _metered_chat(res: Resources, principal: Principal, request_id: str, *, stag
         # the ledger refused (unresolved unknown billing, maintenance, lost ownership): released, nothing sent
         return fail("budget_blocked", "결제 기록 점검 중이어서 유료 호출을 시작하지 않았습니다. 검색과 원문 열람은 계속 "
                     "사용할 수 있습니다.", error=reason[:300])
+    return _call_and_settle(res, model, attempt_id, step=step, prompt_version=prompt_version, messages=messages,
+                            response_format=response_format, max_output_tokens=max_output_tokens, record=record,
+                            fail=fail, on_delta=on_delta)
+
+
+def _call_and_settle(res: Resources, model: str, attempt_id: str, *, step: str, prompt_version: str,
+                     messages: list[dict], response_format: dict, max_output_tokens: int, record: dict, fail,
+                     on_delta):
+    """The dispatched call, traced: settle its usage, release it when it provably never ran, else keep it unknown."""
+    s = res.settings
     with tracing.step(step, "generation", model=model, input=messages,
                       model_parameters={"reasoning_effort": s.generation_reasoning_effort,
                                         "max_completion_tokens": max_output_tokens},
@@ -2273,15 +2322,14 @@ def evaluation_overview(res: Resources, principal: Principal) -> dict:
     """What the verifier may see of phase 4: development validation and freeze state, the sealed set's size and
     freeze state only, development answer runs and their scores, and the latest release decision."""
     principal = _authorize(res, principal, "verifier")
-    from ..evaluation import evaluation
+    from ..evaluation import evaluation, release
 
     s = res.settings
     dev = evaluation.dataset_path(s, "dev")
     validation = json.loads(dev.with_suffix(".validation.json").read_text(encoding="utf-8")) \
         if dev.with_suffix(".validation.json").exists() else None
     runs = []
-    base = s.data_dir / "runs"
-    for d in sorted(base.glob("A-*")) if base.exists() else []:
+    for d in sorted((s.data_dir / "runs").glob("A-*")):  # nothing when the directory does not exist
         try:
             config = json.loads((d / "config.json").read_text(encoding="utf-8"))
             rows_file = d / "rows.jsonl"
@@ -2305,8 +2353,9 @@ def evaluation_overview(res: Resources, principal: Principal) -> dict:
             releases.append((path.stat().st_mtime, data))
     return {"dev_validation": validation, "dev_frozen": evaluation.frozen_dataset(s, "dev"),
             "test": {"rows": sealed_rows_count(s), "frozen": bool(test), "current": bool(test and test["current"])},
-            "answer_runs": runs,
-            "release": max(releases, key=lambda x: x[0])[1] if releases else None}
+            "answer_runs": sorted(runs, key=lambda r: r["config"].get("created_at") or ""),  # IDs are hashes: by time
+            "release": max(releases, key=lambda x: x[0])[1] if releases else None, "targets": {
+                "rates": release.TARGETS, "latency_ms": release.LATENCY_TARGETS_MS}}
 
 
 def sealed_rows_count(settings: Settings) -> int:
@@ -2513,7 +2562,8 @@ def experiments(res: Resources, principal: Principal) -> dict:
                          "active": bool(r.get("run_id")) and r.get("run_id") == active.get("run_id")})
         tables.append({"matrix": t["matrix"], "title": t["title"], "created_at": t["created_at"],
                        "columns": t["columns"], "fixed": t.get("fixed") or {}, "populations": t["populations"],
-                       "needs_evidence_review": t.get("needs_evidence_review") or [], "rows": rows})
+                       "needs_evidence_review": t.get("needs_evidence_review") or [], "rows": rows,
+                       **{k: t.get(k) for k in ("answer_run_id", "model", "conclusion")}})
     golden = compare.compare_dir(res.settings) / "golden-counts.json"
     reranker = active.get("reranker") or {}
     serving_detail = {"mode": active.get("mode"), "embedding": (active.get("embedding") or {}).get("model"),

@@ -1,1 +1,0 @@
-First the selected documents are resolved. If every one of them is unparsed or missing from the index, the request ends as ingestion_unavailable with no paid call. _frozen_run_for finds the verifier run named by a generate request. A frozen run reuses its stored evidence and skips both the conversation and a new retrieval.

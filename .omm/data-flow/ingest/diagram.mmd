@@ -1,9 +1,0 @@
-graph TD
-  reuse["Input key reuse check\nsrc/rfp_assistant/corpus/ingestion.py"] -->|changed HWP input| converter["hwp5proc XML walk\nsrc/rfp_assistant/corpus/ingestion.py"]
-  reuse -->|changed PDF input| pdf["PyMuPDF parse\nsrc/rfp_assistant/corpus/ingestion.py"]
-  converter -->|failure with native print| pdf
-  converter -->|failure without print| quarantine["Quarantine source\nsrc/rfp_assistant/corpus/ingestion.py"]
-  pdf -->|open or text failure| quarantine
-  converter -->|elements| ocr["OCR region merge\nsrc/rfp_assistant/corpus/ocr.py"]
-  pdf -->|elements| ocr
-  ocr -->|merged elements| revision["assign_revision\nsrc/rfp_assistant/corpus/ingestion.py"]

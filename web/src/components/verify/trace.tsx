@@ -81,17 +81,40 @@ export function TraceForm({ onRun }: { onRun: (runId: string) => void }) {
   if (!data.documents.length) return <Empty>색인된 문서가 없습니다.</Empty>;
   return (
     <form onSubmit={submit} className="space-y-4">
-      {data.questions.length > 0 && (
-        <Field id="trace-dev" label="검토된 개발 질문에서 가져오기 (선택)">
-          <select id="trace-dev" value={fromDev ?? ""} onChange={(e) => pickDev(e.target.value === "" ? null : Number(e.target.value))} className={cn(field, "h-10")}>
-            <option value="">직접 입력</option>
-            {data.questions.map((q, i) => <option key={i} value={i}>{q.question_id ?? q.id} · {q.question.slice(0, 50)}</option>)}
-          </select>
-        </Field>
-      )}
+      {data.questions.length > 0 && <DevQuestion questions={data.questions} value={fromDev} onPick={pickDev} />}
       <Field id="trace-q" label="질문">
         <textarea id="trace-q" rows={2} value={question} onChange={(e) => setQuestion(e.target.value)} className={cn(field, "py-2 text-[15px]")} placeholder="예: 하자보수 기간은 얼마인가요?" />
       </Field>
+      <DocPicker docs={docs} matches={matches} filter={filter} onDocs={setDocs} onFilter={setFilter} />
+      <Field id="trace-mode" label="검색 방식" hint="의미 검색은 캐시된 질의 벡터만 씁니다(무료). 캐시에 없으면 키워드로 대체됩니다.">
+        <select id="trace-mode" value={mode ?? data.modes[0]} onChange={(e) => setMode(e.target.value)} aria-describedby="trace-mode-hint" className={cn(field, "h-10")}>
+          {data.modes.map((m, i) => <option key={m} value={m}>{label(MODE, m)}{i === 0 ? " (현재 운영)" : ""}</option>)}
+        </select>
+      </Field>
+      <Button type="submit" size="lg" className="h-10 w-full text-[15px]" disabled={state.busy}>검색만 실행 · 무료</Button>
+      {state.error && <Notice tone="bad">{state.error}</Notice>}
+    </form>
+  );
+}
+
+function DevQuestion({ questions, value, onPick }: {
+  questions: Schemas["TraceQuestion"][]; value: number | null; onPick: (i: number | null) => void;
+}) {
+  return (
+    <Field id="trace-dev" label="검토된 개발 질문에서 가져오기 (선택)">
+      <select id="trace-dev" value={value ?? ""} onChange={(e) => onPick(e.target.value === "" ? null : Number(e.target.value))} className={cn(field, "h-10")}>
+        <option value="">직접 입력</option>
+        {questions.map((q, i) => <option key={i} value={i}>{q.question_id ?? q.id} · {q.question.slice(0, 50)}</option>)}
+      </select>
+    </Field>
+  );
+}
+
+/** Up to two documents: a filter over the indexed ones, its matches, and the chosen ones with a remove button. */
+function DocPicker({ docs, matches, filter, onDocs: setDocs, onFilter: setFilter }: {
+  docs: Doc[]; matches: Doc[]; filter: string; onDocs: (docs: Doc[]) => void; onFilter: (filter: string) => void;
+}) {
+  return (
       <div className="space-y-2">
         <Field id="trace-doc" label={`문서 (최대 2개 · ${docs.length}개 고름)`} hint="사업명이나 기관명 일부를 입력하세요.">
           <input id="trace-doc" value={filter} onChange={(e) => setFilter(e.target.value)} disabled={docs.length >= 2}
@@ -125,14 +148,6 @@ export function TraceForm({ onRun }: { onRun: (runId: string) => void }) {
           </ul>
         )}
       </div>
-      <Field id="trace-mode" label="검색 방식" hint="의미 검색은 캐시된 질의 벡터만 씁니다(무료). 캐시에 없으면 키워드로 대체됩니다.">
-        <select id="trace-mode" value={mode ?? data.modes[0]} onChange={(e) => setMode(e.target.value)} aria-describedby="trace-mode-hint" className={cn(field, "h-10")}>
-          {data.modes.map((m, i) => <option key={m} value={m}>{label(MODE, m)}{i === 0 ? " (현재 운영)" : ""}</option>)}
-        </select>
-      </Field>
-      <Button type="submit" size="lg" className="h-10 w-full text-[15px]" disabled={state.busy}>검색만 실행 · 무료</Button>
-      {state.error && <Notice tone="bad">{state.error}</Notice>}
-    </form>
   );
 }
 
@@ -186,7 +201,6 @@ export function RunView({ runId }: { runId: string }) {
   const t: Run = run.data;
   const r = t.retrieval;
   const parsed = t.docs.filter((d) => d.parse_status === "parsed").length;
-  const checked = t.docs.filter((d) => ["sample_checked", "reviewed"].includes(d.review_status)).length;
   const docNo = (id: string | null | undefined) => `문서 ${t.scope.findIndex((s) => s.doc_id === id) + 1}`;
   return (
     <article className="space-y-6">
@@ -204,8 +218,22 @@ export function RunView({ runId }: { runId: string }) {
         <Stage n={4} title="선택된 근거" value={`${r.evidence.length}개 근거`} active={stage === 4} onOpen={() => setStage(4)} />
         <Stage n={5} title="답변 생성" value={t.generation_block ? "차단됨" : "유료 · 별도 실행"} active={stage === 5} onOpen={() => setStage(5)} />
       </ol>
+      {stage === 4 && <EvidenceStage t={t} docNo={docNo} />}
+      <div className="space-y-2">
+        {stage === 1 && <DocsStage t={t} />}
+        {stage === 2 && <AnalysisStage t={t} />}
+        {stage === 3 && <ChannelStage t={t} />}
+      </div>
+      <RunIdentity t={t} />
+      <div hidden={stage !== 5}><Generate key={t.run_id} run={t} /></div>
+    </article>
+  );
+}
 
-      {stage === 4 && <Section title={`선택된 근거 ${r.evidence.length}개`} aside={
+function EvidenceStage({ t, docNo }: { t: Run; docNo: (id: string | null | undefined) => string }) {
+  const r = t.retrieval;
+  return (
+      <Section title={`선택된 근거 ${r.evidence.length}개`} aside={
         r.limitations.length ? <StatusBadge tone="warn">제한 사항 {r.limitations.length}건</StatusBadge> : <StatusBadge tone="ok">제한 사항 없음</StatusBadge>}>
         {r.limitations.length > 0 && (
           <details className="rounded-xl border border-warn/30 bg-warn-bg">
@@ -240,10 +268,14 @@ export function RunView({ runId }: { runId: string }) {
             </li>
           ))}
         </ol>
-      </Section>}
+      </Section>
+  );
+}
 
-      <div className="space-y-2">
-        {stage === 1 && <Section title={`수집·검수 · 문서 ${t.docs.length}개`} aside={<span className="text-sm">사람 대조 완료 {checked}/{t.docs.length}</span>}>
+function DocsStage({ t }: { t: Run }) {
+  const checked = t.docs.filter((d) => ["sample_checked", "reviewed"].includes(d.review_status)).length;
+  return (
+        <Section title={`수집·검수 · 문서 ${t.docs.length}개`} aside={<span className="text-sm">사람 대조 완료 {checked}/{t.docs.length}</span>}>
           <Table caption="수집·검수 상태" head={["파일", "수집", "원문 대조", "사유"]}>
             {t.docs.map((d) => (
               <tr key={d.doc_id}>
@@ -254,15 +286,27 @@ export function RunView({ runId }: { runId: string }) {
               </tr>
             ))}
           </Table>
-        </Section>}
-        {stage === 2 && <Section title="범위·분석">
+        </Section>
+  );
+}
+
+function AnalysisStage({ t }: { t: Run }) {
+  return (
+        <Section title="범위·분석">
           <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
             <dt className="text-muted-foreground">검수 범위</dt><dd>{t.review_scope === "includes_unreviewed" ? "미검수 원문 포함" : t.review_scope === "reviewed_only" ? "검수된 원문만" : t.review_scope ?? "정보 없음"}</dd>
             <dt className="text-muted-foreground">질의 토큰</dt><dd className="flex flex-wrap gap-1">{t.query_tokens.map((q, i) => <span key={i} className="rounded bg-secondary px-1.5 text-xs">{q}</span>)}</dd>
             <dt className="text-muted-foreground">요구사항 코드</dt><dd>{t.codes.join(", ") || "없음"}</dd>
           </dl>
-        </Section>}
-        {stage === 3 && <Section title={`채널 순위 · 후보 ${r.candidates.length}개`}>
+        </Section>
+  );
+}
+
+function ChannelStage({ t }: { t: Run }) {
+  const r = t.retrieval;
+  return (
+    <>
+        <Section title={`채널 순위 · 후보 ${r.candidates.length}개`}>
           <dl className="grid grid-cols-2 gap-3 text-sm">{[["요청 방식", label(MODE, t.config.mode)], ["실제 방식", label(MODE, r.mode)], ["대체 실행", r.fallback ?? "없음"], ["검색 소요", `${r.timings_ms.total ?? "-"} ms`]].map(([k,v]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="mt-1 font-semibold">{v}</dd></div>)}</dl>
           <p className="text-[13px] text-muted-foreground">점수는 채널 내 순위용 값입니다. 답변 신뢰도가 아닙니다.</p>
           <Table caption="채널 순위" head={["채널", "순위", "점수", "조각"]}>
@@ -275,8 +319,8 @@ export function RunView({ runId }: { runId: string }) {
               </tr>
             ))}
           </Table>
-        </Section>}
-        {stage === 3 && r.excluded.length > 0 && (
+        </Section>
+        {r.excluded.length > 0 && (
           <Fold title={`제외된 후보 ${r.excluded.length}개`}>
             <Table caption="제외된 후보" head={["조각", "사유"]}>
               {r.excluded.map((x, i) => (
@@ -285,8 +329,12 @@ export function RunView({ runId }: { runId: string }) {
             </Table>
           </Fold>
         )}
-      </div>
+    </>
+  );
+}
 
+function RunIdentity({ t }: { t: Run }) {
+  return (
       <details className="rounded-xl border border-input"><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">실행 식별 정보·내보내기</summary>
       <dl className="grid gap-3 p-4 text-[13px] [overflow-wrap:anywhere]">{[["실행", t.run_id], ["설정", t.config.config_id], ["색인", t.index_version ?? "-"]].map(([k,v]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="font-mono">{v}</dd></div>)}</dl>
       <div className="flex flex-wrap gap-2 px-4 pb-4">
@@ -295,9 +343,6 @@ export function RunView({ runId }: { runId: string }) {
         </Button>
       </div>
       </details>
-
-      <div hidden={stage !== 5}><Generate key={t.run_id} run={t} /></div>
-    </article>
   );
 }
 
@@ -369,7 +414,7 @@ export function CompareRuns({ runs }: { runs: Summary[] }) {
       {d && (
         <>
           {!(d.same_question && d.same_scope) && <Notice tone="warn">질문 또는 문서 범위가 다릅니다. 설정 효과만 비교하려면 같은 질문과 범위를 쓰세요.</Notice>}
-          <Table caption="실행 비교" head={["항목", "A", "B"]}>
+          <Table caption="추적 비교" head={["항목", "A", "B"]}>
             {Object.entries(d.config_changes).sort().map(([k, [va, vb]]) => (
               <tr key={k}><td className={cn(td, "font-medium")}>설정 {k}</td><td className={td}>{JSON.stringify(va)}</td><td className={td}>{JSON.stringify(vb)}</td></tr>
             ))}

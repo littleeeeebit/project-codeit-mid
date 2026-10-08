@@ -1,0 +1,1 @@
+Sessions are in memory only, so a restart or redeploy signs every member out (and forgets their API keys). This matches the single-process design, but it means a restart always interrupts the users.

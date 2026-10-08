@@ -1,0 +1,2 @@
+# vitest writes snapshots with LF and rewrites a CRLF checkout on every run
+test/__snapshots__/*.snap text eol=lf

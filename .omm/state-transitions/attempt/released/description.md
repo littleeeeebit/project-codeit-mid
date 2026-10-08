@@ -1,1 +1,0 @@
-The reservation is returned. This happens before dispatch, or after a call the provider rejected before execution (confirmed_pre_execution), or at restart for attempts that never dispatched.

@@ -1,0 +1,1 @@
+The HNSW maintainer note keeps builds serial because the container's default shared memory cannot hold the parallel graph. Larger corpora may require increasing compose shared memory before enabling parallel construction.

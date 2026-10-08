@@ -1,9 +1,0 @@
-created: 2026-10-08T22:02:21.535Z
-updated: 2026-10-08T22:02:21.536Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: dispatching
-children: []
-parentPath:
-  - attempt

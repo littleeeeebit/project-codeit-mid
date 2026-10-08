@@ -1,1 +1,0 @@
-The requests table holds request_json (the input snapshot including capabilities), scope_json, status, cancel_requested, trace_json (config snapshot, retrieval, rewrite, billing) and result_json (the AnswerResult). _view adds the request's attempts: billing_state follows BILLING_PRECEDENCE, where unknown wins over pending, and reserved and settled totals are summed.

@@ -1,1 +1,0 @@
-parse_pdf uses PyMuPDF. It runs for PDF originals, and for an HWP whose conversion failed when a Hancom print already exists at printed_pdf_path. In that case the elements are relabelled format hwp_print, the warning recovered_from_native_print is added, and the fingerprint becomes <pdf>-hancom-print, which keeps the source unreviewed.

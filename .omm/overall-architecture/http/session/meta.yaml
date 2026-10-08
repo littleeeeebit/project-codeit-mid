@@ -1,0 +1,9 @@
+created: 2026-10-08T21:41:49.353Z
+updated: 2026-10-08T21:41:49.645Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: session
+children: []
+parentPath:
+  - http

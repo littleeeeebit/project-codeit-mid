@@ -1,0 +1,1 @@
+Vector sets must match their keyword source index, chunk ordering, extraction scope, model, dimensions and policy. Missing or mismatched dense stages cause an explicit keyword fallback; NumPy is not a serving-store fallback.

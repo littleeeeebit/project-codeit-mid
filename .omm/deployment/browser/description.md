@@ -1,0 +1,1 @@
+Production pages and API requests use one origin. SignedIn initiates hub login through /api/auth/login and web/src/lib/api.ts adds account identity to mutations. Development next.config.ts rewrites API traffic to RFP_API_URL, defaulting to port 8511; the API accepts the development page origin on port 8510 only in local-member mode.

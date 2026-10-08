@@ -19,6 +19,18 @@ export function Empty({ children }: { children: React.ReactNode }) {
   return <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">{children}</p>;
 }
 
+/** A fold for what supports the page but is not the answer: small, quiet, closed by default. */
+export function More({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <details className="group">
+      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+        <span aria-hidden className="transition-transform group-open:rotate-90">›</span>{label}
+      </summary>
+      <div className="pt-2">{children}</div>
+    </details>
+  );
+}
+
 export function PageTitle({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
     <header className="space-y-1">

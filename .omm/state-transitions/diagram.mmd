@@ -1,8 +1,9 @@
 graph TD
-  recovery["Startup recovery\nsrc/rfp_assistant/service/service.py"] -->|queued and running to interrupted| request["Request status\nsrc/rfp_assistant/service/service.py"]
-  recovery -->|dispatching to unknown| attempt["Attempt billing state\nsrc/rfp_assistant/gateway/budget.py"]
-  request -->|status guards dispatch| attempt
-  attempt -->|billing_state precedence| request
-  extraction["Source review status\nsrc/rfp_assistant/corpus/ingestion.py"] -->|review policy filters index| activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  candidate["Gold candidate status\nsrc/rfp_assistant/evaluation/gold.py"] -->|approved rows score runs| activation
-  activation -->|active_run read per request| request
+queued["Queued request\nsrc/rfp_assistant/service/service.py"] -->|Worker claims uncancelled row| running["Running request\nsrc/rfp_assistant/service/service.py"]
+queued -->|Owner cancels before claim| cancelled["Cancelled execution\nsrc/rfp_assistant/service/service.py"]
+queued -->|Shutdown or restart recovery| interrupted["Interrupted execution\nsrc/rfp_assistant/service/service.py"]
+queued -->|Executor submission fails| failed["Failed execution\nsrc/rfp_assistant/service/service.py"]
+running -->|Normal outcome persisted| completed["Completed execution\nsrc/rfp_assistant/service/service.py"]
+running -->|Execution or validation error| failed
+running -->|Stop checkpoint or finalization| cancelled
+running -->|Shutdown or restart recovery| interrupted

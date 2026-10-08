@@ -1,9 +1,0 @@
-created: 2026-10-08T22:02:12.996Z
-updated: 2026-10-08T22:02:13.246Z
-update_count: 3
-last_field: concern
-kind: nested-class
-title: ledger
-children: []
-parentPath:
-  - gateway

@@ -1,1 +1,0 @@
-requests.status values: queued, running, completed, failed, cancelled and interrupted. The terminal statuses (TERMINAL_STATUSES) allow a follow-up turn and end the stream.

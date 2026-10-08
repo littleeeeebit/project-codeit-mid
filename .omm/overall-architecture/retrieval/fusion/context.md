@@ -1,0 +1,1 @@
+Reranker model revision, precision, length limit, concurrency and protected-head depth are configuration identity. Superseded reranker evaluation policy makes active_serving() retain hybrid retrieval while dropping the stale reranker.

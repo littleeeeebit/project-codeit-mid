@@ -1,0 +1,88 @@
+===== run 1 =====
+----- report.md -----
+# Phase 3 report
+
+Generated <time> from `data` state (schema 6). Only recorded results appear below; a missing section means the check has not been run on this host.
+
+## Configuration
+
+- Serving: keyword default (kiwi_bm25), no activated run; active keyword index `<id1>`.
+- Access: no login (owner decision); the sidebar name only attributes requests and actions.
+- Team host: not recorded (`team-host.json`, runbook section 3).
+- Executor: 6 workers, 12 admitted unfinished requests.
+
+## Budget
+
+- Spent $<n> of $<n> (<n>%); pending $<n> (unknown $<n>); cap $<n>; paid enabled True; warnings none.
+- Remaining envelopes: embedding $<n> of $<n>, gold_eval $<n> of $<n>, interactive $<n> of $<n>, judge_eval $<n> of $<n>
+
+| purpose | stage | state | attempts | settled | reserved |
+| --- | --- | --- | --- | --- | --- |
+| - | - | - | 0 | - | - |
+
+Requests by status: none.
+
+## Fake-provider concurrency and recovery
+
+- Not run on this host: `python -m rfp_assistant.cli load-check --users 6 --provider fake --save`.
+- `check --phase 3 --provider fake` covers the scenario table (see its output; it is not stored here).
+
+## Browser verification
+
+- No browser results recorded on this host.
+
+## Paid smoke
+
+- Not run: a real consultant smoke through the gateway needs an explicit owner estimate and approval.
+
+## Open items
+
+- The team host and who may reach it are owner decisions (runbook); without login, network reach is the only access control.
+- Measured warm/cold latency on the team host and six real browsers remain to be recorded there.
+
+===== run 2 =====
+----- report.md -----
+# Phase 3 report
+
+Generated <time> from `data` state (schema 6). Only recorded results appear below; a missing section means the check has not been run on this host.
+
+## Configuration
+
+- Serving: keyword default (kiwi_bm25), no activated run; active keyword index `<id1>`.
+- Access: no login (owner decision); the sidebar name only attributes requests and actions.
+- Team host: codeit, recorded 2026-10-01. Reach: tunnel. Tunnel: `ssh -L`. Members: a, b.
+- Executor: 6 workers, 12 admitted unfinished requests.
+
+## Budget
+
+- Spent $<n> of $<n> (<n>%); pending $<n> (unknown $<n>); cap $<n>; paid enabled True; warnings none.
+- Remaining envelopes: embedding $<n> of $<n>, gold_eval $<n> of $<n>, interactive $<n> of $<n>, judge_eval $<n> of $<n>
+
+| purpose | stage | state | attempts | settled | reserved |
+| --- | --- | --- | --- | --- | --- |
+| - | - | - | 0 | - | - |
+
+Requests by status: none.
+
+## Fake-provider concurrency and recovery
+
+- Synthetic load check (6 users × 2, delay 0.5 s, fail every never): PASSED; checks {'cap_never_exceeded': True}.
+- Outcomes {'completed/answered': 12}; provider calls 12; budget poll p95 <n> ms over 80 reads while calls were in flight; submit p95 <n> ms.
+- `check --phase 3 --provider fake` covers the scenario table (see its output; it is not stored here).
+
+## Browser verification
+
+- six browsers
+
+| step | role | viewport | outcome |
+| --- | --- | --- | --- |
+| ask | consultant | 1280 | ok |
+- Screenshots: a.png, b.png
+
+## Paid smoke
+
+- {'request_id': 'smoke-1', 'settled_micro_usd': 1200}
+
+## Open items
+
+- Measured warm/cold latency on the team host and six real browsers remain to be recorded there.

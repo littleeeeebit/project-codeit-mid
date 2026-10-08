@@ -1,0 +1,1 @@
+A `ponytail:` comment notes that replaced clients stay open until shutdown, one per key change.

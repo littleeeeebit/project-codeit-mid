@@ -1,1 +1,1 @@
-How a historical RFP original becomes cited evidence. Each stage writes immutable files plus hash-bound rows, so a later stage can verify what it reads. Serving reads only what the activated run names.
+Document identity, original content, extraction revision, index version, embedding set and measured run are distinct identities. Candidate creation does not change serving selection. Requests use the activated artifacts and persist their own evidence map, so later corpus changes can be reported without rewriting issued citations.

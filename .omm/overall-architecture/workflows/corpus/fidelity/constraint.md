@@ -1,0 +1,1 @@
+Producing a missing native HWP rendering requires Windows, Hancom Viewer and the configured Microsoft Print to PDF printer. Existing rendered artifacts can be consumed elsewhere. Human sample_checked and reviewed states take precedence over automatic verdicts.

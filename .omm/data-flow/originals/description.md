@@ -1,0 +1,1 @@
+import_manifest() retains raw and normalized notice metadata while hashing original HWP/PDF files. Shared content maps to one source_hash and multiple doc_ids when notices differ. Original files remain managed evidence; metadata conflicts and resolutions affect filter/display facts and index metadata snapshots.

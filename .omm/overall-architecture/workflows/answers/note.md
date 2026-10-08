@@ -1,0 +1,1 @@
+Interactive requests are never automatically replayed. Evaluation explicitly resumes unfinished rows and may create a new attempt after conclusively unbilled failure or resolved lost output, while retaining prior request and billing history.

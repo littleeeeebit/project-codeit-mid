@@ -1,1 +1,0 @@
-Requirement codes in the question (matched by CODE_RE) select chunks whose requirement_key is equal, with requirement_detail chunks first. These rows stay ahead of every ranker. Packing excludes chunks that carry a different code (other_requirement_code). The limitations code_not_found, code_detail_unavailable and code_ambiguous report what happened.

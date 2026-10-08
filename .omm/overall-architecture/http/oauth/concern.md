@@ -1,0 +1,1 @@
+Sessions expire after twelve hours and disappear on process restart. The supplied deployment uses HTTP, and set_cookie() does not set Secure; HTTPS is not established by the inspected service unit.

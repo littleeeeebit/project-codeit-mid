@@ -1,1 +1,0 @@
-evaluate-retrieval writes immutable runs under .runtime/runs/<run_id>/ (config.json, traces.jsonl, scores.json). Each run is frozen by dataset hash, evaluated population, index manifest, analyzer, dense version, limits and EVAL_VERSION. The runs call the same retrieval.retrieve that serving uses.

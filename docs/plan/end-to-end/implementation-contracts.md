@@ -39,7 +39,7 @@ Resolve defaults from the installed package/repository location, never the proce
 | `allowance_usd`, `operational_cap_usd` | `20`, `16`; prior spending counts against the cap |
 | `project_start`, `project_end` | Required before paid mode; actual dates, not an automatic 28-day forecast |
 | `paid_enabled` | False until prior-use reconciliation and rate checks are recorded |
-| `generation_model`, `embedding_model` | `gpt-6-luna`, `text-embedding-3-large`; historical small identities retained; owner selected 1,536 dimensions, pending quality acceptance |
+| `generation_model`, `embedding_model` | `gpt-5-mini` (allowed answer models `gpt-5-mini`, `gpt-5-nano`; `gpt-6-luna` is refused at load and serves only drafting, judges and AI review), `dragonkue/BGE-m3-ko` at 1,024 native dimensions; owner selected hybrid row `H-5b2565f606` on 2026-10-07; later retrieval tuning belongs to the retriever owner |
 | `evidence_target_tokens`, `evidence_max_tokens` | `3000`, `5000`, counted after expansion |
 | `generation_max_output_tokens` | `800`; no UI override above the authorized configuration |
 | `question_max_characters` | `2000`; comparison initially limited to two selected documents |
@@ -154,7 +154,7 @@ Use the schema below with required fields, explicit enums and `additionalPropert
 
 Statuses: `answered|insufficient_evidence|clarification_required|conflicting_evidence`. Claim kinds: `source_fact|inference`; inference requires supporting evidence and must be labeled visibly. Missing reasons: `unknown_metadata|not_found_in_context|ingestion_unavailable|source_absence_verified|scope_ambiguous`. Only independently established absence may use `source_absence_verified`; top-k misses cannot establish it.
 
-Server checks include allowlisted evidence IDs; matching claim document/source scope; actual stored quotes/spans; nonempty references for material claims; evidence-backed conflict alternatives; all compared documents represented by claims or limitations. Reject unknown fields and invented evidence targets. Refusal, truncated output, malformed JSON and provider errors are technical outcomes, not domain abstention. Settle any reported usage before reporting an invalid answer. Structured shape cannot prove entailment; independent evaluation still owns factual support. [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) documents schema constraints and separate refusal handling.
+Server checks include allowlisted evidence IDs; matching claim document/source scope; actual stored quotes/spans; nonempty references for material claims; evidence-backed conflict alternatives; a `conflicting_evidence` answer with at least one conflict, two or more alternatives in every conflict and a nonempty `next_action` (the same rule, `generation.status_problem`, decides offline grading); all compared documents represented by claims or limitations. Reject unknown fields and invented evidence targets. Refusal, truncated output, malformed JSON and provider errors are technical outcomes, not domain abstention. Settle any reported usage before reporting an invalid answer. Structured shape cannot prove entailment; independent evaluation still owns factual support. [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) documents schema constraints and separate refusal handling.
 
 ## Budget state machine
 

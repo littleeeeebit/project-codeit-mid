@@ -1,1 +1,0 @@
-Created by _create inside submit_answer for paid modes, holding an admission slot. No paid work has happened yet. Cancelling here is final and costs nothing.

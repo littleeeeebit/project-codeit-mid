@@ -1,0 +1,1 @@
+A quality or reranker gate failure is displayed for the person's selection; it is not by itself an activation refusal. Incomplete results, obsolete policy, changed population and invalid artifacts do prevent activation. Approval for earlier payloads of the same model does not authorize new missing payloads.

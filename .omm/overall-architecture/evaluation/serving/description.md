@@ -1,1 +1,0 @@
-service.active_serving is the only reader of the activation. Every request re-reads it. Resources.index() reloads the KeywordIndex when the version changes, and retire_inactive unloads GPU models that no longer serve, so a new activation takes effect with no restart.

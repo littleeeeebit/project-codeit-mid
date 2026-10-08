@@ -1,0 +1,1 @@
+Cookies are scoped to /api/ because browsers share cookies across ports on one host. This keeps the session away from JupyterHub notebooks on /user/ and hub routes on /hub/. SameSite alone does not isolate notebook-origin mutations, so the middleware also checks Origin.

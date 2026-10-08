@@ -1,1 +1,1 @@
-serving_config(run) copies a recorded run's mode, index_version, dense_version, embedding, reranker (depth, protect) and limits into active_run. Resources.run_settings then overrides the process settings with these values for every request. See state-transitions/activation.
+activate_decision() changes active_run and active_index together and appends previous configuration, decision, actor and time to activations. service.active_serving() reads these pointers and applies runtime stale-policy fallbacks. Building or scoring a candidate does not itself invoke activation.

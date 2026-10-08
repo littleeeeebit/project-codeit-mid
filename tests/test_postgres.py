@@ -93,8 +93,9 @@ class PostgreSQLTests(unittest.TestCase):
         return dense.ensure_job_request(self.settings, "member", key, {"test": key})
 
     def reserve(self, request):
+        # gpt-6-luna's rate is the price unit here (800 cache-write tokens = 100 micro-USD, the whole cap)
         return budget.reserve(self.target, request_id=request, member_id="member", stage="generation",
-                              purpose="interactive", model=self.settings.generation_model, input_tokens=800,
+                              purpose="interactive", model="gpt-6-luna", input_tokens=800,
                               max_output_tokens=0, count_method="test")
 
     def test_closed_paid_admission_cannot_dispatch(self):
@@ -255,7 +256,7 @@ class PostgreSQLTests(unittest.TestCase):
         environment.update(RFP_DATA_DIR=str(self.root / "startup"), RFP_DATABASE_DSN=self.target.dsn())
         with mock.patch.dict("os.environ", environment, clear=True):
             settings = load_settings()
-            self.assertEqual((settings.embedding_model, settings.embedding_dimensions), ("text-embedding-3-large", 1536))
+            self.assertEqual((settings.embedding_model, settings.embedding_dimensions), ("dragonkue/BGE-m3-ko", 1024))
             for model, dims in (("text-embedding-3-small", 1536), ("nlpai-lab/KURE-v1", 1024),
                                 ("gemini-embedding-001", 3072)):
                 self.assertEqual(load_settings(embedding_model=model, embedding_dimensions=dims).embedding_model, model)

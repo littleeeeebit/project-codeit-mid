@@ -1,0 +1,171 @@
+[
+ {
+  "context": {
+   "by_category": {
+    "deadline": 0,
+    "late_table": 0,
+    "numeric_qualifier": 2,
+    "repeated_code": 0
+   },
+   "dev_documents": 3,
+   "excerpts": 2,
+   "existing_question_keys": [
+    "2325c786-bc0e-5646-b409-<digest>|하자보수기간은?"
+   ],
+   "omitted": [],
+   "queue": {
+    "dev-pilot:rejected": 1
+   },
+   "rejections": [
+    {
+     "candidate_id": "r1",
+     "categories": [
+      "too_easy"
+     ],
+     "doc_id": "2325c786-bc0e-5646-b409-<digest>",
+     "inference": null,
+     "note": "단서가 질문에 있음",
+     "type": "condition"
+    }
+   ],
+   "rules": "Read .wiki/gold-drafting.md. Quote exactly from `text`; keep reviewed_by null; never pick a family or split yourself; a reviewer whose identity differs from yours (an AI reviewer) approves against the original."
+  },
+  "excerpts": [
+   {
+    "category": "numeric_qualifier",
+    "context_clipped": false,
+    "doc_id": "2325c786-bc0e-5646-b409-<digest>",
+    "element_id": "<digest>",
+    "elements_in_extraction": 9,
+    "extraction_id": "<digest>",
+    "family": "src-<digest>",
+    "kind": "paragraph",
+    "location": {
+     "page": 3,
+     "page_label": "1",
+     "path": "p3/i1",
+     "section_path": [
+      "Ⅲ. 계약 조건"
+     ]
+    },
+    "offsets": [
+     [
+      0,
+      28
+     ]
+    ],
+    "position": 0.001,
+    "source_hash": "<digest>",
+    "text": "하자보수 기간은 검수 완료일로부터 12개월로 한다.",
+    "trigger": "12개월",
+    "trigger_offset": [
+     19,
+     23
+    ]
+   },
+   {
+    "category": "numeric_qualifier",
+    "context_clipped": false,
+    "doc_id": "2325c786-bc0e-5646-b409-<digest>",
+    "element_id": "req-x",
+    "elements_in_extraction": 9,
+    "extraction_id": "<digest>",
+    "family": "src-<digest>",
+    "kind": "table",
+    "location": {
+     "page": null,
+     "page_label": null,
+     "path": null,
+     "section_path": null
+    },
+    "offsets": [
+     [
+      0,
+      47
+     ]
+    ],
+    "position": 1.0,
+    "row_lines": [
+     0
+    ],
+    "source_hash": "<digest>",
+    "text": "SFR-001 요구사항: 시스템은 월 99.9% 가용성을 12개월 동안 보장해야 한다",
+    "trigger": "9%",
+    "trigger_offset": [
+     24,
+     26
+    ]
+   }
+  ]
+ },
+ {
+  "context": {
+   "by_category": {
+    "deadline": 0,
+    "late_table": 0,
+    "numeric_qualifier": 1,
+    "repeated_code": 0
+   },
+   "dev_documents": 3,
+   "excerpts": 1,
+   "existing_question_keys": [
+    "2325c786-bc0e-5646-b409-<digest>|하자보수기간은?"
+   ],
+   "omitted": [
+    {
+     "category": "numeric_qualifier",
+     "element_id": "<digest>",
+     "reason": "the triggering fact does not fit the excerpt bound"
+    }
+   ],
+   "queue": {
+    "dev-pilot:rejected": 1
+   },
+   "rejections": [
+    {
+     "candidate_id": "r1",
+     "categories": [
+      "too_easy"
+     ],
+     "doc_id": "2325c786-bc0e-5646-b409-<digest>",
+     "inference": null,
+     "note": "단서가 질문에 있음",
+     "type": "condition"
+    }
+   ],
+   "rules": "Read .wiki/gold-drafting.md. Quote exactly from `text`; keep reviewed_by null; never pick a family or split yourself; a reviewer whose identity differs from yours (an AI reviewer) approves against the original."
+  },
+  "excerpts": [
+   {
+    "category": "numeric_qualifier",
+    "context_clipped": true,
+    "doc_id": "2325c786-bc0e-5646-b409-<digest>",
+    "element_id": "req-x",
+    "elements_in_extraction": 9,
+    "extraction_id": "<digest>",
+    "family": "src-<digest>",
+    "kind": "table",
+    "location": {
+     "page": null,
+     "page_label": null,
+     "path": null,
+     "section_path": null
+    },
+    "offsets": [
+     [
+      24,
+      26
+     ]
+    ],
+    "position": 1.0,
+    "source_hash": "<digest>",
+    "text": "9%",
+    "trigger": "9%",
+    "trigger_offset": [
+     24,
+     26
+    ]
+   }
+  ]
+ }
+]

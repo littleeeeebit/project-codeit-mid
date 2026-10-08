@@ -1,1 +1,0 @@
-Every immediate write in the application, including ledger admission and request inserts, is serialized behind one mutex row. A ponytail comment in postgres.tx marks per-account locks as the upgrade path if measured throughput needs them.

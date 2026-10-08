@@ -3,7 +3,9 @@
 // 검증. Who comes here: a verifier deciding whether the assistant can be trusted on these documents. They clear what
 // waits for a person (flagged originals, disputed gold rows), reproduce a question's retrieval and read its
 // evidence, and read the evaluation and release verdict. The user picked the Linear-style left menu with counts
-// over summary tiles with tabs and a to-do inbox page (DESIGN.md, 검증).
+// over summary tiles with tabs and a to-do inbox page (DESIGN.md, 검증). The groups follow the verifier's questions
+// (what needs me, do we pass, why did it fail); owner operations sit in their own group, and every section opens
+// with one line on who uses it and what it decides.
 
 import { useState } from "react";
 import { cn } from "cn";
@@ -57,9 +59,24 @@ function todoCount(d: Data) {
   return flagged(d.fid.data ?? []).length + (d.ov.data?.awaiting_second_review.length ?? 0);
 }
 
-const TITLES: Record<Key, string> = {
-  todo: "할 일", experiments: "실험 비교", maintenance: "유지보수", trace: "검색 추적", compare: "실행 비교", evaluation: "평가·릴리스", judges: "판정 모델 비교", dataset: "데이터셋",
+export const TITLES: Record<Key, string> = {
+  todo: "할 일", experiments: "검색 구성 비교", maintenance: "유지보수", trace: "검색 추적", compare: "추적 비교", evaluation: "평가·릴리스", judges: "판정 모델 비교", dataset: "데이터셋",
   ingestion: "수집 상태", corrections: "수정 기록", exports: "요청 기록",
+};
+
+/** One line under each title: who uses the section and what it lets them decide. */
+export const PURPOSE: Record<Key, string> = {
+  todo: "원문 대조와 다툼 있는 골드의 2차 검토처럼, 사람이 확인해야 넘어가는 항목을 처리합니다 (검증자)",
+  evaluation: "지금 후보를 출시해도 되는지, 지표마다 기준선을 넘었는지 확인합니다 (검증자)",
+  judges: "Jev 판정 모델이 Luna 판정을 대신해도 되는지 미리 정한 규칙으로 판단합니다 (검증자)",
+  trace: "질문 하나의 검색을 단계별로 재현해 필요한 근거가 어디서 빠졌는지 찾습니다 (검증자)",
+  compare: "저장된 두 검색 추적을 나란히 놓고 결과가 어디서 갈렸는지 찾습니다 (검증자)",
+  experiments: "검색·임베딩·리랭커 변형을 비교하고 서비스할 구성을 고릅니다 (소유자)",
+  maintenance: "새 원문이 들어오면 백업부터 색인·회귀표까지 한 번에 다시 돌리고 어디서 멈췄는지 봅니다 (소유자)",
+  dataset: "개발용 골드 질문의 규모와 유형별 목표, 고정 상태가 평가에 쓸 만한지 확인합니다 (검증자)",
+  ingestion: "원문마다 수집·추출·원문 대조가 어디까지 됐는지 확인합니다 (검증자)",
+  corrections: "검색 추적에서 바로잡은 근거 위치를 누가 왜 고쳤는지 확인합니다 (검증자)",
+  exports: "질문 요청 기록을 자격 증명과 경로를 지운 JSON으로 내려받습니다 (검증자)",
 };
 
 function Body({ k, d }: { k: Key; d: Data }) {
@@ -160,19 +177,19 @@ function TracePane({ runs, onRun }: { runs: Schemas["TraceSummary"][]; onRun: ()
 function SidebarLayout({ d, section, onSection }: { d: Data; section: Key; onSection: (k: Key) => void }) {
   const ov = d.ov.data!;
   const groups: MenuGroup<Key>[] = [
-    { title: "사람이 볼 차례", items: [{ k: "todo", count: todoCount(d), urgent: todoCount(d) > 0 }, { k: "experiments" }, { k: "maintenance" }] },
-    { title: "재현", items: [{ k: "trace", count: d.runs.data?.length }, { k: "compare" }] },
-    { title: "현황", items: [
-      { k: "evaluation", count: <ReleaseBadge release={ov.evaluation.release} /> },
-      { k: "judges" },
+    { title: "내가 처리할 것", items: [{ k: "todo", count: todoCount(d), urgent: todoCount(d) > 0 }] },
+    { title: "기준 통과 여부", items: [{ k: "evaluation", count: <ReleaseBadge release={ov.evaluation.release} /> }, { k: "judges" }] },
+    { title: "실패 원인 찾기", items: [{ k: "trace", count: d.runs.data?.length }, { k: "compare" }] },
+    { title: "운영 · 소유자", items: [{ k: "experiments" }, { k: "maintenance" }] },
+    { title: "기록", items: [
       { k: "dataset", count: ov.evaluation.dev_validation?.rows ?? "-" },
       { k: "ingestion", count: d.ing.data?.length },
+      { k: "corrections" }, { k: "exports" },
     ] },
-    { title: "기록", items: [{ k: "corrections" }, { k: "exports" }] },
   ];
   return (
     <SideMenu compact title="검증" groups={groups} titles={TITLES} section={section} onSection={onSection}>
-      <PageTitle title={TITLES[section]} />
+      <PageTitle title={TITLES[section]}>{PURPOSE[section]}</PageTitle>
       <Body k={section} d={d} />
     </SideMenu>
   );

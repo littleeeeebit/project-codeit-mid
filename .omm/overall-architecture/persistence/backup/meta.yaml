@@ -1,0 +1,9 @@
+created: 2026-10-08T21:41:58.098Z
+updated: 2026-10-08T21:41:58.224Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: backup
+children: []
+parentPath:
+  - persistence

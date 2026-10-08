@@ -20,6 +20,7 @@ Extend the research record into a validated JSONL schema with these fields:
 | `question`, `mode`, `scope`, `as_of_date` | Realistic Korean wording, explicit selected doc/source versions and permissible date |
 | `family_ids`, `question_type`, `difficulty_reason` | Source-family membership and declared stratum; all comparison families belong to the same split |
 | `answerability`, `expected_status` | `answerable`, `unanswerable`, `ambiguous` or `conflicting`; technical ingestion-unavailable cases are a separate operational suite |
+| `accepted_statuses` (optional) | Further statuses the row accepts besides `expected_status`, each allowed for its answerability; without it only `expected_status` passes |
 | `required_claims` | Typed fact/value/unit/qualifier, criticality, permitted alternatives and matching rules |
 | `evidence_groups` | One group per required fact/condition, with alternative valid source spans/cells and exact quotes |
 | `negative_validation` | Scope searched, reviewer methods/locations, original completeness and rationale; required for verified absence |

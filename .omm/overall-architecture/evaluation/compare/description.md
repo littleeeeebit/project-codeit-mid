@@ -1,1 +1,0 @@
-compare.py runs the axis matrices (lexical, chunking, embedding, reranker) and writes .runtime/compare/tables/<matrix>.json. GET /api/verify/experiments reads those tables through service.experiments. A paid embedding row stops at a needs_approval estimate until `compare --approve` is run.

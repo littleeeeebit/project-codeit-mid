@@ -1,0 +1,15 @@
+created: 2026-10-08T21:41:53.384Z
+updated: 2026-10-08T21:41:53.519Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: workflows
+children:
+  - answers
+  - comparison
+  - corpus
+  - gold
+  - indexes
+  - judges
+  - release
+parentPath: []

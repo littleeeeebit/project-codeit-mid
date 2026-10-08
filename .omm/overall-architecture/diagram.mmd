@@ -1,12 +1,9 @@
 graph TD
-  web["Next.js screens\nweb/src/app"] -->|api calls with session cookie| api["FastAPI routes\nsrc/rfp_assistant/api.py"]
-  api -->|one service function per route| service["Service core\nsrc/rfp_assistant/service/service.py"]
-  cli["Owner CLI\nsrc/rfp_assistant/cli.py"] -->|budget admin and evaluation| service
-  cli -->|manifest, ingest, fidelity| corpus["Corpus pipeline\nsrc/rfp_assistant/corpus/ingestion.py"]
-  service -->|scoped retrieve| retrieval["Retrieval engine\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  service -->|reserve, dispatch, settle| gateway["Paid gateway\nsrc/rfp_assistant/gateway/budget.py"]
-  service -->|draft, review, activate| evaluation["Evaluation and activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  corpus -->|extractions and elements| store[("PostgreSQL and .runtime\nsrc/rfp_assistant/storage/store.py")]
-  retrieval -->|index files and pgvector| store
-  gateway -->|attempts ledger| store
-  evaluation -->|active_run setting| store
+web["Browser screens\nweb/src/app/layout.tsx"] -->|Authenticated HTTP actions| http["HTTP boundary\nsrc/rfp_assistant/api.py"]
+http -->|Principal and request inputs| service["Application service\nsrc/rfp_assistant/service/service.py"]
+service -->|Question and document scope| retrieval["Evidence retrieval\nsrc/rfp_assistant/retrieval/retrieval.py"]
+service -->|Records and transactions| persistence["Persistent state\nsrc/rfp_assistant/storage/store.py"]
+retrieval -->|Scoped vectors and artifacts| persistence
+workflows["Corpus and evaluation workflows\nsrc/rfp_assistant/cli.py"] -->|Pinned answer execution| service
+workflows -->|Revisions and measured selections| persistence
+service -->|Request spans and outcomes| tracing["Optional tracing\nsrc/rfp_assistant/gateway/tracing.py"]

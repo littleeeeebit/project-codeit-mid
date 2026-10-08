@@ -1,0 +1,1 @@
+SignedIn fetches GET /api/auth/me, calls bindAccount(data.name), and then provides the account through React context. Anonymous users receive the JupyterHub login entry. web/src/lib/api.ts adds X-BidMate-Account to subsequent API calls, redirects expired sessions to login, and reloads after an account-change response. Account signs out with POST /api/auth/logout.

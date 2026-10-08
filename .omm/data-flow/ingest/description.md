@@ -1,1 +1,0 @@
-ingest() processes each unique active_source_hash once. IngestionError and unexpected crashes are recorded as status 'error' for that source, and the run continues. maintenance.step_ingest turns any error into StepFailed.

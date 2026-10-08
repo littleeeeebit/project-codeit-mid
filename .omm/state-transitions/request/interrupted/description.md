@@ -1,1 +1,0 @@
-Set by RequestRunner.shutdown or recover_requests. _finish keeps this status even when a worker finishes afterwards. _stop_reason treats any row that is not running as interrupted for the next paid stage.

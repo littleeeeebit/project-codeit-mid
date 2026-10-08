@@ -1,0 +1,1 @@
+Tracing is observational. Budget reservation and settlement never read Langfuse. A Langfuse public key has only one owner in the process.

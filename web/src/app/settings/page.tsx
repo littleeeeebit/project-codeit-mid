@@ -9,10 +9,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const MODEL_NOTES: Record<string, string> = {
-  "gpt-6-luna": "기본 모델",
-  "gpt-5-mini": "팀 공용 키로 쓸 수 있음",
+  "gpt-5-mini": "기본 · 팀 공용 키로 쓸 수 있음",
   "gpt-5-nano": "팀 공용 키로 쓸 수 있음 · 가장 저렴",
 };
+
+function ModelPick({ model, models, onPick }: { model: string; models: string[]; onPick: (model: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="api-model">답변 모델</Label>
+      <select id="api-model" value={model} onChange={(event) => onPick(event.target.value)}
+              className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+        {models.map((m) => <option key={m} value={m}>{m}{MODEL_NOTES[m] ? ` — ${MODEL_NOTES[m]}` : ""}</option>)}
+      </select>
+      <p className="text-sm text-muted-foreground">키가 쓸 수 있는 모델이어야 합니다. 저장할 때 OpenAI에 무료로 확인합니다. 답변 평가는 이 선택과 관계없이 기본 모델(gpt-5-mini)로 답하고, 데이터셋 만들기와 판정 모델 비교는 gpt-6-luna를 씁니다.</p>
+    </div>
+  );
+}
 
 function ApiKeySection() {
   const status = usePoll("settings-api-key", () => must(api.GET("/api/settings/api-key"), errorText), 5000);
@@ -60,14 +72,7 @@ function ApiKeySection() {
           <Input id="api-key" type="password" autoComplete="off" spellCheck={false} value={key}
                  onChange={(event) => setKey(event.target.value)} required={!s?.configured} placeholder="sk-…" />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="api-model">답변 모델</Label>
-          <select id="api-model" value={model} onChange={(event) => setPicked(event.target.value)}
-                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-            {(s?.models ?? []).map((m) => <option key={m} value={m}>{m}{MODEL_NOTES[m] ? ` — ${MODEL_NOTES[m]}` : ""}</option>)}
-          </select>
-          <p className="text-sm text-muted-foreground">키가 쓸 수 있는 모델이어야 합니다. 저장할 때 OpenAI에 무료로 확인합니다. 데이터셋 만들기와 평가는 이 선택과 관계없이 기본 모델(gpt-6-luna)을 씁니다.</p>
-        </div>
+        <ModelPick model={model} models={s?.models ?? []} onPick={setPicked} />
         <p className="text-sm text-muted-foreground">키는 로그인한 내 계정에만 쓰입니다. 같은 계정으로 다른 브라우저에서 로그인해도 쓰이고, 다른 팀원 계정에는 보이지도 쓰이지도 않습니다. 서버 프로세스 메모리에만 있고 파일, 데이터베이스, 로그 어디에도 저장되지 않으며 화면에 다시 표시되지 않습니다. 서버가 다시 시작되면 다시 입력해야 합니다. 사용 금액은 모두 아래의 공유 한도에 함께 기록됩니다.</p>
         <Button type="submit" disabled={saving || !model || (!key.trim() && (!s?.configured || model === s?.model))}>
           {saving ? "확인 중…" : key.trim() ? "키 확인 후 적용" : "모델 변경"}

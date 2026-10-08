@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Download, X } from "lucide-react";
 import { cn } from "cn";
-import { api, type Doc, errorText, originalHref, type Owned } from "@/lib/api";
+import { api, type Doc, errorText, originalHref, type Owned, type RequestView } from "@/lib/api";
 import { FIELD, label, REQUEST, REVIEW, REVIEW_WARNING, STATUS, usd, when, wonShort } from "@/lib/format";
 import { useAnswerStream } from "@/lib/use-answer-stream";
 import { must, usePoll } from "@/lib/use-poll";
@@ -47,60 +47,22 @@ async function abandon(owned: Owned) {
   if (!response.ok) throw new Error(errorText(error));
 }
 
-export function AskPage() {
-  const [selected, setSelected] = useState<Doc[]>([]);
-  const [scope, setScope] = useState<Scope>("selected");
-  const [mode, setMode] = useState<Mode>("single");
-  const [question, setQuestion] = useState("");
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [states, setStates] = useState<Record<string, string>>({});  // request_id -> execution status, as polled
+async function postAsk(question: string, mode: Mode, docs: Doc[], previous: string): Promise<Owned> {
+  const { data: request, error } = await api.POST("/api/ask", {
+    body: {
+      scope: docs.map((d) => ({ doc_id: d.doc_id, source_hash: d.source_hash })),
+      question, mode, previous_request_id: previous,
+    },
+  });
+  if (error || !request) throw new Error(errorText(error));
+  return request;
+}
+
+/** The evidence pane: the citation it shows and, below the lg breakpoint, whether it is open as a bottom sheet. */
+function useEvidencePane() {
   const [opened, setOpened] = useState<Opened | null>(null);
   const [sheet, setSheet] = useState(false);  // below the lg breakpoint the evidence pane is a bottom sheet
   const pane = useRef<HTMLElement>(null);
-  const owner = useRef<Owned | null>(null);  // the latest turn: abandoned when the conversation is left
-  const pending = useRef<{ valid: boolean } | null>(null);
-  const mounted = useRef(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const modes = scope === "all" ? ALL : selected.length === 2 ? TWO : ONE;
-  const current = modes.find((m) => m.id === mode) ?? modes[0];
-  const last = turns.at(-1);
-  const lastStatus = last ? states[last.request_id] : undefined;
-
-  // Leaving the conversation (new documents, scope or 새 대화) also invalidates an initial POST that has not
-  // returned its ownership record yet. Finished turns stay in 내 최근 요청.
-  const release = useCallback(() => {
-    if (pending.current) pending.current.valid = false;
-    const previous = owner.current;
-    owner.current = null;
-    setTurns([]);
-    setOpened(null);
-    setSheet(false);
-    if (previous) {
-      void abandon(previous).catch((error) => {
-        if (mounted.current) setSubmitError(`이전 요청을 중단하지 못했습니다: ${error.message}`);
-        else console.error("Could not abandon the queued request", error);
-      });
-    }
-  }, []);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-      release();
-    };
-  }, [release]);
-  const toggle = (d: Doc) => {
-    release();
-    setScope("selected");
-    setSelected((s) => (s.some((x) => x.doc_id === d.doc_id) ? s.filter((x) => x.doc_id !== d.doc_id)
-      : s.length < 2 ? [...s, d] : s));
-  };
-  // Only the latest turn can be unfinished: the input waits for it, and the next turn continues from it.
-  const busy = submitting || (!!last && (!lastStatus || UNFINISHED.includes(lastStatus)));
-  const historyKey = `${last?.request_id ?? ""}:${busy}`;  // reload the history when the latest turn finishes
-  const follow = !!last;
-  const onStatus = useCallback((id: string, s: string) => setStates((m) => (m[id] === s ? m : { ...m, [id]: s })), []);
   const cite = useCallback((o: Opened, show: boolean) => {
     setOpened(o);
     if (show && !window.matchMedia("(min-width: 1024px)").matches) setSheet(true);  // wide screens show the pane
@@ -112,43 +74,67 @@ export function AskPage() {
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [sheet, opened]);
+  const close = useCallback(() => {
+    setOpened(null);
+    setSheet(false);
+  }, []);
+  return { opened, sheet, setSheet, pane, cite, close };
+}
 
-  const modeGroup = (
-    <ToggleGroup type="single" value={current.id} aria-label="질문 방식" variant="outline" spacing={0}
-                 className="grid w-full auto-cols-fr grid-flow-col sm:flex sm:w-fit"
-                 onValueChange={(v) => { if (v) setMode(v as Mode); }}>
-      {modes.map((m) => (
-        <ToggleGroupItem key={m.id} value={m.id}
-                         className={cn("h-auto flex-wrap px-2 py-1 whitespace-normal sm:flex-nowrap sm:px-3 sm:py-0 sm:whitespace-nowrap",
-                           follow ? "min-h-8 text-[13px] sm:h-8" : "min-h-9 text-sm sm:h-9")}>
-          {m.text}<span className={cn("ml-1.5 text-xs", m.paid ? "text-warn" : "text-ok")}>{m.paid ? "유료" : "무료"}</span>
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
-  );
+/** The conversation's turns and their ownership: the latest turn is abandoned when the conversation is left, and an
+ *  initial POST still in flight then is abandoned as soon as it returns. `onLeave` runs on every release. */
+function useConversation(onLeave: () => void) {
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [states, setStates] = useState<Record<string, string>>({});  // request_id -> execution status, as polled
+  const owner = useRef<Owned | null>(null);  // the latest turn: abandoned when the conversation is left
+  const pending = useRef<{ valid: boolean } | null>(null);
+  const mounted = useRef(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const last = turns.at(-1);
+  const lastStatus = last ? states[last.request_id] : undefined;
 
-  const submit = async (e: React.FormEvent) => {
+  // Leaving the conversation (new documents, scope or 새 대화) also invalidates an initial POST that has not
+  // returned its ownership record yet. Finished turns stay in 내 최근 요청.
+  const release = useCallback(() => {
+    if (pending.current) pending.current.valid = false;
+    const previous = owner.current;
+    owner.current = null;
+    setTurns([]);
+    onLeave();
+    if (previous) {
+      void abandon(previous).catch((error) => {
+        if (mounted.current) setSubmitError(`이전 요청을 중단하지 못했습니다: ${error.message}`);
+        else console.error("Could not abandon the queued request", error);
+      });
+    }
+  }, [onLeave]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      release();
+    };
+  }, [release]);
+  // Only the latest turn can be unfinished: the input waits for it, and the next turn continues from it.
+  const busy = submitting || (!!last && (!lastStatus || UNFINISHED.includes(lastStatus)));
+  const onStatus = useCallback((id: string, s: string) => setStates((m) => (m[id] === s ? m : { ...m, [id]: s })), []);
+
+  const ask = async (e: React.FormEvent, current: (typeof ALL)[number], question: string, docs: Doc[], sent: () => void) => {
     e.preventDefault();
     if (pending.current || busy) return;
     setSubmitError(null);
     const q = current.paid ? question.trim() : "";
     if (current.paid && !q) return setSubmitError("질문을 입력하세요.");
-    const docs = scope === "all" ? [] : selected;
     const attempt = { valid: true };
     pending.current = attempt;
     setSubmitting(true);
     try {
-      const { data: request, error } = await api.POST("/api/ask", {
-        body: {
-          scope: docs.map((d) => ({ doc_id: d.doc_id, source_hash: d.source_hash })),
-          question: q, mode: current.id, previous_request_id: last?.request_id ?? "",
-        },
-      });
-      if (error || !request) throw new Error(errorText(error));
+      const request = await postAsk(q, current.id, docs, last?.request_id ?? "");
       if (mounted.current && attempt.valid) {
         owner.current = request;
         setTurns((t) => [...t, { ...request, question: q, mode: current.id, docs: docs.map((d) => d.doc_id) }]);
-        setQuestion("");
+        sent();
       } else {
         await abandon(request);
       }
@@ -160,6 +146,28 @@ export function AskPage() {
       if (mounted.current) setSubmitting(false);
     }
   };
+  return { turns, last, busy, submitError, release, onStatus, ask };
+}
+
+export function AskPage() {
+  const [selected, setSelected] = useState<Doc[]>([]);
+  const [scope, setScope] = useState<Scope>("selected");
+  const [mode, setMode] = useState<Mode>("single");
+  const [question, setQuestion] = useState("");
+  const { opened, sheet, setSheet, pane, cite, close } = useEvidencePane();
+  const { turns, last, busy, submitError, release, onStatus, ask } = useConversation(close);
+  const modes = scope === "all" ? ALL : selected.length === 2 ? TWO : ONE;
+  const current = modes.find((m) => m.id === mode) ?? modes[0];
+  const toggle = (d: Doc) => {
+    release();
+    setScope("selected");
+    setSelected((s) => (s.some((x) => x.doc_id === d.doc_id) ? s.filter((x) => x.doc_id !== d.doc_id)
+      : s.length < 2 ? [...s, d] : s));
+  };
+  const historyKey = `${last?.request_id ?? ""}:${busy}`;  // reload the history when the latest turn finishes
+  const follow = !!last;
+  const modeGroup = <ModeGroup modes={modes} current={current.id} follow={follow} onMode={setMode} />;
+  const submit = (e: React.FormEvent) => ask(e, current, question, scope === "all" ? [] : selected, () => setQuestion(""));
 
   return (
     <div className="mx-auto grid w-full max-w-[1440px] flex-1 lg:grid-cols-[360px_minmax(0,1fr)]">
@@ -172,91 +180,22 @@ export function AskPage() {
           <p className="text-sm text-muted-foreground">제공된 과거 공고(2021-10 ~ 2025-02) 기준입니다. 현재 입찰 가능 여부는 이 자료로 판단할 수 없습니다.</p>
         </header>
 
-        <ToggleGroup type="single" value={scope} aria-label="질문 범위" variant="outline" spacing={0} className="w-fit"
-                     onValueChange={(v) => { if (v) { release(); setScope(v as Scope); } }}>
-          <ToggleGroupItem value="selected" className="h-9 px-3 text-sm">선택한 문서</ToggleGroupItem>
-          <ToggleGroupItem value="all" className="h-9 px-3 text-sm">전체 문서</ToggleGroupItem>
-        </ToggleGroup>
+        <ScopeToggle scope={scope} onScope={(s) => { release(); setScope(s); }} />
 
-        {scope === "selected" && selected.length === 0 ? (
-          <div className="rounded-2xl border border-dashed p-10 text-center">
-            <p className="text-lg font-semibold">질문할 문서를 고르세요</p>
-            <p className="mt-1 text-sm text-muted-foreground">하나를 고르면 질문할 수 있고, 두 개를 고르면 비교할 수 있습니다. 문서를 모르면 &lsquo;전체 문서&rsquo;로 질문하세요.</p>
-          </div>
-        ) : (
+        {scope === "selected" && selected.length === 0 ? <NoDocument /> : (
           <>
-            {scope === "all" ? (
-              <p className="rounded-2xl bg-secondary/60 p-4 text-sm text-muted-foreground">
-                색인된 모든 원문에서 근거를 찾습니다. 문서를 고르지 않아도 됩니다. 사업명이나 기관명을 질문에 넣으면 정확한 문서를 찾기 쉽습니다.
-              </p>
-            ) : (
-              <ul className="grid gap-3 md:grid-cols-2">
-                {selected.map((d, i) => <SelectedDoc key={d.doc_id} doc={d} index={selected.length > 1 ? i + 1 : 0} onRemove={() => toggle(d)} />)}
-              </ul>
-            )}
+            <ScopeSummary scope={scope} selected={selected} onRemove={toggle} />
             <div className={cn("grid gap-8", follow && "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]")}>
               <div className="min-w-0 space-y-8">
-                {follow && (
-                  <div className="flex items-center justify-between gap-3 border-b pb-3">
-                    <h2 className="text-lg font-bold">대화 <span className="ml-1 text-sm font-medium text-muted-foreground">질문 {turns.length}개</span></h2>
-                    <button type="button" onClick={release}
-                            className="h-8 rounded-lg border px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50">
-                      새 대화
-                    </button>
-                  </div>
-                )}
+                {follow && <ConversationHeader turns={turns.length} onRestart={release} />}
                 {turns.map((t, i) => (
                   <TurnView key={t.request_id} turn={t} index={i} latest={i === turns.length - 1} opened={opened}
                             onCite={cite} onStatus={onStatus} />
                 ))}
-                {/* In a conversation the composer sticks to the bottom, so it stays small: question first, then
-                    the modes and the button on one row, and the busy hint in the disabled field. */}
-                <form onSubmit={submit}
-                      className={cn("rounded-2xl border bg-background", follow
-                        ? "sticky bottom-0 z-30 space-y-2 p-3 shadow-[0_-6px_20px_rgb(0_0_0/0.06)]" : "space-y-3 p-4 shadow-[0_1px_2px_rgb(0_0_0/0.04)]")}>
-                  {!follow && modeGroup}
-                  {current.paid && (
-                    <div>
-                      <label htmlFor="question" className="sr-only">질문</label>
-                      <textarea id="question" rows={follow ? 1 : 3} maxLength={2000} value={question} disabled={busy}
-                                onChange={(e) => setQuestion(e.target.value)}
-                                placeholder={busy ? "답변이 끝나면 이어서 질문할 수 있습니다."
-                                  : follow ? "이어서 질문하세요"
-                                  : current.id === "compare" ? "예: 두 사업의 하자보수 조건을 비교해 주세요."
-                                  : current.id === "corpus" ? "예: ○○기관 ○○ 구축 사업의 하자보수 기간은 얼마인가요?" : "예: 하자보수 기간과 조건은 무엇인가요?"}
-                                className={cn("w-full rounded-xl border border-input bg-background p-3 text-[16px] leading-7 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
-                                  follow ? "max-h-40 resize-none [field-sizing:content]" : "resize-y")} />
-                    </div>
-                  )}
-                  <div className="flex flex-wrap items-center gap-3">
-                    {follow && modeGroup}
-                    <button type="submit" disabled={busy}
-                            className={cn("rounded-xl bg-primary px-5 text-[15px] font-semibold text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50",
-                              follow ? "ml-auto h-10" : "h-11")}>
-                      {/* a follow-up pays for rewriting it into a standalone question, then for the answer */}
-                      {follow && current.paid ? "이어서 질문 · 유료 2회" : `${SUBMIT[current.id]}${current.paid ? " · 유료 1회" : ""}`}
-                    </button>
-                    {submitError && <span role="alert" className="text-sm font-medium text-bad">{submitError}</span>}
-                  </div>
-                </form>
+                <Composer follow={follow} modeGroup={modeGroup} current={current} question={question} busy={busy}
+                          submitError={submitError} onQuestion={setQuestion} onSubmit={submit} />
               </div>
-              {follow && (
-                <aside ref={pane} tabIndex={-1} aria-label="대화 근거"
-                       className={cn("fixed inset-x-0 bottom-0 z-40 max-h-[80dvh] overflow-y-auto rounded-t-2xl border-t bg-background p-5 shadow-[0_-8px_30px_rgb(0_0_0/0.15)] outline-none",
-                         "lg:sticky lg:inset-auto lg:top-20 lg:z-auto lg:max-h-[calc(100dvh-6rem)] lg:self-start lg:rounded-2xl lg:border lg:shadow-none",
-                         !sheet && "hidden lg:block")}>
-                  <div className="mb-3 flex min-h-8 items-center justify-between gap-3">
-                    <p className="text-[13px] text-muted-foreground">{opened ? `질문 ${opened.turn + 1}의 근거` : "근거"}</p>
-                    <button type="button" onClick={() => setSheet(false)} aria-label="근거 닫기"
-                            className="rounded-md p-1.5 text-muted-foreground outline-none hover:bg-secondary hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 lg:hidden">
-                      <X className="size-5" aria-hidden />
-                    </button>
-                  </div>
-                  {opened ? <EvidenceDetail key={`${opened.requestId}/${opened.evidenceId}`} requestId={opened.requestId}
-                                            evidenceId={opened.evidenceId} number={opened.number} />
-                    : <p className="text-sm text-muted-foreground">답변 문장 끝의 번호를 누르면 원문 인용과 앞뒤 문단, 원문 파일이 여기에 열립니다.</p>}
-                </aside>
-              )}
+              {follow && <EvidencePane paneRef={pane} sheet={sheet} opened={opened} onClose={() => setSheet(false)} />}
             </div>
           </>
         )}
@@ -264,6 +203,128 @@ export function AskPage() {
         <History refresh={historyKey} />
       </main>
     </div>
+  );
+}
+
+function ScopeToggle({ scope, onScope }: { scope: Scope; onScope: (s: Scope) => void }) {
+  return (
+    <ToggleGroup type="single" value={scope} aria-label="질문 범위" variant="outline" spacing={0} className="w-fit"
+                 onValueChange={(v) => { if (v) onScope(v as Scope); }}>
+      <ToggleGroupItem value="selected" className="h-9 px-3 text-sm">선택한 문서</ToggleGroupItem>
+      <ToggleGroupItem value="all" className="h-9 px-3 text-sm">전체 문서</ToggleGroupItem>
+    </ToggleGroup>
+  );
+}
+
+function ModeGroup({ modes, current, follow, onMode }: {
+  modes: typeof ALL; current: Mode; follow: boolean; onMode: (m: Mode) => void;
+}) {
+  return (
+    <ToggleGroup type="single" value={current} aria-label="질문 방식" variant="outline" spacing={0}
+                 className="grid w-full auto-cols-fr grid-flow-col sm:flex sm:w-fit"
+                 onValueChange={(v) => { if (v) onMode(v as Mode); }}>
+      {modes.map((m) => (
+        <ToggleGroupItem key={m.id} value={m.id}
+                         className={cn("h-auto flex-wrap px-2 py-1 whitespace-normal sm:flex-nowrap sm:px-3 sm:py-0 sm:whitespace-nowrap",
+                           follow ? "min-h-8 text-[13px] sm:h-8" : "min-h-9 text-sm sm:h-9")}>
+          {m.text}<span className={cn("ml-1.5 text-xs", m.paid ? "text-warn" : "text-ok")}>{m.paid ? "유료" : "무료"}</span>
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  );
+}
+
+/** What the question is asked over: every indexed original, or the selected documents with a remove button each. */
+function ScopeSummary({ scope, selected, onRemove }: { scope: Scope; selected: Doc[]; onRemove: (d: Doc) => void }) {
+  return scope === "all" ? (
+    <p className="rounded-2xl bg-secondary/60 p-4 text-sm text-muted-foreground">
+      색인된 모든 원문에서 근거를 찾습니다. 문서를 고르지 않아도 됩니다. 사업명이나 기관명을 질문에 넣으면 정확한 문서를 찾기 쉽습니다.
+    </p>
+  ) : (
+    <ul className="grid gap-3 md:grid-cols-2">
+      {selected.map((d, i) => <SelectedDoc key={d.doc_id} doc={d} index={selected.length > 1 ? i + 1 : 0} onRemove={() => onRemove(d)} />)}
+    </ul>
+  );
+}
+
+function ConversationHeader({ turns, onRestart }: { turns: number; onRestart: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b pb-3">
+      <h2 className="text-lg font-bold">대화 <span className="ml-1 text-sm font-medium text-muted-foreground">질문 {turns}개</span></h2>
+      <button type="button" onClick={onRestart}
+              className="h-8 rounded-lg border px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50">
+        새 대화
+      </button>
+    </div>
+  );
+}
+
+function NoDocument() {
+  return (
+    <div className="rounded-2xl border border-dashed p-10 text-center">
+      <p className="text-lg font-semibold">질문할 문서를 고르세요</p>
+      <p className="mt-1 text-sm text-muted-foreground">하나를 고르면 질문할 수 있고, 두 개를 고르면 비교할 수 있습니다. 문서를 모르면 &lsquo;전체 문서&rsquo;로 질문하세요.</p>
+    </div>
+  );
+}
+
+// In a conversation the composer sticks to the bottom, so it stays small: question first, then the modes and the
+// button on one row, and the busy hint in the disabled field.
+function Composer({ follow, modeGroup, current, question, busy, submitError, onQuestion, onSubmit }: {
+  follow: boolean; modeGroup: React.ReactNode; current: (typeof ALL)[number]; question: string; busy: boolean;
+  submitError: string | null; onQuestion: (q: string) => void; onSubmit: (e: React.FormEvent) => void;
+}) {
+  return (
+    <form onSubmit={onSubmit}
+          className={cn("rounded-2xl border bg-background", follow
+            ? "sticky bottom-0 z-30 space-y-2 p-3 shadow-[0_-6px_20px_rgb(0_0_0/0.06)]" : "space-y-3 p-4 shadow-[0_1px_2px_rgb(0_0_0/0.04)]")}>
+      {!follow && modeGroup}
+      {current.paid && (
+        <div>
+          <label htmlFor="question" className="sr-only">질문</label>
+          <textarea id="question" rows={follow ? 1 : 3} maxLength={2000} value={question} disabled={busy}
+                    onChange={(e) => onQuestion(e.target.value)}
+                    placeholder={busy ? "답변이 끝나면 이어서 질문할 수 있습니다."
+                      : follow ? "이어서 질문하세요"
+                      : current.id === "compare" ? "예: 두 사업의 하자보수 조건을 비교해 주세요."
+                      : current.id === "corpus" ? "예: ○○기관 ○○ 구축 사업의 하자보수 기간은 얼마인가요?" : "예: 하자보수 기간과 조건은 무엇인가요?"}
+                    className={cn("w-full rounded-xl border border-input bg-background p-3 text-[16px] leading-7 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
+                      follow ? "max-h-40 resize-none [field-sizing:content]" : "resize-y")} />
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        {follow && modeGroup}
+        <button type="submit" disabled={busy}
+                className={cn("rounded-xl bg-primary px-5 text-[15px] font-semibold text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50",
+                  follow ? "ml-auto h-10" : "h-11")}>
+          {/* a follow-up pays for rewriting it into a standalone question, then for the answer */}
+          {follow && current.paid ? "이어서 질문 · 유료 2회" : `${SUBMIT[current.id]}${current.paid ? " · 유료 1회" : ""}`}
+        </button>
+        {submitError && <span role="alert" className="text-sm font-medium text-bad">{submitError}</span>}
+      </div>
+    </form>
+  );
+}
+
+function EvidencePane({ paneRef, sheet, opened, onClose }: {
+  paneRef: React.RefObject<HTMLElement | null>; sheet: boolean; opened: Opened | null; onClose: () => void;
+}) {
+  return (
+    <aside ref={paneRef} tabIndex={-1} aria-label="대화 근거"
+           className={cn("fixed inset-x-0 bottom-0 z-40 max-h-[80dvh] overflow-y-auto rounded-t-2xl border-t bg-background p-5 shadow-[0_-8px_30px_rgb(0_0_0/0.15)] outline-none",
+             "lg:sticky lg:inset-auto lg:top-20 lg:z-auto lg:max-h-[calc(100dvh-6rem)] lg:self-start lg:rounded-2xl lg:border lg:shadow-none",
+             !sheet && "hidden lg:block")}>
+      <div className="mb-3 flex min-h-8 items-center justify-between gap-3">
+        <p className="text-[13px] text-muted-foreground">{opened ? `질문 ${opened.turn + 1}의 근거` : "근거"}</p>
+        <button type="button" onClick={onClose} aria-label="근거 닫기"
+                className="rounded-md p-1.5 text-muted-foreground outline-none hover:bg-secondary hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 lg:hidden">
+          <X className="size-5" aria-hidden />
+        </button>
+      </div>
+      {opened ? <EvidenceDetail key={`${opened.requestId}/${opened.evidenceId}`} requestId={opened.requestId}
+                                evidenceId={opened.evidenceId} number={opened.number} />
+        : <p className="text-sm text-muted-foreground">답변 문장 끝의 번호를 누르면 원문 인용과 앞뒤 문단, 원문 파일이 여기에 열립니다.</p>}
+    </aside>
   );
 }
 
@@ -343,38 +404,11 @@ function TurnView({ turn, index, latest, opened, onCite, onStatus }: {
 
   return (
     <article ref={article} aria-label={`질문 ${index + 1}`} className="scroll-mt-20 space-y-4">
-      <div className="flex justify-end">
-        <div className="max-w-[85%] space-y-1 rounded-2xl rounded-br-md bg-secondary px-4 py-3">
-          <p className="text-base [overflow-wrap:anywhere]">{turn.question || FREE_QUESTION[turn.mode]}</p>
-          {answer?.standalone_question && (
-            <p className="text-[13px] text-muted-foreground [overflow-wrap:anywhere]">검색에 쓴 질문 · {answer.standalone_question}</p>
-          )}
-        </div>
-      </div>
+      <QuestionBubble text={turn.question || FREE_QUESTION[turn.mode]} standalone={answer?.standalone_question} />
       <section aria-label={latest ? "답변" : `질문 ${index + 1}의 답변`} aria-busy={live}>
         {status.error && !status.data ? <p role="alert" className="text-sm text-bad">{status.error}</p>
-          : live ? (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3" aria-live="polite">
-                <StatusBadge tone="neutral" size="md">
-                  {revoked && v?.cancel_requested ? "취소 요청됨" : streamed ? "작성 중 · 검증 전" : v ? REQUEST[v.status] : "요청 중"}
-                </StatusBadge>
-                <span className="text-sm text-muted-foreground">
-                  {revoked ? "이 요청의 결과는 답변으로 표시하지 않습니다. 진행 중인 호출이 끝나면 비용을 정산합니다."
-                    : v?.reserved_micro_usd ? `이 요청의 예약 최대 비용 ${usd(v.reserved_micro_usd, 4)}` : "근거를 찾고 있습니다."}
-                </span>
-                {v && !revoked && (
-                  <button type="button" onClick={cancel}
-                          className="ml-auto h-8 rounded-lg border px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50">
-                    요청 취소
-                  </button>
-                )}
-              </div>
-              {cancelError && <p role="alert" className="text-sm text-bad">{cancelError}</p>}
-              {revoked ? null : streamed ? <Provisional streamed={streamed} docs={turn.docs} />
-                : <div className="space-y-2"><Skeleton className="h-5 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6" /></div>}
-            </div>
-          ) : !status.data!.attachable ? (
+          : live ? <LiveTurn v={v} revoked={revoked} streamed={streamed} docs={turn.docs} cancelError={cancelError} onCancel={cancel} />
+          : !status.data!.attachable ? (
             <p className="text-sm text-muted-foreground">{label(REQUEST, v!.status)} · 이 요청의 결과는 답변으로 표시하지 않습니다. 아래 &lsquo;내 최근 요청&rsquo;에서 볼 수 있습니다.</p>
           ) : answer ? (
             <AnswerBody view={v!} answer={answer} cite={{
@@ -384,6 +418,49 @@ function TurnView({ turn, index, latest, opened, onCite, onStatus }: {
           ) : <p className="text-sm text-muted-foreground">{label(REQUEST, v!.status)}: 결과가 없습니다.</p>}
       </section>
     </article>
+  );
+}
+
+/** The question as asked and, for a follow-up, the standalone question the search used. */
+function QuestionBubble({ text, standalone }: { text?: string; standalone?: string }) {
+  return (
+    <div className="flex justify-end">
+      <div className="max-w-[85%] space-y-1 rounded-2xl rounded-br-md bg-secondary px-4 py-3">
+        <p className="text-base [overflow-wrap:anywhere]">{text}</p>
+        {standalone && (
+          <p className="text-[13px] text-muted-foreground [overflow-wrap:anywhere]">검색에 쓴 질문 · {standalone}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A turn still running: its status, reservation and cancel button, then the streamed text or a placeholder. */
+function LiveTurn({ v, revoked, streamed, docs, cancelError, onCancel }: {
+  v: RequestView | undefined; revoked: boolean; streamed: ReturnType<typeof useAnswerStream>; docs: string[];
+  cancelError: string | null; onCancel: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3" aria-live="polite">
+        <StatusBadge tone="neutral" size="md">
+          {revoked && v?.cancel_requested ? "취소 요청됨" : streamed ? "작성 중 · 검증 전" : v ? REQUEST[v.status] : "요청 중"}
+        </StatusBadge>
+        <span className="text-sm text-muted-foreground">
+          {revoked ? "이 요청의 결과는 답변으로 표시하지 않습니다. 진행 중인 호출이 끝나면 비용을 정산합니다."
+            : v?.reserved_micro_usd ? `이 요청의 예약 최대 비용 ${usd(v.reserved_micro_usd, 4)}` : "근거를 찾고 있습니다."}
+        </span>
+        {v && !revoked && (
+          <button type="button" onClick={onCancel}
+                  className="ml-auto h-8 rounded-lg border px-3 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50">
+            요청 취소
+          </button>
+        )}
+      </div>
+      {cancelError && <p role="alert" className="text-sm text-bad">{cancelError}</p>}
+      {revoked ? null : streamed ? <Provisional streamed={streamed} docs={docs} />
+        : <div className="space-y-2"><Skeleton className="h-5 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6" /></div>}
+    </div>
   );
 }
 

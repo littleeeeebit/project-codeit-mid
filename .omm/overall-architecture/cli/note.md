@@ -1,1 +1,0 @@
-The subcommand list comes from the add_parser calls. I did not trace each handler's body line by line.

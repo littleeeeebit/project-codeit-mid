@@ -14,7 +14,7 @@ import math
 import threading
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -623,12 +623,6 @@ _MXBAI_TASK = ("You are a search relevance expert who evaluates how well documen
 _MXBAI_SUFFIX = "<|im_end|>\n<|im_start|>assistant\n"
 
 
-@dataclass
-class _Loaded:
-    spec: RerankerSpec
-    info: dict = field(default_factory=dict)
-
-
 class LocalRerankerModel:
     """One compared reranker, loaded once. `rerank` keeps the interface of `dense.LocalReranker`: (order by score,
     ties by chunk ID; info with truncated pairs, queue and inference time). Scores order passages; they are never
@@ -779,16 +773,3 @@ class LocalRerankerModel:
 
     def peak_vram_mb(self) -> float:
         return round(_cuda().cuda.max_memory_allocated() / 2 ** 20, 1)
-
-
-def load_reranker_model(key: str) -> tuple[LocalRerankerModel | None, dict]:
-    """(model, info) or (None, the failure as a row reason): an unknown model, missing download, out of memory or a
-    crash in remote code all keep the bypass."""
-    try:
-        spec = reranker_spec(key)
-        model = LocalRerankerModel(spec)
-        return model, model.info
-    except Exception as exc:  # noqa: BLE001 - every load failure is a reported row, never a crash of the caller
-        free_gpu()
-        return None, {"error": f"{type(exc).__name__}: {exc}"[:500], "model": key,
-                      "revision": RERANKERS[key].revision if key in RERANKERS else None}

@@ -18,6 +18,7 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from rfp_assistant import api
+from rfp_assistant.evaluation import release
 from rfp_assistant.service import service
 from tests import fake_hub, fixtures
 
@@ -202,23 +203,53 @@ class ApiFlowTest(unittest.TestCase):
         self.assertEqual(self.client.get("/api/budget").status_code, 200)  # a read without one is fine
         self.assertEqual(self.client.post("/api/auth/logout").status_code, 204)  # signing out names no account
 
-    def test_an_api_key_belongs_to_the_account_that_entered_it_and_is_never_shown(self):
-        secret = "sk-test-never-shown-0123456789"
+    def _openai_resources_without_mini_rate(self):
+        """OpenAI resources with no key read at start, on a ledger configured before gpt-5-mini was selectable."""
         with mock.patch.object(service, "read_api_key", return_value=None), \
                 mock.patch.object(service.tracing.Tracing, "from_settings", return_value=None):
             res = service.Resources(dataclasses.replace(self.env.settings, provider="openai"))
-        with service.open_db(res.settings.db_path) as conn:  # a ledger configured before gpt-5-mini was selectable
+        with service.open_db(res.settings.db_path) as conn:
             rates = json.loads(conn.execute("SELECT rates_json FROM budget_settings").fetchone()[0])
             conn.execute("UPDATE budget_settings SET rates_json = ?", (json.dumps(
                 {k: v for k, v in rates.items() if k != "gpt-5-mini"}),))
+        return res
+
+    def _signed_in(self, app, *names):
+        """One browser per name, each with its own cookie jar, signed in through the fake hub."""
+        browsers = []
+        for name in names:
+            browser = TestClient(app)
+            browser.__enter__()
+            self.addCleanup(browser.__exit__, None, None, None)
+            fake_hub.sign_in(browser, name)
+            browsers.append(browser)
+        return browsers
+
+    def _model_switch_follows_the_account(self, res, owner, second, teammate):
+        """Only the key's account changes its model, every browser of it sees the change, and a request already
+        submitted keeps the model it started with."""
+        self.assertEqual(teammate.put("/api/settings/model", json={"model": "gpt-5-nano"}).status_code, 400)
+        with mock.patch.object(res.transport, "check_model", return_value=None):
+            changed = owner.put("/api/settings/model", json={"model": "gpt-5-nano"})
+        self.assertEqual(changed.json()["model"], "gpt-5-nano", changed.text)
+        self.assertEqual(second.get("/api/settings/api-key").json()["model"], "gpt-5-nano")
+        reset = service.bind_request(res, "김검토")  # a request the owner submits now, from either browser
+        try:
+            self.assertEqual((res.paid_refusal(), res.generation_model(), service.budget.BILLING_SCOPE.get()),
+                             ("", "gpt-5-nano", "proj_owner"))
+            with mock.patch.object(res.transport, "check_model", return_value=None):
+                owner.put("/api/settings/model", json={"model": "gpt-5-mini"})
+            self.assertEqual(res.generation_model(), "gpt-5-nano")  # a submitted request keeps its model
+        finally:
+            reset()
+
+    def test_an_api_key_belongs_to_the_account_that_entered_it_and_is_never_shown(self):
+        secret = "sk-test-never-shown-0123456789"
+        res = self._openai_resources_without_mini_rate()
         try:
             app = api.create_app(res, fake_hub.login("김검토", "teammate"))
             # three browsers, separate cookie jars: the owner's two and a teammate's
-            owner, second, teammate = TestClient(app), TestClient(app), TestClient(app)
-            for browser, name in ((owner, "김검토"), (second, "김검토"), (teammate, "teammate")):
-                browser.__enter__()
-                self.addCleanup(browser.__exit__, None, None, None)
-                fake_hub.sign_in(browser, name)
+            owner, second, teammate = self._signed_in(app, "김검토", "김검토", "teammate")
             self.assertEqual(owner.get("/api/settings/api-key").json()["configured"], False)
             with mock.patch.object(service.generation, "check_api_key", return_value=("OpenAI가 이 키를 거부했습니다.", None)):
                 refused = owner.put("/api/settings/api-key",
@@ -246,20 +277,7 @@ class ApiFlowTest(unittest.TestCase):
             seen = teammate.get("/api/settings/api-key").json()
             self.assertEqual((seen["configured"], seen["set_by"], seen["model"]),
                              (False, None, res.settings.generation_model))
-            self.assertEqual(teammate.put("/api/settings/model", json={"model": "gpt-5-nano"}).status_code, 400)
-            with mock.patch.object(res.transport, "check_model", return_value=None):
-                changed = owner.put("/api/settings/model", json={"model": "gpt-5-nano"})
-            self.assertEqual(changed.json()["model"], "gpt-5-nano", changed.text)
-            self.assertEqual(second.get("/api/settings/api-key").json()["model"], "gpt-5-nano")
-            reset = service.bind_request(res, "김검토")  # a request the owner submits now, from either browser
-            try:
-                self.assertEqual((res.paid_refusal(), res.generation_model(), service.budget.BILLING_SCOPE.get()),
-                                 ("", "gpt-5-nano", "proj_owner"))
-                with mock.patch.object(res.transport, "check_model", return_value=None):
-                    owner.put("/api/settings/model", json={"model": "gpt-5-mini"})
-                self.assertEqual(res.generation_model(), "gpt-5-nano")  # a submitted request keeps its model
-            finally:
-                reset()
+            self._model_switch_follows_the_account(res, owner, second, teammate)
             self.assertEqual(res.generation_model(), res.settings.generation_model)
             self.assertEqual(res.paid_refusal(), service.generation.NO_API_KEY)  # no key session bound
             with self.assertRaises(service.generation.ProviderError) as refused_call:
@@ -373,6 +391,17 @@ class ApiFlowTest(unittest.TestCase):
         self.assertTrue(cid)
         overview = self.client.get("/api/verify/overview").json()
         self.assertEqual(overview["evaluation"]["answer_runs"], [])
+
+    def test_the_overview_serves_the_release_pass_lines_and_an_older_manifest(self):
+        evaluation = self.client.get("/api/verify/overview").json()["evaluation"]
+        self.assertEqual(evaluation["targets"], {"rates": release.TARGETS, "latency_ms": release.LATENCY_TARGETS_MS})
+        old = self.res.settings.data_dir / "releases" / "draft-2026-10-01"  # written before structured checks
+        old.mkdir(parents=True)
+        (old / "manifest.json").write_text(json.dumps({"release_id": old.name, "status": "limited",
+                                                       "reasons": ["evidence is development pilot"]}),
+                                           encoding="utf-8")
+        got = self.client.get("/api/verify/overview").json()["evaluation"]["release"]
+        self.assertEqual((got["checks"], got["reasons"]), ([], ["evidence is development pilot"]))
 
     def test_a_run_whose_configuration_changed_cannot_generate(self):
         sources = self.client.get("/api/verify/trace-sources").json()

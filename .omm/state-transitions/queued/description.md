@@ -1,0 +1,1 @@
+submit_answer() persists queued only after obtaining capacity. run_queued() uses a conditional UPDATE to claim it once. cancel_request() can conclusively cancel it before dispatch. abandon_request() also cancels only when the request is still queued. Duplicate submissions do not consume another admission slot.

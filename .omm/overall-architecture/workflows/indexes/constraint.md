@@ -1,0 +1,1 @@
+Default eligibility is auto_verified, sample_checked or reviewed. Including unreviewed or auto_flagged sources is explicit and recorded in the index. Comparison builds and maintenance builds do not change an existing active_run selection.

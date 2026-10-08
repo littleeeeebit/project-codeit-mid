@@ -228,10 +228,7 @@ def build_chunks(elements: list[dict], extraction_id: str) -> tuple[list[dict], 
         if kind == "image_text":
             # Read from pixels by OCR: kept apart so an answer can say its evidence is machine-read.
             flush()
-            for start, end in _split_prose(el["raw_text"], HARD_TOKENS - head_tokens - 8):
-                b.add(heading, el["raw_text"][start:end],
-                      [{"element_id": el["element_id"], "start": start, "end": end}], "image_text", None, path,
-                      el["element_id"])
+            _add_windows(b, heading, el, "image_text", path, HARD_TOKENS - head_tokens - 8)
             continue
         if kind in ("paragraph", "heading") or (kind == "table" and el["table"]["rows"] * el["table"]["cols"] == 1):
             text = el["raw_text"].strip()
@@ -243,10 +240,7 @@ def build_chunks(elements: list[dict], extraction_id: str) -> tuple[list[dict], 
                 buf_path = path
             if tokens + head_tokens > HARD_TOKENS:
                 flush()
-                for start, end in _split_prose(el["raw_text"], HARD_TOKENS - head_tokens - 8):
-                    b.add(heading, el["raw_text"][start:end],
-                          [{"element_id": el["element_id"], "start": start, "end": end}], "prose", None, path,
-                          el["element_id"])
+                _add_windows(b, heading, el, "prose", path, HARD_TOKENS - head_tokens - 8)
                 continue
             buf.append(el)
             buf_tokens += tokens
@@ -255,60 +249,84 @@ def build_chunks(elements: list[dict], extraction_id: str) -> tuple[list[dict], 
             continue
         # Short lines right before a table ("□ 조직별 역할", "[별표 2]") are its title: they go with every group of
         # its rows instead of standing alone as a chunk without facts.
-        labels: list[dict] = []
-        while buf and len(labels) < LABEL_LINES and _is_label(buf[-1]):
-            labels.insert(0, buf.pop())
-            buf_tokens -= count_tokens(labels[0]["raw_text"].strip())
+        labels = _take_labels(buf)
         flush()
-        ctype, codes = classify_table(el)
         rows = table_rows(el)
         if not rows:
             buf, buf_tokens = labels, sum(count_tokens(e["raw_text"].strip()) for e in labels)
             continue
-        label_spans = [{"element_id": e["element_id"], "start": 0, "end": len(e["raw_text"])} for e in labels]
-        caption = "\n".join([e["raw_text"].strip() for e in labels] + [el["table"].get("caption") or ""]).strip()
-        if ctype == "requirement_detail":
-            inventory.append({"requirement_key": codes[0], "source_form": codes[0], "kind": "detail",
-                              "element_id": el["element_id"], "name": _requirement_name(el)})
-        elif ctype == "requirement_summary":
-            for r, line in rows:
-                for code in dict.fromkeys(CODE_RE.findall(line)):
-                    inventory.append({"requirement_key": code, "source_form": code, "kind": "summary",
-                                      "element_id": el["element_id"], "name": line[:120]})
-        # Row groups under the token ceiling; the header row repeats in every group.
-        header_r, header = rows[0] if ctype != "requirement_detail" and len(rows) > 1 else (None, "")
-        body_rows = rows[1:] if header_r is not None else rows
-        fixed = "\n".join(x for x in (caption, header) if x)
-        fixed_tokens = count_tokens(fixed) + head_tokens + 2
-        group: list[tuple[int, str]] = []
-        group_tokens = 0
-
-        def emit(group: list[tuple[int, str]], split_group: str | None = None,
-                 fragment: tuple[int, int] | None = None) -> None:
-            if not group:
-                return
-            body = "\n".join(x for x in (fixed, *[line for _, line in group]) if x)
-            row_ids = ([header_r] if header_r is not None else []) + [r for r, _ in group]
-            keys = list(dict.fromkeys(CODE_RE.findall("\n".join(line for _, line in group))))
-            key = codes[0] if ctype == "requirement_detail" else (keys[0] if len(keys) == 1 else None)
-            span = {"element_id": el["element_id"], "rows": row_ids}
-            if fragment is not None:  # a piece of one oversized row: which characters of the rendered row it carries
-                span["fragment"] = {"row": group[0][0], "start": fragment[0], "end": fragment[1]}
-            b.add(heading, body, label_spans + [span], ctype, key, path, split_group)
-
-        for r, line in body_rows:
-            t = count_tokens(line) + 1
-            if group and group_tokens + t + fixed_tokens > TARGET_TOKENS:
-                emit(group)
-                group, group_tokens = [], 0
-            if t + fixed_tokens > HARD_TOKENS:  # one oversized row: split its text
-                for start, end in _split_prose(line, HARD_TOKENS - fixed_tokens - 8):
-                    group = [(r, line[start:end])]
-                    emit(group, f"{el['element_id']}/r{r}", (start, end))
-                group, group_tokens = [], 0
-                continue
-            group.append((r, line))
-            group_tokens += t
-        emit(group)
+        _add_table(b, el, rows, labels, heading, path, head_tokens, inventory)
     flush()
     return b.linked(), inventory
+
+
+def _add_windows(b: _Builder, heading: str, el: dict, ctype: str, path: list[str], budget: int) -> None:
+    """One oversized element as overlapping token windows, linked to each other."""
+    for start, end in _split_prose(el["raw_text"], budget):
+        b.add(heading, el["raw_text"][start:end],
+              [{"element_id": el["element_id"], "start": start, "end": end}], ctype, None, path,
+              el["element_id"])
+
+
+def _take_labels(buf: list[dict]) -> list[dict]:
+    """Pops the short title lines that end the buffer: they belong to the table that follows."""
+    labels: list[dict] = []
+    while buf and len(labels) < LABEL_LINES and _is_label(buf[-1]):
+        labels.insert(0, buf.pop())
+    return labels
+
+
+def _add_table(b: _Builder, el: dict, rows: list[tuple[int, str]], labels: list[dict], heading: str,
+               path: list[str], head_tokens: int, inventory: list[dict]) -> None:
+    """A table's requirement records, and its rows in groups under the token ceiling with its title lines, caption
+    and header repeated in every group; an oversized row is split into linked pieces."""
+    ctype, codes = classify_table(el)
+    label_spans = [{"element_id": e["element_id"], "start": 0, "end": len(e["raw_text"])} for e in labels]
+    caption = "\n".join([e["raw_text"].strip() for e in labels] + [el["table"].get("caption") or ""]).strip()
+    inventory += _inventory_records(el, ctype, codes, rows)
+    # Row groups under the token ceiling; the header row repeats in every group.
+    header_r, header = rows[0] if ctype != "requirement_detail" and len(rows) > 1 else (None, "")
+    body_rows = rows[1:] if header_r is not None else rows
+    fixed = "\n".join(x for x in (caption, header) if x)
+    fixed_tokens = count_tokens(fixed) + head_tokens + 2
+    group: list[tuple[int, str]] = []
+    group_tokens = 0
+
+    def emit(group: list[tuple[int, str]], split_group: str | None = None,
+             fragment: tuple[int, int] | None = None) -> None:
+        if not group:
+            return
+        body = "\n".join(x for x in (fixed, *[line for _, line in group]) if x)
+        row_ids = ([header_r] if header_r is not None else []) + [r for r, _ in group]
+        keys = list(dict.fromkeys(CODE_RE.findall("\n".join(line for _, line in group))))
+        key = codes[0] if ctype == "requirement_detail" else (keys[0] if len(keys) == 1 else None)
+        span = {"element_id": el["element_id"], "rows": row_ids}
+        if fragment is not None:  # a piece of one oversized row: which characters of the rendered row it carries
+            span["fragment"] = {"row": group[0][0], "start": fragment[0], "end": fragment[1]}
+        b.add(heading, body, label_spans + [span], ctype, key, path, split_group)
+
+    for r, line in body_rows:
+        t = count_tokens(line) + 1
+        if group and group_tokens + t + fixed_tokens > TARGET_TOKENS:
+            emit(group)
+            group, group_tokens = [], 0
+        if t + fixed_tokens > HARD_TOKENS:  # one oversized row: split its text
+            for start, end in _split_prose(line, HARD_TOKENS - fixed_tokens - 8):
+                group = [(r, line[start:end])]
+                emit(group, f"{el['element_id']}/r{r}", (start, end))
+            group, group_tokens = [], 0
+            continue
+        group.append((r, line))
+        group_tokens += t
+    emit(group)
+
+
+def _inventory_records(el: dict, ctype: str, codes: list[str], rows: list[tuple[int, str]]) -> list[dict]:
+    """A requirement detail table's one code, or every code a summary table lists, row by row."""
+    if ctype == "requirement_detail":
+        return [{"requirement_key": codes[0], "source_form": codes[0], "kind": "detail",
+                 "element_id": el["element_id"], "name": _requirement_name(el)}]
+    if ctype != "requirement_summary":
+        return []
+    return [{"requirement_key": code, "source_form": code, "kind": "summary", "element_id": el["element_id"],
+             "name": line[:120]} for _, line in rows for code in dict.fromkeys(CODE_RE.findall(line))]

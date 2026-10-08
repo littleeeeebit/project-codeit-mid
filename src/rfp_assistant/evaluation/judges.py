@@ -44,7 +44,7 @@ from pathlib import Path
 from ..gateway import budget, generation
 from ..retrieval import dense
 from ..settings import REPO_ROOT, Settings, read_api_key
-from ..storage.store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
+from ..storage.store import dumps, open_db, read_jsonl, tx, utcnow, write_text_atomic
 from . import evaluation, judge_set
 
 REFERENCE_RUN = "A-9ef59b566d64"
@@ -127,44 +127,12 @@ def import_reference(settings: Settings, archive: Path = ARCHIVE) -> dict:
     key = json.loads(files["key"].read_text(encoding="utf-8"))
     verdicts = {r["blind_id"]: r["verdict"] for r in read_jsonl(files["verdicts"])}
     reviews = {r["item"]: r for r in read_jsonl(files["reviews"])}  # the latest review of an item wins
-    problems = []
-    if receipt.get("run_id") != REFERENCE_RUN or receipt.get("items") != REFERENCE_ITEMS:
-        problems.append("the receipt names another run or item count")
-    if not receipt.get("all_verdicts_imported_literally_once"):
-        problems.append("the receipt does not record a literal one-time import")
-    if hashes["verdicts"] != receipt.get("verdict_sha256"):
-        problems.append("the verdict file hash differs from the receipt")
-    if hashes["packet"] != receipt.get("packet_sha256"):
-        problems.append("the blind packet hash differs from the receipt")
-    ids = {s["blind_id"] for s in sheet}
-    if not (len(sheet) == len(ids) == len(key) == len(verdicts) == REFERENCE_ITEMS and ids == set(key) == set(verdicts)):
-        problems.append("the sheet, key and verdicts do not cover the same 750 blind items")
-    else:
-        changed = [b for b in ids if (reviews.get(key[b]) or {}).get("verdict") != verdicts[b]]
-        if changed:
-            problems.append(f"{len(changed)} imported verdicts differ from the reviewed verdict file")
+    problems = _receipt_problems(receipt, hashes, sheet, key, verdicts, reviews)
     if problems:
         raise JudgeError("the reference does not match its receipt; ask the owner before using another reference: "
                          + "; ".join(problems))
     rows = {(r["finalist"], r["question_id"]): r for r in read_jsonl(files["rows"])}
-    items = []
-    for s in sorted(sheet, key=lambda x: x["blind_id"]):
-        finalist, qid, kind, *rest = key[s["blind_id"]].split("|")
-        item = {"blind_id": s["blind_id"], "kind": kind, "allowed": s["allowed"], "question_id": qid,
-                "question": s["question"], "reference": verdicts[s["blind_id"]]}
-        if kind == "link":
-            item.update(claim=s["claim"], passages=[s.get("cited_quote") or ""])
-        elif kind == "answer_claim":
-            record = rows[(finalist, qid)]
-            cited = record["answer"]["claims"][int(rest[0])].get("evidence_ids") or []
-            item.update(claim=s["claim"], passages=[record["evidence"][e]["quote"] or "" for e in cited
-                                                    if e in record["evidence"]])
-        else:
-            item.update(required=_render_expected(s["expected"]),
-                        conditions=[" / ".join(q) for q in s.get("qualifiers") or []],
-                        passages=list(s.get("gold_quotes") or []), answer_summary=s.get("answer_summary") or "",
-                        answer_claims=list(s.get("answer_claims") or []), deterministic=s.get("deterministic"))
-        items.append(item)
+    items = [_reference_item(s, key, verdicts, rows) for s in sorted(sheet, key=lambda x: x["blind_id"])]
     out = root(settings) / "reference"
     body = "".join(json.dumps(i, ensure_ascii=False, sort_keys=True) + "\n" for i in items)
     manifest = {"run_id": REFERENCE_RUN, "items": len(items), "source": str(archive), "source_sha256": hashes,
@@ -182,6 +150,48 @@ def import_reference(settings: Settings, archive: Path = ARCHIVE) -> dict:
         write_text_atomic(out / name, text)
         (out / name).chmod(0o444)
     return {**manifest, "imported_at": utcnow()}
+
+
+def _receipt_problems(receipt: dict, hashes: dict, sheet: list[dict], key: dict, verdicts: dict,
+                      reviews: dict) -> list[str]:
+    """Where the archived files disagree with the review receipt, or the verdicts with the reviews."""
+    problems = []
+    if receipt.get("run_id") != REFERENCE_RUN or receipt.get("items") != REFERENCE_ITEMS:
+        problems.append("the receipt names another run or item count")
+    if not receipt.get("all_verdicts_imported_literally_once"):
+        problems.append("the receipt does not record a literal one-time import")
+    if hashes["verdicts"] != receipt.get("verdict_sha256"):
+        problems.append("the verdict file hash differs from the receipt")
+    if hashes["packet"] != receipt.get("packet_sha256"):
+        problems.append("the blind packet hash differs from the receipt")
+    ids = {s["blind_id"] for s in sheet}
+    if not (len(sheet) == len(ids) == len(key) == len(verdicts) == REFERENCE_ITEMS and ids == set(key) == set(verdicts)):
+        problems.append("the sheet, key and verdicts do not cover the same 750 blind items")
+    else:
+        changed = [b for b in ids if (reviews.get(key[b]) or {}).get("verdict") != verdicts[b]]
+        if changed:
+            problems.append(f"{len(changed)} imported verdicts differ from the reviewed verdict file")
+    return problems
+
+
+def _reference_item(s: dict, key: dict, verdicts: dict, rows: dict) -> dict:
+    """One review-sheet row as a reference item, with the passages its kind is judged on."""
+    finalist, qid, kind, *rest = key[s["blind_id"]].split("|")
+    item = {"blind_id": s["blind_id"], "kind": kind, "allowed": s["allowed"], "question_id": qid,
+            "question": s["question"], "reference": verdicts[s["blind_id"]]}
+    if kind == "link":
+        item.update(claim=s["claim"], passages=[s.get("cited_quote") or ""])
+    elif kind == "answer_claim":
+        record = rows[(finalist, qid)]
+        cited = record["answer"]["claims"][int(rest[0])].get("evidence_ids") or []
+        item.update(claim=s["claim"], passages=[record["evidence"][e]["quote"] or "" for e in cited
+                                                if e in record["evidence"]])
+    else:
+        item.update(required=_render_expected(s["expected"]),
+                    conditions=[" / ".join(q) for q in s.get("qualifiers") or []],
+                    passages=list(s.get("gold_quotes") or []), answer_summary=s.get("answer_summary") or "",
+                    answer_claims=list(s.get("answer_claims") or []), deterministic=s.get("deterministic"))
+    return item
 
 
 def load_reference(settings: Settings) -> tuple[list[dict], dict]:
@@ -989,90 +999,16 @@ def run(settings: Settings, transport, estimate_id: str, actor: str, *, closing=
     guard = lambda conn: "interrupted" if closing() else None  # noqa: E731
     stop_reason = None
     try:
-        # 1. the bridge: unique uncached segments, batched exactly as planned
-        fmt = bridge_format()
+        paid = lambda stage, messages, fmt, max_output, effort: _paid(  # noqa: E731
+            settings, transport, request_id, stage, messages, fmt, max_output, effort, est["max_micro_usd"] - spent,
+            guard)
         for batch in bridge_batches(settings, inputs["items"], inputs["orgs"]):
-            if closing():
-                raise Stop("interrupted: the service is stopping; rerun to resume")
-            messages = bridge_messages(batch)
-            tokens = generation.count_request_tokens(messages, fmt, settings.framing_margin_tokens)
-            response, cost, latency, error = _paid(settings, transport, request_id, "judge_bridge", messages, fmt,
-                                                   bridge_max_output(tokens), "none", est["max_micro_usd"] - spent,
-                                                   guard)
-            spent += cost
-            texts, reason = {}, error
-            if response is not None:
-                try:
-                    if response.refusal or response.finish_reason != "stop":
-                        raise ValueError(f"provider_{response.refusal and 'refusal' or response.finish_reason}")
-                    got = json.loads(response.content or "{}")["segments"]
-                    texts = {s["id"]: s["text"] for s in got}
-                    if sorted(texts) != sorted(f"s{i}" for i in range(len(batch))):
-                        raise ValueError("segment_ids_changed")
-                except (ValueError, KeyError, TypeError) as exc:
-                    texts, reason = {}, str(exc) if isinstance(exc, ValueError) else "invalid_response"
-            for i, masked in enumerate(batch):
-                text = texts.get(f"s{i}")
-                record = {"masked": masked, "text": text, "reason": None if text is not None else reason,
-                          "model": MODEL, "version": BRIDGE_VERSION, "glossary_sha256": glossary_sha(),
-                          "latency_ms": latency, "translated_at": utcnow()}
-                path = _cache_path(settings, masked)
-                path.parent.mkdir(parents=True, exist_ok=True)
-                write_text_atomic(path, json.dumps(record, ensure_ascii=False))
-            _append(settings, run_id, {"arm": "bridge", "blind_id": f"batch-{_sha(dumps(batch))[:12]}",
-                                       "status": "done" if texts else "failed", "segments": len(batch),
-                                       "settled_micro_usd": cost, "latency_ms": latency, "error": reason})
+            spent += _bridge_batch(settings, run_id, batch, paid, closing)
         done = load_judgements(settings, run_id)
-        # 2. the Luna judge
         for item in inputs["items"]:
-            if ("luna", item["blind_id"]) in done:
-                continue
-            if closing():
-                raise Stop("interrupted: the service is stopping; rerun to resume")
-            response, cost, latency, error = _paid(
-                settings, transport, request_id, "judge_luna", judge_messages(item), judge_format(item),
-                JUDGE_MAX_OUTPUT, settings.generation_reasoning_effort, est["max_micro_usd"] - spent, guard)
-            spent += cost
-            record = {"arm": "luna", "blind_id": item["blind_id"], "status": "failed", "settled_micro_usd": cost,
-                      "latency_ms": latency, "error": error, "usage": getattr(response, "usage", None)}
-            if response is not None:
-                try:
-                    if response.refusal or response.finish_reason != "stop":
-                        raise ValueError(f"provider_{response.refusal and 'refusal' or response.finish_reason}")
-                    got = json.loads(response.content or "{}")
-                    if got.get("verdict") not in item["allowed"]:
-                        raise ValueError("label_not_allowed")
-                    record.update(status="done", label=got["verdict"], reason=str(got.get("reason") or "")[:400])
-                except (ValueError, TypeError) as exc:
-                    record["error"] = str(exc)
-            _append(settings, run_id, record)
-        # 3. Jev, bridged then raw: free for this ledger, abstaining on any failure
-        key = read_api_key("TYPESAFE_API_KEY")
-        for arm in ("jev_bridged", "jev_raw"):
-            for item in inputs["items"]:
-                if (arm, item["blind_id"]) in done or (arm == "jev_raw" and item["blind_id"] not in inputs["raw"]):
-                    continue
-                if closing():
-                    raise Stop("interrupted: the service is stopping; rerun to resume")
-                record = {"arm": arm, "blind_id": item["blind_id"], "status": "abstained"}
-                if arm == "jev_bridged":
-                    fields, reason = english(settings, item, inputs["orgs"])
-                else:
-                    fields, reason = segments(item), None
-                if fields is None:
-                    record["abstain"] = f"untranslatable: {reason}"
-                elif not key:
-                    record["abstain"] = "missing_api_key"
-                else:
-                    began = time.monotonic()
-                    try:
-                        got = jev_call(key, settings.jev_model, jev_state(item, fields), jev_questions(item))
-                        record.update(status="done", answers=got["answers"], usage=got["usage"], model=got["model"],
-                                      cost_usd=got["cost_usd"])
-                    except JudgeError as exc:
-                        record["abstain"] = f"api_failure: {exc}"
-                    record["latency_ms"] = round((time.monotonic() - began) * 1000, 1)
-                _append(settings, run_id, record)
+            if ("luna", item["blind_id"]) not in done:
+                spent += _luna_judgement(settings, run_id, item, paid, closing)
+        _jev_judgements(settings, run_id, inputs, done, closing)
     except Stop as exc:
         stop_reason = str(exc)
     except Exception as exc:  # noqa: BLE001 - recorded; settled calls stay settled, finished rows stay
@@ -1083,6 +1019,97 @@ def run(settings: Settings, transport, estimate_id: str, actor: str, *, closing=
     if stop_reason:
         write_text_atomic(d / "last-error.txt", stop_reason)
     return finalize(settings, run_id, stop_reason)
+
+
+def _stop_if_closing(closing) -> None:
+    if closing():
+        raise Stop("interrupted: the service is stopping; rerun to resume")
+
+
+def _check_finished(response) -> None:
+    if response.refusal or response.finish_reason != "stop":
+        raise ValueError(f"provider_{response.refusal and 'refusal' or response.finish_reason}")
+
+
+def _bridge_batch(settings: Settings, run_id: str, batch: list[str], paid, closing) -> int:
+    """1. The bridge: one planned batch of unique uncached segments, translated, cached and recorded; returns its
+    settled cost."""
+    _stop_if_closing(closing)
+    fmt = bridge_format()
+    messages = bridge_messages(batch)
+    tokens = generation.count_request_tokens(messages, fmt, settings.framing_margin_tokens)
+    response, cost, latency, error = paid("judge_bridge", messages, fmt, bridge_max_output(tokens), "none")
+    texts, reason = {}, error
+    if response is not None:
+        try:
+            _check_finished(response)
+            got = json.loads(response.content or "{}")["segments"]
+            texts = {s["id"]: s["text"] for s in got}
+            if sorted(texts) != sorted(f"s{i}" for i in range(len(batch))):
+                raise ValueError("segment_ids_changed")
+        except (ValueError, KeyError, TypeError) as exc:
+            texts, reason = {}, str(exc) if isinstance(exc, ValueError) else "invalid_response"
+    for i, masked in enumerate(batch):
+        text = texts.get(f"s{i}")
+        record = {"masked": masked, "text": text, "reason": None if text is not None else reason,
+                  "model": MODEL, "version": BRIDGE_VERSION, "glossary_sha256": glossary_sha(),
+                  "latency_ms": latency, "translated_at": utcnow()}
+        path = _cache_path(settings, masked)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_text_atomic(path, json.dumps(record, ensure_ascii=False))
+    _append(settings, run_id, {"arm": "bridge", "blind_id": f"batch-{_sha(dumps(batch))[:12]}",
+                               "status": "done" if texts else "failed", "segments": len(batch),
+                               "settled_micro_usd": cost, "latency_ms": latency, "error": reason})
+    return cost
+
+
+def _luna_judgement(settings: Settings, run_id: str, item: dict, paid, closing) -> int:
+    """2. The Luna judge on one item, recorded; returns its settled cost."""
+    _stop_if_closing(closing)
+    response, cost, latency, error = paid("judge_luna", judge_messages(item), judge_format(item), JUDGE_MAX_OUTPUT,
+                                          settings.generation_reasoning_effort)
+    record = {"arm": "luna", "blind_id": item["blind_id"], "status": "failed", "settled_micro_usd": cost,
+              "latency_ms": latency, "error": error, "usage": getattr(response, "usage", None)}
+    if response is not None:
+        try:
+            _check_finished(response)
+            got = json.loads(response.content or "{}")
+            if got.get("verdict") not in item["allowed"]:
+                raise ValueError("label_not_allowed")
+            record.update(status="done", label=got["verdict"], reason=str(got.get("reason") or "")[:400])
+        except (ValueError, TypeError) as exc:
+            record["error"] = str(exc)
+    _append(settings, run_id, record)
+    return cost
+
+
+def _jev_judgements(settings: Settings, run_id: str, inputs: dict, done: dict, closing) -> None:
+    """3. Jev, bridged then raw: free for this ledger, abstaining on any failure."""
+    key = read_api_key("TYPESAFE_API_KEY")
+    for arm in ("jev_bridged", "jev_raw"):
+        for item in inputs["items"]:
+            if (arm, item["blind_id"]) in done or (arm == "jev_raw" and item["blind_id"] not in inputs["raw"]):
+                continue
+            _stop_if_closing(closing)
+            record = {"arm": arm, "blind_id": item["blind_id"], "status": "abstained"}
+            if arm == "jev_bridged":
+                fields, reason = english(settings, item, inputs["orgs"])
+            else:
+                fields, reason = segments(item), None
+            if fields is None:
+                record["abstain"] = f"untranslatable: {reason}"
+            elif not key:
+                record["abstain"] = "missing_api_key"
+            else:
+                began = time.monotonic()
+                try:
+                    got = jev_call(key, settings.jev_model, jev_state(item, fields), jev_questions(item))
+                    record.update(status="done", answers=got["answers"], usage=got["usage"], model=got["model"],
+                                  cost_usd=got["cost_usd"])
+                except JudgeError as exc:
+                    record["abstain"] = f"api_failure: {exc}"
+                record["latency_ms"] = round((time.monotonic() - began) * 1000, 1)
+            _append(settings, run_id, record)
 
 
 # ---------------------------------------------------------------- scoring
@@ -1188,31 +1215,11 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
         cost = _ledger_cost(settings, run_id)
         arms, mutations = {}, {}
         for arm in arms_run:
-            rows = [{"kind": by_id[b]["kind"], "reference": by_id[b]["reference"], **{k: v for k, v in x.items()
-                                                                                    if k != "record"}}
-                    for b, x in per[arm].items()]
             if config["part"] == "judge_set":  # the judge's own label: a code check would hide what the judge does
                 mutations[arm] = judge_set.mutation_rates(
                     [{"type": (by_id[b].get("mutation") or {}).get("type"), "judged": x["judged"],
                       "code": x["source"] == "code"} for b, x in per[arm].items()])
-            records = [x["record"] for x in per[arm].values()]
-            m = arm_metrics(rows)
-            if arm == "luna":
-                m["usd"] = {"settled_micro_usd": cost["judge_luna"]["settled_micro_usd"], "priced": True,
-                            "calls": cost["judge_luna"]["attempts"], "source": "shared ledger, judge_eval"}
-            else:
-                reported = [r.get("cost_usd") for r in records if r.get("status") == "done"]
-                calls = sum(r.get("status") == "done" or str(r.get("abstain", "")).startswith("api_failure")
-                            for r in records)
-                priced = bool(reported) and all(c is not None for c in reported)
-                m["usd"] = {"settled_micro_usd": round(sum(reported) * 1_000_000) if priced else None,
-                            "priced": priced, "calls": calls,
-                            "source": "provider-reported" if priced else "unpriced: TypeSafe reports no price"}
-                if arm == "jev_bridged":
-                    m["bridge_usd"] = {"settled_micro_usd": cost["judge_bridge"]["settled_micro_usd"],
-                                       "calls": cost["judge_bridge"]["attempts"], "source": "shared ledger, judge_eval"}
-            m["latency_ms"] = _latency(records)
-            arms[arm] = m
+            arms[arm] = _scored_arm(arm, per[arm], by_id, cost)
         result.update(arms=arms, thresholds_sha256=inputs["config"]["thresholds_sha256"],
                       config_hashes=inputs["config"]["hashes"],
                       verdict=replacement_verdict(arms["luna"], arms["jev_bridged"])
@@ -1224,6 +1231,32 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
                           carried=dict(carried))
     write_text_atomic(d / "results.json", json.dumps(result, ensure_ascii=False, indent=1))
     return result
+
+
+def _scored_arm(arm: str, labelled: dict[str, dict], by_id: dict[str, dict], cost: dict) -> dict:
+    """One arm's metrics with what it cost (the shared ledger for Luna and the bridge, Jev's own report) and its
+    latency."""
+    rows = [{"kind": by_id[b]["kind"], "reference": by_id[b]["reference"], **{k: v for k, v in x.items()
+                                                                            if k != "record"}}
+            for b, x in labelled.items()]
+    records = [x["record"] for x in labelled.values()]
+    m = arm_metrics(rows)
+    if arm == "luna":
+        m["usd"] = {"settled_micro_usd": cost["judge_luna"]["settled_micro_usd"], "priced": True,
+                    "calls": cost["judge_luna"]["attempts"], "source": "shared ledger, judge_eval"}
+    else:
+        reported = [r.get("cost_usd") for r in records if r.get("status") == "done"]
+        calls = sum(r.get("status") == "done" or str(r.get("abstain", "")).startswith("api_failure")
+                    for r in records)
+        priced = bool(reported) and all(c is not None for c in reported)
+        m["usd"] = {"settled_micro_usd": round(sum(reported) * 1_000_000) if priced else None,
+                    "priced": priced, "calls": calls,
+                    "source": "provider-reported" if priced else "unpriced: TypeSafe reports no price"}
+        if arm == "jev_bridged":
+            m["bridge_usd"] = {"settled_micro_usd": cost["judge_bridge"]["settled_micro_usd"],
+                               "calls": cost["judge_bridge"]["attempts"], "source": "shared ledger, judge_eval"}
+    m["latency_ms"] = _latency(records)
+    return m
 
 
 # ---------------------------------------------------------------- views

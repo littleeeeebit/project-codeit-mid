@@ -1,54 +1,79 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-08 22:02:09.454000+00:00
-update_count: 34
+updated: 2026-10-08T21:41:46.942Z
+update_count: 38
 last_field: diagram
-git_commit: 380ac04
-git_branch: fix/hwp-hwpx-loader
+git_commit: 86d9b1f
+git_branch: gpt5-mini-answer-embedding-comparison
 children:
-- api
-- api-layer
-- api-routes
-- api-shell
-- budget-ledger
-- cli
-- corpus
-- corpus-pipeline
-- data-stores
-- evaluation
-- evaluation-suite
-- gateway
-- http-api
-- langfuse-tracing
-- offline-pipelines
-- openai-transport
-- owner-cli
-- paid-gateway
-- persistence
-- postgres-store
-- postgresql-store
-- provider-transport
-- retrieval
-- retrieval-engine
-- runtime-artifacts
-- service
-- service-core
-- service-layer
-- storage
-- store
-- web
-- web-pages
-- web-screens
-prev_diagram: "graph TD\r\n  web-screens[\"Web screens\\nweb/src/lib/api.ts\"]\r\n\
-  \  api-layer[\"HTTP API and session gate\\nsrc/rfp_assistant/api.py\"]\r\n  jupyterhub[\"\
-  JupyterHub OAuth, external\\nsrc/rfp_assistant/service/auth.py\"]\r\n  service-core[\"\
-  Service core and executor\\nsrc/rfp_assistant/service/service.py\"]\r\n  retrieval-engine[\"\
-  Retrieval engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  paid-gateway[\"\
-  Paid gateway and ledger\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n  storage[\"\
-  PostgreSQL and runtime files\\nsrc/rfp_assistant/storage/store.py\"]\r\n  owner-cli[\"\
-  Owner CLI\\nsrc/rfp_assistant/cli.py\"]\r\n  web-screens -->|fetch, SSE, session\
-  \ cookie| api-layer\r\n  api-layer -->|code exchange, whoami| jupyterhub\r\n  api-layer\
-  \ -->|one service call per route| service-core\r\n  service-core -->|scoped retrieval|\
-  \ retrieval-engine\r\n  service-core -->|reserve, dispatch, settle| paid-gateway\r\
-  \n  retrieval-engine -->|chunks, pgvector search| storage\r\n  paid-gateway -->|attempt\
-  \ rows| storage\r\n  service-core -->|requests, runs, audit| storage\r\n  owner-cli\
-  \ -->|same service and pipelines| service-core"
+  - api-layer
+  - api-routes
+  - api-shell
+  - budget-ledger
+  - corpus-pipeline
+  - data-stores
+  - evaluation-suite
+  - http
+  - http-api
+  - langfuse-tracing
+  - offline-pipelines
+  - openai-transport
+  - owner-cli
+  - paid-gateway
+  - persistence
+  - postgres-store
+  - postgresql-store
+  - provider-transport
+  - retrieval
+  - retrieval-engine
+  - runtime-artifacts
+  - service
+  - service-core
+  - service-layer
+  - storage
+  - tracing
+  - web
+  - web-pages
+  - web-screens
+  - workflows
+prev_diagram: "graph TD\r
+
+  \  web-screens[\"Next.js screens\\nweb/src/app/layout.tsx\"]\r
+
+  \  http-api[\"FastAPI wrapper\\nsrc/rfp_assistant/api.py\"]\r
+
+  \  service-core[\"Service core\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  retrieval-engine[\"Retrieval
+  engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
+
+  \  paid-gateway[\"Paid gateway\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  storage[\"PostgreSQL and
+  .runtime\\nsrc/rfp_assistant/storage/postgres.py\"]\r
+
+  \  offline-pipelines[\"Corpus and evaluation
+  pipelines\\nsrc/rfp_assistant/evaluation/evaluation.py\"]\r
+
+  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"]\r
+
+  \  web-screens -->|\"same-origin /api fetch, SSE\"| http-api\r
+
+  \  http-api -->|\"one service call per route\"| service-core\r
+
+  \  service-core -->|\"scoped retrieval\"| retrieval-engine\r
+
+  \  service-core -->|\"reserve, dispatch, settle\"| paid-gateway\r
+
+  \  service-core -->|\"requests, audit, catalog\"| storage\r
+
+  \  retrieval-engine -->|\"index files, pgvector queries\"| storage\r
+
+  \  paid-gateway -->|\"ledger transactions\"| storage\r
+
+  \  service-core -->|\"starts background jobs\"| offline-pipelines\r
+
+  \  owner-cli -->|\"runs pipelines\"| offline-pipelines\r
+
+  \  owner-cli -->|\"ledger administration\"| service-core\r
+
+  \  offline-pipelines -->|\"artifacts, runs, activation\"| storage"

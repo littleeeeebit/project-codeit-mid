@@ -1,0 +1,317 @@
+===== run 1 =====
+----- results.json -----
+{
+ "run_id": "J-calibration-<id1>",
+ "part": "calibration",
+ "status": "complete",
+ "stop_reason": null,
+ "progress": {
+  "luna": {
+   "done": 200,
+   "total": <n>
+  },
+  "jev_bridged": {
+   "done": 200,
+   "total": <n>
+  },
+  "jev_raw": {
+   "done": 120,
+   "total": <n>
+  }
+ },
+ "scored_at": "<time>",
+ "thresholds": {
+  "run_id": "J-calibration-<id1>",
+  "bands": {
+   "jev_bridged": {
+    "support": {
+     "lo": 0.9,
+     "hi": 0.9,
+     "kappa": 1.0,
+     "coverage": 1.0,
+     "false_accepts": 0,
+     "n": 100,
+     "points": 100,
+     "meets_floor": true
+    },
+    "coverage": {
+     "lo": 0.9,
+     "hi": 0.9,
+     "kappa": 1.0,
+     "coverage": 1.0,
+     "false_accepts": 0,
+     "n": 100,
+     "points": 100,
+     "meets_floor": true
+    }
+   },
+   "jev_raw": {
+    "support": {
+     "lo": 0.9,
+     "hi": 0.9,
+     "kappa": 1.0,
+     "coverage": 1.0,
+     "false_accepts": 0,
+     "n": 64,
+     "points": 64,
+     "meets_floor": true
+    },
+    "coverage": {
+     "lo": 0.9,
+     "hi": 0.9,
+     "kappa": 1.0,
+     "coverage": 1.0,
+     "false_accepts": 0,
+     "n": 56,
+     "points": 56,
+     "meets_floor": true
+    }
+   }
+  },
+  "min_fit_coverage": 0.9,
+  "objective": "max binary kappa subject to coverage; then fewer false accepts, more coverage, narrower",
+  "thresholds_sha256": "<id2>"
+ }
+}
+{"arm": "bridge", "blind_id": "batch-<id3>", "status": "done", "segments": 5, "settled_micro_usd": <n>, "latency_ms": <n>, "error": null}
+{"arm": "luna", "blind_id": "B0000", "status": "done", "settled_micro_usd": <n>, "latency_ms": <n>, "error": null, "usage": {"prompt_tokens": 50, "completion_tokens": 10, "cached_tokens": 0}, "label": "unsupported", "reason": "digit 0"}
+{"arm": "jev_bridged", "blind_id": "B0000", "status": "done", "answers": {"support": 0.1}, "usage": {"tokens": 1}, "model": "jev-1.13.0", "cost_usd": 0.0001, "latency_ms": <n>}
+{"arm": "jev_raw", "blind_id": "B0000", "status": "done", "answers": {"support": 0.1}, "usage": {"tokens": 1}, "model": "jev-1.13.0", "cost_usd": 0.0001, "latency_ms": <n>}
+judgements.jsonl sha256 f9180a1dde6ba73867f7a71a8cf9cd1b750b08d21f0b9fba67c51d5036b7cefd
+===== run 2 =====
+----- results.json -----
+{
+ "run_id": "J-held_out-<id1>",
+ "part": "held_out",
+ "status": "complete",
+ "stop_reason": null,
+ "progress": {
+  "luna": {
+   "done": 200,
+   "total": <n>
+  },
+  "jev_bridged": {
+   "done": 200,
+   "total": <n>
+  },
+  "jev_raw": {
+   "done": 120,
+   "total": <n>
+  }
+ },
+ "scored_at": "<time>",
+ "arms": {
+  "luna": {
+   "items": 200,
+   "judged": 200,
+   "coverage": 1.0,
+   "agreement": {
+    "numerator": 163,
+    "denominator": 200,
+    "rate": 0.815,
+    "wilson95": [
+     0.7554,
+     0.8627
+    ]
+   },
+   "kappa": 0.6422,
+   "kappa_exact": 0.<id2>,
+   "false_accepts": 37,
+   "reference_negatives": 120,
+   "code_settled": 0,
+   "abstentions": {},
+   "confusion": {
+    "link": {
+     "unsupported": {
+      "supporting": 20,
+      "unsupported": 40
+     },
+     "supporting": {
+      "supporting": 40
+     }
+    },
+    "claim": {
+     "missing": {
+      "missing": 43,
+      "correct": 17
+     },
+     "correct": {
+      "correct": 40
+     }
+    }
+   },
+   "usd": {
+    "settled_micro_usd": <n>,
+    "priced": true,
+    "calls": 200,
+    "source": "shared ledger, judge_eval"
+   },
+   "latency_ms": {
+    "p50": <n>,
+    "p95": <n>,
+    "n": 200,
+    "condition": "sequential, one call at a time, per item"
+   }
+  },
+  "jev_bridged": {
+   "items": 200,
+   "judged": 200,
+   "coverage": 1.0,
+   "agreement": {
+    "numerator": 200,
+    "denominator": 200,
+    "rate": 1.0,
+    "wilson95": [
+     0.9812,
+     1.0
+    ]
+   },
+   "kappa": 1.0,
+   "kappa_exact": 1.0,
+   "false_accepts": 0,
+   "reference_negatives": 120,
+   "code_settled": 0,
+   "abstentions": {},
+   "confusion": {
+    "link": {
+     "unsupported": {
+      "unsupported": 60
+     },
+     "supporting": {
+      "supporting": 40
+     }
+    },
+    "claim": {
+     "missing": {
+      "missing": 60
+     },
+     "correct": {
+      "correct": 40
+     }
+    }
+   },
+   "usd": {
+    "settled_micro_usd": <n>,
+    "priced": true,
+    "calls": 200,
+    "source": "provider-reported"
+   },
+   "bridge_usd": {
+    "settled_micro_usd": <n>,
+    "calls": 0,
+    "source": "shared ledger, judge_eval"
+   },
+   "latency_ms": {
+    "p50": <n>,
+    "p95": <n>,
+    "n": 200,
+    "condition": "sequential, one call at a time, per item"
+   }
+  },
+  "jev_raw": {
+   "items": 120,
+   "judged": 120,
+   "coverage": 1.0,
+   "agreement": {
+    "numerator": 120,
+    "denominator": 120,
+    "rate": 1.0,
+    "wilson95": [
+     0.969,
+     1.0
+    ]
+   },
+   "kappa": 1.0,
+   "kappa_exact": 1.0,
+   "false_accepts": 0,
+   "reference_negatives": 68,
+   "code_settled": 0,
+   "abstentions": {},
+   "confusion": {
+    "link": {
+     "unsupported": {
+      "unsupported": 36
+     },
+     "supporting": {
+      "supporting": 27
+     }
+    },
+    "claim": {
+     "missing": {
+      "missing": 32
+     },
+     "correct": {
+      "correct": 25
+     }
+    }
+   },
+   "usd": {
+    "settled_micro_usd": <n>,
+    "priced": true,
+    "calls": 120,
+    "source": "provider-reported"
+   },
+   "latency_ms": {
+    "p50": <n>,
+    "p95": <n>,
+    "n": 120,
+    "condition": "sequential, one call at a time, per item"
+   }
+  }
+ },
+ "thresholds_sha256": "<id3>",
+ "config_hashes": {
+  "judge": "<id4>",
+  "bridge": "<id5>",
+  "glossary": "<id6>",
+  "jev": "<id7>",
+  "rule": "<id8>"
+ },
+ "verdict": {
+  "verdict": "replaceable",
+  "rule": {
+   "version": "replacement-rule-1",
+   "kappa_margin": 0.05,
+   "min_coverage": 0.9,
+   "min_judged": 100
+  },
+  "checks": [
+   {
+    "condition": "kappa",
+    "passed": true,
+    "detail": "kappa Jev 1.0 >= Luna 0.6422 - 0.05"
+   },
+   {
+    "condition": "false_accepts",
+    "passed": true,
+    "detail": "false accepts Jev 0 <= Luna 37"
+   },
+   {
+    "condition": "coverage",
+    "passed": true,
+    "detail": "coverage Jev 1.0 >= 0.9"
+   }
+  ],
+  "deciding": [
+   {
+    "condition": "kappa",
+    "passed": true,
+    "detail": "kappa Jev 1.0 >= Luna 0.6422 - 0.05"
+   },
+   {
+    "condition": "false_accepts",
+    "passed": true,
+    "detail": "false accepts Jev 0 <= Luna 37"
+   },
+   {
+    "condition": "coverage",
+    "passed": true,
+    "detail": "coverage Jev 1.0 >= 0.9"
+   }
+  ]
+ }
+}
+{"arm": "luna", "blind_id": "B0004", "status": "done", "settled_micro_usd": <n>, "latency_ms": <n>, "error": null, "usage": {"prompt_tokens": 50, "completion_tokens": 10, "cached_tokens": 0}, "label": "supporting", "reason": "digit 4"}
+{"arm": "jev_bridged", "blind_id": "B0004", "status": "done", "answers": {"support": 0.1}, "usage": {"tokens": 1}, "model": "jev-1.13.0", "cost_usd": 0.0001, "latency_ms": <n>}
+{"arm": "jev_raw", "blind_id": "B0004", "status": "done", "answers": {"support": 0.1}, "usage": {"tokens": 1}, "model": "jev-1.13.0", "cost_usd": 0.0001, "latency_ms": <n>}
+judgements.jsonl sha256 049cf8bb89cfff99c9a998407482d0807d575df2cf8ef8a58d4f69b4c6e197eb

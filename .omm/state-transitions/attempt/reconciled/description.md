@@ -1,1 +1,0 @@
-Set by budget.reconcile from a provider total the owner enters. If usage arrives later, settle() adds a negative adjustment (late-settlement:<attempt_id>) so the amount is not counted twice.

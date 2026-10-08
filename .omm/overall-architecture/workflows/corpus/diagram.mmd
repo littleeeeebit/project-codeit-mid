@@ -1,0 +1,6 @@
+graph TD
+manifest["Manifest and original identity\nsrc/rfp_assistant/corpus/ingestion.py"] -->|Verified original bytes| extraction["HWP and PDF extraction\nsrc/rfp_assistant/corpus/ingestion.py"]
+ocr["Cached image OCR\nsrc/rfp_assistant/corpus/ocr.py"] -->|Matching completed image regions| extraction
+extraction -->|Immutable elements and revision| fidelity["Independent rendering comparison\nsrc/rfp_assistant/corpus/fidelity.py"]
+fidelity -->|Flagged locations and findings| review["Human review and recovery\nsrc/rfp_assistant/corpus/ingestion.py"]
+review -->|Recovery input or reviewed revision| extraction

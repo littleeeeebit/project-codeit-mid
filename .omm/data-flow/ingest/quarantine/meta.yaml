@@ -1,9 +1,0 @@
-created: 2026-10-08T22:02:25.572Z
-updated: 2026-10-08T22:02:25.573Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: quarantine
-children: []
-parentPath:
-  - ingest

@@ -1,0 +1,1 @@
+The configuration comes only from the environment (`BIDMATE_HUB_URL`, `BIDMATE_OAUTH_CLIENT_ID`, `BIDMATE_OAUTH_CLIENT_SECRET`, `BIDMATE_OAUTH_REDIRECT_URI`, `BIDMATE_ALLOWED_USERS`; `/etc/bidmate/server.env` on codeit). When the VM address changes, the hub URL, the redirect URI and the hub's `oauth_redirect_uri` must change together.

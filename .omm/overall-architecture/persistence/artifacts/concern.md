@@ -1,0 +1,1 @@
+Database commits and filesystem publication are not one transactional unit. gold.decide() and second_review() regenerate dataset files inside their database transaction, while index files are published before index records. Integrity checks and gold.check()/sync() detect or repair projections, but process failure can leave artifacts requiring reconciliation.

@@ -1,1 +1,0 @@
-A failure sets sources.parse_status to quarantined, review_status to needs_recovery, and records reason_code and warnings, plus an extraction_inputs row so an unchanged rerun reuses the quarantine. Paid answers on a quarantined document return ingestion_unavailable with the QUARANTINE_TEXT reason. recover-source can register an approved PDF conversion; HWPX recovery is refused.

@@ -1,0 +1,1 @@
+The maintainer note in postgres.tx() reserves per-account locks for a measured throughput need; the existing shared mutation mutex is intentional.

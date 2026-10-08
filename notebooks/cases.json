@@ -1,0 +1,73 @@
+{
+  "description": "Synthetic regression cases adapted from the repository's scoped-retrieval and answer-validation cases. Not a gold quality benchmark.",
+  "as_of": "2026-10-08",
+  "documents": [
+    {
+      "id": "A",
+      "source_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "must_preserve": ["SFR-001", "통합 로그인", "12개월", "부가가치세 포함"],
+      "xml": "<HwpDoc><BodyText><SectionDef><ColumnSet><Paragraph><LineSeg><TableControl><TableBody rows=\"3\" cols=\"2\"><TableRow><TableCell row=\"0\" col=\"0\"><Paragraph><LineSeg><Text>요구사항 고유번호</Text></LineSeg></Paragraph></TableCell><TableCell row=\"0\" col=\"1\"><Paragraph><LineSeg><Text>SFR-001</Text></LineSeg></Paragraph></TableCell></TableRow><TableRow><TableCell row=\"1\" col=\"0\"><Paragraph><LineSeg><Text>요구사항 명칭</Text></LineSeg></Paragraph></TableCell><TableCell row=\"1\" col=\"1\"><Paragraph><LineSeg><Text>통합 로그인</Text></LineSeg></Paragraph></TableCell></TableRow><TableRow><TableCell row=\"2\" col=\"0\"><Paragraph><LineSeg><Text>세부 내용</Text></LineSeg></Paragraph></TableCell><TableCell row=\"2\" col=\"1\"><Paragraph><LineSeg><Text>통합 로그인 기능을 제공하여야 함. 하자보수 기간은 검수 완료일로부터 12개월이다. 사업비는 1억원이며 부가가치세 포함이다.</Text></LineSeg></Paragraph></TableCell></TableRow></TableBody></TableControl></LineSeg></Paragraph></ColumnSet></SectionDef></BodyText></HwpDoc>"
+    },
+    {
+      "id": "B",
+      "source_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "must_preserve": ["SFR-001", "결제", "24개월"],
+      "xml": "<HwpDoc><BodyText><SectionDef><ColumnSet><Paragraph><LineSeg><Text>SFR-001 결제 기능을 제공한다. 하자보수 기간은 24개월이다.</Text></LineSeg></Paragraph></ColumnSet></SectionDef></BodyText></HwpDoc>"
+    },
+    {
+      "id": "C",
+      "source_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "must_preserve": ["교육", "3회"],
+      "xml": "<HwpDoc><BodyText><SectionDef><ColumnSet><Paragraph><LineSeg><Text>담당자 교육은 3회 실시하며 교재를 제공한다.</Text></LineSeg></Paragraph></ColumnSet></SectionDef></BodyText></HwpDoc>"
+    },
+    {
+      "id": "D",
+      "source_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "must_preserve": ["암호화"],
+      "xml": "<HwpDoc><BodyText><SectionDef><ColumnSet><Paragraph><LineSeg><Text>개인정보는 암호화하여 보관하고 접근 권한을 통제한다.</Text></LineSeg></Paragraph></ColumnSet></SectionDef></BodyText></HwpDoc>"
+    },
+    {
+      "id": "E",
+      "source_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "must_preserve": ["백업"],
+      "xml": "<HwpDoc><BodyText><SectionDef><ColumnSet><Paragraph><LineSeg><Text>백업 자료는 별도 장소에 보관하며 매일 복구 가능 여부를 점검한다.</Text></LineSeg></Paragraph></ColumnSet></SectionDef></BodyText></HwpDoc>"
+    },
+    {
+      "id": "F",
+      "source_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "must_preserve": ["산출물"],
+      "xml": "<HwpDoc><BodyText><SectionDef><ColumnSet><Paragraph><LineSeg><Text>산출물 목록은 착수 보고서와 완료 보고서로 구성한다.</Text></LineSeg></Paragraph></ColumnSet></SectionDef></BodyText></HwpDoc>"
+    }
+  ],
+  "questions": [
+    {"id": "requirement", "question": "SFR-001 로그인 요구사항은?", "documents": ["A"], "required": ["통합 로그인"], "forbidden": ["결제", "24개월"]},
+    {"id": "warranty", "question": "하자 보수 기간은?", "documents": ["A"], "required": ["검수 완료일로부터 12개월"], "forbidden": ["24개월"]},
+    {"id": "vat", "question": "사업비에 부가세가 포함되어 있나요?", "documents": ["A"], "required": ["1억원", "부가가치세 포함"]},
+    {"id": "other-document", "question": "SFR-001 결제 요구사항은?", "documents": ["B"], "required": ["결제", "24개월"], "forbidden": ["통합 로그인"]},
+    {"id": "absent", "question": "양자컴퓨터 큐비트", "documents": ["A"], "required": [], "expect_empty": true}
+  ],
+  "fusion": [
+    {"id": "overlap", "lexical": ["warranty", "budget"], "dense": ["budget", "training"]},
+    {"id": "duplicates", "lexical": ["warranty", "warranty"], "dense": ["warranty", "budget"]}
+  ],
+  "vectors": [
+    {"id": "unit", "values": [3, 4], "dimensions": 2, "reject": false},
+    {"id": "zero", "values": [0, 0], "dimensions": 2, "reject": true},
+    {"id": "dimension", "values": [1, 2], "dimensions": 3, "reject": true}
+  ],
+  "answers": [
+    {
+      "id": "supported", "documents": ["A"], "accept": true,
+      "evidence": [{"evidence_id": "E1", "doc_id": "A", "source_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "extraction_id": "A-extraction", "chunk_id": "recorded", "element_ids": ["recorded"], "quote": "하자보수 기간은 12개월이다.", "location": {"format": "hwp", "path": "recorded"}, "token_count": 14}],
+      "answer": {"status": "answered", "summary": "하자보수 기간은 12개월이다.", "summary_evidence_ids": ["E1"], "claims": [{"text": "하자보수 기간은 12개월이다.", "kind": "source_fact", "doc_id": "A", "evidence_ids": ["E1"]}], "missing_fields": [], "conflicts": [], "next_action": null}
+    },
+    {
+      "id": "invented-citation", "documents": ["A"], "accept": false,
+      "evidence": [],
+      "answer": {"status": "answered", "summary": "하자보수 기간은 12개월이다.", "summary_evidence_ids": ["E99"], "claims": [{"text": "하자보수 기간은 12개월이다.", "kind": "source_fact", "doc_id": "A", "evidence_ids": ["E99"]}], "missing_fields": [], "conflicts": [], "next_action": null}
+    }
+  ],
+  "logging": [
+    {"id": "redaction", "input": {"password": "synthetic-secret", "question": "하자보수 기간은?"}, "expected": {"password": "[REDACTED]", "question": "하자보수 기간은?"}}
+  ]
+}

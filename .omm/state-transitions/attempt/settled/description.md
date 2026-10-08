@@ -1,1 +1,0 @@
-Set by budget.settle from the reported usage: uncached, cached, cache-write and completion tokens. A duplicate settle returns the stored value. If the cost is above the reservation, budget_settings.frozen_reason is set.

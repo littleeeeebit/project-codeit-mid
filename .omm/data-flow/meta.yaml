@@ -1,43 +1,45 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-08 22:02:24.164000+00:00
-update_count: 30
+updated: 2026-10-08 21:42:03.532000+00:00
+update_count: 34
 last_field: diagram
-git_commit: 380ac04
-git_branch: fix/hwp-hwpx-loader
+git_commit: 86d9b1f
+git_branch: gpt5-mini-answer-embedding-comparison
 children:
 - activation
 - corpus-ingestion
+- embedding-set
 - extraction
 - fidelity-and-ocr
 - fidelity-check
 - fidelity-ocr
 - frozen-runs
 - index-build
-- ingest
 - keyword
-- manifest
+- measurements
 - ocr-merge
 - original-corpus
 - original-files
 - originals
 - preview
-- retrieval
+- requests
 - retrieval-runs
 - retrieval-selection
 - run-selection
 - source-originals
 - vectors
-prev_diagram: "graph TD\r\n  originals[\"Originals and CSV manifest\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  fidelity-ocr[\"Fidelity print and OCR\\nsrc/rfp_assistant/corpus/fidelity.py\"\
-  ]\r\n  extractions[\"Extraction revisions\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  keyword-build[\"Keyword index build\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  dense-build[\"Dense vector sets\\nsrc/rfp_assistant/retrieval/dense.py\"\
-  ]\r\n  retrieval-runs[\"Frozen runs and matrices\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  activation[\"Serving activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  cited-evidence[\"Answers and citations\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  originals -->|manifest, ingest by hash| extractions\r\n  fidelity-ocr -->|print\
-  \ text, image_text| extractions\r\n  extractions -->|elements, review status| keyword-build\r\
-  \n  keyword-build -->|chunk payloads| dense-build\r\n  keyword-build -->|index version|\
-  \ retrieval-runs\r\n  dense-build -->|dense set version| retrieval-runs\r\n  retrieval-runs\
-  \ -->|person picks a row| activation\r\n  activation -->|active_run, active_index|\
-  \ cited-evidence"
+prev_diagram: "graph TD\r\n  originals[\"Original HWP and PDF\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  extraction-artifacts[\"Extraction revisions\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  keyword-indexes[\"Keyword index versions\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  vector-sets[\"pgvector sets\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
+  ]\r\n  request-evidence[\"Request evidence map\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  evidence-view[\"Evidence pane and download\\nweb/src/components/ask/answer-parts.tsx\"\
+  ]\r\n  gold-datasets[\"Gold datasets\\nsrc/rfp_assistant/evaluation/gold.py\"]\r\
+  \n  evaluation-runs[\"Frozen runs and tables\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
+  ]\r\n  originals -->|\"manifest hash, parse\"| extraction-artifacts\r\n  extraction-artifacts\
+  \ -->|\"chunk, Kiwi tokens\"| keyword-indexes\r\n  keyword-indexes -->|\"payload\
+  \ embeddings\"| vector-sets\r\n  keyword-indexes -->|\"packed EvidenceUnits\"| request-evidence\r\
+  \n  vector-sets -->|\"cosine candidates\"| request-evidence\r\n  request-evidence\
+  \ -->|\"evidence_id lookup\"| evidence-view\r\n  originals -->|\"hash-checked download\"\
+  | evidence-view\r\n  extraction-artifacts -->|\"pinned element spans\"| gold-datasets\r\
+  \n  gold-datasets -->|\"frozen scoring population\"| evaluation-runs\r\n  keyword-indexes\
+  \ -->|\"manifest-bound runs\"| evaluation-runs"

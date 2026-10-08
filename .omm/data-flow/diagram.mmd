@@ -1,9 +1,9 @@
 graph TD
-  manifest["CSV manifest and originals\nsrc/rfp_assistant/corpus/ingestion.py"] -->|sources and documents rows| ingest["Per-source ingest\nsrc/rfp_assistant/corpus/ingestion.py"]
-  ingest -->|elements.jsonl and element rows| extraction[("Extraction revisions\nsrc/rfp_assistant/storage/store.py")]
-  extraction -->|load_elements per active extraction| keyword["Keyword index build\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  keyword -->|chunk payloads to embed| vectors["Embedding sets in pgvector\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  keyword -->|index_version in run| activation["Activated serving config\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  vectors -->|dense_version in run| activation
-  activation -->|active_serving per request| retrieval["Serving retrieval\nsrc/rfp_assistant/service/service.py"]
-  preview["HWP/HWPX preview loader, unwired\nsrc/rfp_assistant/storage/hwp_loader.py"]
+originals["Originals and notice metadata\nsrc/rfp_assistant/corpus/ingestion.py"] -->|Verified bytes and parser inputs| extraction["Preserved extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
+extraction -->|Eligible source elements| keyword["Hashed keyword artifacts\nsrc/rfp_assistant/retrieval/retrieval.py"]
+keyword -->|Chunk payloads and ordering| vectors["Homogeneous embedding sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
+keyword -->|Pinned index and evidence spans| measurements["Frozen retrieval measurements\nsrc/rfp_assistant/evaluation/evaluation.py"]
+vectors -->|Verified dense candidates| measurements
+measurements -->|Explicit validated selection| activation["Active configuration and history\nsrc/rfp_assistant/evaluation/evaluation.py"]
+activation -->|Selected artifacts and limits| requests["Persisted answers and citations\nsrc/rfp_assistant/service/service.py"]
+preview["HWP/HWPX preview loader, unwired\nsrc/rfp_assistant/storage/hwp_loader.py"]

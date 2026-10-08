@@ -1,1 +1,0 @@
-Every paid provider call follows the same order: count tokens, budget.reserve, budget.mark_dispatching, the transport call, then budget.settle, release or mark_unknown. Every step is a row transition in the attempts table. gateway/generation.py is the only place that calls the OpenAI SDK. Tracing only observes this path; admission and settlement never read it.

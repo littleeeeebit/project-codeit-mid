@@ -1,0 +1,7 @@
+graph TD
+browser["Member browser\nweb/src/components/sign-in.tsx"] -->|Static pages and authenticated API| app["Single BidMate process\ntools/infra/bidmate.service"]
+browser -->|OAuth authorization navigation| hub["Configured JupyterHub identity\nsrc/rfp_assistant/service/auth.py"]
+app -->|Code exchange and username lookup| hub
+app -->|Loopback database connections| database["Pinned PostgreSQL container\ncompose.postgresql.yaml"]
+app -->|Metered chat and embedding calls| providers["Outbound model adapters\nsrc/rfp_assistant/gateway/generation.py"]
+cli["Owner maintenance entry point\ntools/infra/bidmate-cli.sh"] -->|Shared environment and database| database

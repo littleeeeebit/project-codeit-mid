@@ -1,1 +1,0 @@
-After changing a route or a response shape, regenerate the schema with `python tools/openapi.py`. tests/test_api.py fails while the schema is stale.

@@ -14,11 +14,13 @@
 /.venv/
 /.venv-converter/
 /.runtime/
+/.runtime.zip
 /.runtime-backups/
 /models/
 __pycache__/
 *.py[cod]
 *.egg-info/
+.ipynb_checkpoints/
 
 # Local secrets and wiki synchronization state
 .wiki/verification*

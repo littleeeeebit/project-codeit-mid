@@ -1,9 +1,0 @@
-created: 2026-10-08T22:02:11.484Z
-updated: 2026-10-08T22:02:11.485Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: fallback
-children: []
-parentPath:
-  - retrieval

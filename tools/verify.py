@@ -15,6 +15,8 @@ The service supplies WIKI_VERIFICATION_HEAD, WIKI_VERIFICATION_ENVIRONMENT, WIKI
 WIKI_VERIFICATION_BROWSER, and copies the owner's env_file to the checkout's `.env` without exporting it. The
 runner therefore reads the supported keys (CONFIG_KEYS) from `.env` first and from the process environment only
 for keys `.env` does not set; every observation names where its corpus came from. OPENAI_API_KEY is never read.
+RFP_VERIFY_PYTHON selects an absolute owner Python executable before dependencies are imported, independent of
+the hub launcher's PATH; omit it when the launching Python already has the application and verification dependencies.
 Browser flows build the screens in web/ (`npm run build`, so the checked HEAD is what is served; needs Node and
 `npm ci` in web/), serve them with the API through one uvicorn worker on RFP_VERIFY_ORIGIN (default
 http://127.0.0.1:8765), sign each browser in through tests/fake_hub.py (a stand-in for JupyterHub's OAuth provider,
@@ -42,13 +44,42 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-import psycopg
-from psycopg.rows import dict_row
-
 REPO = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(REPO / "src"), str(REPO)]
 CONFIG_KEYS = ("RFP_SOURCE_DIR", "RFP_DATA_DIR", "RFP_DATABASE_DSN", "RFP_VERIFY_ORIGIN", "RFP_VERIFY_BROWSER_EXECUTABLE",
-               "RFP_VERIFY_QUESTION", "RFP_VERIFY_HWP_DOC_ID", "RFP_VERIFY_PDF_DOC_ID")
+               "RFP_VERIFY_QUESTION", "RFP_VERIFY_HWP_DOC_ID", "RFP_VERIFY_PDF_DOC_ID", "RFP_VERIFY_PYTHON")
+
+
+def owner_config(repo: Path | None = None) -> tuple[dict, dict]:
+    """Supported keys from the copied env_file (`.env`), then the process environment. Returns (values, source)."""
+    values, source = {}, {}
+    env_file = Path(os.environ.get("RFP_VERIFY_ENV_FILE") or (repo or REPO) / ".env")  # override: tests, manual runs
+    if env_file.is_file():
+        for line in env_file.read_text(encoding="utf-8-sig").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.removeprefix("export ").partition("=")
+            key, value = key.strip(), value.strip().strip("'\"")
+            if key in CONFIG_KEYS and value:
+                values[key], source[key] = value, ".env"
+    for key in CONFIG_KEYS:
+        if key not in values and os.environ.get(key):
+            values[key], source[key] = os.environ[key], "the process environment"
+    return values, source
+
+
+# Select the owner environment before importing dependencies; the hub may use another Python.
+if __name__ == "__main__" and (configured := owner_config()[0].get("RFP_VERIFY_PYTHON")):
+    python = Path(configured)
+    if not python.is_absolute() or not python.is_file():
+        raise SystemExit("RFP_VERIFY_PYTHON must name an existing absolute Python executable")
+    if os.path.normcase(os.path.abspath(python)) != os.path.normcase(os.path.abspath(sys.executable)):
+        raise SystemExit(subprocess.call([str(python), "-B", str(Path(__file__).resolve()), *sys.argv[1:]]))
+
+import psycopg  # noqa: E402 -- imported only after the owner interpreter is selected
+from psycopg.rows import dict_row  # noqa: E402
+
 TERMINAL = ("completed", "failed", "cancelled", "interrupted")
 MANIFEST = REPO / "verification.json"
 FAKE_QUESTION = "하자보수 기간은 얼마인가요?"
@@ -160,7 +191,8 @@ class Context:
             raise RuntimeError(f"RFP_VERIFY_ORIGIN must be scheme://host:port, got {origin!r}")
         host, port = found.groups()
         config = self.work / "fake-config.json"
-        config.write_text(json.dumps({"provider": "fake", "fake_delay_seconds": delay}), encoding="utf-8")
+        config.write_text(json.dumps({"provider": "fake", "fake_delay_seconds": delay,
+                                      "database_timeout_seconds": 30}), encoding="utf-8")
         from tests import fake_hub  # members sign in through a stand-in for JupyterHub, run in this process
 
         env = {**self.env, "RFP_SOURCE_DIR": corpus["source_dir"], "RFP_DATA_DIR": corpus["data_dir"],
@@ -227,7 +259,7 @@ class Context:
     def page(self, browser, origin: str):
         page = browser.new_context(viewport={"width": 1400, "height": 1000}, accept_downloads=True).new_page()
         page.on("response", lambda r: self.requests.append(
-            {"method": r.request.method, "url": r.url, "status": r.status}) if r.url.startswith("http") else None)
+            {"method": r.request.method, "url": r.url, "status": r.status}) if r.url.startswith(origin + "/") else None)
         return page
 
     def act(self, action: str, expected: str, fn) -> tuple[bool, str]:
@@ -281,6 +313,8 @@ def copy_database(source_dsn: str, work: Path) -> str:
     """DSN of a private copy of the configured database: pg_dump (one read-only snapshot) restored into a fresh
     test database. The dump file is removed; the copy is dropped when this process exits."""
     from psycopg.conninfo import conninfo_to_dict
+    from rfp_assistant.gateway import budget
+    from rfp_assistant.settings import ALLOWED_GENERATION_MODELS
 
     from rfp_assistant.storage import postgres, postgres_backup
     from tests import fixtures
@@ -292,7 +326,10 @@ def copy_database(source_dsn: str, work: Path) -> str:
         "--file=" + str(dump)], work)
     target = postgres.Target(fixtures.database(ready=False))
     postgres_backup._run("pg_restore", target, ["--no-owner", "--no-privileges", "--exit-on-error",
-                                                "--dbname=" + conninfo_to_dict(target.dsn())["dbname"], str(dump)], work)
+        "--single-transaction", "--dbname=" + conninfo_to_dict(target.dsn())["dbname"], str(dump)], work, timeout=900)
+    budget.set_paid_enabled(target, "verification", True, "fake-provider flows on a disposable corpus copy")
+    for model in ALLOWED_GENERATION_MODELS:
+        budget.ensure_generation_rate(target, model, "verification")
     dump.unlink()
     return target.dsn()
 
@@ -302,25 +339,6 @@ def db_rows(dsn: str, sql: str, args=()) -> list[dict]:
 
     with psycopg.connect(dsn, row_factory=dict_row, autocommit=True) as conn:
         return conn.execute(bind_sql(sql), args).fetchall()
-
-
-def owner_config(repo: Path | None = None) -> tuple[dict, dict]:
-    """Supported keys from the copied env_file (`.env`), then the process environment. Returns (values, source)."""
-    values, source = {}, {}
-    env_file = Path(os.environ.get("RFP_VERIFY_ENV_FILE") or (repo or REPO) / ".env")  # override: tests, manual runs
-    if env_file.is_file():
-        for line in env_file.read_text(encoding="utf-8-sig").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.removeprefix("export ").partition("=")
-            key, value = key.strip(), value.strip().strip("'\"")
-            if key in CONFIG_KEYS and value:
-                values[key], source[key] = value, ".env"
-    for key in CONFIG_KEYS:
-        if key not in values and os.environ.get(key):
-            values[key], source[key] = os.environ[key], "the process environment"
-    return values, source
 
 
 ATTEMPTS = ("(SELECT string_agg(a.stage || ':' || a.state, ',' ORDER BY a.created_at) FROM attempts a "
@@ -818,35 +836,39 @@ def cap_exhaustion(ctx: Context) -> dict:
         member = f"verify-cap-{os.getpid()}"
         consultant = ctx.page(browser, origin)
         ctx.open_app(consultant, origin, member)
-
-        def blocked():
-            warned = wait_text(consultant, "운영 한도에 도달", 15000)
-            pick_first_document(consultant)
-            row = ask_and_wait(consultant, data, member, corpus["question"])
-            result = json.loads(row["result_json"])["status"] if row and row["result_json"] else None
-            return bool(warned and result == "budget_blocked" and not row["attempts"]), (
-                f"cap warning shown {warned}; result {result}; attempts {row['attempts'] if row else None}")
-        paid = ctx.act("ask at the exhausted cap", "blocked before any attempt", blocked)
-
-        def free_and_polling():
-            count = attempt_count(data)
-            with consultant.expect_download(timeout=30000) as info:
-                consultant.get_by_role("link", name="원문 파일 받기").first.click()
-            path = ctx.work / "cap-download.bin"
-            info.value.save_as(path)
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            managed = bool(db_rows(data, "SELECT 1 FROM documents WHERE active_source_hash = ?", (digest,)))
-            consultant.wait_for_timeout(6000)  # several budget and request polling intervals
-            consultant.reload()
-            consultant.get_by_label("이름", exact=True).wait_for(timeout=60000)
-            consultant.wait_for_timeout(4000)
-            after = attempt_count(data)
-            return managed and after == count, (f"original downloaded ({path.stat().st_size} bytes, managed {managed}); "
-                                                f"attempts {count} before and {after} after 10 s of polling and a reload")
-        free = ctx.act("download an original, keep polling and reload", "works with no new attempt", free_and_polling)
+        paid = ctx.act("ask at the exhausted cap", "blocked before any attempt",
+                       lambda: _blocked_at_cap(consultant, data, member, corpus["question"]))
+        free = ctx.act("download an original, keep polling and reload", "works with no new attempt",
+                       lambda: _free_and_polling(ctx, consultant, data))
         return {"reasonless-refused": refused, "adjustment-audited": audited, "paid-blocked-at-cap": paid,
                 "free-routes-and-polling": free}
     return with_browser(ctx, body)
+
+
+def _blocked_at_cap(consultant, data, member: str, question: str):
+    warned = wait_text(consultant, "운영 한도에 도달", 15000)
+    pick_first_document(consultant)
+    row = ask_and_wait(consultant, data, member, question)
+    result = json.loads(row["result_json"])["status"] if row and row["result_json"] else None
+    return bool(warned and result == "budget_blocked" and not row["attempts"]), (
+        f"cap warning shown {warned}; result {result}; attempts {row['attempts'] if row else None}")
+
+
+def _free_and_polling(ctx: Context, consultant, data):
+    count = attempt_count(data)
+    with consultant.expect_download(timeout=30000) as info:
+        consultant.get_by_role("link", name="원문 파일 받기").first.click()
+    path = ctx.work / "cap-download.bin"
+    info.value.save_as(path)
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    managed = bool(db_rows(data, "SELECT 1 FROM documents WHERE active_source_hash = ?", (digest,)))
+    consultant.wait_for_timeout(6000)  # several budget and request polling intervals
+    consultant.reload()
+    consultant.get_by_label("이름", exact=True).wait_for(timeout=60000)
+    consultant.wait_for_timeout(4000)
+    after = attempt_count(data)
+    return managed and after == count, (f"original downloaded ({path.stat().st_size} bytes, managed {managed}); "
+                                        f"attempts {count} before and {after} after 10 s of polling and a reload")
 
 
 FOCUS_JS = """async () => {
@@ -880,6 +902,84 @@ CONTRAST_JS = """() => {
 }"""
 
 
+def _tab_to(page, focused: list, match, limit=150):
+    """Tab until a focus stop matches, recording every stop in `focused`."""
+    for _ in range(limit):
+        page.keyboard.press("Tab")
+        info = page.evaluate(FOCUS_JS)
+        if info:
+            focused.append(info)
+            if match(info):
+                return info
+    return None
+
+
+def _keyboard_only(page, corpus, member: str, focused: list):
+    # Styles are compared focused vs. unfocused; transitions would report a value mid-animation.
+    page.add_style_tag(content="*, *::before, *::after { transition: none !important; }")
+    page.get_by_label("검색어").focus()  # the document column precedes the question form in tab order
+    pick = _tab_to(page, focused, lambda i: i["role"] == "checkbox")
+    if pick:
+        page.keyboard.press("Space")
+        page.wait_for_timeout(1500)
+    box = _tab_to(page, focused, lambda i: i["tag"] == "TEXTAREA")
+    if box:
+        page.keyboard.type(corpus["question"])
+    known = [r["request_id"] for r in member_requests(corpus["dsn"],member)]
+    submit = _tab_to(page, focused, lambda i: i["tag"] == "BUTTON" and SUBMIT.match(i["name"]))
+    if submit:
+        page.keyboard.press("Enter")
+    row = wait_request(corpus["dsn"],"r.member_id = ?", (member,), 120) if submit else None
+    new = bool(row and row["request_id"] not in known)
+    opened = False
+    if new and rendered(page, row):
+        chip = _tab_to(page, focused, lambda i: i["tag"] == "BUTTON" and CHIP.match(i["name"]))
+        if chip:
+            page.keyboard.press("Enter")
+            opened = evidence_opened(conversation_pane(page), CHIP.match(chip["name"]).group(1), 15000)
+    return bool(pick and box and submit and new and opened), (
+        f"document selected {bool(pick)}; question typed {bool(box)}; submitted {bool(submit)}; "
+        f"request {row['status'] if row else None}; evidence opened {opened}; {len(focused)} Tab stops")
+
+
+def _focus_rings(focused: list):
+    controls = [f for f in focused if f["tag"] in ("INPUT", "TEXTAREA", "BUTTON", "A", "SELECT")]
+    missing = [f"{f['tag']}:{f['name']}" for f in controls if not f["ring"]]
+    return bool(controls) and not missing, f"{len(controls)} focused controls; without a visible ring: {missing[:8]}"
+
+
+def _open_other(others, origin: str, path: str):
+    others.goto(origin + path)
+    others.wait_for_load_state("networkidle")
+    others.wait_for_timeout(800)
+    return others
+
+
+def _contrast(page, others, origin: str):
+    pages = {"질문하기": page.evaluate(CONTRAST_JS)}
+    for name, path in (("검증", "/verify/"), ("데이터셋 만들기", "/dataset/")):
+        pages[name] = _open_other(others, origin, path).evaluate(CONTRAST_JS)
+    items = [i for v in pages.values() for i in v]
+    low = sorted((i for i in items if i["ratio"] < 4.5), key=lambda i: i["ratio"])
+    return all(pages.values()) and not low, (
+        "; ".join(f"{k} {len(v)} texts" for k, v in pages.items()) + f"; minimum ratio "
+        f"{min((i['ratio'] for i in items), default=None)}; below 4.5: {[(i['text'], i['ratio']) for i in low[:6]]}")
+
+
+def _narrow(page, others, origin: str):
+    width = lambda p: p.evaluate("() => [document.documentElement.scrollWidth, window.innerWidth]")  # noqa: E731
+    page.set_viewport_size({"width": 390, "height": 844})
+    others.set_viewport_size({"width": 390, "height": 844})
+    page.wait_for_timeout(1500)
+    widths = {"질문하기": width(page)}
+    for name, path in (("검증", "/verify/"), ("데이터셋 만들기", "/dataset/")):
+        widths[name] = width(_open_other(others, origin, path))
+    status = page.get_by_text(re.compile(r"^(답변|근거 부족|확인 필요|근거 충돌|기술 오류.*)$")).count()
+    return all(w[0] <= w[1] for w in widths.values()) and status > 0, (
+        "; ".join(f"{k} scroll width {w[0]} for {w[1]} px" for k, w in widths.items())
+        + f"; status labels in text {status}")
+
+
 @flow("accessibility")
 def accessibility(ctx: Context) -> dict:
     def body(ctx, browser, origin, corpus):
@@ -887,84 +987,15 @@ def accessibility(ctx: Context) -> dict:
         member = f"verify-a11y-{os.getpid()}"
         ctx.open_app(page, origin, member)
         focused = []
-
-        def tab_to(match, limit=150):
-            for _ in range(limit):
-                page.keyboard.press("Tab")
-                info = page.evaluate(FOCUS_JS)
-                if info:
-                    focused.append(info)
-                    if match(info):
-                        return info
-            return None
-
-        def keyboard():
-            # Styles are compared focused vs. unfocused; transitions would report a value mid-animation.
-            page.add_style_tag(content="*, *::before, *::after { transition: none !important; }")
-            page.get_by_label("검색어").focus()  # the document column precedes the question form in tab order
-            pick = tab_to(lambda i: i["role"] == "checkbox")
-            if pick:
-                page.keyboard.press("Space")
-                page.wait_for_timeout(1500)
-            box = tab_to(lambda i: i["tag"] == "TEXTAREA")
-            if box:
-                page.keyboard.type(corpus["question"])
-            known = [r["request_id"] for r in member_requests(corpus["dsn"],member)]
-            submit = tab_to(lambda i: i["tag"] == "BUTTON" and SUBMIT.match(i["name"]))
-            if submit:
-                page.keyboard.press("Enter")
-            row = wait_request(corpus["dsn"],"r.member_id = ?", (member,), 120) if submit else None
-            new = bool(row and row["request_id"] not in known)
-            opened = False
-            if new and rendered(page, row):
-                chip = tab_to(lambda i: i["tag"] == "BUTTON" and CHIP.match(i["name"]))
-                if chip:
-                    page.keyboard.press("Enter")
-                    opened = evidence_opened(conversation_pane(page), CHIP.match(chip["name"]).group(1), 15000)
-            return bool(pick and box and submit and new and opened), (
-                f"document selected {bool(pick)}; question typed {bool(box)}; submitted {bool(submit)}; "
-                f"request {row['status'] if row else None}; evidence opened {opened}; {len(focused)} Tab stops")
-        keys = ctx.act("select, ask and open evidence with the keyboard only", "all done by keyboard", keyboard)
-
-        def rings():
-            controls = [f for f in focused if f["tag"] in ("INPUT", "TEXTAREA", "BUTTON", "A", "SELECT")]
-            missing = [f"{f['tag']}:{f['name']}" for f in controls if not f["ring"]]
-            return bool(controls) and not missing, f"{len(controls)} focused controls; without a visible ring: {missing[:8]}"
-        ring = ctx.act("inspect every keyboard focus stop", "a visible focus indicator", rings)
-
+        keys = ctx.act("select, ask and open evidence with the keyboard only", "all done by keyboard",
+                       lambda: _keyboard_only(page, corpus, member, focused))
+        ring = ctx.act("inspect every keyboard focus stop", "a visible focus indicator", lambda: _focus_rings(focused))
         others = ctx.page(browser, origin)  # 검증 and 데이터셋 만들기, beside the answered 질문하기
         ctx.open_app(others, origin, member)  # a new browser context: it signs in too
-
-        def open_other(path: str):
-            others.goto(origin + path)
-            others.wait_for_load_state("networkidle")
-            others.wait_for_timeout(800)
-            return others
-
-        def contrast():
-            pages = {"질문하기": page.evaluate(CONTRAST_JS)}
-            for name, path in (("검증", "/verify/"), ("데이터셋 만들기", "/dataset/")):
-                pages[name] = open_other(path).evaluate(CONTRAST_JS)
-            items = [i for v in pages.values() for i in v]
-            low = sorted((i for i in items if i["ratio"] < 4.5), key=lambda i: i["ratio"])
-            return all(pages.values()) and not low, (
-                "; ".join(f"{k} {len(v)} texts" for k, v in pages.items()) + f"; minimum ratio "
-                f"{min((i['ratio'] for i in items), default=None)}; below 4.5: {[(i['text'], i['ratio']) for i in low[:6]]}")
-        readable = ctx.act("measure text contrast on the three pages", "every text at least 4.5:1", contrast)
-
-        def narrow():
-            width = lambda p: p.evaluate("() => [document.documentElement.scrollWidth, window.innerWidth]")  # noqa: E731
-            page.set_viewport_size({"width": 390, "height": 844})
-            others.set_viewport_size({"width": 390, "height": 844})
-            page.wait_for_timeout(1500)
-            widths = {"질문하기": width(page)}
-            for name, path in (("검증", "/verify/"), ("데이터셋 만들기", "/dataset/")):
-                widths[name] = width(open_other(path))
-            status = page.get_by_text(re.compile(r"^(답변|근거 부족|확인 필요|근거 충돌|기술 오류.*)$")).count()
-            return all(w[0] <= w[1] for w in widths.values()) and status > 0, (
-                "; ".join(f"{k} scroll width {w[0]} for {w[1]} px" for k, w in widths.items())
-                + f"; status labels in text {status}")
-        layout = ctx.act("narrow the three pages to 390 px", "no horizontal scroll and text status", narrow)
+        readable = ctx.act("measure text contrast on the three pages", "every text at least 4.5:1",
+                           lambda: _contrast(page, others, origin))
+        layout = ctx.act("narrow the three pages to 390 px", "no horizontal scroll and text status",
+                         lambda: _narrow(page, others, origin))
         return {"keyboard-only": keys, "focus-visible": ring, "contrast": readable, "narrow-layout": layout}
     return with_browser(ctx, body)
 

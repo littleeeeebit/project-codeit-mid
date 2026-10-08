@@ -1,10 +1,6 @@
 graph TD
-  entry["Service retrieve\nsrc/rfp_assistant/service/service.py"] -->|settings, scope pairs, query vector| fallback["Mode fallback check\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  fallback -->|effective mode| routing["Corpus routing and scope rows\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  routing -->|allowed rows| exact["Requirement code match\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  routing -->|allowed rows, dropped terms| lexical["Kiwi BM25 ranking\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  routing -->|allowed rows| dense["pgvector search\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  lexical -->|BM25 order| fusion["Fusion and rerank\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  dense -->|cosine order| fusion
-  exact -->|pinned ahead| packing["Evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  fusion -->|ranking| packing
+scope["Scope and corpus routing\nsrc/rfp_assistant/retrieval/retrieval.py"] -->|Allowed extraction rows| lexical["Exact identifiers and BM25\nsrc/rfp_assistant/retrieval/retrieval.py"]
+scope -->|Allowed rows and query| dense["Query vectors and cosine search\nsrc/rfp_assistant/retrieval/dense.py"]
+lexical -->|Exact and lexical candidates| fusion["Fusion and optional reranking\nsrc/rfp_assistant/retrieval/retrieval.py"]
+dense -->|Scoped dense candidates| fusion
+fusion -->|Exact-first ranked chunks| packing["Bounded evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]

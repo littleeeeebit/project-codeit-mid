@@ -1,7 +1,7 @@
-created: 2026-10-08T22:02:11.851Z
-updated: 2026-10-08T22:02:11.851Z
-update_count: 1
-last_field: description
+created: 2026-10-08T21:41:52.473Z
+updated: 2026-10-08T21:41:52.615Z
+update_count: 2
+last_field: constraint
 kind: nested-class
 title: lexical
 children: []

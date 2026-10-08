@@ -1,1 +1,0 @@
-While any attempt is unknown, mark_dispatching refuses every new paid dispatch across the whole database, and `paid on` is refused. Only the owner CLI (reconcile, settle) clears it.

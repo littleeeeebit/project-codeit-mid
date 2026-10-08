@@ -1,1 +1,0 @@
-A reservation prices every input token at the cache-write rate and adds max_output_tokens, so settlement normally comes in below the reservation.

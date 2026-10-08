@@ -1,0 +1,1 @@
+verify_source() compares extracted paragraphs and table-cell units with a Hancom-produced PDF text layer in both directions and checks digit differences. It persists metrics and findings in fidelity_checks and updates non-human review status to auto_verified or auto_flagged. Native print recovery cannot use that same text layer as an independent witness.
