@@ -1,0 +1,1 @@
+service.py is about 3,000 lines. It mixes request orchestration, verification views, drafting and evaluation wrappers. Job registries (_DRAFT_JOBS, _MAINTENANCE_JOB) are module-level globals.

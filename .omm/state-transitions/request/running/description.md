@@ -1,0 +1,1 @@
+Set when run_queued claims the row (status queued and cancel_requested = 0), or directly by answer() and the free modes. Cancelling only sets cancel_requested. Work already dispatched still settles, and the next checkpoint stops the request.

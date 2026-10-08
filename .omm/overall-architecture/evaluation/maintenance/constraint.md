@@ -1,0 +1,1 @@
+step_keyword fails when nothing has been activated yet.

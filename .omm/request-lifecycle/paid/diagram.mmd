@@ -1,0 +1,9 @@
+graph TD
+  checks["Scope and checkpoint\nsrc/rfp_assistant/service/service.py"] -->|follow-up history| rewrite["Standalone query rewrite\nsrc/rfp_assistant/service/service.py"]
+  checks -->|first turn| prepare["Retrieve and price\nsrc/rfp_assistant/service/service.py"]
+  rewrite -->|standalone question| prepare
+  prepare -->|messages and token count| metered["Metered generation call\nsrc/rfp_assistant/service/service.py"]
+  prepare -->|no evidence| finish["Finish request\nsrc/rfp_assistant/service/service.py"]
+  metered -->|provider response| validate["Citation validation\nsrc/rfp_assistant/gateway/generation.py"]
+  metered -->|refused or failed| finish
+  validate -->|payload or TechnicalError| finish

@@ -1,0 +1,1 @@
+I did not trace the judge comparison (judges.py, judge_set.py), the sealed run (sealed.py) or the release report (release.py) in detail. They appear only through their service wrappers.

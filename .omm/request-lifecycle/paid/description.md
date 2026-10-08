@@ -1,0 +1,1 @@
+_paid_answer runs one paid request. Each paid stage is preceded by _checkpoint, which raises _Stop when the request was cancelled, is no longer running or the service is closing. The same check repeats inside the mark_dispatching transaction through _dispatch_guard.

@@ -1,0 +1,1 @@
+When the rendering exists (the Hancom print for HWP, the original for PDF), ocr.merge adds the cached region text as image_text elements next to the surrounding print text, and appends a suffix to the parser fingerprint. ingest only reads the OCR cache. The paid Gemini fallback runs only from the `ocr` CLI command, under its own $0.50 cap.

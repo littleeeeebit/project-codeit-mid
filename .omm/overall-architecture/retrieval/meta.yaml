@@ -1,0 +1,16 @@
+created: 2026-10-08T22:02:11.114Z
+updated: 2026-10-08T22:02:11.242Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: retrieval
+children:
+  - dense
+  - entry
+  - exact
+  - fallback
+  - fusion
+  - lexical
+  - packing
+  - routing
+parentPath: []

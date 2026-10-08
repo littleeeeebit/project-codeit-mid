@@ -1,1 +1,1 @@
-See state-transitions/serving-activation. Nothing activates on a schedule. A person picks a row (with name and note), and `activate_decision` switches serving in one transaction while keeping the history in `activations`.
+serving_config(run) copies a recorded run's mode, index_version, dense_version, embedding, reranker (depth, protect) and limits into active_run. Resources.run_settings then overrides the process settings with these values for every request. See state-transitions/activation.

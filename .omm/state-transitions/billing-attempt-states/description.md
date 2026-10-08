@@ -1,1 +1,0 @@
-The lifecycle of an `attempts` row in gateway/budget.py. `reserved`, `dispatching` and `unknown` hold reservation against the cap (`OPEN_STATES`).

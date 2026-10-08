@@ -1,0 +1,1 @@
+Written by _finish for technical_error, clarification_required or a refused frozen-run cost, and by _fail_unscheduled when the executor rejected the submit.

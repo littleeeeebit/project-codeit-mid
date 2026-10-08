@@ -1,0 +1,10 @@
+graph TD
+  entry["Service retrieve\nsrc/rfp_assistant/service/service.py"] -->|settings, scope pairs, query vector| fallback["Mode fallback check\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  fallback -->|effective mode| routing["Corpus routing and scope rows\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  routing -->|allowed rows| exact["Requirement code match\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  routing -->|allowed rows, dropped terms| lexical["Kiwi BM25 ranking\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  routing -->|allowed rows| dense["pgvector search\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  lexical -->|BM25 order| fusion["Fusion and rerank\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  dense -->|cosine order| fusion
+  exact -->|pinned ahead| packing["Evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  fusion -->|ranking| packing

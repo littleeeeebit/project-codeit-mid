@@ -1,0 +1,1 @@
+Decide whether the preview gets a caller (for example a comparison next to the fidelity check) or stays test-only. Any HWPX ingestion would also need manifest and format support in corpus/ingestion.py.

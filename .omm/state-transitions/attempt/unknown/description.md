@@ -1,0 +1,1 @@
+The outcome is unknown: a timeout, connection loss, 5xx, missing usage, failed settlement, or a restart during dispatch. The reservation keeps counting as pending.

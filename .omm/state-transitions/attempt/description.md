@@ -1,0 +1,1 @@
+attempts.state is the ledger for every paid stage: query_rewrite, generation, query embedding, drafting and evaluation. Spent money is the sum over settled attempts. Pending money is reserved, dispatching and unknown attempts, and pending counts against the cap.

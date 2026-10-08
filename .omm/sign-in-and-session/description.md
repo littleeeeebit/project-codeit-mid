@@ -1,1 +1,0 @@
-How a browser gets an identity, and how that identity is pinned to every API call and every paid attempt. This was observed in api.py (`_auth_routes`, `_Session`), service/auth.py (`Login`, `Hub`), service.bind_request, and web/src/components/sign-in.tsx with web/src/lib/api.ts.

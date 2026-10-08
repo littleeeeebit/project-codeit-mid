@@ -1,0 +1,1 @@
+ask-page.tsx submit() posts /api/ask and keeps each turn's Owned record. A pending ref blocks double submits. If the component unmounted before the response arrived, it calls abandon. A follow-up sends the last turn's request_id as previous_request_id. Each turn polls GET /api/requests/{id}?generation_id&target and opens the stream only for paid modes.

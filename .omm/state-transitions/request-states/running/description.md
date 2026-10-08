@@ -1,1 +1,0 @@
-Entered only through `run_queued`'s conditional UPDATE, or directly for free modes and the synchronous `answer()` entry. While running, `cancel_request` only sets `cancel_requested=1`. The next `_checkpoint` or `_dispatch_guard` stops further paid stages, and `answer_progress` withdraws the partial (`data: null`).

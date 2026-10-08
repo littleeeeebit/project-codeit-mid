@@ -13,10 +13,8 @@ children:
 - gateway-owner
 - key-sessions
 - langfuse-tracing
-- metered-call
 - openai-transport
 - owner-reconciliation
-- tracing
 parentPath: []
 prev_diagram: "graph TD\r\n  metered-call[\"Metered call\\nsrc/rfp_assistant/service/service.py\"\
   ] -->|\"reserve max cost\"| budget-ledger[\"Budget ledger\\nsrc/rfp_assistant/gateway/budget.py\"\

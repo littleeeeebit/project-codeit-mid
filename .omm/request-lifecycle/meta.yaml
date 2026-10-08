@@ -1,14 +1,13 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-06 22:40:19.457000+00:00
-update_count: 29
+updated: 2026-10-08 22:02:15.906000+00:00
+update_count: 31
 last_field: diagram
-git_commit: '8486353'
-git_branch: web-login-jupyterhub-oauth
+git_commit: 380ac04
+git_branch: fix/hwp-hwpx-loader
 children:
 - answer-stream
 - answer-validation
 - ask-page
-- ask-route
 - cancellation
 - evidence-retrieval
 - finish-record
@@ -16,24 +15,32 @@ children:
 - finish-step
 - langfuse-tracing
 - ownership-and-polling
+- paid
 - paid-answer
 - paid-answer-pipeline
 - paid-answer-stages
 - paid-call
-- request-runner
-- requests-table
+- requests
+- runner
+- screen
+- session
 - status-poll
+- stream
 - stream-and-poll
+- submit
 - submit-answer
 - validation
-prev_diagram: "graph TD\r\n  ask-composer[\"Ask composer\\nweb/src/components/ask/ask-page.tsx\"\
-  ] -->|\"POST /api/ask\"| submit-answer[\"Submit and admit\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  submit-answer -->|\"queued row, runner.submit\"| request-worker[\"Request\
-  \ worker\\nsrc/rfp_assistant/service/service.py\"]\r\n  request-worker -->|\"claims\
-  \ queued to running\"| paid-stages[\"Paid answer stages\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  paid-stages -->|\"partial text in memory\"| answer-stream[\"Answer stream\\\
-  nsrc/rfp_assistant/api.py\"]\r\n  paid-stages -->|\"validated result, billing\"\
-  | finish-request[\"Finish and store\\nsrc/rfp_assistant/service/service.py\"]\r\n\
-  \  answer-stream -->|\"SSE data then done\"| ask-composer\r\n  finish-request -->|\"\
-  result_json on requests row\"| status-poll[\"Status poll\\nsrc/rfp_assistant/api.py\"\
-  ]\r\n  status-poll -->|\"view plus attachable\"| ask-composer"
+prev_diagram: "graph TD\r\n  ask-page[\"Ask page\\nweb/src/components/ask/ask-page.tsx\"\
+  ]\r\n  ask-route[\"POST /api/ask\\nsrc/rfp_assistant/api.py\"]\r\n  submit-answer[\"\
+  Validate and persist\\nsrc/rfp_assistant/service/service.py\"]\r\n  requests-table[\"\
+  requests rows\\nsrc/rfp_assistant/storage/store.py\"]\r\n  request-runner[\"Request\
+  \ executor\\nsrc/rfp_assistant/service/service.py\"]\r\n  paid-answer-stages[\"\
+  Paid answer stages\\nsrc/rfp_assistant/service/service.py\"]\r\n  status-poll[\"\
+  Status poll\\nweb/src/lib/use-poll.ts\"]\r\n  answer-stream[\"Answer stream\\nweb/src/lib/use-answer-stream.ts\"\
+  ]\r\n  ask-page -->|scope, question, mode, previous| ask-route\r\n  ask-route -->|AnswerRequest,\
+  \ new generation id| submit-answer\r\n  submit-answer -->|insert under idempotency\
+  \ key| requests-table\r\n  submit-answer -->|admitted id| request-runner\r\n  request-runner\
+  \ -->|claim queued to running| paid-answer-stages\r\n  paid-answer-stages -->|_finish\
+  \ result and trace| requests-table\r\n  status-poll -->|GET status, attachable|\
+  \ requests-table\r\n  answer-stream -->|SSE of partial text| paid-answer-stages\r\
+  \n  ask-page -->|polls and streams each turn| status-poll"

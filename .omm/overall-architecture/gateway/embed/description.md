@@ -1,0 +1,1 @@
+dense.metered_embed follows the same reserve, dispatch, settle sequence for OpenAI embeddings. dense.query_vector calls it for an uncached query vector when allow_paid is set, and corpus embedding builds call it as well. A local embedding model runs on the GPU for free. Gemini embeddings go through models.gemini_embed against their own cap and the external_attempts ledger.

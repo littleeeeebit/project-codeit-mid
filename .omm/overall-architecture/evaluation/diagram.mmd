@@ -1,0 +1,7 @@
+graph TD
+  drafting["Question drafting\nsrc/rfp_assistant/service/drafting.py"] -->|candidates.jsonl submitted| gold["Gold review queue\nsrc/rfp_assistant/evaluation/gold.py"]
+  gold -->|approved rows to dataset file| runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  runs -->|recorded scores| compare["Comparison matrices\nsrc/rfp_assistant/evaluation/compare.py"]
+  compare -->|person picks a row| activation["activate_decision\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  activation -->|active_run and active_index| serving["Serving resolver\nsrc/rfp_assistant/service/service.py"]
+  maintenance["Maintenance sequence\nsrc/rfp_assistant/storage/maintenance.py"] -->|rebuilt index regression| compare

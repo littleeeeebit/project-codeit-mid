@@ -1,0 +1,1 @@
+A single bad row, for example a .hwpx file, makes read_manifest_csv raise IngestionError for the whole manifest. It is not quarantined per row, so an HWPX original currently blocks manifest import entirely.

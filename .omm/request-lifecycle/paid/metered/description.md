@@ -1,0 +1,1 @@
+The generation stage goes through _metered_chat (see overall-architecture/gateway/caller) with streaming on. The on_delta callback writes the content so far to Resources.partials[request_id]. GET /api/requests/{id}/stream reads it through answer_progress and passes it through generation.partial_answer.

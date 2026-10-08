@@ -1,0 +1,9 @@
+graph TD
+  reserved["Reserved\nsrc/rfp_assistant/gateway/budget.py"] -->|mark_dispatching passes guard| dispatching["Dispatching\nsrc/rfp_assistant/gateway/budget.py"]
+  reserved -->|guard refusal, no key, restart| released["Released\nsrc/rfp_assistant/gateway/budget.py"]
+  dispatching -->|settle with usage| settled["Settled\nsrc/rfp_assistant/gateway/budget.py"]
+  dispatching -->|4xx before execution| released
+  dispatching -->|timeout, 5xx, no usage, restart| unknown["Unknown\nsrc/rfp_assistant/gateway/budget.py"]
+  unknown -->|owner reconcile| reconciled["Reconciled\nsrc/rfp_assistant/gateway/budget.py"]
+  unknown -->|owner settle from evidence| settled
+  reconciled -->|late usage arrives| settled

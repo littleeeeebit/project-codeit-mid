@@ -1,0 +1,1 @@
+Inserted by budget.reserve with reserved_micro_usd equal to max_cost and the rate snapshot in price_json. Not yet sent to the provider.

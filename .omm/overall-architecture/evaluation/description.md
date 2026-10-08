@@ -1,0 +1,1 @@
+This is the loop by which a person changes what serves. Nothing activates by itself and nothing runs on a schedule.

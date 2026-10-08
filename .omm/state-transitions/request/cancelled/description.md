@@ -1,0 +1,1 @@
+Set by cancel_request on a queued row, or by _finish when cancel_requested was set while running. may_attach refuses to show a cancelled request as the current answer.

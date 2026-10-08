@@ -1,0 +1,1 @@
+mark_dispatching refuses every dispatch while any PostgreSQL attempt is in state unknown, and a settlement overrun freezes the ledger. Either one stops all paid work for every member until the owner reconciles or unfreezes through the CLI.

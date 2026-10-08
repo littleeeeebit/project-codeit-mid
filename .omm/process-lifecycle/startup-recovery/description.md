@@ -1,1 +1,0 @@
-Runs only when this process newly took the lock: `recover_requests` (queued and running → interrupted) and `budget.recover` (dispatching → unknown, reserved → released; the same for Gemini `external_attempts`). The counts are kept in `res.recovered`. Nothing is replayed.

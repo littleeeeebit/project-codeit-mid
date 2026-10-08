@@ -1,1 +1,0 @@
-Set by `done(..., request_status='failed')` for clarification_required (a `ServiceError` during execution), for technical_error (provider failures, validation failures, retrieval or pricing exceptions), and by `_fail_unscheduled` when `runner.submit` raised after the row was inserted. The admission slot is released in that last case.

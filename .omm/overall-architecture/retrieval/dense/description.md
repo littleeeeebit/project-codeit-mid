@@ -1,0 +1,1 @@
+PgDenseIndex.search in retrieval/vector_store.py returns the top-k rows by cosine similarity from the verified pgvector set, limited to the allowed rows. It runs an exact scan unless the run's dense_search is 'hnsw', in which case it uses the HNSW index with transaction-local ef_search. The README records that HNSW missed recall@20 0.99, so exact search serves.

@@ -1,0 +1,9 @@
+created: 2026-10-08T22:02:13.597Z
+updated: 2026-10-08T22:02:13.598Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: tracing
+children: []
+parentPath:
+  - gateway

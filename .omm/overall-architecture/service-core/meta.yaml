@@ -10,16 +10,13 @@ children:
 - app-resources
 - background-jobs
 - conversation-context
-- gold-review
 - metered-chat
 - paid-answer
-- request-runner
 - resources
 - resources-owner
 - serving-config
 - submit
 - tracing
-- verifier-runs
 parentPath: []
 prev_diagram: "graph TD\r\n  resources[\"Resources owner\\nsrc/rfp_assistant/service/service.py\"\
   ] -->|\"creates on first paid ask\"| request-runner[\"RequestRunner executor\\nsrc/rfp_assistant/service/service.py\"\

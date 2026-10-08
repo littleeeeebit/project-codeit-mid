@@ -1,0 +1,8 @@
+graph TD
+  caller["Metered chat\nsrc/rfp_assistant/service/service.py"] -->|reserve max cost| ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"]
+  embed["Metered embedding\nsrc/rfp_assistant/retrieval/dense.py"] -->|reserve per batch| ledger
+  ledger -->|owner_guard inside transaction| owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
+  caller -->|chat after dispatching mark| transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
+  embed -->|embed after dispatching mark| transport
+  transport -->|ownership check per call| owner
+  caller -->|spans, usage, cost| tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]

@@ -1,0 +1,1 @@
+Every open stream re-reads the requests row and its attempts every 150 ms on a worker thread. With six members this is cheap, but the cost grows with each open stream.

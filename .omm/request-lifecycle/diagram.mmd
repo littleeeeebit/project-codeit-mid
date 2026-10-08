@@ -1,18 +1,9 @@
 graph TD
-  ask-page["Ask page\nweb/src/components/ask/ask-page.tsx"]
-  ask-route["POST /api/ask\nsrc/rfp_assistant/api.py"]
-  submit-answer["Validate and persist\nsrc/rfp_assistant/service/service.py"]
-  requests-table["requests rows\nsrc/rfp_assistant/storage/store.py"]
-  request-runner["Request executor\nsrc/rfp_assistant/service/service.py"]
-  paid-answer-stages["Paid answer stages\nsrc/rfp_assistant/service/service.py"]
-  status-poll["Status poll\nweb/src/lib/use-poll.ts"]
-  answer-stream["Answer stream\nweb/src/lib/use-answer-stream.ts"]
-  ask-page -->|scope, question, mode, previous| ask-route
-  ask-route -->|AnswerRequest, new generation id| submit-answer
-  submit-answer -->|insert under idempotency key| requests-table
-  submit-answer -->|admitted id| request-runner
-  request-runner -->|claim queued to running| paid-answer-stages
-  paid-answer-stages -->|_finish result and trace| requests-table
-  status-poll -->|GET status, attachable| requests-table
-  answer-stream -->|SSE of partial text| paid-answer-stages
-  ask-page -->|polls and streams each turn| status-poll
+  screen["Ask screen\nweb/src/components/ask/ask-page.tsx"] -->|POST /api/ask| session["Session middleware\nsrc/rfp_assistant/api.py"]
+  session -->|member bound to request| submit["ask and submit_answer\nsrc/rfp_assistant/service/service.py"]
+  submit -->|INSERT status queued| requests[("requests table\nsrc/rfp_assistant/storage/store.py")]
+  submit -->|request_id only| runner["RequestRunner executor\nsrc/rfp_assistant/service/service.py"]
+  runner -->|run_queued claims row| paid["Paid answer pipeline\nsrc/rfp_assistant/service/service.py"]
+  paid -->|_finish stores outcome| requests
+  paid -->|partial text in memory| stream["Status poll and SSE\nweb/src/lib/use-answer-stream.ts"]
+  stream -->|GET status and stream| requests

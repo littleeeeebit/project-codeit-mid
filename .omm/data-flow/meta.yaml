@@ -1,37 +1,43 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-06 22:40:25.308000+00:00
-update_count: 28
+updated: 2026-10-08 22:02:24.164000+00:00
+update_count: 30
 last_field: diagram
-git_commit: '8486353'
-git_branch: web-login-jupyterhub-oauth
+git_commit: 380ac04
+git_branch: fix/hwp-hwpx-loader
 children:
 - activation
-- cited-evidence
 - corpus-ingestion
-- dense-build
 - extraction
-- extractions
 - fidelity-and-ocr
 - fidelity-check
 - fidelity-ocr
 - frozen-runs
 - index-build
-- keyword-build
+- ingest
+- keyword
+- manifest
 - ocr-merge
 - original-corpus
 - original-files
 - originals
+- preview
+- retrieval
 - retrieval-runs
 - retrieval-selection
 - run-selection
 - source-originals
-prev_diagram: "graph TD\r\n  original-files[\"Original files\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ] -->|\"manifest then ingest\"| extraction-artifacts[\"Extraction artifacts\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  extraction-artifacts -->|\"build-keyword chunks\"| keyword-index-build[\"\
-  Keyword index build\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  keyword-index-build\
-  \ -->|\"payload hashes embedded\"| embedding-sets[\"pgvector sets\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
-  ]\r\n  gold-datasets[\"Gold datasets\\nsrc/rfp_assistant/evaluation/gold.py\"] -->|\"\
-  reviewed dev rows\"| frozen-runs[\"Frozen runs\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  keyword-index-build -->|\"index manifest bound\"| frozen-runs\r\n  embedding-sets\
-  \ -->|\"dense_version bound\"| frozen-runs\r\n  frozen-runs -->|\"activate-run decision\"\
-  | request-records[\"Request records\\nsrc/rfp_assistant/service/service.py\"]"
+- vectors
+prev_diagram: "graph TD\r\n  originals[\"Originals and CSV manifest\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  fidelity-ocr[\"Fidelity print and OCR\\nsrc/rfp_assistant/corpus/fidelity.py\"\
+  ]\r\n  extractions[\"Extraction revisions\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  keyword-build[\"Keyword index build\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  dense-build[\"Dense vector sets\\nsrc/rfp_assistant/retrieval/dense.py\"\
+  ]\r\n  retrieval-runs[\"Frozen runs and matrices\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
+  ]\r\n  activation[\"Serving activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
+  ]\r\n  cited-evidence[\"Answers and citations\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  originals -->|manifest, ingest by hash| extractions\r\n  fidelity-ocr -->|print\
+  \ text, image_text| extractions\r\n  extractions -->|elements, review status| keyword-build\r\
+  \n  keyword-build -->|chunk payloads| dense-build\r\n  keyword-build -->|index version|\
+  \ retrieval-runs\r\n  dense-build -->|dense set version| retrieval-runs\r\n  retrieval-runs\
+  \ -->|person picks a row| activation\r\n  activation -->|active_run, active_index|\
+  \ cited-evidence"

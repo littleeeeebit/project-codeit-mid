@@ -1,1 +1,1 @@
-How original RFP files become cited evidence. Each stage writes immutable, content-addressed artifacts plus PostgreSQL rows, and later stages pin the exact versions they used, so issued citations stay resolvable after re-parses and re-indexes.
+How a historical RFP original becomes cited evidence. Each stage writes immutable files plus hash-bound rows, so a later stage can verify what it reads. Serving reads only what the activated run names.

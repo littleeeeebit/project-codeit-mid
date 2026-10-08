@@ -1,0 +1,1 @@
+Written by _finish for any domain outcome: an answer, insufficient_evidence, budget_blocked or ingestion_unavailable. The answer's status field in result_json gives the domain status.
