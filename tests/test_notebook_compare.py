@@ -110,6 +110,13 @@ class ComparisonTest(unittest.TestCase):
         self.assertNotIn("<script>", rendered)
         self.assertIn("&lt;script&gt;", rendered)
 
+    def test_bundle_rejects_empty_required_collections(self):
+        bundle = json.loads((compare.ROOT / compare.INPUT).read_text(encoding="utf-8"))
+        for key in ("documents", "questions", "fusion", "vectors", "answers", "logging"):
+            with self.subTest(collection=key):
+                with self.assertRaisesRegex(ValueError, f"{key} requires at least one case"):
+                    compare.validate_bundle({**bundle, key: []})
+
     def test_bundle_rejects_duplicate_ids_and_unchecked_questions(self):
         bundle = json.loads((compare.ROOT / compare.INPUT).read_text(encoding="utf-8"))
         compare.validate_bundle(bundle)

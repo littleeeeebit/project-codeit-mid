@@ -298,10 +298,10 @@ def validate_bundle(bundle: dict) -> None:
         rows = bundle[key]
         if not isinstance(rows, list) or any(not isinstance(r, dict) or not isinstance(r.get("id"), str) for r in rows):
             raise ValueError(f"{key} must contain objects with string IDs")
+        if not rows:
+            raise ValueError(f"{key} requires at least one case")
         if len({r["id"] for r in rows}) != len(rows):
             raise ValueError(f"duplicate IDs in {key}")
-    if not bundle["documents"] or not bundle["questions"]:
-        raise ValueError("at least one document and one question are required")
     docs = {d["id"] for d in bundle["documents"]}
     for doc in bundle["documents"]:
         if (not isinstance(doc.get("xml"), str) or not isinstance(doc.get("source_hash"), str)

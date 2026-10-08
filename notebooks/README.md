@@ -92,7 +92,8 @@ both versions receive the exact same updated bundle.
 The input bundle contains document XML, preservation phrases, questions with
 document scopes and required/forbidden evidence, fixed fusion rankings, vectors,
 recorded answers with evidence, and expected log redactions. Keep IDs unique in
-each collection. Empty-evidence questions must explicitly set `expect_empty`.
+each collection, and include at least one case in every required collection.
+Empty-evidence questions must explicitly set `expect_empty`.
 Use development cases; do not expose sealed evaluation questions through this
 notebook. Any private inputs and outputs belong under ignored `.runtime/`, not
 in a committed notebook output.
