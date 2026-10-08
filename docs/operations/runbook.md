@@ -164,6 +164,8 @@ systemctl status bidmate-update.path                               # active (wai
 
 Until step 1 runs, the VM runs a commit that was deployed from a bundle and is not on `main` (PRs are squash-merged). The page then shows no banner, and `GET /api/update/status` says in `note` that the running commit cannot be fast-forwarded.
 
+Live check (2026-10-08). After PR #31 merged, a member with sudo ran the one-time setup above. On <http://35.255.64.243:8501> they confirmed four things. The banner appeared for a real newer `main` commit. The button was faded while a paid question ran. 취소 did nothing. Confirming updated the server, and the service came back.
+
 The VM serves the owner host's restored database, whose rows keep Windows paths (`C:\Users\dasdk\PycharmProjects\project-codeit-mid\...`). `RFP_PATH_MAP=C:/Users/dasdk/PycharmProjects/project-codeit-mid=/srv/bidmate/app` maps them onto the copied originals and runtime. Every reader of a recorded original, extraction or index path goes through `postgres.host_path`. Paths written on the VM are Linux paths and need no mapping.
 
 ### 3.3 The move (2026-10-06)
