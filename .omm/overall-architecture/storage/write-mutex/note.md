@@ -1,1 +1,0 @@
-The source marks this as a deliberate `ponytail:` simplification (one global write mutex). Its stated upgrade path is per-account locks, if measured throughput requires them.

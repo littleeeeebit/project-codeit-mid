@@ -1,1 +1,0 @@
-Each open stream holds a threadpool thread that sleeps in a loop for the whole generation. With six executor workers and up to twelve admitted requests, this competes with other sync routes for the default AnyIO threadpool.

@@ -1,0 +1,1 @@
+tools/infra/bidmate.service runs as bidmate from /srv/bidmate/app, reads /etc/bidmate/server.env and starts uvicorn on 0.0.0.0:8501 with --workers 1. SIGINT and a 120-second systemd stop timeout allow bounded Resources shutdown and settlement. Restart-on-failure recreates process-local identity/key state and runs durable recovery.

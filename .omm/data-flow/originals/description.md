@@ -1,1 +1,1 @@
-These are the files under `RFP_SOURCE_DIR/files`, listed in `data_list.csv`. `sources.source_hash` is their SHA-256, rechecked on every ingest and at startup through the validated references. Downloads are served read-only by `original_download`.
+import_manifest() retains raw and normalized notice metadata while hashing original HWP/PDF files. Shared content maps to one source_hash and multiple doc_ids when notices differ. Original files remain managed evidence; metadata conflicts and resolutions affect filter/display facts and index metadata snapshots.

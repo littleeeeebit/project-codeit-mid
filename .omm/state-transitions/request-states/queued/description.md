@@ -1,1 +1,0 @@
-Set by `_create(..., "queued")` for paid modes after an admission slot is taken. Nothing has been dispatched yet. `cancel_request` here is conclusive: status becomes `cancelled` with a stored result saying there was no paid call.

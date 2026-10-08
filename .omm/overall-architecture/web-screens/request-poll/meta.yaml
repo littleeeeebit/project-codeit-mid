@@ -1,9 +1,0 @@
-created: 2026-10-08T22:32:58.025Z
-updated: 2026-10-08T22:32:58.026Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: request-poll
-children: []
-parentPath:
-  - web-screens

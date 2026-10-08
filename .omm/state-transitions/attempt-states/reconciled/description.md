@@ -1,1 +1,0 @@
-Set by the owner's `budget.reconcile` with a dated provider interval covering the unknown attempt. A later `settle` of the same attempt is still allowed and offset.

@@ -1,1 +1,0 @@
-`app.mount("/", StaticFiles(directory=web/out, html=True))` is mounted last, and only when `web/out` exists, so `/api/*` always reaches the API. Non-`/api` paths skip `_Session`, because the screens are static and log in through the API.

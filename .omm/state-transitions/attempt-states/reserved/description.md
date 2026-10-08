@@ -1,1 +1,0 @@
-Inserted by `budget.reserve` with `reserved_micro_usd`, the maximum cost. It counts as `pending` against the cap. `budget.recover` releases reserved attempts that were never dispatched before a restart.

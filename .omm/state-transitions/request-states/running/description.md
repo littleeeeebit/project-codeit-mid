@@ -1,1 +1,0 @@
-Set by the `run_queued` claim (`WHERE status='queued' AND cancel_requested=0`), or directly by `_create(..., "running")` for free modes and synchronous `answer`. `cancel_request` only sets `cancel_requested=1`, and `_stop_reason` then refuses the next paid stage.

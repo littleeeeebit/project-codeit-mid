@@ -1,46 +1,50 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-08 22:33:09.218000+00:00
-update_count: 38
+updated: 2026-10-08 21:41:59.080000+00:00
+update_count: 36
 last_field: diagram
-git_commit: 5274f73
-git_branch: fix/hwp-hwpx-loader
+git_commit: 86d9b1f
+git_branch: gpt5-mini-answer-embedding-comparison
 children:
+- admission
 - answer-stream
 - answer-validation
 - ask-page
-- ask-screen
+- browser
 - cancellation
+- delivery
 - evidence-retrieval
-- finish
+- execution
 - finish-record
 - finish-request
 - finish-step
 - langfuse-tracing
-- ledger
 - metered-call
+- outcome
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
 - paid-answer-stages
 - paid-call
 - poll-and-stream
-- request-runner
-- session-guard
+- preparation
+- provider
 - status-poll
-- status-stream
 - stream-and-poll
-- submit
 - submit-and-admit
 - submit-answer
 - validation
-prev_diagram: "graph TD\r\nbrowser[\"Submit conversation turn\\nweb/src/components/ask/ask-page.tsx\"\
-  ] -->|Question mode scope previous| admission[\"Authenticate and persist ownership\\\
-  nsrc/rfp_assistant/service/service.py\"]\r\nadmission -->|Request ID and copied\
-  \ context| execution[\"Execute claimed request\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\nexecution -->|Standalone question and scope| preparation[\"Retrieve and price\
-  \ evidence\\nsrc/rfp_assistant/service/service.py\"]\r\npreparation -->|Evidence-bound\
-  \ prompt and ceiling| provider[\"Dispatch metered generation\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\nprovider -->|Content usage and response identity| outcome[\"Validate and persist\
-  \ outcome\\nsrc/rfp_assistant/service/service.py\"]\r\nprovider -->|Unvalidated\
-  \ content deltas| delivery[\"Stream and status consumers\\nweb/src/lib/use-answer-stream.ts\"\
-  ]\r\noutcome -->|Terminal status and stored answer| delivery"
+prev_diagram: "graph TD\r\n  compose-turn[\"Compose turn\\nweb/src/components/ask/ask-page.tsx\"\
+  ]\r\n  admit-and-persist[\"Validate and persist\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  worker-claim[\"Executor claim\\nsrc/rfp_assistant/service/service.py\"]\r\
+  \n  rewrite-follow-up[\"Follow-up rewrite\\nsrc/rfp_assistant/gateway/generation.py\"\
+  ]\r\n  retrieve-and-price[\"Retrieve and price\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  generate-and-stream[\"Generate and stream\\nsrc/rfp_assistant/gateway/generation.py\"\
+  ]\r\n  validate-and-finish[\"Validate and finish\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  attach-or-history[\"Attach or keep history\\nweb/src/lib/use-answer-stream.ts\"\
+  ]\r\n  compose-turn -->|\"POST /api/ask\"| admit-and-persist\r\n  admit-and-persist\
+  \ -->|\"request id to executor\"| worker-claim\r\n  worker-claim -->|\"follow-up\
+  \ turns only\"| rewrite-follow-up\r\n  worker-claim -->|\"first turn\"| retrieve-and-price\r\
+  \n  rewrite-follow-up -->|\"standalone question\"| retrieve-and-price\r\n  retrieve-and-price\
+  \ -->|\"messages and estimate\"| generate-and-stream\r\n  generate-and-stream -->|\"\
+  provider response\"| validate-and-finish\r\n  validate-and-finish -->|\"result_json\
+  \ stored\"| attach-or-history\r\n  attach-or-history -->|\"1 s poll, SSE\"| compose-turn"

@@ -1,1 +1,0 @@
-`answer_progress` returns `finished` and the parsed `partial`, which exists only while the request runs, uncancelled, under the same generation. The SSE route emits changes and `done`. After `done`, `useAnswerStream` triggers a reload of the status poll, which returns `RequestOut{view, attachable}`.

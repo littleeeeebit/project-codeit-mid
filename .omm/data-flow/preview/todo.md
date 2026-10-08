@@ -1,1 +1,1 @@
-Decide whether the preview gets a caller (for example a comparison next to the fidelity check) or stays test-only. Any HWPX ingestion would also need manifest and format support in corpus/ingestion.py.
+Decide whether the preview gets a caller (for example a comparison next to the fidelity check) or stays test-only. Any HWPX ingestion would also need manifest and format support in corpus/ingestion.py. If it is wired in, give it its own parser fingerprint so it creates a new extraction revision instead of overwriting one.

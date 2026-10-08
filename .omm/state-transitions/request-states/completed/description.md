@@ -1,1 +1,0 @@
-Set by `_finish` for domain outcomes such as answered, `insufficient_evidence`, `ingestion_unavailable` or `budget_blocked` (with a refused admission), when the row was still running and no cancel was requested.

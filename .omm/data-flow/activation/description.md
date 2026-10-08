@@ -1,1 +1,1 @@
-`app_settings.active_run` (JSON from `serving_config`) and `app_settings.active_index`, with an append-only `activations` history. Before any activation, `build-keyword` moves `active_index` alone and the keyword default serves.
+activate_decision() changes active_run and active_index together and appends previous configuration, decision, actor and time to activations. service.active_serving() reads these pointers and applies runtime stale-policy fallbacks. Building or scoring a candidate does not itself invoke activation.

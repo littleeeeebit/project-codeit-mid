@@ -1,18 +1,16 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-08T22:32:57.141Z
-update_count: 40
+updated: 2026-10-08T21:41:46.942Z
+update_count: 38
 last_field: diagram
-git_commit: 5274f73
-git_branch: fix/hwp-hwpx-loader
+git_commit: 86d9b1f
+git_branch: gpt5-mini-answer-embedding-comparison
 children:
   - api-layer
   - api-routes
   - api-shell
   - budget-ledger
-  - cli
   - corpus-pipeline
   - data-stores
-  - evaluation
   - evaluation-suite
   - http
   - http-api
@@ -39,24 +37,43 @@ children:
   - workflows
 prev_diagram: "graph TD\r
 
-  web[\"Browser screens\\nweb/src/app/layout.tsx\"] -->|Authenticated HTTP
-  actions| http[\"HTTP boundary\\nsrc/rfp_assistant/api.py\"]\r
+  \  web-screens[\"Next.js screens\\nweb/src/app/layout.tsx\"]\r
 
-  http -->|Principal and request inputs| service[\"Application
-  service\\nsrc/rfp_assistant/service/service.py\"]\r
+  \  http-api[\"FastAPI wrapper\\nsrc/rfp_assistant/api.py\"]\r
 
-  service -->|Question and document scope| retrieval[\"Evidence
-  retrieval\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
+  \  service-core[\"Service core\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  service -->|Records and transactions| persistence[\"Persistent
-  state\\nsrc/rfp_assistant/storage/store.py\"]\r
+  \  retrieval-engine[\"Retrieval
+  engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
 
-  retrieval -->|Scoped vectors and artifacts| persistence\r
+  \  paid-gateway[\"Paid gateway\\nsrc/rfp_assistant/gateway/budget.py\"]\r
 
-  workflows[\"Corpus and evaluation workflows\\nsrc/rfp_assistant/cli.py\"]
-  -->|Pinned answer execution| service\r
+  \  storage[\"PostgreSQL and
+  .runtime\\nsrc/rfp_assistant/storage/postgres.py\"]\r
 
-  workflows -->|Revisions and measured selections| persistence\r
+  \  offline-pipelines[\"Corpus and evaluation
+  pipelines\\nsrc/rfp_assistant/evaluation/evaluation.py\"]\r
 
-  service -->|Request spans and outcomes| tracing[\"Optional
-  tracing\\nsrc/rfp_assistant/gateway/tracing.py\"]"
+  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"]\r
+
+  \  web-screens -->|\"same-origin /api fetch, SSE\"| http-api\r
+
+  \  http-api -->|\"one service call per route\"| service-core\r
+
+  \  service-core -->|\"scoped retrieval\"| retrieval-engine\r
+
+  \  service-core -->|\"reserve, dispatch, settle\"| paid-gateway\r
+
+  \  service-core -->|\"requests, audit, catalog\"| storage\r
+
+  \  retrieval-engine -->|\"index files, pgvector queries\"| storage\r
+
+  \  paid-gateway -->|\"ledger transactions\"| storage\r
+
+  \  service-core -->|\"starts background jobs\"| offline-pipelines\r
+
+  \  owner-cli -->|\"runs pipelines\"| offline-pipelines\r
+
+  \  owner-cli -->|\"ledger administration\"| service-core\r
+
+  \  offline-pipelines -->|\"artifacts, runs, activation\"| storage"

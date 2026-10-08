@@ -1,1 +1,0 @@
-A process killed during a restore check leaves its `rfp_mrestore_*` scratch database behind; an owner has to drop it by name.

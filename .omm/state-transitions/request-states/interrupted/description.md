@@ -1,1 +1,0 @@
-Set by `RequestRunner.shutdown` (queued rows, plus running rows when futures are still pending), by `recover_requests` at the next owner startup, or by `_Stop("interrupted")` when `res._closed` is set or the row is no longer running. Interrupted requests are never re-executed.

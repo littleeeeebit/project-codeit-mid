@@ -1,0 +1,1 @@
+ingest_source() produces elements with raw/search text, source ordering, parent structure, table information and locations. assign_revision() preserves changed output beside earlier artifacts. sources.active_extraction_id moves to the newly parsed revision, but existing index manifests and gold rows still name their own revisions.

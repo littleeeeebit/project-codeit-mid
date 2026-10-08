@@ -1,1 +1,0 @@
-Set by `budget.settle` from reported usage. A cost above the reservation freezes the ledger (`frozen_reason`). A settlement after reconciliation adds a negative adjustment, so the provider total is not counted twice.

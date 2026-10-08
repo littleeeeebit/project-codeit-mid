@@ -1,1 +1,0 @@
-Sends `{scope, question, mode, previous_request_id}` and keeps `Owned{request_id, generation_id, target}`. `target` is `service.target_key`, a hash of the scope, normalized question, mode, date and previous turn. The screen renders an outcome as the current answer only while it still asks exactly that.

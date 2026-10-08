@@ -1,1 +1,0 @@
-Statuses are stored in `requests.status`, and `RequestView` exposes `queued`, `running`, `completed`, `failed`, `cancelled` and `interrupted`. `cancel_requested` is a separate flag set on a running request.

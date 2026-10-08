@@ -1,0 +1,1 @@
+release() accepts reserved attempts, or dispatching attempts only when pre-execution rejection is confirmed. Restart recovery releases never-dispatched reserved work. Released reservations no longer consume pending capacity and do not represent a claimed provider charge.

@@ -7,6 +7,10 @@ git_branch: gpt5-mini-answer-embedding-comparison
 children:
 - app
 - app-process
+- browser
+- cli
+- database
+- hub
 - key-sessions
 - openai-api
 - postgresql-container

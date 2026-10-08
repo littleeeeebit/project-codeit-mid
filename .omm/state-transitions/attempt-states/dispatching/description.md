@@ -1,1 +1,0 @@
-Set by `mark_dispatching` just before the network call. After a restart, `budget.recover` turns it into `unknown`, because the call may have executed.

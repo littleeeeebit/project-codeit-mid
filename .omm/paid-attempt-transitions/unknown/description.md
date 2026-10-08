@@ -1,0 +1,1 @@
+mark_unknown() retains dispatched work after timeout, connection loss, missing usage or settlement failure. budget.recover() converts leftover dispatching OpenAI and Gemini embedding attempts to unknown. OpenAI dispatch and Gemini external admission block further calls while unresolved uncertainty remains.

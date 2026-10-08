@@ -1,1 +1,0 @@
-Nothing in `src/` calls it; only `tests/test_hwp_loader.py` does. `docs/hwp-loader-preview-review.md` states that it is not connected to production ingestion.

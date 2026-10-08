@@ -1,1 +1,0 @@
-`import_manifest` reads `data_list.csv` (`read_manifest_csv` and `normalize_row` parse typed dates and amounts with flags), hashes every file in `files/` and writes the `documents` and `sources` rows. Byte-identical files share one source hash but keep their own CSV metadata. `resolve-metadata` records canonical values for fields that conflict.

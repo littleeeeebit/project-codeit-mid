@@ -1,1 +1,0 @@
-`web/src/app/settings/page.tsx` reads and writes `GET/PUT /api/settings/api-key`, `PUT /api/settings/model` and `GET /api/budget` / `PUT /api/budget/limit`. The key goes to `service.set_api_key`, which checks it with a free metadata call (`generation.check_api_key`), creates a new key session and keeps the key only in process memory.

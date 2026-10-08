@@ -1,1 +1,0 @@
-Paid CLI runs (`run-answers`, `build-dense`, `run-judges`, `latency-run`) need the UI stopped, because only one process may own the paid gateway.

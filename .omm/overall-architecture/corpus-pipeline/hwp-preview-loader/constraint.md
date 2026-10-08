@@ -1,1 +1,0 @@
-Preview and comparison only. The loader groups the body first, then tables and notes, so it cannot replace `walk_hwp` without losing native paragraph and table interleaving, cell spans, pages and coordinates.

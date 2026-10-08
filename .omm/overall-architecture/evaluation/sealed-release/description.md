@@ -1,1 +1,0 @@
-`freeze-release` records the release candidate: the activated run, the code, metric, prompt, model, rate and settings hashes, and the frozen manifests. The sealed set then runs once (`sealed.py`). `release-report` (`release.py`) reads the recorded evidence and decides `ready`, `limited` or `blocked`.

@@ -1,1 +1,0 @@
-`compare.MATRICES` (lexical, chunking, embedding, reranker) runs each declared axis over three populations. It caches cells under `compare/cells/` and writes `compare/tables/<matrix>.{json,md}`. Uncached paid embedding rows stop as `needs_approval` with an estimate until `compare --approve`. The 실험 비교 (experiment comparison) view reads these tables through `service.experiments`.
