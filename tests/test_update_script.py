@@ -64,6 +64,7 @@ class UpdateScriptTest(unittest.TestCase):
         self.env_file = root / "server.env"
         self.env_file.write_text(f"# comment\nRFP_CONFIG_FILE={unix(self.config)}\n"
                                  f"RFP_PATH_MAP=C:/Users/owner/project={unix(root)}\n"
+                                 f"BIDMATE_UPDATE_REQUEST={unix(self.request)}\n"  # consumed before the check
                                  "BIDMATE_HUB_URL=http://35.255.64.243:8000\n", encoding="utf-8", newline="\n")
         self.git("init", "--quiet", "--bare", "--initial-branch=main", str(self.remote), cwd=root)
         self.git("clone", "--quiet", str(self.remote), str(self.work), cwd=root)

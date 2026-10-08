@@ -94,6 +94,7 @@ check_env_paths() {
         case "$key" in ''|\#*) continue ;; esac
         value=${value%$'\r'}; value=${value%\"}; value=${value#\"}; value=${value%\'}; value=${value#\'}
         path=${value##*=}  # RFP_PATH_MAP is <windows path>=<linux path>: the Linux side
+        [ "$key" = BIDMATE_UPDATE_REQUEST ] && path=$(dirname "$path")  # the marker itself is gone by now
         case "$path" in
             /*) [ -e "$path" ] || { log "server.env $key names a missing path: $path"; ok=1; } ;;
         esac

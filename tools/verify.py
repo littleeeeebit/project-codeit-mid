@@ -1017,7 +1017,8 @@ def wait_button(button, disabled: bool, timeout_s: float) -> tuple[bool, float]:
     while state[0] != disabled and time.monotonic() < deadline:
         time.sleep(0.5)
         state = button_state(button)
-    return state
+    time.sleep(0.5)  # the button's opacity transition settles
+    return button_state(button)
 
 
 @flow("update-banner")
