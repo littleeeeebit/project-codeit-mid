@@ -1,0 +1,1 @@
+The loader groups the full body first and then tables and notes. It cannot replace walk_hwp without losing native paragraph and table order, cell spans, pages and coordinates, which chunking, citations and the fidelity check depend on.

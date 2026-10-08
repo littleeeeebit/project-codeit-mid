@@ -20,6 +20,7 @@ children:
 - original-corpus
 - original-files
 - originals
+- preview
 - requests
 - retrieval-runs
 - retrieval-selection

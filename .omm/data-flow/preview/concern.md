@@ -1,0 +1,1 @@
+The module sits in storage/ although it is a corpus parser like parse_hwp and parse_pdf in corpus/ingestion.py. It would still be unreachable for HWPX even if wired in, because read_manifest_csv rejects .hwpx rows and recover_source refuses HWPX.

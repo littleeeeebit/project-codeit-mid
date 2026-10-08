@@ -5,6 +5,7 @@
 # Original parsing (HWP structured XML via pyhwp, PDF via PyMuPDF)
 pymupdf==1.28.2
 pyhwp==0.1b15
+langchain-hwp-hwpx-loader==0.1.1
 
 # Korean keyword retrieval
 kiwipiepy==0.24.0

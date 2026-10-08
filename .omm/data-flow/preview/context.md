@@ -1,0 +1,1 @@
+This is the fix/hwp-hwpx-loader branch (commits 21fbfd0, 194fa37, 380ac04). docs/hwp-loader-preview-review.md says it is a read-only preview or comparison adapter and that the production HWP XML walker and PDF parser are unchanged.
