@@ -6,21 +6,14 @@ kind: nested-class
 title: offline-pipelines
 children:
 - activation
-- answer-release
 - cli
 - comparison-runner
 - corpus-pipeline
 - embedding-builds
 - evaluation-release
 - fidelity
-- fidelity-ocr
-- gold-queue
-- index-build
 - maintenance
-- maintenance-sequence
-- manifest-ingest
 - ocr
-- retrieval-evaluation
 - runs
 parentPath: []
 prev_diagram: "graph TD\r\n  cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"]\r\n  ingestion[\"\

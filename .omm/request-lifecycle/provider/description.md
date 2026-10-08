@@ -1,0 +1,1 @@
+_metered_chat() reserves against shared cap, purpose envelope and optional consent ceiling, then atomically checks cancellation, interruption, ownership and unresolved billing before marking dispatching. OpenAITransport sends the request once. Provider usage settles even if later answer validation fails; uncertain call failures retain a pending maximum reservation.

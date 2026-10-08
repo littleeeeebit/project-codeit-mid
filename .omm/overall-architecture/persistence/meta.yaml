@@ -1,9 +1,13 @@
 created: 2026-10-04 13:34:46.770000+00:00
-updated: 2026-10-04 13:34:47.067000+00:00
-update_count: 3
-last_field: todo
+updated: 2026-10-08T21:41:56.986Z
+update_count: 5
+last_field: diagram
 kind: nested-class
 title: persistence
 children:
-- postgresql
+  - artifacts
+  - backup
+  - postgresql
+  - sql
+  - vectors
 parentPath: []

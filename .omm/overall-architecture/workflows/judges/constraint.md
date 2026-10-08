@@ -1,0 +1,1 @@
+Jev calls have no retry and keep provider-reported usage/cost separate from OpenAI accounting. Translation failure and judge errors can yield abstention or stop records. This workflow compares answer judges; it is unrelated to repository PR review.

@@ -1,1 +1,0 @@
-Reached two ways: a conclusive cancel while queued, with no dispatch; or a running request with `cancel_requested` that then finished or stopped at a checkpoint. A call already dispatched keeps its reservation until its usage or provider evidence arrives, and the outcome never attaches to the screen.

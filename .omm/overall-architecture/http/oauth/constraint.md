@@ -1,0 +1,1 @@
+Login.from_env() refuses missing hub configuration and refuses mixing hub settings with BIDMATE_LOCAL_MEMBER. Passwords remain at JupyterHub; no application user table is maintained.

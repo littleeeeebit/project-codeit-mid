@@ -1,0 +1,1 @@
+A conflicting_evidence result requires conflicts, at least two alternatives per conflict and a next action. This structural rule applies only to that status and is shared with offline grading. Runtime reference validation does not prove that every generated claim is semantically supported.

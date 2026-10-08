@@ -1,8 +1,13 @@
 created: 2026-10-05 21:24:06.553000+00:00
-updated: 2026-10-06 07:31:42.157000+00:00
-update_count: 5
-last_field: diagram
-git_commit: 80ccafa
-git_branch: deploy-gcp-vm-ssh-tunnel
+updated: 2026-10-08T21:42:06.049Z
+update_count: 9
+last_field: concern
+git_commit: 86d9b1f
+git_branch: gpt5-mini-answer-embedding-comparison
 children:
-- restore-check
+  - backup
+  - build
+  - ingest
+  - regression
+  - report
+  - restore-check

@@ -1,0 +1,1 @@
+Hybrid retrieval does not use arbitrary nearest neighbors when there is no lexical match, exact hit or recognized name-only query. It reports no_lexical_match:dense_not_used instead.

@@ -1,0 +1,1 @@
+Queued cancellation stores a cancelled result and cancel_requested=1 immediately. Running cancellation is observed before later stages or during _finish(); a normally completed late outcome becomes cancelled execution. may_attach() rejects cancel_requested and cancelled state, while history can retain the result and settled billing.

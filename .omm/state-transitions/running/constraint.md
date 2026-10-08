@@ -1,0 +1,1 @@
+Background workers operate on IDs and persisted snapshots, not frontend state.

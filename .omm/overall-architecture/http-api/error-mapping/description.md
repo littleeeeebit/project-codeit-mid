@@ -1,1 +1,0 @@
-Exception handlers map `ServiceError` to 400 {detail} and `auth.AuthError` to 403 {detail}. Pydantic validation errors keep FastAPI's 422, which the screens show as a generic message. `ApiKeyIn.api_key` deliberately has no constraints, so a validation error can never echo the key back.

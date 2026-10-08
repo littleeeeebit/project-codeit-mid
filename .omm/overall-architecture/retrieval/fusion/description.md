@@ -1,0 +1,1 @@
+_candidates() combines lexical and dense rankings using the run's RRF weights or keyword-first policy. _rerank() invokes the selected local reranker over the specified depth, optionally protecting leading BM25 rows. A reranker failure returns hybrid ranking and a fallback reason. Timings include reranker queue and inference costs.

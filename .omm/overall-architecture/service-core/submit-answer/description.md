@@ -1,5 +1,0 @@
-`ask()` mints a generation_id, which doubles as the idempotency key, and returns {request_id, generation_id, target}. `target_key` hashes the scope, the whitespace-normalized question, the mode, as_of and the previous turn. `submit_answer` then works in four steps:
-- `_validate_request` checks the mode, the question length, the document count (1–2, none for corpus, exactly 2 for compare) and any frozen verifier run.
-- `_conversation` checks the chain: same member, a terminal status, the same scope, at most 6 turns.
-- `_create` inserts the request row with the input hash, the config snapshot hash and the request snapshot in one transaction. A reused key with a different input hash is refused; the same key returns the existing request.
-- Free modes (metadata, inventory) execute inline on the HTTP thread. Paid modes are queued, and a full queue is refused before any row is written.

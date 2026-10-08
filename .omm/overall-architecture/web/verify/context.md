@@ -1,0 +1,1 @@
+Evaluation and release conclusions precede metric details and comparisons with the baseline. Owner operations remain grouped separately in the menu, although authenticated members currently have the capabilities to invoke them.

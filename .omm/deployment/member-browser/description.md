@@ -1,1 +1,0 @@
-An allowed member opens http://<vm>:8501, is redirected to the hub to sign in, and from then on sends `bidmate_session` only on /api/. Every screen call names its account in `X-BidMate-Account`.

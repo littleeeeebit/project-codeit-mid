@@ -1,0 +1,8 @@
+graph TD
+corpus["Original extraction and fidelity\nsrc/rfp_assistant/corpus/ingestion.py"] -->|Eligible extraction revisions| indexes["Keyword and embedding builds\nsrc/rfp_assistant/retrieval/dense.py"]
+indexes -->|Pinned retrieval candidates| comparison["Measured comparisons and activation\nsrc/rfp_assistant/evaluation/compare.py"]
+corpus -->|Source-bound development excerpts| gold["Drafting and gold decisions\nsrc/rfp_assistant/evaluation/gold.py"]
+gold -->|Reviewed frozen evaluation rows| answers["Answer evaluation\nsrc/rfp_assistant/service/answers.py"]
+comparison -->|Finalist retrieval configurations| answers
+answers -->|Claims and blind references| judges["Judge comparison\nsrc/rfp_assistant/evaluation/judges.py"]
+answers -->|Scored and sealed evidence| release["Release freeze and reporting\nsrc/rfp_assistant/evaluation/release.py"]

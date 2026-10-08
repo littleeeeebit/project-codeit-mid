@@ -1,1 +1,0 @@
-The call may have executed, but no usage was recorded: a timeout, a 5xx, a closed transport, missing usage, a settlement failure, or the process ending during dispatch. The attempt keeps its reservation and blocks new dispatches until the owner resolves it with `settle` (dated provider evidence) or `reconcile`. The CLI `unresolved` lists these attempts.

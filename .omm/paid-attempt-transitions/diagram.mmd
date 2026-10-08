@@ -1,0 +1,9 @@
+graph TD
+reserved["Reserved maximum cost\nsrc/rfp_assistant/gateway/budget.py"] -->|Atomic dispatch guard passes| dispatching["Dispatch marker persisted\nsrc/rfp_assistant/gateway/budget.py"]
+reserved -->|Refusal cancellation or recovery| released["Reservation released\nsrc/rfp_assistant/gateway/budget.py"]
+dispatching -->|Confirmed pre-execution rejection| released
+dispatching -->|Provider reports usable usage| settled["Usage settled exactly once\nsrc/rfp_assistant/gateway/budget.py"]
+dispatching -->|Uncertain response or restart| unknown["Billing remains unknown\nsrc/rfp_assistant/gateway/budget.py"]
+unknown -->|Provider usage evidence arrives| settled
+unknown -->|Provider total reconciled| reconciled["Evidence-based reconciliation\nsrc/rfp_assistant/gateway/budget.py"]
+reconciled -->|Late usage with adjustment| settled

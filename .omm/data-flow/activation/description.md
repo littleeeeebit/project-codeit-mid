@@ -1,0 +1,1 @@
+activate_decision() changes active_run and active_index together and appends previous configuration, decision, actor and time to activations. service.active_serving() reads these pointers and applies runtime stale-policy fallbacks. Building or scoring a candidate does not itself invoke activation.

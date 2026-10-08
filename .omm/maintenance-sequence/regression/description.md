@@ -1,0 +1,1 @@
+step_regression() compares Kiwi keyword and serving configurations on both served and rebuilt indexes through compare.regression(). Failed or unapproved rows stop maintenance. Questions whose pinned evidence revision disappeared from the rebuilt population are reported as needs_evidence_review rather than counted as successful evaluation.

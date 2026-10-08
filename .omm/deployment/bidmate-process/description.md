@@ -1,1 +1,0 @@
-The single uvicorn process holds the static screens, /api, the request executor, the background jobs, the in-memory sessions and member keys, and the gateway advisory lock. Restarting it signs everyone out and drops entered keys. On startup, it marks unfinished requests interrupted and dispatching attempts unknown.

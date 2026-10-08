@@ -1,0 +1,1 @@
+Maintenance does not automatically activate its rebuilt index. Paid embedding or query misses require the corresponding estimate approval; local embedding is free.

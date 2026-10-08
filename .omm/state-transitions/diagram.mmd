@@ -1,14 +1,9 @@
 graph TD
-  request-states["Request states\nsrc/rfp_assistant/storage/store.py"]
-  attempt-states["Attempt ledger states\nsrc/rfp_assistant/gateway/budget.py"]
-  admission-switches["Paid admission switches\nsrc/rfp_assistant/gateway/budget.py"]
-  source-states["Source parse and review\nsrc/rfp_assistant/corpus/ingestion.py"]
-  gold-candidate-states["Gold candidate review\nsrc/rfp_assistant/evaluation/gold.py"]
-  serving-activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  request-states -->|"each paid stage reserves"| attempt-states
-  attempt-states -->|"aggregate billing_state"| request-states
-  admission-switches -->|"refuse reserve or dispatch"| attempt-states
-  attempt-states -->|"overrun freezes, unknown blocks"| admission-switches
-  source-states -->|"review filter, served extraction"| serving-activation
-  gold-candidate-states -->|"approved rows scored"| serving-activation
-  serving-activation -->|"config snapshot per request"| request-states
+queued["Queued request\nsrc/rfp_assistant/service/service.py"] -->|Worker claims uncancelled row| running["Running request\nsrc/rfp_assistant/service/service.py"]
+queued -->|Owner cancels before claim| cancelled["Cancelled execution\nsrc/rfp_assistant/service/service.py"]
+queued -->|Shutdown or restart recovery| interrupted["Interrupted execution\nsrc/rfp_assistant/service/service.py"]
+queued -->|Executor submission fails| failed["Failed execution\nsrc/rfp_assistant/service/service.py"]
+running -->|Normal outcome persisted| completed["Completed execution\nsrc/rfp_assistant/service/service.py"]
+running -->|Execution or validation error| failed
+running -->|Stop checkpoint or finalization| cancelled
+running -->|Shutdown or restart recovery| interrupted

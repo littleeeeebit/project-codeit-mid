@@ -1,0 +1,1 @@
+RequestRunner.shutdown() stops admission, waits a bounded time, cancels unstarted futures and marks unfinished rows interrupted. recover_requests() marks leftover queued/running rows interrupted under exclusive startup ownership. Requests are not replayed; budget.recover() separately resolves reservation uncertainty.

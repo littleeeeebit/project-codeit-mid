@@ -1,0 +1,1 @@
+WEB resolves to repository web/out. create_app mounts StaticFiles at / after all API routes when that directory exists. web/next.config.ts uses output='export' and trailingSlash=true in production, so the supplied deployment needs no Node server at runtime. An absent export leaves the API running without this static mount.

@@ -1,47 +1,79 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-07 06:24:14.903000+00:00
-update_count: 36
+updated: 2026-10-08T21:41:46.942Z
+update_count: 38
 last_field: diagram
-git_commit: e4bab69
-git_branch: verify-page-criteria-and-roles
+git_commit: 86d9b1f
+git_branch: gpt5-mini-answer-embedding-comparison
 children:
-- api-layer
-- api-routes
-- api-shell
-- budget-ledger
-- corpus-pipeline
-- data-stores
-- evaluation-suite
-- http-api
-- langfuse-tracing
-- offline-pipelines
-- openai-transport
-- owner-cli
-- paid-gateway
-- persistence
-- postgres-store
-- postgresql-store
-- provider-transport
-- retrieval-engine
-- runtime-artifacts
-- service-core
-- service-layer
-- storage
-- web-pages
-- web-screens
-prev_diagram: "graph TD\r\n  web-screens[\"Next.js screens\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  api-shell[\"FastAPI shell\\nsrc/rfp_assistant/api.py\"]\r\n  service-core[\"\
-  Service core\\nsrc/rfp_assistant/service/service.py\"]\r\n  retrieval-engine[\"\
-  Retrieval engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  paid-gateway[\"\
-  Paid gateway\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n  postgresql-store[\"PostgreSQL\
-  \ and pgvector\\nsrc/rfp_assistant/storage/postgres.py\"]\r\n  offline-pipelines[\"\
-  Offline pipelines\\nsrc/rfp_assistant/cli.py\"]\r\n  openai-provider[\"OpenAI provider\\\
-  nsrc/rfp_assistant/gateway/generation.py\"]\r\n  web-screens -->|\"JSON fetch, SSE\
-  \ stream\"| api-shell\r\n  api-shell -->|\"one service call per route\"| service-core\r\
-  \n  service-core -->|\"scoped question\"| retrieval-engine\r\n  service-core -->|\"\
-  reserve, call, settle\"| paid-gateway\r\n  paid-gateway -->|\"chat and embeddings\"\
-  | openai-provider\r\n  retrieval-engine -->|\"index rows, vector search\"| postgresql-store\r\
-  \n  paid-gateway -->|\"attempts ledger, advisory lock\"| postgresql-store\r\n  service-core\
-  \ -->|\"requests, audit rows\"| postgresql-store\r\n  service-core -->|\"starts\
-  \ eval and maintenance jobs\"| offline-pipelines\r\n  offline-pipelines -->|\"extractions,\
-  \ indexes, activation\"| postgresql-store"
+  - api-layer
+  - api-routes
+  - api-shell
+  - budget-ledger
+  - corpus-pipeline
+  - data-stores
+  - evaluation-suite
+  - http
+  - http-api
+  - langfuse-tracing
+  - offline-pipelines
+  - openai-transport
+  - owner-cli
+  - paid-gateway
+  - persistence
+  - postgres-store
+  - postgresql-store
+  - provider-transport
+  - retrieval
+  - retrieval-engine
+  - runtime-artifacts
+  - service
+  - service-core
+  - service-layer
+  - storage
+  - tracing
+  - web
+  - web-pages
+  - web-screens
+  - workflows
+prev_diagram: "graph TD\r
+
+  \  web-screens[\"Next.js screens\\nweb/src/app/layout.tsx\"]\r
+
+  \  http-api[\"FastAPI wrapper\\nsrc/rfp_assistant/api.py\"]\r
+
+  \  service-core[\"Service core\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  retrieval-engine[\"Retrieval
+  engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
+
+  \  paid-gateway[\"Paid gateway\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  storage[\"PostgreSQL and
+  .runtime\\nsrc/rfp_assistant/storage/postgres.py\"]\r
+
+  \  offline-pipelines[\"Corpus and evaluation
+  pipelines\\nsrc/rfp_assistant/evaluation/evaluation.py\"]\r
+
+  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"]\r
+
+  \  web-screens -->|\"same-origin /api fetch, SSE\"| http-api\r
+
+  \  http-api -->|\"one service call per route\"| service-core\r
+
+  \  service-core -->|\"scoped retrieval\"| retrieval-engine\r
+
+  \  service-core -->|\"reserve, dispatch, settle\"| paid-gateway\r
+
+  \  service-core -->|\"requests, audit, catalog\"| storage\r
+
+  \  retrieval-engine -->|\"index files, pgvector queries\"| storage\r
+
+  \  paid-gateway -->|\"ledger transactions\"| storage\r
+
+  \  service-core -->|\"starts background jobs\"| offline-pipelines\r
+
+  \  owner-cli -->|\"runs pipelines\"| offline-pipelines\r
+
+  \  owner-cli -->|\"ledger administration\"| service-core\r
+
+  \  offline-pipelines -->|\"artifacts, runs, activation\"| storage"

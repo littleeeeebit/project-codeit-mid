@@ -1,0 +1,1 @@
+The model registry supports pinned local embeddings plus OpenAI and Gemini embeddings. Default Settings names BGE-m3-ko for builds; serving uses the model identity recorded in the activated run.

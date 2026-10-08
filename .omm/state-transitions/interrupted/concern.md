@@ -1,0 +1,1 @@
+_finish() documents that interrupted outcomes are history-only, but may_attach() does not explicitly reject interrupted status. TurnView renders a terminal result when attachable is true. A late stored result on an interrupted request can therefore remain attachable if its generation and target still match.

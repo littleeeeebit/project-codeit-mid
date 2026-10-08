@@ -1,0 +1,9 @@
+created: 2026-10-08T21:41:50.796Z
+updated: 2026-10-08T21:41:50.796Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: runner
+children: []
+parentPath:
+  - service

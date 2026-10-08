@@ -1,0 +1,1 @@
+Cancellation prevents later paid stages, not completion of an already dispatched network call. That call can still settle. Billing scope and interactive answer model remain those bound when the HTTP request began.

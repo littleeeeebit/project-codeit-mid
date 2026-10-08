@@ -1,0 +1,1 @@
+Normal inference calls occur outside database transactions. Startup validates migration/import or restore receipts and referenced artifacts. The pool defaults to eight connections, with a dedicated gateway-owner connection in addition.

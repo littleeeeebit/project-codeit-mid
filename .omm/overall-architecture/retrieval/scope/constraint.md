@@ -1,0 +1,1 @@
+Routing-policy changes invalidate old measured activations. active_serving() falls back with an explicit stale-run reason until a current comparison is activated.

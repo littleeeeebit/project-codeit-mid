@@ -1,0 +1,1 @@
+OpenAI accounting persists one attempt per paid stage. Reservation records the maximum cost, frozen rate card, member, request, purpose and billing scope. Dispatch uncertainty remains committed spending until usage or reconciliation resolves it. Request cancellation and model-output quality do not erase provider accounting.

@@ -1,0 +1,1 @@
+Search checks model and dimensions again and filters allowed rows in SQL. HNSW indexes are maintenance-built, dimension-specific and selected only by a measured run; standard HNSW dimensions are limited to 2,000.
