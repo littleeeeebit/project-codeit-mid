@@ -1,0 +1,1 @@
+Set by `release` from `reserved`, or from `dispatching` when `confirmed_pre_execution` (an SDK 4xx, or a lost owner before the call). Set by `mark_dispatching` when the stop guard refuses, and by restart recovery for reserved attempts. A released attempt costs nothing.

@@ -1,0 +1,1 @@
+`_Session` admits the call: correct origin, live session, matching `X-BidMate-Account`. `bind_request` pins `KEY_SESSION`, `REQUEST_MODEL` and `BILLING_SCOPE`. The executor work inherits that context, so a member who changes key or model later does not affect a request already submitted.

@@ -1,0 +1,18 @@
+graph TD
+  resources["Process owner Resources\nsrc/rfp_assistant/service/service.py"]
+  serving-config["Active serving config\nsrc/rfp_assistant/service/service.py"]
+  submit-answer["Validate, persist, admit\nsrc/rfp_assistant/service/service.py"]
+  request-runner["RequestRunner executor\nsrc/rfp_assistant/service/service.py"]
+  execute-request["Traced execution\nsrc/rfp_assistant/service/service.py"]
+  paid-answer["Paid answer pipeline\nsrc/rfp_assistant/service/service.py"]
+  metered-chat["Metered chat call\nsrc/rfp_assistant/service/service.py"]
+  background-jobs["Verifier job threads\nsrc/rfp_assistant/service/service.py"]
+  submit-answer -->|admit slot, submit id| request-runner
+  submit-answer -->|free modes inline| execute-request
+  request-runner -->|run_queued claim| execute-request
+  execute-request -->|single, compare, corpus| paid-answer
+  paid-answer -->|retrieve under activation| serving-config
+  paid-answer -->|rewrite and generate| metered-chat
+  resources -->|owns executor and transport| request-runner
+  resources -->|caches index, dense, reranker| serving-config
+  resources -->|joins on close| background-jobs

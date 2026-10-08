@@ -1,0 +1,1 @@
+`usePoll` keys a poll by `request_id/generation_id` and drops late responses for a key the screen has left. The README describes a one-second read-only poll of `GET /api/requests/{id}`, whose `RequestOut.attachable` comes from `service.may_attach`. This analysis did not read `use-poll.ts` line by line; the interval comes from the README.

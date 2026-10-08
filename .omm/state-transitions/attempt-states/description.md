@@ -1,0 +1,1 @@
+States are stored in `attempts.state` and checked by every transition's `WHERE state IN (...)`. `_bump` increments the ledger revision on each change.

@@ -1,1 +1,0 @@
-Paid preparation can return ingestion_unavailable without model dispatch, rewrite a follow-up, retrieve one or both document scopes, search the routed corpus, or reconstruct a frozen verifier run. No packed evidence returns insufficient_evidence. _priced() builds messages and strict response schema and counts request tokens before reservation.

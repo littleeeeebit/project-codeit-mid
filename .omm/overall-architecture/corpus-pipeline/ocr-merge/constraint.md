@@ -1,0 +1,1 @@
+OCR text is chunked separately, cited as OCR and skipped by the fidelity check.

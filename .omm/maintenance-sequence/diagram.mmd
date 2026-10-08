@@ -1,5 +1,0 @@
-graph TD
-backup["Backup and isolated restore check\nsrc/rfp_assistant/storage/maintenance.py"] -->|Verified rollback evidence| ingest["Manifest ingestion and fidelity\nsrc/rfp_assistant/storage/maintenance.py"]
-ingest -->|Current eligible extractions| build["Candidate index and embeddings\nsrc/rfp_assistant/storage/maintenance.py"]
-build -->|Served and rebuilt versions| regression["Regression comparison table\nsrc/rfp_assistant/storage/maintenance.py"]
-regression -->|Completed or stopped steps| report["Checkpoint and maintenance report\nsrc/rfp_assistant/storage/maintenance.py"]

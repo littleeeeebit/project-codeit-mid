@@ -1,0 +1,1 @@
+Set on a queued request by `cancel_request`. On a running request it comes from `_Stop("cancelled")` at a checkpoint or dispatch, or from `_finish` converting a completion when `cancel_requested` is set. `may_attach` never attaches a cancelled request.

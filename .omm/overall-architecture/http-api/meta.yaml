@@ -1,10 +1,17 @@
 created: 2026-10-04 13:34:42.449000+00:00
-updated: 2026-10-07 06:24:16.742000+00:00
-update_count: 15
+updated: 2026-10-08T22:32:58.813Z
+update_count: 17
 last_field: diagram
 kind: nested-class
 title: http-api
 children:
-- route-groups
-- stream-route
+  - account-routes
+  - answer-stream-route
+  - ask-routes
+  - route-groups
+  - session-middleware
+  - sign-in
+  - static-export
+  - stream-route
+  - verify-routes
 parentPath: []

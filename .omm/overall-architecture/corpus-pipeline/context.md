@@ -1,0 +1,1 @@
+The original corpus has 100 CSV associations and 98 active sources, per the README. Originals are never modified.

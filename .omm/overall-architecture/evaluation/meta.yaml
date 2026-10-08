@@ -1,0 +1,15 @@
+created: 2026-10-08T22:33:07.827Z
+updated: 2026-10-08T22:33:07.967Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: evaluation
+children:
+  - activation
+  - answer-runs
+  - comparison-matrices
+  - gold-drafting
+  - gold-queue
+  - retrieval-runs
+  - sealed-release
+parentPath: []

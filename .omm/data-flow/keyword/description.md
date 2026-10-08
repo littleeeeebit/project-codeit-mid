@@ -1,1 +1,0 @@
-build_keyword_index() freezes the chunk profile, analyzer fingerprint, review scope, extraction set and metadata-term snapshot into index identity. It publishes hash-checked files and corresponding indexes/chunks/requirements rows. KeywordIndex.load() verifies artifacts and reconstructs BM25 plus element provenance before serving.

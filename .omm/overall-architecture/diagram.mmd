@@ -1,9 +1,23 @@
 graph TD
-web["Browser screens\nweb/src/app/layout.tsx"] -->|Authenticated HTTP actions| http["HTTP boundary\nsrc/rfp_assistant/api.py"]
-http -->|Principal and request inputs| service["Application service\nsrc/rfp_assistant/service/service.py"]
-service -->|Question and document scope| retrieval["Evidence retrieval\nsrc/rfp_assistant/retrieval/retrieval.py"]
-service -->|Records and transactions| persistence["Persistent state\nsrc/rfp_assistant/storage/store.py"]
-retrieval -->|Scoped vectors and artifacts| persistence
-workflows["Corpus and evaluation workflows\nsrc/rfp_assistant/cli.py"] -->|Pinned answer execution| service
-workflows -->|Revisions and measured selections| persistence
-service -->|Request spans and outcomes| tracing["Optional tracing\nsrc/rfp_assistant/gateway/tracing.py"]
+  web-screens["Next.js screens\nweb/src/app"]
+  http-api["FastAPI routes and session\nsrc/rfp_assistant/api.py"]
+  cli["Owner CLI\nsrc/rfp_assistant/cli.py"]
+  service-core["Service core and executor\nsrc/rfp_assistant/service/service.py"]
+  retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  paid-gateway["Paid gateway and ledger\nsrc/rfp_assistant/gateway/budget.py"]
+  storage["PostgreSQL and runtime files\nsrc/rfp_assistant/storage/postgres.py"]
+  corpus-pipeline["Corpus ingestion\nsrc/rfp_assistant/corpus/ingestion.py"]
+  evaluation["Evaluation and activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  web-screens -->|fetch api with account header| http-api
+  http-api -->|one service call per route| service-core
+  cli -->|admin and paid commands| service-core
+  cli -->|ingest, ocr, fidelity| corpus-pipeline
+  cli -->|runs, compare, activate-run| evaluation
+  service-core -->|scoped retrieval| retrieval-engine
+  service-core -->|reserve, call, settle| paid-gateway
+  service-core -->|verify jobs and activation| evaluation
+  retrieval-engine -->|index files and pgvector| storage
+  paid-gateway -->|attempt rows| storage
+  corpus-pipeline -->|extractions and elements| storage
+  evaluation -->|active_run and active_index| storage
+  service-core -->|requests and traces| storage

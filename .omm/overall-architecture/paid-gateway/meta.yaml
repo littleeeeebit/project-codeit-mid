@@ -1,31 +1,48 @@
 created: 2026-10-05 04:06:18.173000+00:00
-updated: 2026-10-07 06:24:20.903000+00:00
-update_count: 24
+updated: 2026-10-08T22:33:03.283Z
+update_count: 26
 last_field: diagram
 kind: nested-class
 title: paid-gateway
 children:
-- answer-validation
-- budget-admission
-- budget-ledger
-- dispatch-guard
-- dispatch-marker
-- fake
-- gateway-owner
-- key-sessions
-- langfuse-tracing
-- ledger
-- openai-transport
-- owner-reconciliation
-- tracing
+  - admission
+  - answer-validation
+  - budget-admission
+  - budget-ledger
+  - dispatch-guard
+  - dispatch-marker
+  - fake
+  - gateway-owner
+  - key-sessions
+  - langfuse-tracing
+  - ledger
+  - openai-transport
+  - owner-reconciliation
+  - settlement
+  - tracing
 parentPath: []
-prev_diagram: "graph TD\r\n  ledger[\"Budget ledger\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\n  key-sessions[\"Member key sessions\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\n  owner-lock[\"Gateway advisory lock\\nsrc/rfp_assistant/storage/postgres.py\"\
-  ]\r\n  tracing[\"Langfuse tracing\\nsrc/rfp_assistant/gateway/tracing.py\"]\r\n\
-  \  fake[\"Fake transport\\nsrc/rfp_assistant/gateway/generation.py\"]\r\n  ledger\
-  \ -->|\"require_owner, owner_guard\"| owner-lock\r\n  transport -->|\"_check_owner\
-  \ before call\"| owner-lock\r\n  transport -->|\"client per KEY_SESSION\"| key-sessions\r\
-  \n  tracing -->|\"wraps each call\"| transport\r\n  fake -->|\"stands in when provider\
-  \ fake\"| transport"
+prev_diagram: "graph TD\r
+
+  \  ledger[\"Budget ledger\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"]\r
+
+  \  key-sessions[\"Member key
+  sessions\\nsrc/rfp_assistant/gateway/generation.py\"]\r
+
+  \  owner-lock[\"Gateway advisory
+  lock\\nsrc/rfp_assistant/storage/postgres.py\"]\r
+
+  \  tracing[\"Langfuse tracing\\nsrc/rfp_assistant/gateway/tracing.py\"]\r
+
+  \  fake[\"Fake transport\\nsrc/rfp_assistant/gateway/generation.py\"]\r
+
+  \  ledger -->|\"require_owner, owner_guard\"| owner-lock\r
+
+  \  transport -->|\"_check_owner before call\"| owner-lock\r
+
+  \  transport -->|\"client per KEY_SESSION\"| key-sessions\r
+
+  \  tracing -->|\"wraps each call\"| transport\r
+
+  \  fake -->|\"stands in when provider fake\"| transport"

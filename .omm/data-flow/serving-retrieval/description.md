@@ -1,0 +1,1 @@
+`service.retrieve` reads `active_serving` on each call, so a new activation applies to the next request without a restart. It overlays the run's limits through `run_settings`, retrieves within the scope and returns `EvidenceUnit`s. `open_evidence` later resolves a unit's `element_ids` against `_ordered_elements(extraction_id)` to show the quote in context.

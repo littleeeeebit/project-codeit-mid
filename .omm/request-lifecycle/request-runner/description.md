@@ -1,0 +1,1 @@
+`RequestRunner.submit` schedules `_run(request_id)` on a `ThreadPoolExecutor` (request_workers, 6 per the README). The slot (request_admission, 12) is released in `finally`.

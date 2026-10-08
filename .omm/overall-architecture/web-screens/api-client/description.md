@@ -1,0 +1,1 @@
+`web/src/lib/api.ts` wraps fetch. Every call sends `X-BidMate-Account` (`accountHeaders()`), the URL-encoded account the screen loaded as. A 401 outside `/api/auth/` replaces the page with `/api/auth/login`. A 409 carrying `X-BidMate-Account-Changed: 1` reloads the page. Originals are downloaded from `/api/originals/{doc_id}/{source_hash}`.

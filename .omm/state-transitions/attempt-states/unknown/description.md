@@ -1,0 +1,1 @@
+Set by `mark_unknown` when the call may have executed but no usage was recorded (timeout, connection loss, stream error, missing usage, settlement failure), or by restart recovery. Its reservation still counts toward the cap.

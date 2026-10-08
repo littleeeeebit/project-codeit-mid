@@ -1,33 +1,57 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-07 06:24:18.175000+00:00
-update_count: 23
+updated: 2026-10-08T22:33:00.659Z
+update_count: 25
 last_field: diagram
 kind: nested-class
 title: service-core
 children:
-- answer-check
-- answer-pipeline
-- app-resources
-- background-jobs
-- conversation-context
-- metered-chat
-- paid-answer
-- partials
-- resources
-- resources-owner
-- serving-config
-- submit
-- tracing
+  - answer-check
+  - answer-pipeline
+  - app-resources
+  - background-jobs
+  - conversation-context
+  - execute-request
+  - metered-chat
+  - paid-answer
+  - partials
+  - request-runner
+  - resources
+  - resources-owner
+  - serving-config
+  - submit
+  - submit-answer
+  - tracing
 parentPath: []
-prev_diagram: "graph TD\r\n  resources[\"Process owner Resources\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  runner[\"Bounded request runner\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  paid-answer[\"Paid answer path\\nsrc/rfp_assistant/service/service.py\"]\r\
-  \n  free-answer[\"Free metadata and inventory\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  conversation[\"Conversation and rewrite\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  partials[\"Streamed partials map\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  jobs[\"Background paid jobs\\nsrc/rfp_assistant/service/drafting.py\"]\r\n\
-  \  resources -->|\"lazily creates\"| runner\r\n  runner -->|\"run_queued by request\
-  \ ID\"| paid-answer\r\n  paid-answer -->|\"follow-up history\"| conversation\r\n\
-  \  paid-answer -->|\"on_delta text\"| partials\r\n  resources -->|\"index, dense,\
-  \ reranker\"| paid-answer\r\n  resources -->|\"index inventory rows\"| free-answer\r\
-  \n  resources -->|\"joins on close\"| jobs"
+prev_diagram: "graph TD\r
+
+  \  resources[\"Process owner
+  Resources\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  runner[\"Bounded request runner\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  paid-answer[\"Paid answer path\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  free-answer[\"Free metadata and
+  inventory\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  conversation[\"Conversation and
+  rewrite\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  partials[\"Streamed partials
+  map\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  jobs[\"Background paid jobs\\nsrc/rfp_assistant/service/drafting.py\"]\r
+
+  \  resources -->|\"lazily creates\"| runner\r
+
+  \  runner -->|\"run_queued by request ID\"| paid-answer\r
+
+  \  paid-answer -->|\"follow-up history\"| conversation\r
+
+  \  paid-answer -->|\"on_delta text\"| partials\r
+
+  \  resources -->|\"index, dense, reranker\"| paid-answer\r
+
+  \  resources -->|\"index inventory rows\"| free-answer\r
+
+  \  resources -->|\"joins on close\"| jobs"

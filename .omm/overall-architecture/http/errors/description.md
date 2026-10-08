@@ -1,1 +1,0 @@
-create_app registers ServiceError as HTTP 400 with a detail message and other service.SHELL_ERRORS through _forbidden as HTTP 403. Middleware independently returns 401 for missing identity, 409 for an account mismatch, 428 for unnamed mutations, and 503 for invalid login configuration. Pydantic validates route payload shapes before service execution.

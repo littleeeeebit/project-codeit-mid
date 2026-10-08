@@ -1,0 +1,14 @@
+graph TD
+  gold-drafting["Luna question drafting\nsrc/rfp_assistant/service/drafting.py"]
+  gold-queue["Gold review queue\nsrc/rfp_assistant/evaluation/gold.py"]
+  retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  comparison-matrices["Axis comparison matrices\nsrc/rfp_assistant/evaluation/compare.py"]
+  activation["Activation decision\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  answer-runs["Answer evaluation runs\nsrc/rfp_assistant/service/answers.py"]
+  sealed-release["Sealed run and release\nsrc/rfp_assistant/evaluation/sealed.py"]
+  gold-drafting -->|submit_drafts batch| gold-queue
+  gold-queue -->|approved reviewed rows| retrieval-runs
+  comparison-matrices -->|writes activatable runs| retrieval-runs
+  retrieval-runs -->|person picks a row| activation
+  activation -->|activated run and finalist| answer-runs
+  answer-runs -->|frozen candidate| sealed-release

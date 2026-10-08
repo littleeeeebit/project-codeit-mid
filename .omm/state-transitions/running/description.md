@@ -1,1 +1,0 @@
-A claimed worker reconstructs the request and enters execution. cancel_request() sets cancel_requested without immediately marking a dispatched worker finished. _checkpoint() and the transactional dispatch guard prevent a subsequent paid stage. The provider call already in progress may still return and settle.

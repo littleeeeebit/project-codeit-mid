@@ -1,0 +1,1 @@
+If it is ever wired in, decide whether it belongs in `corpus/` next to `parse_hwp` rather than in `storage/`, and give it its own parser fingerprint so it creates a new extraction revision instead of overwriting one.

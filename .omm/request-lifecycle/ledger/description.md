@@ -1,0 +1,1 @@
+For each paid stage (query embedding, rewrite, generation), `budget.reserve` admits or refuses with a reason. `mark_dispatching` turns that into dispatching or a release, and the result is `settle`, `release` or `mark_unknown`. `_billing` aggregates the attempts per request for `RequestView.billing_state` and the reserved and settled sums the screen shows.

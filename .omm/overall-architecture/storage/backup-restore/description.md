@@ -1,0 +1,1 @@
+`postgres_backup.backup` writes a consistent dump plus a table and artifact manifest. `restore_check` restores into an empty isolated database (`RFP_RESTORE_DATABASE_DSN`), verifies record hashes and artifact references, publishes a verified receipt and disables paid admission on the restored control row, so a restore always starts with paid admission off.

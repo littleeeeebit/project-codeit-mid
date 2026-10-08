@@ -1,21 +1,37 @@
 created: 2026-10-04 13:34:42.331000+00:00
-updated: 2026-10-07 06:24:15.287000+00:00
-update_count: 26
+updated: 2026-10-08T22:32:57.522Z
+update_count: 28
 last_field: diagram
 kind: nested-class
 title: web-screens
 children:
-- api-client
-- ask-page
-- settings-page
-- verify-page
+  - answer-stream
+  - api-client
+  - ask-page
+  - dataset-page
+  - request-poll
+  - settings-page
+  - verify-page
 parentPath: []
-prev_diagram: "graph TD\r\n  ask-page[\"Ask page\\nweb/src/components/ask/ask-page.tsx\"\
-  ] -->|\"submit, cancel, abandon\"| api-client[\"Typed API client\\nweb/src/lib/api.ts\"\
-  ]\r\n  ask-page -->|\"1 s status poll\"| status-poll[\"Poll hook\\nweb/src/lib/use-poll.ts\"\
-  ]\r\n  ask-page -->|\"provisional answer text\"| answer-stream[\"SSE reader\\nweb/src/lib/use-answer-stream.ts\"\
-  ]\r\n  status-poll -->|\"GET request status\"| api-client\r\n  verify-page[\"Verify\
-  \ page\\nweb/src/components/verify/verify-page.tsx\"] -->|\"traces, runs, activation\"\
-  | api-client\r\n  dataset-page[\"Dataset page\\nweb/src/components/dataset/dataset-page.tsx\"\
-  ] -->|\"drafting, gold decisions\"| api-client\r\n  settings-page[\"Settings page\\\
-  nweb/src/app/settings/page.tsx\"] -->|\"key, model, limit\"| api-client"
+prev_diagram: "graph TD\r
+
+  \  ask-page[\"Ask page\\nweb/src/components/ask/ask-page.tsx\"] -->|\"submit,
+  cancel, abandon\"| api-client[\"Typed API client\\nweb/src/lib/api.ts\"]\r
+
+  \  ask-page -->|\"1 s status poll\"| status-poll[\"Poll
+  hook\\nweb/src/lib/use-poll.ts\"]\r
+
+  \  ask-page -->|\"provisional answer text\"| answer-stream[\"SSE
+  reader\\nweb/src/lib/use-answer-stream.ts\"]\r
+
+  \  status-poll -->|\"GET request status\"| api-client\r
+
+  \  verify-page[\"Verify page\\nweb/src/components/verify/verify-page.tsx\"]
+  -->|\"traces, runs, activation\"| api-client\r
+
+  \  dataset-page[\"Dataset
+  page\\nweb/src/components/dataset/dataset-page.tsx\"] -->|\"drafting, gold
+  decisions\"| api-client\r
+
+  \  settings-page[\"Settings page\\nweb/src/app/settings/page.tsx\"] -->|\"key,
+  model, limit\"| api-client"

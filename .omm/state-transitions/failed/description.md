@@ -1,1 +1,0 @@
-_fail_unscheduled() marks a queued request failed when executor submission fails. _execute_traced() persists failed for service/orchestration errors, and paid handling does so for retrieval, rewrite, provider or validation failures. Provider charges already settled remain recorded even when output is unusable.

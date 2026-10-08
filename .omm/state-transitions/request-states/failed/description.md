@@ -1,0 +1,1 @@
+Set when `_execute_traced` catches `ServiceError` (`clarification_required`) or any exception (`technical_error`), when a provider call fails, when validation fails, or by `_fail_unscheduled` when executor submission failed.

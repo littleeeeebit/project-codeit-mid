@@ -1,0 +1,1 @@
+`requests` (`request_json` snapshot, `trace_json` with the configuration, retrieval, rewrite and billing, and `result_json`), `attempts` (the ledger) and `audit_events` (owner and member actions such as `set_api_key` and `set_generation_model`, never key values). `export_request` returns a redacted export, and Langfuse receives a parallel, optional copy of the trace.

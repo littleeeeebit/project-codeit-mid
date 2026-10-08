@@ -1,0 +1,14 @@
+graph TD
+  queued["queued\nsrc/rfp_assistant/service/service.py"]
+  running["running\nsrc/rfp_assistant/service/service.py"]
+  completed["completed\nsrc/rfp_assistant/service/service.py"]
+  failed["failed\nsrc/rfp_assistant/service/service.py"]
+  cancelled["cancelled\nsrc/rfp_assistant/service/service.py"]
+  interrupted["interrupted\nsrc/rfp_assistant/service/service.py"]
+  queued -->|run_queued claim| running
+  queued -->|cancel_request| cancelled
+  queued -->|shutdown or restart| interrupted
+  running -->|finish ok| completed
+  running -->|error or refusal| failed
+  running -->|cancel requested then stop| cancelled
+  running -->|shutdown or restart| interrupted

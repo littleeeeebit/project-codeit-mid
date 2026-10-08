@@ -1,0 +1,1 @@
+`tx(conn, immediate=True)` locks `application_mutex` row 1 `FOR UPDATE` inside the transaction. This serializes every admission, idempotency insert, request transition and ledger transition across the database. `read_snapshot` gives a REPEATABLE READ, read-only view for consistent reads.

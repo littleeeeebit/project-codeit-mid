@@ -1,0 +1,1 @@
+`runs/<run_id>/` records the configuration (mode, index, dense version, embedding, limits, `corpus_route`, `eval_version`, population hash) and scores. These are the only sources `serving_config` reads when it builds an activation.
