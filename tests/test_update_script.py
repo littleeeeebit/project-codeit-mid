@@ -34,8 +34,13 @@ STUBS = {
     "runuser": 'shift 3; exec "$@"\n',
     "systemctl": 'echo "$*" >>"$STUB_LOG/systemctl"\n[ "$1 $2" = "restart bidmate" ] && [ -f "$STUB_LOG/restart-fails" ] && exit 1\nexit 0\n',
     "curl": 'cat "$STUB_LOG/health" 2>/dev/null || printf 000\n',
-    "npm": 'echo "npm $*" >>"$STUB_LOG/npm"\n[ "$1" = run ] && { mkdir -p out; echo new >out/index.html; }\n[ -f "$STUB_LOG/npm-fails" ] && exit 1\nexit 0\n',
+    # npm-kills: SIGKILL the updater (the parent of `sh -c "... npm ci ..."`), as its unit's TimeoutStartSec does
+    "npm": 'echo "npm $*" >>"$STUB_LOG/npm"\n'
+           '[ -f "$STUB_LOG/npm-kills" ] && { read -r _ _ _ up _ </proc/$PPID/stat; kill -9 "$up"; exit 1; }\n'
+           '[ "$1" = run ] && { mkdir -p out; echo new >out/index.html; }\n[ -f "$STUB_LOG/npm-fails" ] && exit 1\nexit 0\n',
     "chown": "exit 0\n",
+    # cp -a <app>/web/out <backup> fails, copying nothing, while $STUB_LOG/backup-fails exists (a full disk)
+    "cp": 'case "$2" in */web/out) [ -f "$STUB_LOG/backup-fails" ] && exit 1 ;; esac\ncommand -p cp "$@"\n',
 }
 
 
@@ -55,8 +60,6 @@ class UpdateScriptTest(unittest.TestCase):
         venv = root / "venv" / "bin"
         venv.mkdir(parents=True)
         (venv / "pip").write_text('#!/bin/sh\necho "pip $*" >>"$STUB_LOG/pip"\nexit 0\n', encoding="utf-8", newline="\n")
-        self.unit = root / "bidmate.service"
-        self.unit.write_text("installed unit\n", encoding="utf-8")
         self.request = root / "request" / "requested"
         self.request.parent.mkdir()
         self.config = root / "config.json"
@@ -76,7 +79,7 @@ class UpdateScriptTest(unittest.TestCase):
         self.env = {**os.environ, "BIDMATE_APP": self.app.as_posix(), "BIDMATE_VENV": (root / "venv").as_posix(),
                     "BIDMATE_USER": "bidmate", "BIDMATE_HOME": root.as_posix(),
                     "BIDMATE_ENV_FILE": self.env_file.as_posix(), "BIDMATE_UPDATE_REQUEST": self.request.as_posix(),
-                    "BIDMATE_UPDATE_STATE_DIR": self.state.as_posix(), "BIDMATE_UNIT": self.unit.as_posix(),
+                    "BIDMATE_UPDATE_STATE_DIR": self.state.as_posix(),
                     "BIDMATE_REMOTE": self.remote.as_posix(), "BIDMATE_HEALTH_SECONDS": "1",
                     "STUB_LOG": self.stub_log.as_posix(), "STUB_DIR": stubs.as_posix()}
 
@@ -100,7 +103,7 @@ class UpdateScriptTest(unittest.TestCase):
         self.git("push", "--quiet", "origin", "HEAD:main")
         return self.head(self.work)
 
-    def run_update(self, health: str = "401") -> dict:
+    def run_update(self, health: str = "401", finished: bool = True) -> dict | None:
         (self.stub_log / "health").write_text(health, encoding="utf-8")
         self.request.write_text("{}", encoding="utf-8")
         # Git for Windows' bash puts its own bin directories first, so the stubs go in front from inside bash.
@@ -109,6 +112,8 @@ class UpdateScriptTest(unittest.TestCase):
                        env=self.env, capture_output=True, timeout=120)
         self.assertFalse(self.request.exists(), "the marker is consumed")
         self.log = (self.state / "update.log").read_text(encoding="utf-8", errors="replace")
+        if not finished:  # killed: its result still says running
+            return None
         return json.loads((self.state / "result.json").read_text(encoding="utf-8"))
 
     def calls(self, name: str) -> str:
@@ -125,17 +130,19 @@ class UpdateScriptTest(unittest.TestCase):
         self.assertIn("npm run build", self.calls("npm"))
         self.assertIn("install --quiet -e", self.calls("pip"))
         self.assertIn("restart bidmate", self.calls("systemctl"))
-        self.assertNotIn("daemon-reload", self.calls("systemctl"))  # the unit did not change
+        self.assertNotIn("daemon-reload", self.calls("systemctl"))
+        self.assertFalse((self.state / "deploying").exists())
 
     def test_a_failed_health_check_restores_the_previous_commit_and_build(self):
-        unit = UNIT.replace("TimeoutStopSec=120", "TimeoutStopSec=90")
-        self.commit({"web/src/page.tsx": "x\n", "tools/infra/bidmate.service": unit}, "breaks startup")
+        target = self.commit({"web/src/page.tsx": "x\n"}, "breaks startup")
         result = self.run_update(health="502")
         self.assertEqual(result["state"], "rollback_failed", self.log)  # the old version is just as unhealthy here
         self.assertEqual(self.head(self.app), self.prev)
         self.assertEqual((self.app / "web" / "out" / "index.html").read_text(encoding="utf-8"), "old\n")
-        self.assertEqual(self.unit.read_text(encoding="utf-8"), "installed unit\n")
         self.assertEqual(self.calls("systemctl").count("restart bidmate"), 2)
+        result = self.run_update()  # the next run starts again from the same commit and saved screens
+        self.assertEqual((result["state"], result["from_commit"], result["to_commit"]),
+                         ("succeeded", self.prev, target), self.log)
 
     def test_a_rollback_that_comes_back_healthy_says_rolled_back(self):
         self.commit({"web/src/page.tsx": "x\n"}, "screens")
@@ -146,12 +153,55 @@ class UpdateScriptTest(unittest.TestCase):
         self.assertEqual(self.head(self.app), self.prev)
         self.assertEqual((self.app / "web" / "out" / "index.html").read_text(encoding="utf-8"), "old\n")
 
-    def test_a_unit_that_would_run_as_root_is_never_installed(self):
-        self.commit({"tools/infra/bidmate.service": UNIT.replace("User=bidmate", "User=root")}, "root unit")
+    def test_a_changed_service_unit_is_never_installed_and_nothing_is_deployed(self):
+        # systemd takes the last User= and ignores spaces around `=`: this unit runs as root
+        unit = UNIT.replace("User=bidmate\n", "User=bidmate\nUser = root\n")
+        self.commit({"tools/infra/bidmate.service": unit, "web/src/page.tsx": "x\n"}, "root unit")
+        result = self.run_update()
+        self.assertEqual(result["state"], "failed", self.log)
+        self.assertIn("bidmate.service", result["message"])
+        self.assertEqual(self.head(self.app), self.prev)
+        self.assertEqual((self.calls("npm"), self.calls("systemctl")), ("", ""))
+
+    def test_a_failed_backup_changes_nothing(self):
+        self.commit({"web/src/page.tsx": "x\n"}, "screens")
+        (self.stub_log / "backup-fails").write_text("", encoding="utf-8")
+        (self.stub_log / "npm-fails").write_text("", encoding="utf-8")
+        result = self.run_update()
+        self.assertEqual(result["state"], "failed", self.log)
+        self.assertEqual(self.head(self.app), self.prev)
+        self.assertEqual((self.app / "web" / "out" / "index.html").read_text(encoding="utf-8"), "old\n")
+        self.assertEqual((self.calls("npm"), self.calls("systemctl")), ("", ""))
+
+    def test_a_run_cut_off_after_the_fast_forward_is_finished_by_the_next_one(self):
+        target = self.commit({"web/src/page.tsx": "x\n"}, "screens")
+        (self.stub_log / "npm-kills").write_text("", encoding="utf-8")
+        self.run_update(finished=False)
+        self.assertEqual(self.head(self.app), target)  # fast-forwarded, never built or restarted
+        self.assertEqual(self.calls("systemctl"), "")
+        (self.stub_log / "npm-kills").unlink()
+        result = self.run_update()
+        self.assertEqual(result["state"], "succeeded", self.log)
+        self.assertEqual((result["from_commit"], result["to_commit"]), (self.prev, target))
+        self.assertIn("npm run build", self.calls("npm"))
+        self.assertIn("restart bidmate", self.calls("systemctl"))
+        self.assertEqual(self.run_update()["state"], "up_to_date", self.log)  # nothing left to finish
+
+    def test_a_cut_off_run_that_fails_again_rolls_back_to_the_commit_before_it(self):
+        self.commit({"web/src/page.tsx": "x\n"}, "screens")
+        (self.stub_log / "npm-kills").write_text("", encoding="utf-8")
+        self.run_update(finished=False)
+        (self.stub_log / "npm-kills").unlink()
+        remote, self.env["BIDMATE_REMOTE"] = self.env["BIDMATE_REMOTE"], (self.root / "gone.git").as_posix()
+        result = self.run_update()  # GitHub unreachable: still unfinished, said so, and kept for the next run
+        self.assertEqual(result["state"], "interrupted", self.log)
+        self.assertEqual(result["from_commit"], self.prev)
+        self.env["BIDMATE_REMOTE"] = remote
+        (self.stub_log / "npm-fails").write_text("", encoding="utf-8")
         result = self.run_update()
         self.assertEqual(result["state"], "rolled_back", self.log)
-        self.assertEqual(self.unit.read_text(encoding="utf-8"), "installed unit\n")
         self.assertEqual(self.head(self.app), self.prev)
+        self.assertEqual((self.app / "web" / "out" / "index.html").read_text(encoding="utf-8"), "old\n")
 
     def test_a_missing_server_env_path_rolls_back(self):
         self.commit({"README.md": "two\n"}, "docs")

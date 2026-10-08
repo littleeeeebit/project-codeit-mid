@@ -101,6 +101,7 @@ class UpdateWatch:
         self.fetch = fetch or (lambda path, accept: github_fetch(GITHUB_API, path, accept))
         self.poll_seconds = poll_seconds
         self.check = Check()
+        self.accepting = False  # a request is between its paid-work check and its marker (service.request_update)
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -158,7 +159,8 @@ class UpdateWatch:
         out = {k: str(data[k])[:500] if data.get(k) is not None else None
                for k in ("state", "from_commit", "to_commit", "started_at", "finished_at", "message")}
         if out["state"] == "running" and _age(out["started_at"]) > STALE_RUN_SECONDS:
-            out["state"], out["message"] = "interrupted", "업데이트 스크립트가 끝나지 않았습니다. 로그를 확인하세요."
+            out["state"], out["message"] = "interrupted", ("업데이트 스크립트가 끝나지 않았습니다. 다음 업데이트가 "
+                                                           "이어서 마무리하거나 되돌립니다.")
         return out
 
     def log_tail(self, lines: int = 40) -> str:
@@ -176,6 +178,11 @@ class UpdateWatch:
     def in_progress(self) -> bool:
         result = self.last_result()
         return self.requested() or bool(result and result["state"] == "running")
+
+    def fenced(self) -> bool:
+        """No new paid work may start: an update was accepted and has not ended without a restart. Read under the
+        service's `_runner_lock`, which every paid admission and the acceptance itself hold."""
+        return self.accepting or self.in_progress()
 
     def write_request(self, member: str) -> None:
         """The marker the path unit watches. Its content is informational: the updater reads nothing from it."""

@@ -12,6 +12,8 @@ from unittest import mock
 from fastapi.testclient import TestClient
 
 from rfp_assistant import api
+from rfp_assistant.contracts import AnswerRequest
+from rfp_assistant.gateway.generation import FakeTransport
 from rfp_assistant.service import service, update
 from tests import fake_hub, fixtures
 
@@ -117,7 +119,7 @@ class UpdateApiTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)
         self.env = fixtures.make_env(root / "env")
-        self.res = service.Resources(self.env.settings)
+        self.res = service.Resources(self.env.settings, transport=FakeTransport())
         self.marker, self.state = root / "update-request" / "requested", root / "update-state"
         self.state.mkdir()
         self.watch = update.UpdateWatch(RUNNING, self.marker, self.state,
@@ -210,6 +212,33 @@ class UpdateApiTest(unittest.TestCase):
                 self.assertFalse(self.client.get("/api/update/status").json()["paid_work"]["open"])  # on its own
         self.assertEqual(self.client.post("/api/update").status_code, 200)
         self.assertTrue(self.marker.exists())
+
+    def test_an_accepted_update_admits_no_new_paid_work_until_it_ends(self):
+        request = AnswerRequest(idempotency_key="k-fence", generation_id="g", question="하자보수 기간은?",
+                                scope=[self.env.refs["기관A"]], mode="single", as_of="2026-09-30")
+        job = threading.Thread(target=lambda: None)
+        self.assertEqual(self.client.post("/api/update").status_code, 200)
+        for name, start in (("question", lambda: service.submit_answer(self.res, self.env.consultant, request)),
+                            ("background job", lambda: service._start_job(self.res, {}, "run-x", job))):
+            with self.subTest(name):
+                with self.assertRaises(service.ServiceError) as refused:
+                    start()
+                self.assertEqual(str(refused.exception), service.UPDATING)
+        self.marker.unlink()  # the updater took it and is building: still fenced
+        (self.state / "result.json").write_text(json.dumps({"state": "running", "started_at": update._now()}))
+        with self.assertRaises(service.ServiceError):
+            service.submit_answer(self.res, self.env.consultant, request)
+        (self.state / "result.json").write_text(json.dumps({"state": "failed", "started_at": update._now()}))
+        self.assertTrue(service.submit_answer(self.res, self.env.consultant, request))  # no restart came: open again
+
+    def test_a_request_admitted_before_its_row_exists_still_refuses_the_update(self):
+        runner = self.res.runner()
+        self.assertTrue(runner.try_admit())  # inside submit_answer, before the queued row is written
+        refused = self.client.post("/api/update")
+        self.assertEqual(refused.status_code, 400, refused.text)
+        self.assertFalse(self.marker.exists())
+        runner.release()
+        self.assertEqual(self.client.post("/api/update").status_code, 200)
 
     def test_a_server_without_the_updater_offers_nothing_and_refuses(self):
         bare = update.UpdateWatch(RUNNING, None, None, FakeGitHub(compare=ahead((LATEST, "x"))), poll_seconds=None)

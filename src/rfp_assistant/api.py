@@ -47,6 +47,7 @@ def create_app(resources=None, login=None, update=None) -> FastAPI:
     async def lifespan(app: FastAPI):
         owned = resources is None
         app.state.res = service.app_resources() if owned else resources
+        app.state.res.update_fence = app.state.update.fenced  # no new paid work while an update may restart us
         app.state.update.start()
         try:
             yield
