@@ -2673,17 +2673,21 @@ def _refuse_while_updating(res: Resources) -> None:
 
 def open_paid_work(res: Resources) -> dict:
     """Whether a restart now would cut off paid work: an open reservation or attempt in the ledger, a queued or
-    running request, or a live background job (drafting, evaluation, judge run, maintenance)."""
-    try:
-        snap = budget.snapshot(res.settings.db_path)
-        with open_db(res.settings.db_path) as conn:
-            active = conn.execute("SELECT COUNT(*) FROM requests WHERE status IN ('queued', 'running')").fetchone()[0]
-    except (*DATABASE_ERRORS, budget.BudgetError) as exc:
-        raise ServiceError(f"ledger_unavailable: {type(exc).__name__}") from None
+    running request, or a live background job (drafting, evaluation, judge run, maintenance).
+
+    Read in the order work leaves them: threads and request slots, then request rows, then the ledger last. Work
+    writes its ledger rows before its row finishes and its thread or slot ends, so whatever ended before its count
+    has already left its open attempts for the ledger read; reading the ledger first could miss both."""
     with res._runner_lock:
         jobs = sum(1 for t in res._jobs if t.is_alive())
-        # an admitted request whose queued row is not written yet counts too
-        active = max(active, res._runner.admitted if res._runner is not None else 0)
+        admitted = res._runner.admitted if res._runner is not None else 0  # counted before its queued row exists
+    try:
+        with open_db(res.settings.db_path) as conn:
+            active = conn.execute("SELECT COUNT(*) FROM requests WHERE status IN ('queued', 'running')").fetchone()[0]
+        snap = budget.snapshot(res.settings.db_path)
+    except (*DATABASE_ERRORS, budget.BudgetError) as exc:
+        raise ServiceError(f"ledger_unavailable: {type(exc).__name__}") from None
+    active = max(active, admitted)
     reasons = []
     if active:
         reasons.append(f"질문 {active}건 실행 중")

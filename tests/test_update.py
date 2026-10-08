@@ -240,6 +240,64 @@ class UpdateApiTest(unittest.TestCase):
         runner.release()
         self.assertEqual(self.client.post("/api/update").status_code, 200)
 
+    def test_the_fence_holds_across_the_updaters_running_write_and_marker_removal(self):
+        (self.state / "result.json").write_text(json.dumps({"state": "failed", "started_at": update._now(),
+                                                            "finished_at": update._now()}))
+        self.assertEqual(self.client.post("/api/update").status_code, 200)
+        real = update.UpdateWatch.last_result
+
+        def handoff(watch):  # the updater writes `running` and removes the marker just after this read
+            old = real(watch)
+            (self.state / "result.json").write_text(json.dumps({"state": "running", "started_at": update._now()}))
+            self.marker.unlink(missing_ok=True)
+            return old
+
+        with mock.patch.object(update.UpdateWatch, "last_result", handoff), \
+                self.assertRaises(service.ServiceError) as refused:
+            self.res.runner().try_admit()
+        self.assertEqual(str(refused.exception), service.UPDATING)
+        self.assertTrue(self.watch.fenced())  # and after the handoff, from the result alone
+
+    def test_a_job_that_leaves_open_billing_as_it_finishes_still_refuses_the_update(self):
+        from rfp_assistant.gateway import budget
+        from rfp_assistant.retrieval import dense
+        from rfp_assistant.service import drafting
+
+        go = threading.Event()
+        admitted = []
+
+        def job():  # drafting's path (drafting.py:376-474): its request row, a call left unknown, the row failed
+            go.wait(10)
+            settings = self.res.settings
+            request_id = dense.ensure_job_request(settings, drafting.DRAFTER, "gold-draft:race", {"job": "race"})
+            admission = budget.reserve(settings.db_path, request_id=request_id, member_id=drafting.DRAFTER,
+                                       stage="gold_drafting", purpose="gold_eval", model=drafting.MODEL,
+                                       input_tokens=100, max_output_tokens=100, count_method="test")
+            admitted.append(admission)
+            if admission["admitted"]:
+                budget.mark_dispatching(settings.db_path, admission["attempt_id"])
+                budget.mark_unknown(settings.db_path, admission["attempt_id"], "TimeoutError")
+            dense.finish_job_request(settings, request_id, "failed", {})
+
+        thread = threading.Thread(target=job, daemon=True)
+        service._start_job(self.res, {}, "draft-race", thread)
+        real = service.budget.snapshot
+
+        def idle_then_finish(*a, **k):  # the ledger read happens before the job reserves; the job ends right after
+            snap = real(*a, **k)
+            go.set()
+            thread.join(10)
+            return snap
+
+        with mock.patch.object(service.budget, "snapshot", side_effect=idle_then_finish):
+            out = self.client.post("/api/update")
+        self.assertTrue(admitted and admitted[0]["admitted"], admitted)
+        self.assertEqual(out.status_code, 400, out.text)
+        self.assertFalse(self.marker.exists())
+        self.assertGreater(real(self.res.settings.db_path).open_attempts, 0)
+        refused = self.client.post("/api/update")  # the open attempt itself now refuses it
+        self.assertEqual(refused.status_code, 400, refused.text)
+
     def test_a_server_without_the_updater_offers_nothing_and_refuses(self):
         bare = update.UpdateWatch(RUNNING, None, None, FakeGitHub(compare=ahead((LATEST, "x"))), poll_seconds=None)
         bare.refresh()

@@ -176,8 +176,12 @@ class UpdateWatch:
         return self.request is not None and self.request.exists()
 
     def in_progress(self) -> bool:
+        # The marker first: update.sh writes `running` before it removes the marker, so a marker found gone means
+        # the result read after it already says running (or how the run ended). The other order can miss both.
+        if self.requested():
+            return True
         result = self.last_result()
-        return self.requested() or bool(result and result["state"] == "running")
+        return bool(result and result["state"] == "running")
 
     def fenced(self) -> bool:
         """No new paid work may start: an update was accepted and has not ended without a restart. Read under the

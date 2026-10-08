@@ -187,6 +187,24 @@ class UpdateScriptTest(unittest.TestCase):
         self.assertIn("restart bidmate", self.calls("systemctl"))
         self.assertEqual(self.run_update()["state"], "up_to_date", self.log)  # nothing left to finish
 
+    def test_a_cut_off_run_is_rebuilt_even_when_main_then_reverted_what_it_changed(self):
+        self.commit({"web/src/page.tsx": "x\n", "pyproject.toml": "[project]\n"}, "B: screens and deps")
+        (self.stub_log / "npm-kills").write_text("", encoding="utf-8")
+        self.run_update(finished=False)  # B's dependencies are installed, its build cut off
+        (self.stub_log / "npm-kills").unlink()
+        (self.app / "web" / "out" / "index.html").write_text("B\n", encoding="utf-8")  # what B's build left
+        for name in ("web/src/page.tsx", "pyproject.toml"):
+            (self.work / name).unlink()
+        target = self.commit({}, "C: revert B")  # A...C is empty
+        for name in ("npm", "pip"):
+            (self.stub_log / name).unlink(missing_ok=True)
+        result = self.run_update()
+        self.assertEqual((result["state"], result["from_commit"], result["to_commit"]),
+                         ("succeeded", self.prev, target), self.log)
+        self.assertIn("npm run build", self.calls("npm"))
+        self.assertIn("install --quiet -e", self.calls("pip"))
+        self.assertEqual((self.app / "web" / "out" / "index.html").read_text(encoding="utf-8"), "new\n")
+
     def test_a_cut_off_run_that_fails_again_rolls_back_to_the_commit_before_it(self):
         self.commit({"web/src/page.tsx": "x\n"}, "screens")
         (self.stub_log / "npm-kills").write_text("", encoding="utf-8")

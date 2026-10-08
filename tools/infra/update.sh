@@ -45,9 +45,8 @@ RECOVERING=0
 result() {  # state, message: the only file the app reads from this run
     local tmp="$STATE/result.json.tmp"
     printf '{"state": "%s", "from_commit": "%s", "to_commit": "%s", "started_at": "%s", "finished_at": %s, "message": "%s"}\n' \
-        "$1" "$PREV" "$TARGET" "$STARTED" "$([ "$1" = running ] && echo null || echo "\"$(now)\"")" "$2" >"$tmp"
-    chmod 644 "$tmp"
-    mv -f "$tmp" "$STATE/result.json"
+        "$1" "$PREV" "$TARGET" "$STARTED" "$([ "$1" = running ] && echo null || echo "\"$(now)\"")" "$2" >"$tmp" \
+        && chmod 644 "$tmp" && mv -f "$tmp" "$STATE/result.json" || { log "could not write result.json ($1)"; return 1; }
     log "result: $1 - $2"
 }
 
@@ -112,8 +111,11 @@ rollback() {
 }
 
 log "update requested; checkout $APP"
-result running "업데이트를 진행하고 있습니다."
-# rm never follows a symlink: whatever the service user put there, only the name goes.
+# `running` is on disk before the marker goes, and the app reads the marker before the result
+# (UpdateWatch.in_progress), so its paid-work fence never finds neither. Without the result the marker stays, and
+# with it the fence, for someone to look. rm never follows a symlink: whatever the service user put there, only
+# the name goes.
+result running "업데이트를 진행하고 있습니다." || exit 1
 rm -f "$REQUEST"
 
 if [ -f "$PENDING" ]; then
@@ -151,13 +153,15 @@ if [ $RECOVERING = 0 ]; then
 fi
 
 git_app merge --quiet --ff-only "$TARGET" || rollback "main으로 빨리 감기하지 못했습니다."
-if changed '^(pyproject\.toml|requirements[^/]*\.txt)$'; then
+# $PREV...$TARGET does not say what a cut-off run already installed or built (main may have reverted it since):
+# after one, both are redone, and a rollback reinstalls $PREV's dependencies.
+if [ $RECOVERING = 1 ] || changed '^(pyproject\.toml|requirements[^/]*\.txt)$'; then
     DEPS=1
-    log "dependencies changed: pip install -e"
+    log "dependencies changed or a cut-off run may have changed them: pip install -e"
     install_deps || rollback "의존성을 설치하지 못했습니다."
 fi
-if changed '^web/'; then
-    log "web/ changed: npm ci && npm run build"
+if [ $RECOVERING = 1 ] || changed '^web/'; then
+    log "web/ changed or a cut-off run may have built it: npm ci && npm run build"
     build_web || rollback "화면을 빌드하지 못했습니다."
 fi
 check_env_paths || rollback "server.env가 가리키는 경로가 새 버전에 없습니다."
