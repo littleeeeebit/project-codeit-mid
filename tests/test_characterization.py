@@ -11,7 +11,7 @@ import re
 import tempfile
 import unittest
 from dataclasses import asdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -981,6 +981,12 @@ class ReleaseReportTest(unittest.TestCase):
     snapshots taken from the original write_release_report."""
 
     NAMES = ("report.md", "manifest.json", "coverage.json", "evaluation.json", "budget.json")
+
+    def setUp(self):
+        pacing = budget.pacing
+        # Keep the snapshots' budget date while exercising the real pacing calculation.
+        self.enterContext(mock.patch.object(budget, "pacing", side_effect=lambda cap, committed, start, end, today:
+            pacing(cap, committed, start, end, date(2026, 10, 7))))
 
     def render(self, s, path: Path) -> str:
         return read_outputs(path.parent, self.NAMES, s.data_dir.parent)
