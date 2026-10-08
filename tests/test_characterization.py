@@ -998,9 +998,10 @@ class ReleaseReportTest(unittest.TestCase):
     NAMES = ("report.md", "manifest.json", "coverage.json", "evaluation.json", "budget.json")
 
     def setUp(self):
-        original = budget.snapshot
-        self.enterContext(mock.patch.object(budget, "snapshot", side_effect=
-            lambda db, today=None: original(db, today or date(2026, 10, 7))))  # the golden capture's pacing date
+        pacing = budget.pacing
+        # Keep the snapshots' budget date while exercising the real pacing calculation.
+        self.enterContext(mock.patch.object(budget, "pacing", side_effect=lambda cap, committed, start, end, today:
+            pacing(cap, committed, start, end, date(2026, 10, 7))))
 
     def render(self, s, path: Path) -> str:
         return read_outputs(path.parent, self.NAMES, s.data_dir.parent)

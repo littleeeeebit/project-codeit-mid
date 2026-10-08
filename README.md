@@ -19,6 +19,7 @@ Internal assistant for historical Korean RFPs: search projects, select one docum
 | `tools/infra/` | PostgreSQL and Langfuse launchers, the database init script, the VM's systemd unit and owner CLI wrapper |
 | `tools/verification/` | Helpers the flows in `verification.json` run; `tools/verify.py` runs the flows, `tools/openapi.py` writes the API schema |
 | `tests/` | `unittest` modules and their shared fixtures |
+| `notebooks/` | Generated before/after notebook: current Python source, fixed Git baseline and isolated offline replays ([setup](notebooks/README.md)) |
 | `docs/plan/` | The end-to-end plan and shared implementation contracts |
 | `docs/rag/` | Research and design notes behind each RAG stage |
 | `docs/operations/` | The runbook and the release report |

@@ -32,6 +32,8 @@ dependencies = [
 reranker = ["sentence-transformers", "torch", "einops"]
 # Browser flows of tools/verify.py (local verification service).
 verify = ["playwright"]
+# Execute the generated before/after notebook in JupyterHub or a local kernel.
+notebook = ["ipykernel", "nbformat", "nbclient"]
 
 [project.scripts]
 rfp-assistant = "rfp_assistant.cli:main"
