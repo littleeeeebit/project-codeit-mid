@@ -23,8 +23,8 @@
     },
     "src/rfp_assistant/cli.py": {
       "dup": 0,
-      "lines": 985,
-      "reason": "gpt5-mini-answer-embedding-comparison: the existing answer-run command accepts bounded workers and documents baseline-first comparison runs while preserving the release-finalist limit"
+      "lines": 1006,
+      "reason": "hwp-ocr-from-embedded-images: `ocr` gains the coverage and sample actions and --ledger-dsn-env, which reserves paid reads in codeit's shared ledger without running schema statements on it"
     },
     "src/rfp_assistant/contracts.py": {
       "dup": 8,
@@ -33,8 +33,8 @@
     },
     "src/rfp_assistant/corpus/ingestion.py": {
       "dup": 0,
-      "lines": 1362,
-      "reason": "hwp-recovery-native-loader: parse_hwp turns a raised walk or equation-record failure into a reason code so ingestion falls back to the HWP loader instead of recording an error"
+      "lines": 1412,
+      "reason": "hwp-ocr-from-embedded-images: walk_hwp leaves a picture marker (BinData reference, page share) where each picture, OLE object or drawing sits, body and table cells alike, so OCR text is placed structurally instead of by print page anchors"
     },
     "src/rfp_assistant/evaluation/compare.py": {
       "dup": 0,
