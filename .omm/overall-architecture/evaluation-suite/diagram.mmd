@@ -1,7 +1,6 @@
 graph TD
-  luna-drafting["gpt-6-luna drafting\nsrc/rfp_assistant/service/drafting.py"] -->|valid drafts batch| gold-queue["Gold review queue\nsrc/rfp_assistant/evaluation/gold.py"]
-  gold-queue -->|approved dev rows| retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  retrieval-runs -->|scored runs| compare-matrices["Comparison matrices\nsrc/rfp_assistant/evaluation/compare.py"]
-  compare-matrices -->|person picks row| run-activation["Run activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  retrieval-runs -->|finalist configs| answer-runs["Answer, sealed, release\nsrc/rfp_assistant/service/answers.py"]
-  answer-runs -->|answers to judge| judge-comparison["Judge comparison\nsrc/rfp_assistant/evaluation/judges.py"]
+  gold-queue["Gold review queue\nsrc/rfp_assistant/evaluation/gold.py"] -->|"approved dataset rows"| retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  retrieval-runs -->|"scored runs"| comparison-matrices["Comparison matrices\nsrc/rfp_assistant/evaluation/compare.py"]
+  comparison-matrices -->|"person picks row"| run-activation["Run activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  run-activation -->|"pinned serving config"| answer-evaluation["Answer evaluation\nsrc/rfp_assistant/service/answers.py"]
+  answer-evaluation -->|"scores, blind review"| release-gate["Sealed run and release\nsrc/rfp_assistant/evaluation/release.py"]

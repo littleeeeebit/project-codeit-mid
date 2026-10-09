@@ -1,9 +1,10 @@
 graph TD
-  ask-composer["Composer and turn\nweb/src/components/ask/ask-page.tsx"] -->|POST /api/ask| session-check["Session middleware\nsrc/rfp_assistant/api.py"]
-  session-check -->|member bound to context| submit-answer["submit_answer\nsrc/rfp_assistant/service/service.py"]
-  submit-answer -->|queued row, request ID| request-runner["RequestRunner worker\nsrc/rfp_assistant/service/service.py"]
-  request-runner -->|claim queued to running| paid-answer["_paid_answer\nsrc/rfp_assistant/service/service.py"]
-  paid-answer -->|rewrite and generation stages| metered-call["_metered_chat\nsrc/rfp_assistant/service/service.py"]
-  metered-call -->|provider response| answer-validation["validate_answer\nsrc/rfp_assistant/gateway/generation.py"]
-  answer-validation -->|payload or TechnicalError| finish-record["_finish\nsrc/rfp_assistant/service/service.py"]
-  finish-record -->|poll and SSE read| ask-composer
+  screen-submit["Screen submits question\nweb/src/components/ask/ask-page.tsx"] -->|"POST /api/ask"| admission-and-persist["Admission and persist\nsrc/rfp_assistant/service/service.py"]
+  admission-and-persist -->|"request_id to executor"| worker-claim["Worker claims request\nsrc/rfp_assistant/service/service.py"]
+  worker-claim -->|"follow-up only"| follow-up-rewrite["Standalone rewrite\nsrc/rfp_assistant/service/service.py"]
+  worker-claim -->|"first turn"| retrieve-and-price["Retrieve and price\nsrc/rfp_assistant/service/service.py"]
+  follow-up-rewrite -->|"standalone query"| retrieve-and-price
+  retrieve-and-price -->|"messages, estimate"| metered-generation["Metered generation\nsrc/rfp_assistant/service/service.py"]
+  metered-generation -->|"provider response"| validate-and-finish["Validate and finish\nsrc/rfp_assistant/service/service.py"]
+  validate-and-finish -->|"result_json stored"| status-and-stream["Status poll and stream\nsrc/rfp_assistant/api.py"]
+  metered-generation -->|"partial text"| status-and-stream

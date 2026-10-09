@@ -1,1 +1,1 @@
-Gemini has its own $0.50 cap, recorded in `.runtime/ocr/gemini-ledger.jsonl` outside the main ledger. OCR text is chunked separately, cited as OCR (`ocr_text` warning) and skipped by the fidelity check.
+Paid re-reads (gpt-5-mini) are settled in the shared ledger under the `ocr` envelope. OCR text is chunked separately, cited as OCR (`ocr_text` warning) and skipped by the fidelity check.

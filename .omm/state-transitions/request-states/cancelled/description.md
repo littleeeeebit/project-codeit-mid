@@ -1,1 +1,0 @@
-Immediate for a queued request (`cancel_request` writes the result 'no paid call'). For a running request it happens through `_Stop('cancelled')`, or when `_finish` sees `cancel_requested` on a `completed` outcome. Billing of an already-dispatched call still settles.

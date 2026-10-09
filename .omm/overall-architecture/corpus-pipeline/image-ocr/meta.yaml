@@ -1,0 +1,9 @@
+created: 2026-10-09T23:18:38.212Z
+updated: 2026-10-09T23:18:38.709Z
+update_count: 3
+last_field: constraint
+kind: nested-class
+title: image-ocr
+children: []
+parentPath:
+  - corpus-pipeline

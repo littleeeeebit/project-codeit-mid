@@ -1,9 +1,0 @@
-created: 2026-10-09T10:52:06.127Z
-updated: 2026-10-09T10:52:06.128Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: status-poll
-children: []
-parentPath:
-  - web-screens

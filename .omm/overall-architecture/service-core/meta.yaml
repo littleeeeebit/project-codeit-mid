@@ -1,36 +1,49 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-09 10:52:09.476000+00:00
-update_count: 27
+updated: 2026-10-09T23:18:25.672Z
+update_count: 29
 last_field: diagram
 kind: nested-class
 title: service-core
 children:
-- answer-check
-- answer-pipeline
-- app-resources
-- background-jobs
-- conversation-context
-- evidence-reader
-- metered-chat
-- paid-answer
-- partials
-- request-runner
-- resources
-- resources-owner
-- serving-config
-- submit
-- tracing
-- update-fence
+  - answer-check
+  - answer-pipeline
+  - app-resources
+  - background-jobs
+  - conversation-context
+  - evidence-reader
+  - hub-login
+  - metered-chat
+  - paid-answer
+  - partials
+  - request-runner
+  - resources
+  - resources-owner
+  - serving-config
+  - submit
+  - tracing
+  - update-fence
+  - update-watch
 parentPath: []
-prev_diagram: "graph TD\r\n  resources-owner[\"Process resources\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  request-runner[\"Bounded request executor\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  answer-pipeline[\"Answer execution\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  metered-chat[\"Metered paid call\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  background-jobs[\"Background paid jobs\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  restart-recovery[\"Stop and restart recovery\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  resources-owner -->|creates on first paid ask| request-runner\r\n  request-runner\
-  \ -->|run_queued by request id| answer-pipeline\r\n  answer-pipeline -->|rewrite\
-  \ and generation stages| metered-chat\r\n  resources-owner -->|registers threads\
-  \ in _jobs| background-jobs\r\n  background-jobs -->|same transport and ledger|\
-  \ metered-chat\r\n  resources-owner -->|close and recover=True| restart-recovery\r\
-  \n  restart-recovery -->|interrupts unfinished rows| request-runner"
+prev_diagram: "graph TD\r
+
+  \  resources-owner[\"Process
+  resources\\nsrc/rfp_assistant/service/service.py\"] -->|creates lazily|
+  request-runner[\"Bounded executor\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  request-runner -->|run_queued by request ID| answer-pipeline[\"Ask
+  pipeline\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  answer-pipeline -->|index, dense, reranker, transport| resources-owner\r
+
+  \  background-jobs[\"Paid background
+  jobs\\nsrc/rfp_assistant/service/service.py\"] -->|transport, gateway owner|
+  resources-owner\r
+
+  \  update-fence[\"Update fence\\nsrc/rfp_assistant/service/update.py\"]
+  -->|refuses new paid admission| request-runner\r
+
+  \  update-fence -->|refuses job start| background-jobs\r
+
+  \  evidence-reader[\"Evidence and
+  originals\\nsrc/rfp_assistant/service/service.py\"] -->|persisted evidence
+  map| answer-pipeline"

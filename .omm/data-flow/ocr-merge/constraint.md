@@ -1,1 +1,1 @@
-Gemini spending uses its own append-only ledger (`.runtime/ocr/gemini-ledger.jsonl`, `ProcessLock` on `gemini-ledger.lock`) with a $0.50 cap (`GEMINI_CAP_MICRO`). It is not part of `budget.snapshot` or the main cap.
+gpt-5-mini re-reads are attempts in the shared ledger (purpose `ocr`, an envelope the owner funds), reserved at worst case and settled on usage; an unknown outcome stays charged and stops the run. The OCR run owns the paid gateway while it reads. `.runtime/ocr/gemini-ledger.jsonl` is history from the retired Gemini fallback.

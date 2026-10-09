@@ -1,0 +1,1 @@
+Clients replaced by a key change are kept in `_retired` until `close()`, one per change; a ponytail comment marks this.

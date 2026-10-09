@@ -1,15 +1,24 @@
 created: 2026-10-06 12:37:58.685000+00:00
-updated: 2026-10-09T10:52:18.442Z
-update_count: 4
+updated: 2026-10-09 23:18:39.453000+00:00
+update_count: 6
 last_field: diagram
 kind: nested-class
 title: evaluation-suite
 children:
-  - answer-runs
-  - compare-matrices
-  - gold-queue
-  - judge-comparison
-  - luna-drafting
-  - retrieval-runs
-  - run-activation
+- answer-evaluation
+- comparison-matrices
+- gold-queue
+- release-gate
+- retrieval-runs
+- run-activation
 parentPath: []
+prev_diagram: "graph TD\r\n  luna-drafting[\"gpt-6-luna drafting\\nsrc/rfp_assistant/service/drafting.py\"\
+  ] -->|valid drafts batch| gold-queue[\"Gold review queue\\nsrc/rfp_assistant/evaluation/gold.py\"\
+  ]\r\n  gold-queue -->|approved dev rows| retrieval-runs[\"Frozen retrieval runs\\\
+  nsrc/rfp_assistant/evaluation/evaluation.py\"]\r\n  retrieval-runs -->|scored runs|\
+  \ compare-matrices[\"Comparison matrices\\nsrc/rfp_assistant/evaluation/compare.py\"\
+  ]\r\n  compare-matrices -->|person picks row| run-activation[\"Run activation\\\
+  nsrc/rfp_assistant/evaluation/evaluation.py\"]\r\n  retrieval-runs -->|finalist\
+  \ configs| answer-runs[\"Answer, sealed, release\\nsrc/rfp_assistant/service/answers.py\"\
+  ]\r\n  answer-runs -->|answers to judge| judge-comparison[\"Judge comparison\\nsrc/rfp_assistant/evaluation/judges.py\"\
+  ]"

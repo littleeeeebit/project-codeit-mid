@@ -1,1 +1,0 @@
-`gold.decide` accepts only a pending row whose hash equals `expected_sha`. The approver is the signed-in member and must not be the drafting requester. Approved development rows are rendered into `.runtime/datasets/dev.jsonl`, which `validate-gold`, frozen runs and trace questions read.

@@ -14,7 +14,7 @@ Generated <time> from `data` state (schema 6). Only recorded results appear belo
 ## Budget
 
 - Spent $<n> of $<n> (<n>%); pending $<n> (unknown $<n>); cap $<n>; paid enabled True; warnings none.
-- Remaining envelopes: embedding $<n> of $<n>, gold_eval $<n> of $<n>, interactive $<n> of $<n>, judge_eval $<n> of $<n>
+- Remaining envelopes: embedding $<n> of $<n>, gold_eval $<n> of $<n>, interactive $<n> of $<n>, judge_eval $<n> of $<n>, ocr $<n> of $<n>
 
 | purpose | stage | state | attempts | settled | reserved |
 | --- | --- | --- | --- | --- | --- |
@@ -56,7 +56,7 @@ Generated <time> from `data` state (schema 6). Only recorded results appear belo
 ## Budget
 
 - Spent $<n> of $<n> (<n>%); pending $<n> (unknown $<n>); cap $<n>; paid enabled True; warnings none.
-- Remaining envelopes: embedding $<n> of $<n>, gold_eval $<n> of $<n>, interactive $<n> of $<n>, judge_eval $<n> of $<n>
+- Remaining envelopes: embedding $<n> of $<n>, gold_eval $<n> of $<n>, interactive $<n> of $<n>, judge_eval $<n> of $<n>, ocr $<n> of $<n>
 
 | purpose | stage | state | attempts | settled | reserved |
 | --- | --- | --- | --- | --- | --- |

@@ -59,7 +59,7 @@ Generated <time> from `data/`. Every figure below is read from recorded state; s
 | gold_eval | embedding | settled | 2 | $<n> | $<n> |
 | embedding | embedding | settled | 1 | $<n> | $<n> |
 
-Envelopes (used incl. open reservations / envelope): embedding $<n>/$<n>, gold_eval $<n>/$<n>, interactive $<n>/$<n>, judge_eval $<n>/$<n>
+Envelopes (used incl. open reservations / envelope): embedding $<n>/$<n>, gold_eval $<n>/$<n>, interactive $<n>/$<n>, judge_eval $<n>/$<n>, ocr $<n>/$<n>
 
 ## Selection
 

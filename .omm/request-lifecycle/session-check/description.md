@@ -1,1 +1,0 @@
-`_Session` resolves the cookie to a member, enforces the origin and account headers, and calls `service.bind_request`, which fixes the member's key session, answer model and billing scope in contextvars. `RequestRunner.submit` copies that context into the worker, so the request pays with the key and model the member had when they clicked.

@@ -1,1 +1,1 @@
-`RFP_SOURCE_DIR` (`원본 데이터`) holds `data_list.csv` and `files/`, with 98 active sources in the All documents scope. Originals are never modified. `original_download` streams them back only for a managed `(doc_id, source_hash)` after re-hashing the bytes.
+`RFP_SOURCE_DIR` (default `<repo>/원본 데이터`) holds `data_list.csv` and `files/`. Settings resolve from the repository location, never the working directory. Originals are never modified; the HWP prints are written under `.runtime/reviews/printed/`.

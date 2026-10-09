@@ -1,0 +1,1 @@
+The stored activation is not served as measured. `describe_serving` names it, reports show it, and retrieval adds a limitation, so serving never silently uses a run whose gate evidence no longer applies.

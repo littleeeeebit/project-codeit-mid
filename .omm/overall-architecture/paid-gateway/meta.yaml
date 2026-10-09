@@ -1,36 +1,33 @@
 created: 2026-10-05 04:06:18.173000+00:00
-updated: 2026-10-09 10:52:14.244000+00:00
-update_count: 28
+updated: 2026-10-09 23:18:32.728000+00:00
+update_count: 30
 last_field: diagram
 kind: nested-class
 title: paid-gateway
 children:
 - answer-validation
-- answer-validator
 - budget-admission
 - budget-ledger
 - dispatch-guard
 - dispatch-marker
 - fake
+- fake-transport
 - gateway-owner
-- gemini-ledger
 - key-sessions
 - langfuse-tracing
 - ledger
-- metered-caller
 - openai-transport
 - owner-reconciliation
 - tracing
 - transport
 parentPath: []
-prev_diagram: "graph TD\r\n  budget-ledger[\"Budget ledger\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  gateway-owner[\"Gateway advisory lock\\nsrc/rfp_assistant/storage/postgres.py\"\
-  ]\r\n  openai-transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\n  fake-transport[\"Fake transport\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\n  answer-validation[\"Answer validation\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\n  langfuse-tracing[\"Langfuse tracing\\nsrc/rfp_assistant/gateway/tracing.py\"\
-  ]\r\n  budget-ledger -->|owner_guard in admission tx| gateway-owner\r\n  openai-transport\
-  \ -->|owner_check before call| gateway-owner\r\n  budget-ledger -->|dispatching\
-  \ attempt| openai-transport\r\n  budget-ledger -->|dispatching attempt in tests|\
-  \ fake-transport\r\n  openai-transport -->|response and usage| answer-validation\r\
-  \n  openai-transport -->|generation spans| langfuse-tracing"
+prev_diagram: "graph TD\r\n  metered-caller[\"Metered call sites\\nsrc/rfp_assistant/service/service.py\"\
+  ] -->|reserve maximum cost| budget-ledger[\"Budget ledger\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  metered-caller -->|mark dispatching with guard| budget-ledger\r\n  metered-caller\
+  \ -->|chat or embed| openai-transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"\
+  ]\r\n  openai-transport -->|usage, response ID| metered-caller\r\n  metered-caller\
+  \ -->|settle, release, unknown| budget-ledger\r\n  metered-caller -->|structured\
+  \ output check| answer-validator[\"Answer validation\\nsrc/rfp_assistant/gateway/generation.py\"\
+  ]\r\n  metered-caller -->|steps, usage, scores| langfuse-tracing[\"Langfuse tracing\\\
+  nsrc/rfp_assistant/gateway/tracing.py\"]\r\n  gemini-ledger[\"Gemini side ledger\\\
+  nsrc/rfp_assistant/retrieval/models.py\"] -->|own cap, own attempts| budget-ledger"

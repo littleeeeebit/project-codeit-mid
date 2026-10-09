@@ -1,1 +1,0 @@
-`fidelity.verify_source` reported findings (자동 대조: 확인 필요) with element, cell and page. It stays in the operating index with the `source_auto_flagged` warning until a person checks the reported places.

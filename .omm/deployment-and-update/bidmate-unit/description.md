@@ -1,0 +1,1 @@
+Runs `uvicorn rfp_assistant.api:app --workers 1`. It holds the gateway advisory lock for its lifetime, so the paid CLI on the same database refuses until it stops.

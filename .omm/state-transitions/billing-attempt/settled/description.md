@@ -1,0 +1,1 @@
+Final cost from the reported usage (`micro_cost` over uncached, cached and cache-write input plus output tokens). `settle` is idempotent: a second settle returns `duplicate`.

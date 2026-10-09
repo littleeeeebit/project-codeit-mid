@@ -1,0 +1,1 @@
+Per-model pgvector sets tagged with model, dimensions and prefix policy, filled by `build-dense` (OpenAI, metered from an approved estimate under the `embedding` envelope), by local GPU embedders, or by the comparison runner. A set becomes `ready` only after every row is verified. Query vectors are cached by normalized text, model and dimensions.

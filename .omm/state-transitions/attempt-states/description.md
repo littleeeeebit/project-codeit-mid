@@ -1,1 +1,0 @@
-States of `attempts.state` in the shared ledger (`budget.py`). The snapshot sums settled amounts as spent, and reserved/dispatching/unknown amounts as pending or unknown against the cap.

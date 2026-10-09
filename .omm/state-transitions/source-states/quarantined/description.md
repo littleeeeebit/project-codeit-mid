@@ -1,1 +1,0 @@
-Set by `ingest_source` when the parser returned a reason code. For HWP that means pyhwp and the HWP loader both failed (`hwp_loader_failed`, `hwp_loader_result_invalid`, `hwp_empty_output`). The original and its failure stay recorded. Such a source is never indexed, and asking about it yields `ingestion_unavailable` with `QUARANTINE_TEXT`.

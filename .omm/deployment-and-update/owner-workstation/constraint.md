@@ -1,0 +1,1 @@
+`fidelity run` needs Windows with Hancom Viewer and Microsoft Print to PDF as the default printer. Local embedders, rerankers and PaddleOCR refuse to run without CUDA.

@@ -1,1 +1,1 @@
-When `web/out` exists, `StaticFiles(directory=WEB, html=True)` is mounted at `/` after all API routes. Non-`/api/` paths bypass the session middleware entirely, so the screens themselves are public static files. The data comes only through authenticated `/api` calls.
+`app.mount("/", StaticFiles(directory=WEB, html=True))` serves web/out when it exists. It is mounted after every route, so the API keeps /api/*. The session cookie is path-scoped to /api/, so static pages and the hub's notebooks on :8000 of the same host never receive it.

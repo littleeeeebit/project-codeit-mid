@@ -142,6 +142,10 @@ type Location = Record<string, unknown>;
 /** Just the place within the document (표 54, 12쪽), for table cells; `locationText` gives the full sentence. */
 export function locationShort(loc: Location | null | undefined): string {
   if (!loc) return "-";
+  if (loc.format === "image_ocr" && loc.rendering === "hwp_bindata") {
+    const path = (loc.section_path as string[] | undefined) ?? [];
+    return path[path.length - 1] ?? "그림";
+  }
   if (loc.format === "pdf" || loc.format === "hwp_print" || loc.format === "image_ocr") {
     const pages = (loc.pages as number[] | undefined) ?? [loc.page as number];
     return `${pages.join(", ")}쪽`;
@@ -154,6 +158,10 @@ export function locationShort(loc: Location | null | undefined): string {
 export function locationText(loc: Location | null | undefined): string {
   if (!loc) return "위치 없음";
   const path = ((loc.section_path as string[] | undefined) ?? []).join(" > ");
+  if (loc.format === "image_ocr" && loc.rendering === "hwp_bindata") {
+    // HWP picture: placed where the picture sits in the document; HWP has no trustworthy page numbers.
+    return "HWP 그림 · OCR 판독" + (path ? ` · ${path}` : "") + " (쪽 번호 없음: 원문 파일에서 확인)";
+  }
   if (loc.format === "image_ocr") {
     const where = loc.rendering === "hancom_print" ? "HWP 한컴 인쇄본" : "PDF";
     return `${where} ${loc.page}쪽 그림 · OCR 판독` + (path ? ` · ${path}` : "");

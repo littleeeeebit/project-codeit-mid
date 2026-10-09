@@ -1,0 +1,1 @@
+Not fenced. The banner shows `available` when GitHub main is ahead of `build_head()`.

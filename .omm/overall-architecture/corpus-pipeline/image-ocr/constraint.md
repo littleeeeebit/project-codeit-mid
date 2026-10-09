@@ -1,0 +1,1 @@
+The OCR cache is an input of `input_key`, so a changed cache makes the next `ingest` reparse that source. Run `ingest`, then `fidelity run` and `build-keyword`, after OCR.

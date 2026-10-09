@@ -1,1 +1,0 @@
-`parse_pdf(original)` uses PyMuPDF page blocks and columns (`_page_items`, `_page_labels`) to produce ordered paragraph and table elements with page locations. For a PDF the original itself is the rendering used for OCR merging.

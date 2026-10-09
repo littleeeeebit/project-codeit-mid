@@ -1,5 +1,0 @@
-graph TD
-  pending["pending\nsrc/rfp_assistant/evaluation/gold.py"] -->|decide approve with note| approved["approved\nsrc/rfp_assistant/evaluation/gold.py"]
-  pending -->|decide reject with note| rejected["rejected\nsrc/rfp_assistant/evaluation/gold.py"]
-  approved -->|disputed, independent reviewer| second-reviewed["second review recorded\nsrc/rfp_assistant/evaluation/gold.py"]
-  rejected -->|gold infer reason| rejected

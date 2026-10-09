@@ -1,0 +1,1 @@
+The latest commits on this branch recover a dead OCR run's paid attempts (`RemoteReader.__enter__` runs `recover_requests` and `budget.recover` after taking the lock) and keep WMF header synthesis in range.

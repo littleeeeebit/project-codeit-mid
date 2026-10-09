@@ -1,0 +1,1 @@
+Charged at its reservation until resolved. Shown on the budget screen and in `unresolved`. Blocks all new dispatch.

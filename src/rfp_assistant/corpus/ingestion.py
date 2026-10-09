@@ -354,7 +354,7 @@ def equation_scripts(original: Path) -> list[str]:
     return out
 
 
-def _collect(node: ET.Element, texts: list[str], tables: list, boxes: list) -> None:
+def _collect(node: ET.Element, texts: list[str], tables: list, boxes: list, shapes: list | None = None) -> None:
     for ch in node:
         tag = ch.tag
         if tag == "Text":
@@ -373,10 +373,12 @@ def _collect(node: ET.Element, texts: list[str], tables: list, boxes: list) -> N
             tables.append(ch)
         elif tag == "GShapeObjectControl":  # text boxes and picture captions ("그림. ...")
             boxes.extend(x for x in ch.iter() if x.tag in ("TextboxParagraphList", "GShapeObjectCaption"))
+            if shapes is not None:
+                shapes.append(ch)
         elif tag in ("Header", "Footer", "HeaderParagraphList", "FooterParagraphList"):
             continue  # page chrome repeats on every page
         else:
-            _collect(ch, texts, tables, boxes)
+            _collect(ch, texts, tables, boxes, shapes)
 
 
 def _paragraphs(container: ET.Element):
@@ -394,34 +396,76 @@ def _plain(p: ET.Element) -> str:
     return "".join(texts)
 
 
-def _table_cells(tbody: ET.Element | None, path: str) -> tuple[list[dict], list[tuple]]:
-    """Each cell with its paragraphs' and text boxes' text, and the tables nested in the cells (table, path,
-    [row, col]), in source order."""
-    cells, nested = [], []
+def _table_cells(tbody: ET.Element | None, path: str) -> tuple[list[dict], list[tuple], list[tuple]]:
+    """Each cell with its paragraphs' and text boxes' text, the tables nested in the cells (table, path,
+    [row, col]) and the shape controls in the cells (control, path), in source order."""
+    cells, nested, shapes = [], [], []
     for tr in (tbody.findall("TableRow") if tbody is not None else []):
         for cell in tr.findall("TableCell"):
             r, c = int(cell.get("row", 0)), int(cell.get("col", 0))
             parts = []
             for pi, p in enumerate(_paragraphs(cell)):
-                texts, tables, boxes = [], [], []
-                _collect(p, texts, tables, boxes)
+                texts, tables, boxes, controls = [], [], [], []
+                _collect(p, texts, tables, boxes, controls)
                 parts.append("".join(texts))
                 parts += [_plain(bp) for box in boxes for bp in _paragraphs(box)]
                 nested += [(t, f"{path}/r{r}c{c}/p{pi}/t{ti}", [r, c]) for ti, t in enumerate(tables)]
+                shapes += [(g, f"{path}/r{r}c{c}/p{pi}/g{gi}") for gi, g in enumerate(controls)]
             cells.append({"row": r, "col": c, "rowspan": int(cell.get("rowspan", 1)),
                           "colspan": int(cell.get("colspan", 1)), "text": "\n".join(parts).strip()})
-    return cells, nested
+    return cells, nested, shapes
 
 
-def walk_hwp(root: ET.Element) -> list[dict]:
+def bindata_names(root: ET.Element) -> list[str | None]:
+    """Stream name under `BinData/` per `bindata-id` (1-based, in DocInfo order); None for a linked file."""
+    names = []
+    for b in root.iter("BinData"):
+        emb = b.find("BinDataEmbedding")
+        names.append(f"{emb.get('storage-id')}.{emb.get('ext')}" if emb is not None else None)
+    return names
+
+
+def shape_objects(gso: ET.Element) -> list[tuple[str, ET.Element]]:
+    """What a shape control shows that text extraction cannot: each picture, else an OLE object, else a drawing.
+    A lone line and a plain text box (its text is already extracted) are neither."""
+    pictures = [sc for sc in gso.iter("ShapeComponent") if sc.find("ShapePicture/PictureInfo") is not None]
+    if pictures:
+        return [("picture", sc) for sc in pictures]
+    chids = [sc.get("chid") for sc in gso.iter("ShapeComponent")]
+    if "$ole" in chids:
+        return [("ole", gso)]
+    # ponytail: any group, or a shape that is neither a line nor a text box, counts as a drawing, decorative
+    # frames included. Tighten when the ocr_unavailable drawing counts prove noisy.
+    if "$con" in chids or chids and chids[0] != "$lin" and gso.find(".//TextboxParagraphList") is None:
+        return [("drawing", gso)]
+    return []
+
+
+def walk_hwp(root: ET.Element, markers: bool = False) -> list[dict]:
     """Walk HWP XML in source order. Every text span is owned by exactly one element:
-    body paragraph, table cell (nested tables excluded) or nested table."""
+    body paragraph, table cell (nested tables excluded) or nested table. With `markers`, a `picture` element (no
+    text) stands where a picture, OLE object or drawing sits, a picture in a cell after its table;
+    `ocr.merge_hwp` turns each into image_text or drops it, so no marker is ever stored."""
     body = root.find("BodyText")
     if body is None:
         raise IngestionError("hwp_empty_output")
     out: list[dict] = []
     tracker = _SectionTracker()
     table_counter = [0]
+    names = bindata_names(root)
+    page_area = [1]
+
+    def emit_shapes(shapes: list[tuple], section: int) -> None:
+        for gso, path in shapes if markers else ():
+            for k, (obj, node) in enumerate(shape_objects(gso)):
+                location = {"format": "hwp", "section": section, "path": f"{path}/i{k}",
+                            "section_path": tracker.path, "object": obj,
+                            "share": round(int(node.get("width", 0)) * int(node.get("height", 0)) / page_area[0], 4)}
+                if obj == "picture":
+                    ref = int(node.find("ShapePicture/PictureInfo").get("bindata-id", 0))
+                    location["bindata"] = names[ref - 1] if 0 < ref <= len(names) else None
+                out.append({"path": f"{path}/i{k}", "kind": "picture", "parent": None, "raw_text": "",
+                            "location": location})
 
     def emit_paragraph(text: str, path: str, section: int, parent: str | None, kind: str = "paragraph") -> None:
         if not text.strip():
@@ -440,7 +484,7 @@ def walk_hwp(root: ET.Element) -> list[dict]:
         tbody = tc.find("TableBody")
         cap = tc.find("TableCaption")
         caption = [_plain(p) for p in _paragraphs(cap)] if cap is not None else []
-        cells, nested = _table_cells(tbody, path)
+        cells, nested, shapes = _table_cells(tbody, path)
         rows = int(tbody.get("rows", 0)) if tbody is not None else 0
         cols = int(tbody.get("cols", 0)) if tbody is not None else 0
         # One-row title boxes ("Ⅰ | | 사업 안내", "1 | | 사업개요 |") are headings laid out as tables.
@@ -457,18 +501,23 @@ def walk_hwp(root: ET.Element) -> list[dict]:
         out.append({"path": path, "kind": kind, "parent": parent, "raw_text": render_table(cells),
                     "location": location,
                     "table": {"rows": rows, "cols": cols, "caption": "\n".join(caption).strip(), "cells": cells}})
+        emit_shapes(shapes, section)
         for t, npath, ref in nested:
             emit_table(t, npath, section, path, ref)
 
     for si, sec in enumerate(body.findall("SectionDef")):
+        page = sec.find("PageDef")
+        page_area[0] = int(page.get("width", 0)) * int(page.get("height", 0)) if page is not None else 0
+        page_area[0] = page_area[0] or 59528 * 84188  # A4 in HWPUNIT
         for pi, p in enumerate(_paragraphs(sec)):
-            texts, tables, boxes = [], [], []
-            _collect(p, texts, tables, boxes)
+            texts, tables, boxes, controls = [], [], [], []
+            _collect(p, texts, tables, boxes, controls)
             path = f"s{si}/p{pi}"
             emit_paragraph("".join(texts), path, si, None)
             for bi, box in enumerate(boxes):
                 for bpi, bp in enumerate(_paragraphs(box)):
                     emit_paragraph(_plain(bp), f"{path}/box{bi}/p{bpi}", si, None)
+            emit_shapes([(g, f"{path}/g{gi}") for gi, g in enumerate(controls)], si)
             for ti, t in enumerate(tables):
                 emit_table(t, f"{path}/t{ti}", si, None, None)
     return out
@@ -497,7 +546,7 @@ def run_hwp_converter(settings: Settings, original: Path, out_xml: Path) -> tupl
 
 
 def parse_hwp(settings: Settings, original: Path) -> tuple[list[dict], list[dict], str | None]:
-    """Returns (elements, warnings, reason_code)."""
+    """Returns (elements with picture markers, warnings, reason_code). `ocr.merge_hwp` removes the markers."""
     with tempfile.TemporaryDirectory(dir=settings.data_dir) as tmp:
         out_xml = Path(tmp) / "out.xml"
         reason, stderr = run_hwp_converter(settings, original, out_xml)
@@ -519,7 +568,7 @@ def parse_hwp(settings: Settings, original: Path) -> tuple[list[dict], list[dict
                     slot.text = equation_text(script)
             else:
                 warnings.append({"code": "equation_count_mismatch", "detail": f"{len(slots)} in XML, {len(scripts)} records"})
-        elements = walk_hwp(root)
+        elements = walk_hwp(root, markers=True)
     except IngestionError as exc:  # walk_hwp's own reason code
         return [], warnings, str(exc)
     except (ValueError, LookupError) as exc:  # a malformed attribute, or a record the equation reader cannot decode
@@ -651,14 +700,12 @@ def finalize_elements(raw_elements: list[dict], extraction_id: str) -> list[dict
 
 
 def input_key(settings: Settings, src) -> str:
-    """Everything a parse depends on: original bytes, parser revision, the native print and the OCR cache.
-    An unchanged key means a rerun would reproduce the same extraction, so it is reused instead."""
+    """Everything a parse depends on: original bytes, parser revision and the OCR cache (the Hancom print is only
+    the fidelity witness). An unchanged key means a rerun would reproduce the same extraction, so it is reused."""
     from .ocr import cache_path  # ocr imports this module
 
-    printed = printed_pdf_path(settings, src["source_hash"])
     ocr_rows = cache_path(settings, src["source_hash"])
     info = {"source": src["source_hash"], "parser": parser_fingerprint(src["format"]),
-            "printed": sha256_file(printed) if printed.exists() else None,
             "ocr": sha256_file(ocr_rows) if ocr_rows.exists() else None}
     if src["format"] == "hwp":  # installing or replacing the converter retries a failed conversion
         info["loader"] = parser_fingerprint("hwp_loader")  # the fallback when the converter fails
@@ -789,27 +836,30 @@ def _reused(settings: Settings, src, prior) -> dict | None:
 
 
 def _parse_source(settings: Settings, src, original: Path) -> tuple[list[dict], list[dict], str | None, str]:
-    """(elements, warnings, reason_code, parser fingerprint) of an original, with OCR merged into its rendering."""
+    """(elements, warnings, reason_code, parser fingerprint) of an original, with OCR text merged: for HWP at the
+    picture markers pyhwp's walk left, for PDF next to the original's text around each image."""
+    from . import ocr  # ocr imports this module
+
     source_hash = src["source_hash"]
     fp = parser_fingerprint(src["format"])
+    suffix = ""
     if src["format"] == "hwp":
         raw, warnings, reason = parse_hwp(settings, original)
-        if reason:
+        if not reason:
+            raw, more, suffix = ocr.merge_hwp(settings, source_hash, raw)
+            warnings += more
+        else:
             # pyhwp cannot read it: the HWP loader parses the original. The print is only the fidelity witness.
+            # The loader gives no picture positions, so this document gets no image text.
             raw, more, failed = load_hwp_hwpx(original)
             warnings += [{"code": "pyhwp_failed", "detail": reason}] + more
             reason, fp = failed, parser_fingerprint("hwp_loader")
     else:
         raw, warnings, reason = parse_pdf(original)
-    rendering = printed_pdf_path(settings, source_hash) if src["format"] == "hwp" else original
-    if not reason and rendering.exists():
-        from .ocr import merge  # ocr imports this module
-
-        raw, more, suffix = merge(settings, source_hash, raw, rendering)
-        warnings += more
-        if suffix:
-            fp = f"{fp}-{suffix}"
-    return raw, warnings, reason, fp
+        if not reason:
+            raw, more, suffix = ocr.merge(settings, source_hash, raw, original)
+            warnings += more
+    return raw, warnings, reason, f"{fp}-{suffix}" if suffix else fp
 
 
 def _store_elements(conn, extraction_id: str, elements: list[dict]) -> None:

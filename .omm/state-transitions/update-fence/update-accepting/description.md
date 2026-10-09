@@ -1,0 +1,1 @@
+`watch.accepting = True` is set under the lock that every paid admission holds, so work admitted before it is counted (and refuses the update) and work after it is refused with `UPDATING`.

@@ -355,9 +355,9 @@ class PostgreSQLTests(unittest.TestCase):
         before = budget.snapshot(self.target)
         with self.assertRaisesRegex(budget.BudgetError, "open reservations"):
             budget.set_envelopes(self.target, "owner", {"embedding": 40, "gold_eval": 0, "interactive": 60,
-                                                        "judge_eval": 0}, "test")
+                                                        "judge_eval": 0, "ocr": 0}, "test")
         budget.set_envelopes(self.target, "owner", {"embedding": 0, "gold_eval": 0, "interactive": 100,
-                                                    "judge_eval": 0}, "test")
+                                                    "judge_eval": 0, "ocr": 0}, "test")
         after = budget.snapshot(self.target)
         self.assertEqual((after.spent_micro_usd, after.pending_micro_usd, after.cap_micro_usd),
                          (before.spent_micro_usd, before.pending_micro_usd, before.cap_micro_usd))

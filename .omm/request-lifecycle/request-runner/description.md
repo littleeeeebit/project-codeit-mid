@@ -1,1 +1,0 @@
-`run_queued` claims the row with `UPDATE ... SET status='running' WHERE status='queued' AND cancel_requested=0`, and does nothing when the claim fails because the row was cancelled first. It rebuilds `AnswerRequest` and `Principal` from `request_json` and calls `_execute`, which opens the Langfuse root.

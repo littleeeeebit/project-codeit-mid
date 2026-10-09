@@ -1,0 +1,1 @@
+A run killed mid restore-check leaves its scratch database behind for the owner to drop by name (SCRATCH_PREFIX comment).

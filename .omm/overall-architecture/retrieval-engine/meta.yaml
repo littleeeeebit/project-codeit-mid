@@ -1,18 +1,18 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-09 10:52:12.964000+00:00
-update_count: 39
+updated: 2026-10-09 23:18:27.241000+00:00
+update_count: 41
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
 children:
 - corpus-route
 - corpus-router
+- corpus-routing
 - dense-channel
 - dense-search
-- evidence-packer
+- evidence-packing
 - fusion
 - fusion-and-rerank
-- fusion-rerank
 - keyword-index
 - lexical-channel
 - local-reranker
@@ -20,13 +20,13 @@ children:
 - scope-routing
 - serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  serving-config[\"Serving configuration\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  scope-routing[\"Scope routing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  lexical-channel[\"Kiwi BM25 and exact codes\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  dense-channel[\"Dense search\\nsrc/rfp_assistant/retrieval/dense.py\"]\r\n\
-  \  fusion-rerank[\"Fusion and rerank\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  evidence-packing[\"Evidence packing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  serving-config -->|mode, limits, embedding| scope-routing\r\n  scope-routing\
-  \ -->|allowed chunk rows| lexical-channel\r\n  scope-routing -->|allowed chunk rows|\
-  \ dense-channel\r\n  lexical-channel -->|BM25 ranked rows| fusion-rerank\r\n  dense-channel\
-  \ -->|nearest rows| fusion-rerank\r\n  fusion-rerank -->|final ranking| evidence-packing"
+prev_diagram: "graph TD\r\n  keyword-index[\"Immutable keyword index\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ] -->|chunks, BM25, scope terms| scope-routing[\"Scope and corpus routing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  scope-routing -->|allowed rows| lexical-channel[\"Exact codes and BM25\\\
+  nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  scope-routing -->|allowed rows|\
+  \ dense-channel[\"Query vector and pgvector\\nsrc/rfp_assistant/retrieval/dense.py\"\
+  ]\r\n  lexical-channel -->|ranked rows| fusion-rerank[\"Keyword-first RRF, reranker\\\
+  nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  dense-channel -->|cosine-ranked\
+  \ rows| fusion-rerank\r\n  fusion-rerank -->|final ranking| evidence-packer[\"Evidence\
+  \ packing\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  keyword-index -->|chunk\
+  \ spans, linked pieces| evidence-packer"

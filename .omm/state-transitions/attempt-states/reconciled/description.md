@@ -1,1 +1,0 @@
-Set by `budget.reconcile` when a provider total covering the interval is recorded with evidence. A late `settle` of a reconciled attempt inserts a compensating negative adjustment `late-settlement:<attempt>`, so the cost is not counted twice.

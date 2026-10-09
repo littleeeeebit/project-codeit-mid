@@ -1,1 +1,0 @@
-Statuses of `requests.status` (`RequestView.status`), with the transitions observed in service.py.

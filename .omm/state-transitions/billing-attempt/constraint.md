@@ -1,0 +1,1 @@
+While any attempt is `unknown`, `mark_dispatching` refuses every PostgreSQL dispatch and `set_paid_enabled(True)` refuses. A settled cost above the reservation sets `budget_settings.frozen_reason`, and `reserve` then refuses everything until an owner inspects it.

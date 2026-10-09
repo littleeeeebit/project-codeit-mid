@@ -1,13 +1,13 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-09 10:52:23.801000+00:00
-update_count: 40
+updated: 2026-10-09 23:18:43.444000+00:00
+update_count: 42
 last_field: diagram
-git_commit: d812067
-git_branch: hwp-recovery-native-loader
+git_commit: 99859d6
+git_branch: hwp-ocr-from-embedded-images
 children:
+- admission-and-persist
 - answer-stream
 - answer-validation
-- ask-composer
 - ask-page
 - ask-submit
 - cancellation
@@ -15,36 +15,38 @@ children:
 - finish-record
 - finish-request
 - finish-step
+- follow-up-rewrite
 - langfuse-tracing
 - metered-call
 - metered-chat
+- metered-generation
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
 - paid-answer-stages
 - paid-call
 - poll-and-stream
-- request-runner
+- retrieve-and-price
 - run-queued
-- session-check
+- screen-submit
+- status-and-stream
 - status-poll
 - stream-and-poll
 - submit-and-admit
 - submit-answer
 - turn-render
+- validate-and-finish
 - validation
-prev_diagram: "graph TD\r\n  ask-screen[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  ask-route[\"POST /api/ask\\nsrc/rfp_assistant/api.py\"]\r\n  submit-answer[\"\
-  submit_answer and _create\\nsrc/rfp_assistant/service/service.py\"]\r\n  runner-worker[\"\
-  Runner worker run_queued\\nsrc/rfp_assistant/service/service.py\"]\r\n  retrieval-step[\"\
-  prepare_answer and retrieve\\nsrc/rfp_assistant/service/service.py\"]\r\n  paid-call[\"\
-  Metered generation\\nsrc/rfp_assistant/service/service.py\"]\r\n  answer-check[\"\
-  validate_answer\\nsrc/rfp_assistant/gateway/generation.py\"]\r\n  finish-record[\"\
-  _finish result row\\nsrc/rfp_assistant/service/service.py\"]\r\n  ask-screen -->|scope,\
-  \ question, mode| ask-route\r\n  ask-route -->|AnswerRequest with new generation\
-  \ id| submit-answer\r\n  submit-answer -->|queued row, executor submit| runner-worker\r\
-  \n  runner-worker -->|claimed running request| retrieval-step\r\n  retrieval-step\
-  \ -->|messages and estimate| paid-call\r\n  paid-call -->|partials over SSE| ask-screen\r\
-  \n  paid-call -->|provider response| answer-check\r\n  answer-check -->|validated\
-  \ payload or error| finish-record\r\n  finish-record -->|status poll, attachable|\
-  \ ask-screen"
+- worker-claim
+prev_diagram: "graph TD\r\n  ask-composer[\"Composer and turn\\nweb/src/components/ask/ask-page.tsx\"\
+  ] -->|POST /api/ask| session-check[\"Session middleware\\nsrc/rfp_assistant/api.py\"\
+  ]\r\n  session-check -->|member bound to context| submit-answer[\"submit_answer\\\
+  nsrc/rfp_assistant/service/service.py\"]\r\n  submit-answer -->|queued row, request\
+  \ ID| request-runner[\"RequestRunner worker\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  request-runner -->|claim queued to running| paid-answer[\"_paid_answer\\\
+  nsrc/rfp_assistant/service/service.py\"]\r\n  paid-answer -->|rewrite and generation\
+  \ stages| metered-call[\"_metered_chat\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  metered-call -->|provider response| answer-validation[\"validate_answer\\\
+  nsrc/rfp_assistant/gateway/generation.py\"]\r\n  answer-validation -->|payload or\
+  \ TechnicalError| finish-record[\"_finish\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  finish-record -->|poll and SSE read| ask-composer"

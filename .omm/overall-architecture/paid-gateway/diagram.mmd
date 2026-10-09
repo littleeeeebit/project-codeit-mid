@@ -1,9 +1,7 @@
 graph TD
-  metered-caller["Metered call sites\nsrc/rfp_assistant/service/service.py"] -->|reserve maximum cost| budget-ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"]
-  metered-caller -->|mark dispatching with guard| budget-ledger
-  metered-caller -->|chat or embed| openai-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
-  openai-transport -->|usage, response ID| metered-caller
-  metered-caller -->|settle, release, unknown| budget-ledger
-  metered-caller -->|structured output check| answer-validator["Answer validation\nsrc/rfp_assistant/gateway/generation.py"]
-  metered-caller -->|steps, usage, scores| langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
-  gemini-ledger["Gemini side ledger\nsrc/rfp_assistant/retrieval/models.py"] -->|own cap, own attempts| budget-ledger
+  budget-ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"] -->|"admitted attempt_id"| openai-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
+  gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"] -->|"owner_check before call"| openai-transport
+  gateway-owner -->|"owner_guard in transaction"| budget-ledger
+  openai-transport -->|"usage or error"| budget-ledger
+  fake-transport["Fake transport\nsrc/rfp_assistant/gateway/generation.py"] -->|"deterministic usage"| budget-ledger
+  langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"] -->|"observes, never gates"| openai-transport

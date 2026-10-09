@@ -1,0 +1,1 @@
+BidMate is registered as the hub OAuth service `bidmate`. If the VM address changes, `BIDMATE_HUB_URL`, `BIDMATE_OAUTH_REDIRECT_URI` and the hub's `oauth_redirect_uri` must be updated together (api.py docstring).

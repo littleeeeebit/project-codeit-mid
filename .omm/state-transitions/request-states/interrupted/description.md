@@ -1,1 +1,0 @@
-`recover_requests` sets every queued and running row interrupted at startup under exclusive ownership. `RequestRunner.shutdown` does the same on a controlled stop (running rows only if a future was still pending). `_finish` never overwrites it. Nothing is replayed.

@@ -1,0 +1,1 @@
+Persisted by `_create` with an admitted executor slot. No ledger attempt exists yet. `abandon_request` cancels only in this state.

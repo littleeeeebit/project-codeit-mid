@@ -1,0 +1,1 @@
+The comparison found differences, reported as exact element, cell and page findings for a person to inspect.
