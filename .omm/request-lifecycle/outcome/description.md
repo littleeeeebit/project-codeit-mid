@@ -1,1 +1,0 @@
-validate_answer() checks schema, permitted citations, stored quote identity, document attribution and comparison/status obligations. _finish() adds attempt IDs and aggregate billing state, persists result and actual trace, retains already terminal execution state and clears the partial cache. Technical errors are not automatically retried.

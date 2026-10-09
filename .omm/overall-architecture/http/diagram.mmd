@@ -1,6 +1,0 @@
-graph TD
-lifespan["Resource lifespan\nsrc/rfp_assistant/api.py"] -->|Provide process resources| routes["Service route adapters\nsrc/rfp_assistant/api.py"]
-oauth["OAuth login routes\nsrc/rfp_assistant/api.py"] -->|Issue opaque session cookie| session["Session and account middleware\nsrc/rfp_assistant/api.py"]
-session -->|Bind authenticated principal context| routes
-routes -->|Raised service domain errors| errors["HTTP error mapping\nsrc/rfp_assistant/api.py"]
-static["Static frontend mount\nsrc/rfp_assistant/api.py"] -->|Screens initiate API calls| session

@@ -1,0 +1,1 @@
+A versioned index of chunks with a frozen `scope-terms.json` and analyzer version. `Resources.index()` reloads it when the serving `index_version` changes. An outdated analyzer is still served but flagged `index_outdated:`.

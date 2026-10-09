@@ -1,6 +1,6 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-07 06:24:19.644000+00:00
-update_count: 35
+updated: 2026-10-09 02:46:29.882000+00:00
+update_count: 37
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
@@ -9,10 +9,15 @@ children:
 - corpus-router
 - dense-channel
 - dense-search
+- evidence-packing
 - fusion
+- fusion-and-rerank
+- fusion-rerank
 - keyword-index
+- lexical-channel
 - local-reranker
 - reranker
+- scope-routing
 - serving-config
 parentPath: []
 prev_diagram: "graph TD\r\n  serving-config[\"Serving config\\nsrc/rfp_assistant/service/service.py\"\

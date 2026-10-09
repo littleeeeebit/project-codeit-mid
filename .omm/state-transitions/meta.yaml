@@ -1,37 +1,34 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-08 21:42:00.555000+00:00
-update_count: 34
+updated: 2026-10-09 02:46:48.155000+00:00
+update_count: 36
 last_field: diagram
-git_commit: 86d9b1f
-git_branch: gpt5-mini-answer-embedding-comparison
+git_commit: 829c708
+git_branch: main-update-banner-button
 children:
 - attempt-billing
 - attempt-record
 - attempt-states
 - billing-attempt
 - billing-attempt-states
-- cancelled
-- completed
-- failed
+- controlled-shutdown
 - gateway-owner
 - gold-candidate
 - gold-candidate-states
 - interrupted
-- queued
+- request-states
 - request-status
+- restart-recovery
 - running
 - serving-activation
 - source-review-states
-prev_diagram: "graph TD\r\n  request-states[\"Request states\\nsrc/rfp_assistant/storage/store.py\"\
-  ]\r\n  attempt-states[\"Attempt ledger states\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  admission-switches[\"Paid admission switches\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  source-states[\"Source parse and review\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  gold-candidate-states[\"Gold candidate review\\nsrc/rfp_assistant/evaluation/gold.py\"\
-  ]\r\n  serving-activation[\"Serving activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  request-states -->|\"each paid stage reserves\"| attempt-states\r\n  attempt-states\
-  \ -->|\"aggregate billing_state\"| request-states\r\n  admission-switches -->|\"\
-  refuse reserve or dispatch\"| attempt-states\r\n  attempt-states -->|\"overrun freezes,\
-  \ unknown blocks\"| admission-switches\r\n  source-states -->|\"review filter, served\
-  \ extraction\"| serving-activation\r\n  gold-candidate-states -->|\"approved rows\
-  \ scored\"| serving-activation\r\n  serving-activation -->|\"config snapshot per\
-  \ request\"| request-states"
+- update-fence
+- update-states
+prev_diagram: "graph TD\r\nqueued[\"Queued request\\nsrc/rfp_assistant/service/service.py\"\
+  ] -->|Worker claims uncancelled row| running[\"Running request\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\nqueued -->|Owner cancels before claim| cancelled[\"Cancelled execution\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\nqueued -->|Shutdown or restart recovery| interrupted[\"Interrupted execution\\\
+  nsrc/rfp_assistant/service/service.py\"]\r\nqueued -->|Executor submission fails|\
+  \ failed[\"Failed execution\\nsrc/rfp_assistant/service/service.py\"]\r\nrunning\
+  \ -->|Normal outcome persisted| completed[\"Completed execution\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\nrunning -->|Execution or validation error| failed\r\nrunning -->|Stop checkpoint\
+  \ or finalization| cancelled\r\nrunning -->|Shutdown or restart recovery| interrupted"

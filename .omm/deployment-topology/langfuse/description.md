@@ -1,0 +1,1 @@
+An optional local Langfuse v4 stack (`compose.langfuse.yaml`, `tools/infra/start-langfuse.ps1`) on 127.0.0.2:3100. Tracing is off unless all three `LANGFUSE_*` variables are set, and a failing Langfuse changes neither answers nor the ledger.

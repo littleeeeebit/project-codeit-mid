@@ -1,0 +1,1 @@
+`service.retrieve` reads `active_serving` on every call (one database read), loads or caches indexes, and returns evidence units with quotes. Those quotes are checked against `_stored_quote` again at validation and when evidence is opened.

@@ -1,0 +1,1 @@
+`_pack_evidence` packs the ranking into `EvidenceUnit`s (evidence_id E1.., quote, location, token_count) within the evidence unit and token limits and keeps linked split pieces. It returns `RetrievalResult` with candidates, excluded rows, limitations, timings_ms and index_version. These evidence IDs are the only ones the answer may cite.

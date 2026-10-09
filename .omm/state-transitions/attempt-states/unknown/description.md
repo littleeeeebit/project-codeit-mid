@@ -1,1 +1,1 @@
-The reserved amount counts as unknown cost and blocks all new dispatch until the owner settles or reconciles it via the CLI.
+The call may have executed but the cost is not known: an exception mid-call, no usage returned, a failed settlement, or a process death while dispatching. While any attempt is unknown, PostgreSQL dispatch is refused, `paid on` is refused and `open_paid_work` refuses updates.

@@ -1,1 +1,0 @@
-step_backup() reuses a backup only when current table digests and artifact hashes match; otherwise it creates one under shared gateway ownership. step_restore_check() creates a fresh scratch database, restores and verifies it with paid admission off, then drops that database. A previous passed check is reused only for the same artifact digest.

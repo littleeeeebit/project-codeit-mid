@@ -1,0 +1,1 @@
+`maintenance.run` walks `STEPS` (backup, restore_check, ingest, fidelity, keyword, embedding, regression, report), reusing unchanged steps. A paid embedding stops at its estimate and a failed step stops the sequence; nothing it does changes what serves. It is started by `cli maintain` or by `service.start_maintenance` from the screen, which runs it as a background job.

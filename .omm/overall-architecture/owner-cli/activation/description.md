@@ -1,0 +1,1 @@
+`activate-run` or the verify screen's `activate_experiment` call `evaluation.activate_decision`. It verifies the index and matrix and the current policy, then in one transaction sets the app setting `active_run` (evaluation.py around line 1546) and appends to `activations`. Every later `active_serving` read picks it up. Nothing activates automatically.

@@ -1,0 +1,1 @@
+Restarted on the new commit and `/api/info` answered 401. `deploying` and `web-out.prev` are removed. The banner's wait reloads the page.

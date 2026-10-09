@@ -1,0 +1,9 @@
+created: 2026-10-09T02:46:30.537Z
+updated: 2026-10-09T02:46:30.538Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: scope-routing
+children: []
+parentPath:
+  - retrieval-engine

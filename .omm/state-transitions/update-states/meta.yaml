@@ -1,14 +1,39 @@
 created: 2026-10-09T00:32:05.948Z
-updated: 2026-10-09T00:32:06.827Z
-update_count: 3
-last_field: concern
+updated: 2026-10-09T02:46:55.708Z
+update_count: 5
+last_field: diagram
 kind: nested-class
 title: update-states
 children:
+  - failed
+  - interrupted
   - marker-written
+  - requested
   - result-failed
   - result-rolled-back
   - result-running
   - result-succeeded
   - result-up-to-date
+  - rollback-failed
+  - rolled-back
+  - running
+  - succeeded
+  - up-to-date
 parentPath: []
+prev_diagram: "graph TD\r
+
+  \  marker-written[\"Marker written\\nsrc/rfp_assistant/service/update.py\"]
+  -->|\"path unit starts script\"| result-running[\"Result
+  running\\ntools/infra/update.sh\"]\r
+
+  \  result-running -->|\"main equals running\"| result-up-to-date[\"Up to
+  date\\ntools/infra/update.sh\"]\r
+
+  \  result-running -->|\"precheck refused\"| result-failed[\"Failed,
+  unchanged\\ntools/infra/update.sh\"]\r
+
+  \  result-running -->|\"healthy 401 after restart\"|
+  result-succeeded[\"Succeeded\\ntools/infra/update.sh\"]\r
+
+  \  result-running -->|\"step failed after ff\"| result-rolled-back[\"Rolled
+  back or rollback failed\\ntools/infra/update.sh\"]"

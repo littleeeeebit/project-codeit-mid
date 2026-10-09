@@ -1,0 +1,1 @@
+The app's view of a run cut off by the unit's 30-minute TimeoutStartSec or a reboot (stale `running`). The script also writes `interrupted` when a recovery run fails a precondition. The next requested update resumes from `deploying`.

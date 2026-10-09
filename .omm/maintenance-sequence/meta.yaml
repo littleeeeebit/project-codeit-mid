@@ -1,13 +1,8 @@
 created: 2026-10-05 21:24:06.553000+00:00
-updated: 2026-10-08T21:42:06.049Z
+updated: 2026-10-08 21:42:06.049000+00:00
 update_count: 9
 last_field: concern
 git_commit: 86d9b1f
 git_branch: gpt5-mini-answer-embedding-comparison
 children:
-  - backup
-  - build
-  - ingest
-  - regression
-  - report
-  - restore-check
+- restore-check

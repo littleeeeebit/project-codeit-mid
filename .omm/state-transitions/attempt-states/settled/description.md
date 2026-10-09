@@ -1,1 +1,1 @@
-The cost comes from reported usage and counts as spent. Settlement is exactly once; a duplicate returns the stored cost.
+`settle` computes cost from reported usage (uncached, cached and cache-write tokens) at the attempt's frozen rates. An overrun beyond the reservation sets `budget_settings.frozen_reason`, which stops all new paid admission until inspected.

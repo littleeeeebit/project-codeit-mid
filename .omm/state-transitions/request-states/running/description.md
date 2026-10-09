@@ -1,0 +1,1 @@
+Claimed by `run_queued`, or inserted directly for free modes. While running, `cancel_request` only sets `cancel_requested=1`, which `_stop_reason` and `_dispatch_guard` honour before the next paid stage. `answer_progress` exposes partials only in this state.

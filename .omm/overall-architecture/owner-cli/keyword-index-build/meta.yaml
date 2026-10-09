@@ -1,0 +1,9 @@
+created: 2026-10-09T02:46:42.709Z
+updated: 2026-10-09T02:46:42.710Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: keyword-index-build
+children: []
+parentPath:
+  - owner-cli

@@ -1,8 +1,18 @@
 graph TD
-browser["Submit conversation turn\nweb/src/components/ask/ask-page.tsx"] -->|Question mode scope previous| admission["Authenticate and persist ownership\nsrc/rfp_assistant/service/service.py"]
-admission -->|Request ID and copied context| execution["Execute claimed request\nsrc/rfp_assistant/service/service.py"]
-execution -->|Standalone question and scope| preparation["Retrieve and price evidence\nsrc/rfp_assistant/service/service.py"]
-preparation -->|Evidence-bound prompt and ceiling| provider["Dispatch metered generation\nsrc/rfp_assistant/gateway/generation.py"]
-provider -->|Content usage and response identity| outcome["Validate and persist outcome\nsrc/rfp_assistant/service/service.py"]
-provider -->|Unvalidated content deltas| delivery["Stream and status consumers\nweb/src/lib/use-answer-stream.ts"]
-outcome -->|Terminal status and stored answer| delivery
+  ask-screen["Ask screen\nweb/src/components/ask/ask-page.tsx"]
+  ask-route["POST /api/ask\nsrc/rfp_assistant/api.py"]
+  submit-answer["submit_answer and _create\nsrc/rfp_assistant/service/service.py"]
+  runner-worker["Runner worker run_queued\nsrc/rfp_assistant/service/service.py"]
+  retrieval-step["prepare_answer and retrieve\nsrc/rfp_assistant/service/service.py"]
+  paid-call["Metered generation\nsrc/rfp_assistant/service/service.py"]
+  answer-check["validate_answer\nsrc/rfp_assistant/gateway/generation.py"]
+  finish-record["_finish result row\nsrc/rfp_assistant/service/service.py"]
+  ask-screen -->|scope, question, mode| ask-route
+  ask-route -->|AnswerRequest with new generation id| submit-answer
+  submit-answer -->|queued row, executor submit| runner-worker
+  runner-worker -->|claimed running request| retrieval-step
+  retrieval-step -->|messages and estimate| paid-call
+  paid-call -->|partials over SSE| ask-screen
+  paid-call -->|provider response| answer-check
+  answer-check -->|validated payload or error| finish-record
+  finish-record -->|status poll, attachable| ask-screen

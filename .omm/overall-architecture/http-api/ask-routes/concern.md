@@ -1,0 +1,1 @@
+Each open stream holds a threadpool thread and makes a database read about every 150 ms (`request_status`) for the length of the answer. This is acceptable at six users and 12 admitted requests, but it scales linearly with open streams.

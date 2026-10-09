@@ -1,1 +1,1 @@
-Document identity, original content, extraction revision, index version, embedding set and measured run are distinct identities. Candidate creation does not change serving selection. Requests use the activated artifacts and persist their own evidence map, so later corpus changes can be reported without rewriting issued citations.
+How corpus data becomes evidence in an answer, and where each stage persists. Building and selection run offline through the CLI or background jobs. Serving only reads the activated configuration.

@@ -1,0 +1,1 @@
+`FakeTransport` is used when settings `provider: "fake"`. It echoes the first evidence, returns deterministic embeddings and never builds an SDK client. It is used by `check`, `load-check`, tests and `tools/verify.py` flows.

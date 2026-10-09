@@ -1,7 +1,0 @@
-graph TD
-resources["Process resource owner\nsrc/rfp_assistant/service/service.py"] -->|Own bounded background executor| runner["Request admission and execution\nsrc/rfp_assistant/service/service.py"]
-runner -->|Reconstructed persisted request| preparation["Answer preparation\nsrc/rfp_assistant/service/service.py"]
-preparation -->|Priced prompt and schema| paid["Metered provider stages\nsrc/rfp_assistant/service/service.py"]
-paid -->|Response and settled usage| completion["Validation and finalization\nsrc/rfp_assistant/service/service.py"]
-preparation -->|Deterministic or empty outcome| completion
-completion -->|Persist exact evidence map| evidence["Citation and original resolution\nsrc/rfp_assistant/service/service.py"]

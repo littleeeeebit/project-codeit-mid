@@ -1,0 +1,1 @@
+`STALE_RUN_SECONDS` (30 min) equals `TimeoutStartSec=30min`, so a run that is genuinely still in its final seconds could briefly show as interrupted. Inferred from the two constants; not observed.

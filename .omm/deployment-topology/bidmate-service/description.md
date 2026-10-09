@@ -1,0 +1,1 @@
+Uvicorn with one worker serving `rfp_assistant.api:app` on :8501, with configuration from `/etc/bidmate/server.env` (hub settings, allowlist, update paths, DSN). The update health check counts it healthy when `/api/info` answers 401 to a signed-out caller.

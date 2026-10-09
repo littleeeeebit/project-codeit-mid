@@ -1,0 +1,1 @@
+`build_keyword_index(settings, Analyzer(), include_unreviewed=...)` chunks the active extractions (`retrieval/chunking.py` structural profile) and writes a versioned index: payload files, manifest and `scope-terms.json`, recorded in the database. The operating index includes unreviewed sources, which are labelled; `--reviewed-only` builds the stricter index.

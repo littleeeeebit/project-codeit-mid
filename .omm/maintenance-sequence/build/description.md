@@ -1,1 +1,0 @@
-step_keyword() loads the served profile and review policy, builds a candidate with activate=False and records rebuilt_index. step_embedding() uses the activated embedding model, reuses a ready set or approved payloads, skips keyword-only serving and returns needs_approval when new paid payloads are not covered.

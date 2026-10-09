@@ -1,1 +1,1 @@
-Request execution state is persisted independently of answer status and billing status. A completed request can hold an abstention or budget-blocked answer; a failed request can still have settled charges. Cancelled and interrupted requests can retain a late outcome without becoming running again.
+Three persisted state machines interact. Request rows hold `requests.status`, ledger attempts hold `attempts.state`, and the root updater writes `result.json` state. Two process-level mechanisms move them: the update fence and stop/restart recovery.

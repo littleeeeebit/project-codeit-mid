@@ -1,0 +1,1 @@
+Unauthenticated GitHub allows 60 calls an hour per address. A poll makes at most two calls, which sets the 300 s interval.

@@ -1,0 +1,1 @@
+Installing or changing these units is a manual root step (runbook 3.2). The app can trigger an update but cannot alter how updates run.

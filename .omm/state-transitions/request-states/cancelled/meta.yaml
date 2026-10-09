@@ -1,0 +1,9 @@
+created: 2026-10-09T02:46:53.052Z
+updated: 2026-10-09T02:46:53.053Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: cancelled
+children: []
+parentPath:
+  - request-states

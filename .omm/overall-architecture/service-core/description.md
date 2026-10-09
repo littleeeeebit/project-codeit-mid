@@ -1,0 +1,1 @@
+`src/rfp_assistant/service/service.py` holds the authenticated public functions and request orchestration, and `service/answers.py`, `drafting.py`, `ops.py`, `auth.py` and `update.py` sit beside it. `_authorize` → `auth.require_any` names the capability each function serves. Every signed-in member is given all capabilities by `auth.visitor`.

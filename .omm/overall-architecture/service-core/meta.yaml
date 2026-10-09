@@ -1,6 +1,6 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-07 06:24:18.175000+00:00
-update_count: 23
+updated: 2026-10-09 02:46:27.417000+00:00
+update_count: 25
 last_field: diagram
 kind: nested-class
 title: service-core
@@ -13,11 +13,14 @@ children:
 - metered-chat
 - paid-answer
 - partials
+- request-runner
 - resources
 - resources-owner
+- restart-recovery
 - serving-config
 - submit
 - tracing
+- update-fence
 parentPath: []
 prev_diagram: "graph TD\r\n  resources[\"Process owner Resources\\nsrc/rfp_assistant/service/service.py\"\
   ]\r\n  runner[\"Bounded request runner\\nsrc/rfp_assistant/service/service.py\"\

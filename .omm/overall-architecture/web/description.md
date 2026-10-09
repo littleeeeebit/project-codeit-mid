@@ -1,1 +1,0 @@
-RootLayout wraps all pages in SignedIn. After /api/auth/me succeeds, the browser binds the displayed account before mounting application screens. Production builds export static files; web/next.config.ts forwards /api requests to a separate Python API only during development.

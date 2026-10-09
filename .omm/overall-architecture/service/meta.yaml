@@ -1,14 +1,13 @@
-created: 2026-10-08T21:41:50.148Z
-updated: 2026-10-08T21:41:50.280Z
+created: 2026-10-08 21:41:50.148000+00:00
+updated: 2026-10-08 21:41:50.280000+00:00
 update_count: 2
 last_field: diagram
 kind: nested-class
 title: service
 children:
-  - completion
-  - evidence
-  - paid
-  - preparation
-  - resources
-  - runner
+- completion
+- evidence
+- paid
+- preparation
+- resources
 parentPath: []

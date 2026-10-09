@@ -1,0 +1,1 @@
+Persisted by `_create` with the request_json snapshot and an admission slot held. No attempt exists yet, so cancelling is conclusive and free.

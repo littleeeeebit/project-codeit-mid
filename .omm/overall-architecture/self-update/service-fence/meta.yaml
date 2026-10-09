@@ -1,0 +1,9 @@
+created: 2026-10-09T02:46:40.769Z
+updated: 2026-10-09T02:46:40.770Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: service-fence
+children: []
+parentPath:
+  - self-update

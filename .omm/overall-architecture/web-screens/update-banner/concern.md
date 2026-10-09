@@ -1,0 +1,1 @@
+In `useUpdateWait`, any non-OK response other than 401/409 sets `wentDown`, and so does a 400 `ledger_unavailable` raised by `open_paid_work`. The next OK response then reloads the page, so a transient database error during the wait looks like a restart. This is inferred from the code and not observed in a run.

@@ -1,0 +1,1 @@
+`Resources._own` on a fresh gateway lock runs `recover_requests` and `budget.recover` (including `external_attempts`), so nothing is replayed. Dispatching attempts become unknown and block dispatch until reconciled.

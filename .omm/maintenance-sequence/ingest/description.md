@@ -1,1 +1,0 @@
-step_ingest() imports the manifest, parses changed inputs and compares resulting active extraction identities. Identical reparsed output is reused without losing review. step_fidelity() checks eligible HWP revisions lacking a current verdict and stops the sequence if required rendering or validation fails.

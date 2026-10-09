@@ -1,1 +1,0 @@
-_finish() normally records completed for answered, conflicting_evidence, insufficient_evidence, ingestion_unavailable, deterministic answers or budget refusal outcomes. Execution completion therefore does not imply an answered result, quality pass or successful paid call.

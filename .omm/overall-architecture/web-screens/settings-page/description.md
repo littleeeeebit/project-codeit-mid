@@ -1,0 +1,1 @@
+설정. It polls `GET /api/settings/api-key` every 5 s and `GET /api/budget` every 2 s. It sends `PUT /api/settings/api-key` (the member's own OpenAI key and model), `PUT /api/settings/model` and `PUT /api/budget/limit` (the shared cap, with a reason). The key reaches `Resources.set_api_key` and stays only in process memory.

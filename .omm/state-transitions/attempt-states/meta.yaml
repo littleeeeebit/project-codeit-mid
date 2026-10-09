@@ -1,9 +1,32 @@
 created: 2026-10-06 07:31:37.565000+00:00
-updated: 2026-10-07 06:24:29.253000+00:00
-update_count: 7
-last_field: constraint
+updated: 2026-10-09T02:46:53.521Z
+update_count: 9
+last_field: diagram
 kind: nested-class
 title: attempt-states
 children:
-- unknown
+  - dispatching
+  - reconciled
+  - released
+  - reserved
+  - settled
+  - unknown
 parentPath: []
+prev_diagram: "graph TD\r
+
+  \  reserved[\"Reserved\\nsrc/rfp_assistant/gateway/budget.py\"] -->|\"guard
+  passes\"| dispatching[\"Dispatching\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  reserved -->|\"stopped or recovered\"|
+  released[\"Released\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  dispatching -->|\"usage reported\"|
+  settled[\"Settled\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  dispatching -->|\"outcome uncertain\"|
+  unknown[\"Unknown\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  unknown -->|\"owner reconcile\"|
+  reconciled[\"Reconciled\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  reconciled -->|\"late usage\"| settled"

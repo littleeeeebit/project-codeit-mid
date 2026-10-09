@@ -1,1 +1,1 @@
-A durable marker written before the network call. On restart it becomes unknown.
+Set by `mark_dispatching` in the same transaction as the request's stop check, the owner guard, `paid_admission` and the no-unknown check. This is the durable marker written before the network call.

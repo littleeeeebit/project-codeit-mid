@@ -1,0 +1,1 @@
+`_validated` runs `generation.validate_answer` inside a `validate-answer` guardrail trace step and scores `citation_valid`. A `TechnicalError` stores the raw output in the trace and fails the request as `technical_error`, with the cost already settled.

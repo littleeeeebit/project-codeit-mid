@@ -1,1 +1,1 @@
-Nothing was sent. The reservation is freed.
+No cost. Reached from reserved when dispatch is refused or the provider is unavailable, or from dispatching only with `confirmed_pre_execution=True`.

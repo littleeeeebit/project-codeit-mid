@@ -1,1 +1,0 @@
-record_review() persists reviewer, extraction revision, locations and findings. recover_source() validates an explicitly supplied converted artifact and review record before registering a managed recovery revision. Metadata corrections use resolve_metadata() with actor, rationale and evidence, rather than overwriting raw CSV provenance.

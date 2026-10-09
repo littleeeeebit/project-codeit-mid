@@ -1,1 +1,0 @@
-service.start_maintenance() launches storage.maintenance.run() with the existing Resources owner. The sequence checkpoints each step to state.json and writes final JSON/Markdown reports. It stops at the first failure or missing paid estimate approval, while recording serving configuration before and after.

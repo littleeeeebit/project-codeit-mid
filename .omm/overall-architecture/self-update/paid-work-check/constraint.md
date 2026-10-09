@@ -1,0 +1,1 @@
+The read order is deliberate: threads and slots, then request rows, then the ledger. Work writes its ledger rows before its row finishes and its thread ends, so reading in this order cannot miss work that is still open.
