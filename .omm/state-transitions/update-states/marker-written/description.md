@@ -1,0 +1,1 @@
+`request_update` → `UpdateWatch.write_request` atomically creates `BIDMATE_UPDATE_REQUEST`. From then on `in_progress()` is true, so the paid-work fence is up.

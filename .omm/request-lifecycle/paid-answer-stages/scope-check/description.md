@@ -1,1 +1,0 @@
-`_resolve_scope` loads the selected documents. Any document whose `parse_status` is not 'parsed' or whose active extraction is not in the serving index becomes a `missing_fields` entry with reason `ingestion_unavailable`. If every selected document is unavailable, the request finishes immediately as `ingestion_unavailable` with the quarantine text, and nothing is paid.

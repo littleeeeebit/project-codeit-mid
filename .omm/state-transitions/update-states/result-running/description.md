@@ -1,0 +1,1 @@
+`update.sh` writes `running`, then `rm -f $REQUEST`. The marker is read before the result, so the fence never sees neither.

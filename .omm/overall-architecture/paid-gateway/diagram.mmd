@@ -1,13 +1,6 @@
 graph TD
-  metered-call["Metered call wrapper\nsrc/rfp_assistant/service/service.py"]
-  budget-ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"]
-  gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
-  openai-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
-  key-sessions["Member key sessions\nsrc/rfp_assistant/service/service.py"]
-  tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
-  metered-call -->|reserve, dispatch, settle| budget-ledger
-  budget-ledger -->|owner_guard in transaction| gateway-owner
-  metered-call -->|chat or embed| openai-transport
-  openai-transport -->|client per KEY_SESSION| key-sessions
-  openai-transport -->|owner check before call| gateway-owner
-  metered-call -->|generation span, usage, cost| tracing
+  ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"] -->|"owner check per txn"| gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
+  ledger -->|"dispatching marker then call"| transport["Provider transport\nsrc/rfp_assistant/gateway/generation.py"]
+  transport -->|"usage settles attempt"| ledger
+  transport -->|"structured output"| answer-validation["Answer validation\nsrc/rfp_assistant/gateway/generation.py"]
+  transport -->|"spans and scores"| tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]

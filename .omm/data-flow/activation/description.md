@@ -1,1 +1,0 @@
-See state-transitions/serving-activation. Nothing activates on a schedule. A person picks a row (with name and note), and `activate_decision` switches serving in one transaction while keeping the history in `activations`.

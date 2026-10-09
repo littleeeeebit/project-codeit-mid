@@ -1,0 +1,1 @@
+There are 100 CSV associations over the unique originals in `원본 데이터` (`data_list.csv` and `files/`). `ingest_source` refuses if the bytes no longer hash to `source_hash`, which means the manifest must be rerun.

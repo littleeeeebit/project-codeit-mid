@@ -1,0 +1,7 @@
+graph TD
+  banner-request["Update button\nweb/src/components/update-banner.tsx"] -->|"POST /api/update"| fence-and-marker["Fence and marker\nsrc/rfp_assistant/service/service.py"]
+  fence-and-marker -->|"requested file appears"| path-unit["Path and oneshot units\ntools/infra/bidmate-update.path"]
+  path-unit -->|"runs root copy"| update-script["Updater script\ntools/infra/update.sh"]
+  update-script -->|"systemctl restart bidmate"| app-service["App service unit\ntools/infra/bidmate.service"]
+  update-script -->|"result.json, update.log"| result-readback["Result readback\nsrc/rfp_assistant/service/update.py"]
+  result-readback -->|"status poll, reload"| banner-request

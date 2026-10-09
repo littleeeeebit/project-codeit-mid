@@ -1,14 +1,25 @@
-created: 2026-10-06T22:40:16.184Z
-updated: 2026-10-06T22:40:16.307Z
-update_count: 2
+created: 2026-10-06 22:40:16.184000+00:00
+updated: 2026-10-09 00:31:51.008000+00:00
+update_count: 4
 last_field: diagram
 kind: nested-class
 title: storage
 children:
-  - app-tables
-  - backup-restore
-  - connection-pool
-  - maintenance
-  - runtime-files
-  - startup-guard
+- backup-restore
+- connection-pool
+- maintenance-sequence
+- postgres-target
+- runtime-files
+- schema-and-store
 parentPath: []
+prev_diagram: "graph TD\r\n  connection-pool[\"Connection pool\\nsrc/rfp_assistant/storage/postgres.py\"\
+  ]\r\n  startup-guard[\"Validated-import guard\\nsrc/rfp_assistant/storage/postgres.py\"\
+  ]\r\n  app-tables[\"Schema and write mutex\\nsrc/rfp_assistant/storage/store.py\"\
+  ]\r\n  runtime-files[\"Runtime artifacts\\nsrc/rfp_assistant/storage/store.py\"\
+  ]\r\n  backup-restore[\"Backup and restore-check\\nsrc/rfp_assistant/storage/postgres_backup.py\"\
+  ]\r\n  maintenance[\"Maintenance sequence\\nsrc/rfp_assistant/storage/maintenance.py\"\
+  ]\r\n  startup-guard -->|reads import markers| connection-pool\r\n  startup-guard\
+  \ -->|hashes referenced artifacts| runtime-files\r\n  app-tables -->|transactions\
+  \ through| connection-pool\r\n  maintenance -->|backup then restore check| backup-restore\r\
+  \n  maintenance -->|ingest, index, embed| runtime-files\r\n  backup-restore -->|dump,\
+  \ staged restore| connection-pool"

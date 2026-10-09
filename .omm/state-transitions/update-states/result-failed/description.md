@@ -1,0 +1,1 @@
+The script refused before changing anything: dirty checkout, fetch failure, not a fast-forward, changed `bidmate.service`, missing `web/out`, or a failure to save the backup or progress record.

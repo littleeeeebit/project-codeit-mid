@@ -1,0 +1,1 @@
+`run_queued` claims `queued` → `running` only where `cancel_requested = 0` (an exactly-once claim), rebuilds the `AnswerRequest` and `Principal` from the persisted `request_json` snapshot, and calls `_execute`. The worker gets only the request ID and the copied contextvars (key session, model, billing scope).

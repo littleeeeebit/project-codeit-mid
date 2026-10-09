@@ -1,0 +1,1 @@
+`bidmate-update.path` (`PathExists=` the marker, `Unit=bidmate-update.service`) and the oneshot `bidmate-update.service` (`ExecStart=/usr/local/sbin/bidmate-update`, `TimeoutStartSec=30min`) are installed by root (runbook 3.2) and never from the checkout.

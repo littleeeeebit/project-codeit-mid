@@ -1,0 +1,1 @@
+Cancellation: `cancel_request` cancels a queued request outright, with no paid call. For a running request it sets `cancel_requested`. The next `_checkpoint` or the `mark_dispatching` guard then stops further paid stages, an already dispatched call still settles, and `_finish` stores `cancelled`, never as the screen's answer.

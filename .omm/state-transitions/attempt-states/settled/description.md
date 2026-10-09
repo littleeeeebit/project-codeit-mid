@@ -1,0 +1,1 @@
+The cost comes from reported usage and counts as spent. Settlement is exactly once; a duplicate returns the stored cost.

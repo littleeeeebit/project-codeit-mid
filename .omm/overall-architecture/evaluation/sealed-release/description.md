@@ -1,0 +1,1 @@
+`freeze-release` (`sealed.py`) records the release candidate's hashes and frozen manifests. The sealed test set then runs once, and any later run is labeled a post-test regression. `release-report` (`release.py`) decides ready, limited or blocked from hard checks and quality targets. `release.py` also implements the backup and staged restore used by `maintenance.step_backup`.

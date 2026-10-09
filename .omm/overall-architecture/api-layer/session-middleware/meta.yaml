@@ -1,0 +1,9 @@
+created: 2026-10-09T00:31:30.261Z
+updated: 2026-10-09T00:31:30.486Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: session-middleware
+children: []
+parentPath:
+  - api-layer

@@ -1,11 +1,16 @@
 created: 2026-10-06 09:08:45.737000+00:00
-updated: 2026-10-06 12:37:57.559000+00:00
-update_count: 4
+updated: 2026-10-09T00:31:44.782Z
+update_count: 6
 last_field: diagram
 kind: nested-class
 title: corpus-pipeline
 children:
-- fidelity-check
-- ocr-and-fidelity
-- ocr-regions
+  - fidelity-check
+  - manifest
+  - ocr-and-fidelity
+  - ocr-merge
+  - ocr-regions
+  - parsers
+  - review-and-recovery
+  - revision-assignment
 parentPath: []

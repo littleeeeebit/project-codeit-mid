@@ -1,0 +1,1 @@
+When `web/out` exists, `create_app` mounts `StaticFiles(..., html=True)` at `/` last. `_Session` skips non-`/api/` paths, so the screens load without a session and their first API call decides whether to redirect to sign-in. If `web/out` is missing (no build), only the API is served.

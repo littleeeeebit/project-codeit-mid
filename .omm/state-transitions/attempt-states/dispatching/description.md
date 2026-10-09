@@ -1,0 +1,1 @@
+A durable marker written before the network call. On restart it becomes unknown.

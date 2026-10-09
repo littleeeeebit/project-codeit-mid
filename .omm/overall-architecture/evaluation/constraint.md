@@ -1,0 +1,1 @@
+Nothing activates on its own. Pipelines run every variant, and a person chooses from the comparison tables (`activate-run` on the CLI or 실험 비교).

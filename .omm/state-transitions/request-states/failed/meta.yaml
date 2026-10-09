@@ -1,9 +1,0 @@
-created: 2026-10-06T22:40:23.213Z
-updated: 2026-10-06T22:40:23.214Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: failed
-children: []
-parentPath:
-  - request-states

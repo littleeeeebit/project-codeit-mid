@@ -1,0 +1,1 @@
+`rollback_failed` keeps `$STATE/deploying`, so the next requested update retries from the same base. Until a person intervenes, the banner shows the failure for 24 h, and the fence stays down because the state is not `running`.

@@ -1,14 +1,8 @@
-created: 2026-10-06T22:40:23.589Z
-updated: 2026-10-06T22:40:23.834Z
+created: 2026-10-06 22:40:23.589000+00:00
+updated: 2026-10-06 22:40:23.834000+00:00
 update_count: 3
 last_field: constraint
 kind: nested-class
 title: billing-attempt-states
-children:
-  - dispatching
-  - reconciled
-  - released
-  - reserved
-  - settled
-  - unknown
+children: []
 parentPath: []

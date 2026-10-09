@@ -1,0 +1,6 @@
+graph TD
+  gold-queue["Gold review queue\nsrc/rfp_assistant/evaluation/gold.py"] -->|"approved dataset rows"| retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  retrieval-runs -->|"scored runs"| compare-matrices["Comparison matrices\nsrc/rfp_assistant/evaluation/compare.py"]
+  compare-matrices -->|"person picks row"| activation["Run activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  activation -->|"serving finalists"| answer-eval-and-judges["Answer runs and judges\nsrc/rfp_assistant/service/answers.py"]
+  answer-eval-and-judges -->|"dev results"| sealed-release["Sealed run and release\nsrc/rfp_assistant/evaluation/release.py"]

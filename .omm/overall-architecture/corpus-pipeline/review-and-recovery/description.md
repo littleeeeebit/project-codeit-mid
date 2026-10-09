@@ -1,0 +1,1 @@
+`record_review` (from `confirm_fidelity` on the screen or `import-reviews` on the CLI) records `sample_checked` or `reviewed` against the active extraction's element IDs. An automatic status never overwrites a human one. `recover_source` turns an approved PDF conversion of a quarantined original into a new `unreviewed` revision.

@@ -1,1 +1,0 @@
-Set by `budget.reconcile` for covered unknown attempts that were dispatched inside the closed interval and billed to the same provider project. Server-environment attempts with no `billing_scope` require an explicit `unscoped_attempts` include/exclude decision. Intervals for the same scope must not overlap.

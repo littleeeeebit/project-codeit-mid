@@ -1,0 +1,9 @@
+created: 2026-10-09T00:31:51.958Z
+updated: 2026-10-09T00:31:51.959Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: schema-and-store
+children: []
+parentPath:
+  - storage

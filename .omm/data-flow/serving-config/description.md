@@ -1,0 +1,1 @@
+`active_serving` plus `Resources.run_settings` fix the mode, depths, fusion, evidence limits, embedding model and dimensions, and the reranker for every retrieval. Changing the process config does not change serving.

@@ -1,6 +1,6 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-06 22:40:14.094000+00:00
-update_count: 32
+updated: 2026-10-09 00:31:37.659000+00:00
+update_count: 34
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
@@ -11,19 +11,21 @@ children:
 - dense-search
 - evidence-packer
 - fusion
-- fusion-rerank
+- fusion-and-rerank
 - keyword-index
-- lexical-ranking
+- lexical-channel
 - local-reranker
 - reranker
 - serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  serving-config[\"Serving config\\nsrc/rfp_assistant/service/service.py\"\
-  ] -->|\"mode, limits, versions\"| lexical-ranking[\"Lexical ranking\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+prev_diagram: "graph TD\r\n  serving-config[\"Active serving config\\nsrc/rfp_assistant/service/service.py\"\
   ]\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ] -->|\"BM25 rows, scope terms\"| lexical-ranking\r\n  serving-config -->|\"embedding\
-  \ model, dims\"| dense-search[\"Dense search\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
-  ]\r\n  lexical-ranking -->|\"BM25 top k\"| fusion-rerank[\"Fusion and rerank\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  dense-search -->|\"cosine top k\"| fusion-rerank\r\n  fusion-rerank -->|\"\
-  ordered chunk rows\"| evidence-packing[\"Evidence packing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]"
+  ]\r\n  lexical-ranking[\"Kiwi BM25 ranking\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  dense-search[\"pgvector dense search\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
+  ]\r\n  fusion-rerank[\"RRF fusion and reranker\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  evidence-packer[\"Evidence packer\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  serving-config -->|selects index version| keyword-index\r\n  serving-config\
+  \ -->|selects dense set, limits| dense-search\r\n  keyword-index -->|scoped rows|\
+  \ lexical-ranking\r\n  lexical-ranking -->|BM25 candidates| fusion-rerank\r\n  dense-search\
+  \ -->|cosine candidates| fusion-rerank\r\n  fusion-rerank -->|ranked chunk ids|\
+  \ evidence-packer\r\n  keyword-index -->|chunk bodies, spans| evidence-packer"

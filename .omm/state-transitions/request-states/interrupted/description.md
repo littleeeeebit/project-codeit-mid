@@ -1,1 +1,1 @@
-Set by `RequestRunner.shutdown` (queued rows always; running rows only if futures were still pending after the wait), by `Resources.close` when job threads outlive the deadline, and by `recover_requests` at the next startup under exclusive gateway ownership. Nothing is replayed; the summary tells the user it will not rerun automatically. `_finish` keeps the 'interrupted' status even if the worker later completes.
+Terminal. It is set by a controlled shutdown or by restart recovery, and an attempt that was dispatching becomes `unknown`.

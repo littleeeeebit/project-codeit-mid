@@ -1,0 +1,1 @@
+Polling is unauthenticated (60 calls/h per address) and makes at most two calls per poll. Requests carry no branch or commit: `write_request` writes `requested_by`, `requested_at` and `running_commit` atomically (`.part` then `os.replace`), and the updater reads only the marker's existence.

@@ -1,0 +1,1 @@
+The reserved amount counts as unknown cost and blocks all new dispatch until the owner settles or reconciles it via the CLI.

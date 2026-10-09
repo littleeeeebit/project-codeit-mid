@@ -1,1 +1,1 @@
-Set by `_create(status='queued')` for paid modes after `RequestRunner.try_admit`. Free modes are inserted directly as `running` and executed inline. A queued request has never dispatched anything.
+The row exists and the runner slot is held. Nothing has been reserved yet.

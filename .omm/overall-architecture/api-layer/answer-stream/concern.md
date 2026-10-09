@@ -1,0 +1,1 @@
+This is a synchronous generator inside a sync route: each open stream holds a Starlette threadpool thread for the whole generation, polling the database every 150 ms. Many concurrent streams compete with ordinary sync routes for that pool. This is observed from the code; it was not load-tested here.

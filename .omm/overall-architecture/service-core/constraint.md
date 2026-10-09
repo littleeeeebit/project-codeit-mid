@@ -1,0 +1,1 @@
+`api.py` imports only `service`; every non-rendering decision lives here so `web/` stays presentation-only.

@@ -1,0 +1,9 @@
+created: 2026-10-09T00:31:45.062Z
+updated: 2026-10-09T00:31:45.064Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: manifest
+children: []
+parentPath:
+  - corpus-pipeline

@@ -1,17 +1,7 @@
 graph TD
-  originals["Originals and CSV manifest\nsrc/rfp_assistant/corpus/ingestion.py"]
-  fidelity-ocr["Fidelity print and OCR\nsrc/rfp_assistant/corpus/fidelity.py"]
-  extractions["Extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
-  keyword-build["Keyword index build\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  dense-build["Dense vector sets\nsrc/rfp_assistant/retrieval/dense.py"]
-  retrieval-runs["Frozen runs and matrices\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  cited-evidence["Answers and citations\nsrc/rfp_assistant/service/service.py"]
-  originals -->|manifest, ingest by hash| extractions
-  fidelity-ocr -->|print text, image_text| extractions
-  extractions -->|elements, review status| keyword-build
-  keyword-build -->|chunk payloads| dense-build
-  keyword-build -->|index version| retrieval-runs
-  dense-build -->|dense set version| retrieval-runs
-  retrieval-runs -->|person picks a row| activation
-  activation -->|active_run, active_index| cited-evidence
+  source-originals["Original HWP and PDF\n원본 데이터/files"] -->|"hash, parse, OCR"| extractions["Extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
+  extractions -->|"chunk by profile"| keyword-build["Keyword index build\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  keyword-build -->|"chunk payloads"| dense-build["Dense vector build\nsrc/rfp_assistant/retrieval/dense.py"]
+  dense-build -->|"index and matrix versions"| frozen-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  frozen-runs -->|"person activates"| serving-config["Active serving config\nsrc/rfp_assistant/service/service.py"]
+  serving-config -->|"evidence units"| cited-evidence["Cited evidence\nsrc/rfp_assistant/service/service.py"]

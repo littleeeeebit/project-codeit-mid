@@ -1,14 +1,23 @@
-created: 2026-10-06T22:40:22.515Z
-updated: 2026-10-06T22:40:22.655Z
-update_count: 2
+created: 2026-10-06 22:40:22.515000+00:00
+updated: 2026-10-09 00:32:01.286000+00:00
+update_count: 4
 last_field: diagram
 kind: nested-class
 title: request-states
 children:
-  - cancelled
-  - completed
-  - failed
-  - interrupted
-  - queued
-  - running
+- cancelled
+- completed
+- interrupted
+- queued
+- running
 parentPath: []
+prev_diagram: "graph TD\r\n  queued[\"queued\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  running[\"running\\nsrc/rfp_assistant/service/service.py\"]\r\n  completed[\"\
+  completed\\nsrc/rfp_assistant/service/service.py\"]\r\n  failed[\"failed\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  cancelled[\"cancelled\\nsrc/rfp_assistant/service/service.py\"]\r\n  interrupted[\"\
+  interrupted\\nsrc/rfp_assistant/service/service.py\"]\r\n  queued -->|run_queued\
+  \ claims| running\r\n  queued -->|cancel_request| cancelled\r\n  queued -->|executor\
+  \ submit fails| failed\r\n  queued -->|shutdown or restart| interrupted\r\n  running\
+  \ -->|_finish with domain status| completed\r\n  running -->|error, refusal, invalid\
+  \ output| failed\r\n  running -->|cancel flag then finish| cancelled\r\n  running\
+  \ -->|shutdown or restart| interrupted"

@@ -1,0 +1,1 @@
+The banner is visible only when `configured && (available || in_progress || recent failure)`. The button is disabled with `paid_work.reason` while `paid_work.open`. After a successful POST, `useUpdateWait` polls with raw fetch so the lost session does not redirect mid-wait.

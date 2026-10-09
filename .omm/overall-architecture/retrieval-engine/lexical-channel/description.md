@@ -1,0 +1,1 @@
+Exact requirement codes (`CODE_RE`) are matched first and stay ahead of every ranker. `rank_lexical` scores BM25 with the Kiwi analyzer (K1) or a whitespace analyzer (K0). Except in K0, `scope_redundant_terms` drops terms with non-positive scope-local IDF and the selected project's restated name, never dropping codes, digits or negations. Dropped terms are listed in limitations.

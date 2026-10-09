@@ -1,0 +1,1 @@
+The maximum cost is counted as pending against the cap and envelope.

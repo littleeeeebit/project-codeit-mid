@@ -1,13 +1,7 @@
 graph TD
-  resources["Process resources\nsrc/rfp_assistant/service/service.py"]
-  request-runner["Bounded request executor\nsrc/rfp_assistant/service/service.py"]
-  answer-pipeline["Answer execution\nsrc/rfp_assistant/service/service.py"]
-  verifier-runs["Frozen verifier runs\nsrc/rfp_assistant/service/service.py"]
-  background-jobs["Paid background jobs\nsrc/rfp_assistant/service/drafting.py"]
-  gold-review["Gold review queue\nsrc/rfp_assistant/evaluation/gold.py"]
-  resources -->|lazily creates| request-runner
-  request-runner -->|run_queued per request id| answer-pipeline
-  answer-pipeline -->|index, dense, transport| resources
-  verifier-runs -->|generate submits request| request-runner
-  background-jobs -->|shared transport, joined on close| resources
-  background-jobs -->|submit drafts batch| gold-review
+  resources["Process resources\nsrc/rfp_assistant/service/service.py"] -->|"lazy create, bounded slots"| request-runner["Request runner\nsrc/rfp_assistant/service/service.py"]
+  request-runner -->|"request_id to worker"| answer-pipeline["Answer pipeline\nsrc/rfp_assistant/service/service.py"]
+  verifier-runs["Frozen verifier runs\nsrc/rfp_assistant/service/service.py"] -->|"vgen idempotent request"| answer-pipeline
+  resources -->|"transport, tracing, closing flag"| background-jobs["Paid background jobs\nsrc/rfp_assistant/service/drafting.py"]
+  update-fence["Update fence\nsrc/rfp_assistant/service/service.py"] -->|"refuses new admission"| request-runner
+  update-fence -->|"refuses job start"| background-jobs

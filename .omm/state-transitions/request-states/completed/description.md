@@ -1,1 +1,1 @@
-The `_finish` default request status. The domain outcome lives in `result_json.status`: answered, insufficient_evidence, ingestion_unavailable, budget_blocked, and other statuses produced by the model's payload.
+Terminal `completed` (with a domain status such as `answered` or `insufficient_evidence`) or `failed` (`technical_error`, `budget_blocked`, `clarification_required`).

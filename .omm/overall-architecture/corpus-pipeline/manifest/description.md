@@ -1,0 +1,1 @@
+`read_manifest_csv` and `import_manifest` build the `documents` rows (per CSV row, with `doc_id_for(filename)`) and the `sources` rows (per byte-identical original, `sha256_file`). Byte-identical associations share one extraction but keep their own metadata. Conflicts stay visible until `resolve_metadata` records a canonical value with a rationale.
