@@ -23,6 +23,7 @@ class LoaderTest(unittest.TestCase):
                 self.assertNotIn('table', elements[1])
                 self.assertEqual(warnings[0]['code'], 'hwp_loader_structure_limited')
                 self.assertFalse(loader.call_args.kwargs['include_images'])
+                self.assertFalse(loader.call_args.kwargs['include_tables'])  # the body already holds table text
     def test_failure_is_not_successful_placeholder(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'broken.hwp'

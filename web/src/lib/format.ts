@@ -164,7 +164,8 @@ export function locationText(loc: Location | null | undefined): string {
     const kind = loc.format === "pdf" ? "PDF" : "HWP 한컴 인쇄본";
     return `${kind} ${pages.join(", ")}쪽${printed}` + (path ? ` · ${path}` : "");
   }
-  const parts = ["HWP"];
+  // hwp_loader: parsed by the HWP loader when pyhwp failed; no sections or tables, only the loader's element order.
+  const parts = [loc.format === "hwp_loader" ? `HWP 보조 파서 요소 ${String(loc.path ?? "").replace("loader/e", "")}` : "HWP"];
   if (path) parts.push(path);
   if (loc.table_ordinal) parts.push(`표 ${loc.table_ordinal}`);
   return parts.join(" · ") + " (쪽 번호 없음: 원문 파일에서 확인)";

@@ -40,7 +40,9 @@ CHROME_PAGES = 3
 MAX_EXTRACTION_UNMATCHED_SHARE = 0.001
 IMAGE_MIN_AREA = 0.02
 HUMAN_STATUSES = ("sample_checked", "reviewed")
-RECOVERED = "recovered_from_native_print"  # ingestion warning: text read from the print, nothing independent left
+# Warning of extractions from before the loader fallback, whose text was read from the print itself: the print
+# cannot judge them. `ingest` replaces them with a loader parse, which `fidelity run` judges like any other HWP.
+RECOVERED = "recovered_from_native_print"
 _DROP = re.compile(r"[^0-9A-Za-z\uac00-\ud7a3\ufffd]")  # U+FFFD kept: a decode failure must never match
 _DIGITS = re.compile(r"\d{3,}")
 _PAGE_NUMBERS = re.compile(r"^\s*(?:\d{1,4}|(?:[-–—]\s*\d{1,4}\s*[-–—]\s*)+)\s*$")  # "- 10 -  - 11 -"

@@ -1,14 +1,20 @@
-"""Read-only HWP/HWPX adapter. Loader order is NOT native document order."""
+"""HWP/HWPX loader adapter: ingestion's parser when pyhwp fails. Loader order is NOT native document order."""
 from collections.abc import Mapping
 from importlib import import_module
 from pathlib import Path
 
+LOADER_ADAPTER_VERSION = "hwp-loader-adapter-2"  # bump when this adapter's output changes
+LOADER_PACKAGES = ("langchain-hwp-hwpx-loader", "hwp-hwpx-parser")
+
 
 def load_hwp_hwpx(original: Path) -> tuple[list[dict], list[dict], str | None]:
-    """Return preview elements without inventing cells or coordinates.
+    """Return elements without inventing cells or coordinates.
 
-    Comparison/preview only: the loader groups the full body, then tables/notes. It cannot
-    replace the structured XML walker without losing native paragraph/table order.
+    The loader gives the full body as one element, table text included, then notes, memos and
+    links. Its separate table elements repeat that text (every table cell of AFSIS and MILE is
+    in the body), so they are not requested. Without native order or cell structure it does not
+    replace the XML walker: ingestion uses it only for an HWP pyhwp cannot read, and `fidelity
+    run` judges it.
 
     Bad paths/extensions and dependency import failures propagate to the caller.
     Load failures return hwp_loader_failed. Invalid result shapes or conversion
@@ -28,7 +34,7 @@ def load_hwp_hwpx(original: Path) -> tuple[list[dict], list[dict], str | None]:
 
     try:
         documents = HwpHwpxLoader(
-            original, mode="elements", include_tables=True, include_notes=True,
+            original, mode="elements", include_tables=False, include_notes=True,
             include_memos=True, include_hyperlinks=True, include_images=False,
             include_extracted_at=False, on_invalid="raise", on_encrypted="raise",
             on_error="raise",
@@ -54,12 +60,12 @@ def load_hwp_hwpx(original: Path) -> tuple[list[dict], list[dict], str | None]:
             path = f"loader/e{index}"
             elements.append({"path": path, "kind": "paragraph",
                              "parent": None, "raw_text": content,
-                             "location": {"format": original.suffix[1:].lower(), "path": path,
+                             "location": {"format": f"{original.suffix[1:].lower()}_loader", "path": path,
                                           "section_path": [], "loader_metadata": meta,
                                           "order_basis": "loader_grouped_elements",
                                           "native_order_verified": False}})
     except Exception as exc:
         return [], [{"code": "hwp_loader_result_error", "detail": type(exc).__name__}], "hwp_loader_result_invalid"
     warnings = [{"code": "hwp_loader_structure_limited",
-                 "detail": "Grouped body/tables; native interleaving, cell spans, pages and coordinates unavailable."}]
+                 "detail": "One body element with table text inline; table cells, spans, pages and coordinates unavailable."}]
     return elements, warnings, None if elements else "hwp_empty_output"

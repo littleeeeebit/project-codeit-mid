@@ -318,7 +318,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
   {
    "doc_id": "<uuid>",
    "filename": "기관E_재난 관리 시스템.hwp",
-   "reason_code": "hwp_converter_missing"
+   "reason_code": "hwp_loader_failed"
   }
  ],
  "human_checked_sources": 3,
