@@ -510,15 +510,21 @@ def parse_hwp(settings: Settings, original: Path) -> tuple[list[dict], list[dict
             root = ET.parse(out_xml).getroot()
         except ET.ParseError as exc:
             return [], warnings + [{"code": "xml_parse_error", "detail": str(exc)}], "hwp_xml_malformed"
-    slots = list(root.iter("EqEdit"))
-    if slots:
-        scripts = equation_scripts(original)
-        if len(scripts) == len(slots):
-            for slot, script in zip(slots, scripts):
-                slot.text = equation_text(script)
-        else:
-            warnings.append({"code": "equation_count_mismatch", "detail": f"{len(slots)} in XML, {len(scripts)} records"})
-    elements = walk_hwp(root)
+    try:  # a document pyhwp cannot walk is a failure reason, so ingestion can fall back to the loader
+        slots = list(root.iter("EqEdit"))
+        if slots:
+            scripts = equation_scripts(original)
+            if len(scripts) == len(slots):
+                for slot, script in zip(slots, scripts):
+                    slot.text = equation_text(script)
+            else:
+                warnings.append({"code": "equation_count_mismatch", "detail": f"{len(slots)} in XML, {len(scripts)} records"})
+        elements = walk_hwp(root)
+    except IngestionError as exc:  # walk_hwp's own reason code
+        return [], warnings, str(exc)
+    except (ValueError, LookupError) as exc:  # a malformed attribute, or a record the equation reader cannot decode
+        return [], warnings + [{"code": "hwp_walk_error", "detail": f"{type(exc).__name__}: {exc}"[:STDERR_LIMIT]}], \
+            "hwp_walk_failed"
     if not any(e["raw_text"].strip() for e in elements):
         return [], warnings, "hwp_empty_output"
     return elements, warnings, None

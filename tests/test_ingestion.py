@@ -260,6 +260,36 @@ class LoaderFallbackTest(unittest.TestCase):
         self.assertEqual([w["code"] for w in json.loads(src["warnings_json"])],
                          ["pyhwp_failed", "hwp_loader_structure_limited"])
 
+    def test_a_raised_walker_failure_also_falls_back_to_the_loader(self):
+        def converter(settings, original, out_xml):
+            out_xml.write_text("<HwpDoc/>", encoding="utf-8")  # well-formed, no BodyText
+            return None, ""
+
+        with mock.patch.object(ingestion, "run_hwp_converter", side_effect=converter):
+            loader, result, src, fp, formats = self.ingest((self.LOADED, [], None))
+        self.assertEqual((loader.call_count, result["status"], fp), (1, "parsed", ingestion.parser_fingerprint("hwp_loader")))
+        self.assertEqual(json.loads(src["warnings_json"])[0], {"code": "pyhwp_failed", "detail": "hwp_empty_output"})
+
+    def test_a_loader_revision_replaces_the_walker_one_and_keeps_its_evidence(self):
+        walked = [dict(self.LOADED[0], location={"format": "hwp", "section": 0, "path": "s0/p0", "section_path": []})]
+        with mock.patch.object(ingestion, "parse_hwp", return_value=(walked, [], None)):
+            _, _, old, _, _ = self.ingest((self.LOADED, [], None))
+        old_id = old["active_extraction_id"]
+        with store.open_db(self.env.settings.db_path) as conn:
+            conn.execute("INSERT INTO fidelity_checks(extraction_id, method, source_hash, verdict, metrics_json, "
+                         "findings_json, rendering_sha256, created_at) VALUES (?, 'm', ?, 'auto_verified', '{}', "
+                         "'[]', 'x', 'now')", (old_id, self.source_hash))
+            conn.execute("UPDATE sources SET review_status = 'auto_verified' WHERE source_hash = ?", (self.source_hash,))
+        _, result, new, fp, _ = self.ingest((self.LOADED, [], None))  # pyhwp fails now: the loader parses
+        self.assertNotEqual(new["active_extraction_id"], old_id)
+        self.assertEqual((result["status"], new["review_status"]), ("parsed", "unreviewed"))  # a new revision resets review
+        with store.open_db(self.env.settings.db_path) as conn:
+            kept = conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?", (old_id,)).fetchone()
+            elements = conn.execute("SELECT COUNT(*) FROM elements WHERE extraction_id = ?", (old_id,)).fetchone()[0]
+            verdict = conn.execute("SELECT verdict FROM fidelity_checks WHERE extraction_id = ?", (old_id,)).fetchone()
+        self.assertTrue(Path(kept["artifact_path"]).exists())
+        self.assertEqual((elements, verdict[0]), (1, "auto_verified"))
+
     def test_loader_failure_quarantines_with_its_reason(self):
         for reason in ("hwp_loader_failed", "hwp_loader_result_invalid", "hwp_empty_output"):
             with self.subTest(reason=reason):

@@ -85,5 +85,26 @@ class FidelityCompareTest(unittest.TestCase):
         self.assertTrue(any(f.get("element_id") == "p2" for f in result["findings"]))
 
 
+class LoaderBodyTest(unittest.TestCase):
+    """The HWP loader gives the whole body as one element; its lines must align to their own pages."""
+
+    def test_one_body_element_over_pages_of_unequal_length_is_auto_verified(self):
+        chars = [chr(0xAC00 + 7 * i) for i in range(360)]  # 360 distinct Hangul syllables
+        blocks = ["".join(chars[:300]), "".join(chars[300:330]), "".join(chars[330:])]
+        with tempfile.TemporaryDirectory() as tmp:
+            doc = pymupdf.open()
+            for block in blocks:
+                page = doc.new_page()
+                for n in range(0, len(block), 30):
+                    page.insert_text((72, 90 + 20 * (n // 30)), block[n:n + 30], fontname="korea", fontsize=9)
+            pdf = Path(tmp) / "print.pdf"
+            doc.save(pdf)
+            pages = fidelity.rendered_pages(pdf)
+        body = {"element_id": "b0", "raw_text": "\n".join(blocks), "table": None,
+                "location": {"format": "hwp_loader"}}
+        result = fidelity.compare([body], pages)
+        self.assertEqual((result["verdict"], result["findings"]), ("auto_verified", []))
+
+
 if __name__ == "__main__":
     unittest.main()

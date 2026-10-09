@@ -292,8 +292,12 @@ def extraction_units(elements: list[dict]) -> list[dict]:
             # (ingestion.equation_text) is printed in two dimensions: a fraction's parts sit on separate lines, so
             # its pieces are compared one by one; its digits are drawn in a private-use equation font and stay
             # flagged for a person.
-            text = _TOC_PAGE.sub("", e["raw_text"])
-            pieces = [("", p) for p in _EQUATION_SPLIT.split(text)]
+            # The HWP loader gives the whole body as one element: each of its lines is a unit aligned on its own
+            # pages, or the pages around the longest stretch would be the only ones compared.
+            grouped = str((e.get("location") or {}).get("format", "")).endswith("_loader")
+            lines = e["raw_text"].split("\n") if grouped else [e["raw_text"]]
+            pieces = [(f"l{k}" if grouped else "", p) for k, line in enumerate(lines)
+                      for p in _EQUATION_SPLIT.split(_TOC_PAGE.sub("", line))]
         for where, text in pieces:
             n = norm(text)
             if n:
