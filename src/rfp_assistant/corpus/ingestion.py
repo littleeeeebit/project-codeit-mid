@@ -789,8 +789,7 @@ def _parse_source(settings: Settings, src, original: Path) -> tuple[list[dict], 
     if src["format"] == "hwp":
         raw, warnings, reason = parse_hwp(settings, original)
         if reason:
-            # pyhwp cannot read it: parse the original with the HWP loader instead. The Hancom print is only the
-            # fidelity witness, so `fidelity run` judges this text like any other HWP extraction.
+            # pyhwp cannot read it: the HWP loader parses the original. The print is only the fidelity witness.
             raw, more, failed = load_hwp_hwpx(original)
             warnings += [{"code": "pyhwp_failed", "detail": reason}] + more
             reason, fp = failed, parser_fingerprint("hwp_loader")
