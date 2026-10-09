@@ -129,8 +129,22 @@ def cmd_fidelity(args, settings) -> int:
 def cmd_ocr(args, settings) -> int:
     from .corpus import ocr
 
+    if args.action == "coverage":
+        _print(ocr.coverage(settings)["totals"])
+        return 0
     hashes = [_source_for(settings, d) for d in args.doc_id] if args.doc_id else None
-    _print(ocr.run(settings, hashes, gemini=not args.local_only))
+    if not args.ledger_dsn_env:
+        _print(ocr.sample(settings, args.n) if args.action == "sample" else
+               ocr.run(settings, hashes, remote=not args.local_only))
+        return 0
+    # The shared ledger in another database (e.g. codeit's, through a tunnel): no schema statements are run on it.
+    ledger = settings.with_(database_dsn_env=args.ledger_dsn_env)
+    with store.database_lifecycle(ledger.db_path):
+        from .storage.postgres import require_imported_database
+
+        require_imported_database(ledger.db_path)
+        _print(ocr.sample(settings, args.n, ledger=ledger) if args.action == "sample" else
+               ocr.run(settings, hashes, remote=not args.local_only, ledger=ledger))
     return 0
 
 
@@ -710,9 +724,16 @@ def _corpus_commands(sub) -> None:
     s.add_argument("action", choices=["run", "show"])
     s.add_argument("--doc-id", action="append", help="run: only these documents (default: every parsed HWP)")
     s.add_argument("--reprint", action="store_true", help="run: print again even if a rendering exists")
-    s = sub.add_parser("ocr", help="image regions: PaddleOCR-VL, Gemini only where the fallback test fails")
-    s.add_argument("--doc-id", action="append", help="only these documents (default: every parsed source)")
-    s.add_argument("--local-only", action="store_true", help="no Gemini calls; flagged regions stay unresolved")
+    s = sub.add_parser("ocr", help="image regions (HWP embedded pictures, PDF original): PaddleOCR-VL, gpt-5-mini "
+                                   "only where the fallback test fails")
+    s.add_argument("action", nargs="?", choices=["run", "coverage", "sample"], default="run",
+                   help="run: read regions; coverage: embedded images read against the print baseline; sample "
+                        "(paid): gpt-5-mini on Gemini-read print regions, cost and F1")
+    s.add_argument("--doc-id", action="append", help="run: only these documents (default: every parsed source)")
+    s.add_argument("--local-only", action="store_true", help="run: no paid calls; flagged regions stay unresolved")
+    s.add_argument("--n", type=int, default=50, help="sample: regions to read")
+    s.add_argument("--ledger-dsn-env", help="environment variable with the DSN of the shared ledger the paid reads "
+                                            "reserve and settle in (default: the corpus database)")
 
 
 def _retrieval_commands(sub) -> None:

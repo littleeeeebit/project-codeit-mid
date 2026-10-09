@@ -160,12 +160,14 @@ Printing takes 20–30 s per document and shows viewer windows. Do not print any
 
 ### Text inside images
 
-`ocr` reads every raster image region (HWP print, or PDF original) with PaddleOCR-VL on the GPU. Only regions that fail the fallback test (loop, low confidence, or output length far from what the ink suggests) are re-read by `gemini-3.5-flash-lite`, under a $0.50 cap of its own recorded in `.runtime/ocr/gemini-ledger.jsonl` (needs `GEMINI_API_KEY` in `.env`). Results are cached per region under `.runtime/ocr/<hash>/`, and a rerun resumes. The next `ingest` places each region's text as an `image_text` element next to the print text around the picture. It is chunked apart and cited as OCR, and the fidelity check skips it. Design and calibration: [docs/rag/preprocessing.md](docs/rag/preprocessing.md#text-inside-images).
+`ocr` reads with PaddleOCR-VL on the GPU the pictures embedded in each HWP file (WMF/EMF rendered to bitmaps, on Windows) and the raster images of each PDF original. The Hancom print is not used. Only regions that fail the fallback test (loop, low confidence, or output length far from what the ink suggests) are re-read by `gpt-5-mini`, paid with `OPENAI_API_KEY` in `.env` (the owner's personal key) through the budget gateway into the shared ledger, from the `ocr` envelope, which starts empty: the owner funds it with `set-envelopes`. Results are cached per region under `.runtime/ocr/<hash>/`, and a rerun resumes. The next `ingest` places an HWP picture's text as an `image_text` element where pyhwp met the picture (a picture in a table cell after its table), and a PDF image's next to the text around it. OLE objects, drawings and images that cannot be decoded are counted per document as `ocr_unavailable`. The text is chunked apart and cited as OCR, and the fidelity check skips it. Design and calibration: [docs/rag/preprocessing.md](docs/rag/preprocessing.md#text-inside-images).
 
 ```powershell
 python -m rfp_assistant.cli ocr --local-only              # free pass: local reads, flagged regions stay unresolved
-python -m rfp_assistant.cli ocr                           # Gemini for the flagged regions, within the cap
+python -m rfp_assistant.cli ocr sample                    # paid, reference only: gpt-5-mini on 50 Gemini-read print regions
+python -m rfp_assistant.cli ocr                           # gpt-5-mini for the flagged regions, from the ocr envelope
 python -m rfp_assistant.cli ingest                        # merge OCR text; then fidelity run and build-keyword again
+python -m rfp_assistant.cli ocr coverage                  # embedded images read against the 463 print images
 ```
 
 ### Dataset questions

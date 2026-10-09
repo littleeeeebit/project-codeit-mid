@@ -75,7 +75,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 ## Budget
 
 - spent $<n> of the $<n> allowance (<n>%); pending $<n> (unknown $<n>); cap $<n>; paid enabled True; last reconciliation never; dates 2026-09-30..2026-10-28
-- envelopes (used incl. open / envelope): embedding $<n>/$<n>, gold_eval $<n>/$<n>, interactive $<n>/$<n>, judge_eval $<n>/$<n>
+- envelopes (used incl. open / envelope): embedding $<n>/$<n>, gold_eval $<n>/$<n>, interactive $<n>/$<n>, judge_eval $<n>/$<n>, ocr $<n>/$<n>
 - adjustments: [('prior-use-baseline', 0)]
 - tracked scope: calls through this application's gateway plus recorded adjustments; not provider credit
 
@@ -350,6 +350,10 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    "used_incl_open": <n>
   },
   "judge_eval": {
+   "envelope": 0,
+   "used_incl_open": <n>
+  },
+  "ocr": {
    "envelope": 0,
    "used_incl_open": <n>
   }

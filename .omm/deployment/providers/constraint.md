@@ -1,1 +1,1 @@
-These transports have different billing contracts. The shared OpenAI attempt ledger must not be assumed to cover Gemini OCR, Gemini embeddings or Jev usage.
+These transports have different billing contracts. The shared OpenAI attempt ledger must not be assumed to cover Gemini embeddings or Jev usage. OCR's gpt-5-mini re-reads are in it (purpose `ocr`).

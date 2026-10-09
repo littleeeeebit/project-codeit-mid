@@ -1,1 +1,1 @@
-The OCR design is decided: PaddleOCR-VL plus a Gemini fallback. The corpus is digital, so do not test with scans.
+The OCR design is decided: PaddleOCR-VL plus a gpt-5-mini fallback. HWP regions are the pictures embedded in the file, PDF regions the original's raster images. The corpus is digital, so do not test with scans.

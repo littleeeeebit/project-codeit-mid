@@ -1,1 +1,1 @@
-I read ocr.run and the PaddleOCR / Gemini fallback logic only at signature and docstring level. The $0.50 Gemini cap is a separate JSONL ledger, not the PostgreSQL ledger (README).
+I read ocr.run and the PaddleOCR / gpt-5-mini fallback logic only at signature and docstring level. The gpt-5-mini reads settle in the PostgreSQL ledger under the `ocr` envelope (README).

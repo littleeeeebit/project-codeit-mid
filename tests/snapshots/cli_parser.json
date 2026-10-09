@@ -175,8 +175,11 @@
 
  ],
  "ocr": [
+  {"name": "action", "dest": "action", "default": "run", "required": false, "choices": ["run", "coverage", "sample"], "type": null, "nargs": "?", "action": "_StoreAction"},
   {"name": ["--doc-id"], "dest": "doc_id", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_AppendAction"},
-  {"name": ["--local-only"], "dest": "local_only", "default": false, "required": false, "choices": null, "type": null, "nargs": 0, "action": "_StoreTrueAction"}
+  {"name": ["--local-only"], "dest": "local_only", "default": false, "required": false, "choices": null, "type": null, "nargs": 0, "action": "_StoreTrueAction"},
+  {"name": ["--n"], "dest": "n", "default": 50, "required": false, "choices": null, "type": "int", "nargs": null, "action": "_StoreAction"},
+  {"name": ["--ledger-dsn-env"], "dest": "ledger_dsn_env", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"}
  ],
  "paid": [
   {"name": "state", "dest": "state", "default": null, "required": true, "choices": ["on", "off"], "type": null, "nargs": null, "action": "_StoreAction"},
