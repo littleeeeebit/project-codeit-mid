@@ -1,11 +1,9 @@
 graph TD
-  web-screens["Next.js screens\nweb/src/app/page.tsx"] -->|"fetch /api with session"| api-layer["HTTP API and session gate\nsrc/rfp_assistant/api.py"]
-  api-layer -->|"one service call per route"| service-core["Service core\nsrc/rfp_assistant/service/service.py"]
-  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"] -->|"same functions, owner actor"| service-core
-  service-core -->|"scoped question"| retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  service-core -->|"reserve, dispatch, settle"| paid-gateway["Paid gateway\nsrc/rfp_assistant/gateway/budget.py"]
-  service-core -->|"background eval and drafting"| evaluation["Evaluation and gold\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  corpus-pipeline["Corpus pipeline\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"element rows for chunking"| retrieval-engine
-  evaluation -->|"activate run config"| storage["PostgreSQL and runtime\nsrc/rfp_assistant/storage/postgres.py"]
-  paid-gateway -->|"attempt ledger rows"| storage
-  retrieval-engine -->|"index files, vectors"| storage
+web["Browser screens\nweb/src/app/layout.tsx"] -->|Authenticated HTTP actions| http["HTTP boundary\nsrc/rfp_assistant/api.py"]
+http -->|Principal and request inputs| service["Application service\nsrc/rfp_assistant/service/service.py"]
+service -->|Question and document scope| retrieval["Evidence retrieval\nsrc/rfp_assistant/retrieval/retrieval.py"]
+service -->|Records and transactions| persistence["Persistent state\nsrc/rfp_assistant/storage/store.py"]
+retrieval -->|Scoped vectors and artifacts| persistence
+workflows["Corpus and evaluation workflows\nsrc/rfp_assistant/cli.py"] -->|Pinned answer execution| service
+workflows -->|Revisions and measured selections| persistence
+service -->|Request spans and outcomes| tracing["Optional tracing\nsrc/rfp_assistant/gateway/tracing.py"]

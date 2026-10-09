@@ -1,0 +1,1 @@
+Dense builds normalize model-specific payloads, reuse matching verified payload hashes and map vectors to keyword chunk rows. PgDenseIndex.load() verifies set completeness and source-manifest identity before retrieval. Query vectors use separate query payload identities and share the persistent embedding cache.

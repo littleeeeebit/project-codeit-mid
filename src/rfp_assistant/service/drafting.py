@@ -343,8 +343,8 @@ def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, tr
 def _draft(settings: Settings, plan: dict, out: Path, max_cost_micro: int, transport, split: str, *, guard=None,
            owner_check=None) -> dict:
     """Five slots per billed request. Cache and settle before validation; never retry or approve automatically."""
-    if settings.generation_model != MODEL or max_cost_micro <= 0:
-        raise gold.GoldError("Generation requires gpt-6-luna and a positive consented cost ceiling")
+    if max_cost_micro <= 0:  # drafting always uses MODEL, whatever the answer model is
+        raise gold.GoldError("Generation requires a positive consented cost ceiling")
     if not out.is_absolute() or out.exists():
         raise gold.GoldError("Choose an absolute new private output directory")
     learned, slots = lessons(settings), source_slots(settings, plan, split)
@@ -352,13 +352,9 @@ def _draft(settings: Settings, plan: dict, out: Path, max_cost_micro: int, trans
         if conn.execute("SELECT 1 FROM attempts WHERE stage = 'gold_drafting' "
                         "AND state IN ('reserved', 'dispatching', 'unknown')").fetchone():
             raise gold.GoldError("Resolve outstanding drafting attempts before another generation run")
-    if transport is None:
-        if settings.provider != "openai" or not (key := read_api_key("OPENAI_API_KEY")):
-            raise gold.GoldError("An explicitly configured OpenAI provider and API key are required")
-        transport = generation.OpenAITransport(key, settings.request_timeout_seconds, owner_check=owner_check)
-        owned = True
-    else:
-        owned = False
+    owned = transport is None
+    if owned:
+        transport = _openai_transport(settings, owner_check)
     request_id = None
     rows, invalid, cost = [], [], 0
 
@@ -379,92 +375,11 @@ def _draft(settings: Settings, plan: dict, out: Path, max_cost_micro: int, trans
         for batch, start in enumerate(range(0, len(slots), 5), 1):
             checkpoint()
             subset = slots[start:start+5]
-            max_output = min(MAX_OUTPUT, 1200 * len(subset))
-            payload = messages(subset, learned)
-            tokens = generation.count_request_tokens(payload, fmt, settings.framing_margin_tokens)
-            if tokens > 100_000:
-                raise gold.GoldError("Drafting batch exceeds the short-context input bound")
-            trace = {"model": MODEL, "prompt_version": PROMPT_VERSION, "messages": payload, "response_format": fmt,
-                     "input_tokens": tokens, "max_output_tokens": max_output, "reasoning_effort": "none"}
             path = out / f"call-{batch:02}.json"
-            store.write_text_atomic(path, store.dumps(trace))
-            admission = budget.reserve(settings.db_path, request_id=request_id,
-                member_id=DRAFTER, stage="gold_drafting", purpose="gold_eval", model=MODEL, input_tokens=tokens,
-                max_output_tokens=max_output, count_method=generation.COUNT_METHOD,
-                ceiling_micro_usd=max_cost_micro-cost)
-            trace["admission"] = admission
-            store.write_text_atomic(path, store.dumps(trace))
-            if not admission["admitted"]:
-                raise gold.GoldError(f"Drafting budget refused: {admission['reason']}")
-            aid = admission["attempt_id"]
-            budget.mark_dispatching(settings.db_path, aid, guard)
-            began = time.monotonic()
-            with tracing.step("draft-question-batch", "generation", model=MODEL, input=payload,
-                              model_parameters={"reasoning_effort": "none", "max_completion_tokens": max_output},
-                              metadata={"batch": batch, "attempt_id": aid,
-                                        "question_ids": [s["question_id"] for s in subset]}) as gen:
-                try:
-                    response = transport.chat(model=MODEL, messages=payload, response_format=fmt,
-                                              max_completion_tokens=max_output, reasoning_effort="none")
-                except Exception as exc:
-                    if isinstance(exc, generation.ProviderError) and exc.pre_execution:
-                        budget.release(settings.db_path, aid, type(exc).__name__, confirmed_pre_execution=True)
-                    else:
-                        budget.mark_unknown(settings.db_path, aid, type(exc).__name__)
-                    raise gold.GoldError(f"Drafting call failed: {type(exc).__name__}; no automatic retry") from None
-                trace.update(seconds=round(time.monotonic()-began, 3), response_id=response.response_id,
-                             usage=response.usage, raw_output=response.content, finish_reason=response.finish_reason,
-                             refusal=response.refusal)
-                store.write_text_atomic(path, store.dumps(trace))
-                gen.update(lambda: {"output": tracing.readable(response.content), "metadata": {
-                    "response_id": response.response_id, "finish_reason": response.finish_reason,
-                    "refusal": response.refusal}})
-                if response.usage is None:
-                    budget.mark_unknown(settings.db_path, aid, "drafting response missing usage")
-                    raise gold.GoldError("Drafting usage unknown; stop and reconcile before another call")
-                try:
-                    settlement = budget.settle(settings.db_path, aid, response.usage, response.response_id)
-                except Exception as exc:
-                    budget.mark_unknown(settings.db_path, aid, f"drafting settlement failed: {type(exc).__name__}")
-                    raise gold.GoldError("Drafting settlement failed; stop and reconcile") from None
-                gen.update(lambda: tracing.usage_and_cost(response.usage, settlement))
+            response, settlement, trace = _draft_call(settings, transport, request_id, guard, path, batch, subset,
+                                                      learned, fmt, max_cost_micro - cost)
             cost += settlement["settled_micro_usd"]
-            trace["settlement"] = settlement
-            store.write_text_atomic(path, store.dumps(trace))
-            if settlement["overrun"]:
-                raise gold.GoldError("Drafting settlement exceeded its reservation")
-            if response.refusal or response.finish_reason != "stop":
-                raise gold.GoldError("Drafting response refused or truncated; inspect the saved call")
-            drafts = DraftBatch.model_validate_json(response.content or "{}").model_dump()["drafts"]
-            if ([d.get("question_id") for d in drafts] != [s["question_id"] for s in subset]):
-                raise gold.GoldError("Drafting response must cover exactly the requested slots in order")
-            with store.open_db(settings.db_path) as conn:
-                checker = evaluation.GoldChecker(settings, conn)
-                for slot, draft in zip(subset, drafts):
-                    try:
-                        row = materialize(slot, draft, {"response_id": response.response_id,
-                            "response_sha256": digest(response.content),
-                            "rejection_learning_sha256": digest(learned), "request_sha256": digest(trace["messages"])})
-                        errors = checker.check(row, slot["question_id"], split=split, require_review=False)
-                        if not str(row["expected_answer"] or "").strip():
-                            errors.append("A readable expected answer is required")
-                        if len(row["question"]) > 180:
-                            errors.append("Keep the question within 180 characters and its claims within scope")
-                        if any(len(q) != 1 for c in row["required_claims"] for q in c["qualifiers"]):
-                            errors.append("Separate required conditions; use one spelling per qualifier list")
-                        if row["question_type"] == "table_numeric" and not any(
-                                c["match"]["type"] in ("number", "date") for c in row["required_claims"]):
-                            errors.append("A table/numeric task must label its typed numeric or date value")
-                        if re.search(r"[\u3400-\u9fff]", row["question"] + row["expected_answer"]):
-                            errors.append("Use Korean wording; unexpected Chinese/Japanese characters need review")
-                        used = {g for c in row["required_claims"] for g in c["support_groups"]}
-                        if used != {g["group_id"] for g in row["evidence_groups"]}:
-                            errors.append("Every evidence group must support a required claim")
-                        if errors:
-                            raise gold.GoldError("; ".join(errors))
-                        rows.append(row)
-                    except (gold.GoldError, KeyError, TypeError, ValueError, IndexError) as exc:
-                        invalid.append({"question_id": slot["question_id"], "draft": draft, "reason": str(exc)})
+            _accept_drafts(settings, path, trace, response, settlement, subset, learned, split, rows, invalid)
             store.write_jsonl_atomic(out / "candidates.jsonl", rows)
             store.write_text_atomic(out / "invalid.json", store.dumps(invalid))
         checkpoint()
@@ -482,3 +397,121 @@ def _draft(settings: Settings, plan: dict, out: Path, max_cost_micro: int, trans
     store.write_text_atomic(out / "receipt.json", store.dumps(receipt))
     dense.finish_job_request(settings, request_id, "completed", receipt)
     return receipt
+
+
+def _openai_transport(settings: Settings, owner_check):
+    if settings.provider != "openai" or not (key := read_api_key("OPENAI_API_KEY")):
+        raise gold.GoldError("An explicitly configured OpenAI provider and API key are required")
+    return generation.OpenAITransport(key, settings.request_timeout_seconds, owner_check=owner_check)
+
+
+def _draft_call(settings: Settings, transport, request_id: str, guard, path: Path, batch: int, subset: list[dict],
+                learned: dict, fmt: dict, ceiling_micro: int) -> tuple:
+    """One admitted, traced and settled drafting request for up to five slots; the saved call record is updated
+    after every step."""
+    max_output = min(MAX_OUTPUT, 1200 * len(subset))
+    payload = messages(subset, learned)
+    tokens = generation.count_request_tokens(payload, fmt, settings.framing_margin_tokens)
+    if tokens > 100_000:
+        raise gold.GoldError("Drafting batch exceeds the short-context input bound")
+    trace = {"model": MODEL, "prompt_version": PROMPT_VERSION, "messages": payload, "response_format": fmt,
+             "input_tokens": tokens, "max_output_tokens": max_output, "reasoning_effort": "none"}
+    store.write_text_atomic(path, store.dumps(trace))
+    admission = budget.reserve(settings.db_path, request_id=request_id,
+        member_id=DRAFTER, stage="gold_drafting", purpose="gold_eval", model=MODEL, input_tokens=tokens,
+        max_output_tokens=max_output, count_method=generation.COUNT_METHOD,
+        ceiling_micro_usd=ceiling_micro)
+    trace["admission"] = admission
+    store.write_text_atomic(path, store.dumps(trace))
+    if not admission["admitted"]:
+        raise gold.GoldError(f"Drafting budget refused: {admission['reason']}")
+    response, settlement = _dispatch_and_settle(settings, transport, admission["attempt_id"], guard, path, batch,
+                                                subset, trace)
+    return response, settlement, trace
+
+
+def _dispatch_and_settle(settings: Settings, transport, aid: str, guard, path: Path, batch: int, subset: list[dict],
+                         trace: dict) -> tuple:
+    """Sends the admitted request once (no retry) and settles its usage; a failure marks the attempt released or
+    unknown and stops the run."""
+    payload, fmt, max_output = trace["messages"], trace["response_format"], trace["max_output_tokens"]
+    budget.mark_dispatching(settings.db_path, aid, guard)
+    began = time.monotonic()
+    with tracing.step("draft-question-batch", "generation", model=MODEL, input=payload,
+                      model_parameters={"reasoning_effort": "none", "max_completion_tokens": max_output},
+                      metadata={"batch": batch, "attempt_id": aid,
+                                "question_ids": [s["question_id"] for s in subset]}) as gen:
+        try:
+            response = transport.chat(model=MODEL, messages=payload, response_format=fmt,
+                                      max_completion_tokens=max_output, reasoning_effort="none")
+        except Exception as exc:
+            if isinstance(exc, generation.ProviderError) and exc.pre_execution:
+                budget.release(settings.db_path, aid, type(exc).__name__, confirmed_pre_execution=True)
+            else:
+                budget.mark_unknown(settings.db_path, aid, type(exc).__name__)
+            raise gold.GoldError(f"Drafting call failed: {type(exc).__name__}; no automatic retry") from None
+        trace.update(seconds=round(time.monotonic()-began, 3), response_id=response.response_id,
+                     usage=response.usage, raw_output=response.content, finish_reason=response.finish_reason,
+                     refusal=response.refusal)
+        store.write_text_atomic(path, store.dumps(trace))
+        gen.update(lambda: {"output": tracing.readable(response.content), "metadata": {
+            "response_id": response.response_id, "finish_reason": response.finish_reason,
+            "refusal": response.refusal}})
+        if response.usage is None:
+            budget.mark_unknown(settings.db_path, aid, "drafting response missing usage")
+            raise gold.GoldError("Drafting usage unknown; stop and reconcile before another call")
+        try:
+            settlement = budget.settle(settings.db_path, aid, response.usage, response.response_id)
+        except Exception as exc:
+            budget.mark_unknown(settings.db_path, aid, f"drafting settlement failed: {type(exc).__name__}")
+            raise gold.GoldError("Drafting settlement failed; stop and reconcile") from None
+        gen.update(lambda: tracing.usage_and_cost(response.usage, settlement))
+    return response, settlement
+
+
+def _accept_drafts(settings: Settings, path: Path, trace: dict, response, settlement: dict, subset: list[dict],
+                   learned: dict, split: str, rows: list[dict], invalid: list[dict]) -> None:
+    """Records the settlement, then sorts the batch's drafts into valid candidate rows and invalid drafts."""
+    trace["settlement"] = settlement
+    store.write_text_atomic(path, store.dumps(trace))
+    if settlement["overrun"]:
+        raise gold.GoldError("Drafting settlement exceeded its reservation")
+    if response.refusal or response.finish_reason != "stop":
+        raise gold.GoldError("Drafting response refused or truncated; inspect the saved call")
+    drafts = DraftBatch.model_validate_json(response.content or "{}").model_dump()["drafts"]
+    if ([d.get("question_id") for d in drafts] != [s["question_id"] for s in subset]):
+        raise gold.GoldError("Drafting response must cover exactly the requested slots in order")
+    with store.open_db(settings.db_path) as conn:
+        checker = evaluation.GoldChecker(settings, conn)
+        for slot, draft in zip(subset, drafts):
+            try:
+                row = materialize(slot, draft, {"response_id": response.response_id,
+                    "response_sha256": digest(response.content),
+                    "rejection_learning_sha256": digest(learned), "request_sha256": digest(trace["messages"])})
+                errors = checker.check(row, slot["question_id"], split=split, require_review=False)
+                errors += _draft_errors(row)
+                if errors:
+                    raise gold.GoldError("; ".join(errors))
+                rows.append(row)
+            except (gold.GoldError, KeyError, TypeError, ValueError, IndexError) as exc:
+                invalid.append({"question_id": slot["question_id"], "draft": draft, "reason": str(exc)})
+
+
+def _draft_errors(row: dict) -> list[str]:
+    """Drafting rules beyond the gold schema."""
+    errors = []
+    if not str(row["expected_answer"] or "").strip():
+        errors.append("A readable expected answer is required")
+    if len(row["question"]) > 180:
+        errors.append("Keep the question within 180 characters and its claims within scope")
+    if any(len(q) != 1 for c in row["required_claims"] for q in c["qualifiers"]):
+        errors.append("Separate required conditions; use one spelling per qualifier list")
+    if row["question_type"] == "table_numeric" and not any(
+            c["match"]["type"] in ("number", "date") for c in row["required_claims"]):
+        errors.append("A table/numeric task must label its typed numeric or date value")
+    if re.search(r"[\u3400-\u9fff]", row["question"] + row["expected_answer"]):
+        errors.append("Use Korean wording; unexpected Chinese/Japanese characters need review")
+    used = {g for c in row["required_claims"] for g in c["support_groups"]}
+    if used != {g["group_id"] for g in row["evidence_groups"]}:
+        errors.append("Every evidence group must support a required claim")
+    return errors

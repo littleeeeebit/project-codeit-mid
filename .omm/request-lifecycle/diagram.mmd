@@ -1,8 +1,8 @@
 graph TD
-  ask-submit["Ask submit\nweb/src/components/ask/ask-page.tsx"] -->|"POST /api/ask"| submit-answer["Persist and admit\nsrc/rfp_assistant/service/service.py"]
-  submit-answer -->|"queued row, request_id"| run-queued["Worker claim\nsrc/rfp_assistant/service/service.py"]
-  run-queued -->|"rebuilt AnswerRequest"| paid-answer["Rewrite and retrieve\nsrc/rfp_assistant/service/service.py"]
-  paid-answer -->|"messages, max cost"| metered-chat["Metered model call\nsrc/rfp_assistant/service/service.py"]
-  metered-chat -->|"validated payload"| finish-request["Store outcome\nsrc/rfp_assistant/service/service.py"]
-  finish-request -->|"poll and attachable"| turn-render["Turn render\nweb/src/components/ask/ask-page.tsx"]
-  metered-chat -->|"partial via SSE"| turn-render
+browser["Submit conversation turn\nweb/src/components/ask/ask-page.tsx"] -->|Question mode scope previous| admission["Authenticate and persist ownership\nsrc/rfp_assistant/service/service.py"]
+admission -->|Request ID and copied context| execution["Execute claimed request\nsrc/rfp_assistant/service/service.py"]
+execution -->|Standalone question and scope| preparation["Retrieve and price evidence\nsrc/rfp_assistant/service/service.py"]
+preparation -->|Evidence-bound prompt and ceiling| provider["Dispatch metered generation\nsrc/rfp_assistant/gateway/generation.py"]
+provider -->|Content usage and response identity| outcome["Validate and persist outcome\nsrc/rfp_assistant/service/service.py"]
+provider -->|Unvalidated content deltas| delivery["Stream and status consumers\nweb/src/lib/use-answer-stream.ts"]
+outcome -->|Terminal status and stored answer| delivery

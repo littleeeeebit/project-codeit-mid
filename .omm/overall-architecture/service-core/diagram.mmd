@@ -1,7 +1,0 @@
-graph TD
-  resources["Process resources\nsrc/rfp_assistant/service/service.py"] -->|"lazy create, bounded slots"| request-runner["Request runner\nsrc/rfp_assistant/service/service.py"]
-  request-runner -->|"request_id to worker"| answer-pipeline["Answer pipeline\nsrc/rfp_assistant/service/service.py"]
-  verifier-runs["Frozen verifier runs\nsrc/rfp_assistant/service/service.py"] -->|"vgen idempotent request"| answer-pipeline
-  resources -->|"transport, tracing, closing flag"| background-jobs["Paid background jobs\nsrc/rfp_assistant/service/drafting.py"]
-  update-fence["Update fence\nsrc/rfp_assistant/service/service.py"] -->|"refuses new admission"| request-runner
-  update-fence -->|"refuses job start"| background-jobs

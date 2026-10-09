@@ -1,0 +1,1 @@
+OCR does not itself activate revised extraction or retrieval indexes. Reingestion incorporates completed OCR results. OCR Gemini accounting uses its own file ledger, distinct from OpenAI attempts and the Gemini embedding external ledger.

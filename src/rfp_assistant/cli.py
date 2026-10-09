@@ -245,8 +245,6 @@ def cmd_compare(args, settings) -> int:
 
 
 def cmd_compare_cap(args, settings) -> int:
-    from decimal import Decimal
-
     from .retrieval import models
 
     cap = int(Decimal(args.usd) * 1_000_000)
@@ -460,7 +458,7 @@ def cmd_run_answers(args, settings) -> int:
     try:
         if res.transport is None:
             raise answers.AnswerEvalError(res.provider_note or "no provider transport")
-        result = answers.run_answers(settings, res, args.estimate_id, args.actor, args.reason)
+        result = answers.run_answers(settings, res, args.estimate_id, args.actor, args.reason, workers=args.workers)
     finally:
         res.close()
     _print(result)
@@ -670,6 +668,14 @@ def cmd_gold(args, settings) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="rfp_assistant.cli")
     sub = p.add_subparsers(dest="command", required=True)
+    for add_commands in (_corpus_commands, _retrieval_commands, _release_commands, _budget_commands,
+                         _dataset_and_operation_commands):
+        add_commands(sub)
+    return p
+
+
+def _corpus_commands(sub) -> None:
+    """Schema, manifest, parsing, fidelity review, recovery and OCR."""
     s = sub.add_parser("init", help="initialize schema/settings idempotently")
     s.add_argument("--paid-disabled", action="store_true")
     sub.add_parser("manifest", help="import all CSV associations and verify originals")
@@ -707,6 +713,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("ocr", help="image regions: PaddleOCR-VL, Gemini only where the fallback test fails")
     s.add_argument("--doc-id", action="append", help="only these documents (default: every parsed source)")
     s.add_argument("--local-only", action="store_true", help="no Gemini calls; flagged regions stay unresolved")
+
+
+def _retrieval_commands(sub) -> None:
+    """Indexes, retrieval runs, axis comparisons and activation."""
     s = sub.add_parser("build-keyword", help="build an immutable Kiwi BM25 index")
     s.add_argument("--profile", choices=sorted(chunking.PROFILES), default="structural")
     s.add_argument("--no-activate", action="store_true", help="build without moving the keyword pointer")
@@ -756,6 +766,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--runs", required=True, help="comma-separated run IDs to compare")
     s.add_argument("--out", required=True, help="absolute path of the draft decision JSON")
     s.add_argument("--select", help="choose this run instead of the recommendation (recorded as an override)")
+
+
+def _release_commands(sub) -> None:
+    """Reports, gates, gold validation and freezing, answer runs, release, backup and restore."""
     s = sub.add_parser("report", help="write the phase handoff report from recorded state")
     s.add_argument("--phase", type=int, required=True)
     s = sub.add_parser("check", help="automated phase gate in temporary state")
@@ -774,9 +788,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="judge-comparison: calibration fits Jev thresholds; held_out is the reported part; "
                         "judge_set runs the mutated judge golden set")
     s.add_argument("--dataset", default="dev", help="answer-finalists: the reviewed development split")
-    s.add_argument("--runs", help="answer-finalists: one or two retrieval run IDs (default: active + its finalist)")
+    s.add_argument("--runs", help="answer-finalists: one or two retrieval run IDs (default: active + its finalist); "
+                                  "embedding-comparison: the baseline run first, then every run to compare")
     s.add_argument("--question-id", action="append",
-                   help="answer-finalists: only these development rows (repeat); part of the run identity")
+                   help="development runs: only these rows (repeat); part of the run identity")
     s.add_argument("--freeze-id", help="sealed: the release freeze")
     s.add_argument("--post-test-regression", action="store_true",
                    help="sealed: a further run after the untouched sealed result (needs --reason at run time)")
@@ -787,6 +802,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--estimate-id", required=True)
     s.add_argument("--actor", required=True)
     s.add_argument("--reason", help="sealed post-test regression: why the sealed set is run again")
+    s.add_argument("--workers", type=int, default=1, help="retrieval runs answered at once (default 1)")
     s = sub.add_parser("latency-run", help="paid: the planned bounded latency sample (stop the UI first)")
     s.add_argument("--estimate-id", required=True)
     s.add_argument("--actor", required=True)
@@ -813,6 +829,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("release-report", help="read-only release report from recorded evidence")
     s.add_argument("--latest", action="store_true", help="the newest freeze (or a dated draft)")
     s.add_argument("--release-id")
+
+
+def _budget_commands(sub) -> None:
+    """The shared budget: configuration, status, load check, reconciliation, settlement and audit."""
     s = sub.add_parser("configure-budget", help="owner-only dates, prior use, rates and paid state")
     s.add_argument("--start", required=True)
     s.add_argument("--end", required=True)
@@ -857,6 +877,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("audit", help="owner actions, newest first")
     s.add_argument("--limit", type=int, default=50)
     s.add_argument("--actor", default="owner-cli")
+
+
+def _dataset_and_operation_commands(sub) -> None:
+    """The gold queue, the judge comparison, maintenance and the owner's envelope, limit and rate changes."""
     s = sub.add_parser("gold", help="dataset candidate queue and rejection wiki")
     s.add_argument("action", choices=["status", "submit", "infer", "check", "sync", "repin", "excerpts", "generate", "show",
                                       "decide", "second-review"])
@@ -901,7 +925,6 @@ def build_parser() -> argparse.ArgumentParser:
     rate = sub.add_parser("register-embedding-rate", help="register the approved large-model price, preserving historical rates")
     rate.add_argument("--actor", required=True)
     rate.add_argument("--reason", required=True)
-    return p
 
 
 COMMANDS = {"init": cmd_init, "set-limit": cmd_set_limit, "register-embedding-rate": cmd_register_embedding_rate,

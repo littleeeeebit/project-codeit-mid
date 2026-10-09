@@ -1,1 +1,0 @@
-Terminal `completed` (with a domain status such as `answered` or `insufficient_evidence`) or `failed` (`technical_error`, `budget_blocked`, `clarification_required`).

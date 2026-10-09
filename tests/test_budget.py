@@ -2,7 +2,6 @@ import tempfile
 import threading
 import unittest
 from datetime import date
-from pathlib import Path
 
 from rfp_assistant.gateway import budget
 from rfp_assistant.storage import postgres, store

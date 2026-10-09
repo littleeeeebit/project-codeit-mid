@@ -1,0 +1,1 @@
+The internals of evaluation.py, compare.py and sealed.py were read only at the function level.

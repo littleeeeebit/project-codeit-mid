@@ -17,13 +17,14 @@ from pydantic import ValidationError
 from ..contracts import AnswerPayload, EvidenceUnit
 from ..retrieval.chunking import count_tokens
 
-PROMPT_VERSION = "grounded-answer-12"  # 4: atomic obligations, per-document citations, conflict action; 5: corpus mode
+PROMPT_VERSION = "grounded-answer-13"  # 4: atomic obligations, per-document citations, conflict action; 5: corpus mode
 # 6: every claim cites evidence; absence goes to missing_fields only; 7: a restated absence is declared kind "absence"
 # 8: an "absence" claim's text is exactly its missing field; 9: absences go only to missing_fields
 # 10: a comparison inference may also cite the other compared document's evidence
 # 11: the summary cites its evidence and each claim is one sentence (sentence-level citations in the chat)
 # 12: a follow-up sees the earlier conversation; restating an earlier answer keeps all of its facts;
 #     an actor owns a function only where the evidence names it; no evidence IDs inside the text
+# 13: validation rejects a conflict answer without conflicts, two alternatives per conflict, or a next action
 COUNT_METHOD = "tiktoken:o200k_base+per_message_4+schema+margin"
 PER_MESSAGE_TOKENS = 4
 
@@ -442,13 +443,18 @@ def build_rewrite_messages(conversation: list[dict], follow_up: str, documents: 
             {"role": "user", "content": json.dumps(request, ensure_ascii=False)}]
 
 
-def validate_rewrite(response: ProviderResponse, max_characters: int) -> str:
+def _complete(response: ProviderResponse) -> None:
+    """A refused, truncated or otherwise unfinished response is a TechnicalError."""
     if response.refusal:
         raise TechnicalError(f"model_refusal: {response.refusal[:200]}")
     if response.finish_reason == "length":
         raise TechnicalError("output_truncated")
     if response.finish_reason not in ("stop", None) or not response.content:
         raise TechnicalError(f"incomplete_output: finish_reason={response.finish_reason}")
+
+
+def validate_rewrite(response: ProviderResponse, max_characters: int) -> str:
+    _complete(response)
     try:
         query = " ".join(str(json.loads(response.content)["query"]).split())
     except (ValueError, KeyError, TypeError):
@@ -503,20 +509,56 @@ def count_request_tokens(messages: list[dict], response_format: dict, margin: in
 # ---------------------------------------------------------------- validation
 
 
+def _parsed_payload(response: ProviderResponse) -> AnswerPayload:
+    """The answer of a complete response; a refusal, truncation or schema violation is a TechnicalError."""
+    _complete(response)
+    try:
+        return AnswerPayload.model_validate_json(response.content)
+    except ValidationError as exc:
+        raise TechnicalError(f"schema_invalid: {exc.errors()[:3]}") from None
+
+
+def _without_listed_absences(payload: AnswerPayload) -> AnswerPayload:
+    """A claim declared "absence" is dropped (never shown) only when its text is exactly the field of a missing_fields
+    entry of its own document, so it carries nothing beyond that listed absence; any other "absence" claim fails.
+    Whatever their text, uncited source facts and inferences still fail the whole answer afterwards."""
+
+    def squash(text: str) -> str:
+        return " ".join(text.split())
+
+    listed = {(m.doc_id, squash(m.field)) for m in payload.missing_fields}
+    for claim in payload.claims:
+        if claim.kind == "absence" and (claim.doc_id, squash(claim.text)) not in listed:
+            raise TechnicalError(f"absence_not_listed: {claim.doc_id}")
+    if any(c.kind == "absence" for c in payload.claims):
+        payload = payload.model_copy(update={"claims": [c for c in payload.claims if c.kind != "absence"]})
+    return payload
+
+
+def status_problem(answer: dict) -> str | None:
+    """Why an answer's status disagrees with its content, else None. Serving validation and offline grading share
+    this rule: a conflict answer names a conflict, gives every conflict two alternatives or more, and says what to do
+    next."""
+    conflicts = answer.get("conflicts") or []
+    if answer.get("status") != "conflicting_evidence":
+        return None
+    if not conflicts:
+        return "conflict_without_conflicts"
+    if any(len(c.get("alternatives") or []) < 2 for c in conflicts):
+        return "conflict_with_one_alternative"
+    if not (answer.get("next_action") or "").strip():
+        return "conflict_without_next_action"
+    return None
+
+
 def validate_answer(response: ProviderResponse, evidence: list[EvidenceUnit], allowed_doc_ids: set[str],
                     stored_quotes: dict[str, str], required_doc_ids: set[str] | None = None) -> AnswerPayload:
     """`required_doc_ids`, given only for a comparison: each of these documents must appear in a claim or a missing
     field, and an inference may also cite them (it compares the sides) as long as it cites its own document too."""
-    if response.refusal:
-        raise TechnicalError(f"model_refusal: {response.refusal[:200]}")
-    if response.finish_reason == "length":
-        raise TechnicalError("output_truncated")
-    if response.finish_reason not in ("stop", None) or not response.content:
-        raise TechnicalError(f"incomplete_output: finish_reason={response.finish_reason}")
-    try:
-        payload = AnswerPayload.model_validate_json(response.content)
-    except ValidationError as exc:
-        raise TechnicalError(f"schema_invalid: {exc.errors()[:3]}") from None
+    payload = _without_listed_absences(_parsed_payload(response))
+    problem = status_problem(payload.model_dump())
+    if problem:
+        raise TechnicalError(problem)
     by_id = {e.evidence_id: e for e in evidence}
 
     def check_refs(ids: list[str], doc_id: str, also: set[str] = frozenset()) -> None:
@@ -529,18 +571,6 @@ def validate_answer(response: ProviderResponse, evidence: list[EvidenceUnit], al
             if stored_quotes.get(eid) != ev.quote:
                 raise TechnicalError(f"evidence_quote_mismatch: {eid}")
 
-    # A claim declared "absence" is dropped (never shown) only when its text is exactly the field of a missing_fields
-    # entry of its own document, so it carries nothing beyond that listed absence; any other "absence" claim fails.
-    # Whatever their text, uncited source facts and inferences still fail the whole answer below.
-    def squash(text: str) -> str:
-        return " ".join(text.split())
-
-    listed = {(m.doc_id, squash(m.field)) for m in payload.missing_fields}
-    for claim in payload.claims:
-        if claim.kind == "absence" and (claim.doc_id, squash(claim.text)) not in listed:
-            raise TechnicalError(f"absence_not_listed: {claim.doc_id}")
-    if any(c.kind == "absence" for c in payload.claims):
-        payload = payload.model_copy(update={"claims": [c for c in payload.claims if c.kind != "absence"]})
     for claim in payload.claims:
         if claim.doc_id not in allowed_doc_ids:
             raise TechnicalError(f"claim_outside_scope: {claim.doc_id}")

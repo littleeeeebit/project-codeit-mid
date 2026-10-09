@@ -1,1 +1,0 @@
-`EvidenceUnit`s (`evidence_id`, `doc_id`, `source_hash`, `extraction_id`, `chunk_id`, `element_ids`, `quote`, `location`) are stored in `result_json.evidence`. `open_evidence` rebuilds the quote with neighbouring elements from the pinned extraction. `original_download` serves the managed original only for known `(doc_id, source_hash)` pairs.

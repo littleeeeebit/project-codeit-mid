@@ -1,0 +1,1 @@
+Login tokens, API-key clients, key metadata and streamed partials are not durable. Key changes create new sessions; old clients remain alive for in-flight work and are closed with Resources, so repeated key changes increase retained clients until shutdown.

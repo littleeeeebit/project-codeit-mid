@@ -400,6 +400,69 @@ def _align(units: list[dict], page_text: list[str]) -> list[list[int]]:
     return out
 
 
+def _unmatched_text(s: str, grams: set[str], whole: str) -> tuple[int, list[str]]:
+    """Unmatched characters and stretches of `s`; text shorter than a shingle is matched as a whole."""
+    if len(s) < N:
+        return (0, []) if s in whole else (len(s), [s])
+    return _unmatched(s, grams)
+
+
+def _extraction_findings(units: list[dict], unit_pages: list[list[int]], near, known) -> tuple[list[dict], int, int]:
+    """Extraction side: each unit against the rendering around its pages. (findings, characters, unmatched)."""
+    findings = []
+    unit_chars = unit_unmatched = 0
+    for u, nos in zip(units, unit_pages):
+        n = u["norm"]
+        unit_chars += len(n)
+        grams, whole = known("r", near(nos))
+        missing, stretches = _unmatched_text(n, grams, whole)
+        digits = [d for d in _DIGITS.findall(n) if d not in whole]
+        unit_unmatched += missing
+        if digits or missing:  # one wrong character leaves exactly one character unmatched
+            findings.append({"side": "extraction", "element_id": u["element_id"], "cell": u["cell"],
+                             "page": nos[0] if nos else None, "unmatched_chars": missing, "digits": digits,
+                             "stretch": stretches[0] if stretches else "", "text": u["text"][:300],
+                             "edge": all(_wrapped(n, x, whole) for x in stretches)})
+    return findings, unit_chars, unit_unmatched
+
+
+def _rendering_findings(pages: list[dict], units: list[dict], unit_near: list[set[int]],
+                        known) -> tuple[list[dict], int, int]:
+    """Rendering side. Flow text: pages in order consume one extraction string, each within the span of its nearby
+    units, so a dropped copy of repeated text is still missing. Table cells: shingles only, because the table
+    finder can return an outer cell that repeats its nested table's cells. (findings, characters, unmatched)."""
+    starts, pos = [], 0
+    for u in units:
+        starts.append(pos)
+        pos += len(u["norm"])
+    pool = "".join(u["norm"] for u in units)
+    chrome = {line for line, k in Counter(x for p in pages for x in set(p["margins"])).items() if k >= CHROME_PAGES}
+    findings = []
+    page_chars = page_unmatched = 0
+    for no, p in enumerate(pages, 1):
+        idx = [i for i, around in enumerate(unit_near) if no in around]
+        lo, hi = (starts[idx[0]], starts[idx[-1]] + len(units[idx[-1]]["norm"])) if idx else (0, 0)
+        tries = [_consume([x for x in lines if x not in chrome], pool[lo:hi])
+                 for lines in (p["lines"], p["stream_lines"])]
+        missing, found, window = min(tries, key=lambda t: t[0])
+        pool = pool[:lo] + window + pool[hi:]
+        grams, extracted = known("e", (no,))
+        for c, words in zip(p["cells"], p["cell_words"]):
+            if c not in extracted:
+                m, ss = _unmatched(c, grams, words, extracted)
+                missing += m
+                found += ss
+        page_chars += len(p["visual"]) + sum(map(len, p["cells"]))
+        page_unmatched += missing
+        stretches = sorted((s for s in found if len(s) >= MIN_STRETCH), key=len, reverse=True)
+        digits = sorted({d for d in p["digits"] if d not in extracted
+                         and not any(d in x for x in p["margins"] if x in chrome)})
+        if digits or stretches:
+            findings.append({"side": "rendering", "page": no, "unmatched_chars": missing, "digits": digits,
+                             "stretch": stretches[0] if stretches else "", "stretches": stretches[:20]})
+    return findings, page_chars, page_unmatched
+
+
 def compare(elements: list[dict], pages: list[dict]) -> dict:
     """Both directions are checked against the neighborhood (page ±1) only, so that a changed or missing copy of
     text repeated elsewhere in the document is still reported."""
@@ -425,58 +488,9 @@ def compare(elements: list[dict], pages: list[dict]) -> dict:
             cache[side, nos] = ({g for piece in text.split("\n") for g in _grams(piece)}, text)
         return cache[side, nos]
 
-    def unmatched(s: str, grams: set[str], whole: str) -> tuple[int, list[str]]:
-        if len(s) < N:
-            return (0, []) if s in whole else (len(s), [s])
-        return _unmatched(s, grams)
-
-    findings = []
-    unit_chars = unit_unmatched = 0
-    for u, nos in zip(units, unit_pages):
-        n = u["norm"]
-        unit_chars += len(n)
-        grams, whole = known("r", near(nos))
-        missing, stretches = unmatched(n, grams, whole)
-        digits = [d for d in _DIGITS.findall(n) if d not in whole]
-        unit_unmatched += missing
-        if digits or missing:  # one wrong character leaves exactly one character unmatched
-            findings.append({"side": "extraction", "element_id": u["element_id"], "cell": u["cell"],
-                             "page": nos[0] if nos else None, "unmatched_chars": missing, "digits": digits,
-                             "stretch": stretches[0] if stretches else "", "text": u["text"][:300],
-                             "edge": all(_wrapped(n, x, whole) for x in stretches)})
-
-    # Rendering side. Flow text: pages in order consume one extraction string, each within the span of its nearby
-    # units, so a dropped copy of repeated text is still missing. Table cells: shingles only, because the table
-    # finder can return an outer cell that repeats its nested table's cells.
-    starts, pos = [], 0
-    for u in units:
-        starts.append(pos)
-        pos += len(u["norm"])
-    pool = "".join(u["norm"] for u in units)
-    chrome = {line for line, k in Counter(x for p in pages for x in set(p["margins"])).items() if k >= CHROME_PAGES}
-    page_chars = page_unmatched = 0
-    for no, p in enumerate(pages, 1):
-        idx = [i for i, around in enumerate(unit_near) if no in around]
-        lo, hi = (starts[idx[0]], starts[idx[-1]] + len(units[idx[-1]]["norm"])) if idx else (0, 0)
-        tries = [_consume([x for x in lines if x not in chrome], pool[lo:hi])
-                 for lines in (p["lines"], p["stream_lines"])]
-        missing, found, window = min(tries, key=lambda t: t[0])
-        pool = pool[:lo] + window + pool[hi:]
-        grams, extracted = known("e", (no,))
-        for c, words in zip(p["cells"], p["cell_words"]):
-            if c not in extracted:
-                m, ss = _unmatched(c, grams, words, extracted)
-                missing += m
-                found += ss
-        page_chars += len(p["visual"]) + sum(map(len, p["cells"]))
-        page_unmatched += missing
-        stretches = sorted((s for s in found if len(s) >= MIN_STRETCH), key=len, reverse=True)
-        digits = sorted({d for d in p["digits"] if d not in extracted
-                         and not any(d in x for x in p["margins"] if x in chrome)})
-        if digits or stretches:
-            findings.append({"side": "rendering", "page": no, "unmatched_chars": missing, "digits": digits,
-                             "stretch": stretches[0] if stretches else "", "stretches": stretches[:20]})
-
+    findings, unit_chars, unit_unmatched = _extraction_findings(units, unit_pages, near, known)
+    rendering, page_chars, page_unmatched = _rendering_findings(pages, units, unit_near, known)
+    findings += rendering
     image_pages = [no for no, p in enumerate(pages, 1) if p["image_share"] >= IMAGE_MIN_AREA]
     metrics = {"units": len(units), "extracted_chars": unit_chars, "rendered_chars": page_chars,
                "pages": len(pages), "extraction_unmatched": unit_unmatched, "rendering_unmatched": page_unmatched,

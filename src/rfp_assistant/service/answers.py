@@ -1,5 +1,6 @@
-"""Phase 4 answer evaluation: estimated, metered answer runs for at most two development finalists, the single
-sealed run, deterministic scoring with a blind human review overlay, and a bounded latency sample.
+"""Phase 4 answer evaluation: estimated, metered answer runs for at most two development finalists, an embedding
+comparison over any number of retrieval runs against a baseline (paired, on the same development questions), the
+single sealed run, deterministic scoring with a blind human review overlay, and a bounded latency sample.
 
 Every answer goes through the service's own answer path (the same prompt, validation, idempotent request record,
 gateway and ledger as a consultant's question) with the retrieval configuration of a recorded run pinned in place
@@ -9,10 +10,14 @@ whose paid attempt has unknown billing is never replayed, and only rows with con
 
 from __future__ import annotations
 
+import contextvars
 import hashlib
 import json
+import math
+import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -25,11 +30,15 @@ from ..settings import Settings
 from ..storage.store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
 from . import service
 
-ANSWER_EVAL_VERSION = "answer-eval-1"
+ANSWER_EVAL_VERSION = "answer-eval-2"  # 2: status must match the row's own statuses; claims need whole-claim support
 EVAL_MEMBER = "evaluation-job"  # fixed: resuming under another typed name must find the same idempotency keys
-MAX_FINALISTS = 2
+MAX_FINALISTS = 2  # release finalists; an embedding comparison answers every run it names, the first as baseline
 ESTIMATE_TTL_HOURS = 24
-ACTIONS = ("answer-finalists", "sealed", "latency")
+ACTIONS = ("answer-finalists", "embedding-comparison", "sealed", "latency")
+DEV_ACTIONS = ("answer-finalists", "embedding-comparison")
+COMPARISON_TABLE = "answer-embedding"
+ALPHA = 0.05
+RESEARCH_ONLY = ("jinaai/jina-embeddings-v3", "google/embeddinggemma-300m")  # non-commercial / Gemma terms
 TECHNICAL = ("technical_error", "budget_blocked", "ingestion_unavailable", "cancelled", "interrupted")
 REFUSALS = ("insufficient_evidence", "clarification_required")
 CLAIM_VERDICTS = ("correct", "wrong_value", "contested", "incomplete_qualifier", "missing", "needs_review")
@@ -116,7 +125,7 @@ def _identity(settings: Settings, action: str, dataset: str, dataset_sha: str, p
                  "prompt": generation.PROMPT_VERSION, "model": settings.generation_model,
                  "reasoning": settings.generation_reasoning_effort,
                  "max_output": settings.generation_max_output_tokens, **(extra or {})})
-    prefix = {"answer-finalists": "A", "sealed": "S", "latency": "L"}[action]
+    prefix = {"answer-finalists": "A", "embedding-comparison": "E", "sealed": "S", "latency": "L"}[action]
     return f"{prefix}-{hashlib.sha256(key.encode()).hexdigest()[:12]}"
 
 
@@ -133,10 +142,16 @@ def _save_progress(settings: Settings, run_id: str, progress: dict) -> None:
 # ---------------------------------------------------------------- finalists
 
 
-def _retrieval_finalists(settings: Settings, dataset: str, population: str, run_ids: list[str] | None) -> list[dict]:
+def _retrieval_finalists(settings: Settings, dataset: str, population: str, run_ids: list[str] | None,
+                         cap: int | None = MAX_FINALISTS) -> list[dict]:
+    """The runs to answer with. `cap` None (an embedding comparison) takes every named run, at least two."""
     from ..storage.store import get_app_setting
 
-    if not run_ids:
+    if cap is None:
+        run_ids = list(dict.fromkeys(run_ids or []))
+        if len(run_ids) < 2:
+            raise AnswerEvalError("an embedding comparison names its baseline run first, then at least one more run")
+    elif not run_ids:
         with open_db(settings.db_path) as conn:
             active = get_app_setting(conn, "active_run")
         if not active:
@@ -144,7 +159,7 @@ def _retrieval_finalists(settings: Settings, dataset: str, population: str, run_
         a = json.loads(active)
         run_ids = [a["run_id"]] + ([a["finalist_run_id"]] if a.get("finalist_run_id") else [])
     run_ids = list(dict.fromkeys(run_ids))
-    if not 1 <= len(run_ids) <= MAX_FINALISTS:
+    if cap is not None and not 1 <= len(run_ids) <= cap:
         raise AnswerEvalError(f"answer evaluation takes one or two retrieval finalists, not {len(run_ids)}")
     out = []
     for rid in run_ids:
@@ -226,14 +241,15 @@ def _plan_inputs(settings: Settings, action: str, dataset: str | None, run_ids: 
                  freeze_id: str | None, question_ids: list[str] | None = None) -> dict:
     """`question_ids` narrows a development run to those rows (e.g. a rerun of earlier failures); the finalists are
     still checked against the whole population and the subset is part of the run identity."""
-    if question_ids and action != "answer-finalists":
-        raise AnswerEvalError("--question-id narrows only an answer-finalists run; the sealed set always runs whole")
-    if action == "answer-finalists":
+    if question_ids and action not in DEV_ACTIONS:
+        raise AnswerEvalError("--question-id narrows only a development run; the sealed set always runs whole")
+    if action in DEV_ACTIONS:
         if dataset not in ("dev",):
-            raise AnswerEvalError("answer finalists are compared on the reviewed development split (`dev`)")
+            raise AnswerEvalError("answer runs are compared on the reviewed development split (`dev`)")
         rows, skipped, sha = evaluation.load_eval_rows(settings, dataset)
         population = evaluation.population_identity(rows, skipped)
-        finalists = _retrieval_finalists(settings, dataset, population, run_ids)
+        finalists = _retrieval_finalists(settings, dataset, population, run_ids,
+                                         MAX_FINALISTS if action == "answer-finalists" else None)
         extra = {}
         if question_ids:
             wanted = sorted(set(question_ids))
@@ -303,12 +319,13 @@ def plan_run(settings: Settings, action: str, dataset: str | None = None, run_id
                                                              and p["max_micro_usd"]),
         "rows_remaining": remaining, "max_micro_usd": to_spend, "max_micro_usd_all_rows": total,
         "judge": {"attempts": 0, "max_micro_usd": 0, "note": "no paid judge is planned; review is human and blind"},
-        "model": settings.generation_model, "prompt_version": generation.PROMPT_VERSION,
+        "model": settings.generation_model, "reasoning_effort": settings.generation_reasoning_effort,
+        "prompt_version": generation.PROMPT_VERSION,
         "max_output_tokens": settings.generation_max_output_tokens, "purpose": "gold_eval", **ledger,
         "fits": to_spend <= min(ledger["envelope_remaining_micro_usd"], ledger["available_micro_usd"]),
         "fingerprint": fingerprint, "per_row": per_row, "created_at": now.isoformat(),
         "expires_at": (now + timedelta(hours=ESTIMATE_TTL_HOURS)).isoformat(),
-        "invalidated_by": "a change to the finalists, dataset or population, index, prompt, model, output cap, rates "
+        "invalidated_by": "a change to the finalists, dataset or population, index, prompt, model, reasoning effort, output cap, rates "
                           "or any row's token count; expiry",
     }
     if store:
@@ -375,8 +392,8 @@ def begin_answers(settings: Settings, estimate_id: str, actor: str, post_test_re
     """Free and synchronous: checks the estimate and inputs, then publishes the run (its `config.json`) so the
     overview lists it from the moment a start returns, before any paid call."""
     est = load_estimate(settings, estimate_id)
-    if est["action"] not in ("answer-finalists", "sealed"):
-        raise AnswerEvalError("run-answers executes answer-finalists or sealed estimates; latency uses latency-run")
+    if est["action"] not in (*DEV_ACTIONS, "sealed"):
+        raise AnswerEvalError("run-answers executes development or sealed estimates; latency uses latency-run")
     recheck(settings, est)
     inputs = _plan_inputs(settings, est["action"], est["dataset"],
                           est["finalists"] if est["action"] != "sealed" else None, est.get("freeze_id"),
@@ -394,8 +411,9 @@ def begin_answers(settings: Settings, estimate_id: str, actor: str, post_test_re
         "finalists": inputs["finalists"], "prompt_version": generation.PROMPT_VERSION,
         "model": settings.generation_model, "reasoning_effort": settings.generation_reasoning_effort,
         "max_output_tokens": settings.generation_max_output_tokens, "freeze_id": est.get("freeze_id"),
-        "label": "post-test regression" if est.get("post_test_regression") else (
-            "sealed test" if est["action"] == "sealed" else "development finalists"),
+        "label": "post-test regression" if est.get("post_test_regression") else {
+            "sealed": "sealed test", "embedding-comparison": "embedding comparison"}.get(
+            est["action"], "development finalists"),
         "skipped": inputs["skipped"], "rows": len(inputs["rows"]), "question_ids": inputs["question_ids"],
         "created_at": utcnow(), "estimates": [],
         "provenance": {"code": evaluation.code_fingerprint(), "hardware": evaluation.hardware(),
@@ -407,38 +425,53 @@ def begin_answers(settings: Settings, estimate_id: str, actor: str, post_test_re
 
 
 def run_answers(settings: Settings, owner: service.Resources, estimate_id: str, actor: str,
-                post_test_reason: str | None = None, begun: dict | None = None) -> dict:
+                post_test_reason: str | None = None, begun: dict | None = None, workers: int = 1) -> dict:
     """Executes a planned answer run (development finalists or the sealed run) with the owner's gateway. Stops on
     the first budget refusal or unknown billing; rerunning the same command (after reconciliation, or with a new
     estimate) resumes only unfinished rows. `begun` is this estimate's `begin_answers`, when the caller already
-    published the run."""
+    published the run. `workers` answers that many retrieval runs at once, each run's rows in order; the ledger
+    admits every reservation on its own, and the first stop reason stops every worker before its next row."""
     if begun is None or begun["estimate_id"] != estimate_id:
         begun = begin_answers(settings, estimate_id, actor, post_test_reason)
     inputs, run_id = begun["inputs"], begun["run_id"]
     progress = load_progress(settings, run_id)
-    stop_reason = None
-    for f in inputs["finalists"]:
+    lock, stops = threading.Lock(), []
+
+    def answer_finalist(f: dict) -> None:
         pinned = PinnedResources(settings, owner.transport, f, owner)
         for row in inputs["rows"]:
-            if owner._closed and not stop_reason:
-                stop_reason = "interrupted: the service is stopping; rerun to resume"
-            if stop_reason:
-                break
             key_base = (f["run_id"], row["question_id"])
-            record = progress.get(key_base)
+            with lock:
+                if owner._closed and not stops:
+                    stops.append("interrupted: the service is stopping; rerun to resume")
+                if stops:
+                    return
+                record = progress.get(key_base)
             if record and record["status"] == "done":
                 continue
             outcome = _answer_row(settings, pinned, run_id, f["run_id"], row, record)
-            progress[key_base] = outcome
-            _save_progress(settings, run_id, progress)
-            if outcome["status"] == "blocked":
-                stop_reason = f"budget_blocked: {outcome.get('reason')}"
-            elif outcome["status"] == "unknown_billing" and (record or {}).get("status") != "unknown_billing":
-                # a new unknown outcome stops spending; a known one is skipped until it is reconciled
-                stop_reason = "unknown_billing: reconcile the attempt before resuming (it is never replayed)"
-        if stop_reason:
-            break
-    return finalize(settings, run_id, stop_reason)
+            with lock:
+                progress[key_base] = outcome
+                _save_progress(settings, run_id, progress)
+                if outcome["status"] == "blocked":
+                    stops.append(f"budget_blocked: {outcome.get('reason')}")
+                elif outcome["status"] == "unknown_billing" and (record or {}).get("status") != "unknown_billing":
+                    # a new unknown outcome stops spending; a known one is skipped until it is reconciled
+                    stops.append("unknown_billing: reconcile the attempt before resuming (it is never replayed)")
+
+    def guarded(f: dict) -> None:
+        try:
+            answer_finalist(f)
+        except BaseException as exc:  # the others stop before their next row; the error still propagates
+            with lock:
+                stops.append(f"error: {type(exc).__name__}")
+            raise
+
+    with ThreadPoolExecutor(max_workers=max(1, workers), thread_name_prefix=f"rfp-answers-{run_id}") as pool:
+        # each worker carries a copy of the caller's context: the member's key session and billing scope
+        for done in [pool.submit(contextvars.copy_context().run, guarded, f) for f in inputs["finalists"]]:
+            done.result()
+    return finalize(settings, run_id, stops[0] if stops else None)
 
 
 def _answer_row(settings: Settings, pinned: PinnedResources, run_id: str, finalist: str, row: dict,
@@ -553,8 +586,9 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
     prefix = f"{record['finalist']}|{row['question_id']}"
     out = {"question_id": row["question_id"], "finalist": record["finalist"], "type": row["question_type"],
            "answerability": row["answerability"], "expected_status": row["expected_status"], "outcome": outcome,
-           "technical": outcome in TECHNICAL, "status_ok": outcome in evaluation.EXPECTED_STATUS[row["answerability"]]
-           and (outcome != "conflicting_evidence" or bool((answer.get("next_action") or "").strip())),
+           "technical": outcome in TECHNICAL,  # only the row's own statuses pass, never its whole answerability class
+           "status_ok": outcome in {row["expected_status"], *(row.get("accepted_statuses") or [])}
+           and (row.get("mode") == "metadata" or generation.status_problem({**answer, "status": outcome}) is None),
            "claims": [], "links": [], "answer_claims": [], "settled_micro_usd": record.get("settled_micro_usd", 0),
            "latency_ms": record.get("latency_ms"), "attempt_no": record.get("attempt_no", 1)}
     scope_docs = {s["doc_id"] for s in row.get("scope") or []}
@@ -595,34 +629,46 @@ def score_record(row: dict, record: dict, index, reviews: dict[str, dict]) -> di
         out["claims"].append({"claim_id": c["claim_id"], "item": item, "verdict": (reviewed or {}).get("verdict", verdict),
                               "deterministic": verdict, "reviewed_by": (reviewed or {}).get("reviewer"),
                               "critical_kind": c.get("critical_kind")})
-    validity = record.get("link_validity") or {}
     for i, ac in enumerate(answer.get("claims") or []):
-        supports = []
-        for eid in ac.get("evidence_ids") or []:
-            ev = (record.get("evidence") or {}).get(eid) or {}
-            chunk = chunks.get(ev.get("chunk_id"))
-            best = max((evaluation.group_grade(chunk, g, index.elements) for g in groups
-                        if chunk is not None and g["doc_id"] == ev.get("doc_id")), default=0)
-            # A gold span in the cited chunk is retrieval relevance, not support for whatever the claim says
-            # (review rounds 1-2): only a claim quoted verbatim from its citation is supported without a person.
-            support = "supporting" if ac.get("doc_id") == ev.get("doc_id") and verbatim_support(
-                ac.get("text", ""), ev.get("quote") or "") else "unjudged"
-            item = f"{prefix}|link|{i}|{eid}"
-            reviewed = reviews.get(item)
-            support = (reviewed or {}).get("verdict", support)
-            supports.append(support)
-            out["links"].append({"claim_index": i, "evidence_id": eid, "item": item, "support": support,
-                                 "valid": bool(validity.get(eid)), "grade": best})
-        item = f"{prefix}|answer_claim|{i}"
-        reviewed = reviews.get(item)
-        supported = True if supports and "supporting" in supports else None
-        if reviewed:
-            supported = reviewed["verdict"] == "supported"
-        elif supports and all(s == "unsupported" for s in supports):
-            supported = False
-        out["answer_claims"].append({"index": i, "item": item, "kind": ac.get("kind"), "supported": supported,
-                                     "doc_id": ac.get("doc_id")})
+        links = _claim_links(i, ac, record, chunks, groups, index, prefix, reviews)
+        out["links"] += links
+        out["answer_claims"].append(_answer_claim(i, ac, links, prefix, reviews))
     return out
+
+
+def _claim_links(i: int, ac: dict, record: dict, chunks: dict, groups: list[dict], index, prefix: str,
+                 reviews: dict[str, dict]) -> list[dict]:
+    """Each citation of answer claim `i`: its support (verbatim, else unjudged, unless reviewed), validity and the
+    best grade its chunk earns against a gold group of the cited document."""
+    validity = record.get("link_validity") or {}
+    links = []
+    for eid in ac.get("evidence_ids") or []:
+        ev = (record.get("evidence") or {}).get(eid) or {}
+        chunk = chunks.get(ev.get("chunk_id"))
+        best = max((evaluation.group_grade(chunk, g, index.elements) for g in groups
+                    if chunk is not None and g["doc_id"] == ev.get("doc_id")), default=0)
+        # A gold span in the cited chunk is retrieval relevance, not support for whatever the claim says
+        # (review rounds 1-2): only a claim quoted verbatim from its citation is supported without a person.
+        verbatim = ac.get("doc_id") == ev.get("doc_id") and verbatim_support(ac.get("text", ""), ev.get("quote") or "")
+        item = f"{prefix}|link|{i}|{eid}"
+        reviewed = reviews.get(item)
+        links.append({"claim_index": i, "evidence_id": eid, "item": item,
+                      "support": (reviewed or {}).get("verdict", "supporting" if verbatim else "unjudged"),
+                      "verbatim": verbatim, "valid": bool(validity.get(eid)), "grade": best})
+    return links
+
+
+def _answer_claim(i: int, ac: dict, links: list[dict], prefix: str, reviews: dict[str, dict]) -> dict:
+    """Answer claim `i` is supported by a link quoting the whole claim verbatim (a link reviewed as supporting states
+    only some part), unsupported when every link is, else unjudged (None); a review of the claim decides over links."""
+    item = f"{prefix}|answer_claim|{i}"
+    reviewed = reviews.get(item)
+    supported = True if any(link["verbatim"] and link["support"] == "supporting" for link in links) else None
+    if reviewed:
+        supported = reviewed["verdict"] == "supported"
+    elif links and all(link["support"] == "unsupported" for link in links):
+        supported = False
+    return {"index": i, "item": item, "kind": ac.get("kind"), "supported": supported, "doc_id": ac.get("doc_id")}
 
 
 def served_retrieval(settings: Settings, index, row: dict, record: dict) -> dict | None:
@@ -725,6 +771,15 @@ def aggregate_answers(scored: list[dict]) -> dict:
     }
 
 
+def graded_config(settings: Settings, run_id: str) -> dict:
+    """The run's config, read before anything is written into the run: a run graded under another answer-eval
+    version is refused, so its scores, review key and reviews stay as recorded, never mixed with new rules."""
+    config = json.loads((run_dir(settings, run_id) / "config.json").read_text(encoding="utf-8"))
+    if config.get("eval_version") != ANSWER_EVAL_VERSION:
+        raise AnswerEvalError(f"{run_id} was graded under {config.get('eval_version')}; start a new answer run")
+    return config
+
+
 def load_reviews(settings: Settings, run_id: str) -> dict[str, dict]:
     path = run_dir(settings, run_id) / "review.jsonl"
     latest: dict[str, dict] = {}
@@ -765,7 +820,7 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
     from ..retrieval.retrieval import KeywordIndex
 
     d = run_dir(settings, run_id)
-    config = json.loads((d / "config.json").read_text(encoding="utf-8"))
+    config = graded_config(settings, run_id)
     progress = load_progress(settings, run_id)
     reviews = load_reviews(settings, run_id)
     rows, _, _ = evaluation.load_eval_rows(settings, config["dataset"], sealed=config["dataset"] == "test")
@@ -795,11 +850,17 @@ def finalize(settings: Settings, run_id: str, stop_reason: str | None = None) ->
     complete = all(v["completed"] == v["of"] for v in per_finalist.values())
     scores = {"status": "complete" if complete else "partial", "stop_reason": stop_reason, "run_id": run_id,
               "label": config["label"], "finalists": per_finalist, "reviews": len(reviews),
-              "selection": compare_finalists(per_finalist) if len(per_finalist) > 1 else None,
+              "selection": compare_finalists(per_finalist) if len(per_finalist) > 1
+              and config["action"] == "answer-finalists" else None,
               "scored_at": utcnow()}
+    if config["action"] == "embedding-comparison":
+        scores["comparison"] = paired_against_baseline(config["finalists"][0]["run_id"], all_scored,
+                                                      [f["run_id"] for f in config["finalists"]])
     write_text_atomic(d / "scores.json", json.dumps(scores, ensure_ascii=False, indent=1))
     write_jsonl_atomic(d / "scored.jsonl", all_scored)
     write_text_atomic(d / "report.md", answer_report_md(config, scores))
+    if config["action"] == "embedding-comparison":
+        write_comparison_table(settings, config, scores)
     return {"run_id": run_id, "status": scores["status"], "stop_reason": stop_reason,
             "finalists": {k: {"completed": v["completed"], "of": v["of"], "rows_passed": v["rows_passed"],
                               "rows_failed": v["rows_failed"],
@@ -818,6 +879,176 @@ def compare_finalists(per: dict) -> dict:
             "p95_ms": [x["latency_ms"]["p95"], y["latency_ms"]["p95"]],
             "settled_micro_usd": [x["cost"]["settled_micro_usd"], y["cost"]["settled_micro_usd"]],
             "note": "development evidence for the owner's selection; small denominators: read the intervals"}
+
+
+# ---------------------------------------------------------------- embedding comparison
+
+
+def mcnemar_exact(b: int, c: int) -> float:
+    """Two-sided exact McNemar p-value: of the b + c questions the two runs disagree on, how unlikely a split at
+    least this uneven is when either run is equally likely to be the one that passes."""
+    n = b + c
+    if n == 0:
+        return 1.0
+    tail = sum(math.comb(n, i) for i in range(min(b, c) + 1)) / 2 ** n
+    return min(1.0, 2 * tail)
+
+
+def holm(pvalues: dict[str, float]) -> dict[str, float]:
+    """Holm-adjusted p-values: comparing many runs with one baseline must not let one lucky run pass as a finding."""
+    out, running = {}, 0.0
+    for i, (key, p) in enumerate(sorted(pvalues.items(), key=lambda kv: kv[1])):
+        running = max(running, min(1.0, (len(pvalues) - i) * p))
+        out[key] = running
+    return out
+
+
+def paired_against_baseline(baseline: str, scored: list[dict], run_ids: list[str]) -> dict:
+    """Each run's answer pass rate against the baseline run's on the same questions (both answered, passage rows):
+    the difference, the discordant pairs and the exact McNemar p-value, Holm-adjusted over every planned run."""
+    passed = {(s["finalist"], s["question_id"]): bool(s.get("passed")) for s in scored if "metadata_correct" not in s}
+    base = {q: ok for (f, q), ok in passed.items() if f == baseline}
+    per = {}
+    for run in dict.fromkeys(run_ids):
+        if run == baseline:
+            continue
+        common = [q for (f, q) in passed if f == run and q in base]
+        b = sum(base[q] and not passed[(run, q)] for q in common)  # baseline passes, this run fails
+        c = sum(passed[(run, q)] and not base[q] for q in common)
+        per[run] = {"n": len(common), "baseline_only": b, "run_only": c,
+                    "pass_diff": round((c - b) / len(common), 4) if common else None,
+                    "p_value": mcnemar_exact(b, c)}
+    for run, p in holm({r: v["p_value"] for r, v in per.items()}).items():
+        per[run]["p_holm"] = round(p, 4)
+        per[run]["p_value"] = round(per[run]["p_value"], 4)
+    return {"baseline": baseline, "test": "exact McNemar on per-question pass, Holm-adjusted", "alpha": ALPHA,
+            "runs": per}
+
+
+def conclusion(rows: list[dict], comparison: dict) -> dict:
+    """The highest pass rate, and which runs differ from the baseline at the Holm-adjusted level."""
+    complete = bool(rows) and all(r["status"] == "complete" for r in rows)
+    done = rows if complete else []
+    top = max((r["answer"]["pass_rate"] for r in done if r["answer"]["pass_rate"] is not None), default=None)
+    per = comparison["runs"]
+    significant = [{"name": r["name"], "pass_diff": per[r["run_id"]]["pass_diff"], "p_holm": per[r["run_id"]]["p_holm"]}
+                   for r in done if r["run_id"] in per and per[r["run_id"]]["p_holm"] < comparison["alpha"]]
+    return {"complete": complete, "best": [r["name"] for r in done if top is not None and r["answer"]["pass_rate"] == top],
+            "best_pass_rate": top, "significant": significant, "alpha": comparison["alpha"],
+            "baseline": next((r["name"] for r in rows if r["run_id"] == comparison["baseline"]), None)}
+
+
+def conclusion_text(c: dict) -> str:
+    if c.get("complete") is False:
+        return "The planned comparison is incomplete; no ranking or significance conclusion is available."
+    if c["best_pass_rate"] is None:
+        return "No row finished; nothing to conclude."
+    lead = f"Highest answer pass rate: {', '.join(c['best'])} ({c['best_pass_rate']:.1%})."
+    if not c["significant"]:
+        return (f"{lead} No row differs significantly from {c['baseline']} (exact McNemar, Holm-adjusted, "
+                f"alpha {c['alpha']}).")
+    better = [s for s in c["significant"] if s["pass_diff"] > 0]
+    worse = [s for s in c["significant"] if s["pass_diff"] < 0]
+    parts = [f"{', '.join(s['name'] for s in group)} {word} than {c['baseline']}"
+             for group, word in ((better, "pass significantly more"), (worse, "pass significantly fewer")) if group]
+    return f"{lead} {'; '.join(parts)} (exact McNemar, Holm-adjusted, alpha {c['alpha']})."
+
+
+COMPARISON_COLUMNS = [
+    ("answer.pass_rate", "answer pass rate", "high"), ("answer.claim_correctness", "required-claim correctness", "high"),
+    ("answer.claim_support", "claim support", "high"), ("answer.critical", "critical failures", "low"),
+    ("answer.rejected", "rejected answers", "low"), ("vs_k1.pass_diff", "pass rate vs K1", "high"),
+    ("vs_k1.p_value", "p (McNemar)", None), ("vs_k1.p_holm", "p (Holm)", None),
+    ("dev.support", "complete support (retrieval)", "high"), ("query_p95_ms", "query p95 ms", "low"),
+    ("answer.cost_usd", "answer cost USD", "low"), ("cost_usd", "corpus embed cost USD", "low"),
+    ("licence", "licence", None), ("retrieval.mode", "retrieval", None),
+    ("retrieval.fusion", "fusion", None), ("retrieval.depth", "candidate depth", None),
+    ("retrieval.fused_depth", "fused depth", None), ("retrieval.units", "evidence units", None),
+    ("retrieval.evidence_max_tokens", "evidence token ceiling", None), ("retrieval.reranker", "reranker", None)]
+
+
+def write_comparison_table(settings: Settings, config: dict, scores: dict) -> dict:
+    """One table on 실험 비교 (`.runtime/compare/tables/answer-embedding`): every run's answer scores, its paired
+    difference against the baseline, and the retrieval columns the embedding and lexical tables already measured.
+    A row's run is the retrieval run, so the person can activate the row they pick."""
+    from ..evaluation import compare
+
+    measured = {r.get("run_id"): r for t in compare.load_tables(settings) if t["matrix"] in ("embedding", "lexical")
+                for r in t["rows"] if r.get("run_id")}
+    comparison = scores["comparison"]
+    rows = []
+    for f in config["finalists"]:
+        rid, v = f["run_id"], scores["finalists"][f["run_id"]]
+        model = (f.get("embedding") or {}).get("model")
+        known = measured.get(rid) or {}
+        licence = known.get("licence") or ("—" if model is None else None)
+        if model in RESEARCH_ONLY:
+            licence = f"{licence} (research-only)"
+        name = model or "K1"
+        limits = f.get("limits") or {}
+        fusion = (f"{limits.get('fusion')}:{limits.get('rrf_k')}:{limits.get('dense_weight')}:{limits.get('keyword_head')}"
+                  if f["mode"] in ("hybrid", "hybrid_rerank") else None)
+        rows.append({
+            "name": name, "axes": {"embedding": name}, "run_id": rid, "label": f["mode"],
+            "status": "complete" if v["completed"] == v["of"] else "partial",
+            "reason": None if v["completed"] == v["of"] else f"{v['completed']}/{v['of']} answered",
+            "answer": {"pass_rate": v["rows_passed"]["rate"], "passed": v["rows_passed"]["numerator"],
+                       "n": v["rows_passed"]["denominator"], "claim_support": v["citation_coverage"]["rate"],
+                       "claim_correctness": v["required_claim_correctness"]["rate"],
+                       "rejected": sum(v["technical_outcomes"].values()),
+                       "claims_unjudged": v["answer_claims_unjudged"], "critical": len(v["critical_wrong"]),
+                       "cost_usd": round(v["cost"]["settled_micro_usd"] / 1_000_000, 6)},
+            "vs_k1": comparison["runs"].get(rid) or {"pass_diff": 0.0},
+            "retrieval": {"mode": f["mode"], "fusion": fusion, "depth": limits.get("channel_top_k"),
+                          "fused_depth": limits.get("fused_top_k"), "units": limits.get("evidence_max_units"),
+                          "evidence_max_tokens": limits.get("evidence_max_tokens"),
+                          "reranker": (f.get("reranker") or {}).get("model"),
+                          "limits": limits, "reranker_config": f.get("reranker")},
+            "dev": {"support": (known.get("dev") or {}).get("support")},
+            "query_p95_ms": known.get("query_p95_ms"), "cost_usd": known.get("cost_usd", 0.0 if model is None else None),
+            "licence": licence, "research_only": model in RESEARCH_ONLY})
+    table = {"version": ANSWER_EVAL_VERSION, "matrix": COMPARISON_TABLE, "title": "임베딩별 gpt-5-mini 답변",
+             "answer_run_id": config["run_id"], "model": config["model"], "axes": {"embedding": [r["name"] for r in rows]},
+             "fixed": {**{("retrieval" if k == "mode" else k): rows[0]["retrieval"][k]
+                          for k in ("mode", "fusion", "depth", "fused_depth", "units", "evidence_max_tokens", "reranker")
+                          if all(r["retrieval"][k] == rows[0]["retrieval"][k] for r in rows)},
+                       "reasoning_effort": config["reasoning_effort"],
+                       "max_output_tokens": config["max_output_tokens"],
+                       "answer_questions": next(iter(scores["finalists"].values()))["of"],
+                       "development_subset": bool(config.get("question_ids"))},
+             "base": None, "baseline_k1_run": comparison["baseline"],
+             "columns": [{"key": k, "label": label, "better": better} for k, label, better in COMPARISON_COLUMNS],
+             "created_at": utcnow(), "populations": {"dev": "development rows on their own documents"},
+             "needs_evidence_review": [], "comparison": comparison, "rows": rows}
+    table["conclusion"] = conclusion(rows, comparison)
+    d = compare.compare_dir(settings) / "tables"
+    write_text_atomic(d / f"{COMPARISON_TABLE}.json", dumps(table))
+    write_text_atomic(d / f"{COMPARISON_TABLE}.md", comparison_md(table))
+    return table
+
+
+def comparison_md(table: dict) -> str:
+    from ..evaluation.compare import _fmt as cell, value
+
+    cols = table["columns"]
+    lines = [f"# Answers by embedding ({table['model']})", "",
+             f"Answer run `{table['answer_run_id']}`, {table['created_at']}. Fixed: "
+             f"`{json.dumps(table['fixed'], ensure_ascii=False)}`; baseline `{table['baseline_k1_run']}` (K1).", "",
+             "| Row | status | " + " | ".join(c["label"] for c in cols) + " | run |",
+             "| --- | --- | " + " | ".join("---" for _ in cols) + " | --- |"]
+    for r in table["rows"]:
+        status = r["status"] if r["status"] == "complete" else f"{r['status']}: {r.get('reason') or ''}"
+        lines.append(f"| {r['name']} | {status} | " + " | ".join(cell(value(r, c["key"])) for c in cols)
+                     + f" | `{r['run_id']}` |")
+    return "\n".join(lines + [
+        "", conclusion_text(table["conclusion"]), "",
+        "Pass: the row's own expected status and every gold group the packed evidence reached is cited. Required-claim "
+        "correctness: the gold typed claims (amounts, dates, conditions) the answer states correctly, checked "
+        "deterministically. Claim support: material answer claims a citation supports whole (verbatim, or by review); "
+        "unjudged claims count against it, so without a review it stays near zero. Critical failures: required claims "
+        "with a wrong critical value. Rejected answers: answers the service's validation refused or that failed "
+        "technically; they count as not passed. Retrieval columns come from the embedding and lexical tables. Rows "
+        "marked research-only may not serve commercially.", ""])
 
 
 def _fmt(r: dict) -> str:
@@ -884,7 +1115,7 @@ def export_review_sheet(settings: Settings, run_id: str, out: Path | None = None
     import random
 
     d = run_dir(settings, run_id)
-    config = json.loads((d / "config.json").read_text(encoding="utf-8"))
+    config = graded_config(settings, run_id)  # the sheet's key is written into the run
     scored = read_jsonl(d / "scored.jsonl") if (d / "scored.jsonl").exists() else []
     progress = load_progress(settings, run_id)
     rows, _, _ = evaluation.load_eval_rows(settings, config["dataset"], sealed=config["dataset"] == "test")
@@ -909,8 +1140,10 @@ def export_review_sheet(settings: Settings, run_id: str, out: Path | None = None
                 items.append(("link", link["item"], {**base, "claim": base["answer_claims"][link["claim_index"]],
                                                      "cited_quote": ev.get("quote")}))
         for a in s["answer_claims"]:
-            if a["supported"] is None:
-                items.append(("answer_claim", a["item"], {**base, "claim": base["answer_claims"][a["index"]]}))
+            if a["supported"] is None:  # judged on what the claim cites, the same passages the judge sees
+                cited = (answer.get("claims") or [])[a["index"]].get("evidence_ids") or []
+                items.append(("answer_claim", a["item"], {**base, "claim": base["answer_claims"][a["index"]],
+                              "cited_quotes": [(rec.get("evidence") or {}).get(e, {}).get("quote") for e in cited]}))
     random.Random(run_id).shuffle(items)
     sheet = []
     for kind, item, body in items:
@@ -931,6 +1164,7 @@ def import_reviews(settings: Settings, run_id: str, path: Path, reviewer: str) -
     """Appends completed blind verdicts; the latest review of an item wins at scoring. Re-scores the run."""
     if not reviewer.strip():
         raise AnswerEvalError("--reviewer is required")
+    graded_config(settings, run_id)  # before the first write: a refused import leaves review.jsonl unchanged
     d = run_dir(settings, run_id)
     key = json.loads((d / "review-key.json").read_text(encoding="utf-8"))
     records, errors = [], []

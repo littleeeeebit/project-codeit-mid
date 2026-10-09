@@ -1,5 +1,9 @@
 graph TD
-  request-states["Request status\nsrc/rfp_assistant/service/service.py"] -->|"guard at dispatch"| attempt-states["Attempt billing state\nsrc/rfp_assistant/gateway/budget.py"]
-  attempt-states -->|"open attempts block update"| update-states["Update result state\ntools/infra/update.sh"]
-  update-states -->|"fence refuses admission"| request-states
-  serving-activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"] -->|"config snapshot per request"| request-states
+queued["Queued request\nsrc/rfp_assistant/service/service.py"] -->|Worker claims uncancelled row| running["Running request\nsrc/rfp_assistant/service/service.py"]
+queued -->|Owner cancels before claim| cancelled["Cancelled execution\nsrc/rfp_assistant/service/service.py"]
+queued -->|Shutdown or restart recovery| interrupted["Interrupted execution\nsrc/rfp_assistant/service/service.py"]
+queued -->|Executor submission fails| failed["Failed execution\nsrc/rfp_assistant/service/service.py"]
+running -->|Normal outcome persisted| completed["Completed execution\nsrc/rfp_assistant/service/service.py"]
+running -->|Execution or validation error| failed
+running -->|Stop checkpoint or finalization| cancelled
+running -->|Shutdown or restart recovery| interrupted

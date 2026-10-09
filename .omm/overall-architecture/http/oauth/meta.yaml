@@ -1,0 +1,9 @@
+created: 2026-10-08T21:41:48.984Z
+updated: 2026-10-08T21:41:49.241Z
+update_count: 3
+last_field: concern
+kind: nested-class
+title: oauth
+children: []
+parentPath:
+  - http

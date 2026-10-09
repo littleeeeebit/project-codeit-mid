@@ -2206,6 +2206,9 @@
        }
       ]
      },
+     "targets": {
+      "$ref": "#/components/schemas/Targets"
+     },
      "test": {
       "$ref": "#/components/schemas/SealedState"
      }
@@ -2215,7 +2218,8 @@
      "dev_frozen",
      "test",
      "answer_runs",
-     "release"
+     "release",
+     "targets"
     ],
     "title": "EvaluationOverview",
     "type": "object"
@@ -2607,12 +2611,35 @@
    },
    "ExperimentTable": {
     "properties": {
+     "answer_run_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Answer Run Id"
+     },
      "columns": {
       "items": {
        "$ref": "#/components/schemas/ExperimentColumn"
       },
       "title": "Columns",
       "type": "array"
+     },
+     "conclusion": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Conclusion"
      },
      "created_at": {
       "title": "Created At",
@@ -2626,6 +2653,17 @@
      "matrix": {
       "title": "Matrix",
       "type": "string"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
      },
      "needs_evidence_review": {
       "default": [],
@@ -2864,6 +2902,11 @@
        }
       ]
      },
+     "claims_needing_review": {
+      "default": 0,
+      "title": "Claims Needing Review",
+      "type": "integer"
+     },
      "completed": {
       "anyOf": [
        {
@@ -2884,6 +2927,12 @@
         "type": "null"
        }
       ]
+     },
+     "critical_unresolved": {
+      "default": [],
+      "items": {},
+      "title": "Critical Unresolved",
+      "type": "array"
      },
      "critical_wrong": {
       "default": [],
@@ -3884,6 +3933,17 @@
    },
    "Latency": {
     "properties": {
+     "n": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "N"
+     },
      "p95": {
       "anyOf": [
        {
@@ -4503,6 +4563,36 @@
    },
    "Release": {
     "properties": {
+     "checks": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/ReleaseCheck"
+      },
+      "title": "Checks",
+      "type": "array"
+     },
+     "evidence_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Evidence Label"
+     },
+     "generated_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Generated At"
+     },
      "reasons": {
       "default": [],
       "items": {
@@ -4525,6 +4615,79 @@
      "status"
     ],
     "title": "Release",
+    "type": "object"
+   },
+   "ReleaseCheck": {
+    "description": "One hard check or quality target of a release decision; ok is None when not verified or not measured.",
+    "properties": {
+     "denominator": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Denominator"
+     },
+     "evidence": {
+      "title": "Evidence",
+      "type": "string"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "kind": {
+      "enum": [
+       "hard",
+       "quality"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "ok": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ok"
+     },
+     "unjudged": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unjudged"
+     },
+     "value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Value"
+     }
+    },
+    "required": [
+     "key",
+     "kind",
+     "ok",
+     "evidence"
+    ],
+    "title": "ReleaseCheck",
     "type": "object"
    },
    "ReplacementVerdict": {
@@ -5277,6 +5440,31 @@
      "met"
     ],
     "title": "Target",
+    "type": "object"
+   },
+   "Targets": {
+    "description": "The release pass lines (release.TARGETS, LATENCY_TARGETS_MS), served so the screen never copies them.",
+    "properties": {
+     "latency_ms": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Latency Ms",
+      "type": "object"
+     },
+     "rates": {
+      "additionalProperties": {
+       "type": "number"
+      },
+      "title": "Rates",
+      "type": "object"
+     }
+    },
+    "required": [
+     "rates",
+     "latency_ms"
+    ],
+    "title": "Targets",
     "type": "object"
    },
    "TraceConfig": {

@@ -1,7 +1,0 @@
-graph TD
-  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval/retrieval.py"] -->|"scope rows, scope terms"| corpus-router["Corpus router\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  corpus-router -->|"narrowed scope"| lexical-channel["Kiwi BM25 channel\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  corpus-router -->|"allowed rows"| dense-channel["Dense channel\nsrc/rfp_assistant/retrieval/dense.py"]
-  lexical-channel -->|"top channel_top_k"| fusion-and-rerank["Fusion and rerank\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  dense-channel -->|"nearest rows"| fusion-and-rerank
-  fusion-and-rerank -->|"ranking"| evidence-packer["Evidence packer\nsrc/rfp_assistant/retrieval/retrieval.py"]

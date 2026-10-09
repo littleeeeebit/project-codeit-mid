@@ -1,1 +1,0 @@
-`tracing.run` creates one trace per executed request, seeded by request_id. `tracing.step` spans cover `retrieve-evidence`, `assemble-evidence`, `rewrite-question`, `generate-answer` and `validate-answer`. Scores are `insufficient_evidence`, `evidence_tokens` and `citation_valid`. Tracing is off when any `LANGFUSE_*` variable is missing. Admission and settlement never read it.

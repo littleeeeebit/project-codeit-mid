@@ -41,23 +41,11 @@ def load_check(users: int = 6, requests_per_user: int = 2, delay_seconds: float 
         sys.path.insert(0, str(REPO_ROOT))
     from tests import fixtures  # the same temporary corpus the automated gate uses
 
-    calls = {"n": 0}
     lock = threading.Lock()
-
-    class Transport(FakeTransport):
-        def chat(self, **kw):
-            with lock:
-                calls["n"] += 1
-                n = calls["n"]
-            if fail_every and n % fail_every == 0:
-                time.sleep(delay_seconds)
-                raise ProviderError("APITimeoutError (injected)", pre_execution=False)
-            return super().chat(**kw)
-
     with tempfile.TemporaryDirectory() as tmp:
         env = fixtures.make_env(Path(tmp))
         settings: Settings = env.settings.with_(request_workers=6, request_admission=max(12, users * 2))
-        transport = Transport(delay_seconds=delay_seconds)
+        transport, calls = _counting_transport(delay_seconds, fail_every, lock)
         res = service.Resources(settings, transport=transport, recover=True)
         try:
             ref = env.refs["기관A"]
@@ -70,67 +58,17 @@ def load_check(users: int = 6, requests_per_user: int = 2, delay_seconds: float 
             violations: list[dict] = []
             poll_ms: list[float] = []
             stop = threading.Event()
-
-            def poller():  # what every open browser's budget strip does, read-only
-                while not stop.is_set():
-                    t0 = time.perf_counter()
-                    snap = service.budget_snapshot(res, members[0])
-                    poll_ms.append((time.perf_counter() - t0) * 1000)
-                    if snap.spent_micro_usd + snap.pending_micro_usd > snap.cap_micro_usd:
-                        violations.append({"spent": snap.spent_micro_usd, "pending": snap.pending_micro_usd})
-                    time.sleep(0.05)
-
-            submitted: list[tuple[Principal, str, float]] = []
-            submit_ms: list[float] = []
-            barrier = threading.Barrier(users)
-
-            def member(p: Principal):
-                barrier.wait()
-                for _ in range(requests_per_user):
-                    key = str(uuid.uuid4())
-                    t0 = time.perf_counter()
-                    rid = service.submit_answer(res, p, AnswerRequest(key, key, question, [ref], as_of="2026-09-30"))
-                    service.submit_answer(res, p, AnswerRequest(key, key, question, [ref], as_of="2026-09-30"))
-                    submit_ms.append((time.perf_counter() - t0) * 1000)
-                    with lock:
-                        submitted.append((p, rid, time.perf_counter()))
-
-            poll_thread = threading.Thread(target=poller, daemon=True)
+            poll_thread = threading.Thread(target=_poll_budget, args=(res, members[0], stop, violations, poll_ms),
+                                           daemon=True)
             poll_thread.start()
             started = time.perf_counter()
-            threads = [threading.Thread(target=member, args=(p,)) for p in members]
-            for t in threads:
-                t.start()
-            for t in threads:
-                t.join()
-            views = {}
-            deadline = time.monotonic() + 120
-            while time.monotonic() < deadline:
-                views = {rid: service.request_status(res, p, rid) for p, rid, _ in submitted}
-                if all(v.status not in ("queued", "running") for v in views.values()):
-                    break
-                time.sleep(0.05)
+            submitted, submit_ms = _submit_concurrently(res, members, question, ref, requests_per_user, lock)
+            views = _wait_until_finished(res, submitted)
             wall = time.perf_counter() - started
             stop.set()
             poll_thread.join(2)
-            snap = budget.snapshot(settings.db_path)
-            with store.open_db(settings.db_path) as conn:
-                per_request = conn.execute("SELECT request_id, COUNT(*) FROM attempts WHERE stage = 'generation' "
-                                           "GROUP BY request_id HAVING COUNT(*) > 1").fetchall()
-                states = dict(conn.execute("SELECT state, COUNT(*) FROM attempts GROUP BY state").fetchall())
-            outcomes: dict[str, int] = {}
-            for v in views.values():
-                key = f"{v.status}/{v.result.status if v.result else '-'}"
-                outcomes[key] = outcomes.get(key, 0) + 1
-            unfinished = [rid for rid, v in views.items() if v.status in ("queued", "running")]
-            checks = {
-                "cap_never_exceeded": not violations,
-                "one_generation_attempt_per_request": not per_request,
-                "no_open_reservation_left": snap.pending_micro_usd == snap.unknown_micro_usd,
-                "all_requests_finished": not unfinished,
-                "duplicate_submit_reused_request": len(submitted) == users * requests_per_user
-                and len({rid for _, rid, _ in submitted}) == users * requests_per_user,
-            }
+            snap, states, outcomes, checks = _load_checks(settings, views, submitted, violations,
+                                                          users * requests_per_user)
             return {
                 "kind": "fake_provider_load_check", "synthetic": True, "users": users,
                 "requests_per_user": requests_per_user, "fake_delay_seconds": delay_seconds,
@@ -146,6 +84,98 @@ def load_check(users: int = 6, requests_per_user: int = 2, delay_seconds: float 
             }
         finally:
             res.close()
+
+
+def _counting_transport(delay_seconds: float, fail_every: int, lock: threading.Lock) -> tuple[FakeTransport, dict]:
+    """A delayed fake transport that counts its calls and, with `fail_every`, times out every n-th one after the
+    request may have executed."""
+    calls = {"n": 0}
+
+    class Transport(FakeTransport):
+        def chat(self, **kw):
+            with lock:
+                calls["n"] += 1
+                n = calls["n"]
+            if fail_every and n % fail_every == 0:
+                time.sleep(delay_seconds)
+                raise ProviderError("APITimeoutError (injected)", pre_execution=False)
+            return super().chat(**kw)
+
+    return Transport(delay_seconds=delay_seconds), calls
+
+
+def _poll_budget(res, member: Principal, stop: threading.Event, violations: list[dict], poll_ms: list[float]) -> None:
+    """What every open browser's budget strip does, read-only, until `stop`."""
+    while not stop.is_set():
+        t0 = time.perf_counter()
+        snap = service.budget_snapshot(res, member)
+        poll_ms.append((time.perf_counter() - t0) * 1000)
+        if snap.spent_micro_usd + snap.pending_micro_usd > snap.cap_micro_usd:
+            violations.append({"spent": snap.spent_micro_usd, "pending": snap.pending_micro_usd})
+        time.sleep(0.05)
+
+
+def _submit_concurrently(res, members: list[Principal], question: str, ref, requests_per_user: int,
+                         lock: threading.Lock) -> tuple[list[tuple[Principal, str, float]], list[float]]:
+    """Every member starts together and submits each request twice with the same key; returns what was submitted
+    and how long each double submit took."""
+    submitted: list[tuple[Principal, str, float]] = []
+    submit_ms: list[float] = []
+    barrier = threading.Barrier(len(members))
+
+    def member(p: Principal):
+        barrier.wait()
+        for _ in range(requests_per_user):
+            key = str(uuid.uuid4())
+            t0 = time.perf_counter()
+            rid = service.submit_answer(res, p, AnswerRequest(key, key, question, [ref], as_of="2026-09-30"))
+            service.submit_answer(res, p, AnswerRequest(key, key, question, [ref], as_of="2026-09-30"))
+            submit_ms.append((time.perf_counter() - t0) * 1000)
+            with lock:
+                submitted.append((p, rid, time.perf_counter()))
+
+    threads = [threading.Thread(target=member, args=(p,)) for p in members]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    return submitted, submit_ms
+
+
+def _wait_until_finished(res, submitted: list[tuple[Principal, str, float]]) -> dict:
+    """Each request's view once none is queued or running, or after two minutes."""
+    views = {}
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        views = {rid: service.request_status(res, p, rid) for p, rid, _ in submitted}
+        if all(v.status not in ("queued", "running") for v in views.values()):
+            break
+        time.sleep(0.05)
+    return views
+
+
+def _load_checks(settings: Settings, views: dict, submitted: list[tuple[Principal, str, float]],
+                 violations: list[dict], expected: int) -> tuple:
+    """The ledger snapshot, attempt states and request outcomes after the run, and the load check's checks."""
+    snap = budget.snapshot(settings.db_path)
+    with store.open_db(settings.db_path) as conn:
+        per_request = conn.execute("SELECT request_id, COUNT(*) FROM attempts WHERE stage = 'generation' "
+                                   "GROUP BY request_id HAVING COUNT(*) > 1").fetchall()
+        states = dict(conn.execute("SELECT state, COUNT(*) FROM attempts GROUP BY state").fetchall())
+    outcomes: dict[str, int] = {}
+    for v in views.values():
+        key = f"{v.status}/{v.result.status if v.result else '-'}"
+        outcomes[key] = outcomes.get(key, 0) + 1
+    unfinished = [rid for rid, v in views.items() if v.status in ("queued", "running")]
+    checks = {
+        "cap_never_exceeded": not violations,
+        "one_generation_attempt_per_request": not per_request,
+        "no_open_reservation_left": snap.pending_micro_usd == snap.unknown_micro_usd,
+        "all_requests_finished": not unfinished,
+        "duplicate_submit_reused_request": len(submitted) == expected
+        and len({rid for _, rid, _ in submitted}) == expected,
+    }
+    return snap, states, outcomes, checks
 
 
 def phase3_dir(settings: Settings) -> Path:
@@ -180,7 +210,6 @@ def write_phase3_report(settings: Settings) -> Path:
     snap = budget.snapshot(settings.db_path)
     load_result, browser, smoke = load("load-check.json"), load("browser-results.json"), load("paid-smoke.json")
     host = load("team-host.json")  # written by the owner on the team host (runbook section 3)
-    usd = lambda m: f"${m / 1_000_000:,.6f}"  # noqa: E731
     lines = ["# Phase 3 report", "",
              f"Generated {store.utcnow()} from `{settings.data_dir.name}` state (schema {schema}). Only recorded "
              "results appear below; a missing section means the check has not been run on this host.", "",
@@ -192,16 +221,31 @@ def write_phase3_report(settings: Settings) -> Path:
               f"`{host['tunnel']}`. Members: {', '.join(host['members'])}." if host else
               "- Team host: not recorded (`team-host.json`, runbook section 3)."),
              f"- Executor: {settings.request_workers} workers, {settings.request_admission} admitted unfinished "
-             "requests.", "",
-             "## Budget", "",
+             "requests.", ""]
+    lines += _phase3_budget_lines(snap, envelopes, used, attempts)
+    lines += ["", f"Requests by status: {requests or 'none'}.", ""]
+    lines += _phase3_evidence_lines(load_result, browser, smoke, host)
+    path = out / "report.md"
+    store.write_text_atomic(path, "\n".join(lines))
+    return path
+
+
+def _phase3_budget_lines(snap, envelopes: dict, used: dict, attempts: list[dict]) -> list[str]:
+    usd = lambda m: f"${m / 1_000_000:,.6f}"  # noqa: E731
+    lines = ["## Budget", "",
              f"- Spent {usd(snap.spent_micro_usd)} of {usd(snap.allowance_micro_usd)} ({snap.spent_percent:.2f}%); "
              f"pending {usd(snap.pending_micro_usd)} (unknown {usd(snap.unknown_micro_usd)}); cap "
              f"{usd(snap.cap_micro_usd)}; paid enabled {snap.paid_enabled}; warnings {snap.warnings or 'none'}.",
              "- Remaining envelopes: " + ", ".join(f"{k} {usd(v - used[k])} of {usd(v)}" for k, v in envelopes.items()),
              "", "| purpose | stage | state | attempts | settled | reserved |", "| --- | --- | --- | --- | --- | --- |"]
-    lines += [f"| {a['purpose']} | {a['stage']} | {a['state']} | {a['n']} | {usd(a['settled'])} | {usd(a['reserved'])} |"
-              for a in attempts] or ["| - | - | - | 0 | - | - |"]
-    lines += ["", f"Requests by status: {requests or 'none'}.", "", "## Fake-provider concurrency and recovery", ""]
+    return lines + ([f"| {a['purpose']} | {a['stage']} | {a['state']} | {a['n']} | {usd(a['settled'])} | "
+                     f"{usd(a['reserved'])} |" for a in attempts] or ["| - | - | - | 0 | - | - |"])
+
+
+def _phase3_evidence_lines(load_result: dict | None, browser: dict | None, smoke: dict | None,
+                           host: dict | None) -> list[str]:
+    """The recorded load check, browser run and paid smoke, each or its absence, and the open items."""
+    lines = ["## Fake-provider concurrency and recovery", ""]
     if load_result:
         lines += [f"- Synthetic load check ({load_result['users']} users × {load_result['requests_per_user']}, delay "
                   f"{load_result['fake_delay_seconds']} s, fail every {load_result['fail_every'] or 'never'}): "
@@ -227,6 +271,4 @@ def write_phase3_report(settings: Settings) -> Path:
               *([] if host else ["- The team host and who may reach it are owner decisions (runbook); without login, "
                                  "network reach is the only access control."]),
               "- Measured warm/cold latency on the team host and six real browsers remain to be recorded there.", ""]
-    path = out / "report.md"
-    store.write_text_atomic(path, "\n".join(lines))
-    return path
+    return lines

@@ -1,0 +1,1 @@
+The README says the local reranker failed the fusion gate, so the current serving run does not use this stage.

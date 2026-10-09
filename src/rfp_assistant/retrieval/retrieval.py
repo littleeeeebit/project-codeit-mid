@@ -183,7 +183,18 @@ def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreview
         chunks += c
         inventory += [{**r, "extraction_id": s["active_extraction_id"]} for r in inv]
     tokens = [{"chunk_id": c["chunk_id"], "tokens": analyzer.tokens(c["payload"])} for c in chunks]
+    _write_index_dir(settings, final_dir, version, source_set_hash, sources, config, chunks, tokens, inventory,
+                     scope_terms)
+    _record_index(settings, version, final_dir / "manifest.json", source_set_hash, config, chunks, inventory, activate)
+    return {"index_version": version, "reused": False, "chunks": len(chunks), "requirements": len(inventory),
+            "review_scope": config["review_scope"], "sources": len(sources), "profile": profile,
+            "activated": activate}
 
+
+def _write_index_dir(settings: Settings, final_dir: Path, version: str, source_set_hash: str, sources: list[dict],
+                     config: dict, chunks: list[dict], tokens: list[dict], inventory: list[dict],
+                     scope_terms: dict) -> None:
+    """Writes the index files and their manifest into a temporary directory, then renames it into place."""
     tmp = settings.data_dir / "indexes" / f".tmp-{uuid.uuid4().hex}"
     try:
         write_jsonl_atomic(tmp / "chunks.jsonl", chunks)
@@ -202,7 +213,11 @@ def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreview
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)
         raise
-    manifest_path = final_dir / "manifest.json"
+
+
+def _record_index(settings: Settings, version: str, manifest_path: Path, source_set_hash: str, config: dict,
+                  chunks: list[dict], inventory: list[dict], activate: bool) -> None:
+    """Replaces the index's rows (a ready row, its chunks and requirements) in one transaction."""
     manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
         conn.execute("DELETE FROM chunks WHERE index_version = ?", (version,))
@@ -227,9 +242,6 @@ def build_keyword_index(settings: Settings, analyzer: Analyzer, include_unreview
         )
         if activate:
             set_app_setting(conn, "active_index", version)
-    return {"index_version": version, "reused": False, "chunks": len(chunks), "requirements": len(inventory),
-            "review_scope": config["review_scope"], "sources": len(sources), "profile": profile,
-            "activated": activate}
 
 
 # ---------------------------------------------------------------- loaded index
@@ -527,7 +539,74 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
     below them (below-the-head mode); 0 reranks the whole list."""
     t0 = time.perf_counter()
     trace_id = str(uuid.uuid4())
-    mode = mode or settings.retrieval_mode
+    mode, fallback = _available_mode(index, mode or settings.retrieval_mode, dense, query_vector, reranker)
+
+    limitations = [f"idf:{IDF_POLICY}"]
+    scope, routed = _routed_scope(index, analyzer, question, scope, limitations)
+    by_extraction = {extraction_id: ref for ref, extraction_id in scope}
+    allowed = scope_rows(index, scope)
+
+    codes = list(dict.fromkeys(CODE_RE.findall(nfc(question))))
+    exact = _exact_matches(index, allowed, codes, limitations)
+    t1 = time.perf_counter()
+    k = settings.channel_top_k
+    lexical_channel = "bm25_ws" if mode == "whitespace_bm25" else "bm25"
+    lexical, drop = _lexical_matches(index, analyzer, question, scope, allowed, mode, k, limitations)
+    name_only = _name_only(index, analyzer, question, scope, routed, mode, exact, drop)
+    if name_only:
+        lexical = []
+        allowed = _named_rows(index, analyzer, question, scope, allowed, limitations)
+    t2 = time.perf_counter()
+    dense_ranked: list[tuple[int, float]] = []
+    if mode in ("hybrid", "hybrid_rerank") and not lexical and not exact and not name_only:
+        # Nearest neighbours always exist; without one lexical match they are arbitrary passages, not evidence.
+        limitations.append("no_lexical_match:dense_not_used")
+    elif mode in DENSE_MODES:
+        dense_ranked = dense.search(query_vector, allowed, k, settings)
+    t3 = time.perf_counter()
+
+    candidates, ordered = _candidates(settings, index, mode, lexical_channel, exact, lexical, dense_ranked)
+    t4 = time.perf_counter()
+    rerank_info = None
+    if mode == "hybrid_rerank":
+        ordered, reranked, rerank_info, error = _rerank(index, reranker, question, ordered, lexical,
+                                                         min(rerank_depth or settings.fused_top_k, len(ordered)),
+                                                         rerank_protect)
+        candidates += reranked
+        if error:
+            fallback, mode = error, "hybrid"
+    t5 = time.perf_counter()
+    ranking = list(dict.fromkeys(exact + ordered))  # exact identifier matches stay ahead of every ranker
+    evidence, excluded, used_tokens = _pack_evidence(settings, index, ranking, codes, by_extraction, limitations)
+    timings = _timings((t0, t1, t2, t3, t4, t5, time.perf_counter()), rerank_info, limitations)
+    return RetrievalResult(
+        mode=mode, scope=[ref for ref, _ in scope],
+        exact_matches=[c for c in candidates if c["channel"] == "exact"],
+        candidates=candidates, evidence=evidence, excluded=excluded,
+        limitations=limitations + ["expansion:linked_split_pieces"], evidence_tokens=used_tokens,
+        timings_ms=timings, trace_id=trace_id, index_version=index.version,
+        ranking=[index.chunks[i]["chunk_id"] for i in ranking], fallback=fallback,
+        dense_version=dense.version if mode in DENSE_MODES else None)
+
+
+def _timings(stamps: tuple[float, ...], rerank_info: dict | None, limitations: list[str]) -> dict[str, float]:
+    """Per-stage milliseconds; with a reranker, its queue and inference time and truncation are added (and its
+    truncation and windows noted), so latency gates show where time goes."""
+    t0, t1, t2, t3, t4, t5, t6 = stamps
+    ms = lambda a, b: round((b - a) * 1000, 1)  # noqa: E731
+    timings = {"exact": ms(t0, t1), "lexical": ms(t1, t2), "dense": ms(t2, t3), "fuse": ms(t3, t4),
+               "rerank": ms(t4, t5), "pack": ms(t5, t6), "total": ms(t0, t6)}
+    if rerank_info:
+        limitations += [f"rerank:{k}={v}" for k, v in rerank_info.items() if k in ("truncated", "windows")]
+        for key in ("queue_ms", "infer_ms", "truncated"):
+            if rerank_info.get(key) is not None:
+                timings[f"rerank_{key.removesuffix('_ms')}"] = rerank_info[key]
+    return timings
+
+
+def _available_mode(index: KeywordIndex, mode: str, dense, query_vector, reranker) -> tuple[str, str | None]:
+    """The requested mode, or the one it falls back to when its dense matrix, query vector or reranker is
+    unavailable, with the reason."""
     if mode not in MODES:
         raise RetrievalError(f"unknown retrieval mode {mode!r}")
     fallback = None
@@ -540,23 +619,29 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
             fallback, mode = f"{mode}->kiwi_bm25:{problem}", "kiwi_bm25"
     if mode == "hybrid_rerank" and reranker is None:
         fallback, mode = "hybrid_rerank->hybrid:reranker_unavailable", "hybrid"
+    return mode, fallback
 
-    limitations = [f"idf:{IDF_POLICY}"]
+
+def _routed_scope(index: KeywordIndex, analyzer: Analyzer, question: str, scope: list[tuple[DocRef, str]],
+                  limitations: list[str]) -> tuple[list[tuple[DocRef, str]], list[tuple[DocRef, str]]]:
+    """The scope to search (the corpus routed to the documents a question names) and the routed documents; what
+    the index cannot serve of it is noted."""
     routed: list[tuple[DocRef, str]] = []
     if len(scope) > 2:  # only the all-documents scope is larger than a selection
         routed = route_corpus(index, analyzer, question, scope)
         if routed:
             scope = routed
             limitations.append("corpus_routed:" + ",".join(ref.doc_id for ref, _ in routed))
-    by_extraction = {extraction_id: ref for ref, extraction_id in scope}
-    allowed = scope_rows(index, scope)
     if index.review_scope != "reviewed_only":
         limitations.append("index_includes_unreviewed_sources")
     missing = [ref.doc_id for ref, x in scope if x not in index.rows_by_extraction]
     if missing:
         limitations.append("scope_not_indexed:" + ",".join(missing))
+    return scope, routed
 
-    codes = list(dict.fromkeys(CODE_RE.findall(nfc(question))))
+
+def _exact_matches(index: KeywordIndex, allowed: list[int], codes: list[str], limitations: list[str]) -> list[int]:
+    """Rows whose requirement key is an asked code, detail rows first."""
     exact = []
     for code in codes:
         hits = sorted((i for i in allowed if index.chunks[i]["requirement_key"] == code),
@@ -570,13 +655,17 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
             limitations.append(f"code_detail_unavailable:{code}")
         elif len(details) > 1:
             limitations.append(f"code_ambiguous:{code}")
-    t1 = time.perf_counter()
-    k = settings.channel_top_k
+    return exact
+
+
+def _lexical_matches(index: KeywordIndex, analyzer: Analyzer, question: str, scope: list[tuple[DocRef, str]],
+                     allowed: list[int], mode: str, k: int,
+                     limitations: list[str]) -> tuple[list[tuple[int, float]], set[str]]:
+    """The BM25 channel and the scope-redundant terms it dropped."""
     lexical: list[tuple[int, float]] = []
-    lexical_channel = "bm25_ws" if mode == "whitespace_bm25" else "bm25"
+    drop: set[str] = set()
     if mode != "dense":
         lex_analyzer = WhitespaceAnalyzer() if mode == "whitespace_bm25" else analyzer
-        drop: set[str] = set()
         if mode != "whitespace_bm25":  # K0 stays the plain documented baseline
             # A selected project's restated name says nothing inside its own scope; across the corpus it is what
             # finds the project, so the restatement rule applies to one or two selected documents only.
@@ -587,34 +676,38 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
                 limitations.append("scope_redundant_terms:" + ",".join(sorted(drop)))
         lexical = rank_lexical(index, lex_analyzer, question, allowed, k, whitespace=mode == "whitespace_bm25",
                                drop=drop)
-    # "한영대학교 사업은 어떤 사업이야?": the question names its documents and asks nothing else. The remaining words
-    # ("알려줘", "하는 거") would only match arbitrary passages, so the named documents are ranked by meaning instead.
-    name_only = False
-    if mode in ("hybrid", "hybrid_rerank") and not exact and len(scope) <= ROUTE_MAX:
-        names = {t for ref, _ in scope for t in index.scope_terms.get(ref.doc_id, [])}
-        named = bool(routed) or len(set(analyzer.tokens(question)) & names) >= METADATA_RESTATEMENT_MIN
-        title_df: dict[str, int] = {}
-        for terms in index.scope_terms.values():
-            for t in set(terms):
-                title_df[t] = title_df.get(t, 0) + 1
-        project_words = {t for t, n in title_df.items() if n > ROUTE_MAX}  # "사업", "구축", "시스템": name a project
-        name_only = named and not (analyzer.content_terms(question) - names - drop - project_words)
-    if name_only:
-        lexical = []
-        limitations.append("name_only_question:dense_within_named_documents")
-        qset = set(analyzer.tokens(question))
-        named_rows = scope_rows(index, [(ref, x) for ref, x in scope if len(qset & set(
-            index.scope_terms.get(ref.doc_id, []))) >= METADATA_RESTATEMENT_MIN])
-        allowed = named_rows or allowed  # a routed scope is already named; a selection keeps the named one
-    t2 = time.perf_counter()
-    dense_ranked: list[tuple[int, float]] = []
-    if mode in ("hybrid", "hybrid_rerank") and not lexical and not exact and not name_only:
-        # Nearest neighbours always exist; without one lexical match they are arbitrary passages, not evidence.
-        limitations.append("no_lexical_match:dense_not_used")
-    elif mode in DENSE_MODES:
-        dense_ranked = dense.search(query_vector, allowed, k, settings)
-    t3 = time.perf_counter()
+    return lexical, drop
 
+
+def _name_only(index: KeywordIndex, analyzer: Analyzer, question: str, scope: list[tuple[DocRef, str]],
+               routed: list[tuple[DocRef, str]], mode: str, exact: list[int], drop: set[str]) -> bool:
+    """"한영대학교 사업은 어떤 사업이야?": the question names its documents and asks nothing else. The remaining words
+    ("알려줘", "하는 거") would only match arbitrary passages, so the named documents are ranked by meaning instead."""
+    if not (mode in ("hybrid", "hybrid_rerank") and not exact and len(scope) <= ROUTE_MAX):
+        return False
+    names = {t for ref, _ in scope for t in index.scope_terms.get(ref.doc_id, [])}
+    named = bool(routed) or len(set(analyzer.tokens(question)) & names) >= METADATA_RESTATEMENT_MIN
+    title_df: dict[str, int] = {}
+    for terms in index.scope_terms.values():
+        for t in set(terms):
+            title_df[t] = title_df.get(t, 0) + 1
+    project_words = {t for t, n in title_df.items() if n > ROUTE_MAX}  # "사업", "구축", "시스템": name a project
+    return named and not (analyzer.content_terms(question) - names - drop - project_words)
+
+
+def _named_rows(index: KeywordIndex, analyzer: Analyzer, question: str, scope: list[tuple[DocRef, str]],
+                allowed: list[int], limitations: list[str]) -> list[int]:
+    """For a name-only question, the rows of the documents it names."""
+    limitations.append("name_only_question:dense_within_named_documents")
+    qset = set(analyzer.tokens(question))
+    named_rows = scope_rows(index, [(ref, x) for ref, x in scope if len(qset & set(
+        index.scope_terms.get(ref.doc_id, []))) >= METADATA_RESTATEMENT_MIN])
+    return named_rows or allowed  # a routed scope is already named; a selection keeps the named one
+
+
+def _candidates(settings: Settings, index: KeywordIndex, mode: str, lexical_channel: str, exact: list[int],
+                lexical: list[tuple[int, float]], dense_ranked: list[tuple[int, float]]) -> tuple[list[dict], list[int]]:
+    """Every channel's ranked candidates, and the order the mode serves before reranking."""
     cid = lambda i: index.chunks[i]["chunk_id"]  # noqa: E731
     candidates = [{"chunk_id": cid(i), "channel": "exact", "rank": r + 1, "score": None} for r, i in enumerate(exact)]
     candidates += [{"chunk_id": cid(i), "channel": lexical_channel, "rank": r + 1, "score": round(s, 4)}
@@ -628,29 +721,34 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
         ordered = [index.row_of[c] for c, _ in fused]
     else:
         ordered = [i for i, _ in (dense_ranked if mode == "dense" else lexical)]
-    t4 = time.perf_counter()
-    rerank_info = None
-    if mode == "hybrid_rerank":
-        depth = min(rerank_depth or settings.fused_top_k, len(ordered))
-        lexical_rows = {i for i, _ in lexical}
-        protect = 0  # the BM25 head as fused: leading rows that came from the keyword channel
-        while protect < min(rerank_protect, depth) and ordered[protect] in lexical_rows:
-            protect += 1
-        head, pool = ordered[:protect], ordered[protect:depth]
-        try:
-            scored, rerank_info = reranker.rerank(question, [index.chunks[i] for i in pool])
-        except Exception as exc:  # noqa: BLE001 - an inference failure serves the H order, visibly
-            scored, rerank_info = None, None
-            fallback, mode = f"hybrid_rerank->hybrid:reranker_error:{type(exc).__name__}: {exc}"[:300], "hybrid"
-        if scored is not None:
-            admitted = set(pool)
-            reranked = [pool[p] for p, _ in scored if 0 <= p < len(pool) and pool[p] in admitted]
-            candidates += [{"chunk_id": cid(pool[p]), "channel": "rerank", "rank": r + 1, "score": round(s, 6)}
-                           for r, (p, s) in enumerate(scored) if 0 <= p < len(pool)]
-            ordered = list(dict.fromkeys(head + reranked + ordered[depth:]))
-    t5 = time.perf_counter()
-    ranking = list(dict.fromkeys(exact + ordered))  # exact identifier matches stay ahead of every ranker
+    return candidates, ordered
 
+
+def _rerank(index: KeywordIndex, reranker, question: str, ordered: list[int], lexical: list[tuple[int, float]],
+            depth: int, rerank_protect: int) -> tuple[list[int], list[dict], dict | None, str | None]:
+    """The fused order with the rows below the protected BM25 head reranked down to `depth`, the rerank candidates,
+    the reranker's info, and the fallback when inference failed (the H order is then served, visibly)."""
+    lexical_rows = {i for i, _ in lexical}
+    protect = 0  # the BM25 head as fused: leading rows that came from the keyword channel
+    while protect < min(rerank_protect, depth) and ordered[protect] in lexical_rows:
+        protect += 1
+    head, pool = ordered[:protect], ordered[protect:depth]
+    try:
+        scored, rerank_info = reranker.rerank(question, [index.chunks[i] for i in pool])
+    except Exception as exc:  # noqa: BLE001 - an inference failure serves the H order, visibly
+        return ordered, [], None, f"hybrid_rerank->hybrid:reranker_error:{type(exc).__name__}: {exc}"[:300]
+    if scored is None:
+        return ordered, [], rerank_info, None
+    admitted = set(pool)
+    reranked = [pool[p] for p, _ in scored if 0 <= p < len(pool) and pool[p] in admitted]
+    candidates = [{"chunk_id": index.chunks[pool[p]]["chunk_id"], "channel": "rerank", "rank": r + 1,
+                   "score": round(s, 6)} for r, (p, s) in enumerate(scored) if 0 <= p < len(pool)]
+    return list(dict.fromkeys(head + reranked + ordered[depth:])), candidates, rerank_info, None
+
+
+def _pack_evidence(settings: Settings, index: KeywordIndex, ranking: list[int], codes: list[str],
+                   by_extraction: dict[str, DocRef], limitations: list[str]) -> tuple[list[EvidenceUnit], list[dict], int]:
+    """Evidence units in ranking order within the budgets, with linked split pieces; exclusions; tokens used."""
     evidence: list[EvidenceUnit] = []
     excluded = []
     used_tokens = 0
@@ -707,24 +805,7 @@ def retrieve(settings: Settings, index: KeywordIndex, analyzer: Analyzer, questi
                 limitations.append(f"linked_evidence_missing:{chunk['chunk_id']}:{reason}")
                 break
             added += 1
-    t6 = time.perf_counter()
-    ms = lambda a, b: round((b - a) * 1000, 1)  # noqa: E731
-    timings = {"exact": ms(t0, t1), "lexical": ms(t1, t2), "dense": ms(t2, t3), "fuse": ms(t3, t4),
-               "rerank": ms(t4, t5), "pack": ms(t5, t6), "total": ms(t0, t6)}
-    if rerank_info:
-        limitations += [f"rerank:{k}={v}" for k, v in rerank_info.items() if k in ("truncated", "windows")]
-        # queue time (waiting for the bounded model) and inference time, so latency gates show where time goes
-        for key in ("queue_ms", "infer_ms", "truncated"):
-            if rerank_info.get(key) is not None:
-                timings[f"rerank_{key.removesuffix('_ms')}"] = rerank_info[key]
-    return RetrievalResult(
-        mode=mode, scope=[ref for ref, _ in scope],
-        exact_matches=[c for c in candidates if c["channel"] == "exact"],
-        candidates=candidates, evidence=evidence, excluded=excluded,
-        limitations=limitations + ["expansion:linked_split_pieces"], evidence_tokens=used_tokens,
-        timings_ms=timings, trace_id=trace_id, index_version=index.version,
-        ranking=[cid(i) for i in ranking], fallback=fallback,
-        dense_version=dense.version if mode in DENSE_MODES else None)
+    return evidence, excluded, used_tokens
 
 
 def best_chunk_per_extraction(index: KeywordIndex, analyzer: Analyzer, query: str) -> dict[str, tuple[float, str]]:

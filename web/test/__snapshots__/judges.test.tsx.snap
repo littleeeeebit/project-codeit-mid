@@ -1,0 +1,812 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the disagreement review > opens on false accepts, filters, searches and pages 1`] = `
+article
+  header
+    p
+      "인용 하나"
+      " · 기준 판정 "
+      span "근거 없음"
+    p "하자보수는 24개월이다"
+  ul
+    li
+      p "Luna"
+      p
+        span "근거 없음"
+    li
+      p "Jev · 영어 다리"
+      p
+        span "지지"
+        span "≠ 기준"
+        span
+          "지지 확률 "
+          "0.71"
+      p lang="en" "The passage states it."
+  div
+    p "원문과 Jev가 읽은 영어"
+    dl
+      div
+        dt "주장"
+        dd
+          div
+            p "하자보수는 24개월이다"
+        dd
+          div lang="en"
+            p "Warranty is 24 months"
+      details
+        summary
+          span aria-hidden="true" "›"
+          "근거 인용"
+          " "
+          "2"
+          "개"
+        div
+          span
+          div
+            p "원문 A"
+            p "원문 B"
+          div lang="en"
+            p "Source A"
+            p "Source B"
+`;
+
+exports[`the disagreement review > opens on false accepts, filters, searches and pages 2`] = `
+article
+  header
+    p
+      "필수 사실"
+      " · 기준 판정 "
+      span "정확"
+    p "사업 금액은?"
+    p
+      "필수 사실 · "
+      "1억 3천만원"
+    p
+      span "금액을 바꿈"
+      " · "
+      span "1억 3천만원"
+      " → "
+      "1억 원"
+  ul
+    li
+      p "Luna"
+      p
+        span "값 틀림"
+        span "≠ 기준"
+      p "코드가 값으로 판정"
+    li
+      p "Jev · 영어 다리"
+      p
+        span "보류"
+        span "≠ 기준"
+      p "영어로 옮기지 못해 보내지 않음"
+  div
+    p "원문과 Jev가 읽은 영어"
+    p
+      "영어 다리 없음 · "
+      "protected value changed"
+      ". 번역이 보호한 값을 바꾸거나 한글을 남겨 Jev에 보내지 않았습니다."
+    dl
+      div
+        dt "질문"
+        dd
+          div
+            p "사업 금액은?"
+      div
+        dt "필수 사실"
+        dd
+          div
+            p "1억 3천만원"
+      div
+        dt "조건"
+        dd
+          div
+            p "부가세 포함"
+`;
+
+exports[`the judge golden set > false accepts per mutation type, overall without unmutated 1`] = `
+div
+  div
+    div
+      div role="group" aria-label="판정 세트"
+        button type="button" aria-pressed="false" "평가용 기준 · 120개"
+        button type="button" aria-pressed="true" "판정 골든 세트 · 오답 70 · 정답 20"
+      section aria-labelledby="judge-set-answer"
+        div
+          p "정답을 일부러 틀리게 바꾸면 판정 모델이 알아채나"
+          h3 id="judge-set-answer" "변형 종류별 잘못 통과율"
+          dl
+            div
+              dt
+                "Luna"
+                " · 틀린 답을 통과시킨 비율"
+              dd "3.6%"
+              dd
+                "판정한 오답 "
+                "55"
+                "개 중 "
+                "2"
+                "개 · 정답 통과 "
+                "95.0%"
+            div
+              dt
+                "Jev · 영어 다리"
+                " · 틀린 답을 통과시킨 비율"
+              dd "13.0%"
+              dd
+                "판정한 오답 "
+                "54"
+                "개 중 "
+                "7"
+                "개 · 정답 통과 "
+                "90.0%"
+        div
+          table
+            caption "변형 종류별로 두 판정 모델이 틀린 답을 통과시킨 비율"
+            thead
+              tr
+                th scope="col" "변형"
+                th scope="col" "항목"
+                th scope="col" "Luna 통과율"
+                th scope="col" "Jev 통과율"
+            tbody
+              tr
+                th scope="row" "금액을 바꿈"
+                td "30"
+                td
+                  span "6.7%"
+                  span
+                    "2"
+                    "/"
+                    "30"
+                    span
+                      " · "
+                      "1.0%"
+                      "–"
+                      "20.0%"
+                td
+                  span "20.0%"
+                  span
+                    "6"
+                    "/"
+                    "30"
+                    span
+                      " · "
+                      "1.0%"
+                      "–"
+                      "20.0%"
+              tr
+                th scope="row" "날짜·기간을 옮김"
+                td "25"
+                td
+                  span "0.0%"
+                  span
+                    "0"
+                    "/"
+                    "25"
+                    span
+                      " · "
+                      "1.0%"
+                      "–"
+                      "20.0%"
+                td
+                  span "4.2%"
+                  span
+                    "1"
+                    "/"
+                    "24"
+                    span
+                      " · "
+                      "1.0%"
+                      "–"
+                      "20.0%"
+              tr
+                th scope="row" "변형 안 한 정답"
+                td "20"
+                td
+                  span "95.0%"
+                  span
+                    "19"
+                    "/"
+                    "20"
+                    span
+                      " · "
+                      "1.0%"
+                      "–"
+                      "20.0%"
+                td
+                  span "90.0%"
+                  span
+                    "18"
+                    "/"
+                    "20"
+                    span
+                      " · "
+                      "1.0%"
+                      "–"
+                      "20.0%"
+        p
+          "오답 행은 판정 모델 스스로 통과로 판정한 비율(낮을수록 좋음)이고, 마지막 행은 변형 안 한 정답을 통과시킨 비율(높을수록 좋음)입니다. 보류는 분모에서 뺍니다. 코드가 값으로 판정할 수 있는 항목("
+          "3"
+          "건)도 판정 모델 자신의 답으로 셉니다. Jev는 영어 다리를 거친 판정입니다. 세트 "
+          "feedface"
+          "."
+    section aria-labelledby="judge-review"
+      h3 id="judge-review"
+        "판정이 엇갈린 "
+        "15"
+        "건"
+      div
+        div role="group" aria-label="엇갈림 종류"
+          button type="button" aria-pressed="true"
+            "틀린 답을 통과시킴"
+            " "
+            span "1"
+          button type="button" aria-pressed="false"
+            "Luna가 기준과 다름"
+            " "
+            span "14"
+          button type="button" aria-pressed="false"
+            "Jev가 기준과 다름"
+            " "
+            span "2"
+          button type="button" aria-pressed="false"
+            "Jev 보류"
+            " "
+            span "1"
+          button type="button" aria-pressed="false"
+            "전체"
+            " "
+            span "15"
+        div
+          select aria-label="항목 종류"
+            option value="all" "모든 종류"
+            option value="link" "인용 하나"
+            option value="answer_claim" "답변 주장"
+            option value="claim" "필수 사실"
+          input aria-label="문장에서 찾기" placeholder="문장에서 찾기" value
+      div
+        nav aria-label="엇갈린 항목 목록"
+          ul
+            li
+              button type="button" aria-current="true"
+                span "하자보수는 24개월이다"
+                span
+                  "기준 "
+                  span "근거 없음"
+                  span
+                    " · "
+                    "Jev"
+                    " "
+                    span "지지"
+        div id="judge-item"
+          article
+            header
+              p
+                "인용 하나"
+                " · 기준 판정 "
+                span "근거 없음"
+              p "하자보수는 24개월이다"
+            ul
+              li
+                p "Luna"
+                p
+                  span "근거 없음"
+              li
+                p "Jev · 영어 다리"
+                p
+                  span "지지"
+                  span "≠ 기준"
+                  span
+                    "지지 확률 "
+                    "0.71"
+                p lang="en" "The passage states it."
+            div
+              p "원문과 Jev가 읽은 영어"
+              dl
+                div
+                  dt "주장"
+                  dd
+                    div
+                      p "하자보수는 24개월이다"
+                  dd
+                    div lang="en"
+                      p "Warranty is 24 months"
+                details
+                  summary
+                    span aria-hidden="true" "›"
+                    "근거 인용"
+                    " "
+                    "2"
+                    "개"
+                  div
+                    span
+                    div
+                      p "원문 A"
+                      p "원문 B"
+                    div lang="en"
+                      p "Source A"
+                      p "Source B"
+    details
+      summary
+        span aria-hidden="true" "›"
+        span "실행 관리"
+        span "평가 완료 · 골든 세트 완료"
+      div
+        p
+          "기준 "
+          "A-ref"
+          " · "
+          "240"
+          "개 · 보정 "
+          "120"
+          " / 평가 "
+          "120"
+          " · 원문 대조 표본 "
+          "30"
+        ul
+          li
+            div
+              span "평가"
+              span
+                span aria-hidden="true"
+                "완료"
+              span "J-held_out-0123456789ab"
+              span
+                "2026-10-05 08:00"
+                " · 번역 묶음 "
+                "4"
+                "개"
+            p "Luna 120/120 · Jev · 영어 다리 120/120 · Jev · 한국어 원문 30/30"
+          li
+            div
+              span "골든 세트"
+              span
+                span aria-hidden="true"
+                "완료"
+              span "J-judge_set-0123456789ab"
+              span
+                "2026-10-05 08:00"
+                " · 번역 묶음 "
+                "4"
+                "개"
+            p "Luna 120/120 · Jev · 영어 다리 120/120 · Jev · 한국어 원문 30/30"
+        div
+          div
+            div
+              label for="judge-part" "실행할 부분"
+              select id="judge-part"
+                option value="calibration" "1. 보정 — Jev 임계값 맞춤"
+                option value="held_out" disabled
+                  "2. 평가 — 화면에 보고"
+                  " (보정 먼저)"
+                option value="judge_set" disabled
+                  "3. 판정 골든 세트 — 변형 오답"
+                  " (보정 먼저)"
+            button data-variant="outline"
+              "비용 추정 "
+              span "무료"
+          p "추정은 호출 없이 남은 번역·판정 호출의 최대 비용만 계산합니다. 이미 끝난 항목은 다시 부르지 않습니다."
+`;
+
+exports[`the verdict > replaceable: three conditions met, the arms side by side, the review 1`] = `
+div
+  div
+    div
+      div role="group" aria-label="판정 세트"
+        button type="button" aria-pressed="true" "평가용 기준 · 120개"
+        button type="button" aria-pressed="false" "판정 골든 세트 · 오답 70 · 정답 20"
+      section aria-labelledby="judge-answer"
+        div
+          p "Jev로 Luna 판정을 바꿀 수 있나"
+          h3 id="judge-answer" "교체 가능"
+          p
+            "미리 정한 세 조건을 모두 충족했습니다."
+            " 판정 속도는 Luna의 4배입니다."
+        dl
+          div
+            dt "기준과의 일치도 (카파)"
+            dd
+              span "0.790"
+              span "✓ 충족"
+            dd
+              "0.762 이상이어야"
+              " · Luna "
+              "0.812"
+          div
+            dt "틀린 답을 통과시킨 수"
+            dd
+              span "1건"
+              span "✓ 충족"
+            dd
+              "2건 이하여야"
+              " · Luna "
+              "2건"
+          div
+            dt "판정한 비율"
+            dd
+              span "95.0%"
+              span "✓ 충족"
+            dd
+              "90.0% 이상이어야"
+              " · Luna "
+              "95.0%"
+        details
+          summary
+            span aria-hidden="true" "›"
+            "이 답을 얼마나 믿을 수 있나 · 불통과 기준이 18건뿐"
+          div
+            div
+              p
+                "기준 세트에서 불통과로 검토된 항목이 "
+                "18"
+                "건뿐이라 카파와 잘못 통과는 한두 건에도 크게 움직입니다. 이 결과는 “이 기준에서 Luna보다 나쁘지 않다”는 뜻이지, 검토자를 대신할 만큼 믿을 만하다는 뜻은 아닙니다."
+              p
+                "규칙 "
+                "r1"
+                "은 평가 실행 전에 코드와 docs/rag/judges.md에 정해 두었습니다. 세 조건을 모두 넘어야 교체 가능이고, 어느 쪽이든 판정한 항목이 "
+                "100"
+                "개 미만이면 판단 보류입니다."
+              p
+                "기준: "
+                "A-ref"
+                "의 독립 검토 "
+                "240"
+                "개 중 평가용 "
+                "120"
+                "개. 보정용 "
+                "120"
+                "개는 Jev 임계값을 맞추는 데만 썼습니다."
+    section aria-labelledby="judge-arms"
+      h3 id="judge-arms" "세 판정 모델"
+      div
+        span
+        span "기준과 일치"
+        span "틀린 답 통과"
+        span "한 건 판정 시간"
+        span "비용"
+      ul
+        li
+          div
+            p "Luna"
+            p "gpt-6-luna, 한국어를 그대로 읽음"
+          dl
+            dt "기준과 일치"
+            dd
+              "92.1%"
+              div role="img" aria-label="95% 구간 85.7%–95.8%"
+                span
+                span
+          dl
+            dt "틀린 답 통과"
+            dd
+              "2"
+              span
+                " / "
+                "18"
+                "건"
+          dl
+            dt "한 건 판정 시간"
+            dd "2.40초"
+          dl
+            dt "비용"
+            dd "$0.412"
+        li
+          div
+            p "Jev · 영어 다리"
+            p "검사한 영어 번역만 읽음"
+          dl
+            dt "기준과 일치"
+            dd
+              "92.1%"
+              div role="img" aria-label="95% 구간 85.7%–95.8%"
+                span
+                span
+          dl
+            dt "틀린 답 통과"
+            dd
+              "1"
+              span
+                " / "
+                "18"
+                "건"
+          dl
+            dt "한 건 판정 시간"
+            dd "0.60초"
+          dl
+            dt "비용"
+            dd "가격 미제공"
+        li
+          div
+            p "Jev · 한국어 원문"
+            p
+              "대조군 · 고정 표본"
+              " 30개"
+          dl
+            dt "기준과 일치"
+            dd
+              "92.1%"
+              div role="img" aria-label="95% 구간 85.7%–95.8%"
+                span
+                span
+          dl
+            dt "틀린 답 통과"
+            dd
+              "2"
+              span
+                " / "
+                "18"
+                "건"
+          dl
+            dt "한 건 판정 시간"
+            dd "2.40초"
+          dl
+            dt "비용"
+            dd "$0.412"
+      details
+        summary
+          span aria-hidden="true" "›"
+          "모든 지표 · 혼동 행렬"
+        div
+          div
+            div
+              table
+                caption "세 판정 모델의 평가용 지표 전체"
+                thead
+                  tr
+                    th scope="col" "지표"
+                    th scope="col" "Luna"
+                    th scope="col" "Jev · 영어 다리"
+                    th scope="col" "Jev · 한국어 원문"
+                tbody
+                  tr
+                    th scope="row" "판정 비율"
+                    td "95.0% (114/120)"
+                    td "95.0% (114/120)"
+                    td "83.3% (25/30)"
+                  tr
+                    th scope="row" "기준과 일치 · Wilson 95%"
+                    td "92.1% (105/114) · 85.7%–95.8%"
+                    td "92.1% (105/114) · 85.7%–95.8%"
+                    td "92.1% (105/114) · 85.7%–95.8%"
+                  tr
+                    th scope="row" "카파 (통과·불통과)"
+                    td "0.812"
+                    td "0.790"
+                    td "0.400"
+                  tr
+                    th scope="row" "틀린 답 통과 / 기준상 불통과"
+                    td "2 / 18"
+                    td "1 / 18"
+                    td "2 / 18"
+                  tr
+                    th scope="row" "코드가 값으로 판정"
+                    td "7건"
+                    td "7건"
+                    td "7건"
+                  tr
+                    th scope="row" "비용"
+                    td "$0.412 · 120회"
+                    td "가격 미제공 · 120회 · 번역 $0.0210"
+                    td "$0.412 · 120회"
+                  tr
+                    th scope="row" "지연 p50 / p95"
+                    td "2.40초 / 5.10초"
+                    td "0.60초 / 0.90초"
+                    td "2.40초 / 5.10초"
+            p
+              "카파는 통과(지지·근거 있음·정확)와 불통과로 나눠 셉니다. 보류(불확실 구간, 호출 실패, 번역 불가)는 오답이 아니라 미판정입니다. 지연은 한 번에 한 호출씩 잰 값입니다. 임계값 "
+              "abcdef01"
+              "."
+            div
+              div
+                p "Luna"
+                div
+                  table
+                    caption "Luna 인용 하나 혼동 행렬"
+                    thead
+                      tr
+                        th scope="col" "인용 하나 · 기준＼판정"
+                        th scope="col" "지지"
+                        th scope="col" "근거 없음"
+                    tbody
+                      tr
+                        th scope="row" "지지"
+                        td "50"
+                        td "2"
+                      tr
+                        th scope="row" "근거 없음"
+                        td "0"
+                        td "9"
+              div
+                p "Jev · 영어 다리"
+                div
+                  table
+                    caption "Jev · 영어 다리 인용 하나 혼동 행렬"
+                    thead
+                      tr
+                        th scope="col" "인용 하나 · 기준＼판정"
+                        th scope="col" "지지"
+                        th scope="col" "근거 없음"
+                    tbody
+                      tr
+                        th scope="row" "지지"
+                        td "50"
+                        td "2"
+                      tr
+                        th scope="row" "근거 없음"
+                        td "0"
+                        td "9"
+              div
+                p "Jev · 한국어 원문"
+                div
+                  table
+                    caption "Jev · 한국어 원문 인용 하나 혼동 행렬"
+                    thead
+                      tr
+                        th scope="col" "인용 하나 · 기준＼판정"
+                        th scope="col" "지지"
+                        th scope="col" "근거 없음"
+                    tbody
+                      tr
+                        th scope="row" "지지"
+                        td "50"
+                        td "2"
+                      tr
+                        th scope="row" "근거 없음"
+                        td "0"
+                        td "9"
+    section aria-labelledby="judge-review"
+      h3 id="judge-review"
+        "판정이 엇갈린 "
+        "15"
+        "건"
+      div
+        div role="group" aria-label="엇갈림 종류"
+          button type="button" aria-pressed="true"
+            "틀린 답을 통과시킴"
+            " "
+            span "1"
+          button type="button" aria-pressed="false"
+            "Luna가 기준과 다름"
+            " "
+            span "14"
+          button type="button" aria-pressed="false"
+            "Jev가 기준과 다름"
+            " "
+            span "2"
+          button type="button" aria-pressed="false"
+            "Jev 보류"
+            " "
+            span "1"
+          button type="button" aria-pressed="false"
+            "전체"
+            " "
+            span "15"
+        div
+          select aria-label="항목 종류"
+            option value="all" "모든 종류"
+            option value="link" "인용 하나"
+            option value="answer_claim" "답변 주장"
+            option value="claim" "필수 사실"
+          input aria-label="문장에서 찾기" placeholder="문장에서 찾기" value
+      div
+        nav aria-label="엇갈린 항목 목록"
+          ul
+            li
+              button type="button" aria-current="true"
+                span "하자보수는 24개월이다"
+                span
+                  "기준 "
+                  span "근거 없음"
+                  span
+                    " · "
+                    "Jev"
+                    " "
+                    span "지지"
+        div id="judge-item"
+          article
+            header
+              p
+                "인용 하나"
+                " · 기준 판정 "
+                span "근거 없음"
+              p "하자보수는 24개월이다"
+            ul
+              li
+                p "Luna"
+                p
+                  span "근거 없음"
+              li
+                p "Jev · 영어 다리"
+                p
+                  span "지지"
+                  span "≠ 기준"
+                  span
+                    "지지 확률 "
+                    "0.71"
+                p lang="en" "The passage states it."
+            div
+              p "원문과 Jev가 읽은 영어"
+              dl
+                div
+                  dt "주장"
+                  dd
+                    div
+                      p "하자보수는 24개월이다"
+                  dd
+                    div lang="en"
+                      p "Warranty is 24 months"
+                details
+                  summary
+                    span aria-hidden="true" "›"
+                    "근거 인용"
+                    " "
+                    "2"
+                    "개"
+                  div
+                    span
+                    div
+                      p "원문 A"
+                      p "원문 B"
+                    div lang="en"
+                      p "Source A"
+                      p "Source B"
+    details
+      summary
+        span aria-hidden="true" "›"
+        span "실행 관리"
+        span "평가 완료 · 보정 완료"
+      div
+        p
+          "기준 "
+          "A-ref"
+          " · "
+          "240"
+          "개 · 보정 "
+          "120"
+          " / 평가 "
+          "120"
+          " · 원문 대조 표본 "
+          "30"
+        ul
+          li
+            div
+              span "평가"
+              span
+                span aria-hidden="true"
+                "완료"
+              span "J-held_out-0123456789ab"
+              span
+                "2026-10-05 08:00"
+                " · 번역 묶음 "
+                "4"
+                "개"
+            p "Luna 120/120 · Jev · 영어 다리 120/120 · Jev · 한국어 원문 30/30"
+          li
+            div
+              span "보정"
+              span
+                span aria-hidden="true"
+                "완료"
+              span "임계값 맞춤 완료"
+              span "J-calibration-0123456789ab"
+              span
+                "2026-10-04 08:00"
+                " · 번역 묶음 "
+                "4"
+                "개"
+            p "Luna 120/120 · Jev · 영어 다리 120/120 · Jev · 한국어 원문 30/30"
+        div
+          div
+            div
+              label for="judge-part" "실행할 부분"
+              select id="judge-part"
+                option value="calibration" "1. 보정 — Jev 임계값 맞춤"
+                option value="held_out" "2. 평가 — 화면에 보고"
+                option value="judge_set" "3. 판정 골든 세트 — 변형 오답"
+            button data-variant="outline"
+              "비용 추정 "
+              span "무료"
+          p "추정은 호출 없이 남은 번역·판정 호출의 최대 비용만 계산합니다. 이미 끝난 항목은 다시 부르지 않습니다."
+`;

@@ -1,0 +1,9 @@
+created: 2026-10-08T21:41:57.456Z
+updated: 2026-10-08T21:41:57.711Z
+update_count: 3
+last_field: constraint
+kind: nested-class
+title: vectors
+children: []
+parentPath:
+  - persistence

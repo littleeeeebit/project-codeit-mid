@@ -1,7 +1,9 @@
 graph TD
-  source-originals["Original HWP and PDF\n원본 데이터/files"] -->|"hash, parse, OCR"| extractions["Extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
-  extractions -->|"chunk by profile"| keyword-build["Keyword index build\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  keyword-build -->|"chunk payloads"| dense-build["Dense vector build\nsrc/rfp_assistant/retrieval/dense.py"]
-  dense-build -->|"index and matrix versions"| frozen-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  frozen-runs -->|"person activates"| serving-config["Active serving config\nsrc/rfp_assistant/service/service.py"]
-  serving-config -->|"evidence units"| cited-evidence["Cited evidence\nsrc/rfp_assistant/service/service.py"]
+originals["Originals and notice metadata\nsrc/rfp_assistant/corpus/ingestion.py"] -->|Verified bytes and parser inputs| extraction["Preserved extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
+extraction -->|Eligible source elements| keyword["Hashed keyword artifacts\nsrc/rfp_assistant/retrieval/retrieval.py"]
+keyword -->|Chunk payloads and ordering| vectors["Homogeneous embedding sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
+keyword -->|Pinned index and evidence spans| measurements["Frozen retrieval measurements\nsrc/rfp_assistant/evaluation/evaluation.py"]
+vectors -->|Verified dense candidates| measurements
+measurements -->|Explicit validated selection| activation["Active configuration and history\nsrc/rfp_assistant/evaluation/evaluation.py"]
+activation -->|Selected artifacts and limits| requests["Persisted answers and citations\nsrc/rfp_assistant/service/service.py"]
+preview["HWP/HWPX preview loader, unwired\nsrc/rfp_assistant/storage/hwp_loader.py"]

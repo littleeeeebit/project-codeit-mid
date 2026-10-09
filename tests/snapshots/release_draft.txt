@@ -1,0 +1,387 @@
+----- report.md -----
+# Release report draft-<date>
+
+Generated <time> from `data/` state. Every figure is read from recorded evidence; anything not run is listed as missing. This command never generates an answer.
+
+## Decision: **limited**
+
+- hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)
+- hard check not verified: no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases (no answer evaluation)
+- hard check not verified: no selected-scope leakage (no answer evaluation)
+- hard check not verified: managed evidence links resolve (no cited links)
+- quality target not measured: single-evidence hit@20 >= 0.90 (None)
+- quality target not measured: multi-evidence complete coverage@20 >= 0.80 (None)
+- quality target not measured: required-claim correctness >= 0.90 (n/a)
+- quality target not measured: citation precision >= 0.95 (unjudged links count as unsupported) (n/a)
+- quality target not measured: negative/ambiguous handling >= 0.90 (n/a)
+- quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)
+- evidence is no answer evaluation, not a sealed evaluation of reviewed gold
+
+## Release manifest
+
+- code: Git `rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr` (uncommitted changes: False), package source `cccccccccccccccc`; metric code `mmmmmmmmmmmmmmmm`
+- model gpt-5-mini, reasoning low, output cap 4000, prompt grounded-answer-13, rates None, settings `<id1>`
+- serving: keyword default (kiwi_bm25), no activated run, keyword index `<id2>`, dense `None`, reranker None; fallback kiwi_bm25
+- dependencies: requirements-lock.txt `<id3>`; hardware {'machine': 'fixture'}
+- freeze: none (draft release)
+
+## Coverage
+
+- associations 4 (1 HWP, 3 PDF), unique sources 3; audit differences {'associations': (4, 100), 'hwp': (1, 96), 'pdf': (3, 4)}
+- parse {'parsed': 3, 'quarantined': 1}; review {'sample_checked': 3, 'needs_recovery': 1}; human-checked sources 2 (automatic verdicts are not counted as review)
+- quarantined: ['기관E_재난 관리 시스템.hwp']
+- byte-identical associations with conflicting metadata: 2
+
+## Datasets
+
+- `dev`: missing; not frozen
+- `test`: missing; not frozen
+
+## Retrieval runs (development, retrieval only)
+
+| Run | Mode | Scored | hit@20 single | complete@20 multi | nDCG@5 | MRR | Critical | Wrong scope | p95 ms |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| — | no current-policy run recorded | | | | | | | | |
+
+## Answer evaluation
+
+- no answer run recorded: `plan-run --dataset dev --action answer-finalists`, then `run-answers`
+
+## Latency
+
+- no latency sample recorded (`plan-run --action latency`, then `latency-run`)
+
+## Checks
+
+- no saved check results (`check --phase all --provider fake --save`)
+
+## Hard checks and quality targets
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| automated invariants (check --phase all --provider fake) | unverified | no saved run: check --phase all --provider fake --save |
+| no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases | unverified | no answer evaluation |
+| no selected-scope leakage | unverified | no answer evaluation |
+| managed evidence links resolve | unverified | no cited links |
+| admission cap enforced and ledger not frozen | pass | committed $<n> of cap $<n>; frozen None |
+| no unresolved billing | pass | 0 open or unknown attempts |
+| single-evidence hit@20 >= 0.90 | not measured | None |
+| multi-evidence complete coverage@20 >= 0.80 | not measured | None |
+| required-claim correctness >= 0.90 | not measured | n/a |
+| citation precision >= 0.95 (unjudged links count as unsupported) | not measured | n/a |
+| negative/ambiguous handling >= 0.90 | not measured | n/a |
+| full-answer p95 < 15 s at six users (real provider) | not measured | no real latency sample |
+
+## Budget
+
+- spent $<n> of the $<n> allowance (<n>%); pending $<n> (unknown $<n>); cap $<n>; paid enabled True; last reconciliation never; dates 2026-09-30..2026-10-28
+- envelopes (used incl. open / envelope): embedding $<n>/$<n>, gold_eval $<n>/$<n>, interactive $<n>/$<n>, judge_eval $<n>/$<n>
+- adjustments: [('prior-use-baseline', 0)]
+- tracked scope: calls through this application's gateway plus recorded adjustments; not provider credit
+
+## Mentor walkthrough
+
+- not recorded for this candidate: follow docs/operations/runbook.md §10.6 and save `releases/draft-<date>/walkthrough-results.json`
+
+## Restore drills
+
+- no restore drill recorded (`backup`, then `restore-check`)
+
+----- manifest.json -----
+{
+ "release_id": "draft-<date>",
+ "generated_at": "<time>",
+ "status": "limited",
+ "reasons": [
+  "hard check not verified: automated invariants (check --phase all --provider fake) (no saved run: check --phase all --provider fake --save)",
+  "hard check not verified: no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases (no answer evaluation)",
+  "hard check not verified: no selected-scope leakage (no answer evaluation)",
+  "hard check not verified: managed evidence links resolve (no cited links)",
+  "quality target not measured: single-evidence hit@20 >= 0.90 (None)",
+  "quality target not measured: multi-evidence complete coverage@20 >= 0.80 (None)",
+  "quality target not measured: required-claim correctness >= 0.90 (n/a)",
+  "quality target not measured: citation precision >= 0.95 (unjudged links count as unsupported) (n/a)",
+  "quality target not measured: negative/ambiguous handling >= 0.90 (n/a)",
+  "quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)",
+  "evidence is no answer evaluation, not a sealed evaluation of reviewed gold"
+ ],
+ "evidence_label": "no answer evaluation",
+ "code": {
+  "source_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "git_revision": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+  "git_dirty": false
+ },
+ "metric_code_sha256": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
+ "settings_fingerprint": "<id1>",
+ "model": "gpt-5-mini",
+ "reasoning_effort": "low",
+ "max_output_tokens": 4000,
+ "prompt_version": "grounded-answer-13",
+ "rate_version": null,
+ "active_run": null,
+ "serving": {
+  "run_id": null,
+  "mode": "kiwi_bm25",
+  "index_version": "<id2>",
+  "dense_version": null,
+  "reranker": null,
+  "fallback_mode": "kiwi_bm25"
+ },
+ "active_index": "<id2>",
+ "datasets": {
+  "dev": {
+   "dataset_sha256": null,
+   "rows": null,
+   "label": null,
+   "review_log_sha256": null,
+   "current": null
+  },
+  "test": {
+   "dataset_sha256": null,
+   "rows": null,
+   "label": null,
+   "review_log_sha256": null,
+   "current": null
+  }
+ },
+ "requirements_lock_sha256": "<id4>",
+ "hardware": {
+  "machine": "fixture"
+ },
+ "stale_evidence": [],
+ "freeze": null,
+ "checks": [
+  {
+   "key": "automated_invariants",
+   "kind": "hard",
+   "ok": null,
+   "evidence": "no saved run: check --phase all --provider fake --save"
+  },
+  {
+   "key": "critical_wrong",
+   "kind": "hard",
+   "ok": null,
+   "evidence": "no answer evaluation"
+  },
+  {
+   "key": "scope_leakage",
+   "kind": "hard",
+   "ok": null,
+   "evidence": "no answer evaluation"
+  },
+  {
+   "key": "evidence_links",
+   "kind": "hard",
+   "ok": null,
+   "evidence": "no cited links"
+  },
+  {
+   "key": "admission_cap",
+   "kind": "hard",
+   "ok": true,
+   "evidence": "committed $<n> of cap $<n>; frozen None"
+  },
+  {
+   "key": "billing_resolved",
+   "kind": "hard",
+   "ok": true,
+   "evidence": "0 open or unknown attempts"
+  },
+  {
+   "key": "single_hit@20",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "None"
+  },
+  {
+   "key": "multi_complete@20",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "None"
+  },
+  {
+   "key": "claim_correctness",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "n/a"
+  },
+  {
+   "key": "citation_precision",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "n/a"
+  },
+  {
+   "key": "negative_handling",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "n/a"
+  },
+  {
+   "key": "answer_p95",
+   "kind": "quality",
+   "ok": null,
+   "evidence": "no real latency sample"
+  }
+ ]
+}
+----- coverage.json -----
+{
+ "counts": {
+  "associations": 4,
+  "hwp": 1,
+  "pdf": 3,
+  "unique_sources": 3
+ },
+ "parse_status": {
+  "parsed": 3,
+  "quarantined": 1
+ },
+ "review_status": {
+  "sample_checked": 3,
+  "needs_recovery": 1
+ },
+ "audit_differences": {
+  "associations": [
+   4,
+   100
+  ],
+  "hwp": [
+   1,
+   96
+  ],
+  "pdf": [
+   3,
+   4
+  ]
+ },
+ "quarantined": [
+  {
+   "doc_id": "<uuid>",
+   "filename": "기관E_재난 관리 시스템.hwp",
+   "reason_code": "hwp_converter_missing"
+  }
+ ],
+ "human_checked_sources": 2,
+ "provenance_conflicts": [
+  {
+   "filename": "기관A_통합 정보시스템.pdf",
+   "fields": [
+    "institution",
+    "notice",
+    "bid_close"
+   ],
+   "resolutions": []
+  },
+  {
+   "filename": "기관C_통합 정보시스템 사본.pdf",
+   "fields": [
+    "institution",
+    "notice",
+    "bid_close"
+   ],
+   "resolutions": []
+  }
+ ]
+}
+----- evaluation.json -----
+{
+ "validation": {
+  "dev": null,
+  "test": null
+ },
+ "frozen": {
+  "dev": null,
+  "test": null
+ },
+ "retrieval_runs": [],
+ "answer_runs": [],
+ "sealed_runs": [],
+ "latency": [],
+ "checks": {}
+}
+----- budget.json -----
+{
+ "snapshot": {
+  "allowance_micro_usd": <n>,
+  "cap_micro_usd": <n>,
+  "spent_micro_usd": <n>,
+  "pending_micro_usd": <n>,
+  "available_micro_usd": <n>,
+  "spent_percent": <n>,
+  "committed_percent": <n>,
+  "paid_enabled": true,
+  "frozen_reason": null,
+  "tokens": {
+   "prompt": <n>,
+   "completion": 0,
+   "cached": 0
+  },
+  "per_member": {},
+  "open_attempts": 0,
+  "ledger_revision": "1",
+  "tracking_scope": "이 앱의 게이트웨이를 거친 호출과 기록된 조정만 포함합니다. 제공자 잔액이 아닙니다.",
+  "last_reconciliation": null,
+  "project_start": "2026-09-30",
+  "project_end": "2026-10-28",
+  "cap_percent": <n>,
+  "warnings": [],
+  "pacing": {
+   "elapsed_fraction": 0.2857,
+   "expected_micro_usd": <n>,
+   "committed_micro_usd": <n>,
+   "ahead": false,
+   "days_left": 21
+  },
+  "read_at": "<time>",
+  "unknown_micro_usd": <n>
+ },
+ "envelopes": {
+  "embedding": {
+   "envelope": 1000000,
+   "used_incl_open": <n>
+  },
+  "gold_eval": {
+   "envelope": 3000000,
+   "used_incl_open": <n>
+  },
+  "interactive": {
+   "envelope": 12000000,
+   "used_incl_open": <n>
+  },
+  "judge_eval": {
+   "envelope": 0,
+   "used_incl_open": <n>
+  }
+ },
+ "attempts": [],
+ "adjustments": [
+  {
+   "correction_key": "prior-use-baseline",
+   "amount_micro_usd": <n>,
+   "interval_start": null,
+   "interval_end": null,
+   "scope": "allowance",
+   "created_at": "<time>"
+  }
+ ],
+ "unresolved_attempts": 0,
+ "configuration_history": [
+  {
+   "actor": "owner",
+   "allowance_micro_usd": null,
+   "at": "<time>",
+   "cap_micro_usd": null,
+   "end": "2026-10-28",
+   "paid_enabled": true,
+   "rate_version": "fixture",
+   "start": "2026-09-30"
+  },
+  {
+   "actor": "owner",
+   "at": "<time>",
+   "paid_enabled": true,
+   "reason": "fixture"
+  }
+ ]
+}

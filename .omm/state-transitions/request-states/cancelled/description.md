@@ -1,1 +1,0 @@
-Terminal. The result is stored for history, and `may_attach` is false.

@@ -1,0 +1,6 @@
+graph TD
+sql["Authoritative records and transactions\nsrc/rfp_assistant/storage/postgres.py"] -->|Schema and operation ownership| vectors["Verified vector records\nsrc/rfp_assistant/retrieval/vector_store.py"]
+artifacts["Immutable and checkpointed files\nsrc/rfp_assistant/storage/store.py"] -->|Referenced paths and hashes| sql
+sql -->|Dump and table digests| backup["Backup and restore validation\nsrc/rfp_assistant/storage/postgres_backup.py"]
+vectors -->|Vector identities and checksums| backup
+artifacts -->|Copied trees and references| backup

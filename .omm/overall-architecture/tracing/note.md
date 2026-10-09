@@ -1,0 +1,1 @@
+Enabled traces can contain questions, retrieved text, prompts and generated output after credential-pattern redaction. Redaction does not imply that document content is excluded from the configured tracing destination.

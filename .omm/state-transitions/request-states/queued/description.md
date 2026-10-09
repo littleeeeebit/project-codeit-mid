@@ -1,1 +1,0 @@
-The row exists and the runner slot is held. Nothing has been reserved yet.

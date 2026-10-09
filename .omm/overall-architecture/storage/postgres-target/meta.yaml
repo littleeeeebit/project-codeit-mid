@@ -1,9 +1,0 @@
-created: 2026-10-09T00:31:51.415Z
-updated: 2026-10-09T00:31:51.416Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: postgres-target
-children: []
-parentPath:
-  - storage

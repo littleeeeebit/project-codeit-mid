@@ -1,0 +1,1 @@
+A conversation permits only one unfinished latest turn. Leaving a conversation cancels queued work through abandon_request(); running work continues unless explicitly cancelled.

@@ -1,0 +1,1 @@
+Members were explicitly intended to reach BidMate in a browser with their existing JupyterHub credentials, without an SSH tunnel. The public address is configured externally and can change.

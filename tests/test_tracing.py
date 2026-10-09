@@ -97,7 +97,7 @@ class AskTracingTest(unittest.TestCase):
         self.assertTrue(all(s.parent.span_id == root.context.span_id for s in spans if s is not root))
         attrs = {s.name: dict(s.attributes) for s in spans}
         self.assertEqual(attrs["generate-answer"]["langfuse.observation.type"], "generation")
-        self.assertEqual(attrs["generate-answer"]["langfuse.observation.model.name"], "gpt-6-luna")
+        self.assertEqual(attrs["generate-answer"]["langfuse.observation.model.name"], "gpt-5-mini")
         self.assertIn("cost_details", " ".join(attrs["generate-answer"]))
         self.assertEqual(attrs["retrieve-evidence"]["langfuse.observation.type"], "retriever")
         self.assertEqual(attrs["answer-question"]["user.id"], "김검토")

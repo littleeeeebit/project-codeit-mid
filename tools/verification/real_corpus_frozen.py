@@ -70,7 +70,7 @@ def main(run_dir: Path) -> int:
         print("real_corpus is not configured as an isolated copy", file=sys.stderr)
         return 2
     settings = load_settings(source_dir=Path(rc["source_dir"]), data_dir=Path(rc["data_dir"]),
-                             provider="fake")  # RFP_DATABASE_DSN: the copy tools/verify.py restored
+                             provider="fake", database_timeout_seconds=30)  # the disposable copy, never the owner runtime
     res = service.Resources(settings, recover=True)
     principal = auth.visitor(MEMBER)
     client = fake_hub.client(res, MEMBER)  # signed in as MEMBER through the fake hub

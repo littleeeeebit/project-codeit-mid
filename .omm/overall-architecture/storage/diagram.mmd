@@ -1,6 +1,0 @@
-graph TD
-  postgres-target["PostgreSQL target\nsrc/rfp_assistant/storage/postgres.py"] -->|"pooled txns"| schema-and-store["Schema and store helpers\nsrc/rfp_assistant/storage/store.py"]
-  schema-and-store -->|"artifact paths and hashes"| runtime-files["Runtime artifacts\n.runtime"]
-  backup-restore["Backup and restore check\nsrc/rfp_assistant/storage/postgres_backup.py"] -->|"pg_dump, staged restore"| postgres-target
-  maintenance-sequence["Maintenance sequence\nsrc/rfp_assistant/storage/maintenance.py"] -->|"backup step first"| backup-restore
-  maintenance-sequence -->|"rebuilt index, vectors"| runtime-files

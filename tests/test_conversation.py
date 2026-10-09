@@ -366,14 +366,19 @@ class StreamingTest(Base):
 
 
 class StreamRouteTest(Base):
+    def start(self, client):
+        """Asks the first question with the provider held, once its answer has begun to stream."""
+        self.transport.release.clear()
+        owned = client.post("/api/ask", json={
+            "scope": [{"doc_id": self.a.doc_id, "source_hash": self.a.source_hash}], "question": FIRST,
+            "mode": "single"}).json()
+        self.assertTrue(self.transport.streamed.wait(10))
+        return owned
+
     def test_cancelling_withdraws_the_streamed_text_before_the_held_call_returns(self):
         client = fake_hub.client(self.res, "c1")
         with client:
-            self.transport.release.clear()
-            owned = client.post("/api/ask", json={
-                "scope": [{"doc_id": self.a.doc_id, "source_hash": self.a.source_hash}], "question": FIRST,
-                "mode": "single"}).json()
-            self.assertTrue(self.transport.streamed.wait(10))
+            owned = self.start(client)
             rid = owned["request_id"]
             body = []  # the test client hands over a streamed body only once it ends: read it on a thread
             reader = threading.Thread(target=lambda: body.append(client.get(
@@ -392,11 +397,7 @@ class StreamRouteTest(Base):
     def test_the_stream_route_sends_the_partial_answer_then_done(self):
         client = fake_hub.client(self.res, "c1")
         with client:
-            self.transport.release.clear()
-            owned = client.post("/api/ask", json={
-                "scope": [{"doc_id": self.a.doc_id, "source_hash": self.a.source_hash}], "question": FIRST,
-                "mode": "single"}).json()
-            self.assertTrue(self.transport.streamed.wait(10))
+            owned = self.start(client)
             threading.Timer(0.5, self.transport.release.set).start()
             with client.stream("GET", f"/api/requests/{owned['request_id']}/stream",
                                params={"generation_id": owned["generation_id"]}) as stream:

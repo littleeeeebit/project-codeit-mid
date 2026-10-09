@@ -1,1 +1,0 @@
-A worker owns the request. Each paid stage re-checks `_stop_reason`: cancelled, interrupted, or `res._closed`.

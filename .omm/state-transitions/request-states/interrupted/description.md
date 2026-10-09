@@ -1,1 +1,0 @@
-Terminal. It is set by a controlled shutdown or by restart recovery, and an attempt that was dispatching becomes `unknown`.

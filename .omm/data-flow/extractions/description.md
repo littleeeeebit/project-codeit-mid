@@ -1,1 +1,0 @@
-`elements.jsonl` artifacts live under `.runtime/extracted/<hash>/<fingerprint>/`, alongside the `extractions`, `elements` and `extraction_inputs` rows. `sources.active_extraction_id` points at the revision serving and indexing use. Review status is per extraction.

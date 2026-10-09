@@ -1,0 +1,1 @@
+`_stored_quote` scans every chunk of the loaded index, about 19k by the README's count, for each evidence unit. It runs from both `_validated` and `_with_carried`, so validation cost grows with chunks × units. No problem was observed at the current corpus size, but it would show up as the corpus grows.

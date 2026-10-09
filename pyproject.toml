@@ -11,6 +11,7 @@ requires-python = ">=3.12"
 dependencies = [
     "pymupdf",
     "pyhwp",
+    "langchain-hwp-hwpx-loader==0.1.1",
     "kiwipiepy",
     "rank_bm25",
     "openai",
@@ -32,6 +33,8 @@ dependencies = [
 reranker = ["sentence-transformers", "torch", "einops"]
 # Browser flows of tools/verify.py (local verification service).
 verify = ["playwright"]
+# Execute the generated before/after notebook in JupyterHub or a local kernel.
+notebook = ["ipykernel", "nbformat", "nbclient"]
 
 [project.scripts]
 rfp-assistant = "rfp_assistant.cli:main"

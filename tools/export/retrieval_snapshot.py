@@ -59,6 +59,47 @@ def read_rows(conn, sql, params=()):
     return [dict(r) for r in conn.execute(sql, params)]
 
 
+def _add_source_details(conn, source: dict) -> None:
+    """The source's element count, three navigation anchors and its latest review, never element text."""
+    extraction = source["active_extraction_id"]
+    sample = read_rows(conn, "SELECT element_id, source_order, kind FROM elements WHERE extraction_id=%s "
+                       "ORDER BY source_order", (extraction,))
+    source["element_count"] = len(sample)
+    # These are navigation anchors, never evidence that a person inspected them.
+    source["navigation_anchors"] = [sample[i] for i in sorted({0, len(sample)//2, len(sample)-1})] if sample else []
+    review = conn.execute("SELECT reviewer, status, extraction_id, locations_json, created_at FROM reviews "
+                          "WHERE source_hash=%s ORDER BY created_at DESC LIMIT 1", (source["source_hash"],)).fetchone()
+    source["latest_review"] = None if review is None else {
+        "reviewer": review["reviewer"], "status": review["status"], "created_at": review["created_at"],
+        "review_is_current": review["extraction_id"] == extraction,
+        "location_count": len(json.loads(review["locations_json"]))}
+
+
+def _fidelity_records(conn, sources: list[dict]) -> list[dict]:
+    """Fidelity checks of the active extractions, with finding counts and locations but no finding text."""
+    fidelity = read_rows(conn, "SELECT f.extraction_id, f.source_hash, f.method, f.verdict, f.findings_json, f.created_at "
+                        "FROM fidelity_checks f JOIN sources s ON s.source_hash=f.source_hash "
+                        "AND s.active_extraction_id=f.extraction_id ORDER BY f.source_hash")
+    for record in fidelity:
+        findings = json.loads(record.pop("findings_json"))
+        record["is_current"] = any(s["source_hash"] == record["source_hash"] and
+                                   s["active_extraction_id"] == record["extraction_id"] for s in sources)
+        record["finding_counts"] = ({k: len(v) if isinstance(v, list) else None for k, v in findings.items()}
+                                    if isinstance(findings, dict) else {"total": len(findings)})
+        record["locations"] = clean_locations(findings)
+    return fidelity
+
+
+def _package_versions() -> dict:
+    packages = {}
+    for name in ("pyhwp", "pymupdf", "kiwipiepy", "openai", "torch", "sentence-transformers"):
+        try:
+            packages[name] = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            packages[name] = None
+    return packages
+
+
 def snapshot(dsn: str, runtime: Path, out: Path):
     """Query the existing PostgreSQL application database in one read-only transaction; never initialize it."""
     with psycopg.connect(dsn, row_factory=dict_row, connect_timeout=5) as conn, conn.transaction():
@@ -71,18 +112,7 @@ def snapshot(dsn: str, runtime: Path, out: Path):
         sources = read_rows(conn, "SELECT source_hash, format, active_extraction_id, parse_status, review_status, "
                            "reason_code FROM sources ORDER BY source_hash")
         for source in sources:
-            extraction = source["active_extraction_id"]
-            sample = read_rows(conn, "SELECT element_id, source_order, kind FROM elements WHERE extraction_id=%s "
-                               "ORDER BY source_order", (extraction,))
-            source["element_count"] = len(sample)
-            # These are navigation anchors, never evidence that a person inspected them.
-            source["navigation_anchors"] = [sample[i] for i in sorted({0, len(sample)//2, len(sample)-1})] if sample else []
-            review = conn.execute("SELECT reviewer, status, extraction_id, locations_json, created_at FROM reviews "
-                                  "WHERE source_hash=%s ORDER BY created_at DESC LIMIT 1", (source["source_hash"],)).fetchone()
-            source["latest_review"] = None if review is None else {
-                "reviewer": review["reviewer"], "status": review["status"], "created_at": review["created_at"],
-                "review_is_current": review["extraction_id"] == extraction,
-                "location_count": len(json.loads(review["locations_json"]))}
+            _add_source_details(conn, source)
         gold = read_rows(conn, "SELECT dataset, status, COUNT(*) AS count FROM gold_candidates "
                          "GROUP BY dataset, status ORDER BY dataset, status")
         indexes = read_rows(conn, "SELECT index_version, state, config_json, created_at FROM indexes ORDER BY created_at")
@@ -93,16 +123,7 @@ def snapshot(dsn: str, runtime: Path, out: Path):
             "SELECT key, value FROM app_settings WHERE key IN ('active_index','active_run')")}
         if active.get("active_run"):
             active["active_run"] = select(json.loads(active["active_run"]), CONFIG_FIELDS + ("run_id", "activated_at"))
-        fidelity = read_rows(conn, "SELECT f.extraction_id, f.source_hash, f.method, f.verdict, f.findings_json, f.created_at "
-                            "FROM fidelity_checks f JOIN sources s ON s.source_hash=f.source_hash "
-                            "AND s.active_extraction_id=f.extraction_id ORDER BY f.source_hash") if "fidelity_checks" in tables else []
-        for record in fidelity:
-            findings = json.loads(record.pop("findings_json"))
-            record["is_current"] = any(s["source_hash"] == record["source_hash"] and
-                                       s["active_extraction_id"] == record["extraction_id"] for s in sources)
-            record["finding_counts"] = ({k: len(v) if isinstance(v, list) else None for k, v in findings.items()}
-                                        if isinstance(findings, dict) else {"total": len(findings)})
-            record["locations"] = clean_locations(findings)
+        fidelity = _fidelity_records(conn, sources) if "fidelity_checks" in tables else []
         budget = read_rows(conn, "SELECT allowance_micro_usd, cap_micro_usd, project_start, project_end, "
                           "paid_enabled, prior_use_recorded, rate_version, revision FROM budget_settings")
         totals = read_rows(conn, "SELECT purpose, stage, state, COUNT(*) AS count, "
@@ -114,12 +135,7 @@ def snapshot(dsn: str, runtime: Path, out: Path):
         schema = conn.execute("SELECT max(version) AS v FROM schema_migrations").fetchone()["v"]
     dataset = runtime / "datasets" / "dev-pilot.jsonl"
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    packages = {}
-    for name in ("pyhwp", "pymupdf", "kiwipiepy", "openai", "torch", "sentence-transformers"):
-        try:
-            packages[name] = importlib.metadata.version(name)
-        except importlib.metadata.PackageNotFoundError:
-            packages[name] = None
+    packages = _package_versions()
     write_json(out / "manifest.json", {
         "package_version": 1, "status": "inventory_only", "collected_at": datetime.now(timezone.utc).isoformat(),
         "commit": commit, "schema_version": schema,

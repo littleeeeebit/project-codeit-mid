@@ -1030,8 +1030,3 @@ def lost_to_reparse(runner: "Runner", served: str, rebuilt: str) -> list[str]:
     return sorted({str(s["id"]) for name in ("dev", "corpus") for s in after[name]["skipped"]
                    if s["reason"] == "evidence_revision_not_active"}
                   & {str(ev.row_id(r)) for name in ("dev", "corpus") for r in before[name]["rows"]})
-
-
-def run_matrix(settings: Settings, analyzer, transport, matrix: str, only: list[str] | None = None) -> dict:
-    name, spec = load_matrix(matrix)
-    return Runner(settings, analyzer, transport).run(name, spec, only)

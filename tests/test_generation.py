@@ -171,6 +171,30 @@ class SafetyTest(unittest.TestCase):
         with self.assertRaises(generation.TechnicalError):
             generation.validate_answer(bad, [], set(), {})
 
+    def test_a_conflict_answer_needs_conflicts_two_alternatives_and_a_next_action(self):
+        ev = EvidenceUnit("E1", "A", "h", "x", "c", ["e"], "하자보수 기간은 1년", {}, 5)
+        alt = {"doc_id": "A", "value": "1년", "evidence_ids": ["E1"]}
+
+        def validate(conflicts, next_action, status="conflicting_evidence"):
+            response = ProviderResponse(json.dumps({
+                "status": status, "summary": "값이 다릅니다.", "summary_evidence_ids": ["E1"], "claims": [],
+                "missing_fields": [], "conflicts": conflicts, "next_action": next_action}, ensure_ascii=False),
+                None, "stop", None, None)
+            return generation.validate_answer(response, [ev], {"A"}, {"E1": ev.quote})
+
+        two = [{"field": "하자보수 기간", "alternatives": [alt, {**alt, "value": "2년"}]}]
+        self.assertEqual(validate(two, "발주처에 확인하세요.").status, "conflicting_evidence")
+        for conflicts, action, error in (([], "발주처에 확인하세요.", "conflict_without_conflicts"),
+                                         ([{"field": "f", "alternatives": [alt]}], "발주처에 확인하세요.",
+                                          "conflict_with_one_alternative"),
+                                         (two, None, "conflict_without_next_action"),
+                                         (two, "  ", "conflict_without_next_action")):
+            with self.subTest(error=error, action=action), self.assertRaisesRegex(generation.TechnicalError, error):
+                validate(conflicts, action)
+        # The contract's shape: another status may still report a one-sided conflict
+        self.assertEqual(validate([{"field": "f", "alternatives": [alt]}], None, "insufficient_evidence").status,
+                         "insufficient_evidence")
+
     def test_only_a_declared_absence_of_a_listed_missing_field_is_dropped(self):
         # The owner's comparison: each side's absence was stated twice, as an uncited claim and a missing field. A
         # restatement is declared kind "absence"; text never decides it, so every uncited inference or fact fails.

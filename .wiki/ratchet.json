@@ -1,0 +1,94 @@
+{
+  "exclude": [],
+  "files": {
+    "docs/history/workflow-acceptance/browser-scripts/b2.js": {
+      "dup": 12,
+      "lines": 63,
+      "reason": "baseline at adoption"
+    },
+    "docs/history/workflow-acceptance/browser-scripts/b3.js": {
+      "dup": 15,
+      "lines": 60,
+      "reason": "baseline at adoption"
+    },
+    "docs/history/workflow-acceptance/browser-scripts/b4.js": {
+      "dup": 15,
+      "lines": 84,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/api.py": {
+      "dup": 8,
+      "lines": 1574,
+      "reason": "gpt5-mini-answer-embedding-comparison: three optional ExperimentTable response fields expose the answer run ID, model and paired conclusion; HTTP response models remain in api.py under the existing API boundary test, including the previous structured release-check fields"
+    },
+    "src/rfp_assistant/cli.py": {
+      "dup": 0,
+      "lines": 985,
+      "reason": "gpt5-mini-answer-embedding-comparison: the existing answer-run command accepts bounded workers and documents baseline-first comparison runs while preserving the release-finalist limit"
+    },
+    "src/rfp_assistant/contracts.py": {
+      "dup": 8,
+      "lines": 212,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/corpus/ingestion.py": {
+      "dup": 0,
+      "lines": 1356,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/evaluation/compare.py": {
+      "dup": 0,
+      "lines": 1032,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/evaluation/evaluation.py": {
+      "dup": 0,
+      "lines": 2627,
+      "reason": "strict-answer-grading: GoldChecker validates a row's accepted_statuses against its answerability"
+    },
+    "src/rfp_assistant/evaluation/gold.py": {
+      "dup": 0,
+      "lines": 903,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/evaluation/judges.py": {
+      "dup": 0,
+      "lines": 1335,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/retrieval/retrieval.py": {
+      "dup": 0,
+      "lines": 824,
+      "reason": "baseline at adoption"
+    },
+    "src/rfp_assistant/service/answers.py": {
+      "dup": 0,
+      "lines": 1289,
+      "reason": "gpt5-mini-answer-embedding-comparison review round 1 F2/F3: 18 net measured lines retain the planned Holm family, withhold partial-population verdicts, and publish recorded per-row retrieval limits with only shared values marked fixed; focused statistical and comparison integration regressions cover these repairs; duplication allowance remains zero"
+    },
+    "src/rfp_assistant/service/service.py": {
+      "dup": 0,
+      "lines": 3077,
+      "reason": "gpt5-mini-answer-embedding-comparison: the existing experiments listing forwards answer_run_id, model and conclusion from the generated table so the comparison screen can display the measured result"
+    },
+    "tools/verify.py": {
+      "dup": 0,
+      "lines": 1062,
+      "reason": "gpt5-mini-answer-embedding-comparison: 12 lines select the owner-configured Python before dependency imports, two enable fake-provider admission only on the validated disposable copy, one applies the supported database timeout after full-corpus restores, and three register missing selectable-model prices on that copy through the existing audited helper; duplication allowance remains zero"
+    },
+    "web/src/components/verify/evaluation.tsx": {
+      "dup": 6,
+      "lines": 87,
+      "reason": "verify-page-criteria-and-roles: verdict, checks and dev run moved to pass-lines.tsx"
+    },
+    "web/src/components/verify/judges.tsx": {
+      "dup": 6,
+      "lines": 657,
+      "reason": "baseline at adoption"
+    }
+  },
+  "new_file_max_lines": 800,
+  "reason": "",
+  "test_file_max_lines": 1500,
+  "version": 1
+}

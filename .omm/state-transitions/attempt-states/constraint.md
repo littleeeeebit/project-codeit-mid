@@ -1,0 +1,1 @@
+On PostgreSQL, a single unknown attempt blocks every new dispatch until it is resolved.

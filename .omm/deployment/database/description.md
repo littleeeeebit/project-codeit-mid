@@ -1,0 +1,1 @@
+compose.postgresql.yaml pins a pgvector PostgreSQL image by digest, publishes container port 5432 only on host 127.0.0.1:55432, initializes UTF-8 with C locale and persists data in a Docker volume. tools/infra/postgresql-init.sql installs the extension. Application connections enforce PostgreSQL 18.6 and pgvector 0.8.6 rather than accepting any reachable server.

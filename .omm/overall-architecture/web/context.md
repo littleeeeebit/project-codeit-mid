@@ -1,0 +1,1 @@
+The verification menu follows verifier questions: items requiring human attention, evaluation and release conclusions, then failure investigation and owner operations. Dataset drafting and decisions have their own screen.

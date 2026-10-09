@@ -17,7 +17,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Empty, Field, field, Notice } from "./parts";
+import { Empty, Field, field, More, Notice } from "./parts";
 
 type Overview = Schemas["JudgeOverview"];
 type Run = Schemas["JudgeRun"];
@@ -178,35 +178,26 @@ function Mutations({ ov, results, run }: { ov: Overview; results?: Results; run?
 
 // ---------------------------------------------------------------- the answer
 
-/** A fold for what supports the page but is not the answer: small, quiet, closed by default. */
-function More({ label, children }: { label: string; children: React.ReactNode }) {
+/** Before a held-out run has finished: whether one is running, and its progress. */
+function NoVerdict({ question, run }: { question: React.ReactNode; run?: Run }) {
   return (
-    <details className="group">
-      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
-        <span aria-hidden className="transition-transform group-open:rotate-90">›</span>{label}
-      </summary>
-      <div className="pt-2">{children}</div>
-    </details>
+    <section aria-labelledby="judge-answer" className="space-y-6">
+      <div className="space-y-2">
+        {question}
+        <h3 id="judge-answer" className="text-4xl font-bold tracking-tight">{run?.running ? "평가 실행 중" : "아직 판정 전"}</h3>
+        <p className="text-lg">{run?.running ? "모든 항목을 판정하면 미리 정한 규칙으로 답합니다."
+          : run ? "평가 실행이 끝나지 않았습니다. 아래 실행 관리에서 남은 항목을 이어서 실행하세요."
+            : "아래 실행 관리에서 보정 → 평가 순서로 실행하세요."}</p>
+      </div>
+      {run?.running && <div className="max-w-3xl"><ArmProgress r={run} /></div>}
+    </section>
   );
 }
 
 function Verdict({ ov, results, run }: { ov: Overview; results?: Results; run?: Run }) {
   const v = results?.verdict;
   const question = <p className="text-sm font-medium text-muted-foreground">Jev로 Luna 판정을 바꿀 수 있나</p>;
-  if (!v) {
-    return (
-      <section aria-labelledby="judge-answer" className="space-y-6">
-        <div className="space-y-2">
-          {question}
-          <h3 id="judge-answer" className="text-4xl font-bold tracking-tight">{run?.running ? "평가 실행 중" : "아직 판정 전"}</h3>
-          <p className="text-lg">{run?.running ? "모든 항목을 판정하면 미리 정한 규칙으로 답합니다."
-            : run ? "평가 실행이 끝나지 않았습니다. 아래 실행 관리에서 남은 항목을 이어서 실행하세요."
-              : "아래 실행 관리에서 보정 → 평가 순서로 실행하세요."}</p>
-        </div>
-        {run?.running && <div className="max-w-3xl"><ArmProgress r={run} /></div>}
-      </section>
-    );
-  }
+  if (!v) return <NoVerdict question={question} run={run} />;
   const verdict = VERDICT[v.verdict];
   const l = results!.arms.luna, j = results!.arms.jev_bridged;
   const margin = Number(v.rule.kappa_margin ?? 0.05);

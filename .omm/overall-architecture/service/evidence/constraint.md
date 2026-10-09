@@ -1,0 +1,1 @@
+Issued citations pin doc_id, source_hash, extraction_id, chunk_id and element_ids. Revising extraction or activation must preserve artifacts required by existing citations.

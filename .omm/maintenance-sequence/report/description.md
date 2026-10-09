@@ -1,0 +1,1 @@
+run() persists pending/running/final step states and ends as complete, failed, needs_approval or unverified. Missing repinned evidence makes an otherwise executed sequence unverified. Reports include actor, step details, provider-call count, reuse information and whether serving configuration changed; the verification frontend polls and displays these persisted states.

@@ -1,1 +1,0 @@
-`build_keyword_index(settings, Analyzer(), include_unreviewed=...)` (`cli build-keyword`) chunks the active extractions (structural or fixed profiles, `retrieval/chunking.py`), freezes `scope-terms.json`, and writes a versioned index. The operating index includes unreviewed and `auto_flagged` sources, labeled through `index_includes_unreviewed_sources`.

@@ -1,0 +1,1 @@
+Grading requires the row's expected status or explicitly accepted statuses. Full generated claims receive deterministic support only when their whole assertion is verbatim in cited text; paraphrases and partially supported claims remain unjudged until blind human review. Required typed claims, citation relevance and whole-claim support are separate measures.

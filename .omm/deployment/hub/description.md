@@ -1,0 +1,1 @@
+Hub.authorize_url() directs browser authorization to BIDMATE_HUB_URL. Hub.username() sends server-side token exchange and user lookup to BIDMATE_HUB_API_URL or the same configured hub URL. Client identity, secret, callback and username allowlist come from environment. A host/address change requires coordinated hub and callback configuration.

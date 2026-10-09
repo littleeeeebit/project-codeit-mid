@@ -1,0 +1,1 @@
+Backup destinations must be absolute, new or empty, and disjoint from originals and runtime. The dedicated public schema is required. Immutable originals, extraction and index references must remain available and hash-correct; a dump alone does not establish a usable restore.

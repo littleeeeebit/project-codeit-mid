@@ -1,0 +1,1 @@
+Comparison limits must match the measured retrieval path. Each side receives its normal evidence allowance; halving allowances previously made serving weaker than evaluation. A frozen verifier answer uses its stored evidence without another retrieval or query-embedding call.

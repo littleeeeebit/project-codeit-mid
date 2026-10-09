@@ -1,0 +1,9 @@
+created: 2026-10-08T21:41:57.101Z
+updated: 2026-10-08T21:41:57.344Z
+update_count: 3
+last_field: todo
+kind: nested-class
+title: sql
+children: []
+parentPath:
+  - persistence

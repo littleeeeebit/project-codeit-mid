@@ -1,6 +1,0 @@
-graph TD
-  ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"] -->|"owner check per txn"| gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
-  ledger -->|"dispatching marker then call"| transport["Provider transport\nsrc/rfp_assistant/gateway/generation.py"]
-  transport -->|"usage settles attempt"| ledger
-  transport -->|"structured output"| answer-validation["Answer validation\nsrc/rfp_assistant/gateway/generation.py"]
-  transport -->|"spans and scores"| tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]

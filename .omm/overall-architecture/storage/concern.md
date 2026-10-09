@@ -1,0 +1,1 @@
+Most row payloads are TEXT JSON (`*_json` columns): request snapshots, evidence maps and price_json. Their invariants are enforced only in Python.

@@ -1,0 +1,9 @@
+created: 2026-10-08T21:41:47.718Z
+updated: 2026-10-08T21:41:47.719Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: gate
+children: []
+parentPath:
+  - web

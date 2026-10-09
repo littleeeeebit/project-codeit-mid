@@ -321,18 +321,56 @@ def _record_review(conn: Connection, candidate_id: str, reviewer: str, kind: str
 # ---------------------------------------------------------------- operations
 
 
-def submit(settings: Settings, source: Path, batch_id: str, dataset: str, drafted_by: str) -> dict:
-    if not ID_RE.fullmatch(batch_id):
-        raise GoldError("batch ids use lowercase letters, digits and hyphens")
-    dataset_path(settings, dataset)  # validates the name
-    if not drafted_by.strip():
-        raise GoldError("--drafted-by is required")
+def _candidate_rows(source: Path) -> list[dict]:
     raw = source.read_bytes()
     if raw.startswith(b"\xef\xbb\xbf"):
         raise GoldError("candidate file must be UTF-8 without BOM")
     rows = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line.strip()]
     if not rows:
         raise GoldError("candidate file is empty")
+    return rows
+
+
+def _known_candidates(conn) -> tuple[dict, dict, dict[str, list[tuple[int, str]]]]:
+    """Every candidate by ID, its question key -> (ID, status, question ID), and question ID -> [(revision,
+    status)] of the gold rows."""
+    known = {r["candidate_id"]: dict(r) for r in conn.execute(
+        "SELECT candidate_id, status, dataset, row_json, question_key FROM gold_candidates")}
+    known_questions = {r["question_key"]: (cid, r["status"], json.loads(r["row_json"]).get("question_id"))
+                       for cid, r in known.items()}
+    revisions: dict[str, list[tuple[int, str]]] = {}
+    for r in known.values():
+        row = json.loads(r["row_json"])
+        if row.get("question_id"):
+            revisions.setdefault(row["question_id"], []).append((row.get("revision") or 0, r["status"]))
+    return known, known_questions, revisions
+
+
+def _revision_errors(tag: str, row: dict, revisions: dict[str, list[tuple[int, str]]], prior) -> list[str]:
+    """A gold correction appends a higher revision once the earlier one is decided; a new question starts at 1.
+    Records the row's revision as pending for the rows after it."""
+    errors = []
+    qid, rev = row.get("question_id"), row.get("revision")
+    earlier = revisions.get(qid, [])
+    if earlier and (not isinstance(rev, int) or rev <= max(r for r, _ in earlier)):
+        errors.append(f"{tag}: a correction appends a higher revision of {qid}")
+    elif earlier and any(s == "pending" for _, s in earlier):
+        errors.append(f"{tag}: an earlier revision of {qid} is still pending review")
+    elif not earlier and isinstance(rev, int) and rev != 1:
+        errors.append(f"{tag}: a new question starts at revision 1")
+    if prior and prior[2] != qid:
+        errors.append(f"{tag}: same question already drafted as {prior[0]} ({prior[1]})")
+    revisions.setdefault(qid, []).append((rev if isinstance(rev, int) else 0, "pending"))
+    return errors
+
+
+def submit(settings: Settings, source: Path, batch_id: str, dataset: str, drafted_by: str) -> dict:
+    if not ID_RE.fullmatch(batch_id):
+        raise GoldError("batch ids use lowercase letters, digits and hyphens")
+    dataset_path(settings, dataset)  # validates the name
+    if not drafted_by.strip():
+        raise GoldError("--drafted-by is required")
+    rows = _candidate_rows(source)
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
         uninferred = [r[0] for r in conn.execute(
             "SELECT candidate_id FROM gold_candidates WHERE status = 'rejected' AND inference_json IS NULL")]
@@ -341,15 +379,7 @@ def submit(settings: Settings, source: Path, batch_id: str, dataset: str, drafte
         if conn.execute("SELECT 1 FROM gold_candidates WHERE batch_id = ?", (batch_id,)).fetchone() \
                 or batch_path(settings, batch_id).exists() or batch_path(settings, batch_id, "test").exists():
             raise GoldError(f"batch {batch_id} already exists")
-        known = {r["candidate_id"]: dict(r) for r in conn.execute(
-            "SELECT candidate_id, status, dataset, row_json, question_key FROM gold_candidates")}
-        known_questions = {r["question_key"]: (cid, r["status"], json.loads(r["row_json"]).get("question_id"))
-                           for cid, r in known.items()}
-        revisions: dict[str, list[tuple[int, str]]] = {}  # question_id -> [(revision, status)] of gold rows
-        for r in known.values():
-            row = json.loads(r["row_json"])
-            if row.get("question_id"):
-                revisions.setdefault(row["question_id"], []).append((row.get("revision") or 0, r["status"]))
+        known, known_questions, revisions = _known_candidates(conn)
         checker = row_checker(settings, conn, dataset)
         errors: list[str] = []
         seen: set[str] = set()
@@ -367,17 +397,7 @@ def submit(settings: Settings, source: Path, batch_id: str, dataset: str, drafte
                 errors.append(f"{tag}: drafts cannot carry a review")
             prior = known_questions.get(question_key(row))
             if is_gold(dataset):
-                qid, rev = row.get("question_id"), row.get("revision")
-                earlier = revisions.get(qid, [])
-                if earlier and (not isinstance(rev, int) or rev <= max(r for r, _ in earlier)):
-                    errors.append(f"{tag}: a correction appends a higher revision of {qid}")
-                elif earlier and any(s == "pending" for _, s in earlier):
-                    errors.append(f"{tag}: an earlier revision of {qid} is still pending review")
-                elif not earlier and isinstance(rev, int) and rev != 1:
-                    errors.append(f"{tag}: a new question starts at revision 1")
-                if prior and prior[2] != qid:
-                    errors.append(f"{tag}: same question already drafted as {prior[0]} ({prior[1]})")
-                revisions.setdefault(qid, []).append((rev if isinstance(rev, int) else 0, "pending"))
+                errors += _revision_errors(tag, row, revisions, prior)
             elif prior:
                 errors.append(f"{tag}: same question already drafted as {prior[0]} ({prior[1]})")
             known_questions[question_key(row)] = (cid, "this batch", row.get("question_id"))
@@ -410,6 +430,36 @@ def _repin_evidence(conn, old: str, new: str, evidence: list[dict]) -> list[dict
     return out
 
 
+def _repinned_row(conn, checker, c) -> dict | None:
+    """Candidate `c`'s row moved onto the active extractions of the documents it cites, naming where it came from;
+    None when it cites none that was superseded."""
+    row = json.loads(c["row_json"])
+    if is_gold(c["dataset"]):
+        stale = {s["doc_id"]: (s.get("extraction_id"), checker.docs[s["doc_id"]]["active_extraction_id"])
+                 for s in row.get("scope") or [] if s.get("doc_id") in checker.docs and s.get("extraction_id")
+                 and s.get("extraction_id") != checker.docs[s["doc_id"]]["active_extraction_id"]}
+        if not stale:
+            return None
+        scope = [{**s, "extraction_id": stale[s["doc_id"]][1]} if s.get("doc_id") in stale else s
+                 for s in row["scope"]]
+        groups = []
+        for g in row.get("evidence_groups") or []:
+            if g.get("doc_id") in stale:
+                old, new = stale[g["doc_id"]]
+                alts = [{**a, "extraction_id": new}
+                        for a in _repin_evidence(conn, old, new, g.get("alternatives") or [])]
+                g = {**g, "alternatives": alts}
+            groups.append(g)
+        return {**row, "scope": scope, "evidence_groups": groups,
+                "repinned_from": {"batch_id": c["batch_id"], "extractions": {d: o for d, (o, _) in stale.items()}}}
+    doc = checker.docs.get(row.get("doc_id"))
+    old, new = row.get("extraction_id"), doc and doc["active_extraction_id"]
+    if not row.get("evidence") or doc is None or old == new:
+        return None
+    return {**row, "extraction_id": new, "evidence": _repin_evidence(conn, old, new, row["evidence"]),
+            "repinned_from": {"batch_id": c["batch_id"], "extraction_id": old}}
+
+
 def repin(settings: Settings, batch_id: str) -> dict:
     """Moves pending rows whose evidence cites a superseded extraction onto the active one, by element path.
 
@@ -426,34 +476,10 @@ def repin(settings: Settings, batch_id: str) -> dict:
         moved, errors, datasets = [], [], set()
         for c in conn.execute("SELECT * FROM gold_candidates WHERE status = 'pending' ORDER BY submitted_at, "
                               "candidate_id").fetchall():
-            row = json.loads(c["row_json"])
             checker = row_checker(settings, conn, c["dataset"])
-            if is_gold(c["dataset"]):
-                stale = {s["doc_id"]: (s.get("extraction_id"), checker.docs[s["doc_id"]]["active_extraction_id"])
-                         for s in row.get("scope") or [] if s.get("doc_id") in checker.docs and s.get("extraction_id")
-                         and s.get("extraction_id") != checker.docs[s["doc_id"]]["active_extraction_id"]}
-                if not stale:
-                    continue
-                scope = [{**s, "extraction_id": stale[s["doc_id"]][1]} if s.get("doc_id") in stale else s
-                         for s in row["scope"]]
-                groups = []
-                for g in row.get("evidence_groups") or []:
-                    if g.get("doc_id") in stale:
-                        old, new = stale[g["doc_id"]]
-                        alts = [{**a, "extraction_id": new}
-                                for a in _repin_evidence(conn, old, new, g.get("alternatives") or [])]
-                        g = {**g, "alternatives": alts}
-                    groups.append(g)
-                new_row = {**row, "scope": scope, "evidence_groups": groups,
-                           "repinned_from": {"batch_id": c["batch_id"],
-                                             "extractions": {d: o for d, (o, _) in stale.items()}}}
-            else:
-                doc = checker.docs.get(row.get("doc_id"))
-                old, new = row.get("extraction_id"), doc and doc["active_extraction_id"]
-                if not row.get("evidence") or doc is None or old == new:
-                    continue
-                new_row = {**row, "extraction_id": new, "evidence": _repin_evidence(conn, old, new, row["evidence"]),
-                           "repinned_from": {"batch_id": c["batch_id"], "extraction_id": old}}
+            new_row = _repinned_row(conn, checker, c)
+            if new_row is None:
+                continue
             problems = check_row(checker, new_row, f"{c['candidate_id']}", c["dataset"])
             if problems:
                 errors += problems
@@ -766,6 +792,67 @@ def _window(raw: str, kind: str, trigger: tuple[int, int], max_chars: int) -> di
     return {"text": raw[a:b], "offsets": [[a, b]], "context_clipped": True}
 
 
+def _drafting_elements(conn, docs: list[dict]) -> dict[str, list[dict]]:
+    """Each document's non-TOC elements in source order; byte-identical copies share one extraction, so only the
+    first document of an original is drafted against."""
+    seen_sources: set[str] = set()
+    elements: dict[str, list[dict]] = {}
+    for d in docs:
+        if d["active_source_hash"] in seen_sources:
+            continue
+        seen_sources.add(d["active_source_hash"])
+        elements[d["doc_id"]] = [dict(r) for r in conn.execute(
+            "SELECT element_id, source_order, kind, raw_text, location_json FROM elements "
+            "WHERE extraction_id = ? AND kind != 'toc' ORDER BY source_order", (d["active_extraction_id"],))]
+    return elements
+
+
+def _drafting_rejections(conn) -> list[dict]:
+    """Rejected candidates with their reasons and inferences; sealed rows never reach drafting packs."""
+    return [{"candidate_id": r["candidate_id"], "doc_id": json.loads(r["row_json"]).get("doc_id"),
+             "type": json.loads(r["row_json"]).get("type"),
+             "categories": json.loads(r["reject_json"])["categories"],
+             "note": json.loads(r["reject_json"]).get("note"),
+             "inference": json.loads(r["inference_json"]) if r["inference_json"] else None}
+            for r in conn.execute("SELECT * FROM gold_candidates WHERE status = 'rejected' "
+                                  "AND dataset NOT IN ('test')")]
+
+
+def _doc_excerpts(d: dict, els: list[dict], family: str, code_docs: dict[str, set[str]], per_category: int,
+                  max_chars: int, out: list[dict], omitted: list[dict]) -> None:
+    """Up to `per_category` excerpts of one document per category, one category per element; a trigger that does
+    not fit the bound is listed as omitted."""
+    n = len(els)
+    picked: dict[str, int] = {}
+    for e in els:
+        raw = e["raw_text"]
+        if len(raw.strip()) < 20:
+            continue
+        position = e["source_order"] / max(1, els[-1]["source_order"])
+        for cat in EXCERPT_CATEGORIES:
+            if picked.get(cat, 0) >= per_category:
+                continue
+            if cat == "late_table" and not (e["kind"] == "table" and position >= LATE_FROM):
+                continue
+            trigger = _trigger(cat, raw, code_docs)
+            if trigger is None:
+                continue
+            window = _window(raw, e["kind"], trigger, max_chars)
+            if window is None:
+                omitted.append({"category": cat, "element_id": e["element_id"],
+                                "reason": "the triggering fact does not fit the excerpt bound"})
+                continue
+            picked[cat] = picked.get(cat, 0) + 1
+            loc = json.loads(e["location_json"])
+            out.append({"category": cat, "doc_id": d["doc_id"], "source_hash": d["active_source_hash"],
+                        "extraction_id": d["active_extraction_id"], "family": family,
+                        "element_id": e["element_id"], "kind": e["kind"], "position": round(position, 3),
+                        "elements_in_extraction": n,
+                        "location": {k: loc.get(k) for k in ("page", "page_label", "section_path", "path")},
+                        "trigger": raw[trigger[0]:trigger[1]], "trigger_offset": list(trigger), **window})
+            break  # one category per element keeps the pack varied
+
+
 def excerpts(settings: Settings, per_category: int = 2, max_chars: int = 800) -> dict:
     """Narrowly scoped drafting inputs: a few candidate elements per dev-family document and category, plus the
     queue context a drafter must respect (rejections with their reasons, existing question keys). Contains source
@@ -781,63 +868,20 @@ def excerpts(settings: Settings, per_category: int = 2, max_chars: int = 800) ->
             "JOIN sources s ON s.source_hash = d.active_source_hash WHERE s.parse_status = 'parsed' "
             "ORDER BY d.csv_row_id")]
         docs = [d for d in docs if d["doc_id"] in dev]
-        seen_sources: set[str] = set()
-        elements: dict[str, list[dict]] = {}
-        for d in docs:
-            if d["active_source_hash"] in seen_sources:
-                continue  # byte-identical copies share one extraction: draft against one association
-            seen_sources.add(d["active_source_hash"])
-            elements[d["doc_id"]] = [dict(r) for r in conn.execute(
-                "SELECT element_id, source_order, kind, raw_text, location_json FROM elements "
-                "WHERE extraction_id = ? AND kind != 'toc' ORDER BY source_order", (d["active_extraction_id"],))]
-        code_docs: dict[str, set[str]] = {}
-        for doc_id, els in elements.items():
-            for e in els:
-                for code in CODE_RE.findall(e["raw_text"]):
-                    code_docs.setdefault(code, set()).add(doc_id)
-        rejected = [{"candidate_id": r["candidate_id"], "doc_id": json.loads(r["row_json"]).get("doc_id"),
-                     "type": json.loads(r["row_json"]).get("type"),
-                     "categories": json.loads(r["reject_json"])["categories"],
-                     "note": json.loads(r["reject_json"]).get("note"),
-                     "inference": json.loads(r["inference_json"]) if r["inference_json"] else None}
-                    for r in conn.execute("SELECT * FROM gold_candidates WHERE status = 'rejected' "
-                                          "AND dataset NOT IN ('test')")]  # sealed rows never reach drafting packs
+        elements = _drafting_elements(conn, docs)
+        rejected = _drafting_rejections(conn)
         keys = sorted(r[0] for r in conn.execute("SELECT question_key FROM gold_candidates "
                                                  "WHERE dataset NOT IN ('test')"))
+    code_docs: dict[str, set[str]] = {}
+    for doc_id, els in elements.items():
+        for e in els:
+            for code in CODE_RE.findall(e["raw_text"]):
+                code_docs.setdefault(code, set()).add(doc_id)
     out, omitted = [], []
     for d in docs:
-        els = elements.get(d["doc_id"])
-        if not els:
-            continue
-        n = len(els)
-        picked: dict[str, int] = {}
-        for e in els:
-            raw = e["raw_text"]
-            if len(raw.strip()) < 20:
-                continue
-            position = e["source_order"] / max(1, els[-1]["source_order"])
-            for cat in EXCERPT_CATEGORIES:
-                if picked.get(cat, 0) >= per_category:
-                    continue
-                if cat == "late_table" and not (e["kind"] == "table" and position >= LATE_FROM):
-                    continue
-                trigger = _trigger(cat, raw, code_docs)
-                if trigger is None:
-                    continue
-                window = _window(raw, e["kind"], trigger, max_chars)
-                if window is None:
-                    omitted.append({"category": cat, "element_id": e["element_id"],
-                                    "reason": "the triggering fact does not fit the excerpt bound"})
-                    continue
-                picked[cat] = picked.get(cat, 0) + 1
-                loc = json.loads(e["location_json"])
-                out.append({"category": cat, "doc_id": d["doc_id"], "source_hash": d["active_source_hash"],
-                            "extraction_id": d["active_extraction_id"], "family": dev[d["doc_id"]],
-                            "element_id": e["element_id"], "kind": e["kind"], "position": round(position, 3),
-                            "elements_in_extraction": n,
-                            "location": {k: loc.get(k) for k in ("page", "page_label", "section_path", "path")},
-                            "trigger": raw[trigger[0]:trigger[1]], "trigger_offset": list(trigger), **window})
-                break  # one category per element keeps the pack varied
+        if elements.get(d["doc_id"]):
+            _doc_excerpts(d, elements[d["doc_id"]], dev[d["doc_id"]], code_docs, per_category, max_chars, out,
+                          omitted)
     context = {"created_at": utcnow(), "dev_documents": len(docs), "excerpts": len(out),
                "by_category": {c: sum(x["category"] == c for x in out) for c in EXCERPT_CATEGORIES},
                "omitted": omitted,
