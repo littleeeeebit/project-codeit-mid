@@ -1,6 +1,6 @@
 {
  "ns": "repo",
- "repo": "main-update-banner-button",
+ "repo": "wt",
  "nodes_from": ".wiki/corpus.json",
  "edges": [
   {

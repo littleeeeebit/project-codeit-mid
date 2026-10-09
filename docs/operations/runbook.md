@@ -164,7 +164,7 @@ sudo -u bidmate env HOME=/srv/bidmate sh -c "cd $APP/web && npm ci && npm run bu
 sudo install -m 644 $APP/tools/infra/bidmate.service /etc/systemd/system/bidmate.service
 
 # 2. The updater runs with systemd's default PATH: node, npm, git and curl must be found there.
-sudo -u bidmate env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin sh -c 'command -v node npm git curl'
+sudo -u bidmate env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin sh -c 'for c in node npm git curl; do command -v $c || echo "missing: $c"; done'
 
 # 3. The updater: a root-owned copy of the script, its units, the marker directory (bidmate writes) and the
 #    state directory (root writes, bidmate reads). Repeat this step whenever a run says the updater changed.
@@ -185,7 +185,9 @@ systemctl status bidmate-update.path                               # active (wai
 
 Until step 1 runs, the VM runs a commit that was deployed from a bundle and is not on `main` (PRs are squash-merged). The page then shows no banner, and `GET /api/update/status` says in `note` that the running commit cannot be fast-forwarded.
 
-Live check (2026-10-08). After PR #31 merged, a member with sudo ran the one-time setup above. On <http://35.255.64.243:8501> they confirmed four things. The banner appeared for a real newer `main` commit. The button was faded while a paid question ran. 취소 did nothing. Confirming updated the server, and the service came back.
+`sh` on `codeit` is dash, whose `command -v` reports only its first name, so step 2 checks each tool in turn.
+
+Setup record (2026-10-09). Until then the VM still ran the PR #29 branch from a bundle; the one-time setup had not been run. The root disk had 618 MB free, too little for `npm ci` and a build, so the regenerable caches went first: `apt-get clean`, root's pip cache (1.7 GB) and journals over 50 MB. Teammates' home directories and BidMate's Hugging Face cache stayed. With no paid work open (pending $0, open attempts 0), steps 1 to 4 ran and the checkout reached `7546ddb` (#31). `/api/info` answered 401 from outside, the screens 200, and `bidmate-update.path` was active (waiting). About 1.2 GB stayed free, and a later run that rebuilds `web/` needs room for `node_modules` and the build. The banner and its button were not yet seen live: the running commit equalled `main`, so no banner was offered. The first newer `main` is that check.
 
 The VM serves the owner host's restored database, whose rows keep Windows paths (`C:\Users\dasdk\PycharmProjects\project-codeit-mid\...`). `RFP_PATH_MAP=C:/Users/dasdk/PycharmProjects/project-codeit-mid=/srv/bidmate/app` maps them onto the copied originals and runtime. Every reader of a recorded original, extraction or index path goes through `postgres.host_path`. Paths written on the VM are Linux paths and need no mapping.
 
