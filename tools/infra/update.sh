@@ -123,6 +123,7 @@ if [ -f "$PENDING" ]; then
     [[ $PREV =~ ^[0-9a-f]{40}$ ]] && [ -d "$BACKUP" ] \
         || { PREV=""; fail "$PENDING 또는 $BACKUP이 온전하지 않습니다. 서버에서 직접 확인해야 합니다."; }
     RECOVERING=1
+    DEPS=1  # the cut-off run may have installed its dependencies: any rollback from here reinstalls $PREV's
     log "a run that fast-forwarded from $PREV never finished: deploying from there again"
 else
     PREV=$(git_app rev-parse HEAD) || fail "실행 중인 커밋을 읽지 못했습니다."
@@ -154,7 +155,7 @@ fi
 
 git_app merge --quiet --ff-only "$TARGET" || rollback "main으로 빨리 감기하지 못했습니다."
 # $PREV...$TARGET does not say what a cut-off run already installed or built (main may have reverted it since):
-# after one, both are redone, and a rollback reinstalls $PREV's dependencies.
+# after one, both are redone (DEPS is already 1 then).
 if [ $RECOVERING = 1 ] || changed '^(pyproject\.toml|requirements[^/]*\.txt)$'; then
     DEPS=1
     log "dependencies changed or a cut-off run may have changed them: pip install -e"

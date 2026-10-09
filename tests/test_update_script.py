@@ -205,6 +205,21 @@ class UpdateScriptTest(unittest.TestCase):
         self.assertIn("install --quiet -e", self.calls("pip"))
         self.assertEqual((self.app / "web" / "out" / "index.html").read_text(encoding="utf-8"), "new\n")
 
+    def test_a_cut_off_run_whose_fast_forward_then_fails_restores_the_previous_dependencies(self):
+        self.commit({"web/src/page.tsx": "x\n", "pyproject.toml": "[project]\n"}, "B: screens and deps")
+        (self.stub_log / "npm-kills").write_text("", encoding="utf-8")
+        self.run_update(finished=False)  # B's dependencies are installed, its build cut off
+        (self.stub_log / "npm-kills").unlink()
+        self.commit({"new.txt": "tracked\n"}, "C: a new file")
+        (self.app / "new.txt").write_text("untracked\n", encoding="utf-8")  # git refuses to overwrite it
+        (self.stub_log / "pip").unlink()
+        result = self.run_update()
+        self.assertEqual(result["state"], "rolled_back", self.log)
+        self.assertIn("빨리 감기하지 못했습니다", result["message"])
+        self.assertEqual(self.head(self.app), self.prev)
+        self.assertIn("install --quiet -e", self.calls("pip"))  # A's dependencies again, not B's
+        self.assertEqual((self.app / "web" / "out" / "index.html").read_text(encoding="utf-8"), "old\n")
+
     def test_a_cut_off_run_that_fails_again_rolls_back_to_the_commit_before_it(self):
         self.commit({"web/src/page.tsx": "x\n"}, "screens")
         (self.stub_log / "npm-kills").write_text("", encoding="utf-8")
