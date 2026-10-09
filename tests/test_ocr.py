@@ -1,4 +1,5 @@
 import io
+import json
 import struct
 import sys
 import tempfile
@@ -628,7 +629,6 @@ class RemoteReaderLedgerTest(unittest.TestCase):
     USAGE = {"prompt_tokens": 900, "completion_tokens": 120, "cached_tokens": 0, "cache_write_tokens": 0}
 
     def setUp(self):
-        import json
         from datetime import date
 
         from rfp_assistant.gateway import budget
@@ -750,12 +750,21 @@ class RemoteReaderLedgerTest(unittest.TestCase):
                          (1, 1.0, round(2 * 2 / (2 + 5), 4), settled / 1e6))
         self.assertEqual(len(transport.calls), 1)
         self.assertFalse(ocr.cache_path(self.settings, h).exists())  # reference only
+        (region,) = json.loads((self.settings.data_dir / "ocr" / "sample-gpt-5-mini.json").read_text("utf-8"))["regions"]
+        self.assertEqual((region["text"], region["reference"]), ("제안요청서", "제안요청서"))
 
     def test_another_gateway_owner_refuses_the_reader_and_a_key_is_required(self):
         with fixtures.foreign_gateway(self.settings):
             with self.assertRaisesRegex(ocr.OcrError, "owns the paid gateway"):
                 ocr.RemoteReader(self.settings, Replies()).__enter__()
         with ocr.RemoteReader(self.settings, Replies()):  # nothing was left held
+            pass
+        from rfp_assistant.gateway import budget
+
+        with mock.patch.object(budget, "ensure_generation_rate", side_effect=RuntimeError("rate")):
+            with self.assertRaisesRegex(RuntimeError, "rate"):
+                ocr.RemoteReader(self.settings, Replies()).__enter__()
+        with ocr.RemoteReader(self.settings, Replies()):  # a reader that failed to start released the gateway
             pass
         with mock.patch.object(ocr, "read_api_key", return_value=None):
             with self.assertRaisesRegex(ocr.OcrError, "OPENAI_API_KEY"):
