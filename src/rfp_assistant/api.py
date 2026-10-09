@@ -35,6 +35,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from .service import service
+from .service import update as updates  # `update` is create_app's parameter
 
 WEB = Path(__file__).resolve().parents[2] / "web" / "out"
 
@@ -59,7 +60,7 @@ def create_app(resources=None, login=None, update=None) -> FastAPI:
     app = FastAPI(title="RFP assistant", version="1", lifespan=lifespan)
     app.state.login = login or service.Login.from_env()
     # The commit this process runs, read once now; GitHub main is compared with it (runbook 3.2).
-    app.state.update = update or service.UpdateWatch.from_env(service.build_head())
+    app.state.update = update or updates.UpdateWatch.from_env(service.build_head())
     app.add_middleware(_Session)
 
     @app.exception_handler(service.ServiceError)
@@ -488,12 +489,12 @@ def _account_routes(app: FastAPI) -> None:
 
     @app.get("/api/update/status", response_model=UpdateStatus)
     def update_status(request: Request, res: Res, member: Member):
-        return service.update_status(res, member, request.app.state.update)
+        return updates.update_status(res, member, request.app.state.update)
 
     @app.post("/api/update", response_model=UpdateStatus)
     def request_update(request: Request, res: Res, member: Member):
         """Takes no input: the updater only ever moves to the latest origin/main."""
-        return service.request_update(res, member, request.app.state.update)
+        return updates.request_update(res, member, request.app.state.update)
 
     @app.get("/api/budget", response_model=Budget)
     def budget(res: Res, member: Member):

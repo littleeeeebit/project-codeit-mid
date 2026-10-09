@@ -10,6 +10,10 @@ here runs git or systemctl, and no request carries a branch or commit: the scrip
 Enabled only when the environment names both places (on `codeit`: /etc/bidmate/server.env):
 BIDMATE_UPDATE_REQUEST (the marker file, in a directory the service user writes) and BIDMATE_UPDATE_STATE_DIR
 (where the script writes its result).
+
+The service side lives here too: what the banner reads (`update_status`), whether paid work is open
+(`open_paid_work`) and the request itself (`request_update`). The fence it raises is checked at every paid admission
+in service.py (`Resources.update_fence`).
 """
 
 from __future__ import annotations
@@ -25,6 +29,10 @@ from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
+
+from ..gateway import budget
+from . import service
+from .service import ServiceError
 
 REQUEST_ENV = "BIDMATE_UPDATE_REQUEST"
 STATE_ENV = "BIDMATE_UPDATE_STATE_DIR"
@@ -196,6 +204,73 @@ class UpdateWatch:
         part.write_text(json.dumps({"requested_by": member, "requested_at": _now(), "running_commit": self.running},
                                    ensure_ascii=False) + "\n", encoding="utf-8")
         os.replace(part, self.request)  # the path unit sees a complete file or none
+
+
+def open_paid_work(res: service.Resources) -> dict:
+    """Whether a restart now would cut off paid work: an open reservation or attempt in the ledger, a queued or
+    running request, or a live background job (drafting, evaluation, judge run, maintenance).
+
+    Read in the order work leaves them: threads and request slots, then request rows, then the ledger last. Work
+    writes its ledger rows before its row finishes and its thread or slot ends, so whatever ended before its count
+    has already left its open attempts for the ledger read; reading the ledger first could miss both."""
+    with res._runner_lock:
+        jobs = sum(1 for t in res._jobs if t.is_alive())
+        admitted = res._runner.admitted if res._runner is not None else 0  # counted before its queued row exists
+    try:
+        with service.open_db(res.settings.db_path) as conn:
+            active = conn.execute("SELECT COUNT(*) FROM requests WHERE status IN ('queued', 'running')").fetchone()[0]
+        snap = budget.snapshot(res.settings.db_path)
+    except (*service.DATABASE_ERRORS, budget.BudgetError) as exc:
+        raise ServiceError(f"ledger_unavailable: {type(exc).__name__}") from None
+    active = max(active, admitted)
+    reasons = []
+    if active:
+        reasons.append(f"질문 {active}건 실행 중")
+    if jobs:
+        reasons.append(f"백그라운드 작업 {jobs}건 실행 중")
+    if snap.unknown_micro_usd:
+        reasons.append("결과를 모르는 유료 호출이 정산을 기다리는 중")
+    elif snap.open_attempts or snap.pending_micro_usd > 0:
+        reasons.append(f"유료 호출 {snap.open_attempts}건 진행 중")
+    return {"open": bool(reasons), "pending_micro_usd": snap.pending_micro_usd, "open_attempts": snap.open_attempts,
+            "active_requests": active, "background_jobs": jobs,
+            "reason": ("진행 중인 유료 작업이 끝나면 업데이트할 수 있습니다: " + ", ".join(reasons)) if reasons else None}
+
+
+def update_status(res: service.Resources, principal, watch: UpdateWatch) -> dict:
+    """What the header's update banner shows. Every signed-in member may read and request it."""
+    service._authorize(res, principal, "consultant", "verifier", "budget_admin")
+    check = watch.check
+    return {"configured": watch.configured, "running_commit": watch.running, "latest_commit": check.latest,
+            "ahead_by": check.ahead_by, "commits": check.commits,
+            "available": watch.configured and check.available, "checked_at": check.checked_at, "note": check.note,
+            "paid_work": open_paid_work(res), "in_progress": watch.in_progress(), "last_result": watch.last_result()}
+
+
+def request_update(res: service.Resources, principal, watch: UpdateWatch) -> dict:
+    """Asks the root updater to move this server to the latest main. It takes no branch or commit: the updater
+    fetches origin/main itself. Refused while paid work is open, so a restart never cuts one off."""
+    principal = service._authorize(res, principal, "consultant", "verifier", "budget_admin")
+    if not watch.configured:
+        raise ServiceError("이 서버에는 업데이트 장치가 설치되어 있지 않습니다.")
+    # The fence goes up before paid work is counted, under the lock every paid admission holds: work admitted
+    # before it is counted and refuses the update, work after it is refused. The marker then keeps it up until the
+    # updater ends without a restart; a restart starts a new process, fenced while its result still says running.
+    with res._runner_lock:
+        if watch.fenced():
+            raise ServiceError("업데이트가 이미 진행 중입니다.")
+        watch.accepting = True
+    try:
+        work = open_paid_work(res)
+        if work["open"]:
+            raise ServiceError(work["reason"])
+        watch.write_request(principal.member_id)
+    finally:
+        watch.accepting = False
+    with service.open_db(res.settings.db_path) as conn, service.tx(conn):
+        service._audit(conn, principal.member_id, "request_update", "main", "header update button",
+                       {"running_commit": watch.running, "latest_commit": watch.check.latest})
+    return update_status(res, principal, watch)
 
 
 def _now() -> str:

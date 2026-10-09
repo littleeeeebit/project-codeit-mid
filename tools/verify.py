@@ -1002,42 +1002,6 @@ def accessibility(ctx: Context) -> dict:
     return with_browser(ctx, body)
 
 
-UPDATE_TITLES = ("검증 화면 결론 먼저", "업데이트 버튼 추가")
-
-
-def fake_github(running: str, latest: str):
-    """A stand-in for the two unauthenticated GitHub routes the update check reads, on a loopback port: main's head
-    is `latest`, two commits ahead of `running`."""
-    import threading
-    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-
-    repo = "littleeeeebit/project-codeit-mid"
-    shas = [hashlib.sha1(b"update-banner-middle").hexdigest(), latest]
-
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *args) -> None:
-            pass
-
-        def do_GET(self) -> None:
-            if self.path == f"/repos/{repo}/commits/main":
-                body, kind = latest.encode(), "text/plain"
-            elif self.path == f"/repos/{repo}/compare/{running}...{latest}":
-                body, kind = json.dumps({"status": "ahead", "ahead_by": 2, "behind_by": 0, "commits": [
-                    {"sha": s, "commit": {"message": t}} for s, t in zip(shas, UPDATE_TITLES)]}).encode(), "application/json"
-            else:
-                self.send_response(404)
-                return self.end_headers()
-            self.send_response(200)
-            self.send_header("Content-Type", kind)
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    return server
-
-
 def button_state(button) -> tuple[bool, float]:
     return button.is_disabled(), float(button.evaluate("e => getComputedStyle(e).opacity"))
 
@@ -1055,7 +1019,8 @@ def wait_button(button, disabled: bool, timeout_s: float) -> tuple[bool, float]:
 @flow("update-banner")
 def update_banner(ctx: Context) -> dict:
     running, latest = git_head(), hashlib.sha1(b"update-banner-latest").hexdigest()
-    github = fake_github(running, latest)
+    from tests import fake_github  # a stand-in for GitHub's two update routes, run in this process
+    github = fake_github.serve(running, latest)
     marker, state = ctx.work / "update-request" / "requested", ctx.work / "update-state"
     state.mkdir()
     extra = {"BIDMATE_UPDATE_REQUEST": str(marker), "BIDMATE_UPDATE_STATE_DIR": str(state),
@@ -1072,7 +1037,7 @@ def update_banner(ctx: Context) -> dict:
         def shown():
             banner.get_by_text("새 버전").wait_for(timeout=30000)
             banner.get_by_text("바뀐 내용").click()
-            titles = [t for t in UPDATE_TITLES if banner.get_by_text(t).count() == 1]
+            titles = [t for t in fake_github.TITLES if banner.get_by_text(t).count() == 1]
             disabled, opacity = button_state(button)
             text = banner.inner_text()
             ok = (len(titles) == 2 and not disabled and opacity == 1 and "새 커밋 2개" in text
