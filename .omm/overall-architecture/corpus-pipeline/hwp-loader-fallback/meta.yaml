@@ -1,0 +1,9 @@
+created: 2026-10-09T10:52:16.493Z
+updated: 2026-10-09T10:52:16.789Z
+update_count: 3
+last_field: constraint
+kind: nested-class
+title: hwp-loader-fallback
+children: []
+parentPath:
+  - corpus-pipeline

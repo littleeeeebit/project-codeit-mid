@@ -1,1 +1,1 @@
-`attempts.state` for every paid call: chat, query embedding, drafting, judges and corpus embedding batches. Transitions are conditional UPDATEs (`_transition`), so each happens at most once.
+States of `attempts.state` in the shared ledger (`budget.py`). The snapshot sums settled amounts as spent, and reserved/dispatching/unknown amounts as pending or unknown against the cap.

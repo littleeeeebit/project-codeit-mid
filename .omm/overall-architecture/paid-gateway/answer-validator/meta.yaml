@@ -1,0 +1,9 @@
+created: 2026-10-09T10:52:15.017Z
+updated: 2026-10-09T10:52:15.018Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: answer-validator
+children: []
+parentPath:
+  - paid-gateway

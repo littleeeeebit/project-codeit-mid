@@ -1,0 +1,1 @@
+`.runtime/runs/<run_id>/` (config, traces, scores, report), `.runtime/compare/{tables,cells,estimates}`, answer run directories, judge runs, drafting runs, and the frozen dev and sealed test manifests. All are written atomically. Recorded scores feed `compare-runs` recommendations and the 실험 비교 tables without recomputation.

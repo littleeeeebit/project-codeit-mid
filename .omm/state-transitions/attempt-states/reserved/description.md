@@ -1,1 +1,1 @@
-Inserted by `budget.reserve` at the maximum cost. It counts as pending against the cap. `budget.recover` releases any reserved attempt left by a dead process because it was never dispatched.
+Inserted by `reserve` with the maximum cost after all admission checks pass. A restart moves a reserved attempt to released (`budget.recover`), because it was never dispatched.

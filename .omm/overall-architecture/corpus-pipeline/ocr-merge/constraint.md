@@ -1,0 +1,1 @@
+OCR text is chunked apart, cited as OCR (evidence warning `ocr_text`), and skipped by the fidelity comparison.

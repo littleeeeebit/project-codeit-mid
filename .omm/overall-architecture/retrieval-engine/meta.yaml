@@ -1,6 +1,6 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-09 02:46:29.882000+00:00
-update_count: 37
+updated: 2026-10-09 10:52:12.964000+00:00
+update_count: 39
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
@@ -9,7 +9,7 @@ children:
 - corpus-router
 - dense-channel
 - dense-search
-- evidence-packing
+- evidence-packer
 - fusion
 - fusion-and-rerank
 - fusion-rerank
@@ -20,12 +20,13 @@ children:
 - scope-routing
 - serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  serving-config[\"Serving config\\nsrc/rfp_assistant/service/service.py\"\
-  ] -->|\"mode, limits, versions\"| lexical-ranking[\"Lexical ranking\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ] -->|\"BM25 rows, scope terms\"| lexical-ranking\r\n  serving-config -->|\"embedding\
-  \ model, dims\"| dense-search[\"Dense search\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
-  ]\r\n  lexical-ranking -->|\"BM25 top k\"| fusion-rerank[\"Fusion and rerank\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  dense-search -->|\"cosine top k\"| fusion-rerank\r\n  fusion-rerank -->|\"\
-  ordered chunk rows\"| evidence-packing[\"Evidence packing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]"
+prev_diagram: "graph TD\r\n  serving-config[\"Serving configuration\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  scope-routing[\"Scope routing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  lexical-channel[\"Kiwi BM25 and exact codes\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  dense-channel[\"Dense search\\nsrc/rfp_assistant/retrieval/dense.py\"]\r\n\
+  \  fusion-rerank[\"Fusion and rerank\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  evidence-packing[\"Evidence packing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  serving-config -->|mode, limits, embedding| scope-routing\r\n  scope-routing\
+  \ -->|allowed chunk rows| lexical-channel\r\n  scope-routing -->|allowed chunk rows|\
+  \ dense-channel\r\n  lexical-channel -->|BM25 ranked rows| fusion-rerank\r\n  dense-channel\
+  \ -->|nearest rows| fusion-rerank\r\n  fusion-rerank -->|final ranking| evidence-packing"

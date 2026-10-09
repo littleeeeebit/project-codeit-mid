@@ -1,0 +1,1 @@
+pyhwp is AGPL-3.0-or-later and PyMuPDF is AGPL or commercial. Licenses are recorded before any distribution decision.

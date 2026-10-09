@@ -1,0 +1,1 @@
+Loader order is not native document order, and table cells, spans, pages and coordinates are unavailable (warning `hwp_loader_structure_limited`). The adapter must not invent cells or coordinates.

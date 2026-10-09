@@ -1,1 +1,0 @@
-OCR results are cached per region under `.runtime/ocr/<hash>/` and merged on the next ingest as `image_text` elements. Fidelity verdicts (`auto_verified`, `auto_flagged`, human `sample_checked`) never overwrite a human status and label sources in traces and on the consultant screen.

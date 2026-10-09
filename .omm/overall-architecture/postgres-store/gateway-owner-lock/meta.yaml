@@ -1,0 +1,9 @@
+created: 2026-10-09T10:52:22.374Z
+updated: 2026-10-09T10:52:22.518Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: gateway-owner-lock
+children: []
+parentPath:
+  - postgres-store

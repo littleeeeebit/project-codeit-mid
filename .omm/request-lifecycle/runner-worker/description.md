@@ -1,1 +1,0 @@
-`RequestRunner._run` → `run_queued` claims the row with `UPDATE ... status='running' WHERE status='queued' AND cancel_requested=0`. A request cancelled while queued is never claimed. The worker rebuilds the AnswerRequest and Principal from `request_json` and calls `_execute`. In `finally` it releases the admission slot.

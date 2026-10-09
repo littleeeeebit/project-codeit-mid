@@ -1,1 +1,1 @@
-A versioned index of chunks with a frozen `scope-terms.json` and analyzer version. `Resources.index()` reloads it when the serving `index_version` changes. An outdated analyzer is still served but flagged `index_outdated:`.
+`indexes/<16-hex version>/` holds `chunks.jsonl`, `tokens.jsonl`, `requirements.jsonl` and `scope-terms.json`, plus a manifest of file hashes, mirrored in `indexes`/`chunks`/`requirements` rows. Active index `29f261abafeb1f8c` at cutover (README). A rebuild never changes what serves unless `activate=True` (phase-1 default) or a run activation.

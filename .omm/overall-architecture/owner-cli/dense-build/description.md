@@ -1,1 +1,0 @@
-`plan-embeddings` stores a priced estimate bound to the index, model and payload set. `build-dense` reserves and settles each batch in the `embedding` envelope and publishes the vector set only after every row verifies. Local models (`retrieval/models.py`) run only on CUDA. Read from the README and cli wiring only.

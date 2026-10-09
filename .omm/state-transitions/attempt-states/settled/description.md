@@ -1,1 +1,1 @@
-`settle` computes cost from reported usage (uncached, cached and cache-write tokens) at the attempt's frozen rates. An overrun beyond the reservation sets `budget_settings.frozen_reason`, which stops all new paid admission until inspected.
+`settle` computes the cost from usage exactly once (a duplicate returns the stored cost). A cost above the reservation sets `budget_settings.frozen_reason`, which then refuses every new reservation until the owner inspects it.

@@ -1,6 +1,6 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-09 02:46:27.417000+00:00
-update_count: 25
+updated: 2026-10-09 10:52:09.476000+00:00
+update_count: 27
 last_field: diagram
 kind: nested-class
 title: service-core
@@ -10,27 +10,27 @@ children:
 - app-resources
 - background-jobs
 - conversation-context
+- evidence-reader
 - metered-chat
 - paid-answer
 - partials
 - request-runner
 - resources
 - resources-owner
-- restart-recovery
 - serving-config
 - submit
 - tracing
 - update-fence
 parentPath: []
-prev_diagram: "graph TD\r\n  resources[\"Process owner Resources\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  runner[\"Bounded request runner\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  paid-answer[\"Paid answer path\\nsrc/rfp_assistant/service/service.py\"]\r\
-  \n  free-answer[\"Free metadata and inventory\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  conversation[\"Conversation and rewrite\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  partials[\"Streamed partials map\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  jobs[\"Background paid jobs\\nsrc/rfp_assistant/service/drafting.py\"]\r\n\
-  \  resources -->|\"lazily creates\"| runner\r\n  runner -->|\"run_queued by request\
-  \ ID\"| paid-answer\r\n  paid-answer -->|\"follow-up history\"| conversation\r\n\
-  \  paid-answer -->|\"on_delta text\"| partials\r\n  resources -->|\"index, dense,\
-  \ reranker\"| paid-answer\r\n  resources -->|\"index inventory rows\"| free-answer\r\
-  \n  resources -->|\"joins on close\"| jobs"
+prev_diagram: "graph TD\r\n  resources-owner[\"Process resources\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  request-runner[\"Bounded request executor\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  answer-pipeline[\"Answer execution\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  metered-chat[\"Metered paid call\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  background-jobs[\"Background paid jobs\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  restart-recovery[\"Stop and restart recovery\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  resources-owner -->|creates on first paid ask| request-runner\r\n  request-runner\
+  \ -->|run_queued by request id| answer-pipeline\r\n  answer-pipeline -->|rewrite\
+  \ and generation stages| metered-chat\r\n  resources-owner -->|registers threads\
+  \ in _jobs| background-jobs\r\n  background-jobs -->|same transport and ledger|\
+  \ metered-chat\r\n  resources-owner -->|close and recover=True| restart-recovery\r\
+  \n  restart-recovery -->|interrupts unfinished rows| request-runner"

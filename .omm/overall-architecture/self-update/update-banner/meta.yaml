@@ -1,9 +1,0 @@
-created: 2026-10-09T02:46:38.826Z
-updated: 2026-10-09T02:46:38.827Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: update-banner
-children: []
-parentPath:
-  - self-update

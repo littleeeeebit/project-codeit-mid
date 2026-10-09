@@ -1,1 +1,1 @@
-Written for `technical_error` and `clarification_required` paths (`request_status='failed'`), and by `_fail_unscheduled` when executor submission fails.
+Written by `_finish` for `clarification_required` from a `ServiceError`, `technical_error` (provider, validation, retrieval or settlement failures) and refused frozen-run estimates, and by `_fail_unscheduled` when the executor rejected the job.

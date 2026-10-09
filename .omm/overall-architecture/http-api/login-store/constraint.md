@@ -1,0 +1,1 @@
+A process restart (including an update) signs every member out, and every member must re-enter their OpenAI key, which is also memory-only.

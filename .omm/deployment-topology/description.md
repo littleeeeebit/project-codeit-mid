@@ -1,1 +1,0 @@
-The production arrangement on the team VM `codeit` and the trust boundaries the code enforces. The FastAPI app is the service user's process. Root owns only the update units and script. External services are reached from the server only.

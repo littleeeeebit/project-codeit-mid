@@ -1,0 +1,1 @@
+The `active_run` app setting, plus the `activations` history, changes only through `evaluation.activate_decision`/`activate_run`. `service.active_serving` reads it on every retrieval and may serve a degraded form: the keyword default when the corpus route is stale, `kiwi_bm25` when the embedding is unknown, hybrid when a reranker run is from an older `EVAL_VERSION`.

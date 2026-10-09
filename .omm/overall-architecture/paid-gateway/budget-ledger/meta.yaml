@@ -1,7 +1,7 @@
 created: 2026-10-05T09:51:19.842Z
-updated: 2026-10-09T02:46:34.313Z
-update_count: 8
-last_field: description
+updated: 2026-10-09T10:52:14.625Z
+update_count: 10
+last_field: concern
 kind: nested-class
 title: budget-ledger
 children: []

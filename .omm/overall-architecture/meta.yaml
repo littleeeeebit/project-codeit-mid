@@ -1,49 +1,80 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-09 02:46:15.278000+00:00
-update_count: 40
+updated: 2026-10-09T10:52:05.040Z
+update_count: 42
 last_field: diagram
-git_commit: 829c708
-git_branch: main-update-banner-button
+git_commit: d812067
+git_branch: hwp-recovery-native-loader
 children:
-- api-layer
-- api-routes
-- api-shell
-- budget-ledger
-- corpus-pipeline
-- data-stores
-- evaluation
-- evaluation-suite
-- http
-- http-api
-- langfuse-tracing
-- offline-pipelines
-- openai-transport
-- owner-cli
-- paid-gateway
-- persistence
-- postgres-store
-- postgresql-store
-- provider-transport
-- retrieval
-- retrieval-engine
-- runtime-artifacts
-- self-update
-- service
-- service-core
-- service-layer
-- storage
-- tracing
-- web
-- web-pages
-- web-screens
-- workflows
-prev_diagram: "graph TD\r\nweb[\"Browser screens\\nweb/src/app/layout.tsx\"] -->|Authenticated\
-  \ HTTP actions| http[\"HTTP boundary\\nsrc/rfp_assistant/api.py\"]\r\nhttp -->|Principal\
-  \ and request inputs| service[\"Application service\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\nservice -->|Question and document scope| retrieval[\"Evidence retrieval\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\nservice -->|Records and transactions| persistence[\"Persistent state\\nsrc/rfp_assistant/storage/store.py\"\
-  ]\r\nretrieval -->|Scoped vectors and artifacts| persistence\r\nworkflows[\"Corpus\
-  \ and evaluation workflows\\nsrc/rfp_assistant/cli.py\"] -->|Pinned answer execution|\
-  \ service\r\nworkflows -->|Revisions and measured selections| persistence\r\nservice\
-  \ -->|Request spans and outcomes| tracing[\"Optional tracing\\nsrc/rfp_assistant/gateway/tracing.py\"\
-  ]"
+  - api-layer
+  - api-routes
+  - api-shell
+  - budget-ledger
+  - corpus-pipeline
+  - data-stores
+  - evaluation
+  - evaluation-suite
+  - http
+  - http-api
+  - langfuse-tracing
+  - offline-pipelines
+  - openai-transport
+  - owner-cli
+  - paid-gateway
+  - persistence
+  - postgres-store
+  - postgresql-store
+  - provider-transport
+  - retrieval
+  - retrieval-engine
+  - runtime-artifacts
+  - self-update
+  - service
+  - service-core
+  - service-layer
+  - storage
+  - tracing
+  - web
+  - web-pages
+  - web-screens
+  - workflows
+prev_diagram: "graph TD\r
+
+  \  web-screens[\"Next.js screens\\nweb/src\"]\r
+
+  \  http-api[\"FastAPI app\\nsrc/rfp_assistant/api.py\"]\r
+
+  \  service-core[\"Service core\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  retrieval-engine[\"Retrieval
+  engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
+
+  \  paid-gateway[\"Paid gateway\\nsrc/rfp_assistant/gateway\"]\r
+
+  \  postgres-store[\"PostgreSQL
+  store\\nsrc/rfp_assistant/storage/postgres.py\"]\r
+
+  \  self-update[\"Self-update watch\\nsrc/rfp_assistant/service/update.py\"]\r
+
+  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"]\r
+
+  \  web-screens -->|fetch /api with session| http-api\r
+
+  \  http-api -->|one service call per route| service-core\r
+
+  \  http-api -->|update status and request| self-update\r
+
+  \  self-update -->|fence paid admission| service-core\r
+
+  \  service-core -->|retrieve scoped evidence| retrieval-engine\r
+
+  \  service-core -->|reserve, call, settle| paid-gateway\r
+
+  \  service-core -->|requests, traces, audit| postgres-store\r
+
+  \  retrieval-engine -->|index rows, pgvector search| postgres-store\r
+
+  \  paid-gateway -->|attempts ledger, advisory lock| postgres-store\r
+
+  \  owner-cli -->|ingest, build, evaluate, activate| postgres-store\r
+
+  \  owner-cli -->|budget admin, maintenance| service-core"

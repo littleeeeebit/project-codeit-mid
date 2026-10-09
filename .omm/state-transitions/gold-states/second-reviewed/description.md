@@ -1,0 +1,1 @@
+`gold.second_review` applies only to approved gold rows. `gold_awaiting_second_review` lists approved development rows marked `disputed` without `second_review` on the 검증 overview.

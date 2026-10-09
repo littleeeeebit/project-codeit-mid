@@ -1,1 +1,0 @@
-States written by `tools/infra/update.sh` to `result.json`, plus `requested` (marker present) and the display-only `interrupted`, which `UpdateWatch.last_result` derives from a running state older than 30 minutes. The script itself also writes `interrupted` when a recovery run fails before changing anything.

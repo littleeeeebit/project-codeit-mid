@@ -1,0 +1,1 @@
+`postAsk` in `ask-page.tsx` sends the request and stores the turn. `TurnView` follows it with `usePoll` (1 s, stops at a terminal status) and `useAnswerStream` (SSE). It shows `LiveTurn` with provisional text while live, `AnswerBody` with numbered citations once terminal and `attachable`, or a history notice when not attachable.

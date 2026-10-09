@@ -1,0 +1,1 @@
+The printed PDF is only an independent witness; it is never parsed as a source of text. A human review status is never overwritten by an automatic one.

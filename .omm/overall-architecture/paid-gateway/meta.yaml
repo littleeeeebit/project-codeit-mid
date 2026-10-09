@@ -1,33 +1,36 @@
 created: 2026-10-05 04:06:18.173000+00:00
-updated: 2026-10-09 02:46:33.549000+00:00
-update_count: 26
+updated: 2026-10-09 10:52:14.244000+00:00
+update_count: 28
 last_field: diagram
 kind: nested-class
 title: paid-gateway
 children:
 - answer-validation
+- answer-validator
 - budget-admission
 - budget-ledger
 - dispatch-guard
 - dispatch-marker
 - fake
-- fake-transport
 - gateway-owner
+- gemini-ledger
 - key-sessions
 - langfuse-tracing
 - ledger
+- metered-caller
 - openai-transport
 - owner-reconciliation
 - tracing
 - transport
 parentPath: []
-prev_diagram: "graph TD\r\n  ledger[\"Budget ledger\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\n  key-sessions[\"Member key sessions\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\n  owner-lock[\"Gateway advisory lock\\nsrc/rfp_assistant/storage/postgres.py\"\
-  ]\r\n  tracing[\"Langfuse tracing\\nsrc/rfp_assistant/gateway/tracing.py\"]\r\n\
-  \  fake[\"Fake transport\\nsrc/rfp_assistant/gateway/generation.py\"]\r\n  ledger\
-  \ -->|\"require_owner, owner_guard\"| owner-lock\r\n  transport -->|\"_check_owner\
-  \ before call\"| owner-lock\r\n  transport -->|\"client per KEY_SESSION\"| key-sessions\r\
-  \n  tracing -->|\"wraps each call\"| transport\r\n  fake -->|\"stands in when provider\
-  \ fake\"| transport"
+prev_diagram: "graph TD\r\n  budget-ledger[\"Budget ledger\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  gateway-owner[\"Gateway advisory lock\\nsrc/rfp_assistant/storage/postgres.py\"\
+  ]\r\n  openai-transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"\
+  ]\r\n  fake-transport[\"Fake transport\\nsrc/rfp_assistant/gateway/generation.py\"\
+  ]\r\n  answer-validation[\"Answer validation\\nsrc/rfp_assistant/gateway/generation.py\"\
+  ]\r\n  langfuse-tracing[\"Langfuse tracing\\nsrc/rfp_assistant/gateway/tracing.py\"\
+  ]\r\n  budget-ledger -->|owner_guard in admission tx| gateway-owner\r\n  openai-transport\
+  \ -->|owner_check before call| gateway-owner\r\n  budget-ledger -->|dispatching\
+  \ attempt| openai-transport\r\n  budget-ledger -->|dispatching attempt in tests|\
+  \ fake-transport\r\n  openai-transport -->|response and usage| answer-validation\r\
+  \n  openai-transport -->|generation spans| langfuse-tracing"

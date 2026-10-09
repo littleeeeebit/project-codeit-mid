@@ -1,1 +1,0 @@
-`ask(body, res, member)` passes `_scope(body.scope)`, question, mode, `date.today()` and `previous_request_id` to `service.ask`. That creates a fresh uuid used as both `idempotency_key` and `generation_id` and returns the `target_key` hash of what the screen asked.

@@ -1,0 +1,9 @@
+created: 2026-10-09T10:52:30.399Z
+updated: 2026-10-09T10:52:30.400Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: quarantined
+children: []
+parentPath:
+  - source-states

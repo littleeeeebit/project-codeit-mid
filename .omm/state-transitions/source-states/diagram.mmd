@@ -1,0 +1,7 @@
+graph TD
+  quarantined["quarantined, needs_recovery\nsrc/rfp_assistant/corpus/ingestion.py"] -->|recover-source passes| unreviewed["parsed, unreviewed\nsrc/rfp_assistant/corpus/ingestion.py"]
+  unreviewed -->|fidelity verdict| auto-verified["auto_verified\nsrc/rfp_assistant/corpus/fidelity.py"]
+  unreviewed -->|fidelity verdict| auto-flagged["auto_flagged\nsrc/rfp_assistant/corpus/fidelity.py"]
+  auto-flagged -->|person confirms findings| human-reviewed["sample_checked or reviewed\nsrc/rfp_assistant/corpus/ingestion.py"]
+  auto-verified -->|import-reviews| human-reviewed
+  human-reviewed -->|new extraction revision| unreviewed

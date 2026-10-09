@@ -1,9 +1,0 @@
-created: 2026-10-09T02:46:43.433Z
-updated: 2026-10-09T02:46:43.434Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: activation
-children: []
-parentPath:
-  - owner-cli

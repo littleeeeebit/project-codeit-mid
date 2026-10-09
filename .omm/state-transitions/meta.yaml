@@ -1,34 +1,39 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-09 02:46:48.155000+00:00
-update_count: 36
+updated: 2026-10-09 10:52:26.129000+00:00
+update_count: 38
 last_field: diagram
-git_commit: 829c708
-git_branch: main-update-banner-button
+git_commit: d812067
+git_branch: hwp-recovery-native-loader
 children:
 - attempt-billing
 - attempt-record
 - attempt-states
 - billing-attempt
 - billing-attempt-states
-- controlled-shutdown
 - gateway-owner
 - gold-candidate
 - gold-candidate-states
+- gold-states
 - interrupted
 - request-states
 - request-status
-- restart-recovery
+- run-selection
 - running
 - serving-activation
 - source-review-states
-- update-fence
+- source-states
 - update-states
-prev_diagram: "graph TD\r\nqueued[\"Queued request\\nsrc/rfp_assistant/service/service.py\"\
-  ] -->|Worker claims uncancelled row| running[\"Running request\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\nqueued -->|Owner cancels before claim| cancelled[\"Cancelled execution\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\nqueued -->|Shutdown or restart recovery| interrupted[\"Interrupted execution\\\
-  nsrc/rfp_assistant/service/service.py\"]\r\nqueued -->|Executor submission fails|\
-  \ failed[\"Failed execution\\nsrc/rfp_assistant/service/service.py\"]\r\nrunning\
-  \ -->|Normal outcome persisted| completed[\"Completed execution\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\nrunning -->|Execution or validation error| failed\r\nrunning -->|Stop checkpoint\
-  \ or finalization| cancelled\r\nrunning -->|Shutdown or restart recovery| interrupted"
+prev_diagram: "graph TD\r\n  request-states[\"Request status\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  attempt-states[\"Ledger attempt state\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  update-states[\"Updater result state\\ntools/infra/update.sh\"]\r\n  update-fence[\"\
+  Update fence\\nsrc/rfp_assistant/service/update.py\"]\r\n  controlled-shutdown[\"\
+  Controlled stop\\nsrc/rfp_assistant/service/service.py\"]\r\n  restart-recovery[\"\
+  Restart recovery\\nsrc/rfp_assistant/service/service.py\"]\r\n  request-states -->|each\
+  \ paid stage opens| attempt-states\r\n  attempt-states -->|open or unknown refuses\
+  \ update| update-fence\r\n  request-states -->|queued or running refuses update|\
+  \ update-fence\r\n  update-states -->|running keeps fence up| update-fence\r\n \
+  \ update-fence -->|blocks new paid admission| request-states\r\n  update-states\
+  \ -->|systemctl restart triggers| controlled-shutdown\r\n  controlled-shutdown -->|unfinished\
+  \ rows interrupted| request-states\r\n  restart-recovery -->|dispatching becomes\
+  \ unknown| attempt-states\r\n  restart-recovery -->|queued and running interrupted|\
+  \ request-states"

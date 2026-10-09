@@ -1,1 +1,0 @@
-Written before the marker is removed. A restarted app process reads it and stays fenced until a terminal state is written.

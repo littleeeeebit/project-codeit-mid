@@ -1,0 +1,1 @@
+`elements.jsonl` per `(source_hash, parser fingerprint[, content id])` plus `elements` rows. The fingerprint encodes the walker or loader revision and the OCR suffix. Gold evidence groups and issued citations pin `extraction_id` and `element_id`, so revisions are kept side by side.

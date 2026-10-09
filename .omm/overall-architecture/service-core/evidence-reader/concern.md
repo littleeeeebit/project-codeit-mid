@@ -1,0 +1,1 @@
+`_stored_quote` scans every chunk of the loaded index (about 19k) for each evidence unit it checks, in `_validated` and `_with_carried`. `KeywordIndex.row_of` already maps chunk ID to row and would make this O(1).

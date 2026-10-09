@@ -1,0 +1,1 @@
+Never start a review, evaluation or paid job automatically. Every start is a person's click or CLI command with a priced estimate the person consented to.

@@ -1,0 +1,1 @@
+The update request carries no branch or commit; the script only ever takes origin/main. Nothing in Python runs git or systemctl.

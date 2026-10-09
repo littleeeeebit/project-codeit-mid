@@ -1,0 +1,1 @@
+Conversation: `_conversation` walks `previous_request_id` up to 6 turns. Every turn must be the same member's, terminal, and of the same scope. It carries up to 8 cited `EvidenceUnit`s from the previous answer, and `_with_carried` appends them after fresh evidence, renumbered.

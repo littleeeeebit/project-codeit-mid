@@ -1,0 +1,1 @@
+Any single `unknown` attempt blocks every member's paid dispatch until an owner runs `reconcile`/`settle` from the CLI. This is deliberate, but a provider timeout during a busy period stops all paid answering.

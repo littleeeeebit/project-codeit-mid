@@ -1,0 +1,1 @@
+`sample_checked` (via `confirm_fidelity` → `record_review`, or CLI `review record`) or `reviewed` (`import-reviews` with coverage). Automatic verdicts never overwrite these (`HUMAN_STATUSES`).

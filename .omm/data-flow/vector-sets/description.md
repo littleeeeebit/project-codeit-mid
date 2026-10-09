@@ -1,1 +1,0 @@
-`embedding_sets` (state building/ready) and their rows reference an index version, with payloads deduplicated in `embedding_payloads` by payload hash, model and dimensions. Query vectors are cached by text, model and dimensions. `DenseIndex.load` verifies the set against the base index; on a mismatch serving falls back to K1.

@@ -1,16 +1,39 @@
 created: 2026-10-06 09:08:45.737000+00:00
-updated: 2026-10-09T00:31:44.782Z
-update_count: 6
+updated: 2026-10-09T10:52:15.730Z
+update_count: 8
 last_field: diagram
 kind: nested-class
 title: corpus-pipeline
 children:
+  - extraction-revisions
   - fidelity-check
+  - hwp-loader-fallback
+  - hwp-xml-walker
   - manifest
+  - manifest-import
   - ocr-and-fidelity
   - ocr-merge
   - ocr-regions
   - parsers
+  - pdf-parser
   - review-and-recovery
   - revision-assignment
 parentPath: []
+prev_diagram: "graph TD\r
+
+  \  manifest[\"CSV manifest import\\nsrc/rfp_assistant/corpus/ingestion.py\"]
+  -->|\"sources and documents rows\"| parsers[\"HWP and PDF
+  parsers\\nsrc/rfp_assistant/corpus/ingestion.py\"]\r
+
+  \  parsers -->|\"raw elements\"| ocr-merge[\"OCR image text
+  merge\\nsrc/rfp_assistant/corpus/ocr.py\"]\r
+
+  \  ocr-merge -->|\"elements with image_text\"|
+  revision-assignment[\"Extraction
+  revision\\nsrc/rfp_assistant/corpus/ingestion.py\"]\r
+
+  \  revision-assignment -->|\"active extraction\"| fidelity-check[\"HWP
+  fidelity check\\nsrc/rfp_assistant/corpus/fidelity.py\"]\r
+
+  \  fidelity-check -->|\"auto verdict, findings\"| review-and-recovery[\"Review
+  and recovery\\nsrc/rfp_assistant/corpus/ingestion.py\"]"
