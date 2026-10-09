@@ -1,6 +1,6 @@
 {
  "ns": "repo",
- "repo": "main-update-banner-button",
+ "repo": "project-codeit-mid",
  "nodes_from": ".wiki/corpus.json",
  "edges": [
   {
@@ -701,7 +701,7 @@
   "read": 8,
   "orphans": 2,
   "pages": 2,
-  "decisions": 29,
+  "decisions": 32,
   "injectable_decisions": 7
  }
 }
