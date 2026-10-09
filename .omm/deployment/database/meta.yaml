@@ -1,17 +1,8 @@
-<<<<<<<< HEAD:.omm/request-lifecycle/ask-submit/meta.yaml
-created: 2026-10-09T00:31:55.961Z
-updated: 2026-10-09T00:31:55.962Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: ask-submit
-========
 created: 2026-10-08T21:42:08.526Z
 updated: 2026-10-08T21:42:08.527Z
 update_count: 1
 last_field: description
 kind: nested-class
 title: database
->>>>>>>> d323e745f1496f85170b8476c8bc04044f95dd6a:.omm/deployment/database/meta.yaml
 children: []
 parentPath: []
