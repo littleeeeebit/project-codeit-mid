@@ -1,0 +1,1 @@
+Set by `RequestRunner.shutdown` or `recover_requests`. A dispatching attempt of such a request becomes `unknown` through `budget.recover` at the next owner's startup. Nothing is re-run automatically.

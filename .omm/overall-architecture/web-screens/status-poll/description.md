@@ -1,1 +1,0 @@
-`usePoll`, keyed per `request_id/generation_id`, calls `GET /api/requests/{request_id}?generation_id&target` every 1,000 ms until the view's status leaves `queued`/`running`. The poll is the authoritative channel: it delivers the validated outcome, billing state, reserved and settled micro-USD, and `attachable`. Late polls for a key the screen has left are dropped.

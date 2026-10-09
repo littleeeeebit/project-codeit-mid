@@ -1,7 +1,7 @@
 created: 2026-10-09T02:46:21.665Z
-updated: 2026-10-09T10:52:07.530Z
-update_count: 3
-last_field: constraint
+updated: 2026-10-09T23:18:24.445Z
+update_count: 4
+last_field: description
 kind: nested-class
 title: session-middleware
 children: []

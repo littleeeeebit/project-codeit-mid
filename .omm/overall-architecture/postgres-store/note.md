@@ -1,0 +1,1 @@
+A maintainer memory records that running psql inside the database container has crashed the server; use psycopg from the host.

@@ -1,9 +1,9 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-09T10:52:05.040Z
-update_count: 42
+updated: 2026-10-09T23:18:20.287Z
+update_count: 44
 last_field: diagram
-git_commit: d812067
-git_branch: hwp-recovery-native-loader
+git_commit: 99859d6
+git_branch: hwp-ocr-from-embedded-images
 children:
   - api-layer
   - api-routes
@@ -39,42 +39,36 @@ children:
   - workflows
 prev_diagram: "graph TD\r
 
-  \  web-screens[\"Next.js screens\\nweb/src\"]\r
+  \  web-screens[\"Next.js screens\\nweb/src\"] -->|typed fetch, SSE, polling|
+  http-api[\"FastAPI routes\\nsrc/rfp_assistant/api.py\"]\r
 
-  \  http-api[\"FastAPI app\\nsrc/rfp_assistant/api.py\"]\r
+  \  http-api -->|one service call per route| service-core[\"Service
+  core\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  service-core[\"Service core\\nsrc/rfp_assistant/service/service.py\"]\r
+  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"] -->|budget admin,
+  answer runs| service-core\r
 
-  \  retrieval-engine[\"Retrieval
-  engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
+  \  owner-cli -->|ingest, fidelity, OCR| corpus-pipeline[\"Corpus
+  pipeline\\nsrc/rfp_assistant/corpus\"]\r
 
-  \  paid-gateway[\"Paid gateway\\nsrc/rfp_assistant/gateway\"]\r
+  \  owner-cli -->|runs, activation, release| evaluation-suite[\"Evaluation and
+  selection\\nsrc/rfp_assistant/evaluation\"]\r
 
-  \  postgres-store[\"PostgreSQL
-  store\\nsrc/rfp_assistant/storage/postgres.py\"]\r
+  \  service-core -->|scoped retrieval| retrieval-engine[\"Retrieval
+  engine\\nsrc/rfp_assistant/retrieval\"]\r
 
-  \  self-update[\"Self-update watch\\nsrc/rfp_assistant/service/update.py\"]\r
+  \  service-core -->|reserve, dispatch, settle| paid-gateway[\"Paid
+  gateway\\nsrc/rfp_assistant/gateway\"]\r
 
-  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"]\r
+  \  service-core -->|drafting, judges, activation| evaluation-suite\r
 
-  \  web-screens -->|fetch /api with session| http-api\r
+  \  corpus-pipeline -->|extractions, elements, verdicts|
+  postgres-store[\"PostgreSQL and runtime files\\nsrc/rfp_assistant/storage\"]\r
 
-  \  http-api -->|one service call per route| service-core\r
+  \  retrieval-engine -->|index files, pgvector sets| postgres-store\r
 
-  \  http-api -->|update status and request| self-update\r
+  \  paid-gateway -->|attempts ledger| postgres-store\r
 
-  \  self-update -->|fence paid admission| service-core\r
+  \  evaluation-suite -->|active_run, activations| postgres-store\r
 
-  \  service-core -->|retrieve scoped evidence| retrieval-engine\r
-
-  \  service-core -->|reserve, call, settle| paid-gateway\r
-
-  \  service-core -->|requests, traces, audit| postgres-store\r
-
-  \  retrieval-engine -->|index rows, pgvector search| postgres-store\r
-
-  \  paid-gateway -->|attempts ledger, advisory lock| postgres-store\r
-
-  \  owner-cli -->|ingest, build, evaluate, activate| postgres-store\r
-
-  \  owner-cli -->|budget admin, maintenance| service-core"
+  \  service-core -->|requests, audit rows| postgres-store"

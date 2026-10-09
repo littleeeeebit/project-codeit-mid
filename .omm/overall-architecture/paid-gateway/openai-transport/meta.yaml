@@ -1,7 +1,7 @@
 created: 2026-10-05T09:51:20.231Z
-updated: 2026-10-09T10:52:14.885Z
-update_count: 8
-last_field: description
+updated: 2026-10-09T23:18:33.478Z
+update_count: 10
+last_field: concern
 kind: nested-class
 title: openai-transport
 children: []

@@ -1,1 +1,0 @@
-설정: `PUT /api/settings/api-key` (key and model), `PUT /api/settings/model`, `GET /api/budget`, `PUT /api/budget/limit`. The header also shows the update banner from `GET /api/update/status` and the `POST /api/update` button (`components/update-banner.tsx`).

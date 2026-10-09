@@ -1,8 +1,8 @@
 graph TD
-  resources-owner["Process resources\nsrc/rfp_assistant/service/service.py"] -->|creates lazily| request-runner["Bounded executor\nsrc/rfp_assistant/service/service.py"]
-  request-runner -->|run_queued by request ID| answer-pipeline["Ask pipeline\nsrc/rfp_assistant/service/service.py"]
-  answer-pipeline -->|index, dense, reranker, transport| resources-owner
-  background-jobs["Paid background jobs\nsrc/rfp_assistant/service/service.py"] -->|transport, gateway owner| resources-owner
-  update-fence["Update fence\nsrc/rfp_assistant/service/update.py"] -->|refuses new paid admission| request-runner
-  update-fence -->|refuses job start| background-jobs
-  evidence-reader["Evidence and originals\nsrc/rfp_assistant/service/service.py"] -->|persisted evidence map| answer-pipeline
+  resources-owner["Resources owner\nsrc/rfp_assistant/service/service.py"] -->|"creates lazily"| request-runner["Request runner\nsrc/rfp_assistant/service/service.py"]
+  request-runner -->|"run_queued per request"| answer-pipeline["Answer pipeline\nsrc/rfp_assistant/service/service.py"]
+  resources-owner -->|"index, dense, reranker, transport"| answer-pipeline
+  resources-owner -->|"joined on close"| background-jobs["Background jobs\nsrc/rfp_assistant/service/service.py"]
+  update-watch["Update fence\nsrc/rfp_assistant/service/update.py"] -->|"fenced under _runner_lock"| request-runner
+  update-watch -->|"fenced under _runner_lock"| background-jobs
+  hub-login["Hub login\nsrc/rfp_assistant/service/auth.py"] -->|"member identity"| answer-pipeline

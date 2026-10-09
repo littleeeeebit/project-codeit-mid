@@ -1,1 +1,0 @@
-Created by `gold.submit` from a drafting run's `candidates.jsonl` (web) or `gold submit --file` (CLI). `gold repin` moves pending rows to a new extraction by element path after a parser revision. `pending_invalid` rows no longer pass the shared checks.

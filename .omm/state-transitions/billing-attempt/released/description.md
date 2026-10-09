@@ -1,0 +1,1 @@
+No charge. The attempt either never left the process or was rejected before execution, and `error_json` holds the reason.

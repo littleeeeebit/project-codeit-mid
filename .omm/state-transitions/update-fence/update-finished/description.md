@@ -1,0 +1,1 @@
+result.json holds a final state that the new process reads through `UpdateWatch.last_result`. `rollback_failed` requires manual inspection (`journalctl -u bidmate`, update.log).

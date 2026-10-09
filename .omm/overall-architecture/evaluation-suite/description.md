@@ -1,1 +1,1 @@
-`evaluation/` plus `service/drafting.py` and `service/answers.py` own the question datasets, frozen retrieval runs, comparison matrices, activation of what serves, answer evaluation, judges, the sealed run and the release report. Plan rule: pipelines run every variant, but a person picks from comparison tables and activates. Nothing runs on a schedule.
+src/rfp_assistant/evaluation plus service/answers.py. Pipelines run every variant, and a person activates. Nothing runs on a schedule or changes serving by itself.

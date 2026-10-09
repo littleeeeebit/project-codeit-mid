@@ -1,1 +1,0 @@
-`settle` computes the cost from usage exactly once (a duplicate returns the stored cost). A cost above the reservation sets `budget_settings.frozen_reason`, which then refuses every new reservation until the owner inspects it.

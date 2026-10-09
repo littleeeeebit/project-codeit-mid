@@ -1,0 +1,1 @@
+`app_settings.active_run` holds `serving_config(...)`. History is appended to `activations` together with the previous value, which serves as the rollback record.

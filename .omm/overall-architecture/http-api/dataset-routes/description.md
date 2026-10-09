@@ -1,1 +1,0 @@
-`/api/drafting/documents` (development-family only), `/documents/{doc_id}/elements`, `/slots`, `/plan` (free), `/start` (paid, consented maximum), `/runs`, `/runs/{id}/submit`. `/api/gold/pending`, `/api/gold/{candidate_id}` and `/api/gold/{candidate_id}/decide`. Registered after `/api/gold/recent`, because `/api/gold/{candidate_id}` would otherwise shadow it.

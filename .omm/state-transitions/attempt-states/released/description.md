@@ -1,1 +1,0 @@
-No charge: a refusal before dispatch, a missing key (`provider_unavailable`), a confirmed pre-execution provider error, or restart recovery of a reservation.

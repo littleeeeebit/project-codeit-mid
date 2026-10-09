@@ -1,0 +1,13 @@
+created: 2026-10-09T23:19:07.075Z
+updated: 2026-10-09T23:19:07.461Z
+update_count: 3
+last_field: constraint
+kind: nested-class
+title: update-fence
+children:
+  - marker-written
+  - update-accepting
+  - update-finished
+  - update-idle
+  - updater-running
+parentPath: []

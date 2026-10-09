@@ -1,9 +1,0 @@
-created: 2026-10-09T10:52:07.655Z
-updated: 2026-10-09T10:52:07.656Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: sign-in-routes
-children: []
-parentPath:
-  - http-api

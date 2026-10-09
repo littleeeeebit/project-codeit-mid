@@ -1,0 +1,1 @@
+Inserted by `reserve` at `max_cost`. A reservation that was never dispatched is released on the next owner's recovery.

@@ -1,1 +1,0 @@
-`fidelity.verify_source` found no difference against the Hancom print (자동 대조 통과). It is admitted to the strict reviewed-only index.

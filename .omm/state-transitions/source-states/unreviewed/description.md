@@ -1,1 +1,0 @@
-Every new extraction ID resets the review to `unreviewed`. Identical output keeps its revision and review. Unreviewed sources serve only through the operating index (`--include-unreviewed`), labeled `source_unreviewed` on evidence and `index_includes_unreviewed_sources` on traces.

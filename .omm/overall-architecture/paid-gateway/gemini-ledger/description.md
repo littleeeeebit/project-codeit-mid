@@ -1,1 +1,0 @@
-`models.external_reserve` / `external_mark_dispatching` / `external_finish` / `external_resolve` keep Gemini spending (embedding comparison rows) in `external_attempts` under its own cap (`compare-cap`, $0.50). OCR no longer calls Gemini; `.runtime/ocr/gemini-ledger.jsonl` is its history. `budget.recover` also resolves the open external attempts. Read at signature level only.

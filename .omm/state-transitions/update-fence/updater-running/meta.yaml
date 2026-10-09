@@ -1,0 +1,9 @@
+created: 2026-10-09T23:19:08.441Z
+updated: 2026-10-09T23:19:08.443Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: updater-running
+children: []
+parentPath:
+  - update-fence

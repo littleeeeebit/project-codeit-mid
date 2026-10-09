@@ -1,0 +1,1 @@
+`FakeTransport` is selected by `provider: "fake"`. It echoes the first evidence (`_echo_first_evidence`) or joins the last question (rewrite) with fake usage, and `fake_embeddings` produces deterministic vectors. `check --phase N --provider fake`, `load-check` and tools/verify.py flows use it. The README states that it cannot establish real retrieval or answer quality.

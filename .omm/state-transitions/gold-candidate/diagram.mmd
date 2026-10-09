@@ -1,0 +1,6 @@
+graph TD
+  draft-run["Draft run files\nsrc/rfp_assistant/service/drafting.py"] -->|"submit valid drafts"| pending["Pending\nsrc/rfp_assistant/evaluation/gold.py"]
+  pending -->|"independent approve"| approved["Approved\nsrc/rfp_assistant/evaluation/gold.py"]
+  pending -->|"reject with note"| rejected["Rejected\nsrc/rfp_assistant/evaluation/gold.py"]
+  approved -->|"second reviewer"| second-review["Second review\nsrc/rfp_assistant/evaluation/gold.py"]
+  pending -->|"parser revision repin"| pending

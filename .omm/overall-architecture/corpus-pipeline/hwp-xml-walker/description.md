@@ -1,1 +1,0 @@
-`parse_hwp` runs `hwp5proc` (pyhwp 0.1b15, resolved from the environment's `Scripts\hwp5proc.exe` or `RFP_HWP_CONVERTER`) via `run_hwp_converter` into XML, then `walk_hwp` produces paragraphs and tables with cells, section paths and equation text. A non-empty reason code means pyhwp could not read the file.

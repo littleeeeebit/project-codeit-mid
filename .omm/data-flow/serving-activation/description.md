@@ -1,1 +1,0 @@
-App settings `active_run` (mode, index_version, dense_version, embedding, reranker, limits including `corpus_route`, eval_version) and `active_index`. Written only by `activate_decision`/`activate_run` (and `build_keyword_index(activate=True)` for the keyword pointer), and read by `service.active_serving` on every retrieval.

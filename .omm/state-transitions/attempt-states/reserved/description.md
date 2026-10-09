@@ -1,1 +1,0 @@
-Inserted by `reserve` with the maximum cost after all admission checks pass. A restart moves a reserved attempt to released (`budget.recover`), because it was never dispatched.

@@ -1,0 +1,1 @@
+The updater takes no branch or commit from the request and only ever moves to origin/main.

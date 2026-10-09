@@ -1,1 +1,0 @@
-Billing cannot be determined (timeout, connection loss, no usage, a failed settlement write). While any unknown attempt exists, `mark_dispatching` refuses all PostgreSQL dispatch, `set_paid_enabled(on)` refuses, and `build-dense` and paid evaluation queries stop. It is resolved by CLI `settle` (from evidence) or `reconcile`.

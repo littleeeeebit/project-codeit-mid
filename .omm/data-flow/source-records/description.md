@@ -1,0 +1,1 @@
+`documents` rows (per CSV association, carrying typed metadata, `metadata_resolutions` overrides and `csv_metadata` kept beside them) and `sources` rows (per unique byte hash, holding parse and review status and `active_extraction_id`).

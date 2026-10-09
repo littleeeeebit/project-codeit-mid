@@ -1,0 +1,1 @@
+`.runtime/ocr/<source_hash>/<version-hash>.jsonl`, one row per region with digest, engine, text, local read, fallback reasons and status (`local`, `remote`, `unresolved`, `unavailable`). Part of the ingest `input_key`.

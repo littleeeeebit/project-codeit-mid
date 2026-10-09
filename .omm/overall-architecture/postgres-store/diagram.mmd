@@ -1,7 +1,0 @@
-graph TD
-  connection-layer["Connection adapter\nsrc/rfp_assistant/storage/postgres.py"] -->|version-checked sessions| domain-tables["Domain tables\nsrc/rfp_assistant/storage/store.py"]
-  gateway-owner-lock["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"] -->|owner_guard checks| domain-tables
-  maintenance-sequence["Maintenance sequence\nsrc/rfp_assistant/storage/maintenance.py"] -->|backup first| backup-restore["Backup and restore check\nsrc/rfp_assistant/storage/postgres_backup.py"]
-  maintenance-sequence -->|rebuild without activating| domain-tables
-  maintenance-sequence -->|state and reports| runtime-files["Runtime files\n.runtime"]
-  backup-restore -->|dump of| domain-tables

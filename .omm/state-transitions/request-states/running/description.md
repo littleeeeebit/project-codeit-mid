@@ -1,1 +1,0 @@
-Set by `run_queued`'s conditional claim (or at insert for free and synchronous requests). While running, `cancel_request` only sets `cancel_requested=1`, which `_stop_reason` turns into a `cancelled` stop before the next paid stage and inside `mark_dispatching`.

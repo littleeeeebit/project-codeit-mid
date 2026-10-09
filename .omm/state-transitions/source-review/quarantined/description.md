@@ -1,0 +1,1 @@
+The parse failed, with a reason such as `hwp_loader_failed`, `hwp_loader_result_invalid` or `hwp_empty_output`. Serving reports `ingestion_unavailable` for such a document (`QUARANTINE_TEXT`).
