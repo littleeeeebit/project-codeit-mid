@@ -1,15 +1,8 @@
-created: 2026-10-09T02:47:09.054Z
-updated: 2026-10-09T02:47:09.942Z
+created: 2026-10-09 02:47:09.054000+00:00
+updated: 2026-10-09 02:47:09.942000+00:00
 update_count: 2
 last_field: diagram
 git_commit: 829c708
 git_branch: main-update-banner-button
 children:
-  - bidmate-service
-  - browser
-  - github-main
-  - jupyterhub
-  - langfuse
-  - openai-api
-  - postgresql
-  - root-updater
+- root-updater

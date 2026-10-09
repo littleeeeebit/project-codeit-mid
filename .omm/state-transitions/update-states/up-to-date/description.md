@@ -1,1 +1,0 @@
-PREV equals origin/main and no cut-off run is pending. Nothing is restarted. The banner shows 'already running the latest main'.

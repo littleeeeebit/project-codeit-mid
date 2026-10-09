@@ -1,1 +1,0 @@
-`RFP_SOURCE_DIR` (default `<repo>/원본 데이터`) holds `data_list.csv` and `files/`. Originals are never modified, and byte-identical files share one extraction while keeping their own metadata. `GET /api/originals/{doc_id}/{source_hash}` serves only managed pairs.

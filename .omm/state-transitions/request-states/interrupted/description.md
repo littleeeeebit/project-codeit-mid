@@ -1,1 +1,1 @@
-Set by `RequestRunner.shutdown` (queued always; running only if workers did not finish within `shutdown_wait_seconds`) and by `recover_requests` when a new owner starts. `_finish` preserves it, so a late worker result is stored as history only.
+`recover_requests` sets every queued and running row interrupted at startup under exclusive ownership. `RequestRunner.shutdown` does the same on a controlled stop (running rows only if a future was still pending). `_finish` never overwrites it. Nothing is replayed.

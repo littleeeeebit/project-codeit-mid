@@ -1,1 +1,0 @@
-Reached only through `OpenAITransport` with the key of the member who started the request, or `OPENAI_API_KEY` where the process environment provides one; the shared host has none. Answer models are limited to `gpt-5-mini`/`gpt-5-nano`, and `gpt-6-luna` is used only for drafting, judges and AI review.

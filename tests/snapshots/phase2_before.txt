@@ -18,7 +18,7 @@ Generated <time> from `data/`. Every figure below is read from recorded state; s
 
 ## Quarantine and recovery
 
-- quarantined: 기관E_재난 관리 시스템.hwp — `hwp_converter_missing`
+- quarantined: 기관E_재난 관리 시스템.hwp — `hwp_loader_failed`
 
 ## Identity and provenance
 

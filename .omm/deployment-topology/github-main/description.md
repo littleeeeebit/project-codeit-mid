@@ -1,1 +1,0 @@
-The public repository `littleeeeebit/project-codeit-mid`. The app makes unauthenticated reads only (commit head and compare). The updater fetches `refs/heads/main` over HTTPS as the service user.

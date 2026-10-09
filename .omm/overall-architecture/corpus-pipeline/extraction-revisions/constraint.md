@@ -1,0 +1,1 @@
+A parsed result never counts as reviewed, and diagnostics (`short_output`, `no_tables`, `thin_tail`, `blank_pages`, `replacement_characters`, probes) only point at problems.

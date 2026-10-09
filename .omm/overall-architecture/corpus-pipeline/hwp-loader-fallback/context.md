@@ -1,0 +1,1 @@
+This is the current branch's change (`hwp-recovery-native-loader`, commits 21acf78 and 4df2bb5). The loader's output is not trusted on its own: `fidelity run` judges it against the Hancom print like every other HWP.

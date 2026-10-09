@@ -1,0 +1,1 @@
+`active_serving` refuses to serve an activated run whose recorded `limits.corpus_route` differs from `corpus_route_record()`. It falls back to the keyword default and flags `activated_run_stale:corpus_route`.

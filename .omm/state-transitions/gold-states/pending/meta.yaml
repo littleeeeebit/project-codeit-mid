@@ -1,0 +1,9 @@
+created: 2026-10-09T10:52:31.422Z
+updated: 2026-10-09T10:52:31.423Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: pending
+children: []
+parentPath:
+  - gold-states

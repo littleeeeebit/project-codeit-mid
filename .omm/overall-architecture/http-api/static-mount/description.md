@@ -1,0 +1,1 @@
+When `web/out` exists, `StaticFiles(directory=WEB, html=True)` is mounted at `/` after all API routes. Non-`/api/` paths bypass the session middleware entirely, so the screens themselves are public static files. The data comes only through authenticated `/api` calls.

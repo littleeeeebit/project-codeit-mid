@@ -1,15 +1,8 @@
 created: 2026-10-04 13:34:48.684000+00:00
-updated: 2026-10-09T02:46:42.193Z
-update_count: 15
-last_field: diagram
+updated: 2026-10-09 10:52:08.940000+00:00
+update_count: 16
+last_field: description
 kind: nested-class
 title: owner-cli
-children:
-  - activation
-  - budget-admin
-  - corpus-pipeline
-  - dense-build
-  - evaluation-runs
-  - keyword-index-build
-  - maintenance-sequence
+children: []
 parentPath: []

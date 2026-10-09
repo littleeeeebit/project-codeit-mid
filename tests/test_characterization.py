@@ -696,8 +696,8 @@ class IngestionHelpersTest(unittest.TestCase):
 
 
 class IngestSourceTest(unittest.TestCase):
-    """ingest_source of the fixture's HWP (기관E, no converter) when Hancom's print exists, and when the parse
-    returns replacement characters: the result, the source row and the stored extraction."""
+    """ingest_source of the fixture's HWP (기관E, no converter) when the parse returns replacement characters:
+    the result, the source row and the stored extraction."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -722,27 +722,6 @@ class IngestSourceTest(unittest.TestCase):
         warnings = [{k: v for k, v in w.items() if k != "rendering_sha256"} for w in json.loads(src.pop(
             "warnings_json"))]
         return result, src, fp and fp[0], els, warnings
-
-    def test_recovered_from_the_native_print(self):
-        import pymupdf
-
-        printed = ingestion.printed_pdf_path(self.env.settings, self.source_hash)
-        printed.parent.mkdir(parents=True, exist_ok=True)
-        with pymupdf.open() as doc:
-            page = doc.new_page()
-            page.insert_text((72, 72), "1. Project overview")
-            page.insert_text((72, 110), "The contractor maintains the system for twelve months.")
-            doc.save(printed)
-        result, src, fp, els, warnings = self.ingest()
-        self.assertEqual(result, {
-            "source_hash": self.source_hash, "status": "parsed", "extraction_id": src["active_extraction_id"],
-            "elements": 2, "tables": 0, "warnings": ["recovered_from_native_print"],
-            "diagnostic_flags": ["short_output", "no_tables"]})
-        self.assertEqual((src["parse_status"], src["review_status"], src["reason_code"]), ("parsed", "unreviewed", None))
-        self.assertEqual(fp, ingestion.parser_fingerprint("pdf") + "-hancom-print")
-        self.assertEqual(els, [("heading", "hwp_print", "1. Project overview"), (
-            "paragraph", "hwp_print", "The contractor maintains the system for twelve months.")])
-        self.assertEqual(warnings, [{"code": "recovered_from_native_print", "detail": "hwp_converter_missing"}])
 
     def test_replacement_characters_are_a_warning(self):
         raw = [{"path": "s0/p0", "kind": "paragraph", "parent": None, "raw_text": "하자보수 �� 기간",
@@ -1316,8 +1295,8 @@ class PaidAnswerOutcomeTest(test_service.Base):
 
     def test_every_document_unavailable(self):
         self.assertEqual(self.outcome(test_service.req(self.e)), {
-            "status": "ingestion_unavailable", "summary": "원문 전체를 확인할 수 없어 답변하지 않습니다. HWP 변환기가 설정되지 "
-            "않았습니다.", "error": None, "billing_state": "none", "missing_fields": [
+            "status": "ingestion_unavailable", "summary": "원문 전체를 확인할 수 없어 답변하지 않습니다. HWP 변환기와 보조 파서 "
+            "모두 문서를 읽지 못했습니다.", "error": None, "billing_state": "none", "missing_fields": [
                 {"doc_id": self.e.doc_id, "field": "document", "reason": "ingestion_unavailable"}],
             "request": "completed", "attempts": []})
 

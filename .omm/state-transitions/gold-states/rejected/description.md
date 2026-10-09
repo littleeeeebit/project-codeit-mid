@@ -1,0 +1,1 @@
+Recorded with categories and a note into the rejection wiki. Rows without `inference_json` are listed by `gold status` for an inferred reason, which later drafting context uses.

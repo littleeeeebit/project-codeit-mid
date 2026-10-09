@@ -1,0 +1,1 @@
+`auth.Login` keeps `_sessions: token -> (hub username, expiry)` in memory with `SESSION_SECONDS = 12h` and prunes expired tokens on sign-in. `Login.from_env` reads hub settings, or the single `BIDMATE_LOCAL_MEMBER`, and refuses both together.

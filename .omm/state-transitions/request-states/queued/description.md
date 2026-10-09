@@ -1,1 +1,1 @@
-Persisted by `_create` with the request_json snapshot and an admission slot held. No attempt exists yet, so cancelling is conclusive and free.
+Inserted by `_create(..., 'queued', before_insert=admit)` only after a runner slot was taken. Free modes are inserted directly as `running` and execute inline.

@@ -40,7 +40,9 @@ CHROME_PAGES = 3
 MAX_EXTRACTION_UNMATCHED_SHARE = 0.001
 IMAGE_MIN_AREA = 0.02
 HUMAN_STATUSES = ("sample_checked", "reviewed")
-RECOVERED = "recovered_from_native_print"  # ingestion warning: text read from the print, nothing independent left
+# Warning of extractions from before the loader fallback, whose text was read from the print itself: the print
+# cannot judge them. `ingest` replaces them with a loader parse, which `fidelity run` judges like any other HWP.
+RECOVERED = "recovered_from_native_print"
 _DROP = re.compile(r"[^0-9A-Za-z\uac00-\ud7a3\ufffd]")  # U+FFFD kept: a decode failure must never match
 _DIGITS = re.compile(r"\d{3,}")
 _PAGE_NUMBERS = re.compile(r"^\s*(?:\d{1,4}|(?:[-–—]\s*\d{1,4}\s*[-–—]\s*)+)\s*$")  # "- 10 -  - 11 -"
@@ -290,8 +292,12 @@ def extraction_units(elements: list[dict]) -> list[dict]:
             # (ingestion.equation_text) is printed in two dimensions: a fraction's parts sit on separate lines, so
             # its pieces are compared one by one; its digits are drawn in a private-use equation font and stay
             # flagged for a person.
-            text = _TOC_PAGE.sub("", e["raw_text"])
-            pieces = [("", p) for p in _EQUATION_SPLIT.split(text)]
+            # The HWP loader gives the whole body as one element: each of its lines is a unit aligned on its own
+            # pages, or the pages around the longest stretch would be the only ones compared.
+            grouped = str((e.get("location") or {}).get("format", "")).endswith("_loader")
+            lines = e["raw_text"].split("\n") if grouped else [e["raw_text"]]
+            pieces = [(f"l{k}" if grouped else "", p) for k, line in enumerate(lines)
+                      for p in _EQUATION_SPLIT.split(_TOC_PAGE.sub("", line))]
         for where, text in pieces:
             n = norm(text)
             if n:

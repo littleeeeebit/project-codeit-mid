@@ -1,1 +1,0 @@
-`GatewayOwner` holds `pg_try_advisory_lock(GATEWAY_LOCK)` on a dedicated autocommit connection for the process lifetime. `check()` verifies the lock is still granted and that recovery and validation are ready. Once lost, the owner stays lost: there is no reconnect. Several Resources in one process share it through `borrow_owner`, and the last `release()` closes the connection.

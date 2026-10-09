@@ -1,1 +1,1 @@
-`requests.status` values and their transitions. A paid request is inserted as `queued`; a free-mode request or a synchronous `answer()` is inserted directly as `running`. Requests are never replayed.
+Statuses of `requests.status` (`RequestView.status`), with the transitions observed in service.py.

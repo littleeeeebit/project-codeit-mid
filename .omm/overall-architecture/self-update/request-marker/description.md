@@ -1,1 +1,0 @@
-The marker defaults to `/srv/bidmate/update-request/requested` and is written by the service user. The `bidmate-update.path` unit (`PathExists=`) starts the oneshot `bidmate-update.service` (TimeoutStartSec=30min, ExecStart `/usr/local/sbin/bidmate-update`). Its JSON content (requested_by, requested_at, running_commit) is informational only.

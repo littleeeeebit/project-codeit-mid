@@ -1,1 +1,0 @@
-The app setting `active_run` (JSON: run_id, mode, index_version, dense_version, embedding, limits, reranker, eval_version) written by `evaluation.activate_decision` in one transaction with an `activations` history row. Per the README the selected serving row is `H-5b2565f606` (BGE-m3-ko hybrid); this was not verified against the live database.

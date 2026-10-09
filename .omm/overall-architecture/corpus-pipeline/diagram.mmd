@@ -1,6 +1,9 @@
 graph TD
-  manifest["CSV manifest import\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"sources and documents rows"| parsers["HWP and PDF parsers\nsrc/rfp_assistant/corpus/ingestion.py"]
-  parsers -->|"raw elements"| ocr-merge["OCR image text merge\nsrc/rfp_assistant/corpus/ocr.py"]
-  ocr-merge -->|"elements with image_text"| revision-assignment["Extraction revision\nsrc/rfp_assistant/corpus/ingestion.py"]
-  revision-assignment -->|"active extraction"| fidelity-check["HWP fidelity check\nsrc/rfp_assistant/corpus/fidelity.py"]
-  fidelity-check -->|"auto verdict, findings"| review-and-recovery["Review and recovery\nsrc/rfp_assistant/corpus/ingestion.py"]
+  manifest-import["CSV manifest\nsrc/rfp_assistant/corpus/ingestion.py"] -->|sources, documents rows| hwp-xml-walker["pyhwp XML walker\nsrc/rfp_assistant/corpus/ingestion.py"]
+  manifest-import -->|PDF sources| pdf-parser["PyMuPDF parser\nsrc/rfp_assistant/corpus/ingestion.py"]
+  hwp-xml-walker -->|parse failure reason| hwp-loader-fallback["HwpHwpxLoader adapter\nsrc/rfp_assistant/storage/hwp_loader.py"]
+  hwp-xml-walker -->|raw elements| ocr-merge["OCR region merge\nsrc/rfp_assistant/corpus/ocr.py"]
+  hwp-loader-fallback -->|single body element| ocr-merge
+  pdf-parser -->|raw elements| ocr-merge
+  ocr-merge -->|elements with image_text| extraction-revisions["Extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
+  extraction-revisions -->|active HWP extraction| fidelity-check["Hancom print fidelity\nsrc/rfp_assistant/corpus/fidelity.py"]

@@ -1,0 +1,9 @@
+created: 2026-10-09T10:52:12.348Z
+updated: 2026-10-09T10:52:12.693Z
+update_count: 2
+last_field: concern
+kind: nested-class
+title: evidence-reader
+children: []
+parentPath:
+  - service-core

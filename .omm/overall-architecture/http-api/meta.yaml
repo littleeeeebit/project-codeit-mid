@@ -1,18 +1,29 @@
 created: 2026-10-04 13:34:42.449000+00:00
-updated: 2026-10-09T02:46:21.007Z
-update_count: 17
+updated: 2026-10-09 10:52:07.250000+00:00
+update_count: 19
 last_field: diagram
 kind: nested-class
 title: http-api
 children:
-  - account-routes
-  - ask-routes
-  - auth-routes
-  - dataset-routes
-  - lifespan
-  - route-groups
-  - session-middleware
-  - static-export
-  - stream-route
-  - verify-routes
+- ask-routes
+- dataset-routes
+- login-store
+- route-groups
+- session-middleware
+- sign-in-routes
+- static-mount
+- stream-route
+- verify-routes
 parentPath: []
+prev_diagram: "graph TD\r\n  lifespan[\"App lifespan\\nsrc/rfp_assistant/api.py\"\
+  ]\r\n  session-middleware[\"Session middleware\\nsrc/rfp_assistant/api.py\"]\r\n\
+  \  auth-routes[\"Hub sign-in routes\\nsrc/rfp_assistant/api.py\"]\r\n  account-routes[\"\
+  Account and update routes\\nsrc/rfp_assistant/api.py\"]\r\n  ask-routes[\"Ask and\
+  \ request routes\\nsrc/rfp_assistant/api.py\"]\r\n  verify-routes[\"Verify routes\\\
+  nsrc/rfp_assistant/api.py\"]\r\n  dataset-routes[\"Dataset routes\\nsrc/rfp_assistant/api.py\"\
+  ]\r\n  static-export[\"Static screens mount\\nweb/out\"]\r\n  lifespan -->|Resources\
+  \ and UpdateWatch| account-routes\r\n  auth-routes -->|sets bidmate_session cookie|\
+  \ session-middleware\r\n  session-middleware -->|member and key session bound| account-routes\r\
+  \n  session-middleware -->|member bound| ask-routes\r\n  session-middleware -->|member\
+  \ bound| verify-routes\r\n  session-middleware -->|member bound| dataset-routes\r\
+  \n  static-export -->|loads screens that call| session-middleware"

@@ -1,9 +1,0 @@
-created: 2026-10-09T02:46:57.611Z
-updated: 2026-10-09T02:46:57.612Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: rollback-failed
-children: []
-parentPath:
-  - update-states

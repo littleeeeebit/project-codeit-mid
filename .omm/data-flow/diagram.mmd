@@ -1,17 +1,9 @@
 graph TD
-  source-originals["Originals and data_list.csv\nsrc/rfp_assistant/settings.py"]
-  extractions["Extractions and elements\nsrc/rfp_assistant/corpus/ingestion.py"]
-  ocr-fidelity["OCR and fidelity checks\nsrc/rfp_assistant/corpus/fidelity.py"]
-  keyword-index["Keyword index versions\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  vector-sets["pgvector embedding sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  active-run["Activated run setting\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  serving-retrieval["Serving retrieval\nsrc/rfp_assistant/service/service.py"]
-  request-records["Requests and ledger rows\nsrc/rfp_assistant/storage/store.py"]
-  source-originals -->|ingest by source hash| extractions
-  ocr-fidelity -->|image text, review status| extractions
-  extractions -->|chunked elements| keyword-index
-  keyword-index -->|payloads to embed| vector-sets
-  keyword-index -->|index version| active-run
-  vector-sets -->|dense version| active-run
-  active-run -->|active_serving config| serving-retrieval
-  serving-retrieval -->|evidence, trace, result| request-records
+  original-files["Originals and CSV\nRFP_SOURCE_DIR"] -->|hash, parse, OCR merge| extraction-artifacts["Extraction revisions\n.runtime/extracted"]
+  extraction-artifacts -->|chunk, tokenize, freeze terms| keyword-index["Keyword index versions\n.runtime/indexes"]
+  keyword-index -->|payload hashes per row| embedding-sets["pgvector embedding sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  keyword-index -->|frozen runs, matrices| evaluation-artifacts["Runs and tables\n.runtime/runs"]
+  evaluation-artifacts -->|person activates row| serving-activation["active_run, active_index\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  serving-activation -->|selects index, set, limits| request-records["Requests with evidence\nsrc/rfp_assistant/service/service.py"]
+  embedding-sets -->|cosine candidates| request-records
+  request-records -->|evidence context, original download| original-files

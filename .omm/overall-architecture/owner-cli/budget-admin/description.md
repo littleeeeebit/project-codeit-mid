@@ -1,1 +1,0 @@
-`configure-budget`, `paid on/off` (`budget.set_paid_enabled`, refused while any attempt is unknown), `unresolved`, `settle`, `reconcile`, `adjust` and `audit`. These are owner CLI only, each with an actor and a reason. The CLI can open a ledger-only `Resources(dispatch=False)` beside the serving app, which never dispatches.

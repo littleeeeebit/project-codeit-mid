@@ -1,0 +1,1 @@
+Workers receive only request IDs and rebuild the request and principal from the persisted `request_json` snapshot. They never touch UI state.

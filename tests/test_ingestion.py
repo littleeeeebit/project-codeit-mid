@@ -100,10 +100,13 @@ class HwpWalkerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             env = fixtures.make_env(Path(tmp), paid=False, index=False)
             with store.open_db(env.settings.db_path) as conn:
-                row = conn.execute("SELECT parse_status, review_status, reason_code FROM sources WHERE format = 'hwp'"
-                                   ).fetchone()
-            self.assertEqual(tuple(row), ("quarantined", "needs_recovery", "hwp_converter_missing"))
-            self.assertIn("hwp_converter_missing", ingestion.QUARANTINE_TEXT)
+                row = conn.execute("SELECT parse_status, review_status, reason_code, warnings_json FROM sources "
+                                   "WHERE format = 'hwp'").fetchone()
+            # No converter, and the fixture's bytes are no real HWP for the loader either.
+            self.assertEqual(tuple(row)[:3], ("quarantined", "needs_recovery", "hwp_loader_failed"))
+            self.assertEqual(json.loads(row["warnings_json"])[0], {"code": "pyhwp_failed",
+                                                                   "detail": "hwp_converter_missing"})
+            self.assertIn("hwp_loader_failed", ingestion.QUARANTINE_TEXT)
 
 
 class PdfTest(unittest.TestCase):
@@ -222,6 +225,98 @@ class IncrementalIngestTest(unittest.TestCase):
             self.assertGreater(d["pages"], 0)
 
 
+class LoaderFallbackTest(unittest.TestCase):
+    """An HWP pyhwp cannot read (the fixture's 기관E, no converter) is parsed by the HWP loader."""
+
+    LOADED = [{"path": "loader/e0", "kind": "paragraph", "parent": None, "raw_text": "사업 개요",
+               "location": {"format": "hwp_loader", "path": "loader/e0", "section_path": []}}]
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.env = fixtures.make_env(Path(self.tmp.name), paid=False, index=False)
+        self.source_hash = self.env.refs["기관E"].source_hash
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def ingest(self, loaded):
+        with mock.patch.object(ingestion, "load_hwp_hwpx", return_value=loaded) as loader:
+            result = ingestion.ingest_source(self.env.settings, self.source_hash, force=True)
+        with store.open_db(self.env.settings.db_path) as conn:
+            src = conn.execute("SELECT * FROM sources WHERE source_hash = ?", (self.source_hash,)).fetchone()
+            fp = conn.execute("SELECT parser_fingerprint FROM extractions WHERE extraction_id = ?",
+                              (src["active_extraction_id"],)).fetchone()
+            formats = [json.loads(r[0])["format"] for r in conn.execute(
+                "SELECT location_json FROM elements WHERE extraction_id = ?", (src["active_extraction_id"],))]
+        return loader, result, src, fp and fp[0], formats
+
+    def test_pyhwp_failure_is_parsed_by_the_loader(self):
+        loader, result, src, fp, formats = self.ingest((self.LOADED, [{"code": "hwp_loader_structure_limited"}], None))
+        self.assertEqual(loader.call_args.args[0].suffix, ".hwp")  # the original, not its print
+        self.assertEqual((result["status"], src["parse_status"], src["reason_code"]), ("parsed", "parsed", None))
+        self.assertEqual(fp, ingestion.parser_fingerprint("hwp_loader"))
+        self.assertNotEqual(fp, ingestion.parser_fingerprint("hwp"))
+        self.assertEqual(formats, ["hwp_loader"])
+        self.assertEqual([w["code"] for w in json.loads(src["warnings_json"])],
+                         ["pyhwp_failed", "hwp_loader_structure_limited"])
+
+    def test_a_raised_walker_failure_also_falls_back_to_the_loader(self):
+        def converter(settings, original, out_xml):
+            out_xml.write_text("<HwpDoc/>", encoding="utf-8")  # well-formed, no BodyText
+            return None, ""
+
+        with mock.patch.object(ingestion, "run_hwp_converter", side_effect=converter):
+            loader, result, src, fp, formats = self.ingest((self.LOADED, [], None))
+        self.assertEqual((loader.call_count, result["status"], fp), (1, "parsed", ingestion.parser_fingerprint("hwp_loader")))
+        self.assertEqual(json.loads(src["warnings_json"])[0], {"code": "pyhwp_failed", "detail": "hwp_empty_output"})
+
+    def test_a_loader_revision_replaces_the_walker_one_and_keeps_its_evidence(self):
+        walked = [dict(self.LOADED[0], location={"format": "hwp", "section": 0, "path": "s0/p0", "section_path": []})]
+        with mock.patch.object(ingestion, "parse_hwp", return_value=(walked, [], None)):
+            _, _, old, _, _ = self.ingest((self.LOADED, [], None))
+        old_id = old["active_extraction_id"]
+        with store.open_db(self.env.settings.db_path) as conn:
+            conn.execute("INSERT INTO fidelity_checks(extraction_id, method, source_hash, verdict, metrics_json, "
+                         "findings_json, rendering_sha256, created_at) VALUES (?, 'm', ?, 'auto_verified', '{}', "
+                         "'[]', 'x', 'now')", (old_id, self.source_hash))
+            conn.execute("UPDATE sources SET review_status = 'auto_verified' WHERE source_hash = ?", (self.source_hash,))
+        _, result, new, fp, _ = self.ingest((self.LOADED, [], None))  # pyhwp fails now: the loader parses
+        self.assertNotEqual(new["active_extraction_id"], old_id)
+        self.assertEqual((result["status"], new["review_status"]), ("parsed", "unreviewed"))  # a new revision resets review
+        with store.open_db(self.env.settings.db_path) as conn:
+            kept = conn.execute("SELECT artifact_path FROM extractions WHERE extraction_id = ?", (old_id,)).fetchone()
+            elements = conn.execute("SELECT COUNT(*) FROM elements WHERE extraction_id = ?", (old_id,)).fetchone()[0]
+            verdict = conn.execute("SELECT verdict FROM fidelity_checks WHERE extraction_id = ?", (old_id,)).fetchone()
+        self.assertTrue(Path(kept["artifact_path"]).exists())
+        self.assertEqual((elements, verdict[0]), (1, "auto_verified"))
+
+    def test_loader_failure_quarantines_with_its_reason(self):
+        for reason in ("hwp_loader_failed", "hwp_loader_result_invalid", "hwp_empty_output"):
+            with self.subTest(reason=reason):
+                _, result, src, _, _ = self.ingest(([], [{"code": "hwp_loader_error"}], reason))
+                self.assertEqual((result["status"], result["reason"]), ("quarantined", reason))
+                self.assertEqual((src["parse_status"], src["review_status"], src["reason_code"]),
+                                 ("quarantined", "needs_recovery", reason))
+                self.assertEqual(json.loads(src["warnings_json"])[0], {"code": "pyhwp_failed",
+                                                                       "detail": "hwp_converter_missing"})
+
+    def test_an_existing_print_does_not_change_the_parser(self):
+        printed = ingestion.printed_pdf_path(self.env.settings, self.source_hash)
+        printed.parent.mkdir(parents=True, exist_ok=True)
+        printed.write_bytes(fixtures.make_pdf([["제안요청서", "인쇄본 본문"]]))
+        with mock.patch.object(ingestion, "parse_pdf", side_effect=AssertionError("print parsed as a source")):
+            loader, result, _, fp, formats = self.ingest((self.LOADED, [], None))
+        self.assertEqual((loader.call_count, result["status"], fp, formats),
+                         (1, "parsed", ingestion.parser_fingerprint("hwp_loader"), ["hwp_loader"]))
+        # pyhwp succeeding keeps its own walker output, print or not.
+        walked = [dict(self.LOADED[0], location={"format": "hwp", "section": 0, "path": "s0/p0", "section_path": []})]
+        with mock.patch.object(ingestion, "parse_hwp", return_value=(walked, [], None)), \
+                mock.patch.object(ingestion, "parse_pdf", side_effect=AssertionError("print parsed as a source")):
+            loader, result, _, fp, formats = self.ingest((self.LOADED, [], None))
+        self.assertEqual((loader.call_count, result["status"], fp, formats),
+                         (0, "parsed", ingestion.parser_fingerprint("hwp"), ["hwp"]))
+
+
 class ReviewImportTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -299,7 +394,7 @@ class RecoveryTest(unittest.TestCase):
             # coverage of the new revision is claimed only by a review against its own elements
             self.assertEqual((src["parse_status"], src["review_status"]), ("parsed", "unreviewed"))
             self.assertEqual(rec["original_hash"], ref.source_hash)
-            self.assertEqual(rec["previous_failure"]["reason_code"], "hwp_converter_missing")
+            self.assertEqual(rec["previous_failure"]["reason_code"], "hwp_loader_failed")
             self.assertEqual(ingestion.sha256_file(s.files_dir / "기관E_재난 관리 시스템.hwp"), ref.source_hash)
             # A later ingest keeps the registered recovery instead of failing the conversion again.
             again = [r for r in ingestion.ingest(s) if r["doc_id"] == ref.doc_id][0]

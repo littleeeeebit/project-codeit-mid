@@ -1,1 +1,0 @@
-`_account_routes`: `GET /api/info` (build head and limits), `GET /api/update/status` → `update.update_status`, `POST /api/update` (no body) → `update.request_update`, `GET /api/budget`, `PUT /api/budget/limit`, and `GET/PUT /api/settings/api-key` and `PUT /api/settings/model`.

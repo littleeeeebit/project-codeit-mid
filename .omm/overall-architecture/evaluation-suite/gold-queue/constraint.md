@@ -1,0 +1,1 @@
+The approver must differ from both the drafter and the person who started the drafting run. Labels are evidence groups of source spans (hash, extraction, element, offsets, exact quote), never chunk IDs.

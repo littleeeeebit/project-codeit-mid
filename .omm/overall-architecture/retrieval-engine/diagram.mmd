@@ -1,13 +1,8 @@
 graph TD
-  serving-config["Serving configuration\nsrc/rfp_assistant/service/service.py"]
-  scope-routing["Scope routing\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  lexical-channel["Kiwi BM25 and exact codes\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  dense-channel["Dense search\nsrc/rfp_assistant/retrieval/dense.py"]
-  fusion-rerank["Fusion and rerank\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  evidence-packing["Evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  serving-config -->|mode, limits, embedding| scope-routing
-  scope-routing -->|allowed chunk rows| lexical-channel
-  scope-routing -->|allowed chunk rows| dense-channel
-  lexical-channel -->|BM25 ranked rows| fusion-rerank
-  dense-channel -->|nearest rows| fusion-rerank
-  fusion-rerank -->|final ranking| evidence-packing
+  keyword-index["Immutable keyword index\nsrc/rfp_assistant/retrieval/retrieval.py"] -->|chunks, BM25, scope terms| scope-routing["Scope and corpus routing\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  scope-routing -->|allowed rows| lexical-channel["Exact codes and BM25\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  scope-routing -->|allowed rows| dense-channel["Query vector and pgvector\nsrc/rfp_assistant/retrieval/dense.py"]
+  lexical-channel -->|ranked rows| fusion-rerank["Keyword-first RRF, reranker\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  dense-channel -->|cosine-ranked rows| fusion-rerank
+  fusion-rerank -->|final ranking| evidence-packer["Evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  keyword-index -->|chunk spans, linked pieces| evidence-packer

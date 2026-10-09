@@ -1,0 +1,1 @@
+The session cookie path is `/api/` only, so it never rides to the hub or notebook servers on :8000 of the same host.

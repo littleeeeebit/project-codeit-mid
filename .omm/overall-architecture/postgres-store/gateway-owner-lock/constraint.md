@@ -1,0 +1,1 @@
+Exactly one process may own the paid gateway per database. Never copy the budget database to make a second independently spendable ledger.

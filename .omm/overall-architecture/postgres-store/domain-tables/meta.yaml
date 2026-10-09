@@ -1,0 +1,9 @@
+created: 2026-10-09T10:52:22.666Z
+updated: 2026-10-09T10:52:22.667Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: domain-tables
+children: []
+parentPath:
+  - postgres-store

@@ -1,16 +1,8 @@
 graph TD
-  lifespan["App lifespan\nsrc/rfp_assistant/api.py"]
-  session-middleware["Session middleware\nsrc/rfp_assistant/api.py"]
-  auth-routes["Hub sign-in routes\nsrc/rfp_assistant/api.py"]
-  account-routes["Account and update routes\nsrc/rfp_assistant/api.py"]
-  ask-routes["Ask and request routes\nsrc/rfp_assistant/api.py"]
-  verify-routes["Verify routes\nsrc/rfp_assistant/api.py"]
-  dataset-routes["Dataset routes\nsrc/rfp_assistant/api.py"]
-  static-export["Static screens mount\nweb/out"]
-  lifespan -->|Resources and UpdateWatch| account-routes
-  auth-routes -->|sets bidmate_session cookie| session-middleware
-  session-middleware -->|member and key session bound| account-routes
-  session-middleware -->|member bound| ask-routes
-  session-middleware -->|member bound| verify-routes
-  session-middleware -->|member bound| dataset-routes
-  static-export -->|loads screens that call| session-middleware
+  session-middleware["Session and origin guard\nsrc/rfp_assistant/api.py"] -->|signed-in member bound| ask-routes["Ask and request routes\nsrc/rfp_assistant/api.py"]
+  session-middleware -->|open without session| sign-in-routes["JupyterHub OAuth routes\nsrc/rfp_assistant/api.py"]
+  session-middleware -->|signed-in member bound| verify-routes["Verification routes\nsrc/rfp_assistant/api.py"]
+  session-middleware -->|signed-in member bound| dataset-routes["Drafting and gold routes\nsrc/rfp_assistant/api.py"]
+  sign-in-routes -->|code exchange, session token| login-store["In-memory sessions\nsrc/rfp_assistant/service/auth.py"]
+  session-middleware -->|token lookup| login-store
+  static-mount["Static screens\nweb/out"] -->|non-api paths| session-middleware

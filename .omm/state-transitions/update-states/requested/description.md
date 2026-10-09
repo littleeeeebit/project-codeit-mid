@@ -1,1 +1,0 @@
-The marker exists. `in_progress()` and the fence are already true from the moment `write_request` replaced the file.

@@ -1,9 +1,15 @@
 created: 2026-10-06 12:37:58.685000+00:00
-updated: 2026-10-06 12:37:58.842000+00:00
-update_count: 2
+updated: 2026-10-09T10:52:18.442Z
+update_count: 4
 last_field: diagram
 kind: nested-class
 title: evaluation-suite
 children:
-- run-activation
+  - answer-runs
+  - compare-matrices
+  - gold-queue
+  - judge-comparison
+  - luna-drafting
+  - retrieval-runs
+  - run-activation
 parentPath: []

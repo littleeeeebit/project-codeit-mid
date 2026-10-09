@@ -1,18 +1,9 @@
 graph TD
-  ask-screen["Ask screen\nweb/src/components/ask/ask-page.tsx"]
-  ask-route["POST /api/ask\nsrc/rfp_assistant/api.py"]
-  submit-answer["submit_answer and _create\nsrc/rfp_assistant/service/service.py"]
-  runner-worker["Runner worker run_queued\nsrc/rfp_assistant/service/service.py"]
-  retrieval-step["prepare_answer and retrieve\nsrc/rfp_assistant/service/service.py"]
-  paid-call["Metered generation\nsrc/rfp_assistant/service/service.py"]
-  answer-check["validate_answer\nsrc/rfp_assistant/gateway/generation.py"]
-  finish-record["_finish result row\nsrc/rfp_assistant/service/service.py"]
-  ask-screen -->|scope, question, mode| ask-route
-  ask-route -->|AnswerRequest with new generation id| submit-answer
-  submit-answer -->|queued row, executor submit| runner-worker
-  runner-worker -->|claimed running request| retrieval-step
-  retrieval-step -->|messages and estimate| paid-call
-  paid-call -->|partials over SSE| ask-screen
-  paid-call -->|provider response| answer-check
-  answer-check -->|validated payload or error| finish-record
-  finish-record -->|status poll, attachable| ask-screen
+  ask-composer["Composer and turn\nweb/src/components/ask/ask-page.tsx"] -->|POST /api/ask| session-check["Session middleware\nsrc/rfp_assistant/api.py"]
+  session-check -->|member bound to context| submit-answer["submit_answer\nsrc/rfp_assistant/service/service.py"]
+  submit-answer -->|queued row, request ID| request-runner["RequestRunner worker\nsrc/rfp_assistant/service/service.py"]
+  request-runner -->|claim queued to running| paid-answer["_paid_answer\nsrc/rfp_assistant/service/service.py"]
+  paid-answer -->|rewrite and generation stages| metered-call["_metered_chat\nsrc/rfp_assistant/service/service.py"]
+  metered-call -->|provider response| answer-validation["validate_answer\nsrc/rfp_assistant/gateway/generation.py"]
+  answer-validation -->|payload or TechnicalError| finish-record["_finish\nsrc/rfp_assistant/service/service.py"]
+  finish-record -->|poll and SSE read| ask-composer

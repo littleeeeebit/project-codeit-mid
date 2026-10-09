@@ -1,0 +1,1 @@
+`RFP_SOURCE_DIR` (`원본 데이터`) holds `data_list.csv` and `files/`, with 98 active sources in the All documents scope. Originals are never modified. `original_download` streams them back only for a managed `(doc_id, source_hash)` after re-hashing the bytes.

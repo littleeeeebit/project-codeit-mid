@@ -1,1 +1,1 @@
-Written by `_finish` for every outcome whose request_status defaults to completed. That includes `answered`-type payload statuses and also `insufficient_evidence`, `ingestion_unavailable` and `budget_blocked`. The result status in result_json carries the distinction.
+Written by `_finish` for every domain outcome, including `answered`, `insufficient_evidence`, `ingestion_unavailable` and `budget_blocked`. The domain status lives in `result_json.status`, separate from the execution status.

@@ -20,6 +20,7 @@ from importlib import metadata
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from ..storage.hwp_loader import LOADER_ADAPTER_VERSION, LOADER_PACKAGES, load_hwp_hwpx
 from ..storage.postgres import host_path
 from ..settings import Settings
 from ..storage.store import dumps, open_db, read_jsonl, tx, utcnow, write_jsonl_atomic, write_text_atomic
@@ -59,6 +60,8 @@ QUARANTINE_TEXT = {
     "hwp_converter_timeout": "HWP 변환 시간이 초과되었습니다.",
     "hwp_converter_missing": "HWP 변환기가 설정되지 않았습니다.",
     "hwp_empty_output": "HWP 변환 결과에 본문이 없습니다.",
+    "hwp_loader_failed": "HWP 변환기와 보조 파서 모두 문서를 읽지 못했습니다.",
+    "hwp_loader_result_invalid": "HWP 보조 파서의 결과 형식이 올바르지 않습니다.",
     "pdf_open_failed": "PDF 파일을 열 수 없습니다.",
     "pdf_no_text": "PDF에서 텍스트를 추출하지 못했습니다.",
 }
@@ -507,15 +510,21 @@ def parse_hwp(settings: Settings, original: Path) -> tuple[list[dict], list[dict
             root = ET.parse(out_xml).getroot()
         except ET.ParseError as exc:
             return [], warnings + [{"code": "xml_parse_error", "detail": str(exc)}], "hwp_xml_malformed"
-    slots = list(root.iter("EqEdit"))
-    if slots:
-        scripts = equation_scripts(original)
-        if len(scripts) == len(slots):
-            for slot, script in zip(slots, scripts):
-                slot.text = equation_text(script)
-        else:
-            warnings.append({"code": "equation_count_mismatch", "detail": f"{len(slots)} in XML, {len(scripts)} records"})
-    elements = walk_hwp(root)
+    try:  # a document pyhwp cannot walk is a failure reason, so ingestion can fall back to the loader
+        slots = list(root.iter("EqEdit"))
+        if slots:
+            scripts = equation_scripts(original)
+            if len(scripts) == len(slots):
+                for slot, script in zip(slots, scripts):
+                    slot.text = equation_text(script)
+            else:
+                warnings.append({"code": "equation_count_mismatch", "detail": f"{len(slots)} in XML, {len(scripts)} records"})
+        elements = walk_hwp(root)
+    except IngestionError as exc:  # walk_hwp's own reason code
+        return [], warnings, str(exc)
+    except (ValueError, LookupError) as exc:  # a malformed attribute, or a record the equation reader cannot decode
+        return [], warnings + [{"code": "hwp_walk_error", "detail": f"{type(exc).__name__}: {exc}"[:STDERR_LIMIT]}], \
+            "hwp_walk_failed"
     if not any(e["raw_text"].strip() for e in elements):
         return [], warnings, "hwp_empty_output"
     return elements, warnings, None
@@ -615,6 +624,8 @@ def parse_pdf(original: Path) -> tuple[list[dict], list[dict], str | None]:
 def parser_fingerprint(fmt: str) -> str:
     if fmt == "hwp":
         info = {"walker": HWP_WALKER_VERSION, "pyhwp": metadata.version("pyhwp")}
+    elif fmt == "hwp_loader":
+        info = {"adapter": LOADER_ADAPTER_VERSION, **{p: metadata.version(p) for p in LOADER_PACKAGES}}
     else:
         info = {"walker": PDF_WALKER_VERSION, "pymupdf": metadata.version("pymupdf")}
     return hashlib.sha256(json.dumps(info, sort_keys=True).encode()).hexdigest()[:16]
@@ -650,6 +661,7 @@ def input_key(settings: Settings, src) -> str:
             "printed": sha256_file(printed) if printed.exists() else None,
             "ocr": sha256_file(ocr_rows) if ocr_rows.exists() else None}
     if src["format"] == "hwp":  # installing or replacing the converter retries a failed conversion
+        info["loader"] = parser_fingerprint("hwp_loader")  # the fallback when the converter fails
         conv = settings.hwp_converter
         info["converter"] = [str(conv), conv.stat().st_size, conv.stat().st_mtime_ns] \
             if conv is not None and Path(conv).is_file() else None
@@ -782,17 +794,11 @@ def _parse_source(settings: Settings, src, original: Path) -> tuple[list[dict], 
     fp = parser_fingerprint(src["format"])
     if src["format"] == "hwp":
         raw, warnings, reason = parse_hwp(settings, original)
-        printed = printed_pdf_path(settings, source_hash)
-        if reason and printed.exists():
-            # pyhwp cannot read it, but Hancom could print it (review print): read the print's text layer instead.
-            # No independent witness remains for this text, so it stays unreviewed.
-            raw, more, failed = parse_pdf(printed)
-            if not failed:
-                for e in raw:
-                    e["location"]["format"] = "hwp_print"
-                warnings += more + [{"code": "recovered_from_native_print", "detail": reason,
-                                     "rendering_sha256": sha256_file(printed)}]
-                reason, fp = None, parser_fingerprint("pdf") + "-hancom-print"
+        if reason:
+            # pyhwp cannot read it: the HWP loader parses the original. The print is only the fidelity witness.
+            raw, more, failed = load_hwp_hwpx(original)
+            warnings += [{"code": "pyhwp_failed", "detail": reason}] + more
+            reason, fp = failed, parser_fingerprint("hwp_loader")
     else:
         raw, warnings, reason = parse_pdf(original)
     rendering = printed_pdf_path(settings, source_hash) if src["format"] == "hwp" else original

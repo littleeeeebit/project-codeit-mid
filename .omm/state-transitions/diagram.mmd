@@ -1,16 +1,7 @@
 graph TD
-  request-states["Request status\nsrc/rfp_assistant/service/service.py"]
-  attempt-states["Ledger attempt state\nsrc/rfp_assistant/gateway/budget.py"]
-  update-states["Updater result state\ntools/infra/update.sh"]
-  update-fence["Update fence\nsrc/rfp_assistant/service/update.py"]
-  controlled-shutdown["Controlled stop\nsrc/rfp_assistant/service/service.py"]
-  restart-recovery["Restart recovery\nsrc/rfp_assistant/service/service.py"]
-  request-states -->|each paid stage opens| attempt-states
-  attempt-states -->|open or unknown refuses update| update-fence
-  request-states -->|queued or running refuses update| update-fence
-  update-states -->|running keeps fence up| update-fence
-  update-fence -->|blocks new paid admission| request-states
-  update-states -->|systemctl restart triggers| controlled-shutdown
-  controlled-shutdown -->|unfinished rows interrupted| request-states
-  restart-recovery -->|dispatching becomes unknown| attempt-states
-  restart-recovery -->|queued and running interrupted| request-states
+  request-states["Request status\nsrc/rfp_assistant/service/service.py"] -->|guards dispatch of| attempt-states["Ledger attempt state\nsrc/rfp_assistant/gateway/budget.py"]
+  attempt-states -->|derives billing_state of| request-states
+  source-states["Source parse and review\nsrc/rfp_assistant/corpus/ingestion.py"] -->|admits to index| request-states
+  gold-states["Gold candidate status\nsrc/rfp_assistant/evaluation/gold.py"] -->|approved rows score runs| run-selection["Run activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  run-selection -->|active_run serves| request-states
+  source-states -->|pinned evidence revisions| gold-states
