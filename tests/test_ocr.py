@@ -568,10 +568,16 @@ class HwpRegionsTest(unittest.TestCase):
                 mock.patch("hwp5.xmlmodel.Hwp5File", hwp5file):
             found, unavailable = ocr.hwp_regions(SimpleNamespace(), Path("doc.hwp"))
         self.assertEqual([r["bindata"] for r in found], ["BIN0001.png"])  # once, though placed twice
-        self.assertEqual(unavailable, [{"bindata": "BIN0002.bmp", "reason": "format"},
-                                       {"bindata": None, "reason": "missing"}])
+        self.assertEqual([(u["bindata"], u["reason"]) for u in unavailable],
+                         [("BIN0002.bmp", "format"), (None, "missing")])
         image = Image.open(io.BytesIO(found[0]["png"]))
         self.assertEqual(image.getpixel((0, 0)), (255, 255, 255))  # transparency on white
+        with mock.patch.object(ocr, "parse_hwp", return_value=(raw, [], None)), \
+                mock.patch("hwp5.xmlmodel.Hwp5File", hwp5file), \
+                mock.patch.object(ocr, "to_png", side_effect=struct.error("short overflow")):
+            found, unavailable = ocr.hwp_regions(SimpleNamespace(), Path("doc.hwp"))
+        self.assertEqual(found, [])  # any conversion failure stays with its picture
+        self.assertEqual(unavailable[0]["error"], "error: short overflow")
         with mock.patch.object(ocr, "parse_hwp", return_value=([], [], "hwp_xml_malformed")):
             self.assertIsNone(ocr.hwp_regions(SimpleNamespace(), Path("doc.hwp")))  # loader-parsed: no positions
 
@@ -587,13 +593,17 @@ class MetafileTest(unittest.TestCase):
     def test_a_wmf_without_the_placeable_header_becomes_a_bitmap(self):
         from PIL import Image
 
-        body = b"".join([struct.pack("<IHhh", 5, 0x020B, 0, 0),  # SETWINDOWORG y, x
-                         struct.pack("<IHhh", 5, 0x020C, 100, 200),  # SETWINDOWEXT height, width
-                         struct.pack("<IHhhhh", 7, 0x041B, 80, 180, 20, 20),  # RECTANGLE
-                         struct.pack("<IH", 3, 0)])  # EOF
-        wmf = struct.pack("<HHHIHIH", 1, 9, 0x0300, (18 + len(body)) // 2, 0, 7, 0) + body
-        image = Image.open(io.BytesIO(ocr.to_png(wmf)))
-        self.assertEqual((image.format, image.size), ("PNG", (ocr.MAX_SIDE, ocr.MAX_SIDE // 2)))
+        def wmf(x):  # a window of 200 x 100 at (x, 0) with a rectangle inside it
+            body = b"".join([struct.pack("<IHhh", 5, 0x020B, 0, x),  # SETWINDOWORG y, x
+                             struct.pack("<IHhh", 5, 0x020C, 100, 200),  # SETWINDOWEXT height, width
+                             struct.pack("<IHhhhh", 7, 0x041B, 80, min(x + 180, 32767), 20, x + 2),  # RECTANGLE
+                             struct.pack("<IH", 3, 0)])  # EOF
+            return struct.pack("<HHHIHIH", 1, 9, 0x0300, (18 + len(body)) // 2, 0, 7, 0) + body
+
+        for x in (0, 32760):  # an origin near the 16-bit limit must not overflow the synthesized header
+            image = Image.open(io.BytesIO(ocr.to_png(wmf(x))))
+            self.assertEqual((image.format, image.size), ("PNG", (ocr.MAX_SIDE, ocr.MAX_SIDE // 2)))
+            self.assertLess(min(image.convert("L").getdata()), 128)  # the rectangle is drawn
 
     def test_an_emf_becomes_a_bitmap(self):
         from PIL import Image
@@ -615,7 +625,7 @@ class Replies:
     def chat(self, **kw):
         self.calls.append(kw)
         reply = self.replies.pop(0)
-        if isinstance(reply, Exception):
+        if isinstance(reply, BaseException):
             raise reply
         return reply
 
@@ -700,6 +710,17 @@ class RemoteReaderLedgerTest(unittest.TestCase):
             with self.assertRaisesRegex(ocr.OcrStop, "refused"):
                 reader.read(b"png", "d2")
         self.assertEqual(transport.calls, [])
+
+    def test_a_read_cut_off_mid_dispatch_is_recovered_as_unknown_before_the_next_reader_dispatches(self):
+        with ocr.RemoteReader(self.settings, Replies(KeyboardInterrupt())) as reader:
+            with self.assertRaises(KeyboardInterrupt):  # the process dies between dispatch and settlement
+                reader.read(b"png", "d1")
+        self.assertEqual(self.attempts()[0]["state"], "dispatching")
+        transport = Replies(self.reply())
+        with ocr.RemoteReader(self.settings, transport) as reader:
+            with self.assertRaisesRegex(ocr.OcrStop, "refused"):
+                reader.read(b"png", "d1")
+        self.assertEqual((transport.calls, self.attempts()[0]["state"]), ([], "unknown"))
 
     def test_a_response_without_usage_is_unknown_billing(self):
         with ocr.RemoteReader(self.settings, Replies(self.reply(usage=None))) as reader:

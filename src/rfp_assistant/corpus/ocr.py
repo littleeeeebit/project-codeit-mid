@@ -115,20 +115,20 @@ def regions(pdf: Path) -> list[dict]:
 
 
 def _placeable(wmf: bytes) -> bytes:
-    """A standard WMF behind the Aldus placeable header Pillow needs. Its box is the first SETWINDOWORG and
-    SETWINDOWEXT, in logical units at 72 to the inch: only the aspect matters, the render is scaled."""
-    org, ext, pos = (0, 0), None, struct.unpack_from("<H", wmf, 2)[0] * 2
+    """A standard WMF behind the Aldus placeable header Pillow needs. Its box is (0, 0) to the first SETWINDOWEXT,
+    in logical units at 72 to the inch: the render follows the metafile's own window records, so the box only gives
+    the aspect, and starting it at 0 keeps any origin from overflowing the header's 16-bit corners."""
+    ext, pos = None, struct.unpack_from("<H", wmf, 2)[0] * 2
     while ext is None and pos + 10 <= len(wmf):
         size, func = struct.unpack_from("<IH", wmf, pos)
-        if func in (0x020B, 0x020C):  # parameters y, x
-            xy = struct.unpack_from("<hh", wmf, pos + 6)[::-1]
-            org, ext = (xy, ext) if func == 0x020B else (org, xy)
+        if func == 0x020C:  # parameters y, x
+            ext = struct.unpack_from("<hh", wmf, pos + 6)[::-1]
         if size < 3:
             break
         pos += size * 2
     if ext is None or min(ext) <= 0:
         raise ValueError("WMF without a window extent")
-    head = struct.pack("<IHhhhhHI", 0x9AC6CDD7, 0, org[0], org[1], org[0] + ext[0], org[1] + ext[1], 72, 0)
+    head = struct.pack("<IHhhhhHI", 0x9AC6CDD7, 0, 0, 0, ext[0], ext[1], 72, 0)
     checksum = 0
     for (word,) in struct.iter_unpack("<H", head):
         checksum ^= word
@@ -160,7 +160,6 @@ def hwp_regions(settings: Settings, original: Path) -> tuple[list[dict], list[di
     (regions {bindata, digest, png}, unavailable {bindata, reason}). None when pyhwp cannot walk the file: the
     loader that parses it then gives no picture positions."""
     from hwp5.xmlmodel import Hwp5File
-    from PIL import Image
 
     raw, _, reason = parse_hwp(settings, original)
     if reason:
@@ -177,8 +176,8 @@ def hwp_regions(settings: Settings, original: Path) -> tuple[list[dict], list[di
             continue
         try:
             png = to_png(f["BinData"][stream].open().read())
-        except (OSError, ValueError, SyntaxError, EOFError, Image.DecompressionBombError):
-            unavailable.append({"bindata": name, "reason": "format"})
+        except Exception as exc:  # noqa: BLE001 - embedded bytes are untrusted: one picture never ends the run
+            unavailable.append({"bindata": name, "reason": "format", "error": f"{type(exc).__name__}: {exc}"[:200]})
             continue
         out.append({"bindata": name, "digest": hashlib.sha256(png).hexdigest()[:24], "png": png})
     return out, unavailable
@@ -269,6 +268,12 @@ class RemoteReader:
         except LockHeld:
             raise OcrError("another process owns the paid gateway of this ledger") from None
         try:
+            from ..service.service import recover_requests
+
+            # As service.Resources._own: no older owner can still dispatch, so a call it left dispatching becomes
+            # unknown (blocking dispatch until reconciled) and an undispatched reservation is released.
+            recover_requests(self.settings.db_path)
+            budget.recover(self.settings.db_path)
             budget.ensure_generation_rate(self.settings.db_path, REMOTE_MODEL, REMOTE_MEMBER)
             self.request_id = dense.ensure_job_request(self.settings, REMOTE_MEMBER, f"{self.job}:{OCR_VERSION}",
                                                        {"job": self.job, "version": OCR_VERSION})
