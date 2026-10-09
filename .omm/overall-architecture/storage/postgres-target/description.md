@@ -1,0 +1,1 @@
+`RFP_DATABASE_DSN` comes from the process environment only. Startup refuses a missing DSN, an unvalidated import, a failed validation or an open recovery fence (`recovery_blocked`). The application database is `bidmate_app`, started by `tools/infra/start-postgresql.ps1` (Windows) or `start-postgresql.sh` (VM, the `ExecStartPre` of `bidmate.service`).

@@ -1,0 +1,1 @@
+`ocr.merge(settings, source_hash, raw, rendering)` inserts cached OCR text per region as `image_text` elements and suffixes the parser fingerprint. OCR itself (`cli ocr`) uses local PaddleOCR-VL, with a Gemini fallback under a separate $0.50 cap ledger (`.runtime/ocr/gemini-ledger.jsonl`). This summary comes from the README and call site; ocr.py internals were not traced.

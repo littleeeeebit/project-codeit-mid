@@ -1,0 +1,1 @@
+It loads static screens and calls /api with the `bidmate_session` cookie (path /api/ only, so the cookie never reaches the hub's notebook servers on :8000) and the `X-BidMate-Account` header.

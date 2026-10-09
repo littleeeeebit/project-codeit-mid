@@ -1,0 +1,1 @@
+`UpdateWatch.fenced()` = `accepting or in_progress()`, read under `Resources._runner_lock`. It refuses new paid requests and jobs from the moment an update is accepted until the updater ends without a restart. If the updater restarts the app, the new process is fenced while the result still says running.

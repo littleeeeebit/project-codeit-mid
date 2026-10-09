@@ -1,0 +1,1 @@
+`_dataset_routes`, registered after the verify group so `/api/gold/{candidate_id}` does not shadow the fixed gold paths. It covers drafting documents and elements, plan and start of drafting, drafting runs, submitting drafts, the pending queue, candidate review and decisions.

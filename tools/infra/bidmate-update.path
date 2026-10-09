@@ -1,0 +1,11 @@
+# Starts bidmate-update.service when the app writes its update request (the header's 업데이트 button, runbook 3.2).
+# Installed as /etc/systemd/system/bidmate-update.path; enable with `systemctl enable --now bidmate-update.path`.
+[Unit]
+Description=Watch for a BidMate update request
+
+[Path]
+PathExists=/srv/bidmate/update-request/requested
+Unit=bidmate-update.service
+
+[Install]
+WantedBy=paths.target

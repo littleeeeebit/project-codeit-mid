@@ -1,0 +1,1 @@
+`requests.trace_json` holds the config snapshot, retrieval, rewrite, admission, usage, settlement and billing. `result_json` holds the AnswerResult with the evidence map. `attempts` holds the ledger and audit events hold owner and member actions, including `request_update`. Langfuse receives a parallel copy when configured; it is not a source of truth.

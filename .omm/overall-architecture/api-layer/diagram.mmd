@@ -1,0 +1,6 @@
+graph TD
+  session-middleware["Session gate\nsrc/rfp_assistant/api.py"] -->|"sign-in paths pass through"| hub-login["JupyterHub OAuth login\nsrc/rfp_assistant/service/auth.py"]
+  session-middleware -->|"member bound to request"| route-handlers["Route handlers\nsrc/rfp_assistant/api.py"]
+  route-handlers -->|"SSE for running answer"| answer-stream["Answer stream route\nsrc/rfp_assistant/api.py"]
+  route-handlers -->|"status and request"| update-watch["Update watch\nsrc/rfp_assistant/service/update.py"]
+  static-screens["Static screens mount\nweb/out"] -->|"served for non-/api paths"| session-middleware

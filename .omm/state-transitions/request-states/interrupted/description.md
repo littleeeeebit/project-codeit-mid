@@ -1,0 +1,1 @@
+Set by `RequestRunner.shutdown` (queued always; running only if workers did not finish within `shutdown_wait_seconds`) and by `recover_requests` when a new owner starts. `_finish` preserves it, so a late worker result is stored as history only.

@@ -1,0 +1,17 @@
+graph TD
+  requested["Marker present\nsrc/rfp_assistant/service/update.py"]
+  running["Running\ntools/infra/update.sh"]
+  up-to-date["Up to date\ntools/infra/update.sh"]
+  failed["Failed unchanged\ntools/infra/update.sh"]
+  succeeded["Succeeded\ntools/infra/update.sh"]
+  rolled-back["Rolled back\ntools/infra/update.sh"]
+  rollback-failed["Rollback failed\ntools/infra/update.sh"]
+  interrupted["Interrupted\nsrc/rfp_assistant/service/update.py"]
+  requested -->|path unit starts script| running
+  running -->|main equals running commit| up-to-date
+  running -->|precondition fails before change| failed
+  running -->|restart and 401 health| succeeded
+  running -->|ff, deps, build, health fail| rolled-back
+  running -->|rollback health fails| rollback-failed
+  running -->|older than 30 min| interrupted
+  rollback-failed -->|next run resumes from deploying| running

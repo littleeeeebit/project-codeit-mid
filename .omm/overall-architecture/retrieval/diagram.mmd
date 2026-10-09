@@ -1,6 +1,0 @@
-graph TD
-scope["Scope and corpus routing\nsrc/rfp_assistant/retrieval/retrieval.py"] -->|Allowed extraction rows| lexical["Exact identifiers and BM25\nsrc/rfp_assistant/retrieval/retrieval.py"]
-scope -->|Allowed rows and query| dense["Query vectors and cosine search\nsrc/rfp_assistant/retrieval/dense.py"]
-lexical -->|Exact and lexical candidates| fusion["Fusion and optional reranking\nsrc/rfp_assistant/retrieval/retrieval.py"]
-dense -->|Scoped dense candidates| fusion
-fusion -->|Exact-first ranked chunks| packing["Bounded evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]

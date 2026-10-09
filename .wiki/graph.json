@@ -1,6 +1,6 @@
 {
  "ns": "repo",
- "repo": "fix-hwp-hwpx-loader",
+ "repo": "main-update-banner-button",
  "nodes_from": ".wiki/corpus.json",
  "edges": [
   {

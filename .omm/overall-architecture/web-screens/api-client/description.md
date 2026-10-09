@@ -1,0 +1,1 @@
+`createClient<paths>` with two middlewares. `expired` sends the browser to `/api/auth/login` on any 401 outside /api/auth/. `sameAccount` attaches `X-BidMate-Account` (the account this screen loaded as, set by `bindAccount`) and reloads the page on a 409 carrying `X-BidMate-Account-Changed`. `errorText` shows the service's Korean `detail`.

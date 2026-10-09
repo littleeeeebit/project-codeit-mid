@@ -1,0 +1,1 @@
+The rollback also failed its restart or health check. `deploying` stays, so the next run starts again from the same PREV and saved screens. The message points to journalctl and update.log.

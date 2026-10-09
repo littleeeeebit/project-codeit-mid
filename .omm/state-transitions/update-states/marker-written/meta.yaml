@@ -1,0 +1,9 @@
+created: 2026-10-09T00:32:07.393Z
+updated: 2026-10-09T00:32:07.394Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: marker-written
+children: []
+parentPath:
+  - update-states

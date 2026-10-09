@@ -1,0 +1,9 @@
+created: 2026-10-09T02:46:39.565Z
+updated: 2026-10-09T02:46:39.920Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: github-compare
+children: []
+parentPath:
+  - self-update

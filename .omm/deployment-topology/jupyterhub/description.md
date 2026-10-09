@@ -1,0 +1,1 @@
+The OAuth service `bidmate` registered on the hub. The browser goes to `/hub/api/oauth2/authorize`; the server exchanges the code at `/hub/api/oauth2/token` and reads `/hub/api/user`. Only names in `BIDMATE_ALLOWED_USERS` get a session; others get 403.

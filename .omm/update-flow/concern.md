@@ -1,0 +1,1 @@
+A restart drops every in-memory session and member API key, so all members must sign in and re-enter keys; the confirm dialog says so. The paid-work check covers this process's runner, jobs and the ledger only. A CLI owner process on the same database is not counted except through the ledger's open attempts.

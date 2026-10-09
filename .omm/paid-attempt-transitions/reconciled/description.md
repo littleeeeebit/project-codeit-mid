@@ -1,1 +1,0 @@
-budget.reconcile() and service reconciliation functions record provider totals, covered attempt IDs, billing scope, evidence and actor. Reconciled attempts no longer retain an independent pending maximum. If individual usage arrives later, settle() appends a compensating adjustment so the reconciled total is not counted twice.

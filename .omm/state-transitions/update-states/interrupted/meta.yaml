@@ -1,0 +1,9 @@
+created: 2026-10-09T02:46:57.914Z
+updated: 2026-10-09T02:46:59.229Z
+update_count: 2
+last_field: concern
+kind: nested-class
+title: interrupted
+children: []
+parentPath:
+  - update-states

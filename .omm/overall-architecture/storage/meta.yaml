@@ -6,4 +6,7 @@ kind: nested-class
 title: storage
 children:
 - connection-pool
+- maintenance-sequence
+- postgres-target
+- schema-and-store
 parentPath: []

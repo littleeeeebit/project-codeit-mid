@@ -1,0 +1,1 @@
+Evaluation selects and freezes what serves. Gold rows are drafted, reviewed and validated. Retrieval runs are frozen and scored by source spans. Comparison matrices produce tables. A person activates a run, and phase 4 adds answer runs, judges, the sealed run and the release report.

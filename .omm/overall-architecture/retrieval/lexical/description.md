@@ -1,1 +1,0 @@
-retrieve() extracts requirement identifiers with CODE_RE, finds exact matches and calls _lexical_matches() for Kiwi or whitespace BM25. KeywordIndex loads persisted tokens, chunks, metadata terms and extraction elements only after manifest and file hashes match. Corpus and document-name routing affect admissible rows; exact identifier hits stay before subsequent ranking channels.

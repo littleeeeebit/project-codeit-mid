@@ -627,6 +627,49 @@
      "expected": "At a 390 px wide viewport none of the three pages scrolls horizontally and the answer status is shown as text"
     }
    ]
+  },
+  {
+   "id": "update-banner",
+   "title": "A newer GitHub main shows the header update banner; its button fades during paid work and only a confirmation requests the update",
+   "kind": "browser",
+   "command": "python -B tools/verify.py update-banner",
+   "paths": [
+    "tests/fake_hub.py",
+    "src/rfp_assistant/api.py",
+    "src/rfp_assistant/service/update.py",
+    "src/rfp_assistant/service/service.py",
+    "src/rfp_assistant/gateway/budget.py",
+    "web/*",
+    "tools/infra/update.sh",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "banner-shown",
+     "expected": "With a stand-in GitHub whose main is two commits ahead, the header shows the banner with both commit titles, the running and latest commits, and an enabled, fully opaque 업데이트 button"
+    },
+    {
+     "id": "faded-while-paid",
+     "expected": "While a paid question runs the button is disabled with reduced opacity and the reason is shown; after the request ends it is enabled and opaque again without a reload"
+    },
+    {
+     "id": "cancel-does-nothing",
+     "expected": "업데이트 opens a dialog warning of the restart, sign-out and re-entering API keys; 취소 closes it, sends no POST /api/update and writes no marker"
+    },
+    {
+     "id": "confirm-requests",
+     "expected": "Confirming sends one POST /api/update, writes only the marker (requester, time, running commit) and shows the updating state"
+    },
+    {
+     "id": "rolled-back-shown",
+     "expected": "When the updater records a rollback, the waiting page shows it and the next visitor sees that the last update was rolled back"
+    }
+   ]
   }
  ]
 }

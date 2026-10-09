@@ -1,0 +1,1 @@
+Written for `technical_error` and `clarification_required` paths (`request_status='failed'`), and by `_fail_unscheduled` when executor submission fails.

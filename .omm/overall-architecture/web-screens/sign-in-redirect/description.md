@@ -1,0 +1,1 @@
+`components/sign-in.tsx` and the `expired` middleware handle the signed-out state. Sign-in itself is a browser navigation to `/api/auth/login`, which bounces through the JupyterHub OAuth flow and returns to `/api/auth/callback`. The screens never fetch the auth routes except `/api/auth/me`.

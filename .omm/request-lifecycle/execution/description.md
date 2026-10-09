@@ -1,1 +1,0 @@
-RequestRunner submits only persisted request IDs. run_queued() claims status='queued' with cancel_requested=0 and rebuilds capabilities, question, mode, scope, date and conversation reference from request_json. _execute_traced() routes deterministic modes or paid preparation and converts service exceptions and unexpected failures into persisted terminal outcomes.

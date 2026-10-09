@@ -1,0 +1,1 @@
+`_candidates`/`fuse` uses the README's serving rule `keyword_first:60:1.0:6`: the BM25 top 6 stay in BM25 order and the rest come from weighted RRF. `_rerank` applies only in hybrid_rerank, with depth and protect from the activated run. A reranker error falls back to hybrid and is recorded.

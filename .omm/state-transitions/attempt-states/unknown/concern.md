@@ -1,0 +1,1 @@
+One unknown attempt halts all paid work for every member until the owner runs `reconcile` or `settle` through the CLI. This is intended (fail closed), but it is an operational single point.

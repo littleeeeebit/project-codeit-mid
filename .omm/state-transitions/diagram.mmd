@@ -1,9 +1,16 @@
 graph TD
-queued["Queued request\nsrc/rfp_assistant/service/service.py"] -->|Worker claims uncancelled row| running["Running request\nsrc/rfp_assistant/service/service.py"]
-queued -->|Owner cancels before claim| cancelled["Cancelled execution\nsrc/rfp_assistant/service/service.py"]
-queued -->|Shutdown or restart recovery| interrupted["Interrupted execution\nsrc/rfp_assistant/service/service.py"]
-queued -->|Executor submission fails| failed["Failed execution\nsrc/rfp_assistant/service/service.py"]
-running -->|Normal outcome persisted| completed["Completed execution\nsrc/rfp_assistant/service/service.py"]
-running -->|Execution or validation error| failed
-running -->|Stop checkpoint or finalization| cancelled
-running -->|Shutdown or restart recovery| interrupted
+  request-states["Request status\nsrc/rfp_assistant/service/service.py"]
+  attempt-states["Ledger attempt state\nsrc/rfp_assistant/gateway/budget.py"]
+  update-states["Updater result state\ntools/infra/update.sh"]
+  update-fence["Update fence\nsrc/rfp_assistant/service/update.py"]
+  controlled-shutdown["Controlled stop\nsrc/rfp_assistant/service/service.py"]
+  restart-recovery["Restart recovery\nsrc/rfp_assistant/service/service.py"]
+  request-states -->|each paid stage opens| attempt-states
+  attempt-states -->|open or unknown refuses update| update-fence
+  request-states -->|queued or running refuses update| update-fence
+  update-states -->|running keeps fence up| update-fence
+  update-fence -->|blocks new paid admission| request-states
+  update-states -->|systemctl restart triggers| controlled-shutdown
+  controlled-shutdown -->|unfinished rows interrupted| request-states
+  restart-recovery -->|dispatching becomes unknown| attempt-states
+  restart-recovery -->|queued and running interrupted| request-states

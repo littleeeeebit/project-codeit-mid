@@ -1,1 +1,0 @@
-create_app() creates one Resources owner during FastAPI lifespan, registers session middleware and exception handlers, installs question, verification and dataset routes, then mounts web/out last if present. Routes deserialize Pydantic inputs, resolve Resources and Principal dependencies, and call public service functions.

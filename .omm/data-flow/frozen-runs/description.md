@@ -1,0 +1,1 @@
+Run directories under `.runtime/runs/` and compare tables under `.runtime/compare/tables/` are produced from cached indexes and vectors. They are the only input to activation.

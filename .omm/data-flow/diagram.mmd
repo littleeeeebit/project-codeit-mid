@@ -1,9 +1,17 @@
 graph TD
-originals["Originals and notice metadata\nsrc/rfp_assistant/corpus/ingestion.py"] -->|Verified bytes and parser inputs| extraction["Preserved extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
-extraction -->|Eligible source elements| keyword["Hashed keyword artifacts\nsrc/rfp_assistant/retrieval/retrieval.py"]
-keyword -->|Chunk payloads and ordering| vectors["Homogeneous embedding sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
-keyword -->|Pinned index and evidence spans| measurements["Frozen retrieval measurements\nsrc/rfp_assistant/evaluation/evaluation.py"]
-vectors -->|Verified dense candidates| measurements
-measurements -->|Explicit validated selection| activation["Active configuration and history\nsrc/rfp_assistant/evaluation/evaluation.py"]
-activation -->|Selected artifacts and limits| requests["Persisted answers and citations\nsrc/rfp_assistant/service/service.py"]
-preview["HWP/HWPX preview loader, unwired\nsrc/rfp_assistant/storage/hwp_loader.py"]
+  source-originals["Originals and data_list.csv\nsrc/rfp_assistant/settings.py"]
+  extractions["Extractions and elements\nsrc/rfp_assistant/corpus/ingestion.py"]
+  ocr-fidelity["OCR and fidelity checks\nsrc/rfp_assistant/corpus/fidelity.py"]
+  keyword-index["Keyword index versions\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  vector-sets["pgvector embedding sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  active-run["Activated run setting\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  serving-retrieval["Serving retrieval\nsrc/rfp_assistant/service/service.py"]
+  request-records["Requests and ledger rows\nsrc/rfp_assistant/storage/store.py"]
+  source-originals -->|ingest by source hash| extractions
+  ocr-fidelity -->|image text, review status| extractions
+  extractions -->|chunked elements| keyword-index
+  keyword-index -->|payloads to embed| vector-sets
+  keyword-index -->|index version| active-run
+  vector-sets -->|dense version| active-run
+  active-run -->|active_serving config| serving-retrieval
+  serving-retrieval -->|evidence, trace, result| request-records

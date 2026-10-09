@@ -1,0 +1,14 @@
+graph TD
+  resources-owner["Process resources\nsrc/rfp_assistant/service/service.py"]
+  request-runner["Bounded request executor\nsrc/rfp_assistant/service/service.py"]
+  answer-pipeline["Answer execution\nsrc/rfp_assistant/service/service.py"]
+  metered-chat["Metered paid call\nsrc/rfp_assistant/service/service.py"]
+  background-jobs["Background paid jobs\nsrc/rfp_assistant/service/service.py"]
+  restart-recovery["Stop and restart recovery\nsrc/rfp_assistant/service/service.py"]
+  resources-owner -->|creates on first paid ask| request-runner
+  request-runner -->|run_queued by request id| answer-pipeline
+  answer-pipeline -->|rewrite and generation stages| metered-chat
+  resources-owner -->|registers threads in _jobs| background-jobs
+  background-jobs -->|same transport and ledger| metered-chat
+  resources-owner -->|close and recover=True| restart-recovery
+  restart-recovery -->|interrupts unfinished rows| request-runner

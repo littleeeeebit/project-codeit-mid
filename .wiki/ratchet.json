@@ -18,8 +18,8 @@
     },
     "src/rfp_assistant/api.py": {
       "dup": 8,
-      "lines": 1574,
-      "reason": "gpt5-mini-answer-embedding-comparison: three optional ExperimentTable response fields expose the answer run ID, model and paired conclusion; HTTP response models remain in api.py under the existing API boundary test, including the previous structured release-check fields"
+      "lines": 1627,
+      "reason": "main-update-banner-button: the header update's four HTTP response models (CommitTitle, PaidWork, UpdateResult, UpdateStatus), its two routes and the lifespan that starts the GitHub watch and installs the paid-work fence; response models stay in api.py under the existing API boundary test, while the status, paid-work check and request live in service/update.py"
     },
     "src/rfp_assistant/cli.py": {
       "dup": 0,
@@ -68,13 +68,13 @@
     },
     "src/rfp_assistant/service/service.py": {
       "dup": 0,
-      "lines": 3077,
-      "reason": "gpt5-mini-answer-embedding-comparison: the existing experiments listing forwards answer_run_id, model and conclusion from the generated table so the comparison screen can display the measured result"
+      "lines": 3102,
+      "reason": "main-update-banner-button: an accepted update must refuse new paid work atomically with admission, so the fence check sits under _runner_lock at each paid admission (request slots, evaluation and judge jobs, maintenance, drafting) and the runner counts admitted slots before their queued row exists; the update status, paid-work check and request moved out to service/update.py"
     },
     "tools/verify.py": {
       "dup": 0,
-      "lines": 1062,
-      "reason": "gpt5-mini-answer-embedding-comparison: 12 lines select the owner-configured Python before dependency imports, two enable fake-provider admission only on the validated disposable copy, one applies the supported database timeout after full-corpus restores, and three register missing selectable-model prices on that copy through the existing audited helper; duplication allowance remains zero"
+      "lines": 1173,
+      "reason": "main-update-banner-button: the update-banner browser flow declared in verification.json registers in verify.py like every other flow, with its button-state helpers and the per-flow server environment; the GitHub stand-in lives in tests/fake_github.py beside tests/fake_hub.py; duplication allowance remains zero"
     },
     "web/src/components/verify/evaluation.tsx": {
       "dup": 6,

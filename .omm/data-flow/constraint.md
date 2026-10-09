@@ -1,0 +1,1 @@
+Originals are never modified. Old extraction revisions, indexes and vector sets stay on disk for issued citations, pinned gold rows and rollback.

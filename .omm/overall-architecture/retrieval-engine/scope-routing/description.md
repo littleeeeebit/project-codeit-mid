@@ -1,0 +1,1 @@
+Scope pairs (DocRef, extraction_id) come from the selected documents, or from `corpus_scope` for All documents. `_routed_scope` narrows a corpus question that names a project to that project's documents. `scope_rows` restricts every channel to the allowed chunk rows, so nothing outside the scope can be scored.

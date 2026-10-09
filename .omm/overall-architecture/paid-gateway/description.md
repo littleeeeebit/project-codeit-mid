@@ -1,0 +1,1 @@
+`src/rfp_assistant/gateway`: `budget.py` (ledger and admission), `generation.py` (the only OpenAI SDK call site, prompts, schemas and answer validation) and `tracing.py` (optional Langfuse). Paid dispatch also needs the PostgreSQL advisory lock owner from `storage/postgres.py`.

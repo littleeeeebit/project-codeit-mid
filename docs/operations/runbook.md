@@ -104,7 +104,88 @@ curl -si http://127.0.0.1:8501/api/info | head -1   # HTTP/1.1 401: sign-in is e
 sudo /srv/bidmate/app/tools/infra/bidmate-cli.sh budget-status   # any owner CLI command, with the service's environment
 ```
 
-Deploying a code change: the repository is private, so ship a bundle from the owner host (`git bundle create bidmate.bundle <branch>`, `scp` it to the VM), then on the VM `sudo -u bidmate git -C /srv/bidmate/app pull /tmp/bidmate.bundle <branch>`. Rebuild `web/out` there (`cd web && npm ci && npm run build`) when screens changed, then `sudo systemctl restart bidmate`. When `tools/infra/bidmate.service` changed, copy it over `/etc/systemd/system/bidmate.service` and run `sudo systemctl daemon-reload` before the restart; the installed unit is a copy, and a stale `ExecStartPre` path stops the service from starting. Stop the service before any paid CLI job or `backup` (section 1).
+Stop the service before any paid CLI job or `backup` (section 1).
+
+#### Deploying a code change: GitHub main, from the page
+
+`/srv/bidmate/app` is a checkout of <https://github.com/littleeeeebit/project-codeit-mid.git> on `main`. The repository is public, so the VM reads it with no token and no deploy key. Only the latest `main` is ever deployed: no branch, tag or commit can be chosen, on the page or anywhere else. Nothing deploys on merge either. A restart signs everyone out and drops entered API keys, so a member picks the moment.
+
+How it works:
+
+1. At startup the server records the commit it runs. Every 5 minutes it asks GitHub's public API for `main`'s head and for the commits between the two. Unauthenticated calls are limited to 60 an hour per address, and one check makes at most two.
+2. When `main` is ahead and fast-forwardable, every signed-in member sees a banner in the header on every page. It shows the running and latest commits and the titles in between (바뀐 내용), with an 업데이트 button. No extra role is needed.
+3. While paid work is open, the button is disabled and faded, and the reason is shown next to it. Paid work counts as open when there is a pending reservation (`pending_micro_usd` > 0), an open attempt (`open_attempts` > 0, including an `unknown` one that waits for settlement, section 5), a queued or running request, or a live background job (dataset drafting, development evaluation, judge run, maintenance). The banner polls every 15 s, so the button re-enables by itself when the work ends.
+4. 업데이트 opens a confirmation. It says the service restarts, everyone connected is signed out, and OpenAI keys entered on 설정 must be entered again. 취소 sends nothing.
+5. On confirmation, `POST /api/update` checks the session and checks paid work again on the server. It refuses with the reason if work is open. Otherwise it writes the request marker `/srv/bidmate/update-request/requested` and an audit row (`request_update`). It takes no input and runs no git or systemctl. From the moment it starts counting paid work, the server admits no new paid work: questions, drafting, evaluation, judge runs and maintenance are refused ("서버 업데이트가 진행 중…"). The check and every paid admission take the same lock, so work is either counted (and the update refused) or refused. The check counts live jobs and request slots first, then request rows, then reads the ledger, so work that ends during the check has already left any open or unknown attempt for the ledger read. The fence holds while the marker exists or the result says `running` (the app reads the marker first; the script writes `running` before removing it), including in the restarted process until its health check passes, and lifts when a run ends without a restart (`failed`, `up_to_date`).
+6. `bidmate-update.path` sees the marker and starts `bidmate-update.service`. That unit runs `/usr/local/sbin/bidmate-update`, a root-owned copy of `tools/infra/update.sh`. The script:
+   - fetches `main` from the fixed GitHub URL as `bidmate`. It refuses, changing nothing, when the checkout has modified tracked files or the running commit is not an ancestor of `main`;
+   - refuses, changing nothing, when `tools/infra/bidmate.service` changed. Root would run what the `bidmate` user's checkout says (`User=`, `ExecStartPre=`), so only a person installs a unit (see the manual update below);
+   - saves `web/out` to `/var/lib/bidmate-update/web-out.prev` and records the running commit in `/var/lib/bidmate-update/deploying`. If either fails, it changes nothing;
+   - fast-forwards;
+   - runs `pip install -e` into `/srv/bidmate/venv` when `pyproject.toml` or a `requirements*.txt` changed. The VM's venv follows `pyproject.toml`, without torch;
+   - runs `npm ci && npm run build` in `web/` when `web/` changed;
+   - checks that every absolute path in `server.env` exists (3.6 step 3);
+   - restarts `bidmate` and waits up to 300 s for `/api/info` to answer 401, then removes `deploying`.
+7. On any failure after the fast-forward, the script resets to the previous commit, restores the saved `web/out`, reinstalls the previous dependencies if they changed, restarts and health-checks again. A missing saved `web/out` makes it `rollback_failed`. A run that was cut off (the unit's 30-minute `TimeoutStartSec`, a reboot) leaves `deploying` behind. The banner shows it as `interrupted` after 30 minutes. The next run, from the button or `sudo systemctl start bidmate-update`, deploys again from the recorded commit. It always reinstalls dependencies and rebuilds `web/` then, because the diff to the current `main` does not show what the cut-off run already changed (`main` may have reverted it since). It restarts even when the checkout already equals `main`, and on failure rolls back to that commit, reinstalling its dependencies. `deploying` also stays after `rollback_failed`, so the next run starts from the same commit and saved screens.
+8. The page waits ("업데이트 중"). When the restarted server answers, the page reloads, which leads to sign-in. A run that ended without a restart (refused, already current) shows its result in place. For a day after a failed run, the banner tells the next visitor what failed: nothing changed (`failed`), rolled back (`rolled_back`), not finished (`interrupted`), or rollback failed too (`rollback_failed`, which needs someone on the VM).
+
+Each run writes `/var/lib/bidmate-update/result.json` (what the banner reads) and `update.log`; the previous log is kept as `update.log.1`. Also see `journalctl -u bidmate-update`. Without the page (the server is down), `sudo systemctl start bidmate-update` runs the same update by hand. When a run reports that the updater itself changed (`update.sh` or the `bidmate-update.*` units), repeat step 3 of the setup below: the root copy never updates itself, because root must not run what the `bidmate` user can edit.
+
+Manual update, when a run refuses because `bidmate.service` changed (a member with sudo; with no paid work open). Root stages the new unit in a file only root can write, reviews that file, and installs that same file. It must say `User=bidmate` exactly once and run nothing with a `+` or `!` prefix.
+
+```sh
+APP=/srv/bidmate/app
+sudo -u bidmate git -C $APP fetch https://github.com/littleeeeebit/project-codeit-mid.git +refs/heads/main:refs/remotes/origin/main
+sudo -u bidmate git -C $APP show origin/main:tools/infra/bidmate.service | sudo install -m 600 /dev/stdin /root/bidmate.service.new
+sudo diff /etc/systemd/system/bidmate.service /root/bidmate.service.new    # review the staged copy
+sudo systemctl stop bidmate
+sudo -u bidmate git -C $APP merge --ff-only origin/main
+sudo -u bidmate env HOME=/srv/bidmate /srv/bidmate/venv/bin/pip install -e $APP
+sudo -u bidmate env HOME=/srv/bidmate sh -c "cd $APP/web && npm ci && npm run build"
+sudo install -m 644 /root/bidmate.service.new /etc/systemd/system/bidmate.service
+sudo systemctl daemon-reload && sudo systemctl start bidmate
+curl -si http://127.0.0.1:8501/api/info | head -1                  # HTTP/1.1 401
+```
+
+One-time setup on `codeit` (a member with sudo; with no paid work open, `budget-status` pending $0):
+
+```sh
+# 1. The checkout follows GitHub main. Untracked runtime data (.runtime, 원본 데이터) is gitignored and stays.
+APP=/srv/bidmate/app
+sudo systemctl stop bidmate
+sudo -u bidmate git -C $APP status --short --untracked-files=no    # must print nothing
+sudo -u bidmate git -C $APP remote get-url origin 2>/dev/null \
+  && sudo -u bidmate git -C $APP remote set-url origin https://github.com/littleeeeebit/project-codeit-mid.git \
+  || sudo -u bidmate git -C $APP remote add origin https://github.com/littleeeeebit/project-codeit-mid.git
+sudo -u bidmate git -C $APP fetch origin main
+sudo -u bidmate git -C $APP checkout -B main origin/main
+sudo -u bidmate env HOME=/srv/bidmate /srv/bidmate/venv/bin/pip install -e $APP
+sudo -u bidmate env HOME=/srv/bidmate sh -c "cd $APP/web && npm ci && npm run build"
+sudo install -m 644 $APP/tools/infra/bidmate.service /etc/systemd/system/bidmate.service
+
+# 2. The updater runs with systemd's default PATH: node, npm, git and curl must be found there.
+sudo -u bidmate env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin sh -c 'command -v node npm git curl'
+
+# 3. The updater: a root-owned copy of the script, its units, the marker directory (bidmate writes) and the
+#    state directory (root writes, bidmate reads). Repeat this step whenever a run says the updater changed.
+sudo install -d -o bidmate -g bidmate -m 700 /srv/bidmate/update-request
+sudo install -d -o root -g root -m 755 /var/lib/bidmate-update
+sudo install -o root -g root -m 755 $APP/tools/infra/update.sh /usr/local/sbin/bidmate-update
+sudo install -m 644 $APP/tools/infra/bidmate-update.service $APP/tools/infra/bidmate-update.path /etc/systemd/system/
+
+# 4. Tell the app where the marker and the result are; without both, it offers no update.
+printf 'BIDMATE_UPDATE_REQUEST=/srv/bidmate/update-request/requested\nBIDMATE_UPDATE_STATE_DIR=/var/lib/bidmate-update\n' \
+  | sudo tee -a /etc/bidmate/server.env >/dev/null
+sudo systemctl daemon-reload
+sudo systemctl enable --now bidmate-update.path
+sudo systemctl start bidmate
+curl -si http://127.0.0.1:8501/api/info | head -1                  # HTTP/1.1 401
+systemctl status bidmate-update.path                               # active (waiting)
+```
+
+Until step 1 runs, the VM runs a commit that was deployed from a bundle and is not on `main` (PRs are squash-merged). The page then shows no banner, and `GET /api/update/status` says in `note` that the running commit cannot be fast-forwarded.
+
+Live check (2026-10-08). After PR #31 merged, a member with sudo ran the one-time setup above. On <http://35.255.64.243:8501> they confirmed four things. The banner appeared for a real newer `main` commit. The button was faded while a paid question ran. 취소 did nothing. Confirming updated the server, and the service came back.
 
 The VM serves the owner host's restored database, whose rows keep Windows paths (`C:\Users\dasdk\PycharmProjects\project-codeit-mid\...`). `RFP_PATH_MAP=C:/Users/dasdk/PycharmProjects/project-codeit-mid=/srv/bidmate/app` maps them onto the copied originals and runtime. Every reader of a recorded original, extraction or index path goes through `postgres.host_path`. Paths written on the VM are Linux paths and need no mapping.
 

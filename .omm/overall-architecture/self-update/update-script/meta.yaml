@@ -1,0 +1,9 @@
+created: 2026-10-09T02:46:41.309Z
+updated: 2026-10-09T02:46:41.310Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: update-script
+children: []
+parentPath:
+  - self-update

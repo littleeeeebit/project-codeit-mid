@@ -1,0 +1,9 @@
+created: 2026-10-09T00:31:29.348Z
+updated: 2026-10-09T02:46:17.803Z
+update_count: 3
+last_field: concern
+kind: nested-class
+title: update-banner
+children: []
+parentPath:
+  - web-screens

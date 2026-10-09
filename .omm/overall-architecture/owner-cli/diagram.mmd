@@ -1,0 +1,14 @@
+graph TD
+  corpus-pipeline["Corpus ingestion\nsrc/rfp_assistant/corpus/ingestion.py"]
+  keyword-index-build["Keyword index build\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  dense-build["Embedding build\nsrc/rfp_assistant/retrieval/dense.py"]
+  evaluation-runs["Frozen evaluation runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  activation["Run activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  maintenance-sequence["Maintenance sequence\nsrc/rfp_assistant/storage/maintenance.py"]
+  budget-admin["Budget administration\nsrc/rfp_assistant/gateway/budget.py"]
+  corpus-pipeline -->|parsed extractions| keyword-index-build
+  keyword-index-build -->|chunks to embed| dense-build
+  dense-build -->|index and vector set| evaluation-runs
+  evaluation-runs -->|scored run picked by person| activation
+  maintenance-sequence -->|reruns changed steps| corpus-pipeline
+  budget-admin -->|opens paid admission| dense-build

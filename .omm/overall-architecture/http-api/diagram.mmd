@@ -1,0 +1,16 @@
+graph TD
+  lifespan["App lifespan\nsrc/rfp_assistant/api.py"]
+  session-middleware["Session middleware\nsrc/rfp_assistant/api.py"]
+  auth-routes["Hub sign-in routes\nsrc/rfp_assistant/api.py"]
+  account-routes["Account and update routes\nsrc/rfp_assistant/api.py"]
+  ask-routes["Ask and request routes\nsrc/rfp_assistant/api.py"]
+  verify-routes["Verify routes\nsrc/rfp_assistant/api.py"]
+  dataset-routes["Dataset routes\nsrc/rfp_assistant/api.py"]
+  static-export["Static screens mount\nweb/out"]
+  lifespan -->|Resources and UpdateWatch| account-routes
+  auth-routes -->|sets bidmate_session cookie| session-middleware
+  session-middleware -->|member and key session bound| account-routes
+  session-middleware -->|member bound| ask-routes
+  session-middleware -->|member bound| verify-routes
+  session-middleware -->|member bound| dataset-routes
+  static-export -->|loads screens that call| session-middleware

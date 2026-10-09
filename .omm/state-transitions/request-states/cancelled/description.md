@@ -1,0 +1,1 @@
+Set directly from queued by `cancel_request`, or by `_finish` when a running request had `cancel_requested` set or `_Stop('cancelled')` fired at a checkpoint or dispatch guard. A dispatched call still settles.

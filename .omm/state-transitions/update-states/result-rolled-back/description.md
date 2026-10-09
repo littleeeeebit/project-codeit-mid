@@ -1,0 +1,1 @@
+`rollback` hard-resets to `$PREV`, restores `web/out` from `web-out.prev`, reinstalls dependencies if they changed or the run was a recovery, restarts and health-checks. Success writes `rolled_back`; otherwise `rollback_failed` is written and `deploying` stays.

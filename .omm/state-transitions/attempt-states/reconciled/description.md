@@ -1,0 +1,1 @@
+Set by `budget.reconcile` when a provider total covers the interval. Late usage that arrives afterwards settles the attempt and inserts a negative `late-settlement:` adjustment so the cost is not counted twice.

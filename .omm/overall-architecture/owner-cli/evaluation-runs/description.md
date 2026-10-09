@@ -1,0 +1,1 @@
+`evaluate-retrieval`, `compare --matrix ...` (`evaluation/compare.py`), `run-answers` (`service/answers.py`), judges and the sealed run produce frozen runs under `.runtime/runs/<run_id>/` and comparison tables under `.runtime/compare/tables/`, which the 검증 실험 비교 view displays.

@@ -1,1 +1,0 @@
-budget.reserve() checks gateway ownership, paid_enabled, database paid admission, frozen ledger state, model rates, purpose envelope, consent ceiling and cap minus spent/pending. It inserts reserved state in the same serialized transaction. Refusal returns a reason without contacting the provider.

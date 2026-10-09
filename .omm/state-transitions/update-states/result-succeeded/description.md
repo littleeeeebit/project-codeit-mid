@@ -1,0 +1,1 @@
+The new process answers `/api/info` with 401, so the app is up and sign-in is enforced. `deploying` and the `web-out.prev` backup are removed, and the waiting banner reloads.

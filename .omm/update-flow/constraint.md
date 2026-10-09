@@ -1,0 +1,1 @@
+The app never runs git or systemctl and passes no branch or commit. The script always fetches `+refs/heads/main` from a URL fixed in the script, never from the checkout's config. A change to `tools/infra/bidmate.service` is refused for manual root review. A change to the updater files themselves succeeds but tells the person to reinstall them (runbook 3.2).

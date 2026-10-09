@@ -150,6 +150,9 @@ class Resources:
         self._runner: RequestRunner | None = None
         self._runner_lock = threading.Lock()
         self._jobs: list[threading.Thread] = []  # drafting, answer evaluation, judge runs: joined by close()
+        # True while an accepted update may restart this process, so no new paid work starts (runbook 3.2). The API
+        # sets it to its UpdateWatch.fenced; read under _runner_lock, which every paid admission holds.
+        self.update_fence = lambda: False
         self.partials: dict[str, str] = {}  # request_id -> answer streamed so far, until the request finishes
         self._closed = False
         closer = weakref.WeakMethod(self.close)  # atexit must not keep every Resources (and its index) alive
@@ -357,11 +360,19 @@ class RequestRunner:
         self._futures: dict[str, object] = {}
         self._lock = threading.Lock()
         self._accepting = True
+        self.admitted = 0  # slots held, counted before the queued row exists (open_paid_work)
 
     def try_admit(self) -> bool:
-        return self._accepting and self._slots.acquire(blocking=False)
+        with self.res._runner_lock:  # one step with the update fence: an accepted update never races a new request
+            _refuse_while_updating(self.res)
+            if not (self._accepting and self._slots.acquire(blocking=False)):
+                return False
+            self.admitted += 1
+            return True
 
     def release(self) -> None:
+        with self.res._runner_lock:
+            self.admitted -= 1
         self._slots.release()
 
     def submit(self, request_id: str) -> None:
@@ -2411,6 +2422,7 @@ def start_answer_evaluation(res: Resources, principal: Principal, estimate_id: s
 def _refuse_closed_or_busy(res: Resources) -> None:
     if res._closed or res.paid_refusal():
         raise ServiceError(res.paid_refusal() or "서비스가 종료 중입니다.")
+    _refuse_while_updating(res)  # before a run is published; _start_job checks again under the lock
     if any(t.is_alive() for t in [*_EVAL_JOBS.values(), *_JUDGE_JOBS.values()]):
         raise ServiceError("다른 평가가 실행 중입니다. 끝난 뒤 다시 시도하세요.")
 
@@ -2420,6 +2432,7 @@ def _start_job(res: Resources, jobs: dict[str, threading.Thread], run_id: str, t
     with res._runner_lock:  # close() must see and join every thread that uses its transport
         if res._closed or res.paid_refusal():  # the run stays listed as partial; rerunning resumes it
             raise ServiceError(res.paid_refusal() or "서비스가 종료 중입니다.")
+        _refuse_while_updating(res)
         jobs[run_id] = thread
         res._jobs.append(thread)
         thread.start()
@@ -2507,6 +2520,7 @@ def start_maintenance(res: Resources, principal: Principal) -> str:
     with _EVAL_LOCK:
         if res._closed:
             raise ServiceError("서비스가 종료 중입니다.")
+        _refuse_while_updating(res)
         if any(t.is_alive() for t in _MAINTENANCE_JOB):
             raise ServiceError("유지보수가 이미 실행 중입니다. 끝난 뒤 다시 시도하세요.")
         state = maintenance.start_state(principal.member_id)
@@ -2520,6 +2534,7 @@ def start_maintenance(res: Resources, principal: Principal) -> str:
         with res._runner_lock:  # close() joins it like every other job that may use the transport
             if res._closed:
                 raise ServiceError("서비스가 종료 중입니다.")
+            _refuse_while_updating(res)
             _MAINTENANCE_JOB[:] = [thread]
             res._jobs.append(thread)
             thread.start()
@@ -2693,6 +2708,15 @@ def build_head() -> str:
         return "unknown"
     head = out.stdout.strip()
     return head if out.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", head) else "unknown"
+
+
+# The update fence (update.py, runbook 3.2): every paid admission below checks it under _runner_lock.
+UPDATING = "서버 업데이트가 진행 중이어서 새 유료 작업을 받지 않습니다. 업데이트가 끝난 뒤 다시 시도하세요. (유료 호출 없음)"
+
+
+def _refuse_while_updating(res: Resources) -> None:
+    if res.update_fence():
+        raise ServiceError(UPDATING)
 
 
 def target_key(scope: list[tuple[str, str]], question: str, mode: str, as_of: str, previous: str = "") -> str:
@@ -2997,6 +3021,7 @@ def start_drafting(res: Resources, principal: Principal, slots: list[dict], cons
     with _DRAFT_LOCK, res._runner_lock:
         if res._closed or res.paid_refusal():
             raise ServiceError(res.paid_refusal() or "서비스가 종료 중입니다.")
+        _refuse_while_updating(res)
         if any(t.is_alive() for t in _DRAFT_JOBS.values()):
             raise ServiceError("다른 초안 생성이 실행 중입니다. 끝난 뒤 다시 시도하세요.")
         run_id = f"draft-{date.today():%Y%m%d}-{uuid.uuid4().hex[:6]}"

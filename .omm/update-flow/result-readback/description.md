@@ -1,0 +1,1 @@
+`GET /api/update/status` → `service.update_status` combines `watch.check` (latest commit, ahead_by, commit titles, note), `open_paid_work`, `in_progress()` and `last_result()`. In the new process, `last_result` still shows the previous run's file, which the banner treats as an outcome. A `running` state older than 30 minutes is shown as `interrupted`.

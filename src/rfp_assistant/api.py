@@ -35,26 +35,32 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from .service import service
+from .service import update as updates  # `update` is create_app's parameter
 
 WEB = Path(__file__).resolve().parents[2] / "web" / "out"
 
 
-def create_app(resources=None, login=None) -> FastAPI:
-    """`resources` and `login` are for tests; the served app opens the data directory's single owner and closes it
-    on stop, and reads its sign-in settings from the environment."""
+def create_app(resources=None, login=None, update=None) -> FastAPI:
+    """`resources`, `login` and `update` are for tests; the served app opens the data directory's single owner and
+    closes it on stop, and reads its sign-in and update settings from the environment."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         owned = resources is None
         app.state.res = service.app_resources() if owned else resources
+        app.state.res.update_fence = app.state.update.fenced  # no new paid work while an update may restart us
+        app.state.update.start()
         try:
             yield
         finally:
+            app.state.update.stop()
             if owned:
                 app.state.res.close()
 
     app = FastAPI(title="RFP assistant", version="1", lifespan=lifespan)
     app.state.login = login or service.Login.from_env()
+    # The commit this process runs, read once now; GitHub main is compared with it (runbook 3.2).
+    app.state.update = update or updates.UpdateWatch.from_env(service.build_head())
     app.add_middleware(_Session)
 
     @app.exception_handler(service.ServiceError)
@@ -158,6 +164,44 @@ class Info(BaseModel):
     build: str
     today: str
     question_max_characters: int
+
+
+class CommitTitle(BaseModel):
+    sha: str
+    title: str
+
+
+class PaidWork(BaseModel):
+    open: bool = Field(description="An update is refused while true: a restart would cut this work off")
+    pending_micro_usd: int
+    open_attempts: int
+    active_requests: int = Field(description="Queued or running requests")
+    background_jobs: int = Field(description="Running drafting, evaluation, judge or maintenance jobs")
+    reason: str | None
+
+
+class UpdateResult(BaseModel):
+    state: str = Field(description="running, succeeded, up_to_date, failed (nothing changed), rolled_back, "
+                                   "rollback_failed or interrupted")
+    from_commit: str | None
+    to_commit: str | None
+    started_at: str | None
+    finished_at: str | None
+    message: str | None
+
+
+class UpdateStatus(BaseModel):
+    configured: bool = Field(description="The root updater's request and state paths are set (runbook 3.2)")
+    running_commit: str
+    latest_commit: str | None = Field(description="GitHub main's head at the last check")
+    ahead_by: int
+    commits: list[CommitTitle] = Field(description="Titles of the commits from the running one to main, oldest first")
+    available: bool
+    checked_at: str | None
+    note: str | None = Field(description="Why no update is offered although main differs, or why the check failed")
+    paid_work: PaidWork
+    in_progress: bool = Field(description="A request is waiting for the updater, or it is running")
+    last_result: UpdateResult | None
 
 
 class Budget(BaseModel):
@@ -442,6 +486,15 @@ def _account_routes(app: FastAPI) -> None:
     def info(res: Res):
         return Info(build=service.build_head(), today=date.today().isoformat(),
                     question_max_characters=res.settings.question_max_characters)
+
+    @app.get("/api/update/status", response_model=UpdateStatus)
+    def update_status(request: Request, res: Res, member: Member):
+        return updates.update_status(res, member, request.app.state.update)
+
+    @app.post("/api/update", response_model=UpdateStatus)
+    def request_update(request: Request, res: Res, member: Member):
+        """Takes no input: the updater only ever moves to the latest origin/main."""
+        return updates.request_update(res, member, request.app.state.update)
 
     @app.get("/api/budget", response_model=Budget)
     def budget(res: Res, member: Member):

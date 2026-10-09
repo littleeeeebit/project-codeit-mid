@@ -1,0 +1,1 @@
+When `tools/infra/update.sh` or the bidmate-update units change, the result message tells the operator to reinstall them by hand (runbook 3.2). The update cannot update itself.

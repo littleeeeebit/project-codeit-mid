@@ -1,0 +1,1 @@
+Extraction revisions are bound to the parser fingerprint and actual output. A changed output creates a new revision, resets review and keeps old elements for pinned gold rows and issued citations. Quarantined sources record `reason_code` and are shown as `ingestion_unavailable` at answer time.

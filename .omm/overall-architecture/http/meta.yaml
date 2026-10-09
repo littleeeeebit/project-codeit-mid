@@ -1,14 +1,10 @@
-created: 2026-10-08T21:41:48.592Z
-updated: 2026-10-08T21:41:48.720Z
+created: 2026-10-08 21:41:48.592000+00:00
+updated: 2026-10-08 21:41:48.720000+00:00
 update_count: 2
 last_field: diagram
 kind: nested-class
 title: http
 children:
-  - errors
-  - lifespan
-  - oauth
-  - routes
-  - session
-  - static
+- oauth
+- session
 parentPath: []

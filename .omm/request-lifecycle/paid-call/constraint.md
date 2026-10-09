@@ -1,0 +1,1 @@
+Never retried automatically. A paid call already dispatched still settles after cancellation; cancellation only prevents the next stage.

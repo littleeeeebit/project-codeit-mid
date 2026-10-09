@@ -1,0 +1,1 @@
+`attempts.state` for every paid call: chat, query embedding, drafting, judges and corpus embedding batches. Transitions are conditional UPDATEs (`_transition`), so each happens at most once.

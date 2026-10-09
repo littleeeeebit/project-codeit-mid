@@ -1,0 +1,1 @@
+`_exact_matches` handles identifier codes found by `CODE_RE`, and these always rank first. `_lexical_matches` runs Kiwi BM25 (or whitespace BM25 for K0) with scope-redundant term dropping. `_name_only` covers questions that only name a project and switches to overview passages through `_named_rows`.

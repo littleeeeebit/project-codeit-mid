@@ -1,0 +1,1 @@
+It keeps the `Owned` {request_id, generation_id, target} returned by `/api/ask`. It shows streamed partial text from `/api/requests/{id}/stream` as provisional and renders the stored outcome only when `GET /api/requests/{id}` returns `attachable` (`service.may_attach`: same request, generation and target, and not cancelled). Otherwise the outcome stays in 내 최근 요청 as history.

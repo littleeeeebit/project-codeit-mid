@@ -1,0 +1,1 @@
+`useAnswerStream` fetches `/api/requests/{id}/stream?generation_id=` with an AbortController and parses `data:` events: a partial `{summary, claims}` object, or `null` to withdraw the text. On `event: done` it calls `onDone`, which is `status.reload`, so the validated outcome arrives at once. Stream errors are swallowed because the status poll still delivers the outcome.

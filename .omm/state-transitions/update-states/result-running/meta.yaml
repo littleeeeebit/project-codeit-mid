@@ -1,0 +1,9 @@
+created: 2026-10-09T00:32:08.101Z
+updated: 2026-10-09T00:32:08.103Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: result-running
+children: []
+parentPath:
+  - update-states

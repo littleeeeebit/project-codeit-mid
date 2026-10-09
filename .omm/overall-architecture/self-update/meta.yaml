@@ -1,0 +1,16 @@
+created: 2026-10-09T02:46:37.499Z
+updated: 2026-10-09T02:46:38.562Z
+update_count: 4
+last_field: todo
+kind: nested-class
+title: self-update
+children:
+  - github-compare
+  - paid-work-check
+  - request-marker
+  - result-file
+  - service-fence
+  - update-banner
+  - update-script
+  - update-watch
+parentPath: []

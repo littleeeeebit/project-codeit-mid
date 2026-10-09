@@ -1,0 +1,1 @@
+`app.mount("/", StaticFiles(directory=web/out, html=True))`, mounted only if `web/out` exists. It bypasses the session middleware because the path does not start with /api/. `update.sh` rebuilds it (`npm ci && npm run build`) when web/ changed and restores `web-out.prev` on rollback.

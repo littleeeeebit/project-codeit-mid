@@ -1,0 +1,14 @@
+created: 2026-10-09T00:31:46.865Z
+updated: 2026-10-09T00:31:47.638Z
+update_count: 3
+last_field: constraint
+kind: nested-class
+title: evaluation
+children:
+  - activation
+  - answer-eval-and-judges
+  - compare-matrices
+  - gold-queue
+  - retrieval-runs
+  - sealed-release
+parentPath: []

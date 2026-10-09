@@ -1,1 +1,0 @@
-settle() calculates cost from provider usage and the attempt's frozen prices, persists usage and response identity, and returns duplicate settlement safely. A unique stage/model/response identity prevents double accounting. Settled cost exceeding reservation freezes new paid admission for inspection.

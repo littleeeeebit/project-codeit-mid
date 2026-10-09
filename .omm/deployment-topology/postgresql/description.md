@@ -1,0 +1,1 @@
+PostgreSQL 18.6 with pgvector 0.8.6, started by `tools/infra/start-postgresql.sh` on the VM (or `start-postgresql.ps1` locally on loopback port 55432). The application database is `bidmate_app`. The paid gateway's advisory lock lives here, so the lock is database-wide rather than per host.

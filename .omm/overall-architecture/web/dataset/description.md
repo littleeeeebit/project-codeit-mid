@@ -1,1 +1,0 @@
-DatasetPage loads /api/gold/pending and /api/drafting/runs, polling runs while drafting is active. DraftBuilder plans and starts development-only question generation. DraftRuns submits completed valid drafts to the review queue. ColumnsQueue presents candidate content beside source spans and sends an explicit decision. RecentDecisions shows persisted approvals and rejections.

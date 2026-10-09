@@ -1,1 +1,0 @@
-postAsk() sends up to two selected document/source pairs, a question, a supported mode and the previous request ID. API ask() supplies today's date. service.ask() creates fresh generation and idempotency IDs and returns request_id, generation_id and a target hash incorporating scope, normalized question, mode, date and previous turn.

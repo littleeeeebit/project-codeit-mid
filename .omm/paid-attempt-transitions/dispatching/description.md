@@ -1,1 +1,0 @@
-mark_dispatching() performs the request stop check and ownership/maintenance/unknown-billing checks inside the mutation transaction. A refusal releases the reservation atomically; success writes dispatching and dispatched_at before transport invocation. No database transaction spans the subsequent inference call.

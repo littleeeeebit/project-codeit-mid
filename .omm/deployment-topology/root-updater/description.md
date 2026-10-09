@@ -1,0 +1,1 @@
+`bidmate-update.path` and `bidmate-update.service` plus `/usr/local/sbin/bidmate-update` (a root copy of `tools/infra/update.sh`). Root runs git, pip and npm as the service user through `runuser`, restarts `bidmate` with systemctl and writes only to its own state directory, which the app can read.

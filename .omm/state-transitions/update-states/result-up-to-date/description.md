@@ -1,0 +1,1 @@
+origin/main equals the running commit and no cut-off run is pending. Nothing restarts, and the banner shows `이미 최신 main을 실행하고 있습니다.`

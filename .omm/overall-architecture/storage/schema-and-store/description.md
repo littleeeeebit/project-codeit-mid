@@ -1,0 +1,1 @@
+`init_schema` creates the tables idempotently and never resets spending. `tx(conn, immediate=True)` wraps every state transition (request status, attempt state, activation). `get_app_setting` and `set_app_setting` hold `active_run` and `active_index`, which `active_serving` reads on every retrieval.

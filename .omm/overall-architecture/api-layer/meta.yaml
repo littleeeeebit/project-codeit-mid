@@ -1,8 +1,14 @@
 created: 2026-10-06T07:31:26.002Z
-updated: 2026-10-06T22:40:12.581Z
-update_count: 4
-last_field: constraint
+updated: 2026-10-09T00:31:29.969Z
+update_count: 6
+last_field: diagram
 kind: nested-class
 title: api-layer
-children: []
+children:
+  - answer-stream
+  - hub-login
+  - route-handlers
+  - session-middleware
+  - static-screens
+  - update-watch
 parentPath: []

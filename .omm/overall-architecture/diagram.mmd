@@ -1,9 +1,20 @@
 graph TD
-web["Browser screens\nweb/src/app/layout.tsx"] -->|Authenticated HTTP actions| http["HTTP boundary\nsrc/rfp_assistant/api.py"]
-http -->|Principal and request inputs| service["Application service\nsrc/rfp_assistant/service/service.py"]
-service -->|Question and document scope| retrieval["Evidence retrieval\nsrc/rfp_assistant/retrieval/retrieval.py"]
-service -->|Records and transactions| persistence["Persistent state\nsrc/rfp_assistant/storage/store.py"]
-retrieval -->|Scoped vectors and artifacts| persistence
-workflows["Corpus and evaluation workflows\nsrc/rfp_assistant/cli.py"] -->|Pinned answer execution| service
-workflows -->|Revisions and measured selections| persistence
-service -->|Request spans and outcomes| tracing["Optional tracing\nsrc/rfp_assistant/gateway/tracing.py"]
+  web-screens["Next.js screens\nweb/src"]
+  http-api["FastAPI app\nsrc/rfp_assistant/api.py"]
+  service-core["Service core\nsrc/rfp_assistant/service/service.py"]
+  retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  paid-gateway["Paid gateway\nsrc/rfp_assistant/gateway"]
+  postgres-store["PostgreSQL store\nsrc/rfp_assistant/storage/postgres.py"]
+  self-update["Self-update watch\nsrc/rfp_assistant/service/update.py"]
+  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"]
+  web-screens -->|fetch /api with session| http-api
+  http-api -->|one service call per route| service-core
+  http-api -->|update status and request| self-update
+  self-update -->|fence paid admission| service-core
+  service-core -->|retrieve scoped evidence| retrieval-engine
+  service-core -->|reserve, call, settle| paid-gateway
+  service-core -->|requests, traces, audit| postgres-store
+  retrieval-engine -->|index rows, pgvector search| postgres-store
+  paid-gateway -->|attempts ledger, advisory lock| postgres-store
+  owner-cli -->|ingest, build, evaluate, activate| postgres-store
+  owner-cli -->|budget admin, maintenance| service-core

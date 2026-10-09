@@ -1,0 +1,1 @@
+데이터셋 만들기 (`web/src/components/dataset/*`). The flow: pick documents and source passages, price a gpt-6-luna drafting plan, then start drafting with a consented maximum. The server's `service.start_drafting` runs it as a background thread. Valid drafts are then sent to the review queue, and a reviewer approves or rejects each candidate through `_dataset_routes`.

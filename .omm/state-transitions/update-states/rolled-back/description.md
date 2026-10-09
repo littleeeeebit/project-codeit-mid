@@ -1,0 +1,1 @@
+A failure after the fast-forward led to `git reset --hard PREV`, restored screens, reinstalled dependencies if needed, a restart and a healthy check. `deploying` is removed.

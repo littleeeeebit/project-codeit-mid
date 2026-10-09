@@ -1,0 +1,6 @@
+graph TD
+  manifest["CSV manifest import\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"sources and documents rows"| parsers["HWP and PDF parsers\nsrc/rfp_assistant/corpus/ingestion.py"]
+  parsers -->|"raw elements"| ocr-merge["OCR image text merge\nsrc/rfp_assistant/corpus/ocr.py"]
+  ocr-merge -->|"elements with image_text"| revision-assignment["Extraction revision\nsrc/rfp_assistant/corpus/ingestion.py"]
+  revision-assignment -->|"active extraction"| fidelity-check["HWP fidelity check\nsrc/rfp_assistant/corpus/fidelity.py"]
+  fidelity-check -->|"auto verdict, findings"| review-and-recovery["Review and recovery\nsrc/rfp_assistant/corpus/ingestion.py"]

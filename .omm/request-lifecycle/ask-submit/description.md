@@ -1,0 +1,1 @@
+The screen keeps the `Owned` record per turn. If the page unmounted before the response, it POSTs `/abandon`, which cancels only a still-queued request. The submit button labels paid modes `유료 1회`, or `유료 2회` for a follow-up.

@@ -1,0 +1,1 @@
+See web-screens/update-banner. It reads `UpdateStatus` {configured, running_commit, latest_commit, ahead_by, commits[≤50], available, checked_at, note, paid_work, in_progress, last_result} and sends `POST /api/update` with no body.

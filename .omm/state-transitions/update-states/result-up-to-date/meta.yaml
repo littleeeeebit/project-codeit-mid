@@ -1,0 +1,9 @@
+created: 2026-10-09T00:32:08.374Z
+updated: 2026-10-09T00:32:08.375Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: result-up-to-date
+children: []
+parentPath:
+  - update-states
