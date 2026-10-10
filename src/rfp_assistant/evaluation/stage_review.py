@@ -328,6 +328,8 @@ def run(settings: Settings, stage: str, base: str, cands: list[str], inputs_from
             variant = read_variant(worktree)
             cand["variant"] = variant.get(stage)
             cand["config"] = config = candidate_config(settings, stage, inputs, variant)
+            if stage == "ocr":  # the remote read is priced on the shared ledger's rate card, as it will settle there
+                config["ledger_env"] = ledger_env
             if config["gpu"] and not host["cuda"]:
                 cand.update(status="refused", host=host, reason=(
                     f"needs a CUDA GPU for the {' and the '.join(config['gpu'])}; this host has none. Run this "
