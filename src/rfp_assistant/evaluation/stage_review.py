@@ -23,7 +23,6 @@ import gzip
 import hashlib
 import json
 import os
-import platform
 import re
 import shutil
 import subprocess
@@ -35,6 +34,7 @@ from pathlib import Path
 from ..settings import REPO_ROOT, Settings
 from ..storage.store import write_text_atomic
 from . import evaluation as ev
+from . import stage_review_worker
 
 SCHEMA = "review-run-1"
 STAGES = ("retriever", "chunking")
@@ -99,16 +99,7 @@ def remove_worktree(path: Path) -> None:
 
 
 def runner_host() -> dict:
-    info = {"platform": platform.platform(), "machine": platform.machine(), "python": platform.python_version(),
-            "cpu_count": os.cpu_count(), "cuda": False, "gpu": None}
-    try:
-        import torch
-
-        if torch.cuda.is_available():
-            info.update(cuda=True, gpu=torch.cuda.get_device_name(0))
-    except Exception:  # noqa: BLE001 - no torch means no GPU
-        pass
-    return info
+    return {**stage_review_worker.host(), "cpu_count": os.cpu_count()}
 
 
 # ---------------------------------------------------------------- frozen inputs
