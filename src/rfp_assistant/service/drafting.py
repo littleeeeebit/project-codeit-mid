@@ -10,6 +10,7 @@ import hashlib
 import json
 import re
 import time
+import uuid
 from pathlib import Path
 from typing import Literal
 
@@ -321,13 +322,14 @@ def generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, tra
 
 def _generate(settings: Settings, plan: dict, out: Path, max_cost_micro: int, transport, split: str, *, guard=None,
               owner_check=None, tracer: tracing.Tracing | None = None, member: str = auth.OWNER_CLI.member_id) -> dict:
-    """One Langfuse trace per drafting run, under the `member` who started it. A lent transport comes with its
-    owner's `tracer`; a run that creates its own transport also creates and closes its own tracer."""
+    """One Langfuse trace per drafting run, under the `member` who started it. Its trace ID is seeded with a fresh
+    UUID: members on different PCs share one project and may draft into the same absolute path. A lent transport
+    comes with its owner's `tracer`; a run that creates its own transport also creates and closes its own tracer."""
     owns_tracer = transport is None and tracer is None
     if owns_tracer:
         tracer = tracing.Tracing.from_settings(settings)
     try:
-        with tracing.run(tracer, "draft-gold-questions", seed=str(out), user_id=member,
+        with tracing.run(tracer, "draft-gold-questions", seed=uuid.uuid4().hex, user_id=member,
                          input={"split": split, "plan": plan, "max_cost_usd": max_cost_micro / 1_000_000},
                          metadata={"out": str(out), "split": split, "model": MODEL, "prompt_version": PROMPT_VERSION},
                          tags=["drafting", split]) as root:

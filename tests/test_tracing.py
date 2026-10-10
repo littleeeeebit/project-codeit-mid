@@ -451,6 +451,21 @@ class DraftingTracingTest(unittest.TestCase):
             self.assertEqual(call.attributes["langfuse.observation.type"], "generation")
             self.assertIn("12 months", call.attributes["langfuse.observation.output"])
 
+            # another PC drafting into the same absolute path: its run is a trace of its own in the shared project
+            shutil.rmtree(Path(folder) / 'out')
+            other = fx.make_env(Path(folder) / 'other-pc')
+            exporter2 = InMemorySpanExporter()
+            tracer = tracing.Tracing(NOWHERE, "pk-lf-test-draft", "sk-lf-test-draft", span_exporter=exporter2)
+            try:
+                with fixtures.paid_gateway(other.settings):
+                    drafting._generate(other.settings, {'slots': [_slot(other)]}, Path(folder) / 'out', 100000,
+                                       transport, 'dev', tracer=tracer, member='spai1302')
+            finally:
+                tracer.close()
+            second = next(s for s in exporter2.get_finished_spans() if s.name == 'draft-gold-questions')
+            self.assertNotEqual(second.context.trace_id, root.context.trace_id)
+            self.assertEqual(second.attributes["user.id"], "spai1302")
+
 
 if __name__ == "__main__":
     unittest.main()
