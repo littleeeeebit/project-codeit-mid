@@ -214,6 +214,27 @@ class TracingLifecycleTest(unittest.TestCase):
             self.assertIsNotNone(built)
             built.close()
 
+    def test_every_trace_carries_member_environment_and_git_ref(self):
+        commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=settings_mod.REPO_ROOT,
+                                capture_output=True, text=True).stdout.strip()
+        cases = {"local": ({"BIDMATE_HUB_URL": "", "BIDMATE_LOCAL_MEMBER": "alice"}, "alice"),
+                 "server": ({"BIDMATE_HUB_URL": "http://hub", "BIDMATE_LOCAL_MEMBER": "alice"}, "spai1303")}
+        for environment, (environ, member) in cases.items():
+            with self.subTest(environment), mock.patch.dict("os.environ", environ):
+                exporter = InMemorySpanExporter()
+                tracer = tracing.Tracing(NOWHERE, f"pk-lf-test-{environment}", "sk", span_exporter=exporter)
+                with tracing.run(tracer, "answer-question", seed="r1", input={}, user_id="spai1303",
+                                 metadata={"request_id": "r1"}, tags=["ask"]):
+                    pass
+                tracer.close()
+                attrs = exporter.get_finished_spans()[0].attributes
+                self.assertEqual(attrs["user.id"], member)
+                self.assertEqual(attrs["langfuse.environment"], environment)
+                self.assertTrue(attrs["langfuse.release"].endswith("@" + commit), attrs["langfuse.release"])
+                self.assertEqual(attrs["langfuse.trace.metadata.member"], member)
+                self.assertEqual(attrs["langfuse.trace.metadata.git_ref"], attrs["langfuse.release"])
+                self.assertEqual(list(attrs["langfuse.trace.tags"]), ["ask", environment])
+
     def test_one_owner_per_key_and_close_frees_it(self):
         first = tracing.Tracing(NOWHERE, "pk-lf-test-own", "sk-lf-test-own")
         with self.assertRaises(tracing.TracingError):
@@ -334,6 +355,39 @@ class LangfuseLauncherTest(unittest.TestCase):
             self.assertNotEqual(refused.returncode, 0)
             self.assertIn("volumes exist", refused.stdout + refused.stderr)
             self.assertFalse((root / ".runtime/langfuse.env").exists())
+
+    def test_shared_keys_replace_the_tracing_lines_and_a_failed_read_writes_nothing(self):
+        script = Path(__file__).resolve().parents[1] / "tools/infra/use-shared-langfuse.ps1"
+        keys = "'LANGFUSE_PUBLIC_KEY=pk-lf-shared'; 'LANGFUSE_SECRET_KEY=sk-lf-shared'"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "tools/infra").mkdir(parents=True)
+            shutil.copyfile(script, root / "tools/infra/use-shared-langfuse.ps1")
+            before = ("OPENAI_API_KEY=keep-me\nLANGFUSE_HOST=http://127.0.0.2:3100\nLANGFUSE_PUBLIC_KEY=pk-lf-local\n"
+                      "LANGFUSE_SECRET_KEY=sk-lf-local\nBIDMATE_LOCAL_MEMBER=old\n")
+            (root / ".env").write_text(before, encoding="utf-8")
+
+            def run(answer: str, code: int) -> subprocess.CompletedProcess:
+                command = (f"function ssh {{ Set-Content -LiteralPath '{(root / 'ssh.txt').as_posix()}' -Value "
+                           f"($args -join ' '); $global:LASTEXITCODE = {code}; {answer} }}; "
+                           f"& '{(root / 'tools/infra/use-shared-langfuse.ps1').as_posix()}' -User spai1302 "
+                           f"-Identity k/id_ed25519")
+                return subprocess.run(["pwsh", "-NoProfile", "-Command", command], capture_output=True,
+                                      encoding="utf-8", errors="replace")
+
+            for answer, code in ((keys, 255), ("'LANGFUSE_PUBLIC_KEY=pk-lf-shared'", 0), ("$null", 0)):
+                with self.subTest(answer=answer, code=code):
+                    self.assertNotEqual(run(answer, code).returncode, 0)
+                    self.assertEqual((root / ".env").read_text(encoding="utf-8"), before)
+            result = run(keys, 0)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual((root / ".env").read_text(encoding="utf-8").splitlines(),
+                             ["OPENAI_API_KEY=keep-me", "LANGFUSE_HOST=http://127.0.0.3:3300",
+                              "BIDMATE_LOCAL_MEMBER=spai1302", "LANGFUSE_PUBLIC_KEY=pk-lf-shared",
+                              "LANGFUSE_SECRET_KEY=sk-lf-shared"])
+            call = (root / "ssh.txt").read_text(encoding="utf-8").strip()
+            self.assertTrue(call.startswith("-o BatchMode=yes -i k/id_ed25519 -o IdentitiesOnly=yes "
+                                            "spai1302@35.255.64.243 sudo grep"), call)
 
 
 def _slot(env) -> dict:

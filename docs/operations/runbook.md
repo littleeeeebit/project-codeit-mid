@@ -43,7 +43,7 @@ The shared application runs on the team's existing GCP VM `codeit`. It is the on
 | Address | `35.255.64.243`, ephemeral: it changes if `codeit` is stopped and started. Then follow "When the address changes" below. |
 | Listening (BidMate) | uvicorn on `0.0.0.0:8501` (one worker), served at <http://35.255.64.243:8501> through the already-open 8501 rule; PostgreSQL 18.6 on `127.0.0.1:55432` only. JupyterHub is the team's, on `:8000` (proxy) and `127.0.0.1:8081` (hub). |
 | Paths | checkout `/srv/bidmate/app`, originals `/srv/bidmate/app/원본 데이터`, runtime `/srv/bidmate/app/.runtime`, venv `/srv/bidmate/venv`, backups `/srv/bidmate/backups`, owned by the `bidmate` service user (mode 750) |
-| Secrets | `/etc/bidmate/server.env` (root, mode 600): `RFP_DATABASE_DSN`, `RFP_CONFIG_FILE`, `RFP_SOURCE_DIR`, `RFP_DATA_DIR`, `RFP_PATH_MAP`, and the sign-in settings below. No tracked file and no `.env` holds them. There is no `OPENAI_API_KEY` on the VM in any file; Langfuse tracing is off there. |
+| Secrets | `/etc/bidmate/server.env` (root, mode 600): `RFP_DATABASE_DSN`, `RFP_CONFIG_FILE`, `RFP_SOURCE_DIR`, `RFP_DATA_DIR`, `RFP_PATH_MAP`, and the sign-in settings below. No tracked file and no `.env` holds them. There is no `OPENAI_API_KEY` on the VM in any file. Since 2026-10-10 it also holds the tracing lines for the shared Langfuse (3.7). |
 
 Sign-in settings in `server.env` (section 2). They are the only place BidMate reads them from:
 
@@ -244,6 +244,92 @@ The owner approved the hub edit and the switch to `0.0.0.0`. With no paid work p
 5. The unit from `tools/infra/` (`--host 0.0.0.0`) was installed and restarted. The previous unit is kept as `bidmate.service.bak-2026-10-06`. From outside the VM, `http://35.255.64.243:8501/api/info` answered 401 ("로그인이 필요합니다.") and the screens answered 200.
 6. The owner (`spai1303`) opened the public address in a browser with no tunnel. `/api/auth/me` answered 401, then login went through the hub (`oauth2/authorize` 302, `oauth2/token` 200), the callback answered 303 with the session cookie, and `/api/auth/me` answered 200. With the key re-entered on 설정 for that account, 질문하기 answered and opened its evidence, and 검증 and 데이터셋 만들기 loaded (`/api/verify/*`, `/api/gold/*`, `/api/drafting/*` all 200). A teammate's first live sign-in had not happened yet, so their allowlist entries and the per-account key separation were covered only by tests (`tests.test_api.LoginTest`, `ApiFlowTest`) at that point.
 7. Review found that the session cookie, set for `/`, also rode to the notebook servers on :8000. The fix (`Path=/api/`, plus account-bound screens) was pulled from a bundle, `web/` rebuilt, and bidmate restarted with nothing pending (`pending_micro_usd` 0, `open_attempts` 0), which signed everyone out and dropped entered keys. From outside, `/api/info` answered 401, and `/api/auth/logout` expired `bidmate_session` at both `Path=/api/` and the first deployment's `Path=/`.
+
+### 3.7 Shared Langfuse on `codeit` (since 2026-10-10)
+
+One Langfuse for the team runs on `codeit` next to BidMate. It has one project, `RFP assistant` (`bidmate-rfp-assistant`, organization `BidMate`), which holds the owner's earlier local traces. It also receives traces from the live server and from every member's local runs. Each trace names the member (user ID), the environment (`server` or `local`) and the git ref (`<branch>@<commit>`, shown as Release), so the trace list can be filtered by person, host and branch (README, Langfuse tracing). The client's one masking gate applies as before. Traces hold RFP text, which is why they stay on team infrastructure rather than Langfuse Cloud.
+
+| | |
+| --- | --- |
+| Stack | Compose project `bidmate-langfuse`, Langfuse 4.50.0 on the image digests of `compose.langfuse.yaml`, the same as the owner's local stack. `/srv/langfuse/` (root, 644) holds copies of `compose.langfuse.yaml`, `compose.langfuse.server.yaml` and `tools/infra/langfuse-clickhouse-logs.xml` |
+| Secrets | `/etc/bidmate/langfuse.env` (root, mode 600): the stack's passwords, salt and encryption key, and the project's `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`. No tracked file holds them |
+| Listening | web on `127.0.0.1:3100` and MinIO on `127.0.0.1:9190`, loopback only. No firewall rule was added and nothing is public |
+| Memory limits | web 1.5 GB, worker 1.5 GB, ClickHouse 2 GB, Postgres 512 MB, MinIO 512 MB, Redis 256 MB |
+| Disk | ClickHouse's own diagnostic logs are off (`langfuse-clickhouse-logs.xml`). On the owner's stack they reached 1.3 GB in five days, while the traces took 4 MB |
+| Boot | `restart: unless-stopped`: Docker starts it with the VM |
+
+```sh
+LF="sudo docker compose --project-directory /srv/langfuse --env-file /etc/bidmate/langfuse.env -f /srv/langfuse/compose.langfuse.yaml -f /srv/langfuse/compose.langfuse.server.yaml"
+$LF ps                                              # six containers, healthy; ports only on 127.0.0.1
+curl -s http://127.0.0.1:3100/api/public/health     # {"status":"OK","version":"4.50.0"}
+$LF stop                                            # safe at any time: answers and the ledger do not depend on it
+$LF up -d --wait                                    # start again, or apply a changed langfuse.env
+```
+
+After one of the three files changes in the repository, copy it into `/srv/langfuse` and run `$LF up -d --wait`. `$LF down -v` deletes every trace, and there is no backup.
+
+#### Reaching the UI
+
+On your own PC, with the same key and username as in 3.1:
+
+```sh
+ssh -i <your private key> -N -L 127.0.0.3:3300:127.0.0.1:3100 <your username>@35.255.64.243
+```
+
+Open <http://127.0.0.3:3300>, exactly this address, because the stack's `NEXTAUTH_URL` names it and sign-in redirects there. `127.0.0.3` is a loopback host of its own. Browsers share cookies across the ports of one host, so this choice keeps a Langfuse that already runs on `127.0.0.1` (the owner has one on :3001) or `127.0.0.2` (this repository's local stack, :3100) signed in. Windows and Linux answer on all of `127.0.0.0/8`. On macOS, add the address once per boot with `sudo ifconfig lo0 alias 127.0.0.3 up`. If the tunnel cannot bind, something else on your PC uses that address and port, and the address cannot change without changing `NEXTAUTH_URL` for everyone. The key-path notes of 3.1 apply here as well.
+
+#### Accounts and sign-up
+
+Each member signs in with their own Langfuse account: an email and a password, unrelated to JupyterHub. The owner's account came with the restored data. Sign-up is normally off. New accounts join organization `BidMate` and the project as `MEMBER` (`LANGFUSE_DEFAULT_*` in `compose.langfuse.server.yaml`). An owner can change roles under Organization settings › Members.
+
+To let someone in:
+
+1. Set `LANGFUSE_AUTH_DISABLE_SIGNUP=false` in `langfuse.env`, then run `$LF up -d --wait`. That recreates only the web container, and signed-in sessions survive.
+2. The person opens their tunnel and signs up at <http://127.0.0.3:3300/auth/sign-up>.
+3. Set the value back to `true`, then run `$LF up -d --wait` again.
+
+While sign-up is open, anyone who can reach the VM over SSH can create an account, so keep the window short.
+
+#### Tracing from the live server
+
+`server.env` holds `LANGFUSE_HOST=http://127.0.0.1:3100`, the two project keys copied from `langfuse.env`, and `LANGFUSE_TRACING_ENVIRONMENT=server`. The SDK reads that last line by default; it names the environment for code deployed before traces were tagged, and later code sets the same value itself. A change takes effect at the next `bidmate` restart. A restart signs everyone out and drops entered API keys, so pick the moment.
+
+#### Tracing from your PC
+
+```powershell
+./tools/infra/use-shared-langfuse.ps1 -User <your username> -Identity "$HOME/.ssh/<your key>"
+```
+
+It reads the two keys over SSH (with sudo) from `langfuse.env` and rewrites the tracing lines of your gitignored `.env`:
+
+- `LANGFUSE_HOST=http://127.0.0.3:3300`
+- the two keys
+- `BIDMATE_LOCAL_MEMBER=<your username>` (`-Member` sets another name), which every local trace carries as its member
+
+If the keys cannot be read, it writes nothing. Keep the tunnel open while you run the app. Without it, traces are dropped with a warning and answers carry on. To go back to a stack of your own, run `./tools/infra/start-langfuse.ps1` again (README).
+
+#### Turning it off
+
+- The server: remove the four `LANGFUSE_*` lines from `server.env` and restart `bidmate` at a moment you pick.
+- A member: remove the tracing lines from `.env`.
+- Stopping the stack (`$LF stop`) needs neither.
+
+#### Setup record (2026-10-10)
+
+1. Measured before anything was installed:
+   - the boot disk: 77 GB, 27 GB free
+   - RAM: 15.6 GB in all, 4.9 GB used, 11.1 GB available, no swap
+   - Docker 29.1.3 and Compose 2.40.3 were already installed, running only BidMate's PostgreSQL
+   - clearable caches: apt 294 MB, `/var/log` 411 MB (journal 327 MB)
+   - the owner's local stack: Postgres 64 MB, ClickHouse 1.48 GB (1.3 GB of it ClickHouse's own diagnostic logs), MinIO 27 MB, Redis 0.4 MB
+
+   It fit with room left for the `web/` rebuild, so nothing was cleared.
+2. The images took 5 GB. The owner's stack was stopped for a consistent copy. Its four data volumes were archived with `tar --numeric-owner`, copied, checked against their SHA-256 sums and unpacked into the new, empty volumes before the first start, and the owner's stack was started again. The copied diagnostic-log tables were dropped.
+3. The copy of `.runtime/langfuse.env` on the VM had its `LANGFUSE_INIT_USER_PASSWORD` replaced by a random value. The original is the owner's local login, and every sudoer can read the file.
+4. Counts were taken in ClickHouse through a throwaway client container on the stack network: 230 traces, 620 observations and 263 scores in `bidmate-rfp-assistant`, the same on both stacks. The v4 public traces API is off in events-only mode. Through the tunnel, the owner signed in with their existing account and opened the project and its traces. Their :3001 session stayed signed in.
+5. After the start: 21 GB free and 9.2 GB of RAM available. The stack used about 2.1 GB: web 856 MB, worker 595 MB, ClickHouse 488 MB, MinIO 134 MB, Postgres 42 MB, Redis 12 MB. BidMate's `/api/info` answered 401 from outside, and the hub answered on :8000.
+6. With nothing pending, `bidmate` was stopped from 13:30 to 13:49 UTC. From the owner's PC, a local uvicorn (`BIDMATE_LOCAL_MEMBER=spai1303`) answered against codeit's database through a second tunnel. Its traces arrived as user `spai1303`, environment `local`, release `shared-langfuse-on-codeit@5b47cb2`. The first, a corpus-wide question, was refused by validation (`absence_not_listed`), which was the pipeline's verdict and not tracing's. With the Langfuse tunnel closed, a single-document answer still completed and settled, with pending at $0. The SDK only logged export retries.
+7. `bidmate` was started with tracing on. A 질문하기 answer by `spai1303` on the live site arrived about a second after it finished, as user `spai1303`, environment `server`. With the stack stopped, the next answer completed and settled, with pending at $0, and the stack was started again.
 
 ## 4. Request execution and controlled stop
 

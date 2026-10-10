@@ -3035,7 +3035,7 @@ def start_drafting(res: Resources, principal: Principal, slots: list[dict], cons
             try:  # this process already owns the gateway lock that drafting.generate would take
                 drafting._generate(res.settings, est["plan"], run_dir / "output", consented_max_micro,
                                    res.transport, "dev", guard=lambda conn: "interrupted" if res._closed else None,
-                                   tracer=res.tracing)
+                                   tracer=res.tracing, member=principal.member_id)
             except Exception as exc:  # noqa: BLE001 - recorded for the run list; settled calls stay settled
                 name = "interrupted.txt" if res._closed else "error.txt"
                 write_text_atomic(run_dir / name, f"{type(exc).__name__}: {exc}"[:500])
