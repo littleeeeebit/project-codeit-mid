@@ -11,17 +11,23 @@ export type Candidate = {
   commit: string;
   working_tree: boolean;
   changed_files?: string[];
-  status: "complete" | "failed" | "refused";
+  status: "complete" | "failed" | "refused" | "stopped";
   reason?: string | null;
   host?: Host | null;
   elapsed_s?: number | null;
   config?: Record<string, unknown> | null;
   variant?: Record<string, unknown> | null;
+  ledger?: Ledger | null;
 };
+
+/** A candidate's spend as the shared ledger records it (paid stages). */
+export type Ledger = { settled_micro_usd: number; attempts: number; open: number; target: string };
+
+export type Stage = "retriever" | "chunking" | "generation" | "ocr";
 
 export type RunListItem = {
   run_id: string;
-  stage: "retriever" | "chunking";
+  stage: Stage;
   created_at: string;
   imported: { imported_at: string } | null;
   decided: boolean;
@@ -121,7 +127,125 @@ export type DocView = {
   rows: { at: { element: number; row: number; kind: string | null }; cells: Record<string, Cell>; differs: boolean }[];
 };
 
-export type RunView = RetrieverView | ChunkingView;
+export type Claim = {
+  text: string;
+  kind: string | null;
+  doc: string | null;
+  evidence_ids: string[];
+  supported: boolean | null; // true: quoted verbatim from its citation; false: every citation rejected; null: unjudged
+  links: { evidence_id: string; valid: boolean; verbatim: boolean; grade: number }[];
+};
+
+export type Evidence = { doc: string | null; quote: string | null; section: string; text: string | null };
+
+export type Answer = {
+  error?: string;
+  detail?: string | null;
+  outcome?: string;
+  passed?: boolean;
+  status_ok?: boolean;
+  summary?: string;
+  claims?: Claim[];
+  evidence?: Record<string, Evidence>;
+  missing?: { doc_id: string; field: string; reason: string }[];
+  validation?: string | null;
+  validation_detail?: string | null;
+  required?: { claim_id: string; verdict: string }[];
+  cost_micro_usd: number;
+  latency_ms?: number | null;
+  trace_url?: string | null;
+};
+
+export type GenerationQuestion = {
+  key: string;
+  id: string;
+  question: string;
+  type: string;
+  mode: string | null;
+  expected_status: string;
+  answerability: string;
+  docs: string[];
+  required: { claim_id: string; text: string; critical: boolean }[];
+  candidates: Record<string, Answer>;
+  differs: boolean;
+};
+
+export type GenerationSummary = {
+  rows: number;
+  answered: number;
+  passed: number;
+  required_correct: number;
+  required: number;
+  claims_supported: number;
+  claims_rejected: number;
+  claims: number;
+  links_invalid: number;
+  links: number;
+  validation_failures: Record<string, number>;
+  validation_failed: number;
+  cost_micro_usd: number;
+  paid_answers: number;
+  latency_ms: { p50: number | null; p95: number | null; n: number };
+  not_done: number;
+  ledger?: Ledger | null;
+};
+
+export type GenerationView = {
+  stage: "generation";
+  run_id: string;
+  candidates: Candidate[];
+  summary: Record<string, GenerationSummary>;
+  dataset: { dataset: string; rows: number; skipped: number };
+  activation: { run_id: string | null; mode: string; index_version: string; dense_version: string | null };
+  traced: boolean;
+  questions: GenerationQuestion[];
+};
+
+export type Read = {
+  status: "local" | "remote" | "unresolved" | "unreadable" | "missing";
+  text?: string;
+  local_text?: string | null;
+  reasons?: string[] | null;
+  mean_prob?: number | null;
+  error?: string | null;
+  micro_usd?: number | null;
+  diff?: [string, string, string][] | null; // [tag, baseline text, this candidate's text], character runs
+};
+
+export type OcrImage = {
+  n: number;
+  title: string | null;
+  doc_id: string | null;
+  where: string;
+  sample: boolean;
+  cached_reasons: string[];
+  shown: boolean;
+  candidates: Record<string, Read>;
+  differs: boolean;
+};
+
+export type OcrSummary = {
+  images: number;
+  read: number;
+  unreadable: number;
+  flagged: number;
+  reread: number;
+  unresolved: number;
+  not_reached: number;
+  spent_micro_usd: number;
+  ledger?: Ledger | null;
+};
+
+export type OcrView = {
+  stage: "ocr";
+  run_id: string;
+  candidates: Candidate[];
+  summary: Record<string, OcrSummary>;
+  set: { ocr_version: string; flagged: number; sample: number; seed: number };
+  images: OcrImage[];
+};
+
+export type RunView = RetrieverView | ChunkingView | GenerationView | OcrView;
 
 export type Decision = {
   chosen: string | null;
@@ -149,4 +273,6 @@ export const short = (commit: string) => commit.slice(0, 7);
 export const when = (iso: string) =>
   new Date(iso).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
-export const hostLabel = (h?: Host | null) => (h ? (h.cuda ? (h.gpu ?? "CUDA GPU") : ["CPU", h.machine].filter(Boolean).join(" · ")) : "—");
+export const usd = (micro: number) => `$${(micro / 1e6).toFixed(micro && micro < 10_000 ? 5 : 4)}`;
+
+export const hostLabel =(h?: Host | null) => (h ? (h.cuda ? (h.gpu ?? "CUDA GPU") : ["CPU", h.machine].filter(Boolean).join(" · ")) : "—");

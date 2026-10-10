@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Candidate, Passage, Question, QuestionResult, RetrieverView as View } from "@/lib/api";
-import { Badge, CandidateHead, Failure, columns } from "./ui";
+import { Badge, CandidateHead, Failure, Segmented, columns } from "./ui";
 import { NoteField } from "./note-field";
 
 type Filter = "outcome" | "ranking" | "all";
@@ -84,21 +84,6 @@ function Summary({ c, view }: { c: Candidate; view: View }) {
         </div>
       )}
       {s && s.errors > 0 && <p className="mt-2 text-[13px] text-bad">채점하지 못한 질문 {s.errors}개</p>}
-    </div>
-  );
-}
-
-function Segmented<T extends string>({ value, onChange, options }: {
-  value: T; onChange: (v: T) => void; options: [T, string][];
-}) {
-  return (
-    <div role="radiogroup" className="inline-flex rounded-[10px] bg-surface p-1">
-      {options.map(([v, label]) => (
-        <button key={v} type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}
-                className={`h-8 rounded-md px-3 text-[14px] font-medium ${value === v ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"}`}>
-          {label}
-        </button>
-      ))}
     </div>
   );
 }

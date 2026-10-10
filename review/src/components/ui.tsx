@@ -20,7 +20,43 @@ export function Badge({ tone = "neutral", children }: { tone?: keyof typeof TONE
 export function StatusBadge({ status }: { status: Candidate["status"] }) {
   if (status === "complete") return <Badge tone="ok">완료</Badge>;
   if (status === "refused") return <Badge tone="warn">실행 거부</Badge>;
+  if (status === "stopped") return <Badge tone="warn">중간에 멈춤</Badge>;
   return <Badge tone="bad">실패</Badge>;
+}
+
+export function Segmented<T extends string>({ value, onChange, options }: {
+  value: T; onChange: (v: T) => void; options: [T, string][];
+}) {
+  return (
+    <div role="radiogroup" className="inline-flex rounded-[10px] bg-surface p-1">
+      {options.map(([v, label]) => (
+        <button key={v} type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}
+                className={`h-8 rounded-md px-3 text-[14px] font-medium ${value === v ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A stopped paid candidate keeps what it finished: shown with its reason, never as a complete result. */
+export function Stopped({ c }: { c: Candidate }) {
+  if (c.status !== "stopped") return null;
+  return (
+    <p className="mt-2 rounded-md bg-warn-bg px-2 py-1 text-[13px] text-warn">
+      중간에 멈춤: {c.reason ?? "이유가 기록되지 않았습니다"} · 다시 이어서 실행하면 남은 것만 지불합니다
+    </p>
+  );
+}
+
+export function LedgerLine({ ledger }: { ledger?: Candidate["ledger"] }) {
+  if (!ledger) return null;
+  return (
+    <p className="mt-2 text-[13px] text-muted" title={ledger.target}>
+      공유 원장 기록 ${(ledger.settled_micro_usd / 1e6).toFixed(4)} · 시도 {ledger.attempts}건
+      {ledger.open > 0 && <span className="text-bad"> · 정산 안 됨 {ledger.open}건</span>}
+    </p>
+  );
 }
 
 /** One candidate's identity, the same block over every column so the eye finds the same candidate everywhere. */

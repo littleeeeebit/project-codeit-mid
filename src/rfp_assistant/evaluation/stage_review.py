@@ -9,12 +9,14 @@ writes one run folder, `<data_dir>/review/runs/<run-id>/`, that the review app (
     candidates/<id>.json  raw worker output: rankings or chunks
     view.json             what the app shows first; chunking adds docs/<n>.json, one per document
 
-Every candidate runs with the frozen serving activation (retriever) or the serving chunk profile (chunking). A
-candidate changes code, and may override configuration with a committed `review-variant.json`:
-{"retriever": {"mode", "embedding", "reranker", "limits", "dense_version"}, "chunking": {"profile"}}.
-Nothing here activates, builds or pays: worker database sessions are read-only, no API embedding is sent, and a
-candidate that needs a local GPU model on a host without CUDA is refused with its reason. A failed candidate stays
-in the run with its reason.
+Every candidate runs with the frozen serving activation (retriever, generation) or the serving chunk profile
+(chunking). A candidate changes code, and may override configuration with a committed `review-variant.json`:
+{"retriever": {"mode", "embedding", "reranker", "limits", "dense_version"}, "chunking": {"profile"},
+"generation": {"reasoning_effort", "max_output_tokens"}}.
+Retriever and chunking never activate, build or pay: their worker sessions are read-only, no API embedding is sent.
+Generation and OCR are paid (`stage_review_paid`): a run stops at a priced estimate, and only `resume` of an
+approved estimate gives the workers a key. A candidate that needs a local GPU model on a host without CUDA is
+refused with its reason. A failed candidate stays in the run with its reason.
 """
 
 from __future__ import annotations
@@ -34,17 +36,20 @@ from pathlib import Path
 from ..settings import REPO_ROOT, Settings
 from ..storage.store import write_text_atomic
 from . import evaluation as ev
+from . import stage_review_paid as paid
 from . import stage_review_worker
 
 SCHEMA = "review-run-1"
-STAGES = ("retriever", "chunking")
+STAGES = ("retriever", "chunking", "generation", "ocr")
+PAID_STAGES = ("generation", "ocr")
 WORKING_TREE = "."
 VARIANT_FILE = "review-variant.json"
 TOP_K = 10  # passages per side kept for the view; nDCG@5 and needle top-5 use the evaluation's own cut-offs
 WORKER_TIMEOUT_S = 3600
 VARIANT_TYPES = {"chunking": {"profile": (str,)},
                  "retriever": {"mode": (str,), "embedding": (str,), "reranker": (str, dict), "limits": (dict,),
-                               "dense_version": (str,)}}
+                               "dense_version": (str,)},
+                 "generation": {"reasoning_effort": (str,), "max_output_tokens": (int,)}, "ocr": {}}
 TITLE_LINES, TITLE_CHARS = 2, 60  # the title rule the chunking view checks, fixed here so no candidate can move it
 _SECRETS = ("OPENAI_", "GEMINI_", "GOOGLE_API_", "LANGFUSE_", "TYPESAFE_", "HF_TOKEN")
 
@@ -55,6 +60,13 @@ class ReviewError(RuntimeError):
 
 def review_dir(settings: Settings) -> Path:
     return settings.data_dir / "review"
+
+
+def run_folder(settings: Settings, run_id: str) -> Path:
+    folder = review_dir(settings) / "runs" / run_id
+    if not re.fullmatch(r"[a-z]+-\d{8}T\d{6}Z-[0-9a-f]{6}", run_id) or not (folder / "run.json").exists():
+        raise ReviewError(f"no review run {run_id}")
+    return folder
 
 
 def _git(*args: str, cwd: Path = REPO_ROOT) -> str:
@@ -128,12 +140,16 @@ def freeze(settings: Settings, stage: str, inputs: Path) -> None:
     from ..service.service import active_serving
 
     inputs.mkdir(parents=True)
+    if stage == "ocr":
+        return paid.freeze(settings, stage, inputs)
     activation = active_serving(settings)
     if not activation.get("index_version"):
         raise ReviewError("no active keyword index to freeze")
+    write_text_atomic(inputs / "activation.json", json.dumps(activation, ensure_ascii=False, indent=1))
+    if stage == "generation":
+        return paid.freeze(settings, stage, inputs)
     index = KeywordIndex.load(settings, activation["index_version"])
     docs = _documents(settings, index)
-    write_text_atomic(inputs / "activation.json", json.dumps(activation, ensure_ascii=False, indent=1))
     if stage == "chunking":
         from ..corpus.ingestion import load_elements
 
@@ -181,6 +197,8 @@ def candidate_config(settings: Settings, stage: str, inputs: Path, variant: dict
     from ..retrieval.retrieval import DENSE_MODES, RUN_MODES
 
     own = variant.get(stage) or {}
+    if stage in PAID_STAGES:
+        return paid.candidate_config(settings, stage, inputs, own)
     activation = json.loads((inputs / "activation.json").read_text(encoding="utf-8"))
     if stage == "chunking":
         with gzip.open(inputs / "documents.json.gz", "rt", encoding="utf-8") as f:
@@ -252,14 +270,19 @@ def read_variant(worktree: Path) -> dict:
 
 
 def execute(settings: Settings, worker: Path, worktree: Path, stage: str, inputs: Path, config: Path,
-            output: Path) -> dict:
+            output: Path, mode: str = "run", approval: dict | None = None) -> dict:
+    """One worker process. `mode` is "run" (retriever, chunking), "estimate" (a paid stage's free pricing pass) or
+    "paid", which gets the API key only from `paid.approved_env`, i.e. from an approved estimate of this run."""
     env = {k: v for k, v in os.environ.items() if not k.startswith(_SECRETS)}
+    if mode == "paid":
+        env.update(paid.approved_env(worker.parent, approval or {}))
     env.update(PYTHONUTF8="1", PYTHONIOENCODING="utf-8", HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1",
-               PGOPTIONS="-c default_transaction_read_only=on", RFP_DATA_DIR=str(settings.data_dir),
-               RFP_SOURCE_DIR=str(settings.source_dir))
+               RFP_DATA_DIR=str(settings.data_dir), RFP_SOURCE_DIR=str(settings.source_dir))
+    if stage in ("retriever", "chunking") or stage == "ocr" and mode == "estimate":
+        env["PGOPTIONS"] = "-c default_transaction_read_only=on"  # generation records requests; paid reads settle
     try:
         done = subprocess.run([sys.executable, "-I", "-B", str(worker), str(worktree), stage, str(inputs), str(config),
-                               str(output)], cwd=worktree, env=env, capture_output=True, timeout=WORKER_TIMEOUT_S)
+                               str(output), mode], cwd=worktree, env=env, capture_output=True, timeout=WORKER_TIMEOUT_S)
     except subprocess.TimeoutExpired:
         return {"status": "failed", "reason": f"the worker exceeded {WORKER_TIMEOUT_S} s"}
     if not output.exists():
@@ -271,7 +294,10 @@ def execute(settings: Settings, worker: Path, worktree: Path, stage: str, inputs
 # ---------------------------------------------------------------- the run
 
 
-def run(settings: Settings, stage: str, base: str, cands: list[str], inputs_from: str | None = None) -> dict:
+def run(settings: Settings, stage: str, base: str, cands: list[str], inputs_from: str | None = None,
+        ledger_env: str | None = None) -> dict:
+    """Freezes the inputs and runs every candidate. A paid stage stops after pricing: run.json says needs_approval
+    and estimate.json holds the price; `paid.approve` and `resume` continue it."""
     if stage not in STAGES:
         raise ReviewError(f"stage must be one of {STAGES}")
     if not cands:
@@ -309,7 +335,9 @@ def run(settings: Settings, stage: str, base: str, cands: list[str], inputs_from
                 continue
             config_path = folder / "candidates" / f"{cand['id']}.config.json"
             write_text_atomic(config_path, json.dumps(config, ensure_ascii=False, indent=1))
-            out = execute(settings, worker, worktree, stage, inputs, config_path, folder / "candidates" / f"{cand['id']}.json")
+            priced = stage in PAID_STAGES
+            out = execute(settings, worker, worktree, stage, inputs, config_path, folder / "candidates" / (
+                f"{cand['id']}.estimate.json" if priced else f"{cand['id']}.json"), "estimate" if priced else "run")
             cand.update({k: out[k] for k in ("status", "reason", "host", "packages", "elapsed_s") if k in out})
         except ReviewError as exc:
             cand.update(status="failed", reason=str(exc), host=host)
@@ -322,7 +350,59 @@ def run(settings: Settings, stage: str, base: str, cands: list[str], inputs_from
               "worker_sha256": _sha(worker.read_bytes()), "scorer": {**ev.code_fingerprint(),
                                                                       "metric_code_sha256": ev.metric_code_sha256()},
               "runner_host": host, "candidates": refs}
+    if stage in PAID_STAGES:
+        record.update(state="needs_approval", ledger_env=ledger_env)
+        if stage == "ocr":
+            paid.render_images(folder)
+        record["estimate"] = paid.estimate(settings, folder, record)["estimate_id"]
+        write_text_atomic(folder / "run.json", json.dumps(record, ensure_ascii=False, indent=1))
+        return record
     view = score_retriever(settings, folder, record) if stage == "retriever" else score_chunking(folder, record)
+    write_text_atomic(folder / "view.json", json.dumps(view, ensure_ascii=False))
+    write_text_atomic(folder / "run.json", json.dumps(record, ensure_ascii=False, indent=1))
+    return record
+
+
+def resume(settings: Settings, run_id: str) -> dict:
+    """Pays an approved estimate: each candidate that priced and has not finished answers or reads with the key, at
+    the commit it was priced at. A candidate stopped by the budget, unknown billing or its approved maximum keeps
+    what it finished; resuming again pays only for what is left. Writes view.json after every candidate ran."""
+    folder = run_folder(settings, run_id)
+    record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+    if record["stage"] not in PAID_STAGES or record.get("state") not in ("needs_approval", "stopped"):
+        raise ReviewError(f"{run_id} has nothing left to pay for")
+    estimate = paid.load_estimate(folder)
+    paid.require_approved(estimate)  # before any worktree: an unapproved estimate makes nothing
+    paid.recheck(settings, folder, record, estimate)
+    inputs, worker = folder / "inputs", folder / "worker.py"
+    for cand in record["candidates"]:
+        if cand["id"] not in estimate["candidates"] or paid._finished(folder, cand["id"]):
+            continue
+        worktree = review_dir(settings) / "worktrees" / f"{run_id}-{cand['id']}"
+        try:
+            now = resolve(cand["ref"])
+            if now["commit"] != cand["commit"]:
+                raise ReviewError(f"{cand['ref']} moved to {now['commit'][:12]} since it was priced")
+            checkout(now, worktree)
+            if now.get("changed_sha256") != cand.get("changed_sha256"):
+                raise ReviewError("the working tree changed since it was priced")
+            config_path = folder / "candidates" / f"{cand['id']}.paid.json"
+            write_text_atomic(config_path, json.dumps(paid.paid_config(folder, record, estimate, cand),
+                                                      ensure_ascii=False, indent=1))
+            out = execute(settings, worker, worktree, record["stage"], inputs, config_path,
+                          folder / "candidates" / f"{cand['id']}.json", "paid", estimate)
+            cand.update({k: out[k] for k in ("status", "reason", "host", "packages", "elapsed_s") if k in out})
+        except ReviewError as exc:
+            cand.update(status="failed", reason=str(exc))
+        except Exception as exc:  # noqa: BLE001 - one broken candidate must not cost the others' results
+            cand.update(status="failed", reason=f"{type(exc).__name__}: {exc}")
+        finally:
+            remove_worktree(worktree)
+    paid.ledger_spend(settings, folder, record)
+    record.update(state="stopped" if any(c.get("status") == "stopped" for c in record["candidates"]) else "complete",
+                  paid_at=datetime.now(timezone.utc).isoformat())
+    view = paid.score_generation(settings, folder, record) if record["stage"] == "generation" else \
+        paid.score_ocr(folder, record)
     write_text_atomic(folder / "view.json", json.dumps(view, ensure_ascii=False))
     write_text_atomic(folder / "run.json", json.dumps(record, ensure_ascii=False, indent=1))
     return record
@@ -337,7 +417,7 @@ def _output(folder: Path, cand: dict) -> dict | None:
 
 def _summary(cand: dict) -> dict:
     return {k: cand.get(k) for k in ("id", "label", "ref", "role", "commit", "working_tree", "changed_files",
-                                     "status", "reason", "host", "elapsed_s", "config", "variant")}
+                                     "status", "reason", "host", "elapsed_s", "config", "variant", "ledger")}
 
 
 # ---------------------------------------------------------------- retriever scoring

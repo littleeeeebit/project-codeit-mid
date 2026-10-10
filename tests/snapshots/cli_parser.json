@@ -275,11 +275,14 @@
   {"name": ["--actor"], "dest": "actor", "default": "owner-cli", "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"}
  ],
  "stage-review": [
-  {"name": "action", "dest": "action", "default": null, "required": true, "choices": ["run"], "type": null, "nargs": null, "action": "_StoreAction"},
-  {"name": "stage", "dest": "stage", "default": null, "required": true, "choices": ["retriever", "chunking"], "type": null, "nargs": null, "action": "_StoreAction"},
-  {"name": ["--base"], "dest": "base", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": "action", "dest": "action", "default": null, "required": true, "choices": ["run", "approve", "resume"], "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": "stage", "dest": "stage", "default": null, "required": false, "choices": ["retriever", "chunking", "generation", "ocr"], "type": null, "nargs": "?", "action": "_StoreAction"},
+  {"name": ["--base"], "dest": "base", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--cand"], "dest": "cand", "default": [], "required": false, "choices": null, "type": null, "nargs": null, "action": "_AppendAction"},
-  {"name": ["--inputs-from"], "dest": "inputs_from", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"}
+  {"name": ["--inputs-from"], "dest": "inputs_from", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": ["--run"], "dest": "run", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": ["--approved-by"], "dest": "approved_by", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": ["--ledger-dsn-env"], "dest": "ledger_dsn_env", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"}
  ],
  "trial-reranker": [
   {"name": ["--dataset"], "dest": "dataset", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},

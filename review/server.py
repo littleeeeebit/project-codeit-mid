@@ -5,7 +5,8 @@
 
 Standard library only, so a machine without the project's Python environment can still view imported runs. It reads
 run folders, imports and exports them as zip files and writes decision files. It never runs a pipeline, loads a model
-or calls a paid service; runs come from `python -m rfp_assistant.cli stage-review run ...`.
+or calls a paid service; runs come from `python -m rfp_assistant.cli stage-review run ...`, and a paid run (generation,
+ocr) appears here only after its approved estimate was paid (`stage-review resume`).
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ REPO = APP.parent
 OUT = APP / "out"
 RUN_SCHEMA = "review-run-1"
 DECISION_SCHEMA = "review-decision-1"
-RUN_ID = re.compile(r"^(retriever|chunking)-\d{8}T\d{6}Z-[0-9a-f]{6}$")
+RUN_ID = re.compile(r"^(retriever|chunking|generation|ocr)-\d{8}T\d{6}Z-[0-9a-f]{6}$")
 SKIP = {"node_modules", "out", ".next", "__pycache__"}
 MAX_IMPORT = 2 * 1024 ** 3
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json",
@@ -114,6 +115,8 @@ def list_runs(root: Path) -> list[dict]:
     out = []
     base = runs_dir(root)
     for folder in sorted(base.iterdir(), reverse=True) if base.exists() else []:
+        if not (folder / "view.json").exists():  # a paid run still waiting for its estimate's approval
+            continue
         try:
             run = json.loads((folder / "run.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -192,9 +195,12 @@ def import_run(root: Path, data: bytes) -> str:
 
 
 def _items(view: dict) -> dict[str, str]:
-    """Things a note can be attached to: questions (retriever) or documents (chunking), with a readable label."""
-    if view["stage"] == "retriever":
+    """Things a note can be attached to: questions (retriever, generation), documents (chunking) or images (ocr),
+    with a readable label."""
+    if view["stage"] in ("retriever", "generation"):
         return {q["key"]: q["question"] for q in view["questions"]}
+    if view["stage"] == "ocr":
+        return {str(i["n"]): f"{i['title'] or i['doc_id']} · {i['where']}" for i in view["images"]}
     return {str(d["n"]): d["title"] or d["doc_id"] for d in view["documents"]}
 
 
@@ -242,6 +248,16 @@ def _measure(stage: str, s: dict | None) -> str:
     if stage == "retriever":
         return (f"nDCG@5 {s['ndcg5'] if s['ndcg5'] is not None else '-'} over {s['ndcg5_n']}/{s['dev_rows']} dev "
                 f"questions; needle top-5 hits {s['needle_hits']}/{s['needle_rows']}")
+    if stage == "generation":
+        failures = ", ".join(f"{k} {v}" for k, v in sorted(s["validation_failures"].items())) or "none"
+        return (f"passed {s['passed']}/{s['rows']}; required claims correct {s['required_correct']}/{s['required']}; "
+                f"claims supported {s['claims_supported']}/{s['claims']}; validation failures {failures}; "
+                f"{s['cost_micro_usd'] / 1e6:.4f} USD over {s['paid_answers']} paid answers; latency p50 "
+                f"{s['latency_ms']['p50']} ms, p95 {s['latency_ms']['p95']} ms (n={s['latency_ms']['n']})")
+    if stage == "ocr":
+        return (f"flagged {s['flagged']}/{s['read']} read images, re-read {s['reread']}/{s['flagged']}, unresolved "
+                f"{s['unresolved']}; not OCR'd (unreadable) {s['unreadable']}/{s['images']}; "
+                f"{s['spent_micro_usd'] / 1e6:.4f} USD")
     z = s["sizes"]
     return (f"{z['count']} chunks (median {z.get('p50')}, p90 {z.get('p90')}, max {z.get('max')} tokens); table "
             f"titles kept {s['tables_kept']}/{s['tables_titled']}")
@@ -266,7 +282,12 @@ def decision_markdown(record: dict, folder: Path) -> str:
         for n in record["notes"]:
             lines += [f"### `{n['item']}` {n['label']}", "", n["note"], ""]
     lines += ["", "## Next step", ""]
-    if chosen and chosen.get("variant"):
+    if chosen and chosen.get("variant") and record["stage"] == "generation":
+        lines.append("The chosen candidate changes configuration through `review-variant.json`. Do not merge that "
+                     "file: propose the same values (`generation_reasoning_effort`, `generation_max_output_tokens`) "
+                     "for the server configuration (RFP_CONFIG_FILE) in a pull request; merge only its code changes, "
+                     "if any.")
+    elif chosen and chosen.get("variant"):
         lines.append("The chosen candidate changes configuration through `review-variant.json`. Do not merge that "
                      "file: reproduce the configuration with `compare` and switch serving with `activate-run` after "
                      "the person approves; merge only its code changes, if any.")
@@ -351,6 +372,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, (folder / "view.json").read_bytes())
             if len(parts) == 5 and parts[3] == "docs" and parts[4].isdigit():
                 return self._send(200, (folder / "docs" / f"{parts[4]}.json").read_bytes())
+            if len(parts) == 5 and parts[3] == "images" and re.fullmatch(r"\d+\.png", parts[4]):
+                return self._send(200, (folder / "images" / parts[4]).read_bytes(), TYPES[".png"])
             if len(parts) == 4 and parts[3] == "export":
                 return self._send(200, export_run(self.root, parts[2]), "application/zip",
                                   {"Content-Disposition": f'attachment; filename="{parts[2]}.zip"'})

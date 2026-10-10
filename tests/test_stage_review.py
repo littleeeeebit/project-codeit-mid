@@ -14,6 +14,7 @@ from pathlib import Path
 
 from rfp_assistant.corpus import ingestion
 from rfp_assistant.evaluation import stage_review
+from rfp_assistant.evaluation import stage_review_paid as paid
 from rfp_assistant.retrieval import chunking
 
 SERVER = Path(__file__).resolve().parents[1] / "review" / "server.py"
@@ -136,10 +137,130 @@ class StageReviewContractTest(unittest.TestCase):
 
         # A variant section of the wrong type fails that candidate with its reason instead of crashing the run.
         with tempfile.TemporaryDirectory() as tmp:
-            for bad in ('{"chunking": 1}', '{"retriever": {"limits": 5}}'):
+            for bad in ('{"chunking": 1}', '{"retriever": {"limits": 5}}', '{"generation": {"max_output_tokens": "9"}}'):
                 (Path(tmp) / stage_review.VARIANT_FILE).write_text(bad, encoding="utf-8")
                 with self.assertRaises(stage_review.ReviewError):
                     stage_review.read_variant(Path(tmp))
+
+
+def paid_folder(root: Path, stage: str, record: dict) -> Path:
+    run_id = f"{stage}-20261010T000000Z-abc123"
+    folder = root / "review" / "runs" / run_id
+    (folder / "inputs").mkdir(parents=True)
+    (folder / "candidates").mkdir()
+    cand = {"ref": "r", "commit": "a" * 40, "working_tree": False, "status": "complete", "host": {"cuda": True}}
+    record.update(schema=stage_review.SCHEMA, run_id=run_id, stage=stage, created_at="2026-10-10T00:00:00+00:00",
+                  candidates=[{**cand, "id": "base", "label": "main", "role": "baseline"},
+                              {**cand, "id": "c1", "label": "minimal", "role": "candidate"}])
+    (folder / "run.json").write_text(json.dumps(record), encoding="utf-8")
+    return folder
+
+
+def write_outputs(folder: Path, outputs: dict) -> None:
+    for cid, out in outputs.items():
+        (folder / "candidates" / f"{cid}.json").write_text(json.dumps({"status": "complete", **out}, ensure_ascii=False),
+                                                           encoding="utf-8")
+
+
+class PaidStageTest(unittest.TestCase):
+    def test_a_paid_run_never_starts_without_an_approved_estimate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = paid_folder(Path(tmp), "generation", {"state": "needs_approval"})
+            (folder / "worker.py").write_text("", encoding="utf-8")
+            estimate = {"estimate_id": "e1", "run_id": folder.name, "stage": "generation", "fingerprint": "f",
+                        "expires_at": "2999-01-01T00:00:00+00:00", "approved_by": None, "candidates": {}}
+            (folder / "estimate.json").write_text(json.dumps(estimate), encoding="utf-8")
+            with mock.patch.object(stage_review.subprocess, "run") as launched, \
+                    mock.patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}):
+                with self.assertRaisesRegex(stage_review.ReviewError, "not approved"):
+                    stage_review.resume(SimpleNamespace(data_dir=Path(tmp)), folder.name)
+                with self.assertRaisesRegex(stage_review.ReviewError, "not approved"):
+                    stage_review.execute(SimpleNamespace(data_dir=Path(tmp), source_dir=Path(tmp)),
+                                         folder / "worker.py", Path(tmp), "generation", folder / "inputs",
+                                         folder / "c.json", folder / "o.json", "paid", estimate)
+            launched.assert_not_called()
+
+    def test_generation_view_and_decision(self):
+        claim = {"claim_id": "c1", "criticality": "critical", "match": {"type": "text", "patterns": ["보안확약서"]},
+                 "qualifiers": [], "support_groups": ["g1"]}
+        rows = [{"question_id": q, "question": f"질문 {q}", "question_type": "fact", "answerability": "answerable",
+                 "expected_status": "answered", "mode": "single", "scope": [{"doc_id": "d1", "source_hash": "h"}],
+                 "required_claims": [claim], "evidence_groups": []} for q in ("q1", "q2")]
+
+        def done(qid, outcome, text, error=None, **kw):
+            return {"finalist": "f", "question_id": qid, "status": "done", "outcome": outcome, "request_id": f"r-{qid}",
+                    "settled_micro_usd": 900, "latency_ms": 1000.0, "link_validity": {"E1": True},
+                    "evidence": {"E1": {"doc_id": "d1", "chunk_id": "k1", "quote": "보안확약서를 제출한다"}},
+                    "answer": {"summary": text, "error": error, "claims": [
+                        {"text": text, "doc_id": "d1", "evidence_ids": ["E1"], "kind": "fact"}] if text else []}, **kw}
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = paid_folder(Path(tmp), "generation", {"state": "complete"})
+            for name, value in (("rows", rows), ("documents", {"d1": "보안 사업"}),
+                                ("dataset", {"dataset": "dev", "rows": 2, "skipped": []}),
+                                ("activation", {"index_version": "i1", "mode": "hybrid"})):
+                (folder / "inputs" / f"{name}.json").write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
+            write_outputs(folder, {
+                "base": {"rows": [done("q1", "answered", "보안확약서를 제출한다", trace_url="http://lf/t/1"),
+                                  done("q2", "technical_error", "", error="claim_without_evidence")]},
+                "c1": {"rows": [done("q1", "answered", "확약서를 낸다"),
+                                {"question_id": "q2", "status": "blocked", "reason": "envelope"}]}})
+            index = SimpleNamespace(chunks=[{"chunk_id": "k1", "section_path": ["2. 보안"], "body": "보안확약서를 제출한다"}],
+                                    elements={})
+            record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+            with mock.patch("rfp_assistant.retrieval.retrieval.KeywordIndex.load", return_value=index):
+                view = paid.score_generation(SimpleNamespace(), folder, record)
+            base, c1 = view["summary"]["base"], view["summary"]["c1"]
+            self.assertEqual((base["rows"], base["answered"], base["required_correct"], base["required"]), (2, 2, 1, 2))
+            self.assertEqual((base["claims_supported"], base["claims"], base["validation_failures"]),
+                             (1, 1, {"claim_without_evidence": 1}))
+            self.assertEqual((base["cost_micro_usd"], base["paid_answers"], base["latency_ms"]["n"]), (1800, 2, 2))
+            self.assertEqual((c1["answered"], c1["not_done"], c1["claims_supported"]), (1, 1, 0))
+            q1 = view["questions"][0]["candidates"]
+            self.assertEqual(q1["base"]["evidence"]["E1"]["section"], "2. 보안")
+            self.assertEqual((q1["base"]["trace_url"], q1["c1"]["trace_url"]), ("http://lf/t/1", None))
+            self.assertTrue(all(q["differs"] for q in view["questions"]))
+
+            (folder / "view.json").write_text(json.dumps(view, ensure_ascii=False), encoding="utf-8")
+            self.assertEqual(server.read_view(Path(tmp), folder.name)["stage"], "generation")
+            saved = server.write_decision(Path(tmp), view, None, {"c1": "paraphrases the obligation"}, {"q2": "재확인"})
+            markdown = Path(saved["markdown"]).read_text(encoding="utf-8")
+            for line in ("passed 0/2; required claims correct 1/2", "claim_without_evidence 1", "### `q2` 질문 q2",
+                         "Merge no candidate."):
+                self.assertIn(line, markdown)
+
+    def test_ocr_view_counts_and_character_diff(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = paid_folder(Path(tmp), "ocr", {"state": "complete"})
+            items = [{"n": 0, "title": "사업", "doc_id": "d1", "bindata": "BIN0001.png", "kind": "hwp", "sample": False,
+                      "reasons": ["low_confidence"]},
+                     {"n": 1, "title": "사업", "doc_id": "d1", "page": 3, "kind": "png", "sample": True, "reasons": []},
+                     {"n": 2, "title": "사업", "doc_id": "d1", "bindata": "BIN0002.wmf", "kind": "hwp", "sample": False,
+                      "reasons": ["unavailable:format"]}]
+            (folder / "inputs" / "images.json").write_text(json.dumps(
+                {"ocr_version": "v", "flagged": 2, "sample": 1, "seed": 1, "images": items}), encoding="utf-8")
+            unreadable = {"n": 2, "status": "unreadable", "text": "", "reasons": []}
+            write_outputs(folder, {
+                "base": {"images": [{"n": 0, "status": "remote", "text": "가나다라", "reasons": ["low_confidence"],
+                                     "micro_usd": 600}, {"n": 1, "status": "local", "text": "표 1", "reasons": []},
+                                    unreadable]},
+                "c1": {"images": [{"n": 0, "status": "remote", "text": "가나다마", "reasons": ["low_confidence"],
+                                   "micro_usd": 700}, {"n": 1, "status": "unresolved", "text": "표 1", "reasons": ["loop"]},
+                                  unreadable]}})
+            view = paid.score_ocr(folder, json.loads((folder / "run.json").read_text(encoding="utf-8")))
+            self.assertEqual({k: view["summary"]["base"][k] for k in ("images", "read", "flagged", "reread",
+                                                                      "unreadable", "spent_micro_usd")},
+                             {"images": 3, "read": 2, "flagged": 1, "reread": 1, "unreadable": 1, "spent_micro_usd": 600})
+            self.assertEqual({k: view["summary"]["c1"][k] for k in ("flagged", "reread", "unresolved")},
+                             {"flagged": 2, "reread": 1, "unresolved": 1})
+            first = next(i for i in view["images"] if i["n"] == 0)
+            self.assertEqual(first["candidates"]["c1"]["diff"], [["equal", "가나다", "가나다"], ["replace", "라", "마"]])
+            self.assertEqual([i["n"] for i in view["images"]], [0, 1, 2])  # differing images first
+
+            (folder / "view.json").write_text(json.dumps(view, ensure_ascii=False), encoding="utf-8")
+            saved = server.write_decision(Path(tmp), view, "c1", {}, {"0": "마가 맞음"})
+            markdown = Path(saved["markdown"]).read_text(encoding="utf-8")
+            for line in ("re-read 1/2", "not OCR'd (unreadable) 1/3", "### `0` 사업 · BIN0001.png", "chose `r`"):
+                self.assertIn(line, markdown)
 
 
 if __name__ == "__main__":
