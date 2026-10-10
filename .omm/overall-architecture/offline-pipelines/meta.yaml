@@ -1,32 +1,65 @@
 created: 2026-10-05 09:51:21.480000+00:00
-updated: 2026-10-07 06:24:23.838000+00:00
-update_count: 11
+updated: 2026-10-10T23:15:02.007Z
+update_count: 13
 last_field: diagram
 kind: nested-class
 title: offline-pipelines
 children:
-- activation
-- cli
-- comparison-runner
-- corpus-pipeline
-- embedding-builds
-- evaluation-release
-- fidelity
-- maintenance
-- ocr
-- runs
+  - activation
+  - cli
+  - cli-entry
+  - comparison-runner
+  - corpus-pipeline
+  - embedding-builds
+  - evaluation-release
+  - evaluation-selection
+  - fidelity
+  - index-builds
+  - maintenance
+  - maintenance-sequence
+  - ocr
+  - runs
+  - stage-review
 parentPath: []
-prev_diagram: "graph TD\r\n  cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"]\r\n  ingestion[\"\
-  Ingestion and revisions\\nsrc/rfp_assistant/corpus/ingestion.py\"]\r\n  fidelity[\"\
-  OCR and fidelity checks\\nsrc/rfp_assistant/corpus/fidelity.py\"]\r\n  keyword-build[\"\
-  Keyword index build\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  dense-build[\"\
-  Embedding set build\\nsrc/rfp_assistant/retrieval/dense.py\"]\r\n  runs[\"Frozen\
-  \ runs and matrices\\nsrc/rfp_assistant/evaluation/compare.py\"]\r\n  activation[\"\
-  Run activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"]\r\n  maintenance[\"\
-  Maintenance sequence\\nsrc/rfp_assistant/storage/maintenance.py\"]\r\n  cli -->|\"\
-  manifest, ingest\"| ingestion\r\n  fidelity -->|\"image_text, review status\"| ingestion\r\
-  \n  ingestion -->|\"parsed active extractions\"| keyword-build\r\n  keyword-build\
-  \ -->|\"chunk payloads\"| dense-build\r\n  keyword-build -->|\"index version\"|\
-  \ runs\r\n  dense-build -->|\"embedding set version\"| runs\r\n  runs -->|\"person\
-  \ picks a row\"| activation\r\n  cli -->|\"activate-run\"| activation\r\n  maintenance\
-  \ -->|\"rebuild then regression\"| keyword-build"
+prev_diagram: "graph TD\r
+
+  \  cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"]\r
+
+  \  ingestion[\"Ingestion and
+  revisions\\nsrc/rfp_assistant/corpus/ingestion.py\"]\r
+
+  \  fidelity[\"OCR and fidelity
+  checks\\nsrc/rfp_assistant/corpus/fidelity.py\"]\r
+
+  \  keyword-build[\"Keyword index
+  build\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
+
+  \  dense-build[\"Embedding set
+  build\\nsrc/rfp_assistant/retrieval/dense.py\"]\r
+
+  \  runs[\"Frozen runs and
+  matrices\\nsrc/rfp_assistant/evaluation/compare.py\"]\r
+
+  \  activation[\"Run
+  activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"]\r
+
+  \  maintenance[\"Maintenance
+  sequence\\nsrc/rfp_assistant/storage/maintenance.py\"]\r
+
+  \  cli -->|\"manifest, ingest\"| ingestion\r
+
+  \  fidelity -->|\"image_text, review status\"| ingestion\r
+
+  \  ingestion -->|\"parsed active extractions\"| keyword-build\r
+
+  \  keyword-build -->|\"chunk payloads\"| dense-build\r
+
+  \  keyword-build -->|\"index version\"| runs\r
+
+  \  dense-build -->|\"embedding set version\"| runs\r
+
+  \  runs -->|\"person picks a row\"| activation\r
+
+  \  cli -->|\"activate-run\"| activation\r
+
+  \  maintenance -->|\"rebuild then regression\"| keyword-build"

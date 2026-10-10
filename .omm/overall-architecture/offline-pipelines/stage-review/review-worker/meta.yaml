@@ -1,0 +1,10 @@
+created: 2026-10-10T23:15:07.043Z
+updated: 2026-10-10T23:15:07.045Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: review-worker
+children: []
+parentPath:
+  - offline-pipelines
+  - stage-review

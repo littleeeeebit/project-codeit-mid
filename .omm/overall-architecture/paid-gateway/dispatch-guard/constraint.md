@@ -1,0 +1,1 @@
+On PostgreSQL, a single `unknown` attempt anywhere blocks every new dispatch for every member until the owner reconciles it.

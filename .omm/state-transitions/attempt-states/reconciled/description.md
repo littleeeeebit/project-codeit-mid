@@ -1,1 +1,0 @@
-An owner reconciliation covered this unknown attempt with a provider total for a closed interval. If usage arrives later, settle adds a negative late-settlement adjustment.

@@ -1,13 +1,8 @@
 graph TD
-  service-retrieve["service.retrieve wrapper\nsrc/rfp_assistant/service/service.py"]
-  active-serving["active_serving activation\nsrc/rfp_assistant/service/service.py"]
-  keyword-index["KeywordIndex and Kiwi BM25\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  dense-search["Dense matrix and query vector\nsrc/rfp_assistant/retrieval/dense.py"]
-  fusion-rerank["RRF fusion and reranker\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  evidence-packer["_pack_evidence budgets\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  service-retrieve -->|"mode, limits, index version"| active-serving
-  service-retrieve -->|"scope pairs, question"| keyword-index
-  service-retrieve -->|"cached or paid query vector"| dense-search
-  keyword-index -->|"exact and BM25 rows"| fusion-rerank
-  dense-search -->|"nearest rows in scope"| fusion-rerank
-  fusion-rerank -->|"final ranking"| evidence-packer
+  serving-activation["Active serving config\nsrc/rfp_assistant/service/service.py"] -->|"mode, limits, index version"| keyword-index["Kiwi BM25 KeywordIndex\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  keyword-index -->|"scope terms, rows"| corpus-routing["Corpus routing and scope\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  corpus-routing -->|"allowed rows"| lexical-channel["Exact codes and BM25\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  corpus-routing -->|"allowed rows"| dense-channel["Query vector and pgvector\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  lexical-channel -->|"ranked rows"| fusion-rerank["Keyword-first RRF, reranker\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  dense-channel -->|"cosine top k"| fusion-rerank
+  fusion-rerank -->|"final ranking"| evidence-packing["Evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]

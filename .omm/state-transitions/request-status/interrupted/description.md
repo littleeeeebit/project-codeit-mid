@@ -1,0 +1,1 @@
+Set by `RequestRunner.shutdown` (queued rows always, running rows when workers did not finish in time) and by `recover_requests` when a new owner takes the gateway lock. `_finish` keeps an interrupted status if the worker still completes. The outcome is stored as history, never as the current answer. The screen shows it in recent requests, and nothing re-runs automatically.

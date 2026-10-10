@@ -1,0 +1,1 @@
+The person picks one candidate or none and gives a reason for each rejected one. The server writes `.runtime/review/decisions/<run-id>.md` and `.json` (`review-decision-1`), and the app copies a short prompt that points the coding agent at the file. Accepted variants are reproduced with `compare` and `activate-run`; the variant file itself is not merged.

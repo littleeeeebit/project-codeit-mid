@@ -1,0 +1,10 @@
+created: 2026-10-10T23:15:04.499Z
+updated: 2026-10-10T23:15:04.675Z
+update_count: 2
+last_field: concern
+kind: nested-class
+title: gold-queue
+children: []
+parentPath:
+  - offline-pipelines
+  - evaluation-selection

@@ -1,0 +1,1 @@
+The loader lives under `storage/` although it is a corpus parser; ingestion is its only caller.

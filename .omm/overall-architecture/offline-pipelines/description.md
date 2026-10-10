@@ -1,0 +1,1 @@
+Everything that builds or changes what serves runs here, invoked by the owner through `python -m rfp_assistant.cli <command>` or, for a subset, by verifier routes that call the same functions in a background job. Nothing runs on a schedule, and nothing changes serving until a person activates a run.

@@ -1,0 +1,1 @@
+With the tunnel closed, the shared Langfuse drops traces with a warning. Answers continue, but the traces are lost and are not buffered for later delivery.

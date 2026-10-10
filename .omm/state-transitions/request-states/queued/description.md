@@ -1,1 +1,0 @@
-Inserted by _create for paid modes after try_admit. The worker claims it only while cancel_requested = 0.

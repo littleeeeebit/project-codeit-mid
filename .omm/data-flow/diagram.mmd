@@ -1,15 +1,9 @@
 graph TD
-  source-originals["Originals and data_list.csv\nsrc/rfp_assistant/corpus/ingestion.py"]
-  extraction-revisions["Extraction artifacts and elements\nsrc/rfp_assistant/corpus/ingestion.py"]
-  ocr-reads["OCR region cache\nsrc/rfp_assistant/corpus/ocr.py"]
-  keyword-index["Immutable keyword index\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  vector-sets["Embedding vector sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  serving-activation["active_run and active_index\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  evidence-map["Request evidence map\nsrc/rfp_assistant/service/service.py"]
-  source-originals -->|"sha256 source_hash"| extraction-revisions
-  ocr-reads -->|"image_text elements"| extraction-revisions
-  extraction-revisions -->|"chunk profile build"| keyword-index
-  keyword-index -->|"chunk payloads embedded"| vector-sets
-  serving-activation -->|"selects index, dense version"| keyword-index
-  keyword-index -->|"packed EvidenceUnit quotes"| evidence-map
-  evidence-map -->|"open_evidence context"| extraction-revisions
+  original-files["Originals and data_list.csv\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"sha256, parse, OCR merge"| extraction-artifacts["Element artifacts\nsrc/rfp_assistant/corpus/ingestion.py"]
+  extraction-artifacts -->|"chunk profile, Kiwi tokens"| keyword-index["Keyword index version\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  keyword-index -->|"payload hashes"| embedding-sets["pgvector embedding sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  keyword-index -->|"index_version"| serving-config["active_run setting\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  embedding-sets -->|"dense_version"| serving-config
+  serving-config -->|"retrieve and pack"| evidence-units["EvidenceUnit list\nsrc/rfp_assistant/contracts.py"]
+  evidence-units -->|"validated answer JSON"| request-records["requests.result_json\nsrc/rfp_assistant/storage/store.py"]
+  request-records -->|"open_evidence by ID"| evidence-pane["Evidence pane\nweb/src/components/ask/answer-parts.tsx"]

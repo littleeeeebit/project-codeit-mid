@@ -1,0 +1,1 @@
+Set by `budget.reconcile` when an owner-imported provider interval total covers the unknown attempts. A late settlement afterwards records a negative `late-settlement:` adjustment, so nothing is counted twice.

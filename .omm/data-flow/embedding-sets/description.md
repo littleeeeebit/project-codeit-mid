@@ -1,0 +1,1 @@
+One vector per unique normalized payload per model, dimensions and prefix policy (`embedding_payloads`, shared across sets and cached for reuse), mapped to an index's row order by `embedding_set_rows`. Byte-identical associations share one vector. Query vectors are cached the same way under kind `query`.

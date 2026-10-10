@@ -1,0 +1,1 @@
+Set by `_finish` for any domain outcome, including `insufficient_evidence`, `ingestion_unavailable` and `budget_blocked`. `result_json.status` carries the domain status, so completed does not mean an answer was generated.

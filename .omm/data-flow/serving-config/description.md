@@ -1,1 +1,1 @@
-`active_serving` plus `Resources.run_settings` fix the mode, depths, fusion, evidence limits, embedding model and dimensions, and the reranker for every retrieval. Changing the process config does not change serving.
+The `active_run` JSON: run_id, mode, index_version, dense_version, embedding model and dimensions, limits (channel and fused depth, evidence units and tokens, RRF k, dense weight, keyword head, corpus route), reranker, and eval_version. `Resources.run_settings` turns it into the effective `Settings` for each retrieval.

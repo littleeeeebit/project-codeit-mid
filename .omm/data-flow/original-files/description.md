@@ -1,0 +1,1 @@
+`RFP_SOURCE_DIR` (default `<repo>/원본 데이터`) holds `data_list.csv` and `files/`. The manifest import records each file's SHA-256 as `sources.source_hash`, and its path as `original_path` resolved through `postgres.host_path`. `original_download` serves only a managed `(doc_id, source_hash)` pair whose file sits directly in `files_dir` and still hashes to the recorded value.

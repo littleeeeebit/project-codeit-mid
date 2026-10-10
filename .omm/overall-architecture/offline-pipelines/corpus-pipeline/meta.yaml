@@ -1,10 +1,17 @@
 created: 2026-10-05 09:51:21.768000+00:00
-updated: 2026-10-05 09:51:21.896000+00:00
-update_count: 2
+updated: 2026-10-10T23:15:02.413Z
+update_count: 4
 last_field: diagram
 kind: nested-class
 title: corpus-pipeline
 children:
-- ocr-merge
+  - fidelity-check
+  - hwp-parser
+  - manifest-import
+  - ocr-merge
+  - ocr-reader
+  - pdf-parser
+  - review-records
+  - revision-assignment
 parentPath:
-- offline-pipelines
+  - offline-pipelines

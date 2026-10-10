@@ -1,0 +1,1 @@
+Every signed-in member gets every capability (`auth.visitor`). The `_authorize` calls in the service document which role a function serves, and only narrower in-process principals (CLI, tests) are actually restricted by them.

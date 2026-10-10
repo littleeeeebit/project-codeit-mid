@@ -1,0 +1,1 @@
+Sessions are a process-memory dict, so every restart (including the self-update restart) signs everyone out.

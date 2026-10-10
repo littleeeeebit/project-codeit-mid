@@ -1,0 +1,9 @@
+created: 2026-10-10T23:14:57.001Z
+updated: 2026-10-10T23:14:57.134Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: update-watch
+children: []
+parentPath:
+  - service-core

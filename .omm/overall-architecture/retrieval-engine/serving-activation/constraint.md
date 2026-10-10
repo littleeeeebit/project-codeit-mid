@@ -1,0 +1,1 @@
+Every reader of the activation goes through `active_serving`, including latency samples, so nothing serves a run that activation would refuse.

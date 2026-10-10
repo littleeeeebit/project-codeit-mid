@@ -1,0 +1,1 @@
+Hybrid with no lexical or exact match deliberately skips dense (`no_lexical_match:dense_not_used`), because nearest neighbours always exist and would be arbitrary passages.

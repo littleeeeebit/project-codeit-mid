@@ -1,1 +1,0 @@
-Set by mark_dispatching before the network call, in the same transaction as the stop check. A process that dies here leaves the attempt to become unknown at the next start.

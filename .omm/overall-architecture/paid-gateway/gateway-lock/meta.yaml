@@ -1,0 +1,9 @@
+created: 2026-10-10T23:14:59.754Z
+updated: 2026-10-10T23:14:59.890Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: gateway-lock
+children: []
+parentPath:
+  - paid-gateway

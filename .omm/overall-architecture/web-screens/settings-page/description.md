@@ -1,0 +1,1 @@
+`web/src/app/settings/page.tsx` reads `GET /api/settings/api-key` and `GET /api/budget`. It writes `PUT /api/settings/api-key` (key plus model, checked server-side with a free metadata call), `PUT /api/settings/model`, and `PUT /api/budget/limit` (the shared cumulative cap, with a reason). The key is held only in the server's memory for the signed-in member.

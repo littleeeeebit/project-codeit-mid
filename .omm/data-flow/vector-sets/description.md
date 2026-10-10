@@ -1,1 +1,0 @@
-Per-model pgvector sets over an index's chunk payloads, each tagged with model, dimensions and prefix policy, plus a query-vector cache keyed by normalized text, model and dimensions. DenseIndex verifies that a set matches its base index version before serving.

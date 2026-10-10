@@ -1,1 +1,0 @@
-requests.status transitions observed in service.py. Result status (answered, insufficient_evidence, budget_blocked, technical_error, and so on) is separate from row status: budget_blocked and insufficient_evidence finish with row status completed.

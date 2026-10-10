@@ -1,0 +1,1 @@
+`_stored_quote` scans every chunk of the loaded index linearly for each evidence unit, and is called for every unit during validation and carried-evidence filtering. That is roughly 18 units times 19,000 chunks per answer: acceptable today, but an `idx.row_of` lookup would remove it.

@@ -1,0 +1,1 @@
+This pipeline turns the CSV manifest and the 100 originals (HWP and PDF) into immutable, reviewed extraction revisions. It reuses any input whose key (original, parser revision, native print, OCR cache, converter) is unchanged, quarantines a failure with a reason code, and never marks a source reviewed on its own diagnostics.

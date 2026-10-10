@@ -1,0 +1,9 @@
+graph TD
+  cli-entry["Owner CLI main\nsrc/rfp_assistant/cli.py"] -->|"manifest, ingest, ocr, fidelity"| corpus-pipeline["Corpus pipeline\nsrc/rfp_assistant/corpus/ingestion.py"]
+  cli-entry -->|"build-keyword, build-dense"| index-builds["Index builds\nsrc/rfp_assistant/retrieval/dense.py"]
+  cli-entry -->|"gold, compare, activate-run"| evaluation-selection["Evaluation and selection\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  cli-entry -->|"maintain"| maintenance-sequence["Maintenance sequence\nsrc/rfp_assistant/storage/maintenance.py"]
+  cli-entry -->|"stage-review run, resume"| stage-review["Stage review runner\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  corpus-pipeline -->|"parsed extractions"| index-builds
+  index-builds -->|"versioned indexes"| evaluation-selection
+  maintenance-sequence -->|"reruns each step"| corpus-pipeline

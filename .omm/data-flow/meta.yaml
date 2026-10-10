@@ -1,16 +1,18 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-10 12:42:08.715000+00:00
-update_count: 42
+updated: 2026-10-10 23:15:13.135000+00:00
+update_count: 44
 last_field: diagram
-git_commit: 96c6ed3
-git_branch: review-app-generation-ocr
+git_commit: 759fac6
+git_branch: shared-langfuse-on-codeit
 children:
 - activation
 - corpus-ingestion
 - embedding-set
-- evidence-map
+- embedding-sets
+- evidence-pane
+- evidence-units
 - extraction
-- extraction-revisions
+- extraction-artifacts
 - fidelity-and-ocr
 - fidelity-check
 - fidelity-ocr
@@ -19,26 +21,27 @@ children:
 - keyword-index
 - maintenance-sequence
 - ocr-merge
-- ocr-reads
 - original-corpus
 - original-files
 - originals
 - preview
+- request-records
 - retrieval-runs
 - retrieval-selection
 - run-selection
-- serving-activation
 - serving-config
 - source-originals
 - vector-sets
-prev_diagram: "graph TD\r\n  original-files[\"Original HWP and PDF\\nsrc/rfp_assistant/settings.py\"\
-  ] -->|\"manifest hashes\"| source-records[\"documents and sources rows\\nsrc/rfp_assistant/storage/store.py\"\
-  ]\r\n  original-files -->|\"embedded pictures, rasters\"| ocr-cache[\"OCR region\
-  \ cache\\nsrc/rfp_assistant/corpus/ocr.py\"]\r\n  source-records -->|\"ingest parses\"\
-  | extraction-artifacts[\"Elements and artifacts\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  ocr-cache -->|\"merged as image_text\"| extraction-artifacts\r\n  extraction-artifacts\
-  \ -->|\"build-keyword chunks\"| keyword-index-files[\"Keyword index files\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  keyword-index-files -->|\"embed chunk payloads\"| vector-sets[\"pgvector\
-  \ sets\\nsrc/rfp_assistant/retrieval/vector_store.py\"]\r\n  vector-sets -->|\"\
-  evaluate, compare, activate\"| active-serving[\"Active serving config\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  keyword-index-files -->|\"activate-run\"| active-serving"
+prev_diagram: "graph TD\r\n  source-originals[\"Originals and data_list.csv\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  extraction-revisions[\"Extraction artifacts and elements\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  ocr-reads[\"OCR region cache\\nsrc/rfp_assistant/corpus/ocr.py\"]\r\n  keyword-index[\"\
+  Immutable keyword index\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  vector-sets[\"\
+  Embedding vector sets\\nsrc/rfp_assistant/retrieval/vector_store.py\"]\r\n  serving-activation[\"\
+  active_run and active_index\\nsrc/rfp_assistant/evaluation/evaluation.py\"]\r\n\
+  \  evidence-map[\"Request evidence map\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  source-originals -->|\"sha256 source_hash\"| extraction-revisions\r\n  ocr-reads\
+  \ -->|\"image_text elements\"| extraction-revisions\r\n  extraction-revisions -->|\"\
+  chunk profile build\"| keyword-index\r\n  keyword-index -->|\"chunk payloads embedded\"\
+  | vector-sets\r\n  serving-activation -->|\"selects index, dense version\"| keyword-index\r\
+  \n  keyword-index -->|\"packed EvidenceUnit quotes\"| evidence-map\r\n  evidence-map\
+  \ -->|\"open_evidence context\"| extraction-revisions"

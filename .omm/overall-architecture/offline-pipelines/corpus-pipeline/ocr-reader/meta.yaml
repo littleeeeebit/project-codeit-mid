@@ -1,0 +1,10 @@
+created: 2026-10-10T23:15:03.067Z
+updated: 2026-10-10T23:15:03.223Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: ocr-reader
+children: []
+parentPath:
+  - offline-pipelines
+  - corpus-pipeline
