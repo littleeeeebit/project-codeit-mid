@@ -251,7 +251,8 @@ def _measure(stage: str, s: dict | None) -> str:
     if stage == "generation":
         failures = ", ".join(f"{k} {v}" for k, v in sorted(s["validation_failures"].items())) or "none"
         return (f"passed {s['passed']}/{s['rows']}; required claims correct {s['required_correct']}/{s['required']}; "
-                f"claims supported {s['claims_supported']}/{s['claims']}; validation failures {failures}; "
+                f"of {s['claims']} claims {s['claims_supported']} quoted verbatim, {s['claims_rejected']} rejected, "
+                f"{s['claims'] - s['claims_supported'] - s['claims_rejected']} unjudged; validation failures {failures}; "
                 f"{s['cost_micro_usd'] / 1e6:.4f} USD over {s['paid_answers']} paid answers; latency p50 "
                 f"{s['latency_ms']['p50']} ms, p95 {s['latency_ms']['p95']} ms (n={s['latency_ms']['n']})")
     if stage == "ocr":

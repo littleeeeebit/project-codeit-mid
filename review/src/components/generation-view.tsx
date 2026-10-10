@@ -84,8 +84,12 @@ function Summary({ c, view }: { c: Candidate; view: View }) {
         </div>
       </div>
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 text-[14px] tabular-nums">
-        <dt className="text-muted">근거와 일치한 주장</dt>
-        <dd>{s.claims_supported}/{s.claims}{s.claims_rejected > 0 && <span className="text-bad"> · 근거 아님 {s.claims_rejected}</span>}</dd>
+        {/* Support is decided only by a verbatim quote or a review, so the unjudged rest is shown, not hidden. */}
+        <dt className="text-muted">주장 {s.claims}개</dt>
+        <dd>
+          원문 그대로 인용 {s.claims_supported} · <span className={s.claims_rejected ? "text-bad" : ""}>근거 아님 {s.claims_rejected}</span>
+          {" "}· 사람 확인 필요 {s.claims - s.claims_supported - s.claims_rejected}
+        </dd>
         <dt className="text-muted">열리지 않는 인용</dt><dd>{s.links_invalid}/{s.links}</dd>
         <dt className="text-muted">비용</dt><dd>{usd(s.cost_micro_usd)} · 유료 답변 {s.paid_answers}개</dd>
         <dt className="text-muted">지연</dt>
@@ -118,9 +122,9 @@ function QuestionRow({ q, candidates, note, setNote }: {
       {q.required.length > 0 && (
         <div className="mt-3 max-w-[960px] text-[14px]">
           <span className="mr-2 font-semibold text-muted">필수 주장</span>
-          {q.required.map((r) => (
+          {q.required.map((r, i) => (
             <span key={r.claim_id} className="mr-2 inline rounded bg-cite px-1 leading-7" title={r.claim_id}>
-              {r.critical && <span className="font-semibold">★ </span>}{r.text}
+              <span className="font-semibold">{i + 1}{r.critical && " ★"}</span> {r.text}
             </span>
           ))}
         </div>
@@ -137,7 +141,7 @@ function QuestionRow({ q, candidates, note, setNote }: {
 
 function AnswerColumn({ c, a, q }: { c: Candidate; a: Answer | undefined; q: GenerationQuestion }) {
   const [open, setOpen] = useState<string | null>(null);
-  if (!a) return <div className="rounded-[10px] bg-surface px-3 py-2 text-[14px] text-muted">{c.label}: 결과 없음</div>;
+  if (!a) return <p className="self-start text-[14px] text-muted">{c.label}: 결과 없음</p>;
   if (a.error) {
     return (
       <div className="min-w-0">
@@ -169,9 +173,9 @@ function AnswerColumn({ c, a, q }: { c: Candidate; a: Answer | undefined; q: Gen
       )}
       {q.required.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {q.required.map((r) => {
+          {q.required.map((r, i) => {
             const [label, tone] = VERDICT[verdicts[r.claim_id]] ?? ["—", "neutral"];
-            return <Badge key={r.claim_id} tone={tone}>{r.claim_id} {label}</Badge>;
+            return <Badge key={r.claim_id} tone={tone}>필수 {i + 1} {label}</Badge>;
           })}
         </div>
       )}
@@ -217,7 +221,7 @@ function ClaimItem({ claim, evidence, open, setOpen }: {
         </Fragment>
       ))}
       <span className="ml-2 text-[12px] text-muted">
-        {claim.supported === true ? "근거와 일치" : claim.supported === false ? "근거 아님" : "사람 확인 필요"}
+        {claim.supported === true ? "원문 그대로 인용" : claim.supported === false ? "근거 아님" : "사람 확인 필요"}
       </span>
     </li>
   );
