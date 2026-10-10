@@ -2,7 +2,10 @@ agents = ["claude", "codex"]
 
 [slots]
 review_dir = ".wiki/review"
-gate_cmd = "git diff --check"
+gate_cmd = "git diff --check && python -B tools/verify.py stage-review"
 live_cmd = "open a new host session in this repository and confirm wiki hooks and the options question UI"
 server_stop = "Ctrl+C in the terminal that started the server"
 scratch_dirs = ".wiki/review/"
+
+[checks]
+stage-review = {cmd = "python -B tools/verify.py stage-review", about = "stage review run-folder contract tests, then review/server.py importing a fixture run and writing a decision", paths = ["review/*", "review.cmd", "review.command", "src/rfp_assistant/evaluation/stage_review*.py", "tests/test_stage_review.py"]}
