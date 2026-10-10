@@ -149,4 +149,4 @@ export const short = (commit: string) => commit.slice(0, 7);
 export const when = (iso: string) =>
   new Date(iso).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
-export const hostLabel = (h?: Host | null) => (h ? (h.cuda ? (h.gpu ?? "CUDA GPU") : `CPU · ${h.machine}`) : "—");
+export const hostLabel = (h?: Host | null) => (h ? (h.cuda ? (h.gpu ?? "CUDA GPU") : ["CPU", h.machine].filter(Boolean).join(" · ")) : "—");

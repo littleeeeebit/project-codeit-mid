@@ -30,34 +30,42 @@ DOC = """<HwpDoc><BodyText><SectionDef><ColumnSet>
 </ColumnSet></SectionDef></BodyText></HwpDoc>"""
 
 
+def make_run(root: Path) -> tuple[str, dict]:
+    """A chunking run as the runner writes it: a kept, a title-losing and a refused candidate. The macOS
+    launcher workflow imports it, since real runs carry corpus text that must not leave the machine."""
+    elements = ingestion.finalize_elements(ingestion.walk_hwp(ET.fromstring(DOC)), "x1")
+    kept = chunking.build_chunks(elements, "x1")[0]
+    lost = [{**c, "payload": c["payload"].replace("□ 조직별 역할", "")} for c in kept]
+    run_id = "chunking-20261010T000000Z-abc123"
+    folder = root / "review" / "runs" / run_id
+    (folder / "inputs").mkdir(parents=True)
+    (folder / "candidates").mkdir()
+    with gzip.open(folder / "inputs" / "documents.json.gz", "wt", encoding="utf-8") as f:
+        json.dump({"profile": "structural", "documents": [
+            {"extraction_id": "x1", "doc_id": "d1", "title": "사업", "elements": elements}]}, f)
+    for cid, chunks in (("base", kept), ("c1", lost)):
+        (folder / "candidates" / f"{cid}.json").write_text(json.dumps({"status": "complete", "documents": [
+            {"extraction_id": "x1", "chunks": chunks}]}, ensure_ascii=False), encoding="utf-8")
+    cand = {"ref": "r", "commit": "a" * 40, "working_tree": False, "status": "complete", "host": {"cuda": False}}
+    record = {"schema": stage_review.SCHEMA, "run_id": run_id, "stage": "chunking",
+              "created_at": "2026-10-10T00:00:00+00:00", "candidates": [
+                  {**cand, "id": "base", "label": "main", "role": "baseline"},
+                  {**cand, "id": "c1", "label": "lost", "role": "candidate"},
+                  {**cand, "id": "c2", "label": "gpu", "role": "candidate", "status": "refused",
+                   "reason": "needs a CUDA GPU"}]}
+    view = stage_review.score_chunking(folder, record)
+    (folder / "view.json").write_text(json.dumps(view, ensure_ascii=False), encoding="utf-8")
+    (folder / "run.json").write_text(json.dumps(record), encoding="utf-8")
+    return run_id, view
+
+
 class StageReviewContractTest(unittest.TestCase):
     def test_run_folder_and_decision_files(self):
         self.assertEqual(stage_review.SCHEMA, server.RUN_SCHEMA)
-        elements = ingestion.finalize_elements(ingestion.walk_hwp(ET.fromstring(DOC)), "x1")
-        kept = chunking.build_chunks(elements, "x1")[0]
-        lost = [{**c, "payload": c["payload"].replace("□ 조직별 역할", "")} for c in kept]
-        run_id = "chunking-20261010T000000Z-abc123"
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
+            run_id, view = make_run(root)
             folder = root / "review" / "runs" / run_id
-            (folder / "inputs").mkdir(parents=True)
-            (folder / "candidates").mkdir()
-            with gzip.open(folder / "inputs" / "documents.json.gz", "wt", encoding="utf-8") as f:
-                json.dump({"profile": "structural", "documents": [
-                    {"extraction_id": "x1", "doc_id": "d1", "title": "사업", "elements": elements}]}, f)
-            for cid, chunks in (("base", kept), ("c1", lost)):
-                (folder / "candidates" / f"{cid}.json").write_text(json.dumps({"status": "complete", "documents": [
-                    {"extraction_id": "x1", "chunks": chunks}]}, ensure_ascii=False), encoding="utf-8")
-            cand = {"ref": "r", "commit": "a" * 40, "working_tree": False, "status": "complete", "host": {"cuda": False}}
-            record = {"schema": stage_review.SCHEMA, "run_id": run_id, "stage": "chunking",
-                      "created_at": "2026-10-10T00:00:00+00:00", "candidates": [
-                          {**cand, "id": "base", "label": "main", "role": "baseline"},
-                          {**cand, "id": "c1", "label": "lost", "role": "candidate"},
-                          {**cand, "id": "c2", "label": "gpu", "role": "candidate", "status": "refused",
-                           "reason": "needs a CUDA GPU"}]}
-            view = stage_review.score_chunking(folder, record)
-            (folder / "view.json").write_text(json.dumps(view, ensure_ascii=False), encoding="utf-8")
-            (folder / "run.json").write_text(json.dumps(record), encoding="utf-8")
 
             # What the app reads: every candidate listed (the refused one with its reason, never ranked), the
             # title check, aligned boundaries per document.
