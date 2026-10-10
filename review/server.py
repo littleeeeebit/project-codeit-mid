@@ -250,7 +250,10 @@ def _measure(stage: str, s: dict | None) -> str:
                 f"questions; needle top-5 hits {s['needle_hits']}/{s['needle_rows']}")
     if stage == "generation":
         failures = ", ".join(f"{k} {v}" for k, v in sorted(s["validation_failures"].items())) or "none"
-        return (f"passed {s['passed']}/{s['rows']}; required claims correct {s['required_correct']}/{s['required']}; "
+        metadata = (f"metadata questions correct {s['metadata_correct']}/{s['metadata_rows']}; "
+                    if s.get("metadata_rows") else "")
+        return (f"passed {s['passed']}/{s.get('passage_rows', s['rows'])}; {metadata}"
+                f"required claims correct {s['required_correct']}/{s['required']}; "
                 f"of {s['claims']} claims {s['claims_supported']} quoted verbatim, {s['claims_rejected']} rejected, "
                 f"{s['claims'] - s['claims_supported'] - s['claims_rejected']} unjudged; validation failures {failures}; "
                 f"processing failures {s.get('technical_failures', 0)}; "

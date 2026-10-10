@@ -105,7 +105,7 @@ export function Summaries<S>({ candidates, summary, note, children }: {
             <div key={c.id} className="border-t-2 border-ink pt-3">
               <CandidateHead c={c} />
               {s !== undefined && (c.status === "complete" || c.status === "stopped")
-                ? <><Stopped c={c} />{children(s, c)}</> : <Failure c={c} />}
+                ? <><Stopped c={c} />{children(s, c)}</> : <><Failure c={c} /><LedgerLine ledger={c.ledger} /></>}
             </div>
           );
         })}

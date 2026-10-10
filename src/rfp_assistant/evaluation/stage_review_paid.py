@@ -29,6 +29,7 @@ from ..settings import TRACING_ENV, Settings, read_api_key, tracing_credentials
 from ..storage.store import dumps, open_db, utcnow, write_text_atomic
 from . import evaluation as ev
 from . import stage_review as sr
+from . import stage_review_worker
 
 STAGES = ("generation", "ocr")
 MODEL = "gpt-5-mini"
@@ -194,34 +195,91 @@ def _ledger_view(settings: Settings, record: dict) -> dict:
             "settled_average_n": n}
 
 
+def _read(path: Path) -> dict | None:
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
 def _estimate_output(folder: Path, cand: dict) -> dict | None:
-    path = folder / "candidates" / f"{cand['id']}.estimate.json"
-    if cand.get("status") != "complete" or not path.exists():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    """What a candidate priced in its free pass, when that pass finished."""
+    out = _read(folder / "candidates" / f"{cand['id']}.estimate.json")
+    return out if out and out.get("status") == "complete" else None
+
+
+def key_prefix(record: dict, cid: str) -> str:
+    """The idempotency keys of one candidate's paid requests in the ledger (answers `<run>:<candidate>:<question>:<n>`,
+    the OCR job `review:<run>:<candidate>:<OCR version>`), whatever its output holds."""
+    return f"{record['run_id']}:{cid}:" if record["stage"] == "generation" else f"review:{record['run_id']}:{cid}:"
+
+
+def _done(folder: Path, stage: str, cid: str) -> set:
+    """What a candidate has finished and paid for: answered questions, or images gpt-5-mini read."""
+    if stage == "generation":
+        rows = (_read(folder / "candidates" / f"{cid}.json") or {}).get("rows") or []
+        return {r["question_id"] for r in rows if r.get("status") == "done"}
+    return {r["n"] for r in stage_review_worker.paid_reads(str(folder / "candidates" / f"{cid}.json"),
+                                                           str(_progress(folder, cid)))}
+
+
+def _progress(folder: Path, cid: str) -> Path:
+    return folder / "candidates" / f"{cid}.progress.jsonl"
+
+
+def _rates(conn) -> dict:
+    return json.loads(conn.execute("SELECT rates_json FROM budget_settings WHERE id = 1").fetchone()[0])
+
+
+def _bound(rates: dict, model: str, input_tokens: int, max_output_tokens: int) -> int:
+    from ..gateway import budget
+
+    if model not in rates:
+        raise sr.ReviewError(f"the ledger has no rate for {model}")
+    return budget.max_cost(rates[model], input_tokens, max_output_tokens)
+
+
+def _priced(out: dict, rates: dict, rate_version: str) -> dict:
+    """Each item's maximum at the ledger's rates now, from the token bounds the candidate's free pass recorded."""
+    if "max_output_tokens" not in out:
+        raise sr.ReviewError("these prices carry no token bounds (an earlier worker); run the comparison again")
+    if "per_read_micro_usd" in out:
+        return {"per_read": _bound(rates, out["model"], out["input_tokens"], out["max_output_tokens"])}
+    prices = {}
+    for p in out["prices"]:
+        if p["extra_micro_usd"] and out["rate_version"] != rate_version:
+            raise sr.ReviewError("a paid query embedding was priced at rates that changed since; run the comparison "
+                                 "again")
+        prices[p["question_id"]] = p["max_micro_usd"] and (
+            _bound(rates, out["model"], p["input_tokens"], out["max_output_tokens"]) + p["extra_micro_usd"])
+    return {"prices": prices}
 
 
 def estimate(settings: Settings, folder: Path, record: dict) -> dict:
-    """Prices every paid call each candidate may make, writes estimate.json and returns it. The fingerprint binds the
-    inputs, worker, candidates' commits and configuration, every priced item and the ledger's rates."""
+    """Prices every paid call each candidate may still make, at the ledger's rates now, writes estimate.json and
+    returns it. A stopped run is priced for what is left: what a candidate finished is not priced again, and what the
+    ledger already holds against it (`committed_micro_usd`) counts toward the maximum the worker may reach. The
+    fingerprint binds the inputs, worker, candidates' commits and configuration, every priced item and the rates."""
     stage = record["stage"]
     ledger = _ledger_view(settings, record)
+    with open_db(ledger_settings(settings, record).db_path) as conn:
+        rates = _rates(conn)
+        held = {c["id"]: stage_review_worker.committed(conn, key_prefix(record, c["id"])) for c in record["candidates"]}
     cands = {}
     for c in record["candidates"]:
         out = _estimate_output(folder, c)
-        if out is None:
+        if out is None or _finished(folder, c["id"]):
             continue
+        done, priced = _done(folder, stage, c["id"]), _priced(out, rates, ledger["rate_version"])
         if stage == "generation":
-            prices = {p["question_id"]: p["max_micro_usd"] for p in out["prices"]}
+            prices = {q: v for q, v in priced["prices"].items() if q not in done}
             cands[c["id"]] = {"max_micro_usd": sum(prices.values()), "calls": sum(1 for v in prices.values() if v),
                               "rows": len(prices), "prices": prices,
                               "notes": sorted({p["note"] for p in out["prices"] if p.get("note")})}
         else:
-            flagged = [i["n"] for i in out["images"] if i.get("reasons")]
-            per = out["per_read_micro_usd"]
+            flagged = [i["n"] for i in out["images"] if i.get("reasons") and i["n"] not in done]
+            per = priced["per_read"]
             cands[c["id"]] = {"max_micro_usd": per * len(flagged), "calls": len(flagged), "flagged": flagged,
                               "images": len(out["images"]), "per_read_micro_usd": per,
                               "unreadable": sum(i["status"] == "unreadable" for i in out["images"])}
+        cands[c["id"]]["committed_micro_usd"] = held[c["id"]]
         if ledger["settled_average_micro_usd"] is not None:
             cands[c["id"]]["typical_micro_usd"] = ledger["settled_average_micro_usd"] * cands[c["id"]]["calls"]
     total = sum(c["max_micro_usd"] for c in cands.values())
@@ -263,7 +321,7 @@ def approve(settings: Settings, run_id: str, approved_by: str) -> dict:
     if not approved_by.strip():
         raise sr.ReviewError("approval needs the person's name (--approved-by)")
     if datetime.fromisoformat(est["expires_at"]) < datetime.now(timezone.utc):
-        raise sr.ReviewError("the estimate expired; run the comparison again for a new one")
+        raise sr.ReviewError(f"the estimate expired; `stage-review reprice --run {run_id}` prices what is left")
     if not est["fits"]:
         raise sr.ReviewError(f"the maximum {est['max_micro_usd'] / 1e6:.4f} USD does not fit the {est['purpose']} "
                              "envelope, the cap or paid admission of the ledger; nothing was approved")
@@ -279,7 +337,8 @@ def require_approved(est: dict) -> None:
         raise sr.ReviewError(f"estimate {est.get('estimate_id')} of {est.get('run_id')} is not approved: read it, then "
                              f"`stage-review approve --run {est.get('run_id')} --approved-by <name>`")
     if datetime.fromisoformat(est["expires_at"]) < datetime.now(timezone.utc):
-        raise sr.ReviewError("the approved estimate expired; run the comparison again for a new one")
+        raise sr.ReviewError(f"the approved estimate expired; `stage-review reprice --run {est.get('run_id')}` prices "
+                             "what is left for a new approval")
 
 
 def approved_env(folder: Path, est: dict) -> dict[str, str]:
@@ -299,57 +358,71 @@ def approved_env(folder: Path, est: dict) -> dict[str, str]:
 
 
 def recheck(settings: Settings, folder: Path, record: dict, est: dict) -> None:
-    """Before paying: the inputs and worker are the estimated ones, the rates unchanged, and the remaining maximum
-    still fits the ledger."""
+    """Before paying: the inputs and worker are the estimated ones, the rates unchanged, and what the unfinished
+    candidates may still reserve fits the ledger, whose balance already counts what they spent."""
     if sr.input_hashes(folder / "inputs") != record["input_sha256"]:
         raise sr.ReviewError("the frozen inputs changed since the estimate")
     if sr._sha((folder / "worker.py").read_bytes()) != record["worker_sha256"]:
         raise sr.ReviewError("the worker changed since the estimate")
     now = _ledger_view(settings, record)
     if now["rate_version"] != est["rate_version"]:
-        raise sr.ReviewError("the ledger's rates changed since the estimate; run the comparison again")
-    left = sum(c["max_micro_usd"] for cid, c in est["candidates"].items() if not _finished(folder, cid))
+        raise sr.ReviewError("the ledger's rates changed since the estimate; reprice the run (`stage-review reprice`)")
+    with open_db(ledger_settings(settings, record).db_path) as conn:
+        left = sum(_outstanding(conn, folder, record, cid, c) for cid, c in est["candidates"].items()
+                   if not _finished(folder, cid))
     if not now["paid_enabled"] or left > min(now["envelope_remaining_micro_usd"], now["available_micro_usd"]):
         raise sr.ReviewError(f"the remaining maximum {left / 1e6:.4f} USD no longer fits the {est['purpose']} envelope "
                              "or the cap, or paid admission is off; nothing was dispatched")
 
 
 def _finished(folder: Path, cid: str) -> bool:
-    path = folder / "candidates" / f"{cid}.json"
-    return path.exists() and json.loads(path.read_text(encoding="utf-8")).get("status") == "complete"
+    return ((_read(folder / "candidates" / f"{cid}.json") or {}).get("status")) == "complete"
+
+
+def _cap(mine: dict) -> int:
+    """The most the ledger may ever hold against a candidate under this estimate: what it held when priced, plus the
+    approved maximum of what was left."""
+    return mine.get("committed_micro_usd", 0) + mine["max_micro_usd"]
+
+
+def _outstanding(conn, folder: Path, record: dict, cid: str, mine: dict) -> int:
+    """What an unfinished candidate may still reserve: the priced items it has not finished, never more than its
+    approval has left after what the ledger holds against it."""
+    done = _done(folder, record["stage"], cid)
+    if record["stage"] == "generation":
+        bound = sum(v for q, v in mine["prices"].items() if q not in done)
+    else:
+        bound = mine["per_read_micro_usd"] * sum(n not in done for n in mine["flagged"])
+    return max(0, min(bound, _cap(mine) - stage_review_worker.committed(conn, key_prefix(record, cid))))
 
 
 def paid_config(folder: Path, record: dict, est: dict, cand: dict) -> dict:
     mine = est["candidates"][cand["id"]]
-    config = {**(cand.get("config") or {}), "run_key": record["run_id"], "candidate": cand["id"],
-              "cap_micro_usd": mine["max_micro_usd"]}
     previous = folder / "candidates" / f"{cand['id']}.json"
+    config = {**(cand.get("config") or {}), "run_key": record["run_id"], "candidate": cand["id"],
+              "cap_micro_usd": _cap(mine), "ledger_key": key_prefix(record, cand["id"]),
+              "previous": str(previous) if previous.exists() else None}
     if record["stage"] == "generation":
-        return {**config, "prices": mine["prices"], "previous": str(previous) if previous.exists() else None}
+        return {**config, "prices": mine["prices"]}
     return {**config, "ledger_env": record.get("ledger_env"), "per_read_micro_usd": mine["per_read_micro_usd"],
             "local_reads": str(folder / "candidates" / f"{cand['id']}.estimate.json"),
-            "previous": str(previous) if previous.exists() else None}
+            "progress": str(_progress(folder, cand["id"]))}
 
 
 def ledger_spend(settings: Settings, folder: Path, record: dict) -> None:
-    """Each candidate's spend as the shared ledger records it, beside what its worker counted."""
+    """Each candidate's spend as the shared ledger records it, found by its request keys whether it finished,
+    stopped or failed: settled cost, attempts and those still open (unknown billing included)."""
     ls = ledger_settings(settings, record)
     with open_db(ls.db_path) as conn:
         for c in record["candidates"]:
-            out = sr._output(folder, c) or {}
-            if record["stage"] == "generation":
-                where, arg = "r.idempotency_key LIKE ?", f"{record['run_id']}:{c['id']}:%"
-            elif out.get("request_id"):
-                where, arg = "r.request_id = ?", out["request_id"]
-            else:
-                continue
             row = conn.execute(
                 "SELECT COALESCE(SUM(CASE WHEN a.state = 'settled' THEN a.settled_micro_usd ELSE 0 END), 0), "
                 "COUNT(a.attempt_id), COALESCE(SUM(CASE WHEN a.state IN ('reserved', 'dispatching', 'unknown') "
-                f"THEN 1 ELSE 0 END), 0) FROM requests r JOIN attempts a ON a.request_id = r.request_id WHERE {where}",
-                (arg,)).fetchone()
+                "THEN 1 ELSE 0 END), 0) FROM requests r JOIN attempts a ON a.request_id = r.request_id "
+                "WHERE r.idempotency_key LIKE ?", (key_prefix(record, c["id"]) + "%",)).fetchone()
             c["ledger"] = {"settled_micro_usd": row[0], "attempts": row[1], "open": row[2], "target": _target(ls)}
             if record["stage"] == "generation":
+                out = _read(folder / "candidates" / f"{c['id']}.json") or {}
                 c["replayed"] = _replayed(conn, out.get("rows") or [])
 
 
@@ -395,7 +468,8 @@ def score_generation(settings: Settings, folder: Path, record: dict) -> dict:
         per = {cid: _answer(row, by_q.get(row["question_id"]), index, chunks, titles,
                             row["question_id"] in replayed.get(cid, ())) for cid, by_q in answered.items()}
         done = [p for p in per.values() if "error" not in p]
-        outcomes = {json.dumps([p["outcome"], p["passed"], [r["verdict"] for r in p["required"]]]) for p in done}
+        outcomes = {json.dumps([p["outcome"], p["passed"], p["metadata_correct"], p["facts"],
+                                [r["verdict"] for r in p["required"]]]) for p in done}
         questions.append({"key": row["question_id"], "id": row["question_id"], "question": row["question"],
                           "type": row["question_type"], "mode": row.get("mode"),
                           "expected_status": row["expected_status"], "answerability": row["answerability"],
@@ -440,9 +514,10 @@ NOT_DONE = {"blocked": "예산 게이트가 거절했습니다", "unknown_billin
 def _answer(row: dict, rec: dict | None, index, chunks: dict, titles: dict, replayed: bool = False) -> dict:
     from ..service import answers
 
+    metadata = row.get("mode") == "metadata"  # judged by its facts, in its own stratum, never by `passed`
     if rec is None:
-        return {"error": "이 질문 전에 실행이 멈췄습니다"}
-    base = {"cost_micro_usd": rec.get("settled_micro_usd") or 0,
+        return {"error": "이 질문 전에 실행이 멈췄습니다", "metadata": metadata}
+    base = {"metadata": metadata, "cost_micro_usd": rec.get("settled_micro_usd") or 0,
             "latency_ms": None if replayed else rec.get("latency_ms"), "replayed": replayed,
             "trace_url": rec.get("trace_url"), "request_id": rec.get("request_id")}
     if rec.get("status") != "done":
@@ -471,6 +546,7 @@ def _answer(row: dict, rec: dict | None, index, chunks: dict, titles: dict, repl
     # (InternalServerError), failed the request without a verdict on the answer.
     validation = code if code and re.fullmatch(r"[a-z_]+", code) else None
     return {**base, "outcome": s["outcome"], "passed": s.get("passed"), "status_ok": s["status_ok"],
+            "metadata_correct": s.get("metadata_correct"), "facts": answer.get("facts") or [],
             "summary": answer.get("summary") or "", "claims": claims, "evidence": evidence,
             "conflicts": answer.get("conflicts") or [], "missing": answer.get("missing_fields") or [],
             "validation": validation, "validation_detail": error if validation else None,
@@ -491,6 +567,9 @@ def _generation_summary(per: list[dict]) -> dict:
     paid = [p["cost_micro_usd"] for p in per if p.get("cost_micro_usd")]
     latency = [p["latency_ms"] for p in done if p.get("latency_ms") is not None]
     return {"rows": len(per), "answered": len(done), "passed": sum(bool(p.get("passed")) for p in done),
+            "passage_rows": sum(not p.get("metadata") for p in per),
+            "metadata_rows": sum(bool(p.get("metadata")) for p in per),
+            "metadata_correct": sum(bool(p.get("metadata_correct")) for p in done),
             "required_correct": sum(r["verdict"] == "correct" for r in required), "required": len(required),
             "claims_supported": sum(c["supported"] is True for c in claims),
             "claims_rejected": sum(c["supported"] is False for c in claims), "claims": len(claims),

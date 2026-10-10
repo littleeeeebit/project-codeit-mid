@@ -4,18 +4,26 @@ import gzip
 import importlib.util
 import io
 import json
+import os
 import tempfile
 import unittest
+import uuid
 import xml.etree.ElementTree as ET
 import zipfile
+from datetime import date
 from types import SimpleNamespace
 from unittest import mock
 from pathlib import Path
 
-from rfp_assistant.corpus import ingestion
+from rfp_assistant.corpus import ingestion, ocr
 from rfp_assistant.evaluation import stage_review
 from rfp_assistant.evaluation import stage_review_paid as paid
+from rfp_assistant.evaluation import stage_review_worker as worker
+from rfp_assistant.gateway import budget
 from rfp_assistant.retrieval import chunking
+from rfp_assistant.settings import Settings
+from rfp_assistant.storage import postgres, store
+from tests import fixtures
 
 SERVER = Path(__file__).resolve().parents[1] / "review" / "server.py"
 _spec = importlib.util.spec_from_file_location("review_server", SERVER)
@@ -207,7 +215,7 @@ class PaidStageTest(unittest.TestCase):
             self.assertEqual((second["state"], second["candidates"][1]["reason"]), ("complete", None))
             self.assertEqual(ran, ["c1.json", "c1.json"])  # the finished baseline is never paid again
 
-    def test_reprice_replaces_the_estimate_of_an_unpaid_run_only(self):
+    def test_reprice_never_touches_a_completed_run(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = paid_folder(Path(tmp), "ocr", {"state": "needs_approval"})
             settings = SimpleNamespace(data_dir=Path(tmp))
@@ -216,7 +224,7 @@ class PaidStageTest(unittest.TestCase):
                 record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
                 (folder / "run.json").write_text(json.dumps({**record, "state": "complete"}), encoding="utf-8")
                 with self.assertRaisesRegex(stage_review.ReviewError, "not waiting for an estimate"):
-                    stage_review.reprice(settings, folder.name)  # paid work is never re-priced
+                    stage_review.reprice(settings, folder.name)  # a completed run has nothing left to price
             self.assertEqual(priced.call_count, 1)
 
     def test_a_replayed_answer_has_no_measured_latency(self):
@@ -313,6 +321,212 @@ class PaidStageTest(unittest.TestCase):
             markdown = Path(saved["markdown"]).read_text(encoding="utf-8")
             for line in ("re-read 1/2", "not OCR'd (unreadable) 1/3", "### `0` 사업 · BIN0001.png", "chose `r`"):
                 self.assertIn(line, markdown)
+
+
+U = ocr.REMOTE_MAX_OUTPUT  # one worst-case gpt-5-mini read when its output costs 1 micro-USD a token
+
+
+def png() -> bytes:
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (8, 8), "white").save(buf, "PNG")
+    return buf.getvalue()
+
+
+class Reads:
+    """gpt-5-mini as the ledger sees it: each call settles its planned completion tokens, or the worker dies mid-call."""
+
+    def __init__(self, *plan):
+        self.plan, self.calls = list(plan), 0
+
+    def chat(self, **_):
+        self.calls += 1
+        step = self.plan.pop(0)
+        if step == "crash":
+            raise KeyboardInterrupt
+        return SimpleNamespace(usage={"prompt_tokens": 0, "completion_tokens": step}, response_id=str(uuid.uuid4()),
+                               refusal=None, finish_reason="stop", content="글")
+
+    def close(self):
+        pass
+
+
+class PaidLedgerTest(unittest.TestCase):
+    """Recovery, pricing and admission of paid runs on a real ledger: an approval is a maximum across every resume."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        self.env = fixtures.database()
+        self.db = postgres.Target(self.env)
+        budget.ensure_budget_row(self.db)
+        self.rate(1, "r1")
+        budget.set_paid_enabled(self.db, "owner", True, "test")
+        with store.open_db(self.db) as conn:  # both paid purposes funded
+            conn.execute("UPDATE budget_settings SET envelopes_json = ?",
+                         (json.dumps({"gold_eval": 10 ** 8, "ocr": 10 ** 8}),))
+        self.settings = Settings(source_dir=self.root, data_dir=self.root, hwp_converter=None,
+                                 database_dsn_env=self.env)
+        # The worker opens its own pool on the ledger, as a separate process would.
+        self.worker_env = f"{self.env}_WORKER"
+        os.environ[self.worker_env] = os.environ[self.env]
+        self.addCleanup(os.environ.pop, self.worker_env)
+
+    def rate(self, output: int, version: str) -> None:
+        budget.configure(self.db, "owner", project_start=date(2026, 9, 30), project_end=date(2026, 10, 28),
+                         prior_use_micro=0, prior_use_evidence="test", rate_version=version, enable_paid=True,
+                         rates={"gpt-5-mini": {"input": "0", "cached_input": "0", "output": str(output)}})
+
+    def attempt(self, key: str, state: str, reserved: int, settled: int | None = None, purpose: str = "gold_eval"):
+        with store.open_db(self.db) as conn:
+            row = conn.execute("SELECT request_id FROM requests WHERE idempotency_key = ?", (key,)).fetchone()
+            rid = row[0] if row else str(uuid.uuid4())
+            if row is None:
+                conn.execute("INSERT INTO requests(request_id, member_id, idempotency_key, input_hash, config_hash, "
+                             "scope_json, status, created_at, updated_at) VALUES (?, 'm', ?, 'h', 'c', '[]', "
+                             "'running', 't', 't')", (rid, key))
+            conn.execute("INSERT INTO attempts(attempt_id, request_id, member_id, stage, purpose, model, state, "
+                         "reserved_micro_usd, settled_micro_usd, estimated_input_tokens, max_output_tokens, "
+                         "count_method, price_json, created_at) VALUES (?, ?, 'm', 's', ?, 'gpt-5-mini', ?, ?, ?, 0, 0, "
+                         "'t', '{}', 't')", (str(uuid.uuid4()), rid, purpose, state, reserved, settled))
+        return rid
+
+    def settled(self) -> int:
+        with store.open_db(self.db) as conn:
+            return conn.execute("SELECT COALESCE(SUM(settled_micro_usd), 0) FROM attempts "
+                                "WHERE state = 'settled'").fetchone()[0]
+
+    def folder(self, stage: str, state: str) -> Path:
+        return paid_folder(self.root, stage, {"state": state, "ledger_env": self.env, "input_sha256": {},
+                                              "worker_sha256": "w"})
+
+    def ocr_folder(self, images: int, state: str = "needs_approval") -> Path:
+        folder = self.folder("ocr", state)
+        (folder / "inputs" / "images").mkdir()
+        items = [{"n": n, "kind": "png", "digest": f"d{n}", "reasons": ["loop"], "sample": False} for n in range(images)]
+        for n in range(images):
+            (folder / "inputs" / "images" / f"{n}.bin").write_bytes(png())
+        (folder / "inputs" / "images.json").write_text(json.dumps(
+            {"ocr_version": "v", "flagged": images, "sample": 0, "seed": 1, "images": items}), encoding="utf-8")
+        (folder / "candidates" / "c1.estimate.json").write_text(json.dumps(
+            {"status": "complete", "per_read_micro_usd": U, "input_tokens": 0, "max_output_tokens": U,
+             "model": "gpt-5-mini", "images": [{"n": n, "status": "local", "text": "", "reasons": ["loop"]}
+                                               for n in range(images)]}), encoding="utf-8")
+        return folder
+
+    def ocr_config(self, folder: Path, est: dict) -> dict:
+        record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+        return {**paid.paid_config(folder, record, est, record["candidates"][1]), "ledger_env": self.worker_env}
+
+    def read(self, folder: Path, config: dict, transport: Reads) -> dict:
+        real = ocr.RemoteReader
+        with mock.patch.object(ocr, "RemoteReader", lambda s, job: real(s, transport=transport, job=job)):
+            return worker.ocr_stage(folder / "inputs", config, "paid")
+
+    def test_resumed_ocr_never_repays_a_read_or_passes_the_approval(self):
+        folder = self.ocr_folder(2)
+        est = {"candidates": {"c1": {"max_micro_usd": 2 * U, "per_read_micro_usd": U, "flagged": [0, 1]}}}
+        crashed = Reads(U * 8 // 10, "crash")
+        with self.assertRaises(KeyboardInterrupt):  # the worker dies after one paid read, before writing its output
+            self.read(folder, self.ocr_config(folder, est), crashed)
+        with store.open_db(self.db) as conn:  # the lost call is billed in full and the owner settles it so
+            lost = conn.execute("SELECT attempt_id FROM attempts WHERE state = 'dispatching'").fetchone()[0]
+        budget.settle(self.db, lost, {"completion_tokens": U}, None)
+        resumed = Reads(U * 8 // 10, U * 8 // 10)
+        out = self.read(folder, self.ocr_config(folder, est), resumed)
+        self.assertEqual(resumed.calls, 0)  # the first read is kept, and the second would pass 2U
+        self.assertEqual((out["status"], out["images"][0]["status"]), ("stopped", "remote"))
+        self.assertLessEqual(self.settled(), 2 * U)
+
+    def test_a_rate_change_is_repriced_and_never_reserved_above_the_approval(self):
+        folder = self.ocr_folder(1)
+        record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+        gen = self.folder("generation", "needs_approval")
+        (gen / "candidates" / "c1.estimate.json").write_text(json.dumps(
+            {"status": "complete", "model": "gpt-5-mini", "max_output_tokens": U, "rate_version": "r1",
+             "prices": [{"question_id": "q1", "max_micro_usd": U, "input_tokens": 0, "extra_micro_usd": 0}]}),
+            encoding="utf-8")
+        self.rate(3, "r2")
+        self.assertEqual(paid.estimate(self.settings, folder, record)["candidates"]["c1"]["max_micro_usd"], 3 * U)
+        gen_record = json.loads((gen / "run.json").read_text(encoding="utf-8"))
+        self.assertEqual(paid.estimate(self.settings, gen, gen_record)["candidates"]["c1"]["prices"], {"q1": 3 * U})
+        # An approval made at the old rate reserves nothing at the new one.
+        reads = Reads(U)
+        out = self.read(folder, self.ocr_config(folder, {"candidates": {"c1": {
+            "max_micro_usd": U, "per_read_micro_usd": U, "flagged": [0]}}}), reads)
+        self.assertEqual((reads.calls, out["status"]), (0, "stopped"))
+
+    def test_a_stopped_run_whose_approval_expired_is_priced_again_for_what_is_left(self):
+        folder = self.ocr_folder(2, state="stopped")
+        (folder / "estimate.json").write_text(json.dumps(
+            {"estimate_id": "old", "run_id": folder.name, "approved_by": "kim", "approved_at": "2026-10-09T00:00:00",
+             "expires_at": "2026-10-09T00:00:00+00:00", "candidates": {}}), encoding="utf-8")
+        record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+        record["candidates"][1]["status"] = "stopped"
+        (folder / "run.json").write_text(json.dumps(record), encoding="utf-8")
+        (folder / "candidates" / "c1.json").write_text(json.dumps(
+            {"status": "stopped", "images": [{"n": 0, "status": "remote", "text": "글", "reasons": ["loop"]},
+                                             {"n": 1, "status": "unresolved", "text": "", "reasons": ["loop"]}]}),
+            encoding="utf-8")
+        self.attempt(f"review:{folder.name}:c1:{ocr.OCR_VERSION}", "settled", U, U * 8 // 10, purpose="ocr")
+        with self.assertRaisesRegex(stage_review.ReviewError, "expired"):
+            paid.require_approved(paid.load_estimate(folder))
+        stage_review.reprice(self.settings, folder.name)
+        fresh = paid.approve(self.settings, folder.name, "kim")
+        paid.require_approved(fresh)
+        self.assertEqual({k: fresh["candidates"]["c1"][k] for k in ("max_micro_usd", "committed_micro_usd")},
+                         {"max_micro_usd": U, "committed_micro_usd": U * 8 // 10})  # only image 1 is left to pay
+
+    def test_resume_admits_what_is_left_of_a_candidate_not_its_whole_maximum(self):
+        folder = self.folder("generation", "stopped")
+        (folder / "worker.py").write_text("", encoding="utf-8")
+        record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+        record.update(input_sha256=stage_review.input_hashes(folder / "inputs"),
+                      worker_sha256=stage_review._sha(b""))
+        (folder / "candidates" / "c1.json").write_text(json.dumps({"status": "stopped", "rows": [
+            {"question_id": q, "status": "done"} for q in ("q1", "q2")]}), encoding="utf-8")
+        for q in ("q1", "q2"):
+            self.attempt(f"{folder.name}:c1:{q}:1", "settled", 4, 3)
+        with store.open_db(self.db) as conn:  # 10 in all: 6 spent, 4 left
+            conn.execute("UPDATE budget_settings SET cap_micro_usd = 10")
+        est = {"rate_version": "r1", "purpose": "gold_eval", "candidates": {"c1": {
+            "max_micro_usd": 10, "prices": {"q1": 4, "q2": 4, "q3": 2}}}}
+        paid.recheck(self.settings, folder, record, est)  # q3's 2 fits the 4 left
+
+    def test_a_stopped_ocr_candidate_reports_its_ledger(self):
+        folder = self.ocr_folder(2, state="stopped")
+        record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+        record["candidates"][1]["status"] = "stopped"
+        key = f"review:{folder.name}:c1:{ocr.OCR_VERSION}"
+        rid = self.attempt(key, "settled", U, 900, purpose="ocr")
+        self.attempt(key, "unknown", U, purpose="ocr")
+        (folder / "candidates" / "c1.json").write_text(json.dumps(
+            {"status": "stopped", "request_id": rid, "images": []}), encoding="utf-8")
+        paid.ledger_spend(self.settings, folder, record)
+        self.assertEqual({k: record["candidates"][1]["ledger"][k] for k in ("settled_micro_usd", "attempts", "open")},
+                         {"settled_micro_usd": 900, "attempts": 2, "open": 1})
+
+
+class MetadataAnswerTest(unittest.TestCase):
+    def test_metadata_answers_keep_their_verdict_and_facts(self):
+        row = {"question_id": "m", "question": "금액", "question_type": "fact", "answerability": "answerable",
+               "expected_status": "answered", "mode": "metadata", "scope": [{"doc_id": "d", "source_hash": "h"}],
+               "expected_states": {"amount_krw": "known", "bid_close": "unknown"}}
+        facts = [{"doc_id": "d", "field": "amount_krw", "state": "known"},
+                 {"doc_id": "d", "field": "bid_close", "state": "unknown"}]
+
+        def answered(found):
+            return {"finalist": "c1", "question_id": "m", "status": "done", "outcome": "answered",
+                    "answer": {"facts": found}}
+        good, bad = (paid._answer(row, answered(f), None, {}, {}) for f in (facts, facts[:1]))
+        self.assertEqual((good["metadata_correct"], bad["metadata_correct"]), (True, False))
+        self.assertEqual((good["facts"], bad["facts"]), (facts, facts[:1]))
+        summary = paid._generation_summary([good, bad])
+        self.assertEqual({k: summary[k] for k in ("metadata_correct", "metadata_rows", "passed", "passage_rows")},
+                         {"metadata_correct": 1, "metadata_rows": 2, "passed": 0, "passage_rows": 0})
+        self.assertIn("passed 0/0; metadata questions correct 1/2", server._measure("generation", summary))
 
 
 if __name__ == "__main__":

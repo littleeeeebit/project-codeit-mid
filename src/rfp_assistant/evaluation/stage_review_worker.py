@@ -11,11 +11,14 @@ is read from the cache or embedded by a local model without being stored, and an
 Generation and OCR price first (mode `estimate`, no key, no paid call) and pay only in mode `paid`, which the runner
 starts with an approved estimate: answers go through the candidate's own answer path and budget gateway (charged to
 gold_eval, idempotency keys `<run>:<candidate>:<question>:<n>`), OCR re-reads through its own RemoteReader (the
-`ocr` envelope). Each candidate stops before a call that could take it past its approved maximum.
+`ocr` envelope). The approved maximum holds across every pass: the ledger, not this pass, counts what a candidate
+has already spent or left unknown, each reservation is refused above what is left, and each paid OCR read is kept on
+disk as it settles, so a pass that dies midway never pays for it again.
 """
 
 from __future__ import annotations
 
+import contextlib
 import gzip
 import io
 import json
@@ -119,6 +122,46 @@ def chunking(inputs: Path, config: dict) -> dict:
     return {"documents": out}
 
 
+def committed(conn, key_prefix: str) -> int:
+    """What the ledger holds against one candidate's approval across every pass: settled attempts at their cost, every
+    other attempt but a released one at its reservation (an unknown one may yet be billed in full)."""
+    return conn.execute(
+        "SELECT COALESCE(SUM(CASE WHEN a.state = 'settled' THEN a.settled_micro_usd WHEN a.state = 'released' THEN 0 "
+        "ELSE a.reserved_micro_usd END), 0) FROM requests r JOIN attempts a ON a.request_id = r.request_id "
+        "WHERE r.idempotency_key LIKE ?", (key_prefix + "%",)).fetchone()[0]
+
+
+def _within_approval(db, config: dict, price: int) -> bool:
+    from rfp_assistant.storage import store
+
+    with store.open_db(db) as conn:
+        return committed(conn, config["ledger_key"]) + price <= config["cap_micro_usd"]
+
+
+@contextlib.contextmanager
+def capped_reservations(config: dict):
+    """While open, every reservation is admitted only up to what the candidate's approval has left: the approved
+    maximum less what the ledger holds against it. The gateway refuses above that in its own admission, so it binds
+    whatever the candidate's code reserves at whatever the rates are now."""
+    from rfp_assistant.gateway import budget
+    from rfp_assistant.storage import store
+
+    reserve = budget.reserve
+
+    def capped(db, **kw):
+        # ponytail: read before the admission transaction; one worker per candidate makes it the only writer
+        with store.open_db(db) as conn:
+            left = config["cap_micro_usd"] - committed(conn, config["ledger_key"])
+        ceiling = kw.get("ceiling_micro_usd")
+        return reserve(db, **{**kw, "ceiling_micro_usd": left if ceiling is None else min(ceiling, left)})
+
+    budget.reserve = capped
+    try:
+        yield
+    finally:
+        budget.reserve = reserve
+
+
 def _generation_settings(config: dict):
     from rfp_assistant.settings import load_settings
     from rfp_assistant.storage import store
@@ -139,9 +182,19 @@ def generation(inputs: Path, config: dict, mode: str) -> dict:
     serving = json.loads((inputs / "activation.json").read_text(encoding="utf-8"))
     s = _generation_settings(config)
     if mode == "estimate":
+        from rfp_assistant.gateway import budget
+        from rfp_assistant.storage import store
+
         pinned = answers.PinnedResources(s, None, serving)
         try:
-            return {"prices": [{"question_id": r["question_id"], **answers.price_row(pinned, r)} for r in rows]}
+            prices = [{"question_id": r["question_id"], **answers.price_row(pinned, r)} for r in rows]
+            for p in prices:  # the call's token bound, so a re-price applies the rates of its day; the rest is the query
+                p["extra_micro_usd"] = p["max_micro_usd"] and p["max_micro_usd"] - budget.estimate(
+                    s.db_path, s.generation_model, p["input_tokens"], s.generation_max_output_tokens)
+            with store.open_db(s.db_path) as conn:
+                version = conn.execute("SELECT rate_version FROM budget_settings WHERE id = 1").fetchone()[0]
+            return {"prices": prices, "model": s.generation_model, "rate_version": version,
+                    "max_output_tokens": s.generation_max_output_tokens}
         finally:
             pinned.close()
     owner = service.Resources(s)  # the gateway owner of the shared ledger, the key's transport, tracing if set
@@ -151,25 +204,25 @@ def generation(inputs: Path, config: dict, mode: str) -> dict:
             raise RuntimeError(owner.provider_note or "no provider transport")
         pinned = answers.PinnedResources(s, owner.transport, serving, owner)
         pinned.tracing = owner.tracing  # a borrowed transport is not traced on its own
-        out, spent, stop = [], 0, None
-        # A resumed candidate keeps the answers it finished, with their measured latency, instead of replaying them.
+        out, stop = [], None
+        # A resumed candidate keeps the answers it finished, with their measured latency, instead of replaying them;
+        # an answer whose output was lost replays from its request without a call (`_answer_row`).
         earlier = json.loads(Path(config["previous"]).read_text(encoding="utf-8")).get("rows") or [] \
             if config.get("previous") else []
         finished = {r["question_id"]: r for r in earlier if r.get("status") == "done"}
-        for row in rows:
-            if row["question_id"] in finished:
-                out.append(finished[row["question_id"]])
-                spent += out[-1].get("settled_micro_usd") or 0
-                continue
-            if spent + config["prices"].get(row["question_id"], 0) > config["cap_micro_usd"]:
-                stop = "the next answer could pass the approved maximum"
-                break
-            record = answers._answer_row(s, pinned, config["run_key"], config["candidate"], row, None)
-            spent += record.get("settled_micro_usd") or 0
-            out.append(record)
-            if record["status"] in ("blocked", "unknown_billing"):
-                stop = f"{record['status']}: {record.get('reason') or record.get('outcome') or ''}".strip()
-                break
+        with capped_reservations(config):
+            for row in rows:
+                if row["question_id"] in finished:
+                    out.append(finished[row["question_id"]])
+                    continue
+                if not _within_approval(s.db_path, config, config["prices"].get(row["question_id"], 0)):
+                    stop = "the next answer could pass the approved maximum"
+                    break
+                record = answers._answer_row(s, pinned, config["run_key"], config["candidate"], row, None)
+                out.append(record)
+                if record["status"] in ("blocked", "unknown_billing"):
+                    stop = f"{record['status']}: {record.get('reason') or record.get('outcome') or ''}".strip()
+                    break
         if owner.tracing is not None:
             client = owner.tracing.client
             for record in out:
@@ -178,7 +231,7 @@ def generation(inputs: Path, config: dict, mode: str) -> dict:
                         seed=record["request_id"]))
                 except Exception:  # noqa: BLE001 - a missing link never changes the answer
                     pass
-        return {"rows": out, "spent_micro_usd": spent, **({"status": "stopped", "reason": stop} if stop else {})}
+        return {"rows": out, **({"status": "stopped", "reason": stop} if stop else {})}
     finally:
         if pinned is not None:
             pinned.tracing = None  # the owner flushes and closes it
@@ -228,15 +281,14 @@ def ocr_stage(inputs: Path, config: dict, mode: str) -> dict:
                 reads.append({"n": item["n"], "status": "local", "text": first["text"], "reasons": reasons,
                               **{k: first[k] for k in ("mean_prob", "looped", "truncated", "expected")},
                               "seconds": round(time.perf_counter() - started, 2)})
-        return {"images": reads, "per_read_micro_usd": per_read, "model": ocr.REMOTE_MODEL}
+        # The read's token bound beside its price, so a re-price applies the rates of its day.
+        return {"images": reads, "per_read_micro_usd": per_read, "model": ocr.REMOTE_MODEL,
+                "input_tokens": ocr.remote_input_tokens(ledger), "max_output_tokens": ocr.REMOTE_MAX_OUTPUT}
     local_reads = json.loads(Path(config["local_reads"]).read_text(encoding="utf-8"))["images"]
-    previous = {}
-    if config.get("previous") and Path(config["previous"]).exists():
-        previous = {r["n"]: r for r in json.loads(Path(config["previous"]).read_text(encoding="utf-8")).get("images")
-                    or [] if r["status"] == "remote"}
+    previous = {r["n"]: r for r in paid_reads(config.get("previous"), config["progress"])}
     by_n = {i["n"]: i for i in images}
-    out, spent, stop, request_id = [], 0, None, None
-    with store.database_lifecycle(ledger.db_path), ocr.RemoteReader(
+    out, stop, request_id = [], None, None
+    with store.database_lifecycle(ledger.db_path), capped_reservations(config), ocr.RemoteReader(
             ledger, job=f"review:{config['run_key']}:{config['candidate']}") as reader:
         request_id = reader.request_id
         for read in local_reads:
@@ -244,14 +296,15 @@ def ocr_stage(inputs: Path, config: dict, mode: str) -> dict:
             if read["reasons"] and read["n"] in previous:
                 row = previous[read["n"]]
             elif read["reasons"] and stop is None:
-                if spent + config["per_read_micro_usd"] > config["cap_micro_usd"]:
+                if not _within_approval(ledger.db_path, config, config["per_read_micro_usd"]):
                     stop = "the next read could pass the approved maximum"
                 else:
                     png, _ = _image(by_n[read["n"]], inputs)
                     try:
                         text, micro = reader.read(png, by_n[read["n"]].get("digest") or str(read["n"]))
                         row.update(status="remote", text=text, micro_usd=micro)
-                        spent += micro
+                        with open(config["progress"], "a", encoding="utf-8") as f:  # kept even if this process dies
+                            f.write(json.dumps(row, ensure_ascii=False) + "\n")
                     except ocr.OcrStop as exc:
                         row.update(status="unresolved", error=str(exc)[:300])
                         stop = str(exc)
@@ -260,8 +313,18 @@ def ocr_stage(inputs: Path, config: dict, mode: str) -> dict:
             elif read["reasons"]:
                 row["status"] = "unresolved"
             out.append(row)
-    return {"images": out, "request_id": request_id, "spent_micro_usd": spent,
-            **({"status": "stopped", "reason": stop} if stop else {})}
+    return {"images": out, "request_id": request_id, **({"status": "stopped", "reason": stop} if stop else {})}
+
+
+def paid_reads(previous: str | None, progress: str | None) -> list[dict]:
+    """Every gpt-5-mini read a candidate already paid for: those its last output holds and those it recorded one by
+    one before it could write an output (a worker that died midway)."""
+    reads = []
+    if previous and Path(previous).exists():
+        reads += json.loads(Path(previous).read_text(encoding="utf-8")).get("images") or []
+    if progress and Path(progress).exists():
+        reads += [json.loads(line) for line in Path(progress).read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [r for r in reads if r.get("status") == "remote"]
 
 
 def main() -> None:

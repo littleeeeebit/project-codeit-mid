@@ -393,7 +393,7 @@
    "assertions": [
     {
      "id": "contract-tests",
-     "expected": "tests.test_stage_review passes: run-folder schema, chunking title check, export/import, decision files, gold rank, variant validation, the paid-run approval gate and the generation and OCR views"
+     "expected": "tests.test_stage_review passes: run-folder schema, chunking title check, export/import, decision files, gold rank, variant validation, the paid-run approval gate, paid recovery, repricing and admission on a real ledger, and the generation and OCR views"
     },
     {
      "id": "served-import",

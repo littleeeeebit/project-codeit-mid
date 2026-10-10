@@ -820,7 +820,7 @@ def _retrieval_commands(sub) -> None:
     s = sub.add_parser("stage-review", help="run a baseline ref and candidate refs on one stage's frozen inputs for "
                                            "the review app (review.cmd / review.command); activates nothing. "
                                            "generation and ocr stop at a priced estimate: approve, then resume; "
-                                           "reprice prices an unpaid run again from its candidates' stored work; "
+                                           "reprice re-prices an unpaid or stopped run at today's rates; "
                                            "rescore re-scores a paid run from its stored outputs without paying")
     s.add_argument("action", choices=["run", "approve", "resume", "rescore", "reprice"])
     s.add_argument("stage", nargs="?", choices=["retriever", "chunking", "generation", "ocr"], help="run: the stage")

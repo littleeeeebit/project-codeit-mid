@@ -59,7 +59,10 @@ function Summary({ s, c }: { s: View["summary"][string]; c: Candidate }) {
     <>
       <Metrics>
         <Metric lead value={`${s.required_correct}/${s.required}`} label="필수 주장 정답" />
-        <Metric value={`${s.passed}/${s.rows}`} label="질문 통과" />
+        <Metric value={`${s.passed}/${s.passage_rows ?? s.rows}`} label="질문 통과" />
+        {(s.metadata_rows ?? 0) > 0 && (
+          <Metric value={`${s.metadata_correct}/${s.metadata_rows}`} label="메타데이터 질문 정답" />
+        )}
         <Metric value={`${s.validation_failed}/${s.answered}`} label="검증에서 거부된 답변"
                 tone={s.validation_failed ? "text-bad" : ""} />
       </Metrics>
@@ -156,6 +159,16 @@ function AnswerColumn({ c, a, q }: { c: Candidate; a: Answer | undefined; q: Gen
         </ol>
       )}
       {open && a.evidence?.[open] && <EvidencePanel id={open} e={a.evidence[open]} onClose={() => setOpen(null)} />}
+      {(a.facts ?? []).length > 0 && (
+        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 text-[14px]">
+          {a.facts!.map((f) => (
+            <Fragment key={`${f.doc_id} ${f.field}`}>
+              <dt className="text-muted">{f.field}</dt>
+              <dd className="break-words">{f.state}{f.value != null && ` · ${String(f.value)}`}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      )}
       {(a.missing ?? []).length > 0 && (
         <p className="mt-2 text-[13px] text-muted">빠진 항목: {a.missing!.map((m) => m.field).join(", ")}</p>
       )}
@@ -175,11 +188,15 @@ function ColumnHead({ c, a }: { c: Candidate; a: Answer }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line pb-1.5">
       <span className="truncate text-[14px] font-semibold text-muted">{c.label}</span>
-      {a.outcome && (
+      {a.outcome && (a.metadata ? (
+        <span className={`text-[15px] font-bold ${a.metadata_correct ? "text-ok" : "text-bad"}`}>
+          {OUTCOME[a.outcome] ?? a.outcome} · 메타데이터 {a.metadata_correct ? "정답" : "오답"}
+        </span>
+      ) : (
         <span className={`text-[15px] font-bold ${a.passed ? "text-ok" : a.status_ok ? "" : "text-bad"}`}>
           {OUTCOME[a.outcome] ?? a.outcome}{a.passed ? " · 통과" : ""}
         </span>
-      )}
+      ))}
       <span className="ml-auto whitespace-nowrap text-[13px] tabular-nums text-muted">
         {usd(a.cost_micro_usd)} · {a.replayed ? <span title="저장된 답변을 다시 읽어 지연을 재지 못했습니다">지연 미측정</span> : sec(a.latency_ms)}
         {a.trace_url && (

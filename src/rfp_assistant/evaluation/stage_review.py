@@ -367,11 +367,12 @@ def run(settings: Settings, stage: str, base: str, cands: list[str], inputs_from
 
 
 def reprice(settings: Settings, run_id: str) -> dict:
-    """Prices an unpaid run again from what its candidates already priced (no worker runs): after a pricing step that
-    failed, or an estimate that expired. Any earlier approval belongs to the replaced estimate and does not carry."""
+    """Prices a run again at the ledger's rates now from the token bounds its candidates recorded (no worker runs):
+    after a pricing step that failed, a rate change, or an estimate that expired, also for a run stopped midway, which
+    is priced for what it has left. Any earlier approval belongs to the replaced estimate and does not carry."""
     folder = run_folder(settings, run_id)
     record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
-    if record["stage"] not in PAID_STAGES or record.get("state") != "needs_approval":
+    if record["stage"] not in PAID_STAGES or record.get("state") not in ("needs_approval", "stopped"):
         raise ReviewError(f"{run_id} is not waiting for an estimate")
     record["estimate"] = paid.estimate(settings, folder, record)["estimate_id"]
     write_text_atomic(folder / "run.json", json.dumps(record, ensure_ascii=False, indent=1))

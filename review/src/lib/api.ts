@@ -144,6 +144,9 @@ export type Answer = {
   outcome?: string;
   passed?: boolean;
   status_ok?: boolean;
+  metadata?: boolean;
+  metadata_correct?: boolean | null;
+  facts?: { doc_id: string; field: string; value?: unknown; state: string }[];
   summary?: string;
   claims?: Claim[];
   evidence?: Record<string, Evidence>;
@@ -176,6 +179,9 @@ export type GenerationSummary = {
   rows: number;
   answered: number;
   passed: number;
+  passage_rows?: number;
+  metadata_rows?: number;
+  metadata_correct?: number;
   required_correct: number;
   required: number;
   claims_supported: number;
