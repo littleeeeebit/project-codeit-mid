@@ -1,0 +1,1 @@
+Rendered into the rejection wiki (`render_rejection`, `render_index`) and fed back to drafting as context (`_drafting_rejections`).

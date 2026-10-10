@@ -1,1 +1,0 @@
-Each candidate runs against the live database schema and the frozen inputs read through the runner's settings. A candidate whose code expects a different schema or row shape will fail rather than be compared. That is the expected outcome for schema-changing refs, and it is visible as a failed candidate.

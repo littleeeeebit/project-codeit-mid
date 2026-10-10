@@ -1,1 +1,0 @@
-Set by `mark_dispatching` immediately before the network call, in the same transaction as the request's stop guard and the ownership check, with `dispatched_at` recorded. From here on the call may have executed, so only usage, a confirmed pre-execution error or an owner reconciliation resolves the attempt.

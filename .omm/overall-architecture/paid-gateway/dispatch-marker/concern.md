@@ -1,1 +1,0 @@
-A single `unknown` attempt anywhere blocks every PostgreSQL dispatch, for all members and purposes, until an owner reconciles it (`cli reconcile`/`settle`). This is deliberate conservatism, but it is a shared-availability failure mode.

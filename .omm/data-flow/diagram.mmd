@@ -1,17 +1,9 @@
 graph TD
-  original-files["Original HWP and PDF\nsrc/rfp_assistant/corpus/ingestion.py"]
-  source-records["Documents and sources\nsrc/rfp_assistant/corpus/ingestion.py"]
-  extraction-artifacts["Extraction elements\nsrc/rfp_assistant/corpus/ingestion.py"]
-  keyword-index-files["Keyword index files\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  vector-sets["pgvector sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  evaluation-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  active-run["Active run setting\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  request-records["Requests and traces\nsrc/rfp_assistant/service/service.py"]
-  original-files -->|"manifest hashes bytes"| source-records
-  source-records -->|"ingest parses revision"| extraction-artifacts
-  extraction-artifacts -->|"build-keyword chunks"| keyword-index-files
-  keyword-index-files -->|"embed chunk payloads"| vector-sets
-  keyword-index-files -->|"bound by manifest hash"| evaluation-runs
-  vector-sets -->|"bound by dense_version"| evaluation-runs
-  evaluation-runs -->|"person activates row"| active-run
-  active-run -->|"serving config, evidence"| request-records
+  original-files["Original HWP and PDF\nsrc/rfp_assistant/settings.py"] -->|"manifest hashes"| source-records["documents and sources rows\nsrc/rfp_assistant/storage/store.py"]
+  original-files -->|"embedded pictures, rasters"| ocr-cache["OCR region cache\nsrc/rfp_assistant/corpus/ocr.py"]
+  source-records -->|"ingest parses"| extraction-artifacts["Elements and artifacts\nsrc/rfp_assistant/corpus/ingestion.py"]
+  ocr-cache -->|"merged as image_text"| extraction-artifacts
+  extraction-artifacts -->|"build-keyword chunks"| keyword-index-files["Keyword index files\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  keyword-index-files -->|"embed chunk payloads"| vector-sets["pgvector sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  vector-sets -->|"evaluate, compare, activate"| active-serving["Active serving config\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  keyword-index-files -->|"activate-run"| active-serving

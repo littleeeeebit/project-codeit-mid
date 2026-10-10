@@ -1,1 +1,0 @@
-A stage review never builds vectors or pays. It refuses when no ready vector set of a variant's embedding exists and asks for `compare --matrix embedding` first.

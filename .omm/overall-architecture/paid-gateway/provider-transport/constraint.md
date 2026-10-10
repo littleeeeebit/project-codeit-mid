@@ -1,1 +1,0 @@
-Authentication errors keep only their type (`_reason`), because their message quotes part of the key.

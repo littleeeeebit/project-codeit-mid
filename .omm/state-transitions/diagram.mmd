@@ -1,15 +1,6 @@
 graph TD
-  queued["Queued\nsrc/rfp_assistant/service/service.py"]
-  running["Running\nsrc/rfp_assistant/service/service.py"]
-  completed["Completed\nsrc/rfp_assistant/service/service.py"]
-  failed["Failed\nsrc/rfp_assistant/service/service.py"]
-  cancelled["Cancelled\nsrc/rfp_assistant/service/service.py"]
-  interrupted["Interrupted\nsrc/rfp_assistant/service/service.py"]
-  queued -->|"run_queued claims it"| running
-  queued -->|"cancel before start"| cancelled
-  queued -->|"shutdown or restart"| interrupted
-  queued -->|"executor submit failed"| failed
-  running -->|"_finish stores outcome"| completed
-  running -->|"error or invalid answer"| failed
-  running -->|"cancel seen at checkpoint"| cancelled
-  running -->|"shutdown wait expired"| interrupted
+  request-status["Request status\nsrc/rfp_assistant/service/service.py"] -->|"owns attempts"| billing-attempt["Billing attempt\nsrc/rfp_assistant/gateway/budget.py"]
+  source-review["Source parse and review\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"gates index membership"| serving-activation["Serving activation\nsrc/rfp_assistant/service/service.py"]
+  gold-candidate["Gold candidate\nsrc/rfp_assistant/evaluation/gold.py"] -->|"approved rows score runs"| serving-activation
+  update-fence["Update fence\nsrc/rfp_assistant/service/update.py"] -->|"blocks new admission"| request-status
+  billing-attempt -->|"open attempts block update"| update-fence

@@ -1,1 +1,0 @@
-Set exactly once by `settle` with the cost computed from the reported usage and the response ID (a duplicate settle returns the existing cost). A cost above the reservation freezes paid admission (`frozen_reason`) until it is inspected.

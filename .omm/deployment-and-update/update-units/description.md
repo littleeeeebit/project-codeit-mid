@@ -1,0 +1,1 @@
+bidmate-update.path watches the marker, and bidmate-update.service runs update.sh as root with the git, pip and npm steps dropped to the service user. The script writes only result.json and update.log in the state directory, which the app reads.

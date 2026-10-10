@@ -1,1 +1,0 @@
-It never runs a pipeline, loads a model or pays. `data_dir()` resolves `RFP_DATA_DIR` from the environment or the checkout's `.env`, otherwise `.runtime`.

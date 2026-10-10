@@ -1,15 +1,8 @@
 graph TD
-  manifest-import["Manifest import\nsrc/rfp_assistant/corpus/ingestion.py"]
-  source-parsing["Source parsing\nsrc/rfp_assistant/storage/hwp_loader.py"]
-  ocr-merge["Image OCR merge\nsrc/rfp_assistant/corpus/ocr.py"]
-  revision-assignment["Extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
-  fidelity-check["HWP fidelity check\nsrc/rfp_assistant/corpus/fidelity.py"]
-  keyword-build["Keyword index build\nsrc/rfp_assistant/retrieval/chunking.py"]
-  dense-build["Vector set build\nsrc/rfp_assistant/retrieval/dense.py"]
-  manifest-import -->|"sources keyed by hash"| source-parsing
-  ocr-merge -->|"image_text elements"| source-parsing
-  source-parsing -->|"raw elements, fingerprint"| revision-assignment
-  revision-assignment -->|"parsed HWP extraction"| fidelity-check
-  fidelity-check -->|"review_status gate"| keyword-build
-  revision-assignment -->|"active extraction elements"| keyword-build
-  keyword-build -->|"chunk payloads"| dense-build
+  manifest-import["Manifest import\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"documents, sources rows"| hwp-parsing["HWP parsing\nsrc/rfp_assistant/corpus/ingestion.py"]
+  manifest-import -->|"documents, sources rows"| pdf-parsing["PDF parsing\nsrc/rfp_assistant/corpus/ingestion.py"]
+  image-ocr["Image OCR cache\nsrc/rfp_assistant/corpus/ocr.py"] -->|"image_text at markers"| hwp-parsing
+  image-ocr -->|"image_text by anchors"| pdf-parsing
+  hwp-parsing -->|"raw elements"| extraction-revisions["Extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
+  pdf-parsing -->|"raw elements"| extraction-revisions
+  extraction-revisions -->|"active extraction"| fidelity-check["HWP fidelity check\nsrc/rfp_assistant/corpus/fidelity.py"]

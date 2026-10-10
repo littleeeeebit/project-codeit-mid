@@ -1,1 +1,0 @@
-The lifecycle of one `attempts` row in the shared ledger. Every paid provider call has exactly one attempt. Open states (`reserved`, `dispatching`) and `unknown` hold their reservation against the cap. `pending` on screen means reserved or dispatching.

@@ -1,1 +1,0 @@
-`ocr.merge_hwp` (HWP pictures at pyhwp's picture markers) and `ocr.merge` (PDF raster images next to the text around them) insert `image_text` elements from the per-region cache under `.runtime/ocr/<hash>/`, and suffix the parser fingerprint. The cache is filled by `cli ocr`: PaddleOCR-VL on the GPU, with paid gpt-5-mini re-reads of flagged regions from the `ocr` envelope.

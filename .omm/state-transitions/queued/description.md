@@ -1,1 +1,0 @@
-Written by `_create(..., "queued", before_insert=admit)` for paid modes, after a runner slot was admitted. Free modes are inserted directly as `running` and executed inline. While a request is queued, `cancel_request` makes it `cancelled` with an explicit "no paid call" result.

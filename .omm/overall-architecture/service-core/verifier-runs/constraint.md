@@ -1,1 +1,0 @@
-A frozen run cannot continue a conversation (`_conversation` refuses `previous_request_id` together with `verifier_run_id`).

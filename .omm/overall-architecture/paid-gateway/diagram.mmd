@@ -1,16 +1,7 @@
 graph TD
-  gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
-  budget-ledger["Atomic reservation\nsrc/rfp_assistant/gateway/budget.py"]
-  dispatch-marker["Dispatch marker\nsrc/rfp_assistant/gateway/budget.py"]
-  provider-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
-  settlement["Settlement and unknowns\nsrc/rfp_assistant/gateway/budget.py"]
-  startup-recovery["Startup recovery\nsrc/rfp_assistant/gateway/budget.py"]
-  langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
-  gateway-owner -->|"owner_guard inside tx"| budget-ledger
-  budget-ledger -->|"attempt reserved"| dispatch-marker
-  dispatch-marker -->|"dispatching, then call"| provider-transport
-  gateway-owner -->|"owner_check before call"| provider-transport
-  provider-transport -->|"usage or provider error"| settlement
-  provider-transport -->|"generation span"| langfuse-tracing
-  startup-recovery -->|"dispatching becomes unknown"| settlement
-  startup-recovery -->|"reserved becomes released"| budget-ledger
+  budget-ledger["Budget ledger\nsrc/rfp_assistant/gateway/budget.py"] -->|"admitted attempt_id"| openai-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
+  gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"] -->|"owner_check before call"| openai-transport
+  gateway-owner -->|"owner_guard in transaction"| budget-ledger
+  openai-transport -->|"usage or error"| budget-ledger
+  fake-transport["Fake transport\nsrc/rfp_assistant/gateway/generation.py"] -->|"deterministic usage"| budget-ledger
+  langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"] -->|"observes, never gates"| openai-transport

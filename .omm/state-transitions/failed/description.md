@@ -1,1 +1,0 @@
-Set for `clarification_required` (a `ServiceError` raised during execution, or a frozen run above its consented cost), for `technical_error` (provider failure, unvalidated answer, settlement failure, retrieval or estimate failure, unexpected exception) and by `_fail_unscheduled` when the executor refused the job.

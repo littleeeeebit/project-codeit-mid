@@ -1,0 +1,1 @@
+Written by `_finish` when a run ends with an outcome, including `insufficient_evidence`, `budget_blocked` and `ingestion_unavailable`, which complete without a paid answer.

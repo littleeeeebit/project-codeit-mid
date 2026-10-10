@@ -1,1 +1,0 @@
-`app.mount("/", StaticFiles(directory=web/out, html=True))`, mounted only when `web/out` exists, after `cd web && npm run build`. The screens are static and need no session. Only `/api/*` carries the cookie.

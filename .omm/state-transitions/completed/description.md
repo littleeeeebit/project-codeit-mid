@@ -1,1 +1,0 @@
-Set by `_finish` for every domain outcome produced with `request_status="completed"`. That includes answered, `insufficient_evidence`, `ingestion_unavailable`, free metadata and inventory answers, and `budget_blocked` refusals from `_metered_chat`.

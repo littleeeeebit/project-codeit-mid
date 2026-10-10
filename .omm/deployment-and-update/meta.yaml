@@ -1,8 +1,13 @@
-created: 2026-10-09 23:19:17.027000+00:00
-updated: 2026-10-09 23:19:17.309000+00:00
+created: 2026-10-09T23:19:17.027Z
+updated: 2026-10-09T23:19:17.309Z
 update_count: 2
 last_field: diagram
 git_commit: 99859d6
 git_branch: hwp-ocr-from-embedded-images
 children:
-- owner-workstation
+  - bidmate-unit
+  - jupyterhub
+  - member-browser
+  - owner-workstation
+  - postgres-server
+  - update-units

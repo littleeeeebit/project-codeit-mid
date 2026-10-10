@@ -5,7 +5,11 @@ last_field: diagram
 kind: nested-class
 title: evaluation-suite
 children:
+- answer-evaluation
+- comparison-matrices
 - gold-queue
+- release-gate
+- retrieval-runs
 - run-activation
 parentPath: []
 prev_diagram: "graph TD\r\n  luna-drafting[\"gpt-6-luna drafting\\nsrc/rfp_assistant/service/drafting.py\"\

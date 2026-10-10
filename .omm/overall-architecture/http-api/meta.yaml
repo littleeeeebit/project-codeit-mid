@@ -1,26 +1,27 @@
 created: 2026-10-04 13:34:42.449000+00:00
-updated: 2026-10-10 02:11:40.342000+00:00
-update_count: 23
+updated: 2026-10-09 23:18:24.263000+00:00
+update_count: 21
 last_field: diagram
 kind: nested-class
 title: http-api
 children:
+- app-lifespan
 - ask-routes
-- dataset-routes
+- auth-routes
 - login-store
 - route-groups
-- session-guard
 - session-middleware
-- sign-in-routes
-- static-export
+- static-mount
 - stream-route
 - verify-routes
 parentPath: []
-prev_diagram: "graph TD\r\n  session-middleware[\"Session middleware\\nsrc/rfp_assistant/api.py\"\
-  ] -->|\"signed-in member bound\"| ask-routes[\"Ask and request routes\\nsrc/rfp_assistant/api.py\"\
-  ]\r\n  session-middleware -->|\"signed-in member bound\"| verify-routes[\"Verify\
-  \ and dataset routes\\nsrc/rfp_assistant/api.py\"]\r\n  session-middleware -->|\"\
-  sign-in paths pass\"| auth-routes[\"Sign-in routes\\nsrc/rfp_assistant/api.py\"\
-  ]\r\n  app-lifespan[\"Lifespan owner\\nsrc/rfp_assistant/api.py\"] -->|\"opens Resources,\
-  \ UpdateWatch\"| session-middleware\r\n  static-mount[\"Static screens\\nweb/out\"\
-  ] -->|\"served after /api\"| session-middleware"
+prev_diagram: "graph TD\r\n  session-middleware[\"Session and origin guard\\nsrc/rfp_assistant/api.py\"\
+  ] -->|signed-in member bound| ask-routes[\"Ask and request routes\\nsrc/rfp_assistant/api.py\"\
+  ]\r\n  session-middleware -->|open without session| sign-in-routes[\"JupyterHub\
+  \ OAuth routes\\nsrc/rfp_assistant/api.py\"]\r\n  session-middleware -->|signed-in\
+  \ member bound| verify-routes[\"Verification routes\\nsrc/rfp_assistant/api.py\"\
+  ]\r\n  session-middleware -->|signed-in member bound| dataset-routes[\"Drafting\
+  \ and gold routes\\nsrc/rfp_assistant/api.py\"]\r\n  sign-in-routes -->|code exchange,\
+  \ session token| login-store[\"In-memory sessions\\nsrc/rfp_assistant/service/auth.py\"\
+  ]\r\n  session-middleware -->|token lookup| login-store\r\n  static-mount[\"Static\
+  \ screens\\nweb/out\"] -->|non-api paths| session-middleware"

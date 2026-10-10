@@ -1,1 +1,0 @@
-The call was never sent: refused at dispatch (`stopped_before_dispatch:<reason>`), refused before execution by the provider (4xx, `confirmed_pre_execution=True`), no key (`provider_unavailable`), or still reserved at restart. No cost is counted.

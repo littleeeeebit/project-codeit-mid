@@ -1,9 +1,0 @@
-created: 2026-10-10T02:11:40.598Z
-updated: 2026-10-10T02:11:40.732Z
-update_count: 2
-last_field: constraint
-kind: nested-class
-title: sign-in-routes
-children: []
-parentPath:
-  - http-api

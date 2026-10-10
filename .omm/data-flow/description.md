@@ -1,1 +1,1 @@
-How the original documents become served evidence, and how a measured configuration becomes what serves. Each artifact is immutable and content-addressed, so earlier citations, gold rows and runs stay resolvable after re-parses and rebuilds. Serving changes only when a person activates a run.
+How data moves from the original files into a served answer. Each arrow is an explicit, rerunnable command that reuses unchanged inputs. Only `activate-run` changes what serves.

@@ -1,9 +1,0 @@
-created: 2026-10-10T02:11:45.480Z
-updated: 2026-10-10T02:11:45.480Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: settlement
-children: []
-parentPath:
-  - paid-gateway

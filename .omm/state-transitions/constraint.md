@@ -1,1 +1,0 @@
-Nothing is replayed. An interrupted request stays interrupted, and the member asks again under a new generation ID.

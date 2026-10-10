@@ -1,0 +1,1 @@
+Hosts `bidmate_app` (live) and `bidmate_pilot_archive` (phase-4 pilot, paid admission disabled). Tests and gates create temporary databases on `RFP_POSTGRES_TEST_DSN`.

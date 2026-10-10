@@ -1,1 +1,0 @@
-`tools/infra/update.sh` and the systemd units were not read. Their behaviour is taken from the module docstring.
