@@ -60,10 +60,12 @@ def data_dir() -> Path:
 
 def source_digest() -> str:
     h = hashlib.sha256()
-    for path in sorted(APP.rglob("*")):
-        rel = path.relative_to(APP)
-        if path.is_file() and not SKIP & set(rel.parts) and path.suffix != ".py" and rel.name != "tsconfig.tsbuildinfo":
-            h.update(rel.as_posix().encode() + b"\0" + hashlib.sha256(path.read_bytes()).digest())
+    files = []
+    for folder, dirs, names in os.walk(APP):
+        dirs[:] = [d for d in dirs if d not in SKIP]  # never descend into node_modules: walking it is most of a start
+        files += [Path(folder, n) for n in names if not n.endswith(".py") and n != "tsconfig.tsbuildinfo"]
+    for path in sorted(files):
+        h.update(path.relative_to(APP).as_posix().encode() + b"\0" + hashlib.sha256(path.read_bytes()).digest())
     return h.hexdigest()
 
 
