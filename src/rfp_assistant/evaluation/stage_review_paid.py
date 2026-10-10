@@ -211,13 +211,17 @@ def key_prefix(record: dict, cid: str) -> str:
     return f"{record['run_id']}:{cid}:" if record["stage"] == "generation" else f"review:{record['run_id']}:{cid}:"
 
 
-def _done(folder: Path, stage: str, cid: str) -> set:
-    """What a candidate has finished and paid for: answered questions, or images gpt-5-mini read."""
-    if stage == "generation":
+def _done(conn, folder: Path, record: dict, cid: str) -> set:
+    """What a candidate will never pay for again: questions it answered or the ledger holds a billed or finished
+    request for, images gpt-5-mini read or the ledger holds a billed read of (its output may have been lost)."""
+    billed = stage_review_worker.paid_items(conn, key_prefix(record, cid))
+    if record["stage"] == "generation":
         rows = (_read(folder / "candidates" / f"{cid}.json") or {}).get("rows") or []
-        return {r["question_id"] for r in rows if r.get("status") == "done"}
+        return {r["question_id"] for r in rows if r.get("status") == "done"} | billed
+    images = json.loads((folder / "inputs" / "images.json").read_text(encoding="utf-8"))["images"]
     return {r["n"] for r in stage_review_worker.paid_reads(str(folder / "candidates" / f"{cid}.json"),
-                                                           str(_progress(folder, cid)))}
+                                                           str(_progress(folder, cid)))} | {
+        i["n"] for i in images if (i.get("digest") or str(i["n"])) in billed}
 
 
 def _progress(folder: Path, cid: str) -> Path:
@@ -262,12 +266,13 @@ def estimate(settings: Settings, folder: Path, record: dict) -> dict:
     with open_db(ledger_settings(settings, record).db_path) as conn:
         rates = _rates(conn)
         held = {c["id"]: stage_review_worker.committed(conn, key_prefix(record, c["id"])) for c in record["candidates"]}
+        never_again = {c["id"]: _done(conn, folder, record, c["id"]) for c in record["candidates"]}
     cands = {}
     for c in record["candidates"]:
         out = _estimate_output(folder, c)
         if out is None or _finished(folder, c["id"]):
             continue
-        done, priced = _done(folder, stage, c["id"]), _priced(out, rates, ledger["rate_version"])
+        done, priced = never_again[c["id"]], _priced(out, rates, ledger["rate_version"])
         if stage == "generation":
             prices = {q: v for q, v in priced["prices"].items() if q not in done}
             cands[c["id"]] = {"max_micro_usd": sum(prices.values()), "calls": sum(1 for v in prices.values() if v),
@@ -388,7 +393,7 @@ def _cap(mine: dict) -> int:
 def _outstanding(conn, folder: Path, record: dict, cid: str, mine: dict) -> int:
     """What an unfinished candidate may still reserve: the priced items it has not finished, never more than its
     approval has left after what the ledger holds against it."""
-    done = _done(folder, record["stage"], cid)
+    done = _done(conn, folder, record, cid)
     if record["stage"] == "generation":
         bound = sum(v for q, v in mine["prices"].items() if q not in done)
     else:
@@ -403,8 +408,8 @@ def paid_config(folder: Path, record: dict, est: dict, cand: dict) -> dict:
               "cap_micro_usd": _cap(mine), "ledger_key": key_prefix(record, cand["id"]),
               "previous": str(previous) if previous.exists() else None}
     if record["stage"] == "generation":
-        return {**config, "prices": mine["prices"]}
-    return {**config, "ledger_env": record.get("ledger_env"), "per_read_micro_usd": mine["per_read_micro_usd"],
+        return config
+    return {**config, "ledger_env": record.get("ledger_env"),
             "local_reads": str(folder / "candidates" / f"{cand['id']}.estimate.json"),
             "progress": str(_progress(folder, cand["id"]))}
 
@@ -548,7 +553,11 @@ def _answer(row: dict, rec: dict | None, index, chunks: dict, titles: dict, repl
     return {**base, "outcome": s["outcome"], "passed": s.get("passed"), "status_ok": s["status_ok"],
             "metadata_correct": s.get("metadata_correct"), "facts": answer.get("facts") or [],
             "summary": answer.get("summary") or "", "claims": claims, "evidence": evidence,
-            "conflicts": answer.get("conflicts") or [], "missing": answer.get("missing_fields") or [],
+            "conflicts": [{"field": c.get("field"), "alternatives": [
+                {"doc": titles.get(a.get("doc_id"), a.get("doc_id")), "value": a.get("value"),
+                 "evidence_ids": a.get("evidence_ids") or []} for a in c.get("alternatives") or []]}
+                for c in answer.get("conflicts") or []],
+            "next_action": answer.get("next_action"), "missing": answer.get("missing_fields") or [],
             "validation": validation, "validation_detail": error if validation else None,
             "failure": error if error and not validation else None,
             "required": [{"claim_id": c["claim_id"], "verdict": c["verdict"]} for c in s["claims"]],

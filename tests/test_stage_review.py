@@ -436,9 +436,52 @@ class PaidLedgerTest(unittest.TestCase):
         budget.settle(self.db, lost, {"completion_tokens": U}, None)
         resumed = Reads(U * 8 // 10, U * 8 // 10)
         out = self.read(folder, self.ocr_config(folder, est), resumed)
-        self.assertEqual(resumed.calls, 0)  # the first read is kept, and the second would pass 2U
-        self.assertEqual((out["status"], out["images"][0]["status"]), ("stopped", "remote"))
+        self.assertEqual(resumed.calls, 0)  # the first read is kept, and the billed second one is not paid again
+        self.assertEqual([i["status"] for i in out["images"]], ["remote", "unresolved"])
+        self.assertIn("lost", out["images"][1]["error"])
         self.assertLessEqual(self.settled(), 2 * U)
+
+    def test_a_read_whose_progress_could_not_be_written_is_never_paid_again(self):
+        folder = self.ocr_folder(2)
+        est = {"candidates": {"c1": {"max_micro_usd": 2 * U, "per_read_micro_usd": U, "flagged": [0, 1]}}}
+        config = self.ocr_config(folder, est)
+        first = self.read(folder, {**config, "progress": str(folder / "gone" / "p.jsonl")}, Reads(U * 8 // 10))
+        self.assertEqual((first["status"], first["images"][0]["status"]), ("stopped", "remote"))
+        # Its output is lost too (the disk is full): only the ledger knows image 0 was paid.
+        resumed = Reads(U * 8 // 10)
+        out = self.read(folder, config, resumed)
+        self.assertEqual(resumed.calls, 1)
+        self.assertEqual([i["status"] for i in out["images"]], ["unresolved", "remote"])
+        self.assertLessEqual(self.settled(), 2 * U)
+        with store.open_db(self.db) as conn:
+            self.assertEqual(paid._done(conn, folder, json.loads((folder / "run.json").read_text()), "c1"), {0, 1})
+
+    def test_a_stored_answer_whose_output_was_lost_replays_and_is_not_priced_again(self):
+        folder = self.folder("generation", "stopped")
+        record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+        rid = self.attempt(f"{folder.name}:c1:q1:1", "settled", 10, 8)
+        with store.open_db(self.db) as conn:  # the answer finished in the ledger; c1.json never got written
+            conn.execute("UPDATE requests SET status = 'completed', result_json = ? WHERE request_id = ?",
+                         (json.dumps({"status": "answered"}), rid))
+        calls = []
+
+        def answer_row(_s, _p, _run, _cid, row, _rec):
+            calls.append(row["question_id"])
+            return {"question_id": row["question_id"], "status": "done", "request_id": rid}
+        (folder / "inputs" / "rows.json").write_text(json.dumps([{"question_id": "q1"}]), encoding="utf-8")
+        (folder / "inputs" / "activation.json").write_text("{}", encoding="utf-8")
+        from rfp_assistant.service import answers, service
+        owner = SimpleNamespace(transport=object(), tracing=None, close=lambda: None)
+        with mock.patch.object(worker, "_generation_settings", return_value=self.settings), \
+                mock.patch.object(service, "Resources", return_value=owner), \
+                mock.patch.object(answers, "PinnedResources", return_value=SimpleNamespace(close=lambda: None)), \
+                mock.patch.object(answers, "_answer_row", answer_row):
+            out = worker.generation(folder / "inputs", {"run_key": folder.name, "candidate": "c1",
+                                                        "cap_micro_usd": 10, "ledger_key": f"{folder.name}:c1:",
+                                                        "prices": {"q1": 10}}, "paid")
+        self.assertEqual((calls, out.get("status")), (["q1"], None))  # 8 held + 10 priced > 10, yet it replays
+        with store.open_db(self.db) as conn:  # and a re-price leaves it out
+            self.assertEqual(paid._done(conn, folder, record, "c1"), {"q1"})
 
     def test_a_rate_change_is_repriced_and_never_reserved_above_the_approval(self):
         folder = self.ocr_folder(1)
@@ -457,6 +500,19 @@ class PaidLedgerTest(unittest.TestCase):
         out = self.read(folder, self.ocr_config(folder, {"candidates": {"c1": {
             "max_micro_usd": U, "per_read_micro_usd": U, "flagged": [0]}}}), reads)
         self.assertEqual((reads.calls, out["status"]), (0, "stopped"))
+
+    def test_the_read_the_approval_refuses_is_unresolved_with_its_reason(self):
+        folder = self.ocr_folder(2)
+        reads = Reads(U * 8 // 10, U)
+        out = self.read(folder, self.ocr_config(folder, {"candidates": {"c1": {
+            "max_micro_usd": U * 3 // 2, "per_read_micro_usd": U, "flagged": [0, 1]}}}), reads)
+        self.assertEqual((reads.calls, out["status"]), (1, "stopped"))
+        self.assertEqual(out["images"][1]["status"], "unresolved")  # never shown as a resolved local read
+        self.assertIn("above_consented_maximum", out["images"][1]["error"])
+        (folder / "candidates" / "c1.json").write_text(json.dumps(out), encoding="utf-8")
+        record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+        record["candidates"][1]["status"] = "stopped"
+        self.assertEqual(paid.score_ocr(folder, record)["summary"]["c1"]["unresolved"], 1)
 
     def test_a_stopped_run_whose_approval_expired_is_priced_again_for_what_is_left(self):
         folder = self.ocr_folder(2, state="stopped")

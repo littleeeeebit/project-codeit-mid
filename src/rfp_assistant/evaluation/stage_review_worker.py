@@ -12,8 +12,9 @@ Generation and OCR price first (mode `estimate`, no key, no paid call) and pay o
 starts with an approved estimate: answers go through the candidate's own answer path and budget gateway (charged to
 gold_eval, idempotency keys `<run>:<candidate>:<question>:<n>`), OCR re-reads through its own RemoteReader (the
 `ocr` envelope). The approved maximum holds across every pass: the ledger, not this pass, counts what a candidate
-has already spent or left unknown, each reservation is refused above what is left, and each paid OCR read is kept on
-disk as it settles, so a pass that dies midway never pays for it again.
+has already spent or left unknown, and each reservation is refused above what is left (the read or answer it was for
+is unresolved, with the refusal). Each paid OCR read is kept on disk as it settles, and the ledger names every region
+and answer already billed, so a pass that dies midway or loses its output never pays for one again.
 """
 
 from __future__ import annotations
@@ -131,11 +132,23 @@ def committed(conn, key_prefix: str) -> int:
         "WHERE r.idempotency_key LIKE ?", (key_prefix + "%",)).fetchone()[0]
 
 
-def _within_approval(db, config: dict, price: int) -> bool:
-    from rfp_assistant.storage import store
-
-    with store.open_db(db) as conn:
-        return committed(conn, config["ledger_key"]) + price <= config["cap_micro_usd"]
+def paid_items(conn, key_prefix: str) -> set[str]:
+    """What the ledger will never pay for again under one candidate's keys, whatever its output holds: an OCR region
+    (attempt stage `ocr:<region>`) or a question (key `<prefix><question>:<n>`) with an attempt that is not released
+    (it was or may have been billed), and a question whose request stored a finished answer (it replays for free)."""
+    items = set()
+    for key, result, stage, state in conn.execute(
+            "SELECT r.idempotency_key, r.result_json, a.stage, a.state FROM requests r LEFT JOIN attempts a "
+            "ON a.request_id = r.request_id WHERE r.idempotency_key LIKE ?", (key_prefix + "%",)).fetchall():
+        billed = state is not None and state != "released"
+        if key_prefix.startswith("review:"):  # the OCR job: one request, an attempt per region
+            if billed and (stage or "").startswith("ocr:"):
+                items.add(stage[4:])
+            continue
+        stored = json.loads(result)["status"] if result else None
+        if billed or stored not in (None, "budget_blocked", "technical_error"):
+            items.add(key[len(key_prefix):].rsplit(":", 1)[0])
+    return items
 
 
 @contextlib.contextmanager
@@ -206,7 +219,8 @@ def generation(inputs: Path, config: dict, mode: str) -> dict:
         pinned.tracing = owner.tracing  # a borrowed transport is not traced on its own
         out, stop = [], None
         # A resumed candidate keeps the answers it finished, with their measured latency, instead of replaying them;
-        # an answer whose output was lost replays from its request without a call (`_answer_row`).
+        # an answer whose output was lost replays from its request without a call (`_answer_row`), so nothing is
+        # checked before it: only a reservation can pass the approval, and the gateway refuses that one.
         earlier = json.loads(Path(config["previous"]).read_text(encoding="utf-8")).get("rows") or [] \
             if config.get("previous") else []
         finished = {r["question_id"]: r for r in earlier if r.get("status") == "done"}
@@ -215,9 +229,6 @@ def generation(inputs: Path, config: dict, mode: str) -> dict:
                 if row["question_id"] in finished:
                     out.append(finished[row["question_id"]])
                     continue
-                if not _within_approval(s.db_path, config, config["prices"].get(row["question_id"], 0)):
-                    stop = "the next answer could pass the approved maximum"
-                    break
                 record = answers._answer_row(s, pinned, config["run_key"], config["candidate"], row, None)
                 out.append(record)
                 if record["status"] in ("blocked", "unknown_billing"):
@@ -291,27 +302,31 @@ def ocr_stage(inputs: Path, config: dict, mode: str) -> dict:
     with store.database_lifecycle(ledger.db_path), capped_reservations(config), ocr.RemoteReader(
             ledger, job=f"review:{config['run_key']}:{config['candidate']}") as reader:
         request_id = reader.request_id
+        with store.open_db(ledger.db_path) as conn:  # after the reader's recovery: an orphaned call is unknown now
+            billed = paid_items(conn, config["ledger_key"])
         for read in local_reads:
             row = {**read, "local_text": read["text"]}
+            region = by_n[read["n"]].get("digest") or str(read["n"])
             if read["reasons"] and read["n"] in previous:
                 row = previous[read["n"]]
+            elif read["reasons"] and region in billed:
+                row.update(status="unresolved", error="paid in the ledger, but its read was lost; not paid again")
             elif read["reasons"] and stop is None:
-                if not _within_approval(ledger.db_path, config, config["per_read_micro_usd"]):
-                    stop = "the next read could pass the approved maximum"
-                else:
-                    png, _ = _image(by_n[read["n"]], inputs)
-                    try:
-                        text, micro = reader.read(png, by_n[read["n"]].get("digest") or str(read["n"]))
-                        row.update(status="remote", text=text, micro_usd=micro)
-                        with open(config["progress"], "a", encoding="utf-8") as f:  # kept even if this process dies
-                            f.write(json.dumps(row, ensure_ascii=False) + "\n")
-                    except ocr.OcrStop as exc:
-                        row.update(status="unresolved", error=str(exc)[:300])
-                        stop = str(exc)
-                    except ocr.OcrError as exc:
-                        row.update(status="unresolved", error=str(exc)[:300])
+                png, _ = _image(by_n[read["n"]], inputs)
+                try:
+                    text, micro = reader.read(png, region)  # refused above what the approval has left
+                    row.update(status="remote", text=text, micro_usd=micro)
+                    with open(config["progress"], "a", encoding="utf-8") as f:  # kept even if this process dies
+                        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+                except ocr.OcrStop as exc:
+                    row.update(status="unresolved", error=str(exc)[:300])
+                    stop = str(exc)
+                except ocr.OcrError as exc:
+                    row.update(status="unresolved", error=str(exc)[:300])
+                except OSError as exc:  # the read is paid and in hand; the ledger keeps it from being paid twice
+                    stop = f"could not record a paid read: {exc}"[:300]
             elif read["reasons"]:
-                row["status"] = "unresolved"
+                row.update(status="unresolved", error=f"not read: {stop}"[:300])
             out.append(row)
     return {"images": out, "request_id": request_id, **({"status": "stopped", "reason": stop} if stop else {})}
 

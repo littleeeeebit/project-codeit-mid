@@ -158,7 +158,23 @@ function AnswerColumn({ c, a, q }: { c: Candidate; a: Answer | undefined; q: Gen
           ))}
         </ol>
       )}
+      {(a.conflicts ?? []).map((conflict) => (
+        <div key={conflict.field} className="mt-3">
+          <p className="text-[13px] font-semibold text-warn">근거 충돌 · {conflict.field}</p>
+          <ul className="mt-1 flex flex-col gap-1">
+            {conflict.alternatives.map((alt, i) => (
+              <li key={i} className="border-l-[3px] border-warn pl-2 text-[14px] leading-relaxed">
+                <span className="text-muted">{alt.doc}</span> <span className="break-words font-semibold">{alt.value}</span>
+                <Cites ids={alt.evidence_ids} evidence={a.evidence ?? {}} open={open} setOpen={setOpen} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
       {open && a.evidence?.[open] && <EvidencePanel id={open} e={a.evidence[open]} onClose={() => setOpen(null)} />}
+      {a.next_action && (
+        <p className="mt-2 text-[14px]"><span className="mr-1 font-semibold text-muted">다음 조치</span>{a.next_action}</p>
+      )}
       {(a.facts ?? []).length > 0 && (
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 text-[14px]">
           {a.facts!.map((f) => (
@@ -215,21 +231,29 @@ function ClaimItem({ claim, evidence, open, setOpen }: {
   return (
     <li className={`border-l-[3px] pl-2 text-[14px] leading-relaxed ${mark}`}>
       <span className="break-words">{claim.text}</span>
-      {claim.evidence_ids.map((id) => (
-        <Fragment key={id}>
-          {" "}
-          <button type="button" onClick={() => setOpen(open === id ? null : id)} aria-expanded={open === id}
-                  disabled={!evidence[id]}
-                  className={`rounded px-1 text-[12px] font-semibold tabular-nums ${valid[id] === false ? "bg-bad-bg text-bad" : "bg-primary-bg text-primary"} ${open === id ? "ring-2 ring-primary" : ""}`}>
-            {id}
-          </button>
-        </Fragment>
-      ))}
+      <Cites ids={claim.evidence_ids} valid={valid} evidence={evidence} open={open} setOpen={setOpen} />
       <span className="ml-2 text-[12px] text-muted">
         {claim.supported === true ? "원문 그대로 인용" : claim.supported === false ? "근거 아님" : "사람 확인 필요"}
       </span>
     </li>
   );
+}
+
+/** Citation buttons that open their evidence below the answer; one marked invalid did not open on the server. */
+function Cites({ ids, valid = {}, evidence, open, setOpen }: {
+  ids: string[]; valid?: Record<string, boolean>; evidence: Record<string, Evidence>;
+  open: string | null; setOpen: (id: string | null) => void;
+}) {
+  return ids.map((id) => (
+    <Fragment key={id}>
+      {" "}
+      <button type="button" onClick={() => setOpen(open === id ? null : id)} aria-expanded={open === id}
+              disabled={!evidence[id]}
+              className={`rounded px-1 text-[12px] font-semibold tabular-nums ${valid[id] === false ? "bg-bad-bg text-bad" : "bg-primary-bg text-primary"} ${open === id ? "ring-2 ring-primary" : ""}`}>
+        {id}
+      </button>
+    </Fragment>
+  ));
 }
 
 function EvidencePanel({ id, e, onClose }: { id: string; e: Evidence; onClose: () => void }) {

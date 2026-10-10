@@ -150,6 +150,8 @@ export type Answer = {
   summary?: string;
   claims?: Claim[];
   evidence?: Record<string, Evidence>;
+  conflicts?: { field: string; alternatives: { doc: string | null; value: string; evidence_ids: string[] }[] }[];
+  next_action?: string | null;
   missing?: { doc_id: string; field: string; reason: string }[];
   validation?: string | null;
   validation_detail?: string | null;
