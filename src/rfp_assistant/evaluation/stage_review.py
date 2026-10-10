@@ -356,11 +356,23 @@ def run(settings: Settings, stage: str, base: str, cands: list[str], inputs_from
         record.update(state="needs_approval", ledger_env=ledger_env)
         if stage == "ocr":
             paid.render_images(folder)
-        record["estimate"] = paid.estimate(settings, folder, record)["estimate_id"]
+        # Written before pricing: a ledger that dropped during an hour of local reads costs a re-price, not the reads.
         write_text_atomic(folder / "run.json", json.dumps(record, ensure_ascii=False, indent=1))
-        return record
+        return reprice(settings, run_id)
     view = score_retriever(settings, folder, record) if stage == "retriever" else score_chunking(folder, record)
     write_text_atomic(folder / "view.json", json.dumps(view, ensure_ascii=False))
+    write_text_atomic(folder / "run.json", json.dumps(record, ensure_ascii=False, indent=1))
+    return record
+
+
+def reprice(settings: Settings, run_id: str) -> dict:
+    """Prices an unpaid run again from what its candidates already priced (no worker runs): after a pricing step that
+    failed, or an estimate that expired. Any earlier approval belongs to the replaced estimate and does not carry."""
+    folder = run_folder(settings, run_id)
+    record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+    if record["stage"] not in PAID_STAGES or record.get("state") != "needs_approval":
+        raise ReviewError(f"{run_id} is not waiting for an estimate")
+    record["estimate"] = paid.estimate(settings, folder, record)["estimate_id"]
     write_text_atomic(folder / "run.json", json.dumps(record, ensure_ascii=False, indent=1))
     return record
 

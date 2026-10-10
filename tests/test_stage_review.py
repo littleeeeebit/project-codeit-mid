@@ -207,6 +207,18 @@ class PaidStageTest(unittest.TestCase):
             self.assertEqual((second["state"], second["candidates"][1]["reason"]), ("complete", None))
             self.assertEqual(ran, ["c1.json", "c1.json"])  # the finished baseline is never paid again
 
+    def test_reprice_replaces_the_estimate_of_an_unpaid_run_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = paid_folder(Path(tmp), "ocr", {"state": "needs_approval"})
+            settings = SimpleNamespace(data_dir=Path(tmp))
+            with mock.patch.object(paid, "estimate", return_value={"estimate_id": "e2"}) as priced:
+                self.assertEqual(stage_review.reprice(settings, folder.name)["estimate"], "e2")
+                record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+                (folder / "run.json").write_text(json.dumps({**record, "state": "complete"}), encoding="utf-8")
+                with self.assertRaisesRegex(stage_review.ReviewError, "not waiting for an estimate"):
+                    stage_review.reprice(settings, folder.name)  # paid work is never re-priced
+            self.assertEqual(priced.call_count, 1)
+
     def test_a_replayed_answer_has_no_measured_latency(self):
         def conn(created):
             return SimpleNamespace(execute=lambda sql, args: SimpleNamespace(fetchone=lambda: (created,)))
