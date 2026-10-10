@@ -455,11 +455,12 @@ class DraftingTracingTest(unittest.TestCase):
             shutil.rmtree(Path(folder) / 'out')
             other = fx.make_env(Path(folder) / 'other-pc')
             exporter2 = InMemorySpanExporter()
-            tracer = tracing.Tracing(NOWHERE, "pk-lf-test-draft", "sk-lf-test-draft", span_exporter=exporter2)
+            with mock.patch.dict("os.environ", {"BIDMATE_HUB_URL": "", "BIDMATE_LOCAL_MEMBER": "spai1302"}):
+                tracer = tracing.Tracing(NOWHERE, "pk-lf-test-draft", "sk-lf-test-draft", span_exporter=exporter2)
             try:
                 with fixtures.paid_gateway(other.settings):
                     drafting._generate(other.settings, {'slots': [_slot(other)]}, Path(folder) / 'out', 100000,
-                                       transport, 'dev', tracer=tracer, member='spai1302')
+                                       transport, 'dev', tracer=tracer)
             finally:
                 tracer.close()
             second = next(s for s in exporter2.get_finished_spans() if s.name == 'draft-gold-questions')
