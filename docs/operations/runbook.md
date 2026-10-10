@@ -39,7 +39,7 @@ The shared application runs on the team's existing GCP VM `codeit`. It is the on
 | | |
 | --- | --- |
 | VM | `codeit` (existing team VM, also JupyterHub), project `sprint-ai-01`, zone `us-central1-c`, Ubuntu 24.04 |
-| Machine | `g2-standard-4` (4 vCPU, 16 GB, one NVIDIA L4), 50 GB boot disk shared with the team |
+| Machine | `g2-standard-4` (4 vCPU, 16 GB, one NVIDIA L4), 80 GB `pd-balanced` boot disk shared with the team |
 | Address | `35.255.64.243`, ephemeral: it changes if `codeit` is stopped and started. Then follow "When the address changes" below. |
 | Listening (BidMate) | uvicorn on `0.0.0.0:8501` (one worker), served at <http://35.255.64.243:8501> through the already-open 8501 rule; PostgreSQL 18.6 on `127.0.0.1:55432` only. JupyterHub is the team's, on `:8000` (proxy) and `127.0.0.1:8081` (hub). |
 | Paths | checkout `/srv/bidmate/app`, originals `/srv/bidmate/app/원본 데이터`, runtime `/srv/bidmate/app/.runtime`, venv `/srv/bidmate/venv`, backups `/srv/bidmate/backups`, owned by the `bidmate` service user (mode 750) |
@@ -188,6 +188,8 @@ Until step 1 runs, the VM runs a commit that was deployed from a bundle and is n
 `sh` on `codeit` is dash, whose `command -v` reports only its first name, so step 2 checks each tool in turn.
 
 Setup record (2026-10-09). Until then the VM still ran the PR #29 branch from a bundle; the one-time setup had not been run. The root disk had 618 MB free, too little for `npm ci` and a build, so the regenerable caches went first: `apt-get clean`, root's pip cache (1.7 GB) and journals over 50 MB. Teammates' home directories and BidMate's Hugging Face cache stayed. With no paid work open (pending $0, open attempts 0), steps 1 to 4 ran and the checkout reached `7546ddb` (#31). `/api/info` answered 401 from outside, the screens 200, and `bidmate-update.path` was active (waiting). About 1.2 GB stayed free, and a later run that rebuilds `web/` needs room for `node_modules` and the build. The banner and its button were not yet seen live: the running commit equalled `main`, so no banner was offered. The first newer `main` is that check.
+
+Disk record (2026-10-10). The root disk filled again during a stage-review generation run: PostgreSQL refused a write with `No space left on device` and stayed up. Teammates' home directories held about 24 GB of the 48 GB. With the owner's approval the boot disk was grown in place from 50 GB to 80 GB (`gcloud compute disks resize codeit --zone us-central1-c --size 80GB`, then `growpart /dev/nvme0n1 1` and `resize2fs /dev/nvme0n1p1` on the running VM; no new VM, no reboot), leaving about 30 GB free. A persistent disk cannot be shrunk afterwards. `gcloud` on the owner host signs in through a browser redirect to `localhost:8085`, which the browser may send to `::1`; replace `localhost` with `127.0.0.1` in the final address if the sign-in hangs.
 
 The VM serves the owner host's restored database, whose rows keep Windows paths (`C:\Users\dasdk\PycharmProjects\project-codeit-mid\...`). `RFP_PATH_MAP=C:/Users/dasdk/PycharmProjects/project-codeit-mid=/srv/bidmate/app` maps them onto the copied originals and runtime. Every reader of a recorded original, extraction or index path goes through `postgres.host_path`. Paths written on the VM are Linux paths and need no mapping.
 
