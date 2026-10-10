@@ -19,6 +19,7 @@ import difflib
 import hashlib
 import json
 import random
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -311,9 +312,9 @@ def paid_config(folder: Path, record: dict, est: dict, cand: dict) -> dict:
     mine = est["candidates"][cand["id"]]
     config = {**(cand.get("config") or {}), "run_key": record["run_id"], "candidate": cand["id"],
               "cap_micro_usd": mine["max_micro_usd"]}
-    if record["stage"] == "generation":
-        return {**config, "prices": mine["prices"]}
     previous = folder / "candidates" / f"{cand['id']}.json"
+    if record["stage"] == "generation":
+        return {**config, "prices": mine["prices"], "previous": str(previous) if previous.exists() else None}
     return {**config, "ledger_env": record.get("ledger_env"), "per_read_micro_usd": mine["per_read_micro_usd"],
             "local_reads": str(folder / "candidates" / f"{cand['id']}.estimate.json"),
             "previous": str(previous) if previous.exists() else None}
@@ -337,6 +338,23 @@ def ledger_spend(settings: Settings, folder: Path, record: dict) -> None:
                 f"THEN 1 ELSE 0 END), 0) FROM requests r JOIN attempts a ON a.request_id = r.request_id WHERE {where}",
                 (arg,)).fetchone()
             c["ledger"] = {"settled_micro_usd": row[0], "attempts": row[1], "open": row[2], "target": _target(ls)}
+            if record["stage"] == "generation":
+                c["replayed"] = _replayed(conn, out.get("rows") or [])
+
+
+def _replayed(conn, rows: list[dict]) -> list[str]:
+    """Rows answered from a stored request rather than a call (their earlier output was lost): the request began
+    long before the row's measured call could have, so the latency measured is the replay's, not the answer's."""
+    replayed = []
+    for r in rows:
+        if not (r.get("request_id") and r.get("answered_at") and r.get("latency_ms") is not None):
+            continue
+        hit = conn.execute("SELECT created_at FROM requests WHERE request_id = ?", (r["request_id"],)).fetchone()
+        created = hit and (hit[0] if isinstance(hit[0], datetime) else datetime.fromisoformat(hit[0]))
+        answered = datetime.fromisoformat(r["answered_at"])
+        if created and (answered - created).total_seconds() > r["latency_ms"] / 1000 + 120:
+            replayed.append(r["question_id"])
+    return replayed
 
 
 # ---------------------------------------------------------------- generation view
@@ -360,17 +378,18 @@ def score_generation(settings: Settings, folder: Path, record: dict) -> dict:
     chunks = {c["chunk_id"]: c for c in index.chunks}
     answered = {c["id"]: {r["question_id"]: r for r in out["rows"]}
                 for c in record["candidates"] for out in [sr._output(folder, c) or _partial(folder, c)] if out}
+    replayed = {c["id"]: set(c.get("replayed") or ()) for c in record["candidates"]}
     questions = []
     for row in rows:
-        per = {cid: _answer(row, by_q.get(row["question_id"]), index, chunks, titles) for cid, by_q in answered.items()}
+        per = {cid: _answer(row, by_q.get(row["question_id"]), index, chunks, titles,
+                            row["question_id"] in replayed.get(cid, ())) for cid, by_q in answered.items()}
         done = [p for p in per.values() if "error" not in p]
         outcomes = {json.dumps([p["outcome"], p["passed"], [r["verdict"] for r in p["required"]]]) for p in done}
         questions.append({"key": row["question_id"], "id": row["question_id"], "question": row["question"],
                           "type": row["question_type"], "mode": row.get("mode"),
                           "expected_status": row["expected_status"], "answerability": row["answerability"],
                           "docs": [titles.get(s["doc_id"], s["doc_id"]) for s in row.get("scope") or []],
-                          "required": [{"claim_id": c["claim_id"], "text": ((c.get("match") or {}).get("patterns")
-                                                                            or [""])[0],
+                          "required": [{"claim_id": c["claim_id"], "text": _claim_text(c),
                                         "critical": c.get("criticality") == "critical"}
                                        for c in row.get("required_claims") or []],
                           "candidates": per, "differs": len(outcomes) > 1 or len(done) < len(per)})
@@ -386,6 +405,16 @@ def score_generation(settings: Settings, folder: Path, record: dict) -> dict:
             "questions": questions}
 
 
+def _claim_text(claim: dict) -> str:
+    """A required claim as the gold states it: its text, or a number with its unit and qualifiers."""
+    match = claim.get("match") or {}
+    if match.get("type") != "number":
+        return (match.get("patterns") or [""])[0]
+    qualifiers = " · ".join(q[0] for q in claim.get("qualifiers") or [] if q)
+    number = f"{match.get('value')}{match.get('unit') or ''}"
+    return f"{number} ({qualifiers})" if qualifiers else number
+
+
 def _partial(folder: Path, cand: dict) -> dict | None:
     """A stopped candidate's answers so far: shown, never ranked as complete."""
     path = folder / "candidates" / f"{cand['id']}.json"
@@ -397,12 +426,13 @@ NOT_DONE = {"blocked": "예산 게이트가 거절했습니다", "unknown_billin
             "technical": "제공자 호출 전에 실패했습니다"}
 
 
-def _answer(row: dict, rec: dict | None, index, chunks: dict, titles: dict) -> dict:
+def _answer(row: dict, rec: dict | None, index, chunks: dict, titles: dict, replayed: bool = False) -> dict:
     from ..service import answers
 
     if rec is None:
         return {"error": "이 질문 전에 실행이 멈췄습니다"}
-    base = {"cost_micro_usd": rec.get("settled_micro_usd") or 0, "latency_ms": rec.get("latency_ms"),
+    base = {"cost_micro_usd": rec.get("settled_micro_usd") or 0,
+            "latency_ms": None if replayed else rec.get("latency_ms"), "replayed": replayed,
             "trace_url": rec.get("trace_url"), "request_id": rec.get("request_id")}
     if rec.get("status") != "done":
         return {**base, "error": NOT_DONE.get(rec.get("status"), rec.get("status")), "detail": rec.get("reason")}
@@ -425,10 +455,15 @@ def _answer(row: dict, rec: dict | None, index, chunks: dict, titles: dict) -> d
                          "section": " > ".join(chunk.get("section_path") or []),
                          "text": chunk.get("body") or chunk.get("payload")}
     error = answer.get("error") if s["outcome"] in VALIDATION else None
+    code = error.split(":", 1)[0] if error else None
+    # The validator names its rule in snake_case (claim_without_evidence); anything else, such as a provider 503
+    # (InternalServerError), failed the request without a verdict on the answer.
+    validation = code if code and re.fullmatch(r"[a-z_]+", code) else None
     return {**base, "outcome": s["outcome"], "passed": s.get("passed"), "status_ok": s["status_ok"],
             "summary": answer.get("summary") or "", "claims": claims, "evidence": evidence,
             "conflicts": answer.get("conflicts") or [], "missing": answer.get("missing_fields") or [],
-            "validation": error.split(":", 1)[0] if error else None, "validation_detail": error,
+            "validation": validation, "validation_detail": error if validation else None,
+            "failure": error if error and not validation else None,
             "required": [{"claim_id": c["claim_id"], "verdict": c["verdict"]} for c in s["claims"]],
             "groups": s.get("groups"), "scope_leaks": s.get("scope_leaks", 0)}
 
@@ -450,6 +485,7 @@ def _generation_summary(per: list[dict]) -> dict:
             "claims_rejected": sum(c["supported"] is False for c in claims), "claims": len(claims),
             "links_invalid": sum(not link["valid"] for link in links), "links": len(links),
             "validation_failures": failures, "validation_failed": sum(failures.values()),
+            "technical_failures": sum(bool(p.get("failure")) for p in done),
             "cost_micro_usd": sum(paid), "paid_answers": len(paid),
             "latency_ms": {"p50": _percentile(latency, 0.5), "p95": _percentile(latency, 0.95), "n": len(latency)},
             "not_done": len(per) - len(done)}

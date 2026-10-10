@@ -306,7 +306,7 @@ def cmd_stage_review(args, settings) -> int:
                 "next": f"stage-review resume --run {args.run}"})
         return 0
     ledger = settings.with_(database_dsn_env=args.ledger_dsn_env) if args.ledger_dsn_env else None
-    if args.action == "resume" and ledger is None:
+    if args.action in ("resume", "rescore") and ledger is None:
         record = json.loads((stage_review.run_folder(settings, args.run) / "run.json").read_text(encoding="utf-8"))
         ledger = settings.with_(database_dsn_env=record["ledger_env"]) if record.get("ledger_env") else None
     with store.database_lifecycle(ledger.db_path) if ledger else contextlib.nullcontext():
@@ -314,8 +314,11 @@ def cmd_stage_review(args, settings) -> int:
             from .storage.postgres import require_imported_database
 
             require_imported_database(ledger.db_path)
-        record = stage_review.resume(settings, args.run) if args.action == "resume" else stage_review.run(
-            settings, args.stage, args.base, args.cand, inputs_from=args.inputs_from, ledger_env=args.ledger_dsn_env)
+        if args.action in ("resume", "rescore"):
+            record = getattr(stage_review, args.action)(settings, args.run)
+        else:
+            record = stage_review.run(settings, args.stage, args.base, args.cand, inputs_from=args.inputs_from,
+                                      ledger_env=args.ledger_dsn_env)
     _print({"run_id": record["run_id"], "folder": str(stage_review.review_dir(settings) / "runs" / record["run_id"]),
             "state": record.get("state", "complete"),
             "candidates": [{k: c.get(k) for k in ("id", "label", "commit", "status", "reason", "ledger")}
@@ -830,14 +833,15 @@ def _retrieval_commands(sub) -> None:
     s.add_argument("--select", help="choose this run instead of the recommendation (recorded as an override)")
     s = sub.add_parser("stage-review", help="run a baseline ref and candidate refs on one stage's frozen inputs for "
                                            "the review app (review.cmd / review.command); activates nothing. "
-                                           "generation and ocr stop at a priced estimate: approve, then resume")
-    s.add_argument("action", choices=["run", "approve", "resume"])
+                                           "generation and ocr stop at a priced estimate: approve, then resume; "
+                                           "rescore re-scores a paid run from its stored outputs without paying")
+    s.add_argument("action", choices=["run", "approve", "resume", "rescore"])
     s.add_argument("stage", nargs="?", choices=["retriever", "chunking", "generation", "ocr"], help="run: the stage")
     s.add_argument("--base", help="run: baseline git ref, e.g. main")
     s.add_argument("--cand", action="append", default=[], help="candidate git ref, repeatable; '.' is the working tree")
     s.add_argument("--inputs-from", help="reuse the frozen inputs of this earlier run ID (chunking then needs no "
                                          "database)")
-    s.add_argument("--run", help="approve, resume: the paid run ID")
+    s.add_argument("--run", help="approve, resume, rescore: the paid run ID")
     s.add_argument("--approved-by", help="approve: the person approving the estimate")
     s.add_argument("--ledger-dsn-env", help="ocr: environment variable with the DSN of the shared ledger the paid reads "
                                             "settle in (default the corpus database)")

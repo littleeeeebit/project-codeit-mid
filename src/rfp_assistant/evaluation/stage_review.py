@@ -391,17 +391,31 @@ def resume(settings: Settings, run_id: str) -> dict:
                                                       ensure_ascii=False, indent=1))
             out = execute(settings, worker, worktree, record["stage"], inputs, config_path,
                           folder / "candidates" / f"{cand['id']}.json", "paid", estimate)
-            cand.update({k: out[k] for k in ("status", "reason", "host", "packages", "elapsed_s") if k in out})
+            cand.update({"reason": None, **{k: out[k] for k in ("status", "reason", "host", "packages", "elapsed_s")
+                                            if k in out}})
         except ReviewError as exc:
             cand.update(status="failed", reason=str(exc))
         except Exception as exc:  # noqa: BLE001 - one broken candidate must not cost the others' results
             cand.update(status="failed", reason=f"{type(exc).__name__}: {exc}")
         finally:
             remove_worktree(worktree)
-    paid.ledger_spend(settings, folder, record)
     # A candidate stopped or failed midway (a full disk, a lost connection) keeps the run resumable.
     done = all(c.get("status") == "complete" for c in record["candidates"] if c["id"] in estimate["candidates"])
     record.update(state="complete" if done else "stopped", paid_at=datetime.now(timezone.utc).isoformat())
+    return _score_paid(settings, folder, record)
+
+
+def rescore(settings: Settings, run_id: str) -> dict:
+    """Re-reads the ledger and re-scores a paid run from its stored outputs: no worker, no call, no payment."""
+    folder = run_folder(settings, run_id)
+    record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+    if record["stage"] not in PAID_STAGES or record.get("state") not in ("complete", "stopped"):
+        raise ReviewError(f"{run_id} has no paid results to score")
+    return _score_paid(settings, folder, record)
+
+
+def _score_paid(settings: Settings, folder: Path, record: dict) -> dict:
+    paid.ledger_spend(settings, folder, record)
     view = paid.score_generation(settings, folder, record) if record["stage"] == "generation" else \
         paid.score_ocr(folder, record)
     write_text_atomic(folder / "view.json", json.dumps(view, ensure_ascii=False))

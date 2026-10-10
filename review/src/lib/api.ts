@@ -150,9 +150,11 @@ export type Answer = {
   missing?: { doc_id: string; field: string; reason: string }[];
   validation?: string | null;
   validation_detail?: string | null;
+  failure?: string | null;
   required?: { claim_id: string; verdict: string }[];
   cost_micro_usd: number;
   latency_ms?: number | null;
+  replayed?: boolean;
   trace_url?: string | null;
 };
 
@@ -183,6 +185,7 @@ export type GenerationSummary = {
   links: number;
   validation_failures: Record<string, number>;
   validation_failed: number;
+  technical_failures: number;
   cost_micro_usd: number;
   paid_answers: number;
   latency_ms: { p50: number | null; p95: number | null; n: number };

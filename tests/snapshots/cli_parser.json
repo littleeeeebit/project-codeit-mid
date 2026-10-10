@@ -275,7 +275,7 @@
   {"name": ["--actor"], "dest": "actor", "default": "owner-cli", "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"}
  ],
  "stage-review": [
-  {"name": "action", "dest": "action", "default": null, "required": true, "choices": ["run", "approve", "resume"], "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": "action", "dest": "action", "default": null, "required": true, "choices": ["run", "approve", "resume", "rescore"], "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": "stage", "dest": "stage", "default": null, "required": false, "choices": ["retriever", "chunking", "generation", "ocr"], "type": null, "nargs": "?", "action": "_StoreAction"},
   {"name": ["--base"], "dest": "base", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--cand"], "dest": "cand", "default": [], "required": false, "choices": null, "type": null, "nargs": null, "action": "_AppendAction"},

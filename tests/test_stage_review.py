@@ -204,8 +204,15 @@ class PaidStageTest(unittest.TestCase):
                 first = stage_review.resume(settings, folder.name)
                 self.assertEqual((first["state"], first["candidates"][1]["status"]), ("stopped", "failed"))
                 second = stage_review.resume(settings, folder.name)
-            self.assertEqual(second["state"], "complete")
+            self.assertEqual((second["state"], second["candidates"][1]["reason"]), ("complete", None))
             self.assertEqual(ran, ["c1.json", "c1.json"])  # the finished baseline is never paid again
+
+    def test_a_replayed_answer_has_no_measured_latency(self):
+        def conn(created):
+            return SimpleNamespace(execute=lambda sql, args: SimpleNamespace(fetchone=lambda: (created,)))
+        row = {"question_id": "q1", "request_id": "r1", "answered_at": "2026-10-10T06:00:00+00:00", "latency_ms": 1500.0}
+        self.assertEqual(paid._replayed(conn("2026-10-10T05:00:00+00:00"), [row]), ["q1"])  # stored an hour earlier
+        self.assertEqual(paid._replayed(conn("2026-10-10T05:59:59+00:00"), [row]), [])  # created by this call
 
     def test_generation_view_and_decision(self):
         claim = {"claim_id": "c1", "criticality": "critical", "match": {"type": "text", "patterns": ["보안확약서"]},
@@ -229,11 +236,12 @@ class PaidStageTest(unittest.TestCase):
             write_outputs(folder, {
                 "base": {"rows": [done("q1", "answered", "보안확약서를 제출한다", trace_url="http://lf/t/1"),
                                   done("q2", "technical_error", "", error="claim_without_evidence")]},
-                "c1": {"rows": [done("q1", "answered", "확약서를 낸다"),
+                "c1": {"rows": [done("q1", "technical_error", "", error="InternalServerError: Error code: 503"),
                                 {"question_id": "q2", "status": "blocked", "reason": "envelope"}]}})
             index = SimpleNamespace(chunks=[{"chunk_id": "k1", "section_path": ["2. 보안"], "body": "보안확약서를 제출한다"}],
                                     elements={})
             record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+            record["candidates"][1]["replayed"] = ["q1"]
             with mock.patch("rfp_assistant.retrieval.retrieval.KeywordIndex.load", return_value=index):
                 view = paid.score_generation(SimpleNamespace(), folder, record)
             base, c1 = view["summary"]["base"], view["summary"]["c1"]
@@ -242,6 +250,11 @@ class PaidStageTest(unittest.TestCase):
                              (1, 1, {"claim_without_evidence": 1}))
             self.assertEqual((base["cost_micro_usd"], base["paid_answers"], base["latency_ms"]["n"]), (1800, 2, 2))
             self.assertEqual((c1["answered"], c1["not_done"], c1["claims_supported"]), (1, 1, 0))
+            self.assertEqual(c1["latency_ms"]["n"], 0)  # its one answer was replayed, so no latency was measured
+            # a provider 503 failed the request; it is no verdict of the answer validator
+            self.assertEqual((c1["technical_failures"], c1["validation_failures"]), (1, {}))
+            self.assertEqual(paid._claim_text({"match": {"type": "number", "value": 3, "unit": "초"},
+                                               "qualifiers": [["최대"], ["이내"]]}), "3초 (최대 · 이내)")
             q1 = view["questions"][0]["candidates"]
             self.assertEqual(q1["base"]["evidence"]["E1"]["section"], "2. 보안")
             self.assertEqual((q1["base"]["trace_url"], q1["c1"]["trace_url"]), ("http://lf/t/1", None))

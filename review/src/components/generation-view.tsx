@@ -93,10 +93,13 @@ function Summary({ c, view }: { c: Candidate; view: View }) {
         <dt className="text-muted">열리지 않는 인용</dt><dd>{s.links_invalid}/{s.links}</dd>
         <dt className="text-muted">비용</dt><dd>{usd(s.cost_micro_usd)} · 유료 답변 {s.paid_answers}개</dd>
         <dt className="text-muted">지연</dt>
-        <dd>p50 {sec(s.latency_ms.p50)} · p95 {sec(s.latency_ms.p95)} · {s.latency_ms.n}개</dd>
+        <dd>p50 {sec(s.latency_ms.p50)} · p95 {sec(s.latency_ms.p95)} · 측정 {s.latency_ms.n}/{s.answered}개</dd>
       </dl>
       {failures.length > 0 && (
         <p className="mt-2 text-[13px] text-bad">{failures.map(([code, n]) => `${code} ${n}`).join(" · ")}</p>
+      )}
+      {s.technical_failures > 0 && (
+        <p className="mt-1 text-[13px] text-warn">처리 실패(제공자 오류 등) {s.technical_failures}/{s.answered}</p>
       )}
       {s.not_done > 0 && <p className="mt-1 text-[13px] text-warn">답하지 못한 질문 {s.not_done}개</p>}
       <LedgerLine ledger={s.ledger ?? c.ledger} />
@@ -159,6 +162,11 @@ function AnswerColumn({ c, a, q }: { c: Candidate; a: Answer | undefined; q: Gen
           검증 실패 <code>{a.validation}</code> · 이 답변은 사용자에게 보이지 않습니다
         </p>
       )}
+      {a.failure && (
+        <p className="mt-2 break-words rounded-md bg-warn-bg px-2 py-1 text-[14px] text-warn">
+          처리 실패 (답변 검증과 무관) · {a.failure}
+        </p>
+      )}
       {a.summary && <p className="mt-2 whitespace-pre-line break-words text-[15px] leading-relaxed">{a.summary}</p>}
       {(a.claims ?? []).length > 0 && (
         <ol className="mt-3 flex flex-col gap-2">
@@ -193,7 +201,7 @@ function ColumnHead({ c, a }: { c: Candidate; a: Answer }) {
         </span>
       )}
       <span className="ml-auto whitespace-nowrap text-[13px] tabular-nums text-muted">
-        {usd(a.cost_micro_usd)} · {sec(a.latency_ms)}
+        {usd(a.cost_micro_usd)} · {a.replayed ? <span title="저장된 답변을 다시 읽어 지연을 재지 못했습니다">지연 미측정</span> : sec(a.latency_ms)}
         {a.trace_url && (
           <> · <a href={a.trace_url} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">트레이스</a></>
         )}
@@ -235,7 +243,7 @@ function EvidencePanel({ id, e, onClose }: { id: string; e: Evidence; onClose: (
       <div className="flex items-center gap-2 text-[13px] text-muted">
         <span className="font-semibold text-ink">{id}</span>
         <span className="truncate">{[e.doc, e.section].filter(Boolean).join(" · ")}</span>
-        <button type="button" onClick={onClose} className="ml-auto font-medium text-primary hover:underline">닫기</button>
+        <button type="button" onClick={onClose} className="ml-auto shrink-0 font-medium text-primary hover:underline">닫기</button>
       </div>
       <p className="mt-1 max-h-[320px] overflow-y-auto whitespace-pre-line break-words text-[14px] leading-relaxed">
         {at >= 0 ? (

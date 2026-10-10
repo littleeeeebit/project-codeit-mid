@@ -152,7 +152,15 @@ def generation(inputs: Path, config: dict, mode: str) -> dict:
         pinned = answers.PinnedResources(s, owner.transport, serving, owner)
         pinned.tracing = owner.tracing  # a borrowed transport is not traced on its own
         out, spent, stop = [], 0, None
+        # A resumed candidate keeps the answers it finished, with their measured latency, instead of replaying them.
+        earlier = json.loads(Path(config["previous"]).read_text(encoding="utf-8")).get("rows") or [] \
+            if config.get("previous") else []
+        finished = {r["question_id"]: r for r in earlier if r.get("status") == "done"}
         for row in rows:
+            if row["question_id"] in finished:
+                out.append(finished[row["question_id"]])
+                spent += out[-1].get("settled_micro_usd") or 0
+                continue
             if spent + config["prices"].get(row["question_id"], 0) > config["cap_micro_usd"]:
                 stop = "the next answer could pass the approved maximum"
                 break

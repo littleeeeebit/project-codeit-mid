@@ -253,8 +253,10 @@ def _measure(stage: str, s: dict | None) -> str:
         return (f"passed {s['passed']}/{s['rows']}; required claims correct {s['required_correct']}/{s['required']}; "
                 f"of {s['claims']} claims {s['claims_supported']} quoted verbatim, {s['claims_rejected']} rejected, "
                 f"{s['claims'] - s['claims_supported'] - s['claims_rejected']} unjudged; validation failures {failures}; "
+                f"processing failures {s.get('technical_failures', 0)}; "
                 f"{s['cost_micro_usd'] / 1e6:.4f} USD over {s['paid_answers']} paid answers; latency p50 "
-                f"{s['latency_ms']['p50']} ms, p95 {s['latency_ms']['p95']} ms (n={s['latency_ms']['n']})")
+                f"{s['latency_ms']['p50']} ms, p95 {s['latency_ms']['p95']} ms (measured {s['latency_ms']['n']} of "
+                f"{s['answered']} answered)")
     if stage == "ocr":
         return (f"flagged {s['flagged']}/{s['read']} read images, re-read {s['reread']}/{s['flagged']}, unresolved "
                 f"{s['unresolved']}; not OCR'd (unreadable) {s['unreadable']}/{s['images']}; "

@@ -36,7 +36,7 @@ from tests import (release_fixtures, test_budget, test_dense, test_gold, test_po
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOTS = Path(__file__).parent / "snapshots"
 CLI_SNAPSHOT = SNAPSHOTS / "cli_parser.json"
-HELP_SHA = "4fd227ac202ebfef"  # sha256 of every help text at COLUMNS=100; repinned for embedding-comparison, --workers, ocr actions, stage-review (paid generation/ocr)
+HELP_SHA = "6ff17e3eeca1f7ef"  # sha256 of every help text at COLUMNS=100; repinned for embedding-comparison, --workers, ocr actions, stage-review (paid generation/ocr, rescore)
 
 
 def rate(k, n, lo_hi):
