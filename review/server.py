@@ -17,6 +17,7 @@ import json
 import os
 import re
 import shutil
+import socketserver
 import subprocess
 import sys
 import tempfile
@@ -369,6 +370,13 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, target.read_bytes(), TYPES.get(target.suffix, "application/octet-stream"))
 
 
+class Server(ThreadingHTTPServer):
+    def server_bind(self) -> None:
+        # HTTPServer.server_bind reverse-resolves 127.0.0.1 (socket.getfqdn), which can stall a macOS start for ~30 s.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--port", type=int, default=0, help="0 picks a free port")
@@ -379,7 +387,7 @@ def main() -> None:
         stream.reconfigure(encoding="utf-8")
     if not args.no_build:
         ensure_build()
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    server = Server(("127.0.0.1", args.port), Handler)
     Handler.port = server.server_address[1]
     url = f"http://127.0.0.1:{Handler.port}/"
     print(f"Review app: {url}  (runs: {runs_dir(Handler.root)}; Ctrl+C stops it)", flush=True)
