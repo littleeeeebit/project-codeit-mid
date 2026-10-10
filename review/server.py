@@ -138,6 +138,26 @@ def export_run(root: Path, run_id: str) -> bytes:
     return buffer.getvalue()
 
 
+def check_run(run_id: str, run: dict, view: dict) -> None:
+    """run.json and view.json both describe the run in folder run_id, with the same candidates and commits: the
+    app sends decisions by view.run_id and writes the view's candidate commits into the decision."""
+    def cands(record: dict) -> list:
+        return [(c.get("id"), c.get("role"), c.get("commit"), c.get("status")) for c in record.get("candidates") or []]
+    for name, record in (("run.json", run), ("view.json", view)):
+        if not isinstance(record, dict) or record.get("schema") != RUN_SCHEMA or record.get("run_id") != run_id \
+                or record.get("stage") != run_id.split("-", 1)[0]:
+            raise ReviewInputError(f"{name} is not a {RUN_SCHEMA} record of {run_id}")
+    if not cands(run) or cands(run) != cands(view):
+        raise ReviewInputError(f"view.json lists other candidates than run.json of {run_id}")
+
+
+def read_view(root: Path, run_id: str) -> dict:
+    folder = run_folder(root, run_id)
+    view = json.loads((folder / "view.json").read_text(encoding="utf-8"))
+    check_run(run_id, json.loads((folder / "run.json").read_text(encoding="utf-8")), view)
+    return view
+
+
 def import_run(root: Path, data: bytes) -> str:
     """A zip holding one run folder (as exported) becomes runs/<run-id>; an existing run is never replaced."""
     try:
@@ -152,12 +172,10 @@ def import_run(root: Path, data: bytes) -> str:
     if any(".." in Path(n).parts or Path(n).is_absolute() or "\\" in n for n in names):
         raise ReviewInputError("the zip holds a path outside its run folder")
     try:
-        run = json.loads(z.read(f"{run_id}/run.json"))
-        json.loads(z.read(f"{run_id}/view.json"))
+        run, view = json.loads(z.read(f"{run_id}/run.json")), json.loads(z.read(f"{run_id}/view.json"))
     except (KeyError, ValueError):
         raise ReviewInputError("run.json or view.json is missing or unreadable") from None
-    if run.get("schema") != RUN_SCHEMA or run.get("run_id") != run_id:
-        raise ReviewInputError(f"run.json is not a {RUN_SCHEMA} record of {run_id}")
+    check_run(run_id, run, view)
     target = runs_dir(root) / run_id
     if target.exists():
         raise ReviewInputError(f"{run_id} is already here")
@@ -347,7 +365,7 @@ class Handler(BaseHTTPRequestHandler):
         if parts == ["api", "import"]:
             return self._json(200, {"run_id": import_run(self.root, self._body(MAX_IMPORT))})
         if len(parts) == 4 and parts[:2] == ["api", "runs"] and parts[3] == "decision":
-            view = json.loads((run_folder(self.root, parts[2]) / "view.json").read_text(encoding="utf-8"))
+            view = read_view(self.root, parts[2])
             try:
                 body = json.loads(self._body(4 * 1024 ** 2))
             except ValueError:

@@ -2,10 +2,14 @@
 
 import gzip
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
+import zipfile
+from types import SimpleNamespace
+from unittest import mock
 from pathlib import Path
 
 from rfp_assistant.corpus import ingestion
@@ -84,6 +88,25 @@ class StageReviewContractTest(unittest.TestCase):
             self.assertIsNotNone(server.list_runs(other)[0]["imported"])
             with self.assertRaises(server.ReviewInputError):
                 server.import_run(other, server.export_run(root, run_id))
+            # A view naming another run would send this run's decision to that run's files.
+            exported = zipfile.ZipFile(io.BytesIO(server.export_run(root, run_id)))
+            tampered = io.BytesIO()
+            with zipfile.ZipFile(tampered, "w") as z:
+                for name in exported.namelist():
+                    data = exported.read(name)
+                    if name.endswith("/view.json"):
+                        data = json.dumps({**json.loads(data), "run_id": "chunking-20261010T000000Z-bbbbbb"}).encode()
+                    z.writestr(name, data)
+            with self.assertRaisesRegex(server.ReviewInputError, "view.json is not"):
+                server.import_run(Path(tmp) / "third", tampered.getvalue())
+
+            # A candidate that drops a titled table entirely loses its title; the table still counts.
+            dropped = json.loads((folder / "candidates" / "c1.json").read_text(encoding="utf-8"))
+            for d in dropped["documents"]:
+                d["chunks"] = [c for c in d["chunks"] if not any("rows" in s for s in c["spans"])]
+            (folder / "candidates" / "c1.json").write_text(json.dumps(dropped, ensure_ascii=False), encoding="utf-8")
+            rescored = stage_review.score_chunking(folder, json.loads((folder / "run.json").read_text()))
+            self.assertEqual((rescored["summary"]["c1"]["tables_kept"], rescored["summary"]["c1"]["tables_titled"]), (0, 1))
 
             with self.assertRaises(server.ReviewInputError):
                 server.write_decision(root, view, "c2", {}, {})  # a refused candidate cannot be chosen
@@ -101,6 +124,22 @@ class StageReviewContractTest(unittest.TestCase):
                          "table titles kept 0/1", "### `0` 사업", "check row 2", "Merge no candidate."):
                 self.assertIn(line, markdown)
             self.assertIn(saved["markdown"], saved["prompt"])
+
+    def test_gold_rank_beyond_shown_passages_and_bad_variant_sections(self):
+        # The first fully correct chunk at rank 15 of the 20 scored is rank 15, not "outside the top 20".
+        chunks = [{"chunk_id": f"k{i}", "extraction_id": "x", "payload": "p"} for i in range(20)]
+        index = SimpleNamespace(chunks=chunks, row_of={c["chunk_id"]: i for i, c in enumerate(chunks)}, elements={})
+        answer = {"sides": [{"ranking": [c["chunk_id"] for c in chunks], "packed": []}]}
+        with mock.patch.object(stage_review.ev, "score_row", return_value={}),                 mock.patch.object(stage_review.ev, "group_grade", lambda c, g, e: 2 if c["chunk_id"] == "k14" else 0):
+            scored = stage_review._score_question(index, {}, {}, [{}], {"side_docs": [None]}, answer)
+        self.assertEqual((scored["gold_rank"], len(scored["sides"][0])), (15, stage_review.TOP_K))
+
+        # A variant section of the wrong type fails that candidate with its reason instead of crashing the run.
+        with tempfile.TemporaryDirectory() as tmp:
+            for bad in ('{"chunking": 1}', '{"retriever": {"limits": 5}}'):
+                (Path(tmp) / stage_review.VARIANT_FILE).write_text(bad, encoding="utf-8")
+                with self.assertRaises(stage_review.ReviewError):
+                    stage_review.read_variant(Path(tmp))
 
 
 if __name__ == "__main__":

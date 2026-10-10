@@ -12,16 +12,19 @@ export function ChunkingView({ view, notes, setNote }: {
   setNote: (key: string, note: string) => void;
 }) {
   const [n, setN] = useState(view.documents[0]?.n ?? 0);
-  const [doc, setDoc] = useState<DocView | null>(null);
-  const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState<DocView | null>(null);
+  const [failed, setFailed] = useState<{ n: number; message: string } | null>(null);
   const [onlyDiff, setOnlyDiff] = useState(true);
   useEffect(() => {
     let live = true;
     getJson<DocView>(`/api/runs/${view.run_id}/docs/${n}`)
-      .then((d) => { if (live) { setDoc(d); setError(""); } })
-      .catch((e: Error) => { if (live) setError(e.message); });
+      .then((d) => { if (live) { setLoaded(d); setFailed(null); } })
+      .catch((e: Error) => { if (live) setFailed({ n, message: e.message }); });
     return () => { live = false; };
   }, [view.run_id, n]);
+  // Only the selected document's chunks are shown (and so can be noted on); an earlier one never stands in for it.
+  const doc = loaded?.n === n ? loaded : null;
+  const error = failed?.n === n ? failed.message : "";
   const done = view.candidates.filter((c) => c.status === "complete");
   const rows = doc ? doc.rows.filter((r) => !onlyDiff || r.differs) : [];
   const listed = view.documents.find((d) => d.n === n);
@@ -77,6 +80,7 @@ export function ChunkingView({ view, notes, setNote }: {
           </label>
         </div>
         {error && <p className="text-bad">문서를 읽지 못했습니다: {error}</p>}
+        {!doc && !error && <p className="py-10 text-center text-muted">불러오는 중…</p>}
         {doc && (
           <>
             <div className="mt-2 grid gap-4 overflow-x-auto" style={columns(view.candidates.length)}>

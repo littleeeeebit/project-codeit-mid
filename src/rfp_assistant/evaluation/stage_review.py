@@ -42,6 +42,9 @@ WORKING_TREE = "."
 VARIANT_FILE = "review-variant.json"
 TOP_K = 10  # passages per side kept for the view; nDCG@5 and needle top-5 use the evaluation's own cut-offs
 WORKER_TIMEOUT_S = 3600
+VARIANT_TYPES = {"chunking": {"profile": (str,)},
+                 "retriever": {"mode": (str,), "embedding": (str,), "reranker": (str, dict), "limits": (dict,),
+                               "dense_version": (str,)}}
 TITLE_LINES, TITLE_CHARS = 2, 60  # the title rule the chunking view checks, fixed here so no candidate can move it
 _SECRETS = ("OPENAI_", "GEMINI_", "GOOGLE_API_", "LANGFUSE_", "TYPESAFE_", "HF_TOKEN")
 
@@ -237,8 +240,14 @@ def read_variant(worktree: Path) -> dict:
         variant = json.loads(path.read_text(encoding="utf-8"))
     except ValueError as exc:
         raise ReviewError(f"{VARIANT_FILE} is not valid JSON: {exc}") from None
-    if not isinstance(variant, dict) or set(variant) - set(STAGES):
+    if not isinstance(variant, dict) or set(variant) - set(STAGES) or not all(
+            isinstance(v, dict) for v in variant.values()):
         raise ReviewError(f"{VARIANT_FILE} holds one object per stage among {STAGES}")
+    for stage, section in variant.items():
+        for key, value in section.items():
+            if key in VARIANT_TYPES[stage] and not isinstance(value, VARIANT_TYPES[stage][key]):
+                raise ReviewError(f"{VARIANT_FILE}: {stage}.{key} must be "
+                                  f"{' or '.join(t.__name__ for t in VARIANT_TYPES[stage][key])}")
     return variant
 
 
@@ -304,6 +313,8 @@ def run(settings: Settings, stage: str, base: str, cands: list[str], inputs_from
             cand.update({k: out[k] for k in ("status", "reason", "host", "packages", "elapsed_s") if k in out})
         except ReviewError as exc:
             cand.update(status="failed", reason=str(exc), host=host)
+        except Exception as exc:  # noqa: BLE001 - one broken candidate must not cost the others' results
+            cand.update(status="failed", reason=f"{type(exc).__name__}: {exc}", host=host)
         finally:
             remove_worktree(worktree)
     record = {"schema": SCHEMA, "run_id": run_id, "stage": stage, "created_at": datetime.now(timezone.utc).isoformat(),
@@ -385,11 +396,11 @@ def _score_question(index, docs: dict, row: dict, groups: list[dict], q: dict, a
             packed = [index.chunks[index.row_of[c]] for c in side["packed"]]
             mine = groups if doc is None else [g for g in groups if g.get("doc_id") == doc]
             parts.append(ev.score_row(row, ranking, packed, index.elements, mine))
+            grades = [max((ev.group_grade(chunk, g, index.elements) for g in mine), default=0) for chunk in ranking]
+            if len(answer["sides"]) == 1:  # over the whole scored ranking, not only the passages shown
+                gold_rank = next((rank for rank, grade in enumerate(grades, start=1) if grade == 2), None)
             top = []
-            for rank, chunk in enumerate(ranking[:TOP_K], start=1):
-                grade = max((ev.group_grade(chunk, g, index.elements) for g in mine), default=0)
-                if grade == 2 and gold_rank is None and len(answer["sides"]) == 1:
-                    gold_rank = rank
+            for rank, (chunk, grade) in enumerate(zip(ranking[:TOP_K], grades), start=1):
                 top.append({"rank": rank, "chunk_id": chunk["chunk_id"], "grade": grade,
                             "doc": (docs.get(chunk["extraction_id"]) or {}).get("title"),
                             "section": " > ".join(chunk.get("section_path") or []),
@@ -473,11 +484,10 @@ def score_chunking(folder: Path, record: dict) -> dict:
         per, ends = {}, {}
         for cid, by_doc in chunks.items():
             mine = by_doc.get(x) or []
-            lost, titled = [], 0
+            lost, titled = [], len(titles)  # titled tables come from the frozen source; a dropped table is lost
             for table, lines in titles.items():
                 carrying = [c for c in mine if any(s["element_id"] == table for s in c["spans"])]
-                titled += bool(carrying)
-                if carrying and not all(_squash(t) in _squash(c["payload"]) for c in carrying for t in lines):
+                if not carrying or not all(_squash(t) in _squash(c["payload"]) for c in carrying for t in lines):
                     lost.append(table)
             totals[cid]["titled"] += titled
             totals[cid]["kept"] += titled - len(lost)
