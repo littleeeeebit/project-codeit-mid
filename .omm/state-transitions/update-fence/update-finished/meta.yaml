@@ -1,9 +1,0 @@
-created: 2026-10-09T23:19:08.666Z
-updated: 2026-10-09T23:19:08.667Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: update-finished
-children: []
-parentPath:
-  - update-fence

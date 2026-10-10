@@ -1,0 +1,1 @@
+app_settings.active_run (JSON serving config: run_id, mode, index_version, dense_version, embedding, reranker, limits, eval_version) and app_settings.active_index, written only by activate_decision or by build_keyword_index with activate. Every request reads them through active_serving.

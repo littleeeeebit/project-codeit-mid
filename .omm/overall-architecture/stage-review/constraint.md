@@ -1,0 +1,1 @@
+The review app never runs a pipeline, loads a model or pays. Only `stage-review resume` of an approved, unexpired estimate gives a worker OPENAI_API_KEY. Running generation against codeit's shared ledger requires stopping bidmate.service for `resume`, because that service holds the gateway lock.

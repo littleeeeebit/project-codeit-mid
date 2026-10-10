@@ -1,0 +1,1 @@
+The provider may have executed and billed: timeouts, connection loss, 5xx, mid-stream errors, a missing usage block, a failed settlement, or a restart while dispatching. While any unknown attempt exists, mark_dispatching refuses every PostgreSQL dispatch.

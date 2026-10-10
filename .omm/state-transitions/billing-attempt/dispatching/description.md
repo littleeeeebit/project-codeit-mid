@@ -1,1 +1,0 @@
-The durable marker written immediately before the network call, in the same transaction as the request's stop check. After a crash this state is the only evidence that a call may have executed.

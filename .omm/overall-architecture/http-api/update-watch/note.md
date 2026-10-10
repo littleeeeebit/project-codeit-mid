@@ -1,0 +1,1 @@
+The root updater script and its systemd units were not read; their behaviour is taken from update.py docstrings.

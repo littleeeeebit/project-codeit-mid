@@ -1,15 +1,22 @@
 graph TD
-  web-screens["Next.js screens\nweb/src"] -->|"fetch /api with session"| http-api["FastAPI app\nsrc/rfp_assistant/api.py"]
-  http-api -->|"one service call per route"| service-core["Service core\nsrc/rfp_assistant/service/service.py"]
-  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"] -->|"same functions, own Resources"| service-core
-  owner-cli -->|"manifest, ingest, ocr, fidelity"| corpus-pipeline["Corpus pipeline\nsrc/rfp_assistant/corpus"]
-  owner-cli -->|"runs, activate-run, release"| evaluation-suite["Evaluation and selection\nsrc/rfp_assistant/evaluation"]
-  service-core -->|"verify jobs, activation"| evaluation-suite
-  service-core -->|"retrieve evidence"| retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval"]
-  service-core -->|"reserve, call, settle"| paid-gateway["Paid gateway\nsrc/rfp_assistant/gateway"]
-  retrieval-engine -->|"paid query embedding"| paid-gateway
-  corpus-pipeline -->|"sources, elements, OCR text"| postgres-store["PostgreSQL and pgvector\nsrc/rfp_assistant/storage"]
-  retrieval-engine -->|"chunks, vectors"| postgres-store
-  paid-gateway -->|"attempts, advisory lock"| postgres-store
-  evaluation-suite -->|"active_run setting"| postgres-store
-  service-core -->|"requests, audit rows"| postgres-store
+  web-screens["Next.js screens\nweb/src/components/ask/ask-page.tsx"]
+  http-api["FastAPI app and session gate\nsrc/rfp_assistant/api.py"]
+  service-core["Service core and request executor\nsrc/rfp_assistant/service/service.py"]
+  retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  paid-gateway["Budget ledger and OpenAI transport\nsrc/rfp_assistant/gateway/budget.py"]
+  postgres-store["PostgreSQL store and gateway lock\nsrc/rfp_assistant/storage/postgres.py"]
+  corpus-pipeline["Corpus ingestion, OCR, fidelity\nsrc/rfp_assistant/corpus/ingestion.py"]
+  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"]
+  stage-review["Stage review runner and app\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  web-screens -->|"fetch /api with session"| http-api
+  http-api -->|"one service call per route"| service-core
+  service-core -->|"scoped retrieve per question"| retrieval-engine
+  service-core -->|"reserve, dispatch, settle"| paid-gateway
+  service-core -->|"requests rows, result_json"| postgres-store
+  paid-gateway -->|"attempts in locked tx"| postgres-store
+  retrieval-engine -->|"active index, vectors"| postgres-store
+  corpus-pipeline -->|"extractions, elements, chunks"| postgres-store
+  owner-cli -->|"ingest, build, activate"| corpus-pipeline
+  owner-cli -->|"settle, reconcile, paid on"| paid-gateway
+  owner-cli -->|"stage-review run, resume"| stage-review
+  stage-review -->|"paid candidates via ledger"| paid-gateway

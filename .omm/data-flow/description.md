@@ -1,1 +1,1 @@
-How data moves from the original files into a served answer. Each arrow is an explicit, rerunnable command that reuses unchanged inputs. Only `activate-run` changes what serves.
+How corpus data becomes cited evidence, and which identifiers keep it traceable. source_hash identifies original bytes. extraction_id identifies a parser output revision. index_version identifies an immutable chunk set. chunk_id and element_ids tie evidence back to source spans. Old revisions and indexes stay on disk so issued citations and pinned gold rows keep resolving.

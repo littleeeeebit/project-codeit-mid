@@ -1,9 +1,15 @@
 graph TD
-  original-files["Original HWP and PDF\nsrc/rfp_assistant/settings.py"] -->|"manifest hashes"| source-records["documents and sources rows\nsrc/rfp_assistant/storage/store.py"]
-  original-files -->|"embedded pictures, rasters"| ocr-cache["OCR region cache\nsrc/rfp_assistant/corpus/ocr.py"]
-  source-records -->|"ingest parses"| extraction-artifacts["Elements and artifacts\nsrc/rfp_assistant/corpus/ingestion.py"]
-  ocr-cache -->|"merged as image_text"| extraction-artifacts
-  extraction-artifacts -->|"build-keyword chunks"| keyword-index-files["Keyword index files\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  keyword-index-files -->|"embed chunk payloads"| vector-sets["pgvector sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  vector-sets -->|"evaluate, compare, activate"| active-serving["Active serving config\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  keyword-index-files -->|"activate-run"| active-serving
+  source-originals["Originals and data_list.csv\nsrc/rfp_assistant/corpus/ingestion.py"]
+  extraction-revisions["Extraction artifacts and elements\nsrc/rfp_assistant/corpus/ingestion.py"]
+  ocr-reads["OCR region cache\nsrc/rfp_assistant/corpus/ocr.py"]
+  keyword-index["Immutable keyword index\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  vector-sets["Embedding vector sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  serving-activation["active_run and active_index\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  evidence-map["Request evidence map\nsrc/rfp_assistant/service/service.py"]
+  source-originals -->|"sha256 source_hash"| extraction-revisions
+  ocr-reads -->|"image_text elements"| extraction-revisions
+  extraction-revisions -->|"chunk profile build"| keyword-index
+  keyword-index -->|"chunk payloads embedded"| vector-sets
+  serving-activation -->|"selects index, dense version"| keyword-index
+  keyword-index -->|"packed EvidenceUnit quotes"| evidence-map
+  evidence-map -->|"open_evidence context"| extraction-revisions

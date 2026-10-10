@@ -1,0 +1,1 @@
+compare() internals were read at signature level; the verdict rules are from README.md.

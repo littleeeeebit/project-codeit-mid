@@ -1,0 +1,1 @@
+A 55-question generation candidate took about 25–40 minutes on 2026-10-10. An OCR candidate's local reads took about 30 minutes for 200 images on an RTX 3080.

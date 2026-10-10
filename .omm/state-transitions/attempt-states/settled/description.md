@@ -1,0 +1,1 @@
+Cost from reported usage at the reservation's stored rates. A duplicate settle returns the stored value. A cost above the reservation freezes the ledger for inspection.

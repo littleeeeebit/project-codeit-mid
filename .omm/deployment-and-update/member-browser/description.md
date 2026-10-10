@@ -1,1 +1,0 @@
-Loads the static screens from the same origin and calls /api with the `bidmate_session` cookie, path /api/. Signs in through `/api/auth/login`.

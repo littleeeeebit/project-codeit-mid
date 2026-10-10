@@ -1,0 +1,1 @@
+_stored_quote scans res.index().chunks linearly for every evidence unit (roughly 19k active chunks); this is cheap per answer but O(chunks x units).

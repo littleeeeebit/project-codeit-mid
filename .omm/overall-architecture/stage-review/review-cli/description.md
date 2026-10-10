@@ -1,0 +1,1 @@
+stage-review run <stage> --base <ref> --cand <ref>... (`.` means the working tree), approve --run --approved-by, resume, rescore and reprice. on_ledger runs reprice, resume or rescore inside the lifecycle of the ledger database named by --ledger-dsn-env, opened only for that step so it is never held idle through hours of local reads.

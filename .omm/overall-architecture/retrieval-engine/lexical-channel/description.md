@@ -1,1 +1,0 @@
-`_lexical_matches` → `rank_lexical` runs BM25 over the analyzer tokens of the allowed rows. `scope_redundant_terms` drops query terms that cannot discriminate inside the scope: non-positive scope-local IDF, or the selected project's own name terms. Codes, digits and negations are never dropped, and every drop is recorded in limitations.

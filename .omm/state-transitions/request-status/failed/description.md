@@ -1,1 +1,0 @@
-Written by `_finish` for `technical_error`, `clarification_required` and validation failures, or by `_fail_unscheduled` when the executor rejected the submission. Billing of any dispatched call is still recorded.

@@ -1,8 +1,16 @@
 graph TD
-  resources-owner["Resources owner\nsrc/rfp_assistant/service/service.py"] -->|"creates lazily"| request-runner["Request runner\nsrc/rfp_assistant/service/service.py"]
-  request-runner -->|"run_queued per request"| answer-pipeline["Answer pipeline\nsrc/rfp_assistant/service/service.py"]
-  resources-owner -->|"index, dense, reranker, transport"| answer-pipeline
-  resources-owner -->|"joined on close"| background-jobs["Background jobs\nsrc/rfp_assistant/service/service.py"]
-  update-watch["Update fence\nsrc/rfp_assistant/service/update.py"] -->|"fenced under _runner_lock"| request-runner
-  update-watch -->|"fenced under _runner_lock"| background-jobs
-  hub-login["Hub login\nsrc/rfp_assistant/service/auth.py"] -->|"member identity"| answer-pipeline
+  resources-owner["Resources process owner\nsrc/rfp_assistant/service/service.py"]
+  submit-answer["submit_answer and _create\nsrc/rfp_assistant/service/service.py"]
+  request-runner["RequestRunner executor\nsrc/rfp_assistant/service/service.py"]
+  paid-answer["_paid_answer pipeline\nsrc/rfp_assistant/service/service.py"]
+  metered-chat["_metered_chat and _call_and_settle\nsrc/rfp_assistant/service/service.py"]
+  answer-validation["validate_answer guardrail\nsrc/rfp_assistant/gateway/generation.py"]
+  free-modes["Metadata and inventory answers\nsrc/rfp_assistant/service/service.py"]
+  background-jobs["Drafting, evaluation, maintenance threads\nsrc/rfp_assistant/service/service.py"]
+  submit-answer -->|"try_admit slot, insert queued"| request-runner
+  submit-answer -->|"free modes run inline"| free-modes
+  request-runner -->|"run_queued claims row"| paid-answer
+  paid-answer -->|"rewrite and generation stages"| metered-chat
+  paid-answer -->|"response plus evidence"| answer-validation
+  resources-owner -->|"owns runner, transport, index"| request-runner
+  resources-owner -->|"registers and joins"| background-jobs

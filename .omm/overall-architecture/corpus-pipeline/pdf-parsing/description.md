@@ -1,1 +1,0 @@
-`parse_pdf` (PyMuPDF) builds page-ordered text and table elements with page labels and columns. `ocr.merge` inserts each raster image's OCR text next to the original's text around it, located by text anchors (`_anchors`, `_find`).

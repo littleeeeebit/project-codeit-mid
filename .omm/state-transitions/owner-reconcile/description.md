@@ -1,0 +1,1 @@
+Owner CLI commands with --actor and a reason: settle an unknown attempt from provider evidence, reconcile an interval's provider total, add an external adjustment, toggle paid admission. These are the only ways to clear unknown billing and reopen dispatch.

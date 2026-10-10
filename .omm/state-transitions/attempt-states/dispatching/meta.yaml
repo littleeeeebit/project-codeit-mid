@@ -1,0 +1,9 @@
+created: 2026-10-10T12:42:07.332Z
+updated: 2026-10-10T12:42:07.333Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: dispatching
+children: []
+parentPath:
+  - attempt-states

@@ -1,6 +1,14 @@
 graph TD
-  session-middleware["Session middleware\nsrc/rfp_assistant/api.py"] -->|"signed-in member bound"| ask-routes["Ask and request routes\nsrc/rfp_assistant/api.py"]
-  session-middleware -->|"signed-in member bound"| verify-routes["Verify and dataset routes\nsrc/rfp_assistant/api.py"]
-  session-middleware -->|"sign-in paths pass"| auth-routes["Sign-in routes\nsrc/rfp_assistant/api.py"]
-  app-lifespan["Lifespan owner\nsrc/rfp_assistant/api.py"] -->|"opens Resources, UpdateWatch"| session-middleware
-  static-mount["Static screens\nweb/out"] -->|"served after /api"| session-middleware
+  session-gate["_Session middleware\nsrc/rfp_assistant/api.py"]
+  hub-login["JupyterHub OAuth sign-in\nsrc/rfp_assistant/service/auth.py"]
+  ask-routes["Ask and request routes\nsrc/rfp_assistant/api.py"]
+  answer-sse["Stream route events()\nsrc/rfp_assistant/api.py"]
+  verify-routes["Verify, drafting, gold routes\nsrc/rfp_assistant/api.py"]
+  update-watch["UpdateWatch fence\nsrc/rfp_assistant/service/update.py"]
+  static-mount["Static web/out mount\nsrc/rfp_assistant/api.py"]
+  hub-login -->|"session cookie on /api/"| session-gate
+  session-gate -->|"bind_request contextvars"| ask-routes
+  session-gate -->|"member principal"| verify-routes
+  ask-routes -->|"same request id"| answer-sse
+  update-watch -->|"fence read at admission"| ask-routes
+  session-gate -->|"non-/api paths pass"| static-mount

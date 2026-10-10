@@ -1,27 +1,16 @@
 created: 2026-10-05 03:34:25.621000+00:00
-updated: 2026-10-09T23:19:03.983Z
+updated: 2026-10-09 23:19:03.983000+00:00
 update_count: 22
 last_field: diagram
 kind: nested-class
 title: serving-activation
 children:
-  - activated-run
-  - keyword-default
-  - request-fallback
-  - route-stale-default
+- activated-run
 parentPath: []
-prev_diagram: "graph TD\r
-
-  \  keyword-default[\"Keyword default\\nsrc/rfp_assistant/service.py\"]
-  -->|\"activate_decision\"| activated-run[\"Activated
-  run\\nsrc/rfp_assistant/evaluation.py\"]\r
-
-  \  activated-run -->|\"corpus route changed\"| stale-fallback[\"Stale
-  fallback\\nsrc/rfp_assistant/service.py\"]\r
-
-  \  activated-run -->|\"HR under old policy\"| hybrid-without-reranker[\"Hybrid
-  without reranker\\nsrc/rfp_assistant/service.py\"]\r
-
-  \  stale-fallback -->|\"rerun then activate\"| activated-run\r
-
-  \  hybrid-without-reranker -->|\"current trial activated\"| activated-run"
+prev_diagram: "graph TD\r\n  keyword-default[\"Keyword default\\nsrc/rfp_assistant/service.py\"\
+  ] -->|\"activate_decision\"| activated-run[\"Activated run\\nsrc/rfp_assistant/evaluation.py\"\
+  ]\r\n  activated-run -->|\"corpus route changed\"| stale-fallback[\"Stale fallback\\\
+  nsrc/rfp_assistant/service.py\"]\r\n  activated-run -->|\"HR under old policy\"\
+  | hybrid-without-reranker[\"Hybrid without reranker\\nsrc/rfp_assistant/service.py\"\
+  ]\r\n  stale-fallback -->|\"rerun then activate\"| activated-run\r\n  hybrid-without-reranker\
+  \ -->|\"current trial activated\"| activated-run"

@@ -1,9 +1,0 @@
-created: 2026-10-09T23:19:03.241Z
-updated: 2026-10-09T23:19:03.241Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: approved
-children: []
-parentPath:
-  - gold-candidate

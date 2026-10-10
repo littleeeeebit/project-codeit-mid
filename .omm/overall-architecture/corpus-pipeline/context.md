@@ -1,0 +1,1 @@
+OCR design per the maintainer's memory and README.md: PaddleOCR-VL locally on the GPU, with a gpt-5-mini fallback for flagged regions on the owner's personal key, charged to the `ocr` envelope of the shared codeit ledger through a tunnel. HWP image text comes from embedded pictures, not from the Hancom print.

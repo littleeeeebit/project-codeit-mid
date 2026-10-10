@@ -1,0 +1,1 @@
+A worker thread runs run_queued: an atomic claim queued -> running unless cancel was requested, then _execute and _paid_answer. The principal is rebuilt from the persisted snapshot, so the worker never touches UI state. Every exit goes through done() -> _finish, so a claimed request always reaches a terminal row.

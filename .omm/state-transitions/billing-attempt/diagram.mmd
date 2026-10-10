@@ -1,9 +1,0 @@
-graph TD
-  reserved["Reserved\nsrc/rfp_assistant/gateway/budget.py"] -->|"mark_dispatching"| dispatching["Dispatching\nsrc/rfp_assistant/gateway/budget.py"]
-  reserved -->|"guard refused or recover"| released["Released\nsrc/rfp_assistant/gateway/budget.py"]
-  dispatching -->|"usage settled"| settled["Settled\nsrc/rfp_assistant/gateway/budget.py"]
-  dispatching -->|"confirmed pre-execution 4xx"| released
-  dispatching -->|"timeout, no usage, restart"| unknown["Unknown\nsrc/rfp_assistant/gateway/budget.py"]
-  unknown -->|"evidence of usage"| settled
-  unknown -->|"owner reconcile"| reconciled["Reconciled\nsrc/rfp_assistant/gateway/budget.py"]
-  reconciled -->|"late usage, adjustment"| settled

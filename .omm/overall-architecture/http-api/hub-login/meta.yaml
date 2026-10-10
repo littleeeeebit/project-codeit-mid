@@ -1,0 +1,9 @@
+created: 2026-10-10T12:41:53.796Z
+updated: 2026-10-10T12:41:53.921Z
+update_count: 2
+last_field: note
+kind: nested-class
+title: hub-login
+children: []
+parentPath:
+  - http-api

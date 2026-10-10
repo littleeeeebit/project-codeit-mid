@@ -1,0 +1,1 @@
+The pgvector storage in retrieval/vector_store.py and the local GPU runners in retrieval/models.py were not read in detail.

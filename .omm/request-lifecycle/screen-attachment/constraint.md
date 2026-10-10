@@ -1,0 +1,1 @@
+An answer renders only while the screen still asks exactly what it asked (DESIGN.md §12 and README.md).

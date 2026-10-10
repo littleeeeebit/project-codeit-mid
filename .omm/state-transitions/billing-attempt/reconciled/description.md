@@ -1,1 +1,0 @@
-Covered by an owner reconciliation that recorded the provider's total for an interval and billing scope (`_check_covered`, `_settled_in`).

@@ -1,1 +1,0 @@
-update.sh runs git, pip and npm as the service user. On any failing step it calls `rollback`, which restores the previous commit, rebuilds and restarts.

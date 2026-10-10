@@ -1,10 +1,15 @@
 graph TD
-  screen-submit["Screen submits question\nweb/src/components/ask/ask-page.tsx"] -->|"POST /api/ask"| admission-and-persist["Admission and persist\nsrc/rfp_assistant/service/service.py"]
-  admission-and-persist -->|"request_id to executor"| worker-claim["Worker claims request\nsrc/rfp_assistant/service/service.py"]
-  worker-claim -->|"follow-up only"| follow-up-rewrite["Standalone rewrite\nsrc/rfp_assistant/service/service.py"]
-  worker-claim -->|"first turn"| retrieve-and-price["Retrieve and price\nsrc/rfp_assistant/service/service.py"]
-  follow-up-rewrite -->|"standalone query"| retrieve-and-price
-  retrieve-and-price -->|"messages, estimate"| metered-generation["Metered generation\nsrc/rfp_assistant/service/service.py"]
-  metered-generation -->|"provider response"| validate-and-finish["Validate and finish\nsrc/rfp_assistant/service/service.py"]
-  validate-and-finish -->|"result_json stored"| status-and-stream["Status poll and stream\nsrc/rfp_assistant/api.py"]
-  metered-generation -->|"partial text"| status-and-stream
+  ask-composer["Ask composer postAsk\nweb/src/components/ask/ask-page.tsx"]
+  session-gate["Session and account check\nsrc/rfp_assistant/api.py"]
+  request-admission["ask and submit_answer\nsrc/rfp_assistant/service/service.py"]
+  worker-execution["run_queued and _paid_answer\nsrc/rfp_assistant/service/service.py"]
+  paid-stages["Rewrite, embed, generate\nsrc/rfp_assistant/service/service.py"]
+  outcome-store["_finish result_json\nsrc/rfp_assistant/service/service.py"]
+  screen-attachment["TurnView poll and stream\nweb/src/components/ask/ask-page.tsx"]
+  ask-composer -->|"POST /api/ask"| session-gate
+  session-gate -->|"member, key, model bound"| request-admission
+  request-admission -->|"queued row, executor submit"| worker-execution
+  worker-execution -->|"checkpoint before each"| paid-stages
+  paid-stages -->|"validated payload or failure"| outcome-store
+  request-admission -->|"request_id, generation_id, target"| screen-attachment
+  screen-attachment -->|"poll view, SSE partials"| outcome-store

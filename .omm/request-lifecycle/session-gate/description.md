@@ -1,0 +1,1 @@
+_Session resolves the session cookie to a hub username, checks the X-BidMate-Account header, and calls bind_request. From that point KEY_SESSION, REQUEST_MODEL and BILLING_SCOPE identify the member's own key session, chosen answer model (gpt-5-mini or gpt-5-nano) and billing project for this HTTP request and all work it starts.

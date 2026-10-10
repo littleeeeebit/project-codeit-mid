@@ -1,6 +1,12 @@
 graph TD
-  request-status["Request status\nsrc/rfp_assistant/service/service.py"] -->|"owns attempts"| billing-attempt["Billing attempt\nsrc/rfp_assistant/gateway/budget.py"]
-  source-review["Source parse and review\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"gates index membership"| serving-activation["Serving activation\nsrc/rfp_assistant/service/service.py"]
-  gold-candidate["Gold candidate\nsrc/rfp_assistant/evaluation/gold.py"] -->|"approved rows score runs"| serving-activation
-  update-fence["Update fence\nsrc/rfp_assistant/service/update.py"] -->|"blocks new admission"| request-status
-  billing-attempt -->|"open attempts block update"| update-fence
+  request-states["Request row status\nsrc/rfp_assistant/service/service.py"]
+  attempt-states["Ledger attempt state\nsrc/rfp_assistant/gateway/budget.py"]
+  stop-checkpoint["_checkpoint and _dispatch_guard\nsrc/rfp_assistant/service/service.py"]
+  restart-recovery["recover_requests and budget.recover\nsrc/rfp_assistant/service/service.py"]
+  owner-reconcile["Owner settle and reconcile\nsrc/rfp_assistant/cli.py"]
+  request-states -->|"cancel flag, status read"| stop-checkpoint
+  stop-checkpoint -->|"refusal releases reservation"| attempt-states
+  attempt-states -->|"_billing precedence"| request-states
+  restart-recovery -->|"running to interrupted"| request-states
+  restart-recovery -->|"dispatching to unknown"| attempt-states
+  owner-reconcile -->|"unknown to reconciled"| attempt-states

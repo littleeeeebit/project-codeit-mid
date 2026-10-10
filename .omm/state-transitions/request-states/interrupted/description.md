@@ -1,0 +1,1 @@
+Set by RequestRunner.shutdown (queued always; running only when workers were still pending at the deadline) and by recover_requests when a new process takes the gateway. Interrupted work is never replayed automatically.
