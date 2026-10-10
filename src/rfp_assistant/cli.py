@@ -305,20 +305,22 @@ def cmd_stage_review(args, settings) -> int:
         _print({"run_id": args.run, "approved_by": est["approved_by"], "max_usd": est["max_micro_usd"] / 1e6,
                 "next": f"stage-review resume --run {args.run}"})
         return 0
-    ledger = settings.with_(database_dsn_env=args.ledger_dsn_env) if args.ledger_dsn_env else None
-    if args.action in ("resume", "rescore", "reprice") and ledger is None:
-        record = json.loads((stage_review.run_folder(settings, args.run) / "run.json").read_text(encoding="utf-8"))
-        ledger = settings.with_(database_dsn_env=record["ledger_env"]) if record.get("ledger_env") else None
-    with store.database_lifecycle(ledger.db_path) if ledger else contextlib.nullcontext():
-        if ledger:  # the shared ledger in another database (e.g. codeit's, through a tunnel): no schema statements
-            from .storage.postgres import require_imported_database
+    action, run_id = args.action, args.run
+    if action == "run":
+        # Workers may read for an hour; the ledger is opened afterwards to price their work, never held idle meanwhile.
+        record = stage_review.run(settings, args.stage, args.base, args.cand, inputs_from=args.inputs_from,
+                                  ledger_env=args.ledger_dsn_env)
+        action, run_id = ("reprice", record["run_id"]) if record.get("state") == "needs_approval" else (None, None)
+    if action:
+        record = json.loads((stage_review.run_folder(settings, run_id) / "run.json").read_text(encoding="utf-8"))
+        ledger_env = args.ledger_dsn_env or record.get("ledger_env")
+        ledger = settings.with_(database_dsn_env=ledger_env) if ledger_env else None
+        with store.database_lifecycle(ledger.db_path) if ledger else contextlib.nullcontext():
+            if ledger:  # the shared ledger in another database (e.g. codeit's, through a tunnel): no schema statements
+                from .storage.postgres import require_imported_database
 
-            require_imported_database(ledger.db_path)
-        if args.action in ("resume", "rescore", "reprice"):
-            record = getattr(stage_review, args.action)(settings, args.run)
-        else:
-            record = stage_review.run(settings, args.stage, args.base, args.cand, inputs_from=args.inputs_from,
-                                      ledger_env=args.ledger_dsn_env)
+                require_imported_database(ledger.db_path)
+            record = getattr(stage_review, action)(settings, run_id)
     _print({"run_id": record["run_id"], "folder": str(stage_review.review_dir(settings) / "runs" / record["run_id"]),
             "state": record.get("state", "complete"),
             "candidates": [{k: c.get(k) for k in ("id", "label", "commit", "status", "reason", "ledger")}

@@ -356,9 +356,10 @@ def run(settings: Settings, stage: str, base: str, cands: list[str], inputs_from
         record.update(state="needs_approval", ledger_env=ledger_env)
         if stage == "ocr":
             paid.render_images(folder)
-        # Written before pricing: a ledger that dropped during an hour of local reads costs a re-price, not the reads.
+        # Unpriced on purpose: `reprice` prices it on a ledger connection opened after an hour of local reads, not
+        # one held idle through them; a failed pricing step then costs a re-price, not the reads.
         write_text_atomic(folder / "run.json", json.dumps(record, ensure_ascii=False, indent=1))
-        return reprice(settings, run_id)
+        return record
     view = score_retriever(settings, folder, record) if stage == "retriever" else score_chunking(folder, record)
     write_text_atomic(folder / "view.json", json.dumps(view, ensure_ascii=False))
     write_text_atomic(folder / "run.json", json.dumps(record, ensure_ascii=False, indent=1))
