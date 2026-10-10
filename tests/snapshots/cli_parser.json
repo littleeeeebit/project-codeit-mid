@@ -274,6 +274,13 @@
   {"name": ["--reason"], "dest": "reason", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--actor"], "dest": "actor", "default": "owner-cli", "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"}
  ],
+ "stage-review": [
+  {"name": "action", "dest": "action", "default": null, "required": true, "choices": ["run"], "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": "stage", "dest": "stage", "default": null, "required": true, "choices": ["retriever", "chunking"], "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": ["--base"], "dest": "base", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": ["--cand"], "dest": "cand", "default": [], "required": false, "choices": null, "type": null, "nargs": null, "action": "_AppendAction"},
+  {"name": ["--inputs-from"], "dest": "inputs_from", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"}
+ ],
  "trial-reranker": [
   {"name": ["--dataset"], "dest": "dataset", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--candidate-counts"], "dest": "candidate_counts", "default": "10,20", "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
