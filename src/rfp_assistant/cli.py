@@ -291,6 +291,16 @@ def cmd_compare_runs(args, settings) -> int:
     return 0
 
 
+def cmd_stage_review(args, settings) -> int:
+    from .evaluation import stage_review
+
+    record = stage_review.run(settings, args.stage, args.base, args.cand, inputs_from=args.inputs_from)
+    _print({"run_id": record["run_id"], "folder": str(stage_review.review_dir(settings) / "runs" / record["run_id"]),
+            "candidates": [{k: c.get(k) for k in ("id", "label", "commit", "status", "reason")}
+                           for c in record["candidates"]]})
+    return 0
+
+
 def cmd_draft_activation(args, settings) -> int:
     draft = evaluation.draft_activation(settings, [r.strip() for r in args.runs.split(",") if r.strip()],
                                         Path(args.out), select=args.select)
@@ -787,6 +797,14 @@ def _retrieval_commands(sub) -> None:
     s.add_argument("--runs", required=True, help="comma-separated run IDs to compare")
     s.add_argument("--out", required=True, help="absolute path of the draft decision JSON")
     s.add_argument("--select", help="choose this run instead of the recommendation (recorded as an override)")
+    s = sub.add_parser("stage-review", help="run a baseline ref and candidate refs on one stage's frozen inputs for "
+                                           "the review app (review.cmd / review.command); activates nothing")
+    s.add_argument("action", choices=["run"])
+    s.add_argument("stage", choices=["retriever", "chunking"])
+    s.add_argument("--base", required=True, help="baseline git ref, e.g. main")
+    s.add_argument("--cand", action="append", default=[], help="candidate git ref, repeatable; '.' is the working tree")
+    s.add_argument("--inputs-from", help="reuse the frozen inputs of this earlier run ID (chunking then needs no "
+                                         "database)")
 
 
 def _release_commands(sub) -> None:
@@ -958,6 +976,7 @@ COMMANDS = {"init": cmd_init, "set-limit": cmd_set_limit, "register-embedding-ra
             "golden-counts": cmd_golden_counts, "judge-set": cmd_judge_set, "run-judges": cmd_run_judges,
             "maintain": cmd_maintain,
             "compare-runs": cmd_compare_runs, "draft-activation": cmd_draft_activation,
+            "stage-review": cmd_stage_review,
             "fidelity": cmd_fidelity, "ocr": cmd_ocr, "build-keyword": cmd_build_keyword, "check": cmd_check, "validate-gold": cmd_validate_gold,
             "configure-budget": cmd_configure_budget, "budget-status": cmd_budget_status,
             "budget-report": cmd_budget_report,
@@ -985,6 +1004,10 @@ def main(argv: list[str] | None = None) -> int:
 
             os.environ.setdefault("RFP_POSTGRES_TEST_DSN", server_dsn())
             return COMMANDS[args.command](args, load_settings(provider="fake", database_dsn_env="RFP_POSTGRES_TEST_DSN"))
+        if args.command == "stage-review" and args.stage == "chunking" and args.inputs_from:
+            # Chunking from an earlier run's frozen inputs reads no database (a Mac teammate's checkout has none).
+            os.environ.setdefault("RFP_NO_DATABASE_DSN", "unused")
+            return cmd_stage_review(args, load_settings(provider="fake", database_dsn_env="RFP_NO_DATABASE_DSN"))
         settings = load_settings()
         with store.database_lifecycle(settings.db_path):
             if args.command != "init":
