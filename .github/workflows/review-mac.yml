@@ -50,8 +50,8 @@ jobs:
           grep -q "Building the review app" "$RUNNER_TEMP/launch-1.log"
           grep -o "http://127.0.0.1:[0-9]*/" "$RUNNER_TEMP/launch-1.log" | head -1 > "$RUNNER_TEMP/url"
           sleep 5
-          echo "Browser processes after the launcher opened the URL:"
-          pgrep -il "safari|chrome|firefox"
+          # The default browser itself, not the Safari helper agents that run on every login.
+          pgrep -lx Safari
 
       - name: Import the run folder through the app
         run: |
