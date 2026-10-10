@@ -246,6 +246,17 @@ def load_estimate(folder: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def estimate_report(est: dict) -> dict:
+    """What the person reads before approving: each candidate's maximum, the envelope it must fit, the next command."""
+    return {"estimate": {cid: {"max_usd": c["max_micro_usd"] / 1e6, "calls": c["calls"],
+                               "typical_usd": c["typical_micro_usd"] / 1e6 if "typical_micro_usd" in c else None}
+                         for cid, c in est["candidates"].items()},
+            "max_usd": est["max_micro_usd"] / 1e6, "ledger": est["ledger"], "purpose": est["purpose"],
+            "envelope_remaining_usd": est["envelope_remaining_micro_usd"] / 1e6, "fits": est["fits"],
+            "expires_at": est["expires_at"],
+            "next": f"read the estimate, then stage-review approve --run {est['run_id']} --approved-by <name>"}
+
+
 def approve(settings: Settings, run_id: str, approved_by: str) -> dict:
     folder = sr.run_folder(settings, run_id)
     est = load_estimate(folder)

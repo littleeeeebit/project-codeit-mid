@@ -6,7 +6,6 @@ Run: python -m rfp_assistant.cli <command> ...  Errors exit nonzero with an acti
 from __future__ import annotations
 
 import argparse
-import contextlib
 import json
 import os
 import sys
@@ -305,35 +304,20 @@ def cmd_stage_review(args, settings) -> int:
         _print({"run_id": args.run, "approved_by": est["approved_by"], "max_usd": est["max_micro_usd"] / 1e6,
                 "next": f"stage-review resume --run {args.run}"})
         return 0
-    action, run_id = args.action, args.run
-    if action == "run":
+    if args.action == "run":
         # Workers may read for an hour; the ledger is opened afterwards to price their work, never held idle meanwhile.
         record = stage_review.run(settings, args.stage, args.base, args.cand, inputs_from=args.inputs_from,
                                   ledger_env=args.ledger_dsn_env)
-        action, run_id = ("reprice", record["run_id"]) if record.get("state") == "needs_approval" else (None, None)
-    if action:
-        record = json.loads((stage_review.run_folder(settings, run_id) / "run.json").read_text(encoding="utf-8"))
-        ledger_env = args.ledger_dsn_env or record.get("ledger_env")
-        ledger = settings.with_(database_dsn_env=ledger_env) if ledger_env else None
-        with store.database_lifecycle(ledger.db_path) if ledger else contextlib.nullcontext():
-            if ledger:  # the shared ledger in another database (e.g. codeit's, through a tunnel): no schema statements
-                from .storage.postgres import require_imported_database
-
-                require_imported_database(ledger.db_path)
-            record = getattr(stage_review, action)(settings, run_id)
+        if record.get("state") == "needs_approval":
+            record = stage_review.on_ledger(settings, "reprice", record["run_id"], args.ledger_dsn_env)
+    else:
+        record = stage_review.on_ledger(settings, args.action, args.run, args.ledger_dsn_env)
     _print({"run_id": record["run_id"], "folder": str(stage_review.review_dir(settings) / "runs" / record["run_id"]),
             "state": record.get("state", "complete"),
             "candidates": [{k: c.get(k) for k in ("id", "label", "commit", "status", "reason", "ledger")}
                            for c in record["candidates"]]})
     if record.get("state") == "needs_approval":
-        est = paid.load_estimate(stage_review.run_folder(settings, record["run_id"]))
-        _print({"estimate": {cid: {"max_usd": c["max_micro_usd"] / 1e6, "calls": c["calls"],
-                                   "typical_usd": c["typical_micro_usd"] / 1e6 if "typical_micro_usd" in c else None}
-                             for cid, c in est["candidates"].items()},
-                "max_usd": est["max_micro_usd"] / 1e6, "ledger": est["ledger"], "purpose": est["purpose"],
-                "envelope_remaining_usd": est["envelope_remaining_micro_usd"] / 1e6, "fits": est["fits"],
-                "expires_at": est["expires_at"],
-                "next": f"read the estimate, then stage-review approve --run {record['run_id']} --approved-by <name>"})
+        _print(paid.estimate_report(paid.load_estimate(stage_review.run_folder(settings, record["run_id"]))))
     return 0
 
 

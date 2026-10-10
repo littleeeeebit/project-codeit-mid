@@ -3,7 +3,7 @@
 import { Fragment, useState } from "react";
 import type { Answer, Candidate, Claim, Evidence, GenerationQuestion, GenerationView as View } from "@/lib/api";
 import { usd } from "@/lib/api";
-import { Badge, CandidateHead, Failure, LedgerLine, Segmented, Stopped, columns } from "./ui";
+import { Badge, LedgerLine, Metric, Metrics, NotedList, Segmented, Summaries, columns } from "./ui";
 import { NoteField } from "./note-field";
 
 const OUTCOME: Record<string, string> = {
@@ -26,17 +26,14 @@ export function GenerationView({ view, notes, setNote }: {
   const shown = filter === "all" ? view.questions : view.questions.filter((q) => q.differs);
   return (
     <>
-      <section aria-label="후보별 결과" className="overflow-x-auto">
-        <div className="grid gap-4" style={columns(view.candidates.length)}>
-          {view.candidates.map((c) => <Summary key={c.id} c={c} view={view} />)}
-        </div>
-        <p className="mt-3 text-[13px] text-muted">
-          모든 후보가 gpt-5-mini로 같은 개발 질문 {view.dataset.rows}개에 한 번씩 답했습니다
-          {view.dataset.skipped > 0 && ` (검토되지 않았거나 근거가 맞지 않는 ${view.dataset.skipped}개 제외)`}. 검색은 서빙 중인
-          설정({view.activation.run_id ?? "기본"} · {view.activation.mode})으로 같고, 후보의 코드와 review-variant.json만
-          다릅니다. 비용은 공유 원장의 정산 금액입니다.
-        </p>
-      </section>
+      <Summaries candidates={view.candidates} summary={view.summary} note={<>
+        모든 후보가 gpt-5-mini로 같은 개발 질문 {view.dataset.rows}개에 한 번씩 답했습니다
+        {view.dataset.skipped > 0 && ` (검토되지 않았거나 근거가 맞지 않는 ${view.dataset.skipped}개 제외)`}. 검색은 서빙 중인
+        설정({view.activation.run_id ?? "기본"} · {view.activation.mode})으로 같고, 후보의 코드와 review-variant.json만
+        다릅니다. 비용은 공유 원장의 정산 금액입니다.
+      </>}>
+        {(s, c) => <Summary s={s} c={c} />}
+      </Summaries>
 
       <section aria-label="질문별 답변" className="mt-10">
         <div className="sticky top-0 z-10 -mx-2 flex flex-wrap items-center gap-3 bg-white/95 px-2 py-3 backdrop-blur">
@@ -48,41 +45,24 @@ export function GenerationView({ view, notes, setNote }: {
         {shown.length === 0 && (
           <p className="py-10 text-center text-muted">결과가 다른 질문이 없습니다. &apos;전체&apos;에서 답변을 봅니다.</p>
         )}
-        <ol className="divide-y divide-line">
-          {shown.map((q) => (
-            <QuestionRow key={q.key} q={q} candidates={view.candidates} note={notes[q.key] ?? ""}
-                         setNote={(v) => setNote(q.key, v)} />
-          ))}
-        </ol>
+        <NotedList items={shown} keyOf={(q) => q.key} notes={notes} setNote={setNote} row={(q, note, set) => (
+          <QuestionRow q={q} candidates={view.candidates} note={note} setNote={set} />
+        )} />
       </section>
     </>
   );
 }
 
-function Summary({ c, view }: { c: Candidate; view: View }) {
-  const s = view.summary[c.id];
-  if (!s || (c.status !== "complete" && c.status !== "stopped")) return <div className="border-t-2 border-ink pt-3"><CandidateHead c={c} /><Failure c={c} /></div>;
+function Summary({ s, c }: { s: View["summary"][string]; c: Candidate }) {
   const failures = Object.entries(s.validation_failures);
   return (
-    <div className="border-t-2 border-ink pt-3">
-      <CandidateHead c={c} />
-      <Stopped c={c} />
-      <div className="mt-3 flex flex-wrap items-end gap-x-8 gap-y-3">
-        <div>
-          <div className="text-[32px] font-bold leading-none tabular-nums">{s.required_correct}/{s.required}</div>
-          <div className="mt-1 whitespace-nowrap text-[13px] text-muted">필수 주장 정답</div>
-        </div>
-        <div>
-          <div className="text-[24px] font-bold leading-none tabular-nums">{s.passed}/{s.rows}</div>
-          <div className="mt-1 whitespace-nowrap text-[13px] text-muted">질문 통과</div>
-        </div>
-        <div>
-          <div className={`text-[24px] font-bold leading-none tabular-nums ${s.validation_failed ? "text-bad" : ""}`}>
-            {s.validation_failed}/{s.answered}
-          </div>
-          <div className="mt-1 whitespace-nowrap text-[13px] text-muted">검증에서 거부된 답변</div>
-        </div>
-      </div>
+    <>
+      <Metrics>
+        <Metric lead value={`${s.required_correct}/${s.required}`} label="필수 주장 정답" />
+        <Metric value={`${s.passed}/${s.rows}`} label="질문 통과" />
+        <Metric value={`${s.validation_failed}/${s.answered}`} label="검증에서 거부된 답변"
+                tone={s.validation_failed ? "text-bad" : ""} />
+      </Metrics>
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 text-[14px] tabular-nums">
         {/* Support is decided only by a verbatim quote or a review, so the unjudged rest is shown, not hidden. */}
         <dt className="text-muted">주장 {s.claims}개</dt>
@@ -103,7 +83,7 @@ function Summary({ c, view }: { c: Candidate; view: View }) {
       )}
       {s.not_done > 0 && <p className="mt-1 text-[13px] text-warn">답하지 못한 질문 {s.not_done}개</p>}
       <LedgerLine ledger={s.ledger ?? c.ledger} />
-    </div>
+    </>
   );
 }
 

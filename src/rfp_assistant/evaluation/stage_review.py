@@ -429,6 +429,23 @@ def rescore(settings: Settings, run_id: str) -> dict:
     return _score_paid(settings, folder, record)
 
 
+def on_ledger(settings: Settings, action: str, run_id: str, ledger_env: str | None = None) -> dict:
+    """Runs reprice, resume or rescore inside the ledger's lifecycle, opened only now and never held idle through a
+    worker's reads. The shared ledger may live in another database (codeit's, through a tunnel): no schema there."""
+    from ..storage import store
+    from ..storage.postgres import require_imported_database
+
+    record = json.loads((run_folder(settings, run_id) / "run.json").read_text(encoding="utf-8"))
+    step = {"reprice": reprice, "resume": resume, "rescore": rescore}[action]
+    ledger_env = ledger_env or record.get("ledger_env")
+    if not ledger_env:
+        return step(settings, run_id)
+    ledger = settings.with_(database_dsn_env=ledger_env)
+    with store.database_lifecycle(ledger.db_path):
+        require_imported_database(ledger.db_path)
+        return step(settings, run_id)
+
+
 def _score_paid(settings: Settings, folder: Path, record: dict) -> dict:
     paid.ledger_spend(settings, folder, record)
     view = paid.score_generation(settings, folder, record) if record["stage"] == "generation" else \

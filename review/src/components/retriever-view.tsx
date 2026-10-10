@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Candidate, Passage, Question, QuestionResult, RetrieverView as View } from "@/lib/api";
-import { Badge, CandidateHead, Failure, Segmented, columns } from "./ui";
+import { Badge, Metric, Metrics, NotedList, Segmented, Summaries, columns } from "./ui";
 import { NoteField } from "./note-field";
 
 type Filter = "outcome" | "ranking" | "all";
@@ -24,17 +24,22 @@ export function RetrieverView({ view, notes, setNote }: {
     filter === "all" ? true : filter === "ranking" ? q.differs : (q.outcome_differs ?? q.differs));
   return (
     <>
-      <section aria-label="후보별 결과" className="overflow-x-auto">
-        <div className="grid gap-4" style={columns(view.candidates.length)}>
-          {view.candidates.map((c) => <Summary key={c.id} c={c} view={view} />)}
-        </div>
-        <p className="mt-3 text-[13px] text-muted">
-          모든 후보는 서빙 중인 설정({view.activation.run_id ?? "기본"} · {view.activation.mode} · 색인{" "}
-          {view.activation.index_version})에서 시작하고, 후보의 코드와 review-variant.json만 다릅니다. 같은 질문{" "}
-          {view.populations.dev?.rows ?? 0}개(개발)와 니들 {view.populations.needle?.rows ?? 0}개를 모두 같은 채점기로
-          매겼습니다.
-        </p>
-      </section>
+      <Summaries candidates={view.candidates} summary={view.summary} note={<>
+        모든 후보는 서빙 중인 설정({view.activation.run_id ?? "기본"} · {view.activation.mode} · 색인{" "}
+        {view.activation.index_version})에서 시작하고, 후보의 코드와 review-variant.json만 다릅니다. 같은 질문{" "}
+        {view.populations.dev?.rows ?? 0}개(개발)와 니들 {view.populations.needle?.rows ?? 0}개를 모두 같은 채점기로
+        매겼습니다.
+      </>}>
+        {(s) => (
+          <>
+            <Metrics>
+              <Metric lead value={s.ndcg5?.toFixed(3) ?? "—"} label={`nDCG@5 · 개발 질문 ${s.ndcg5_n}/${s.dev_rows}개 채점`} />
+              <Metric value={`${s.needle_hits}/${s.needle_rows}`} label="니들 top-5 적중" />
+            </Metrics>
+            {s.errors > 0 && <p className="mt-2 text-[13px] text-bad">채점하지 못한 질문 {s.errors}개</p>}
+          </>
+        )}
+      </Summaries>
 
       <section aria-label="질문별 비교" className="mt-10">
         <div className="sticky top-0 z-10 -mx-2 flex flex-wrap items-center gap-3 bg-white/95 px-2 py-3 backdrop-blur">
@@ -55,36 +60,11 @@ export function RetrieverView({ view, notes, setNote }: {
               : "이 조건에서 후보 간 차이가 나는 질문이 없습니다."}
           </p>
         )}
-        <ol className="divide-y divide-line">
-          {shown.map((q) => (
-            <QuestionRow key={q.key} q={q} candidates={view.candidates} note={notes[q.key] ?? ""}
-                         setNote={(v) => setNote(q.key, v)} />
-          ))}
-        </ol>
+        <NotedList items={shown} keyOf={(q) => q.key} notes={notes} setNote={setNote} row={(q, note, set) => (
+          <QuestionRow q={q} candidates={view.candidates} note={note} setNote={set} />
+        )} />
       </section>
     </>
-  );
-}
-
-function Summary({ c, view }: { c: Candidate; view: View }) {
-  const s = view.summary[c.id];
-  return (
-    <div className="border-t-2 border-ink pt-3">
-      <CandidateHead c={c} />
-      {c.status !== "complete" || !s ? <Failure c={c} /> : (
-        <div className="mt-3 flex flex-wrap items-end gap-x-8 gap-y-3">
-          <div>
-            <div className="text-[32px] font-bold leading-none tabular-nums">{s.ndcg5?.toFixed(3) ?? "—"}</div>
-            <div className="mt-1 whitespace-nowrap text-[13px] text-muted">nDCG@5 · 개발 질문 {s.ndcg5_n}/{s.dev_rows}개 채점</div>
-          </div>
-          <div>
-            <div className="text-[24px] font-bold leading-none tabular-nums">{s.needle_hits}/{s.needle_rows}</div>
-            <div className="mt-1 whitespace-nowrap text-[13px] text-muted">니들 top-5 적중</div>
-          </div>
-        </div>
-      )}
-      {s && s.errors > 0 && <p className="mt-2 text-[13px] text-bad">채점하지 못한 질문 {s.errors}개</p>}
-    </div>
   );
 }
 

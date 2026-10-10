@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { Candidate } from "@/lib/api";
 import { hostLabel, short } from "@/lib/api";
 
@@ -86,3 +87,64 @@ export function Failure({ c }: { c: Candidate }) {
 }
 
 export const columns = (n: number) => ({ gridTemplateColumns: `repeat(${n}, minmax(280px, 1fr))` });
+
+/** Every candidate's results side by side under its head, and what makes them comparable underneath. A candidate
+ *  without results shows why instead; a stopped paid one shows what it finished. */
+export function Summaries<S>({ candidates, summary, note, children }: {
+  candidates: Candidate[];
+  summary: Record<string, S | undefined>;
+  note?: React.ReactNode;
+  children: (s: S, c: Candidate) => React.ReactNode;
+}) {
+  return (
+    <section aria-label="후보별 결과" className="overflow-x-auto">
+      <div className="grid gap-4" style={columns(candidates.length)}>
+        {candidates.map((c) => {
+          const s = summary[c.id];
+          return (
+            <div key={c.id} className="border-t-2 border-ink pt-3">
+              <CandidateHead c={c} />
+              {s !== undefined && (c.status === "complete" || c.status === "stopped")
+                ? <><Stopped c={c} />{children(s, c)}</> : <Failure c={c} />}
+            </div>
+          );
+        })}
+      </div>
+      {note && <p className="mt-3 text-[13px] text-muted">{note}</p>}
+    </section>
+  );
+}
+
+export function Metrics({ children }: { children: React.ReactNode }) {
+  return <div className="mt-3 flex flex-wrap items-end gap-x-8 gap-y-3">{children}</div>;
+}
+
+/** A number over its label; the lead one, read first, is larger. */
+export function Metric({ value, label, lead = false, tone = "" }: {
+  value: React.ReactNode; label: React.ReactNode; lead?: boolean; tone?: string;
+}) {
+  return (
+    <div>
+      <div className={`${lead ? "text-[32px]" : "text-[24px]"} font-bold leading-none tabular-nums ${tone}`}>{value}</div>
+      <div className="mt-1 whitespace-nowrap text-[13px] text-muted">{label}</div>
+    </div>
+  );
+}
+
+/** The rows a person reads and notes on, each note saved under the row's key. */
+export function NotedList<T>({ items, keyOf, notes, setNote, row }: {
+  items: T[];
+  keyOf: (item: T) => string;
+  notes: Record<string, string>;
+  setNote: (key: string, note: string) => void;
+  row: (item: T, note: string, setNote: (v: string) => void) => React.ReactNode;
+}) {
+  return (
+    <ol className="divide-y divide-line">
+      {items.map((item) => {
+        const key = keyOf(item);
+        return <Fragment key={key}>{row(item, notes[key] ?? "", (v) => setNote(key, v))}</Fragment>;
+      })}
+    </ol>
+  );
+}
