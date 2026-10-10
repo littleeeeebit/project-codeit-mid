@@ -1,31 +1,34 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-10 12:41:56.824000+00:00
-update_count: 43
+updated: 2026-10-10 23:14:57.522000+00:00
+update_count: 45
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
 children:
-- active-serving
 - corpus-route
 - corpus-router
+- corpus-routing
 - dense-channel
 - dense-search
-- evidence-packer
+- evidence-packing
 - fusion
 - fusion-rerank
 - keyword-index
+- lexical-channel
 - local-reranker
 - reranker
 - scope-routing
-- service-retrieve
+- serving-activation
 - serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ] -->|\"scoped rows\"| corpus-routing[\"Corpus routing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  corpus-routing -->|\"allowed rows\"| lexical-channel[\"Lexical channel\\\
-  nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  corpus-routing -->|\"allowed rows\"\
-  | dense-channel[\"Dense channel\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
-  ]\r\n  lexical-channel -->|\"BM25 ranking\"| fusion-and-rerank[\"Fusion and rerank\\\
-  nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  dense-channel -->|\"cosine ranking\"\
-  | fusion-and-rerank\r\n  fusion-and-rerank -->|\"ordered chunk rows\"| evidence-packing[\"\
-  Evidence packing\\nsrc/rfp_assistant/retrieval/retrieval.py\"]"
+prev_diagram: "graph TD\r\n  service-retrieve[\"service.retrieve wrapper\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  active-serving[\"active_serving activation\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  keyword-index[\"KeywordIndex and Kiwi BM25\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  dense-search[\"Dense matrix and query vector\\nsrc/rfp_assistant/retrieval/dense.py\"\
+  ]\r\n  fusion-rerank[\"RRF fusion and reranker\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  evidence-packer[\"_pack_evidence budgets\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  service-retrieve -->|\"mode, limits, index version\"| active-serving\r\n\
+  \  service-retrieve -->|\"scope pairs, question\"| keyword-index\r\n  service-retrieve\
+  \ -->|\"cached or paid query vector\"| dense-search\r\n  keyword-index -->|\"exact\
+  \ and BM25 rows\"| fusion-rerank\r\n  dense-search -->|\"nearest rows in scope\"\
+  | fusion-rerank\r\n  fusion-rerank -->|\"final ranking\"| evidence-packer"

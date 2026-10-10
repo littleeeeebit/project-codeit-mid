@@ -1,0 +1,9 @@
+created: 2026-10-10T23:14:57.638Z
+updated: 2026-10-10T23:14:57.785Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: serving-activation
+children: []
+parentPath:
+  - retrieval-engine

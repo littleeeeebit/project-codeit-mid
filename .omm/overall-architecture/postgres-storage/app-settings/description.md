@@ -1,0 +1,1 @@
+`app_settings` is a key/value table. Its serving-critical keys are `active_run` (the JSON serving configuration from `activate_decision`) and `active_index`. `activations` is the append-only history of every activation, with decision, previous config and actor.

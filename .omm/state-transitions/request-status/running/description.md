@@ -1,0 +1,1 @@
+Set by the worker claim, or directly at creation for free modes and synchronous `service.answer`. While running, `_stop_reason` allows paid stages only when the request is not cancelled and the service is not closing.

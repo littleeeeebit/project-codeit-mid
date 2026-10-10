@@ -1,0 +1,14 @@
+<!-- ClickHouse's own diagnostic logs, off on the shared stack (runbook 3.7). On the owner's local stack they grew to
+     1.3 GB in five days while the traces themselves took 4 MB; codeit's boot disk is shared with the team.
+     query_log stays: it is small and shows slow queries. -->
+<clickhouse>
+    <trace_log remove="1"/>
+    <text_log remove="1"/>
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <part_log remove="1"/>
+    <processors_profile_log remove="1"/>
+    <query_metric_log remove="1"/>
+    <latency_log remove="1"/>
+    <opentelemetry_span_log remove="1"/>
+</clickhouse>

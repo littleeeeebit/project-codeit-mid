@@ -1,0 +1,8 @@
+graph TD
+  gold-drafting["gpt-6-luna drafting\nsrc/rfp_assistant/service/drafting.py"] -->|"valid drafts submitted"| gold-queue["Gold review queue\nsrc/rfp_assistant/evaluation/gold.py"]
+  gold-queue -->|"approved dataset JSONL"| retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  retrieval-runs -->|"scored rows"| compare-matrix["Axis matrix tables\nsrc/rfp_assistant/evaluation/compare.py"]
+  compare-matrix -->|"person picks row"| activation["activate_decision\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  gold-queue -->|"development questions"| answer-runs["Paid answer runs\nsrc/rfp_assistant/service/answers.py"]
+  answer-runs -->|"answers to judge"| judges["Luna and Jev judges\nsrc/rfp_assistant/evaluation/judges.py"]
+  answer-runs -->|"finalist results"| sealed-release["Sealed run and release\nsrc/rfp_assistant/evaluation/release.py"]

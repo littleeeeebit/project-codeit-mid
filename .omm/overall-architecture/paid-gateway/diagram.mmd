@@ -1,15 +1,8 @@
 graph TD
-  reserve-admission["reserve() atomic admission\nsrc/rfp_assistant/gateway/budget.py"]
-  dispatch-marker["mark_dispatching() guard\nsrc/rfp_assistant/gateway/budget.py"]
-  gateway-owner["GatewayOwner advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
-  openai-transport["OpenAITransport per-key clients\nsrc/rfp_assistant/gateway/generation.py"]
-  settlement["settle, release, mark_unknown\nsrc/rfp_assistant/gateway/budget.py"]
-  owner-reconcile["reconcile and adjustments\nsrc/rfp_assistant/gateway/budget.py"]
-  langfuse-tracing["Langfuse tracing steps\nsrc/rfp_assistant/gateway/tracing.py"]
-  gateway-owner -->|"owner_guard in each tx"| reserve-admission
-  reserve-admission -->|"attempt reserved"| dispatch-marker
-  dispatch-marker -->|"dispatching, then call"| openai-transport
-  gateway-owner -->|"owner_check before call"| openai-transport
-  openai-transport -->|"usage or ProviderError"| settlement
-  owner-reconcile -->|"unknown becomes reconciled"| settlement
-  settlement -->|"usage and cost on span"| langfuse-tracing
+  gateway-lock["DB advisory lock GatewayOwner\nsrc/rfp_assistant/storage/postgres.py"] -->|"owner_guard in transaction"| admission["Atomic reservation reserve\nsrc/rfp_assistant/gateway/budget.py"]
+  admission -->|"attempt reserved"| dispatch-guard["Dispatch marker mark_dispatching\nsrc/rfp_assistant/gateway/budget.py"]
+  dispatch-guard -->|"dispatching, then call"| openai-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
+  gateway-lock -->|"owner_check before call"| openai-transport
+  openai-transport -->|"usage or error"| settlement["Settle, release or unknown\nsrc/rfp_assistant/gateway/budget.py"]
+  openai-transport -->|"generation observed"| langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
+  settlement -->|"settled cost shown"| langfuse-tracing

@@ -7,23 +7,16 @@ title: corpus-pipeline
 children:
 - extraction-revisions
 - fidelity-check
-- hwp-loader
 - hwp-loader-fallback
 - hwp-xml-walker
 - image-ocr
-- keyword-build
 - manifest
-- manifest-import
 - ocr-and-fidelity
-- ocr-cache
 - ocr-merge
 - ocr-regions
 - parsers
 - review-and-recovery
-- revision-assign
 - revision-assignment
-- run-activation
-- source-parse
 parentPath: []
 prev_diagram: "graph TD\r\n  manifest-import[\"Manifest import\\nsrc/rfp_assistant/corpus/ingestion.py\"\
   ] -->|\"documents, sources rows\"| hwp-parsing[\"HWP parsing\\nsrc/rfp_assistant/corpus/ingestion.py\"\

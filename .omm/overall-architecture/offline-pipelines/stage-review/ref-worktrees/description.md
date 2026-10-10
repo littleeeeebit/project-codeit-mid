@@ -1,0 +1,1 @@
+`checkout` runs `git worktree add --detach` at the candidate's commit under `.runtime/review/worktrees/<run>-<cand>`. The `.` ref copies the working tree's changed and untracked files on top. `read_variant` reads an optional `review-variant.json` at the ref's root that overrides the frozen activation for this comparison only. `remove_worktree` force-removes and prunes afterwards.

@@ -1,0 +1,1 @@
+Set once by `budget.settle` from provider usage at the reservation's frozen rates. A settled cost above the reservation freezes the budget (`frozen_reason`).

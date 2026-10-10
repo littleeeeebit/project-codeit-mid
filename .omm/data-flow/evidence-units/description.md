@@ -1,0 +1,1 @@
+`EvidenceUnit` (contracts.py): evidence_id `E1..En`, doc_id, source_hash, extraction_id, chunk_id, element_ids, quote, location and token_count. These are the only IDs the model may cite. The prompt (`generation.build_messages`, prompt version `grounded-answer-13`) presents them with document briefs and limitations, and the model never supplies a URL, path or page.

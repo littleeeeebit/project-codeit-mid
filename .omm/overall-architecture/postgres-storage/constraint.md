@@ -1,0 +1,1 @@
+Never run psql inside the database container (`docker exec psql`). Use psycopg from the host. The application database is `bidmate_app`; `RFP_DATABASE_DSN` is kept in the process environment only.

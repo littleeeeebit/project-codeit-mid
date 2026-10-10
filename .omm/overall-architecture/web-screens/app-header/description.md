@@ -1,0 +1,1 @@
+`app-header.tsx` polls `GET /api/budget` and shows only the highest cap warning (`service.visible_warnings`). `update-banner.tsx` polls `GET /api/update/status` and offers `POST /api/update` when GitHub main is ahead and no paid work is open (see service-core/update-watch). `sign-in.tsx` calls `GET /api/auth/me` and `POST /api/auth/logout`.

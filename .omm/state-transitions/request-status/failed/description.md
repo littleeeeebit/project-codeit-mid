@@ -1,0 +1,1 @@
+Set by `_finish` with `request_status='failed'`: technical errors, validation failures, refused rewrites, frozen-estimate violations, `ServiceError` (`clarification_required`), and `_fail_unscheduled` for a queued row the executor could not take.

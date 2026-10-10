@@ -1,0 +1,9 @@
+created: 2026-10-10T23:14:58.162Z
+updated: 2026-10-10T23:14:58.163Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: lexical-channel
+children: []
+parentPath:
+  - retrieval-engine

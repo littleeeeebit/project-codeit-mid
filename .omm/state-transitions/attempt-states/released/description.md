@@ -1,1 +1,0 @@
-Nothing was sent, or the provider refused before execution. Holds no money.

@@ -1,0 +1,1 @@
+This step runs only on Windows with Hancom Viewer, and the default printer must be Microsoft Print to PDF. It takes 20 to 30 seconds per document and opens viewer windows, so nothing else should print while it runs.

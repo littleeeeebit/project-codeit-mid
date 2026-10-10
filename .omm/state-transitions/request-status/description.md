@@ -1,0 +1,1 @@
+The `requests.status` CHECK allows queued, running, completed, failed, cancelled and interrupted. Terminal states are never re-run. Restart recovery and controlled shutdown mark unfinished rows `interrupted` and replay nothing. `cancel_requested` is a separate flag: it prevents further paid stages and attachment while a dispatched call still settles.

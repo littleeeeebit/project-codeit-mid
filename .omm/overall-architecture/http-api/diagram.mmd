@@ -1,14 +1,7 @@
 graph TD
-  session-gate["_Session middleware\nsrc/rfp_assistant/api.py"]
-  hub-login["JupyterHub OAuth sign-in\nsrc/rfp_assistant/service/auth.py"]
-  ask-routes["Ask and request routes\nsrc/rfp_assistant/api.py"]
-  answer-sse["Stream route events()\nsrc/rfp_assistant/api.py"]
-  verify-routes["Verify, drafting, gold routes\nsrc/rfp_assistant/api.py"]
-  update-watch["UpdateWatch fence\nsrc/rfp_assistant/service/update.py"]
-  static-mount["Static web/out mount\nsrc/rfp_assistant/api.py"]
-  hub-login -->|"session cookie on /api/"| session-gate
-  session-gate -->|"bind_request contextvars"| ask-routes
-  session-gate -->|"member principal"| verify-routes
-  ask-routes -->|"same request id"| answer-sse
-  update-watch -->|"fence read at admission"| ask-routes
-  session-gate -->|"non-/api paths pass"| static-mount
+  static-mount["Static export mount\nsrc/rfp_assistant/api.py"] -->|"screens call /api"| session-middleware["Session gate _Session\nsrc/rfp_assistant/api.py"]
+  session-middleware -->|"open without session"| sign-in-routes["Hub OAuth routes\nsrc/rfp_assistant/service/auth.py"]
+  session-middleware -->|"bind member key, model"| ask-routes["Ask and request routes\nsrc/rfp_assistant/api.py"]
+  session-middleware -->|"bind member"| verify-routes["Verification routes\nsrc/rfp_assistant/api.py"]
+  session-middleware -->|"bind member"| dataset-routes["Drafting and gold routes\nsrc/rfp_assistant/api.py"]
+  sign-in-routes -->|"session cookie on /api/"| session-middleware

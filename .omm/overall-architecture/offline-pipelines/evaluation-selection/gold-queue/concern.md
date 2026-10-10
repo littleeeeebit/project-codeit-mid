@@ -1,0 +1,1 @@
+`decide` writes the dataset or rejection file inside the open database transaction, before commit. If the commit then fails, the file is ahead of the database. `gold check` and `sync` exist to detect and repair the mismatch, but the write order itself is a small inconsistency window. That is an inference from the code; no failure has been observed.

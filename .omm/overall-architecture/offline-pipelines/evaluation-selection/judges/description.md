@@ -1,0 +1,1 @@
+`judges.plan`, `begin`, `run` and `results` compare a gpt-6-luna judge with a Jev judge on a reviewed reference split into calibration and held-out parts, plus a mutated judge set (`judge_set.py`). Paid calls go through the gateway in `judge_eval`, never above the estimate. Each run stops on `closing()` when the service stops.

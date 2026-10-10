@@ -1,0 +1,1 @@
+For `stage-review resume` on the shared ledger, `bidmate.service` must be stopped for the duration, which the README notes is roughly 25 to 40 minutes per 55-question candidate.

@@ -1,0 +1,1 @@
+This compares a baseline git ref with candidate refs on identical frozen inputs for one stage: retriever, chunking, generation or ocr. The CLI runs it, and the separate review app only displays runs and writes decisions.

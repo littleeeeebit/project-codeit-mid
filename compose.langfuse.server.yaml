@@ -1,0 +1,39 @@
+# The team's shared Langfuse on codeit (runbook 3.7): compose.langfuse.yaml plus these overrides, under the same
+# Compose project name and image digests as the owner's local stack, whose data it was restored from.
+#   sudo docker compose --project-directory /srv/langfuse --env-file /etc/bidmate/langfuse.env \
+#     -f /srv/langfuse/compose.langfuse.yaml -f /srv/langfuse/compose.langfuse.server.yaml up -d --wait
+# Published ports stay on 127.0.0.1 of the VM; members reach the UI through an SSH tunnel to 127.0.0.3:3300 on
+# their own PC, the one address NEXTAUTH_URL names (a loopback host of its own, so it shares no cookies with a local
+# Langfuse on 127.0.0.1 or 127.0.0.2). Memory limits keep it from starving BidMate and JupyterHub on the same VM.
+x-server-env: &server-env
+  NEXTAUTH_URL: http://127.0.0.3:3300
+services:
+  langfuse-web:
+    ports: !override
+      - "127.0.0.1:3100:3000"
+    mem_limit: 1536m
+    environment:
+      <<: *server-env
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://127.0.0.1:9190
+      # open only while members create their accounts (runbook 3.7), then "true" again
+      AUTH_DISABLE_SIGNUP: ${LANGFUSE_AUTH_DISABLE_SIGNUP:-true}
+      # a new account joins the shared organization and project as a member
+      LANGFUSE_DEFAULT_ORG_ID: bidmate
+      LANGFUSE_DEFAULT_ORG_ROLE: MEMBER
+      LANGFUSE_DEFAULT_PROJECT_ID: bidmate-rfp-assistant
+      LANGFUSE_DEFAULT_PROJECT_ROLE: MEMBER
+  langfuse-worker:
+    mem_limit: 1536m
+    environment: *server-env
+  clickhouse:
+    mem_limit: 2g
+    volumes:
+      - ./langfuse-clickhouse-logs.xml:/etc/clickhouse-server/config.d/langfuse-logs.xml:ro
+  minio:
+    ports: !override
+      - "127.0.0.1:9190:9000"
+    mem_limit: 512m
+  redis:
+    mem_limit: 256m
+  postgres:
+    mem_limit: 512m

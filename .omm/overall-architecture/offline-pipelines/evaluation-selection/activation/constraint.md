@@ -1,0 +1,1 @@
+A person picks the row; nothing activates on its own, and maintenance never activates.

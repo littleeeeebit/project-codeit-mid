@@ -1,0 +1,9 @@
+created: 2026-10-10T23:15:10.269Z
+updated: 2026-10-10T23:15:10.270Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: queued
+children: []
+parentPath:
+  - request-status

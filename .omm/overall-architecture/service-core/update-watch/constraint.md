@@ -1,0 +1,1 @@
+Nothing in the service runs git or systemctl, and no request carries a branch or commit. The updater only takes origin/main.

@@ -6,18 +6,23 @@ to its workers and closes it (flush, shutdown, unregister). The SDK keeps one re
 the whole process, so a second owner of the same key is refused instead of silently sharing the first's threads.
 Every SDK call is guarded: a missing, unreachable or failing Langfuse never changes an answer or the ledger.
 `mask_otel_spans` is the single exit gate: every exported string attribute passes `redact` first. Payloads are built
-lazily (`Step.update(lambda: ...)`) so formatting them can never delay or break the accounting around them."""
+lazily (`Step.update(lambda: ...)`) so formatting them can never delay or break the accounting around them.
+Every trace says where it came from (`origin`): the member, the environment (`server` or `local`) and the git ref,
+so the one shared project on codeit can be filtered by person and branch."""
 
 from __future__ import annotations
 
 import contextvars
 import json
 import logging
+import os
 import re
+import subprocess
 import threading
 from contextlib import contextmanager
 
-from ..settings import Settings, tracing_credentials
+from ..service.auth import HUB_ENV, LOCAL_MEMBER_ENV
+from ..settings import REPO_ROOT, Settings, read_api_key, tracing_credentials
 
 log = logging.getLogger(__name__)
 
@@ -108,6 +113,22 @@ class TracingError(RuntimeError):
     pass
 
 
+def origin() -> tuple[str, str, str | None]:
+    """(environment, git ref, member). `server` where JupyterHub sign-in is configured, which only the team host's
+    server.env has; `local` everywhere else, where the member is BIDMATE_LOCAL_MEMBER from the environment or .env
+    (None when unset). The ref is `<branch>@<short commit>` of this checkout, `unknown` without git."""
+    server = bool(os.environ.get(HUB_ENV["hub_url"], "").strip())
+    try:
+        branch, commit = (subprocess.run(["git", "rev-parse", *args, "HEAD"], cwd=REPO_ROOT, capture_output=True,
+                                         text=True, timeout=5, check=True).stdout.strip()
+                          for args in (["--abbrev-ref"], ["--short"]))
+        ref = f"{branch}@{commit}"
+    except Exception:  # noqa: BLE001 - no git, no checkout or a timeout: the trace still leaves
+        ref = "unknown"
+    member = None if server else (read_api_key(LOCAL_MEMBER_ENV) or "").strip()[:40] or None
+    return ("server" if server else "local"), ref, member
+
+
 _REGISTRY_LOCK = threading.Lock()
 
 
@@ -123,12 +144,14 @@ class Tracing:
         self._registry = LangfuseResourceManager._instances  # private: the SDK offers no per-key release
         self._key = public_key
         self._closed = False
+        self.environment, self.ref, self.member = origin()
         with _REGISTRY_LOCK:
             if public_key in self._registry:
                 raise TracingError("this Langfuse public key already has an owner in this process")
             self._provider = TracerProvider()
             self.client = Langfuse(public_key=public_key, secret_key=secret_key, base_url=host, timeout=5,
                                    tracer_provider=self._provider, should_export_span=is_langfuse_span,
+                                   environment=self.environment, release=self.ref,
                                    mask_otel_spans=mask_otel_spans, span_exporter=span_exporter)
 
     @classmethod
@@ -182,13 +205,17 @@ class Step:
 def run(tracing: Tracing | None, name: str, *, seed: str, input, user_id: str, metadata: dict[str, str],
         tags: list[str]):
     """The root observation of one trace (trace ID derived from `seed`). Steps opened on this thread inside it
-    nest under it; outside any run, `step` records nothing (verifier traces, evaluation runs)."""
+    nest under it; outside any run, `step` records nothing (verifier traces, evaluation runs). The trace's user is
+    the member: `user_id` (the signed-in account) on the server, BIDMATE_LOCAL_MEMBER on a member's PC."""
     if tracing is None or tracing._closed:
         yield Step(None)
         return
     from langfuse import propagate_attributes
 
     client = tracing.client
+    user_id = tracing.member or user_id
+    metadata = {**metadata, "member": user_id, "environment": tracing.environment, "git_ref": tracing.ref}
+    tags = [*tags, tracing.environment]
     token = _ACTIVE.set(tracing)
     try:
         with _observe(lambda: propagate_attributes(user_id=user_id, metadata=metadata, tags=tags, trace_name=name)):

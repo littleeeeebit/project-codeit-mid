@@ -1,0 +1,1 @@
+A queued request is cancelled immediately by `cancel_request`, with a result stating no paid call. A running request gets `cancel_requested=1`. The next checkpoint or dispatch guard raises `_Stop('cancelled')`, or `_finish` converts a completed outcome to cancelled. A dispatched call keeps its reservation until it settles.

@@ -1,0 +1,1 @@
+The `ocr` envelope starts empty; the owner funds it with `set-envelopes`.

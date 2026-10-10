@@ -1,6 +1,6 @@
 created: 2026-10-04 13:34:42.331000+00:00
-updated: 2026-10-10 12:41:52.328000+00:00
-update_count: 34
+updated: 2026-10-10 23:14:53.736000+00:00
+update_count: 36
 last_field: diagram
 kind: nested-class
 title: web-screens
@@ -8,20 +8,25 @@ children:
 - answer-stream
 - answer-stream-hook
 - api-client
+- app-header
 - ask-page
 - dataset-page
-- evidence-pane
 - settings-page
 - sign-in-redirect
-- status-poll
 - update-banner
 - verify-page
 parentPath: []
-prev_diagram: "graph TD\r\n  ask-page[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
-  ] -->|\"typed calls\"| api-client[\"API client\\nweb/src/lib/api.ts\"]\r\n  ask-page\
-  \ -->|\"follow running turn\"| answer-stream[\"Answer stream hook\\nweb/src/lib/use-answer-stream.ts\"\
-  ]\r\n  verify-page[\"Verify screen\\nweb/src/components/verify/verify-page.tsx\"\
-  ] -->|\"typed calls\"| api-client\r\n  dataset-page[\"Dataset screen\\nweb/src/components/dataset/dataset-page.tsx\"\
-  ] -->|\"typed calls\"| api-client\r\n  settings-and-header[\"Settings, header, update\
-  \ banner\\nweb/src/app/settings/page.tsx\"] -->|\"typed calls\"| api-client\r\n\
-  \  answer-stream -->|\"account header only\"| api-client"
+prev_diagram: "graph TD\r\n  ask-page[\"Ask conversation page\\nweb/src/components/ask/ask-page.tsx\"\
+  ]\r\n  api-client[\"Typed openapi-fetch client\\nweb/src/lib/api.ts\"]\r\n  status-poll[\"\
+  Polling hook\\nweb/src/lib/use-poll.ts\"]\r\n  answer-stream[\"Answer stream reader\\\
+  nweb/src/lib/use-answer-stream.ts\"]\r\n  evidence-pane[\"Citation evidence pane\\\
+  nweb/src/components/ask/answer-parts.tsx\"]\r\n  verify-page[\"Verification tabs\\\
+  nweb/src/components/verify/verify-page.tsx\"]\r\n  dataset-page[\"Dataset drafting\
+  \ and review\\nweb/src/components/dataset/dataset-page.tsx\"]\r\n  ask-page -->|\"\
+  postAsk, cancel, abandon\"| api-client\r\n  ask-page -->|\"one poll per turn\"|\
+  \ status-poll\r\n  status-poll -->|\"GET request view\"| api-client\r\n  ask-page\
+  \ -->|\"while live, not revoked\"| answer-stream\r\n  answer-stream -->|\"done event\
+  \ reloads poll\"| status-poll\r\n  ask-page -->|\"marker click opens\"| evidence-pane\r\
+  \n  evidence-pane -->|\"GET evidence by id\"| api-client\r\n  verify-page -->|\"\
+  /api/verify routes\"| api-client\r\n  dataset-page -->|\"/api/drafting, /api/gold\"\
+  | api-client"

@@ -1,0 +1,1 @@
+`freeze-release` records the release candidate's hashes. `sealed.py` runs the sealed test set once, and any later run is labelled as a post-test regression. `release.py` handles backup, staged restore (`restore-check` into an empty database with paid admission off) and the read-only `release-report`.
