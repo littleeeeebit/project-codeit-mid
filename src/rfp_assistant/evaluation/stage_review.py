@@ -399,8 +399,9 @@ def resume(settings: Settings, run_id: str) -> dict:
         finally:
             remove_worktree(worktree)
     paid.ledger_spend(settings, folder, record)
-    record.update(state="stopped" if any(c.get("status") == "stopped" for c in record["candidates"]) else "complete",
-                  paid_at=datetime.now(timezone.utc).isoformat())
+    # A candidate stopped or failed midway (a full disk, a lost connection) keeps the run resumable.
+    done = all(c.get("status") == "complete" for c in record["candidates"] if c["id"] in estimate["candidates"])
+    record.update(state="complete" if done else "stopped", paid_at=datetime.now(timezone.utc).isoformat())
     view = paid.score_generation(settings, folder, record) if record["stage"] == "generation" else \
         paid.score_ocr(folder, record)
     write_text_atomic(folder / "view.json", json.dumps(view, ensure_ascii=False))

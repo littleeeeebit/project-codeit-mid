@@ -180,6 +180,33 @@ class PaidStageTest(unittest.TestCase):
                                          folder / "c.json", folder / "o.json", "paid", estimate)
             launched.assert_not_called()
 
+    def test_a_candidate_failing_midway_leaves_the_run_resumable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = paid_folder(Path(tmp), "generation", {"state": "needs_approval"})
+            write_outputs(folder, {"base": {"rows": []}})
+            estimate = {"candidates": {"base": {}, "c1": {}}}
+            settings = SimpleNamespace(data_dir=Path(tmp))
+            ran = []
+
+            def execute(*args):
+                ran.append(args[6].name)
+                if len(ran) == 1:
+                    raise RuntimeError("DiskFull: No space left on device")
+                return {"status": "complete"}
+
+            with mock.patch.object(paid, "load_estimate", return_value=estimate), \
+                    mock.patch.object(paid, "require_approved"), mock.patch.object(paid, "recheck"), \
+                    mock.patch.object(paid, "paid_config", return_value={}), \
+                    mock.patch.object(paid, "ledger_spend"), mock.patch.object(paid, "score_generation", return_value={}), \
+                    mock.patch.object(stage_review, "resolve", return_value={"commit": "a" * 40}), \
+                    mock.patch.object(stage_review, "checkout"), mock.patch.object(stage_review, "remove_worktree"), \
+                    mock.patch.object(stage_review, "execute", side_effect=execute):
+                first = stage_review.resume(settings, folder.name)
+                self.assertEqual((first["state"], first["candidates"][1]["status"]), ("stopped", "failed"))
+                second = stage_review.resume(settings, folder.name)
+            self.assertEqual(second["state"], "complete")
+            self.assertEqual(ran, ["c1.json", "c1.json"])  # the finished baseline is never paid again
+
     def test_generation_view_and_decision(self):
         claim = {"claim_id": "c1", "criticality": "critical", "match": {"type": "text", "patterns": ["보안확약서"]},
                  "qualifiers": [], "support_groups": ["g1"]}
