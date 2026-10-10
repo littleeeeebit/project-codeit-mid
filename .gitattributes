@@ -1,2 +1,5 @@
 # Shell scripts run under bash on the VM and in tests/test_update_script.py on Windows: never CRLF.
 *.sh text eol=lf
+# The review app launchers: cmd.exe wants CRLF, macOS sh refuses CR.
+*.cmd text eol=crlf
+*.command text eol=lf

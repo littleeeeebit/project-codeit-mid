@@ -1,0 +1,93 @@
+# Starts review.command on macOS as a person would: first start installs and builds, opens the browser; an exported
+# run folder is imported through the app's own button; the second start skips npm ci and the build.
+name: review app on macOS
+
+on:
+  pull_request:
+    paths:
+      - review/**
+      - review.command
+      - src/rfp_assistant/evaluation/stage_review*.py
+      - tests/test_stage_review.py
+      - .github/workflows/review-mac.yml
+  workflow_dispatch:
+
+jobs:
+  launcher:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Export a run folder to import
+        # Synthetic documents from the contract test: real runs carry corpus text and stay on the owner's machine.
+        run: |
+          python -m pip install -q -e . playwright
+          python -m playwright install chromium
+          python - "$RUNNER_TEMP/other-machine" "$RUNNER_TEMP/run.zip" <<'EOF'
+          import sys
+          from pathlib import Path
+          from tests.test_stage_review import make_run, server
+          root = Path(sys.argv[1])
+          run_id, _ = make_run(root)
+          Path(sys.argv[2]).write_bytes(server.export_run(root, run_id))
+          print("exported", run_id)
+          EOF
+
+      - name: First start of review.command
+        run: |
+          test -x review.command
+          ./review.command > "$RUNNER_TEMP/launch-1.log" 2>&1 &
+          for i in $(seq 450); do grep -q "Review app:" "$RUNNER_TEMP/launch-1.log" && break; sleep 2; done
+          cat "$RUNNER_TEMP/launch-1.log"
+          grep -q "Installing the review app" "$RUNNER_TEMP/launch-1.log"
+          grep -q "Building the review app" "$RUNNER_TEMP/launch-1.log"
+          grep -o "http://127.0.0.1:[0-9]*/" "$RUNNER_TEMP/launch-1.log" | head -1 > "$RUNNER_TEMP/url"
+          sleep 5
+          # The default browser itself, not the Safari helper agents that run on every login.
+          pgrep -lx Safari
+
+      - name: Import the run folder through the app
+        run: |
+          mkdir -p "$RUNNER_TEMP/shots"
+          python - "$(cat "$RUNNER_TEMP/url")" "$RUNNER_TEMP/run.zip" "$RUNNER_TEMP/shots" <<'EOF'
+          import sys
+          from playwright.sync_api import expect, sync_playwright
+          url, zip_path, shots = sys.argv[1:]
+          with sync_playwright() as p:
+              page = p.chromium.launch().new_page(viewport={"width": 1280, "height": 900})
+              page.goto(url)
+              expect(page.get_by_text("아직 비교 실행이 없습니다")).to_be_visible()
+              page.locator("input[type=file]").set_input_files(zip_path)
+              expect(page.get_by_role("heading", name="청킹 비교")).to_be_visible()
+              expect(page.get_by_text("가져옴").first).to_be_visible()
+              expect(page.get_by_text("needs a CUDA GPU").first).to_be_visible()
+              page.screenshot(path=f"{shots}/imported.png")
+              page.screenshot(path=f"{shots}/imported-full.png", full_page=True)
+              print("imported run shown at", page.url)
+          EOF
+
+      - name: Second start skips install and build
+        run: |
+          pkill -f "review/server.py"
+          ./review.command --no-browser > "$RUNNER_TEMP/launch-2.log" 2>&1 &
+          for i in $(seq 60); do grep -q "Review app:" "$RUNNER_TEMP/launch-2.log" && break; sleep 1; done
+          cat "$RUNNER_TEMP/launch-2.log"
+          grep -q "Review app:" "$RUNNER_TEMP/launch-2.log"
+          if grep -q "Installing the review app\|Building the review app" "$RUNNER_TEMP/launch-2.log"; then exit 1; fi
+          curl -fsS "$(grep -o "http://127.0.0.1:[0-9]*/" "$RUNNER_TEMP/launch-2.log" | head -1)api/runs" | head -c 300
+          pkill -f "review/server.py"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: review-mac
+          path: |
+            ${{ runner.temp }}/shots
+            ${{ runner.temp }}/launch-*.log

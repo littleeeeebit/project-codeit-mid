@@ -594,6 +594,22 @@ def evaluation_release(ctx: Context) -> dict:
     return {"gold-and-answers": gold_answers, "backup-and-report": release_tests, "cli-walkthrough": walk}
 
 
+@flow("stage-review")
+def stage_review(ctx: Context) -> dict:
+    """The run-folder contract tests, then review/server.py itself serving a fixture run (no database or npm)."""
+    tests = ctx.unit("stage-review-tests", ["tests.test_stage_review"], 300)
+    code, out = ctx.run("stage-review-served", [ctx.python, "-B", "tools/verification/stage_review_served.py",
+                                                str(ctx.work)], 300)
+    try:
+        served = json.loads(out.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        served = {}
+    ctx.requests += served.pop("requests", [])
+    missing = (False, f"no result (exit {code}): {out.strip()[-300:]}")
+    return {"contract-tests": tests, **{k: tuple(served.get(k, missing))
+                                        for k in ("served-import", "tampered-view-refused", "served-decision")}}
+
+
 # ---------------------------------------------------------------- browser flows
 
 

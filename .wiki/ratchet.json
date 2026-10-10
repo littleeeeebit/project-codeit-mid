@@ -23,8 +23,8 @@
     },
     "src/rfp_assistant/cli.py": {
       "dup": 0,
-      "lines": 1006,
-      "reason": "hwp-ocr-from-embedded-images: `ocr` gains the coverage and sample actions and --ledger-dsn-env, which reserves paid reads in codeit's shared ledger without running schema statements on it"
+      "lines": 1029,
+      "reason": "review-app-retriever-chunking: `stage-review run retriever|chunking --base --cand --inputs-from` runs baseline and candidate refs in worktrees for the review app; chunking from an earlier run's frozen inputs starts without a database"
     },
     "src/rfp_assistant/contracts.py": {
       "dup": 8,
@@ -73,8 +73,8 @@
     },
     "tools/verify.py": {
       "dup": 0,
-      "lines": 1173,
-      "reason": "main-update-banner-button: the update-banner browser flow declared in verification.json registers in verify.py like every other flow, with its button-state helpers and the per-flow server environment; the GitHub stand-in lives in tests/fake_github.py beside tests/fake_hub.py; duplication allowance remains zero"
+      "lines": 1189,
+      "reason": "review-app-retriever-chunking: the stage-review flow, the repository gate's focused check, registers in verify.py like every other flow (its assertion ids must appear in the flow source); the served-app scenario lives in tools/verification/stage_review_served.py; duplication allowance remains zero"
     },
     "web/src/components/verify/evaluation.tsx": {
       "dup": 6,

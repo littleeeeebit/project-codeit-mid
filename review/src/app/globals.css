@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/* The palette of DESIGN.md (Toss-style neutrals, navy accent, status pairs that keep WCAG AA). */
+@theme inline {
+  --font-sans: var(--font-pretendard), "Pretendard Variable", sans-serif;
+  --color-ink: #191f28;
+  --color-muted: #5b6573;
+  --color-line: #e5e8eb;
+  --color-surface: #f2f4f6;
+  --color-primary: #1f4e9a;
+  --color-primary-bg: #e8f0fb;
+  --color-cite: #fff3bf;
+  --color-ok: #1e6b3a;
+  --color-ok-bg: #e6f4ea;
+  --color-warn: #8a4b00;
+  --color-warn-bg: #fff1dc;
+  --color-bad: #b3261e;
+  --color-bad-bg: #fdecea;
+  --color-neutral: #4a5160;
+  --color-neutral-bg: #eef0f3;
+  --radius-card: 10px;
+}
+
+html {
+  color: var(--color-ink);
+  background: #ffffff;
+}
+
+body {
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}

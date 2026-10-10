@@ -372,6 +372,44 @@
    ]
   },
   {
+   "id": "stage-review",
+   "title": "Stage review: run-folder contract, and review/server.py importing a run and writing a decision",
+   "kind": "command",
+   "command": "python -B tools/verify.py stage-review",
+   "paths": [
+    "review/*",
+    "review.cmd",
+    "review.command",
+    "src/rfp_assistant/evaluation/stage_review.py",
+    "src/rfp_assistant/evaluation/stage_review_worker.py",
+    "src/rfp_assistant/corpus/ingestion.py",
+    "src/rfp_assistant/retrieval/chunking.py",
+    "src/rfp_assistant/cli.py",
+    "tests/test_stage_review.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [],
+   "assertions": [
+    {
+     "id": "contract-tests",
+     "expected": "tests.test_stage_review passes: run-folder schema, chunking title check, export/import, decision files, gold rank and variant validation"
+    },
+    {
+     "id": "served-import",
+     "expected": "review/server.py on a free loopback port imports an exported fixture run zip, lists it and serves its view with every candidate"
+    },
+    {
+     "id": "tampered-view-refused",
+     "expected": "A new run's zip whose view.json names the already imported run is refused with 400 for its view.json and adds no run"
+    },
+    {
+     "id": "served-decision",
+     "expected": "A decision from a foreign Origin is refused with 403; a same-origin decision writes <run-id>.md and .json under review/decisions and its prompt points at the .md"
+    }
+   ]
+  },
+  {
    "id": "consultant-answer",
    "title": "Consultant asks one question and opens the original evidence in a browser",
    "kind": "browser",
