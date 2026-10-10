@@ -1,1 +1,0 @@
-The JSON marker at `BIDMATE_UPDATE_REQUEST` (requested_by, running_commit) is informational only; the updater reads nothing from it. Its existence keeps the fence up.

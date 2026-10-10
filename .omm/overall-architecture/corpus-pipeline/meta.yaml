@@ -1,34 +1,34 @@
 created: 2026-10-06 09:08:45.737000+00:00
-updated: 2026-10-09 23:18:37.401000+00:00
-update_count: 10
+updated: 2026-10-10 02:11:46.514000+00:00
+update_count: 12
 last_field: diagram
 kind: nested-class
 title: corpus-pipeline
 children:
+- dense-build
 - extraction-revisions
 - fidelity-check
 - hwp-loader-fallback
-- hwp-parsing
 - hwp-xml-walker
 - image-ocr
+- keyword-build
 - manifest
 - manifest-import
 - ocr-and-fidelity
 - ocr-merge
 - ocr-regions
 - parsers
-- pdf-parsing
 - review-and-recovery
 - revision-assignment
+- source-parsing
 parentPath: []
-prev_diagram: "graph TD\r\n  manifest-import[\"CSV manifest\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ] -->|sources, documents rows| hwp-xml-walker[\"pyhwp XML walker\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  manifest-import -->|PDF sources| pdf-parser[\"PyMuPDF parser\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  hwp-xml-walker -->|parse failure reason| hwp-loader-fallback[\"HwpHwpxLoader\
-  \ adapter\\nsrc/rfp_assistant/storage/hwp_loader.py\"]\r\n  hwp-xml-walker -->|raw\
-  \ elements| ocr-merge[\"OCR region merge\\nsrc/rfp_assistant/corpus/ocr.py\"]\r\n\
-  \  hwp-loader-fallback -->|single body element| ocr-merge\r\n  pdf-parser -->|raw\
-  \ elements| ocr-merge\r\n  ocr-merge -->|elements with image_text| extraction-revisions[\"\
-  Extraction revisions\\nsrc/rfp_assistant/corpus/ingestion.py\"]\r\n  extraction-revisions\
-  \ -->|active HWP extraction| fidelity-check[\"Hancom print fidelity\\nsrc/rfp_assistant/corpus/fidelity.py\"\
+prev_diagram: "graph TD\r\n  manifest-import[\"Manifest import\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ] -->|\"documents, sources rows\"| hwp-parsing[\"HWP parsing\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  manifest-import -->|\"documents, sources rows\"| pdf-parsing[\"PDF parsing\\\
+  nsrc/rfp_assistant/corpus/ingestion.py\"]\r\n  image-ocr[\"Image OCR cache\\nsrc/rfp_assistant/corpus/ocr.py\"\
+  ] -->|\"image_text at markers\"| hwp-parsing\r\n  image-ocr -->|\"image_text by\
+  \ anchors\"| pdf-parsing\r\n  hwp-parsing -->|\"raw elements\"| extraction-revisions[\"\
+  Extraction revisions\\nsrc/rfp_assistant/corpus/ingestion.py\"]\r\n  pdf-parsing\
+  \ -->|\"raw elements\"| extraction-revisions\r\n  extraction-revisions -->|\"active\
+  \ extraction\"| fidelity-check[\"HWP fidelity check\\nsrc/rfp_assistant/corpus/fidelity.py\"\
   ]"

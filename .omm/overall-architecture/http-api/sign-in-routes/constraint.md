@@ -1,0 +1,1 @@
+The hub URL, redirect URI and allowlist come only from the environment (`/etc/bidmate/server.env` on `codeit`). Without them every `/api` call is refused unless `BIDMATE_LOCAL_MEMBER` is set, and `Login.from_env` refuses that variable when hub settings are also present.

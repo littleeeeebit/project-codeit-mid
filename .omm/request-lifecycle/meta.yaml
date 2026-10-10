@@ -1,13 +1,13 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-09 23:18:43.444000+00:00
-update_count: 42
+updated: 2026-10-10 02:11:50.089000+00:00
+update_count: 44
 last_field: diagram
-git_commit: 99859d6
-git_branch: hwp-ocr-from-embedded-images
+git_commit: dc10905
+git_branch: review-app-retriever-chunking
 children:
-- admission-and-persist
 - answer-stream
 - answer-validation
+- ask-composer
 - ask-page
 - ask-submit
 - cancellation
@@ -15,38 +15,35 @@ children:
 - finish-record
 - finish-request
 - finish-step
-- follow-up-rewrite
 - langfuse-tracing
 - metered-call
 - metered-chat
-- metered-generation
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
 - paid-answer-stages
 - paid-call
 - poll-and-stream
-- retrieve-and-price
+- request-finish
+- request-runner
 - run-queued
-- screen-submit
-- status-and-stream
 - status-poll
+- status-stream
 - stream-and-poll
 - submit-and-admit
 - submit-answer
 - turn-render
-- validate-and-finish
 - validation
-- worker-claim
-prev_diagram: "graph TD\r\n  ask-composer[\"Composer and turn\\nweb/src/components/ask/ask-page.tsx\"\
-  ] -->|POST /api/ask| session-check[\"Session middleware\\nsrc/rfp_assistant/api.py\"\
-  ]\r\n  session-check -->|member bound to context| submit-answer[\"submit_answer\\\
-  nsrc/rfp_assistant/service/service.py\"]\r\n  submit-answer -->|queued row, request\
-  \ ID| request-runner[\"RequestRunner worker\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  request-runner -->|claim queued to running| paid-answer[\"_paid_answer\\\
-  nsrc/rfp_assistant/service/service.py\"]\r\n  paid-answer -->|rewrite and generation\
-  \ stages| metered-call[\"_metered_chat\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  metered-call -->|provider response| answer-validation[\"validate_answer\\\
-  nsrc/rfp_assistant/gateway/generation.py\"]\r\n  answer-validation -->|payload or\
-  \ TechnicalError| finish-record[\"_finish\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  finish-record -->|poll and SSE read| ask-composer"
+prev_diagram: "graph TD\r\n  screen-submit[\"Screen submits question\\nweb/src/components/ask/ask-page.tsx\"\
+  ] -->|\"POST /api/ask\"| admission-and-persist[\"Admission and persist\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  admission-and-persist -->|\"request_id to executor\"| worker-claim[\"Worker\
+  \ claims request\\nsrc/rfp_assistant/service/service.py\"]\r\n  worker-claim -->|\"\
+  follow-up only\"| follow-up-rewrite[\"Standalone rewrite\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  worker-claim -->|\"first turn\"| retrieve-and-price[\"Retrieve and price\\\
+  nsrc/rfp_assistant/service/service.py\"]\r\n  follow-up-rewrite -->|\"standalone\
+  \ query\"| retrieve-and-price\r\n  retrieve-and-price -->|\"messages, estimate\"\
+  | metered-generation[\"Metered generation\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  metered-generation -->|\"provider response\"| validate-and-finish[\"Validate\
+  \ and finish\\nsrc/rfp_assistant/service/service.py\"]\r\n  validate-and-finish\
+  \ -->|\"result_json stored\"| status-and-stream[\"Status poll and stream\\nsrc/rfp_assistant/api.py\"\
+  ]\r\n  metered-generation -->|\"partial text\"| status-and-stream"

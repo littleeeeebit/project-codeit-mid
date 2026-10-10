@@ -1,8 +1,15 @@
 graph TD
-  resources-owner["Resources owner\nsrc/rfp_assistant/service/service.py"] -->|"creates lazily"| request-runner["Request runner\nsrc/rfp_assistant/service/service.py"]
-  request-runner -->|"run_queued per request"| answer-pipeline["Answer pipeline\nsrc/rfp_assistant/service/service.py"]
-  resources-owner -->|"index, dense, reranker, transport"| answer-pipeline
-  resources-owner -->|"joined on close"| background-jobs["Background jobs\nsrc/rfp_assistant/service/service.py"]
-  update-watch["Update fence\nsrc/rfp_assistant/service/update.py"] -->|"fenced under _runner_lock"| request-runner
-  update-watch -->|"fenced under _runner_lock"| background-jobs
-  hub-login["Hub login\nsrc/rfp_assistant/service/auth.py"] -->|"member identity"| answer-pipeline
+  app-resources["Process resources\nsrc/rfp_assistant/service/service.py"]
+  request-runner["Bounded request runner\nsrc/rfp_assistant/service/service.py"]
+  answer-execution["Answer execution\nsrc/rfp_assistant/service/service.py"]
+  verifier-runs["Frozen verifier runs\nsrc/rfp_assistant/service/service.py"]
+  background-jobs["Paid background jobs\nsrc/rfp_assistant/service/drafting.py"]
+  member-keys["Member key sessions\nsrc/rfp_assistant/gateway/generation.py"]
+  update-watch["Update watch and fence\nsrc/rfp_assistant/service/update.py"]
+  app-resources -->|"lazily creates executor"| request-runner
+  request-runner -->|"run_queued(request_id)"| answer-execution
+  verifier-runs -->|"frozen evidence, vgen key"| answer-execution
+  member-keys -->|"key, model, billing scope"| answer-execution
+  app-resources -->|"joins threads on close"| background-jobs
+  update-watch -->|"fence refuses admission"| request-runner
+  update-watch -->|"fence refuses job start"| background-jobs

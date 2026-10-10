@@ -1,0 +1,1 @@
+`gateway/tracing.py` itself was not read. This description comes from its call sites in `service.py` and `Resources`.

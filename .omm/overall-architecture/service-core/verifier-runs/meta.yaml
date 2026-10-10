@@ -1,0 +1,9 @@
+created: 2026-10-10T02:11:42.131Z
+updated: 2026-10-10T02:11:42.294Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: verifier-runs
+children: []
+parentPath:
+  - service-core

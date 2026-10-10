@@ -1,0 +1,1 @@
+`run_queued` claims the row with `UPDATE … SET status='running' WHERE status='queued' AND cancel_requested=0`, so a request runs exactly once and a queued cancel wins. It rebuilds the `AnswerRequest` and `Principal` from the persisted snapshot. Workers never see UI state, and the member's key, model and billing scope arrive through the copied contextvars.

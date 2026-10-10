@@ -1,0 +1,1 @@
+The 설정 page. Each member enters their own OpenAI key and answer model (`PUT /api/settings/api-key`, `PUT /api/settings/model`) and can change the shared cumulative cap (`PUT /api/budget/limit`). The key is checked against the model with a free metadata call (`generation.check_api_key`) and then lives only in server memory under a new key session.

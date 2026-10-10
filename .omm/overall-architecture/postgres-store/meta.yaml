@@ -1,10 +1,10 @@
 created: 2026-10-06 07:57:08.419000+00:00
-updated: 2026-10-09 23:18:37.077000+00:00
-update_count: 10
-last_field: note
+updated: 2026-10-10T02:11:46.245Z
+update_count: 11
+last_field: description
 kind: nested-class
 title: postgres-store
 children:
-- gateway-owner-lock
-- maintenance-sequence
+  - gateway-owner-lock
+  - maintenance-sequence
 parentPath: []

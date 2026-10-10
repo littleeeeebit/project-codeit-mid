@@ -1,15 +1,21 @@
 graph TD
-  web-screens["Next.js screens\nweb/src"] -->|"fetch /api with session"| http-api["FastAPI app\nsrc/rfp_assistant/api.py"]
-  http-api -->|"one service call per route"| service-core["Service core\nsrc/rfp_assistant/service/service.py"]
-  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"] -->|"same functions, own Resources"| service-core
-  owner-cli -->|"manifest, ingest, ocr, fidelity"| corpus-pipeline["Corpus pipeline\nsrc/rfp_assistant/corpus"]
-  owner-cli -->|"runs, activate-run, release"| evaluation-suite["Evaluation and selection\nsrc/rfp_assistant/evaluation"]
-  service-core -->|"verify jobs, activation"| evaluation-suite
-  service-core -->|"retrieve evidence"| retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval"]
-  service-core -->|"reserve, call, settle"| paid-gateway["Paid gateway\nsrc/rfp_assistant/gateway"]
-  retrieval-engine -->|"paid query embedding"| paid-gateway
-  corpus-pipeline -->|"sources, elements, OCR text"| postgres-store["PostgreSQL and pgvector\nsrc/rfp_assistant/storage"]
-  retrieval-engine -->|"chunks, vectors"| postgres-store
-  paid-gateway -->|"attempts, advisory lock"| postgres-store
-  evaluation-suite -->|"active_run setting"| postgres-store
-  service-core -->|"requests, audit rows"| postgres-store
+  web-screens["Web screens\nweb/src/app/layout.tsx"]
+  http-api["HTTP API\nsrc/rfp_assistant/api.py"]
+  service-core["Service core\nsrc/rfp_assistant/service/service.py"]
+  retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  paid-gateway["Paid gateway\nsrc/rfp_assistant/gateway/budget.py"]
+  postgres-store["PostgreSQL store\nsrc/rfp_assistant/storage/postgres.py"]
+  corpus-pipeline["Corpus pipeline\nsrc/rfp_assistant/corpus/ingestion.py"]
+  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"]
+  stage-review-app["Stage review app\nreview/server.py"]
+  web-screens -->|"fetch /api with session"| http-api
+  http-api -->|"one service call per route"| service-core
+  service-core -->|"scoped evidence retrieval"| retrieval-engine
+  service-core -->|"reserve, dispatch, settle"| paid-gateway
+  service-core -->|"maintenance job steps"| corpus-pipeline
+  retrieval-engine -->|"chunks, pgvector search"| postgres-store
+  paid-gateway -->|"ledger rows, advisory lock"| postgres-store
+  corpus-pipeline -->|"sources, extractions, indexes"| postgres-store
+  owner-cli -->|"ingest, build, activate"| corpus-pipeline
+  owner-cli -->|"ledger-only budget admin"| paid-gateway
+  owner-cli -->|"writes review run folders"| stage-review-app

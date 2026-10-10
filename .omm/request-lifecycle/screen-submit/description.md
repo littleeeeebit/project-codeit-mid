@@ -1,1 +1,0 @@
-ask-page.tsx posts {scope: [{doc_id, source_hash}], question, mode, previous_request_id}. `service.ask` creates a fresh `generation_id`, which is also the idempotency key, and returns {request_id, generation_id, target}. `target` is `target_key(scope, question, mode, as_of, previous)`, a SHA-256 of what the screen asked.

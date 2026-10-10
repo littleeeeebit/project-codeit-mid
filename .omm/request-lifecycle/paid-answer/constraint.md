@@ -1,0 +1,1 @@
+A failure in retrieval or estimation ends the request as `technical_error` before any answer reservation. A query embedding already settled in this request stays billed.

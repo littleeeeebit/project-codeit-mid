@@ -1,6 +1,12 @@
 graph TD
-  session-middleware["Session middleware\nsrc/rfp_assistant/api.py"] -->|"signed-in member bound"| ask-routes["Ask and request routes\nsrc/rfp_assistant/api.py"]
-  session-middleware -->|"signed-in member bound"| verify-routes["Verify and dataset routes\nsrc/rfp_assistant/api.py"]
-  session-middleware -->|"sign-in paths pass"| auth-routes["Sign-in routes\nsrc/rfp_assistant/api.py"]
-  app-lifespan["Lifespan owner\nsrc/rfp_assistant/api.py"] -->|"opens Resources, UpdateWatch"| session-middleware
-  static-mount["Static screens\nweb/out"] -->|"served after /api"| session-middleware
+  session-guard["Session middleware\nsrc/rfp_assistant/api.py"]
+  sign-in-routes["Sign-in routes\nsrc/rfp_assistant/service/auth.py"]
+  ask-routes["Ask and request routes\nsrc/rfp_assistant/api.py"]
+  verify-routes["Verify routes\nsrc/rfp_assistant/api.py"]
+  dataset-routes["Dataset routes\nsrc/rfp_assistant/api.py"]
+  static-export["Static screens mount\nweb/src/app/layout.tsx"]
+  sign-in-routes -->|"sets bidmate_session cookie"| session-guard
+  session-guard -->|"member bound per request"| ask-routes
+  session-guard -->|"member bound per request"| verify-routes
+  session-guard -->|"member bound per request"| dataset-routes
+  session-guard -->|"non-/api paths pass"| static-export

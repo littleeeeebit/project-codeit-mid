@@ -1,0 +1,1 @@
+No request carries a branch or commit, and nothing in the process runs git or systemctl to update. A `running` result older than 30 minutes is shown as interrupted.

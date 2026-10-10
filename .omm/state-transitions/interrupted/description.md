@@ -1,0 +1,1 @@
+Set by `RequestRunner.shutdown` (queued rows always, running rows only when workers did not finish within `shutdown_wait_seconds`) and by `recover_requests` when a new process takes the gateway lock. A worker that keeps running afterwards stops at its next checkpoint, because `_stop_reason` returns interrupted for a closed `Resources` or a row that is no longer running.

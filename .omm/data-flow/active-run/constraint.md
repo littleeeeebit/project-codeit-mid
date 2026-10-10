@@ -1,0 +1,1 @@
+A run measured under another corpus-routing rule (`limits.corpus_route`) is refused at activation and, if already active, is not served: the keyword default serves, and the stale run is flagged in each result's limitations.

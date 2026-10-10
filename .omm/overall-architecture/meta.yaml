@@ -1,9 +1,9 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-09T23:18:20.287Z
-update_count: 44
+updated: 2026-10-10T02:11:39.012Z
+update_count: 46
 last_field: diagram
-git_commit: 99859d6
-git_branch: hwp-ocr-from-embedded-images
+git_commit: dc10905
+git_branch: review-app-retriever-chunking
 children:
   - api-layer
   - api-routes
@@ -31,6 +31,7 @@ children:
   - service
   - service-core
   - service-layer
+  - stage-review-app
   - storage
   - tracing
   - web
@@ -39,36 +40,39 @@ children:
   - workflows
 prev_diagram: "graph TD\r
 
-  \  web-screens[\"Next.js screens\\nweb/src\"] -->|typed fetch, SSE, polling|
-  http-api[\"FastAPI routes\\nsrc/rfp_assistant/api.py\"]\r
+  \  web-screens[\"Next.js screens\\nweb/src\"] -->|\"fetch /api with session\"|
+  http-api[\"FastAPI app\\nsrc/rfp_assistant/api.py\"]\r
 
-  \  http-api -->|one service call per route| service-core[\"Service
+  \  http-api -->|\"one service call per route\"| service-core[\"Service
   core\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"] -->|budget admin,
-  answer runs| service-core\r
+  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"] -->|\"same functions,
+  own Resources\"| service-core\r
 
-  \  owner-cli -->|ingest, fidelity, OCR| corpus-pipeline[\"Corpus
+  \  owner-cli -->|\"manifest, ingest, ocr, fidelity\"| corpus-pipeline[\"Corpus
   pipeline\\nsrc/rfp_assistant/corpus\"]\r
 
-  \  owner-cli -->|runs, activation, release| evaluation-suite[\"Evaluation and
+  \  owner-cli -->|\"runs, activate-run, release\"|
+  evaluation-suite[\"Evaluation and
   selection\\nsrc/rfp_assistant/evaluation\"]\r
 
-  \  service-core -->|scoped retrieval| retrieval-engine[\"Retrieval
+  \  service-core -->|\"verify jobs, activation\"| evaluation-suite\r
+
+  \  service-core -->|\"retrieve evidence\"| retrieval-engine[\"Retrieval
   engine\\nsrc/rfp_assistant/retrieval\"]\r
 
-  \  service-core -->|reserve, dispatch, settle| paid-gateway[\"Paid
+  \  service-core -->|\"reserve, call, settle\"| paid-gateway[\"Paid
   gateway\\nsrc/rfp_assistant/gateway\"]\r
 
-  \  service-core -->|drafting, judges, activation| evaluation-suite\r
+  \  retrieval-engine -->|\"paid query embedding\"| paid-gateway\r
 
-  \  corpus-pipeline -->|extractions, elements, verdicts|
-  postgres-store[\"PostgreSQL and runtime files\\nsrc/rfp_assistant/storage\"]\r
+  \  corpus-pipeline -->|\"sources, elements, OCR text\"|
+  postgres-store[\"PostgreSQL and pgvector\\nsrc/rfp_assistant/storage\"]\r
 
-  \  retrieval-engine -->|index files, pgvector sets| postgres-store\r
+  \  retrieval-engine -->|\"chunks, vectors\"| postgres-store\r
 
-  \  paid-gateway -->|attempts ledger| postgres-store\r
+  \  paid-gateway -->|\"attempts, advisory lock\"| postgres-store\r
 
-  \  evaluation-suite -->|active_run, activations| postgres-store\r
+  \  evaluation-suite -->|\"active_run setting\"| postgres-store\r
 
-  \  service-core -->|requests, audit rows| postgres-store"
+  \  service-core -->|\"requests, audit rows\"| postgres-store"

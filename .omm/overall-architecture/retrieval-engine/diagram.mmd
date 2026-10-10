@@ -1,7 +1,16 @@
 graph TD
-  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval/retrieval.py"] -->|"scoped rows"| corpus-routing["Corpus routing\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  corpus-routing -->|"allowed rows"| lexical-channel["Lexical channel\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  corpus-routing -->|"allowed rows"| dense-channel["Dense channel\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  lexical-channel -->|"BM25 ranking"| fusion-and-rerank["Fusion and rerank\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  dense-channel -->|"cosine ranking"| fusion-and-rerank
-  fusion-and-rerank -->|"ordered chunk rows"| evidence-packing["Evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  serving-config["Activated serving config\nsrc/rfp_assistant/service/service.py"]
+  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  scope-routing["Scope routing\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  lexical-channel["BM25 channel\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  dense-channel["pgvector channel\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  fusion-rerank["Fusion and rerank\nsrc/rfp_assistant/retrieval/dense.py"]
+  evidence-packing["Evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  serving-config -->|"active index_version"| keyword-index
+  serving-config -->|"dense_version, embedding, limits"| dense-channel
+  keyword-index -->|"scope_terms, extraction rows"| scope-routing
+  scope-routing -->|"allowed rows"| lexical-channel
+  scope-routing -->|"allowed rows"| dense-channel
+  lexical-channel -->|"BM25 ranking"| fusion-rerank
+  dense-channel -->|"cosine ranking"| fusion-rerank
+  fusion-rerank -->|"final ranking"| evidence-packing

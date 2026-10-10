@@ -1,14 +1,15 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-09 23:19:09.079000+00:00
-update_count: 40
+updated: 2026-10-10 02:11:54.490000+00:00
+update_count: 42
 last_field: diagram
-git_commit: 99859d6
-git_branch: hwp-ocr-from-embedded-images
+git_commit: dc10905
+git_branch: review-app-retriever-chunking
 children:
 - activation
-- active-serving
+- active-run
 - corpus-ingestion
 - embedding-set
+- evaluation-runs
 - extraction
 - extraction-artifacts
 - fidelity-and-ocr
@@ -18,12 +19,12 @@ children:
 - index-build
 - keyword-index-files
 - maintenance-sequence
-- ocr-cache
 - ocr-merge
 - original-corpus
 - original-files
 - originals
 - preview
+- request-records
 - retrieval-runs
 - retrieval-selection
 - run-selection
@@ -31,15 +32,14 @@ children:
 - source-originals
 - source-records
 - vector-sets
-prev_diagram: "graph TD\r\n  original-files[\"Originals and CSV\\nRFP_SOURCE_DIR\"\
-  ] -->|hash, parse, OCR merge| extraction-artifacts[\"Extraction revisions\\n.runtime/extracted\"\
-  ]\r\n  extraction-artifacts -->|chunk, tokenize, freeze terms| keyword-index[\"\
-  Keyword index versions\\n.runtime/indexes\"]\r\n  keyword-index -->|payload hashes\
-  \ per row| embedding-sets[\"pgvector embedding sets\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
-  ]\r\n  keyword-index -->|frozen runs, matrices| evaluation-artifacts[\"Runs and\
-  \ tables\\n.runtime/runs\"]\r\n  evaluation-artifacts -->|person activates row|\
-  \ serving-activation[\"active_run, active_index\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  serving-activation -->|selects index, set, limits| request-records[\"Requests\
-  \ with evidence\\nsrc/rfp_assistant/service/service.py\"]\r\n  embedding-sets -->|cosine\
-  \ candidates| request-records\r\n  request-records -->|evidence context, original\
-  \ download| original-files"
+prev_diagram: "graph TD\r\n  original-files[\"Original HWP and PDF\\nsrc/rfp_assistant/settings.py\"\
+  ] -->|\"manifest hashes\"| source-records[\"documents and sources rows\\nsrc/rfp_assistant/storage/store.py\"\
+  ]\r\n  original-files -->|\"embedded pictures, rasters\"| ocr-cache[\"OCR region\
+  \ cache\\nsrc/rfp_assistant/corpus/ocr.py\"]\r\n  source-records -->|\"ingest parses\"\
+  | extraction-artifacts[\"Elements and artifacts\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  ocr-cache -->|\"merged as image_text\"| extraction-artifacts\r\n  extraction-artifacts\
+  \ -->|\"build-keyword chunks\"| keyword-index-files[\"Keyword index files\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  keyword-index-files -->|\"embed chunk payloads\"| vector-sets[\"pgvector\
+  \ sets\\nsrc/rfp_assistant/retrieval/vector_store.py\"]\r\n  vector-sets -->|\"\
+  evaluate, compare, activate\"| active-serving[\"Active serving config\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
+  ]\r\n  keyword-index-files -->|\"activate-run\"| active-serving"

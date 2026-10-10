@@ -1,0 +1,15 @@
+created: 2026-10-10T02:11:48.044Z
+updated: 2026-10-10T02:11:48.177Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: stage-review-app
+children:
+  - candidate-worker
+  - candidate-worktrees
+  - decision-files
+  - review-server
+  - run-folder
+  - stage-review-runner
+  - stage-scorer
+parentPath: []

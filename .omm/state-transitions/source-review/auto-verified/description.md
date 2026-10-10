@@ -1,1 +1,0 @@
-Passed the two-way shingle comparison against the Hancom print. Included in the reviewed-only index.

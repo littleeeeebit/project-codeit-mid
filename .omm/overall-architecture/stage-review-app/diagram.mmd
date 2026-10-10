@@ -1,0 +1,16 @@
+graph TD
+  stage-review-runner["Stage review runner\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  candidate-worktrees["Candidate worktrees\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  candidate-worker["Candidate worker process\nsrc/rfp_assistant/evaluation/stage_review_worker.py"]
+  stage-scorer["Shared scorer\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  run-folder["Run folder\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  review-server["Review server\nreview/server.py"]
+  decision-files["Decision files\nreview/server.py"]
+  stage-review-runner -->|"git worktree add --detach"| candidate-worktrees
+  stage-review-runner -->|"freezes inputs/"| run-folder
+  candidate-worktrees -->|"subprocess per ref"| candidate-worker
+  candidate-worker -->|"candidates/id.json"| run-folder
+  stage-review-runner -->|"after every candidate"| stage-scorer
+  stage-scorer -->|"view.json"| run-folder
+  run-folder -->|"read, export, import zip"| review-server
+  review-server -->|"POST decision"| decision-files

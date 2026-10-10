@@ -1,0 +1,1 @@
+Reached directly from queued (`cancel_request`), through a `_Stop('cancelled')` raised at a checkpoint or by a dispatch refusal, or by `_finish` turning a completed outcome into cancelled when `cancel_requested` was set. The screen then shows the request only in 내 최근 요청 history, never as the current answer.

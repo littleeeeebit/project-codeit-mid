@@ -1,0 +1,1 @@
+Inserted by `budget.reserve` with the maximum cost and a price snapshot (model, rates, rate version, billing scope). Counted as pending against the cap and against the purpose's envelope.

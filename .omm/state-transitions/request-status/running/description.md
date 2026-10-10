@@ -1,1 +1,0 @@
-Claimed by `run_queued`, or inserted directly for free modes and the synchronous `answer()` used by the CLI and tests. Paid stages may reserve and dispatch only while the row is `running` and `cancel_requested = 0` (`_stop_reason`).

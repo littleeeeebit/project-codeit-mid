@@ -1,0 +1,1 @@
+The internals of `compare.py` and `evaluation.py` scoring were sampled, not traced. The run and table layout above comes from their docstrings, the README and `activate_decision`.

@@ -1,0 +1,1 @@
+`checkout` runs `git worktree add --detach <path> <commit>` under `.runtime/review/worktrees/`. For the working tree it then copies every changed and untracked file (from `git diff --name-only HEAD` plus `ls-files --others --exclude-standard`), deletes removed ones and records `changed_files` and `changed_sha256`. `remove_worktree` force-removes the worktree and prunes.

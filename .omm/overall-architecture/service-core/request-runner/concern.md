@@ -1,0 +1,1 @@
+A running worker cut off by shutdown can still be inside a provider call. Its attempt stays dispatching and becomes unknown after restart (`budget.recover`), and then blocks all PostgreSQL dispatch until the owner reconciles it.

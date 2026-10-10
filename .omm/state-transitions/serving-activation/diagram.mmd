@@ -1,6 +1,0 @@
-graph TD
-  keyword-default["Keyword default\nsrc/rfp_assistant/service/service.py"] -->|"activate_decision"| activated-run["Activated run\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  activated-run -->|"another activation"| activated-run
-  activated-run -->|"routing or policy changed"| route-stale-default["Stale-run downgrade\nsrc/rfp_assistant/service/service.py"]
-  activated-run -->|"dense or reranker missing"| request-fallback["Per-request fallback\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  route-stale-default -->|"rerun then activate"| activated-run

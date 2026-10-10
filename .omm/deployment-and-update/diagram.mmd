@@ -1,7 +1,0 @@
-graph TD
-  member-browser["Member browser\nweb/src/app/layout.tsx"] -->|"HTTP :8501 with cookie"| bidmate-unit["bidmate systemd unit\ntools/infra/bidmate.service"]
-  bidmate-unit -->|"OAuth code exchange"| jupyterhub["JupyterHub OAuth\nsrc/rfp_assistant/service/auth.py"]
-  bidmate-unit -->|"psycopg pool, advisory lock"| postgres-server["PostgreSQL server\ntools/infra/start-postgresql.sh"]
-  bidmate-unit -->|"marker file"| update-units["Update path unit\ntools/infra/bidmate-update.path"]
-  update-units -->|"ff main, restart"| bidmate-unit
-  owner-workstation["Owner CLI via tunnel\ntools/infra/bidmate-cli.sh"] -->|"ledger DSN env"| postgres-server

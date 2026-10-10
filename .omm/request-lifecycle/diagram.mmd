@@ -1,10 +1,18 @@
 graph TD
-  screen-submit["Screen submits question\nweb/src/components/ask/ask-page.tsx"] -->|"POST /api/ask"| admission-and-persist["Admission and persist\nsrc/rfp_assistant/service/service.py"]
-  admission-and-persist -->|"request_id to executor"| worker-claim["Worker claims request\nsrc/rfp_assistant/service/service.py"]
-  worker-claim -->|"follow-up only"| follow-up-rewrite["Standalone rewrite\nsrc/rfp_assistant/service/service.py"]
-  worker-claim -->|"first turn"| retrieve-and-price["Retrieve and price\nsrc/rfp_assistant/service/service.py"]
-  follow-up-rewrite -->|"standalone query"| retrieve-and-price
-  retrieve-and-price -->|"messages, estimate"| metered-generation["Metered generation\nsrc/rfp_assistant/service/service.py"]
-  metered-generation -->|"provider response"| validate-and-finish["Validate and finish\nsrc/rfp_assistant/service/service.py"]
-  validate-and-finish -->|"result_json stored"| status-and-stream["Status poll and stream\nsrc/rfp_assistant/api.py"]
-  metered-generation -->|"partial text"| status-and-stream
+  ask-composer["Ask composer\nweb/src/components/ask/ask-page.tsx"]
+  submit-answer["Validate and persist\nsrc/rfp_assistant/service/service.py"]
+  request-runner["Executor worker\nsrc/rfp_assistant/service/service.py"]
+  paid-answer["Paid answer path\nsrc/rfp_assistant/service/service.py"]
+  metered-chat["Metered model call\nsrc/rfp_assistant/gateway/generation.py"]
+  answer-validation["Citation validation\nsrc/rfp_assistant/gateway/generation.py"]
+  request-finish["Outcome and billing\nsrc/rfp_assistant/service/service.py"]
+  status-stream["Status poll and SSE\nsrc/rfp_assistant/api.py"]
+  ask-composer -->|"POST /api/ask"| submit-answer
+  submit-answer -->|"queued row, admitted slot"| request-runner
+  request-runner -->|"claims queued to running"| paid-answer
+  paid-answer -->|"rewrite, then answer"| metered-chat
+  metered-chat -->|"streamed deltas to partials"| status-stream
+  metered-chat -->|"provider response"| answer-validation
+  answer-validation -->|"payload or TechnicalError"| request-finish
+  request-finish -->|"stored result_json"| status-stream
+  status-stream -->|"SSE and 1 s poll"| ask-composer

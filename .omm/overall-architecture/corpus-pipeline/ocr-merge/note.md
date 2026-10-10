@@ -1,0 +1,1 @@
+`corpus/ocr.py` internals were not traced. The merge call sites are in `ingestion._parse_source`, and the rest comes from the README.

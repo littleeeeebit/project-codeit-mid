@@ -1,9 +1,0 @@
-created: 2026-10-09T23:19:06.834Z
-updated: 2026-10-09T23:19:06.836Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: request-fallback
-children: []
-parentPath:
-  - serving-activation

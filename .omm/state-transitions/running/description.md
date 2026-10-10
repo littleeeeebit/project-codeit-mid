@@ -1,0 +1,1 @@
+Entered by `run_queued`'s conditional update, or by direct insertion for free modes and for the synchronous `service.answer` used by the CLI and tests. While running, `cancel_request` only sets `cancel_requested=1`. The next `_checkpoint` or `mark_dispatching` guard raises `_Stop`, and a call already dispatched still settles.

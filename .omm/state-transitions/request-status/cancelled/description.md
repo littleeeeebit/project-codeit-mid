@@ -1,1 +1,0 @@
-Conclusive from `queued`, with no paid call. From `running` it is reached when a checkpoint raises `_Stop("cancelled")`, or when `_finish` sees `cancel_requested` on a completed run. The outcome is stored for history and never attached to the screen.
