@@ -191,8 +191,16 @@ def _ledger_view(settings: Settings, record: dict) -> dict:
     with open_db(ls.db_path) as conn:
         avg, n = conn.execute("SELECT AVG(settled_micro_usd), COUNT(*) FROM attempts WHERE purpose = ? AND model = ? "
                               "AND state = 'settled'", (PURPOSE[record["stage"]], MODEL)).fetchone()
-    return {**view, "ledger": _target(ls), "settled_average_micro_usd": round(avg) if n else None,
-            "settled_average_n": n}
+        # This run's reservations a dead pass never dispatched: no pass of it is live while it is priced or admitted,
+        # and the next pass's recovery releases them, so the balance they hold is the run's to spend again.
+        stale = sum(conn.execute(
+            "SELECT COALESCE(SUM(a.reserved_micro_usd), 0) FROM requests r JOIN attempts a ON a.request_id = "
+            "r.request_id WHERE a.state = 'reserved' AND r.idempotency_key LIKE ?",
+            (key_prefix(record, c["id"]) + "%",)).fetchone()[0] for c in record["candidates"])
+    return {**view, "available_micro_usd": view["available_micro_usd"] + stale,
+            "envelope_remaining_micro_usd": view["envelope_remaining_micro_usd"] + stale,
+            "stale_reserved_micro_usd": stale, "ledger": _target(ls),
+            "settled_average_micro_usd": round(avg) if n else None, "settled_average_n": n}
 
 
 def _read(path: Path) -> dict | None:

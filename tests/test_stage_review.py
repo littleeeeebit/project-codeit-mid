@@ -505,14 +505,19 @@ class PaidLedgerTest(unittest.TestCase):
         folder = self.ocr_folder(1, state="stopped")
         record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
         record["candidates"][1]["status"] = "stopped"
+        (folder / "worker.py").write_text("", encoding="utf-8")
+        record.update(input_sha256=stage_review.input_hashes(folder / "inputs"), worker_sha256=stage_review._sha(b""))
         (folder / "run.json").write_text(json.dumps(record), encoding="utf-8")
         # The worker died between reserving image 0's read and dispatching it; the gateway has not recovered yet.
         self.attempt(f"review:{folder.name}:c1:{ocr.OCR_VERSION}", "reserved", U, purpose="ocr", stage="ocr:d0",
                      member=ocr.REMOTE_MEMBER)
+        with store.open_db(self.db) as conn:  # the cap has room for exactly that read once recovery releases it
+            conn.execute("UPDATE budget_settings SET cap_micro_usd = ?", (U,))
         stage_review.reprice(self.settings, folder.name)
         fresh = paid.approve(self.settings, folder.name, "kim")
         self.assertEqual({k: fresh["candidates"]["c1"][k] for k in ("calls", "max_micro_usd", "committed_micro_usd")},
                          {"calls": 1, "max_micro_usd": U, "committed_micro_usd": 0})
+        paid.recheck(self.settings, folder, record, fresh)  # resume's admission, before the worker's recovery
         reads = Reads(U * 8 // 10)
         out = self.read(folder, self.ocr_config(folder, fresh), reads)  # recovery releases it; the read is approved
         self.assertEqual((reads.calls, out["images"][0]["status"]), (1, "remote"))
