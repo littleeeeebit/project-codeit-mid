@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Candidate, ChunkingView as View, DocView, Sizes } from "@/lib/api";
 import { getJson } from "@/lib/api";
-import { Badge, CandidateHead, Failure, columns } from "./ui";
+import { Badge, Metric, Metrics, Summaries, columns } from "./ui";
 import { NoteField } from "./note-field";
 
 export function ChunkingView({ view, notes, setNote }: {
@@ -30,35 +30,18 @@ export function ChunkingView({ view, notes, setNote }: {
   const listed = view.documents.find((d) => d.n === n);
   return (
     <>
-      <section aria-label="후보별 결과" className="overflow-x-auto">
-        <div className="grid gap-4" style={columns(view.candidates.length)}>
-          {view.candidates.map((c) => {
-            const s = view.summary[c.id];
-            return (
-              <div key={c.id} className="border-t-2 border-ink pt-3">
-                <CandidateHead c={c} />
-                {c.status !== "complete" || !s ? <Failure c={c} /> : (
-                  <>
-                    <div className="mt-3 flex flex-wrap items-end gap-x-8 gap-y-3">
-                      <div>
-                        <div className="text-[32px] font-bold leading-none tabular-nums">{s.sizes.count.toLocaleString()}</div>
-                        <div className="mt-1 whitespace-nowrap text-[13px] text-muted">조각 · 문서 {s.documents}개</div>
-                      </div>
-                      <div>
-                        <div className={`text-[24px] font-bold leading-none tabular-nums ${s.tables_kept < s.tables_titled ? "text-warn" : ""}`}>
-                          {s.tables_kept}/{s.tables_titled}
-                        </div>
-                        <div className="mt-1 whitespace-nowrap text-[13px] text-muted">표 제목이 행과 함께 남음</div>
-                      </div>
-                    </div>
-                    <SizeBars sizes={s.sizes} />
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <Summaries candidates={view.candidates} summary={view.summary}>
+        {(s) => (
+          <>
+            <Metrics>
+              <Metric lead value={s.sizes.count.toLocaleString()} label={`조각 · 문서 ${s.documents}개`} />
+              <Metric value={`${s.tables_kept}/${s.tables_titled}`} label="표 제목이 행과 함께 남음"
+                      tone={s.tables_kept < s.tables_titled ? "text-warn" : ""} />
+            </Metrics>
+            <SizeBars sizes={s.sizes} />
+          </>
+        )}
+      </Summaries>
 
       <section aria-label="문서별 경계" className="mt-10">
         <div className="sticky top-0 z-10 -mx-2 flex flex-wrap items-center gap-3 bg-white/95 px-2 py-3 backdrop-blur">

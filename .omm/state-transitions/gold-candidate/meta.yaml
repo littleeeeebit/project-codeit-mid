@@ -1,13 +1,8 @@
-created: 2026-10-06T07:57:20.295Z
-updated: 2026-10-09T23:19:02.572Z
+created: 2026-10-06 07:57:20.295000+00:00
+updated: 2026-10-09 23:19:02.572000+00:00
 update_count: 7
 last_field: diagram
 kind: nested-class
 title: gold-candidate
-children:
-  - approved
-  - draft-run
-  - pending
-  - rejected
-  - second-review
+children: []
 parentPath: []

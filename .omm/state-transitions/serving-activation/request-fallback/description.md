@@ -1,1 +1,0 @@
-A one-request downgrade recorded in `RetrievalResult.fallback` and in limitations such as `dense_unavailable` and `reranker_unavailable`. `Resources.stage_errors` keeps the last reason.

@@ -1,0 +1,1 @@
+auth.Login internals were not read; behaviour is from api.py and README.md.

@@ -1,8 +1,17 @@
 graph TD
-  manifest-import["Manifest import\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"documents, sources rows"| hwp-parsing["HWP parsing\nsrc/rfp_assistant/corpus/ingestion.py"]
-  manifest-import -->|"documents, sources rows"| pdf-parsing["PDF parsing\nsrc/rfp_assistant/corpus/ingestion.py"]
-  image-ocr["Image OCR cache\nsrc/rfp_assistant/corpus/ocr.py"] -->|"image_text at markers"| hwp-parsing
-  image-ocr -->|"image_text by anchors"| pdf-parsing
-  hwp-parsing -->|"raw elements"| extraction-revisions["Extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
-  pdf-parsing -->|"raw elements"| extraction-revisions
-  extraction-revisions -->|"active extraction"| fidelity-check["HWP fidelity check\nsrc/rfp_assistant/corpus/fidelity.py"]
+  manifest-import["Manifest import\nsrc/rfp_assistant/corpus/ingestion.py"]
+  source-parse["_parse_source HWP and PDF\nsrc/rfp_assistant/corpus/ingestion.py"]
+  hwp-loader["HWP/HWPX loader fallback\nsrc/rfp_assistant/storage/hwp_loader.py"]
+  ocr-cache["OCR run and merge\nsrc/rfp_assistant/corpus/ocr.py"]
+  revision-assign["assign_revision and elements\nsrc/rfp_assistant/corpus/ingestion.py"]
+  fidelity-check["Hancom print fidelity\nsrc/rfp_assistant/corpus/fidelity.py"]
+  keyword-build["build_keyword_index\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  run-activation["activate_decision\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  manifest-import -->|"sources, documents rows"| source-parse
+  source-parse -->|"pyhwp failure reason"| hwp-loader
+  ocr-cache -->|"cached image_text reads"| source-parse
+  source-parse -->|"raw elements, fingerprint"| revision-assign
+  revision-assign -->|"new revision unreviewed"| fidelity-check
+  fidelity-check -->|"auto_verified or auto_flagged"| keyword-build
+  revision-assign -->|"active extraction elements"| keyword-build
+  keyword-build -->|"ready index version"| run-activation

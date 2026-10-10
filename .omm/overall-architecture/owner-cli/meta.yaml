@@ -1,7 +1,7 @@
 created: 2026-10-04 13:34:48.684000+00:00
-updated: 2026-10-09T23:18:40.561Z
-update_count: 17
-last_field: description
+updated: 2026-10-10T12:42:01.138Z
+update_count: 19
+last_field: note
 kind: nested-class
 title: owner-cli
 children: []

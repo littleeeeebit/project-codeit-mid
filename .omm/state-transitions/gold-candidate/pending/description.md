@@ -1,1 +1,0 @@
-Awaiting review. `gold status` lists `pending_invalid` rows that no longer pass the shared checks.

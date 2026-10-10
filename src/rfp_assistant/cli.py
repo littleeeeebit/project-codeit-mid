@@ -293,11 +293,31 @@ def cmd_compare_runs(args, settings) -> int:
 
 def cmd_stage_review(args, settings) -> int:
     from .evaluation import stage_review
+    from .evaluation import stage_review_paid as paid
 
-    record = stage_review.run(settings, args.stage, args.base, args.cand, inputs_from=args.inputs_from)
+    if args.action == "run" and not (args.stage and args.base):
+        raise ValueError("stage-review run needs a stage and --base")
+    if args.action != "run" and not args.run:
+        raise ValueError(f"stage-review {args.action} needs --run <run id>")
+    if args.action == "approve":
+        est = paid.approve(settings, args.run, args.approved_by or "")
+        _print({"run_id": args.run, "approved_by": est["approved_by"], "max_usd": est["max_micro_usd"] / 1e6,
+                "next": f"stage-review resume --run {args.run}"})
+        return 0
+    if args.action == "run":
+        # Workers may read for an hour; the ledger is opened afterwards to price their work, never held idle meanwhile.
+        record = stage_review.run(settings, args.stage, args.base, args.cand, inputs_from=args.inputs_from,
+                                  ledger_env=args.ledger_dsn_env)
+        if record.get("state") == "needs_approval":
+            record = stage_review.on_ledger(settings, "reprice", record["run_id"], args.ledger_dsn_env)
+    else:
+        record = stage_review.on_ledger(settings, args.action, args.run, args.ledger_dsn_env)
     _print({"run_id": record["run_id"], "folder": str(stage_review.review_dir(settings) / "runs" / record["run_id"]),
-            "candidates": [{k: c.get(k) for k in ("id", "label", "commit", "status", "reason")}
+            "state": record.get("state", "complete"),
+            "candidates": [{k: c.get(k) for k in ("id", "label", "commit", "status", "reason", "ledger")}
                            for c in record["candidates"]]})
+    if record.get("state") == "needs_approval":
+        _print(paid.estimate_report(paid.load_estimate(stage_review.run_folder(settings, record["run_id"]))))
     return 0
 
 
@@ -798,13 +818,20 @@ def _retrieval_commands(sub) -> None:
     s.add_argument("--out", required=True, help="absolute path of the draft decision JSON")
     s.add_argument("--select", help="choose this run instead of the recommendation (recorded as an override)")
     s = sub.add_parser("stage-review", help="run a baseline ref and candidate refs on one stage's frozen inputs for "
-                                           "the review app (review.cmd / review.command); activates nothing")
-    s.add_argument("action", choices=["run"])
-    s.add_argument("stage", choices=["retriever", "chunking"])
-    s.add_argument("--base", required=True, help="baseline git ref, e.g. main")
+                                           "the review app (review.cmd / review.command); activates nothing. "
+                                           "generation and ocr stop at a priced estimate: approve, then resume; "
+                                           "reprice re-prices an unpaid or stopped run at today's rates; "
+                                           "rescore re-scores a paid run from its stored outputs without paying")
+    s.add_argument("action", choices=["run", "approve", "resume", "rescore", "reprice"])
+    s.add_argument("stage", nargs="?", choices=["retriever", "chunking", "generation", "ocr"], help="run: the stage")
+    s.add_argument("--base", help="run: baseline git ref, e.g. main")
     s.add_argument("--cand", action="append", default=[], help="candidate git ref, repeatable; '.' is the working tree")
     s.add_argument("--inputs-from", help="reuse the frozen inputs of this earlier run ID (chunking then needs no "
                                          "database)")
+    s.add_argument("--run", help="approve, resume, rescore, reprice: the paid run ID")
+    s.add_argument("--approved-by", help="approve: the person approving the estimate")
+    s.add_argument("--ledger-dsn-env", help="ocr: environment variable with the DSN of the shared ledger the paid reads "
+                                            "settle in (default the corpus database)")
 
 
 def _release_commands(sub) -> None:

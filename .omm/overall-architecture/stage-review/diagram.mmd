@@ -1,0 +1,17 @@
+graph TD
+  review-cli["stage-review CLI commands\nsrc/rfp_assistant/cli.py"]
+  frozen-inputs["freeze() inputs folder\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  ref-worktrees["Per-ref git worktrees\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  review-worker["Isolated worker process\nsrc/rfp_assistant/evaluation/stage_review_worker.py"]
+  paid-approval["Estimate, approve, recheck\nsrc/rfp_assistant/evaluation/stage_review_paid.py"]
+  scorer-view["Scorer and view.json\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  review-app["Review app server\nreview/server.py"]
+  decision-files["Decision md and json\nreview/server.py"]
+  review-cli -->|"run freezes activation"| frozen-inputs
+  frozen-inputs -->|"same inputs every ref"| ref-worktrees
+  ref-worktrees -->|"python -I worker.py"| review-worker
+  review-worker -->|"free estimate pass"| paid-approval
+  paid-approval -->|"approved_env key on resume"| review-worker
+  review-worker -->|"candidate outputs"| scorer-view
+  scorer-view -->|"run.json, view.json"| review-app
+  review-app -->|"POST decision"| decision-files

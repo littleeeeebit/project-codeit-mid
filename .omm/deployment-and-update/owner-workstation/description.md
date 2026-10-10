@@ -1,1 +1,0 @@
-Owner-only commands, covering budget administration, OCR with GPU, Hancom printing (Windows only) and evaluation runs, use the same gateway contract. `cmd_ocr --ledger-dsn-env` opens the remote ledger with `database_lifecycle` and `require_imported_database` and runs no schema statements on it.

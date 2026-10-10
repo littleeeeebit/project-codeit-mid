@@ -1,0 +1,1 @@
+An immutable directory .runtime/indexes/<version>/ (chunks, tokens, requirements, scope-terms.json, manifest with file hashes) plus indexes, chunks and requirements rows. KeywordIndex.load serves it from memory. A chunk carries spans to element_ids, payload/body, token_count, chunk_type, requirement_key and linked siblings.

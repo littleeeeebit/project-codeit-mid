@@ -1,0 +1,1 @@
+_stop_reason(conn, request_id) returns cancelled (cancel_requested or status cancelled) or interrupted (resources closing, or status no longer running). _checkpoint raises _Stop before each paid stage. _dispatch_guard passes the same check into budget.mark_dispatching, so the reservation is released atomically and DispatchRefused is mapped back to _Stop.

@@ -1,0 +1,1 @@
+attempts.state transitions in src/rfp_assistant/gateway/budget.py. Open states (reserved, dispatching, unknown) hold their reservation against the cap; settled holds its cost.

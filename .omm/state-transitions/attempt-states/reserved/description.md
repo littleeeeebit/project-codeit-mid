@@ -1,0 +1,1 @@
+Inserted by reserve() at the maximum cost. A reserved attempt that is never dispatched (guard refusal, no key, restart) is released and counts as available; stage review estimates rely on this.

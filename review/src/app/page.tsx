@@ -1,7 +1,8 @@
 "use client";
 
-// Who comes here: the person deciding whether a retriever or chunking change ships. What for: see, on the same
-// questions or documents, where each candidate ref differs from the baseline, then record which one to keep and why.
+// Who comes here: the person deciding whether a retriever, chunking, generation or OCR change ships. What for: see,
+// on the same questions, documents or images, where each candidate ref differs from the baseline, then record which
+// one to keep and why.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Decision, RunListItem, RunView } from "@/lib/api";
@@ -9,9 +10,11 @@ import { getJson, hostLabel, postJson, short, when } from "@/lib/api";
 import { Badge } from "@/components/ui";
 import { RetrieverView } from "@/components/retriever-view";
 import { ChunkingView } from "@/components/chunking-view";
+import { GenerationView } from "@/components/generation-view";
+import { OcrView } from "@/components/ocr-view";
 import { DecisionPanel } from "@/components/decision-panel";
 
-const STAGE = { retriever: "리트리버", chunking: "청킹" } as const;
+const STAGE = { retriever: "리트리버", chunking: "청킹", generation: "답변 생성", ocr: "OCR" } as const;
 
 export default function Page() {
   const [runs, setRuns] = useState<RunListItem[] | null>(null);
@@ -82,9 +85,10 @@ export default function Page() {
               </div>
             </header>
             <div className="mt-8">
-              {view.stage === "retriever"
-                ? <RetrieverView view={view} notes={notes} setNote={setNote} />
-                : <ChunkingView view={view} notes={notes} setNote={setNote} />}
+              {view.stage === "retriever" && <RetrieverView view={view} notes={notes} setNote={setNote} />}
+              {view.stage === "chunking" && <ChunkingView view={view} notes={notes} setNote={setNote} />}
+              {view.stage === "generation" && <GenerationView view={view} notes={notes} setNote={setNote} />}
+              {view.stage === "ocr" && <OcrView view={view} notes={notes} setNote={setNote} />}
             </div>
             <DecisionPanel key={view.run_id} view={view} notes={notes} initial={decision} onSaved={loadRuns} />
           </>
@@ -161,10 +165,16 @@ function EmptyState() {
   return (
     <div className="max-w-[720px]">
       <h1 className="text-[24px] font-bold">아직 비교 실행이 없습니다</h1>
-      <p className="mt-3 text-muted">저장소 루트에서 실행을 만든 뒤 이 화면을 새로 고치세요. 다른 기기에서 만든 실행은 왼쪽에서 가져옵니다.</p>
+      <p className="mt-3 text-muted">
+        저장소 루트에서 실행을 만든 뒤 이 화면을 새로 고치세요. 다른 기기에서 만든 실행은 왼쪽에서 가져옵니다. 답변 생성과
+        OCR은 비용 추정에서 멈추고, 승인한 뒤 이어서 실행한 결과만 여기에 나타납니다.
+      </p>
       <pre className="mt-4 overflow-x-auto rounded-[10px] bg-surface p-4 text-[14px]">
         python -m rfp_assistant.cli stage-review run retriever --base main --cand {"<branch>"}{"\n"}
-        python -m rfp_assistant.cli stage-review run chunking --base main --cand .
+        python -m rfp_assistant.cli stage-review run chunking --base main --cand .{"\n"}
+        python -m rfp_assistant.cli stage-review run generation --base main --cand {"<branch>"}{"\n"}
+        python -m rfp_assistant.cli stage-review approve --run {"<run id>"} --approved-by {"<name>"}{"\n"}
+        python -m rfp_assistant.cli stage-review resume --run {"<run id>"}
       </pre>
     </div>
   );

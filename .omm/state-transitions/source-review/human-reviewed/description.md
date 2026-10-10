@@ -1,1 +1,0 @@
-`sample_checked` or `reviewed`, recorded with reviewer and locations. Automatic verdicts never replace it, but a new extraction revision resets it, because parsed does not mean faithful.

@@ -1,1 +1,0 @@
-Agreement or disagreement recorded in `gold_reviews` from the verify screen (`POST /api/gold/{candidate_id}/second-review`).

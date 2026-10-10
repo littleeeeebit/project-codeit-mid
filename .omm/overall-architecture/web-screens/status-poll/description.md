@@ -1,0 +1,1 @@
+usePoll(key, fetcher, intervalMs, stop). TurnView polls GET /api/requests/{request_id}?generation_id&target every 1000 ms and stops once view.status leaves queued/running. The response is RequestOut {view: RequestView, attachable}, where attachable comes from service.may_attach. The pane uses the same hook to fetch evidence.

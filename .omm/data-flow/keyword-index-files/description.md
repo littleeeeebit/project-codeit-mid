@@ -1,1 +1,0 @@
-`.runtime/indexes/<version>/` holding chunks, tokens, requirements, scope terms and the manifest, plus `indexes`, `chunks` and `requirements` rows. Serving loads it through `KeywordIndex.load`. `index_compatibility` flags an index built under another analyzer policy as `index_outdated:` while still serving it.

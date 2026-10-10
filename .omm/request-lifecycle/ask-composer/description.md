@@ -1,0 +1,1 @@
+postAsk sends the selected documents' scope, the question, the mode and the previous turn's request_id. The response Owned {request_id, generation_id, target} is appended as a new Turn. target is service.target_key: a hash of scope, normalized question, mode, as_of and previous ID.

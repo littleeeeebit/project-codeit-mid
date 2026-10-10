@@ -1,0 +1,1 @@
+Inferred, not measured: each open stream holds a Starlette threadpool thread for the request's whole duration, because the generator is synchronous and polls the database every 0.15 s. Partials are process memory only, so after a restart a stream can only report the stored outcome.

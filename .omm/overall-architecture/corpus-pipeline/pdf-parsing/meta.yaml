@@ -1,9 +1,0 @@
-created: 2026-10-09T23:18:37.915Z
-updated: 2026-10-09T23:18:37.916Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: pdf-parsing
-children: []
-parentPath:
-  - corpus-pipeline

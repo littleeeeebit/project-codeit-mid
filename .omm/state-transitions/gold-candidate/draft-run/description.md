@@ -1,1 +1,0 @@
-A drafting run directory holding request.json, output/candidates.jsonl, invalid.json and receipt.json. Its status (running, completed, failed, interrupted) is derived from those files and from the live thread in `drafting_runs`.

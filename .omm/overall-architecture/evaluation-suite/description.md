@@ -1,1 +1,0 @@
-src/rfp_assistant/evaluation plus service/answers.py. Pipelines run every variant, and a person activates. Nothing runs on a schedule or changes serving by itself.

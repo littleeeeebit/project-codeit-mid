@@ -1,0 +1,9 @@
+created: 2026-10-10T12:42:02.273Z
+updated: 2026-10-10T12:42:02.274Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: ref-worktrees
+children: []
+parentPath:
+  - stage-review

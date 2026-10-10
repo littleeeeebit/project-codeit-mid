@@ -1,6 +1,0 @@
-graph TD
-  update-idle["No update\nsrc/rfp_assistant/service/update.py"] -->|"member presses update"| update-accepting["Accepting\nsrc/rfp_assistant/service/update.py"]
-  update-accepting -->|"paid work open"| update-idle
-  update-accepting -->|"marker written"| marker-written["Marker file\ntools/infra/bidmate-update.path"]
-  marker-written -->|"path unit fires"| updater-running["Updater running\ntools/infra/update.sh"]
-  updater-running -->|"result.json final"| update-finished["Finished or rolled back\ntools/infra/update.sh"]

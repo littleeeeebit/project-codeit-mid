@@ -1,1 +1,0 @@
-`.runtime/extracted/<source_hash>/<fingerprint>[/<content_id>]/elements.jsonl`, mirrored into `elements` rows (raw_text, search_text, location_json, table_json), with `extractions` and `extraction_inputs` rows. The parser fingerprint includes the OCR suffix.

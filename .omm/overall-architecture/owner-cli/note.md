@@ -1,0 +1,1 @@
+cli.py dispatch was not read in full; the command list is from README.md.

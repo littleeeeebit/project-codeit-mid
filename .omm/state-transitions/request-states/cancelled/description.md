@@ -1,0 +1,1 @@
+Queued plus cancel gives an immediate cancelled row with a result. Running plus cancel ends cancelled either when the next checkpoint or dispatch guard raises _Stop('cancelled'), or when _finish sees cancel_requested on a completed outcome.

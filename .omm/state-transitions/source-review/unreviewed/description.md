@@ -1,1 +1,0 @@
-Parsed but not yet compared with the original. Included only in the operating index.

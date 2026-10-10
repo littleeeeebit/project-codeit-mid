@@ -1,9 +1,0 @@
-created: 2026-10-09T00:31:39.340Z
-updated: 2026-10-09T23:18:32.070Z
-update_count: 2
-last_field: description
-kind: nested-class
-title: fusion-and-rerank
-children: []
-parentPath:
-  - retrieval-engine

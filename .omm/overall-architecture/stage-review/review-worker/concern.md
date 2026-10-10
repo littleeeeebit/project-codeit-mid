@@ -1,0 +1,1 @@
+capped_reservations monkeypatches the module attribute budget.reserve. It reads committed spend before the admission transaction, which is safe only because there is one worker per candidate (marked ponytail).

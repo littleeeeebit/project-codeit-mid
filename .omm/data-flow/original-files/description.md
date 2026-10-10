@@ -1,1 +1,0 @@
-`RFP_SOURCE_DIR` (default `<repo>/원본 데이터`) holds `data_list.csv` and `files/`. Settings resolve from the repository location, never the working directory. Originals are never modified; the HWP prints are written under `.runtime/reviews/printed/`.

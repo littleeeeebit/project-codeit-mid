@@ -1,0 +1,9 @@
+created: 2026-10-10T12:41:55.389Z
+updated: 2026-10-10T12:41:55.390Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: submit-answer
+children: []
+parentPath:
+  - service-core

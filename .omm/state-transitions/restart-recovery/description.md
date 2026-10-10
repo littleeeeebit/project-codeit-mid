@@ -1,0 +1,1 @@
+Runs when Resources first acquires the gateway lock (_own) and again in close() when a background job outlived the shutdown wait. recover_requests marks queued and running rows interrupted. budget.recover moves dispatching attempts to unknown and reserved ones to released, and applies the same rule to the Gemini external_attempts ledger.

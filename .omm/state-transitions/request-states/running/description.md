@@ -1,0 +1,1 @@
+Set by the run_queued claim, or inserted directly by _create for free modes and for the synchronous answer() entry. While running, cancel_request only sets cancel_requested = 1; already dispatched calls still settle.

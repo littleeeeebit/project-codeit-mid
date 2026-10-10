@@ -1,0 +1,1 @@
+Written for technical_error, clarification_required, a validation failure, a provider failure, or a submit that never reached the executor (_fail_unscheduled).

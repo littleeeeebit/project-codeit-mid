@@ -1,0 +1,1 @@
+When pyhwp returns a reason, load_hwp_hwpx parses the original instead. Its fingerprint is parser_fingerprint('hwp_loader') and it adds warning pyhwp_failed. Only a loader failure quarantines the source (hwp_loader_failed, hwp_loader_result_invalid, hwp_empty_output). The loader gives no picture positions, so these documents get no image text.

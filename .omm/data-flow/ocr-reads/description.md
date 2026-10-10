@@ -1,0 +1,1 @@
+Per-source JSONL cache under .runtime/ocr/<source_hash>/<version-hash>.jsonl. Each row holds the region placement, digest, engine (local PaddleOCR-VL or gpt-5-mini), text, flags and status: local, remote, unresolved or unavailable. Ingest turns finished reads into image_text elements cited with format image_ocr; open_evidence adds an ocr_text warning.

@@ -1,0 +1,1 @@
+Opens a citation marker by fetching GET /api/requests/{request_id}/evidence/{evidence_id}. The server answers from the request's persisted evidence map (service.open_evidence): exact quote, neighbouring elements, location, review status and warnings. The model never supplies a URL or page. The original file comes from /api/originals/{doc_id}/{source_hash} (originalHref).

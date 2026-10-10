@@ -1,0 +1,1 @@
+Inferred from README.md and dense.py signatures; vector_store.py was not read.

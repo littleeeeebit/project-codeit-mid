@@ -1,9 +1,0 @@
-created: 2026-10-09T23:18:33.595Z
-updated: 2026-10-09T23:18:33.596Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: fake-transport
-children: []
-parentPath:
-  - paid-gateway

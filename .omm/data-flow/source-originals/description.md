@@ -1,0 +1,1 @@
+Original HWP and PDF files under RFP_SOURCE_DIR/files plus data_list.csv. The originals are never modified. original_download serves bytes only for a managed (doc_id, source_hash) pair whose file sits directly in the managed directory and re-hashes to source_hash.

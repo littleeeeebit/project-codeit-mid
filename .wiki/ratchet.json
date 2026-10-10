@@ -23,8 +23,8 @@
     },
     "src/rfp_assistant/cli.py": {
       "dup": 0,
-      "lines": 1029,
-      "reason": "review-app-retriever-chunking: `stage-review run retriever|chunking --base --cand --inputs-from` runs baseline and candidate refs in worktrees for the review app; chunking from an earlier run's frozen inputs starts without a database"
+      "lines": 1056,
+      "reason": "review-app-generation-ocr: stage-review gains the paid stages generation and ocr with approve, resume, rescore and reprice (--run, --approved-by, --ledger-dsn-env) and the approve branch that prints the next step; pricing on the ledger and the estimate printout live in evaluation/stage_review*.py"
     },
     "src/rfp_assistant/contracts.py": {
       "dup": 8,

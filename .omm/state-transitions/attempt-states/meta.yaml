@@ -1,19 +1,43 @@
 created: 2026-10-06 07:31:37.565000+00:00
-updated: 2026-10-09 10:52:29.002000+00:00
-update_count: 11
+updated: 2026-10-10T12:42:07.022Z
+update_count: 13
 last_field: diagram
 kind: nested-class
 title: attempt-states
 children:
-- unknown
+  - dispatching
+  - reconciled
+  - released
+  - reserved
+  - settled
+  - unknown
 parentPath: []
-prev_diagram: "graph TD\r\n  reserved[\"Reserved\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  dispatching[\"Dispatching\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n  settled[\"\
-  Settled\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n  released[\"Released\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  unknown[\"Unknown\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n  reconciled[\"\
-  Reconciled\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n  reserved -->|mark_dispatching\
-  \ passes guard| dispatching\r\n  reserved -->|guard refused or no key| released\r\
-  \n  dispatching -->|settle with usage| settled\r\n  dispatching -->|pre-execution\
-  \ provider error| released\r\n  dispatching -->|timeout, no usage, restart| unknown\r\
-  \n  unknown -->|owner reconcile| reconciled\r\n  unknown -->|late usage settle|\
-  \ settled\r\n  reconciled -->|late settle plus adjustment| settled"
+prev_diagram: "graph TD\r
+
+  \  reserved[\"Reserved\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  dispatching[\"Dispatching\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  settled[\"Settled\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  released[\"Released\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  unknown[\"Unknown\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  reconciled[\"Reconciled\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  reserved -->|mark_dispatching passes guard| dispatching\r
+
+  \  reserved -->|guard refused or no key| released\r
+
+  \  dispatching -->|settle with usage| settled\r
+
+  \  dispatching -->|pre-execution provider error| released\r
+
+  \  dispatching -->|timeout, no usage, restart| unknown\r
+
+  \  unknown -->|owner reconcile| reconciled\r
+
+  \  unknown -->|late usage settle| settled\r
+
+  \  reconciled -->|late settle plus adjustment| settled"
