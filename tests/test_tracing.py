@@ -48,6 +48,11 @@ def exported_text(exporter: InMemorySpanExporter) -> str:
 
 class AskTracingTest(unittest.TestCase):
     def setUp(self):
+        # the app signs in through a hub, as on the team host: the trace's user is the principal, whatever the
+        # developer's .env says about BIDMATE_LOCAL_MEMBER
+        hub = mock.patch.dict("os.environ", {"BIDMATE_HUB_URL": "http://hub"})
+        hub.start()
+        self.addCleanup(hub.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.env = fixtures.make_env(Path(self.tmp.name))
 
