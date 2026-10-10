@@ -379,18 +379,19 @@ class PaidLedgerTest(unittest.TestCase):
                          prior_use_micro=0, prior_use_evidence="test", rate_version=version, enable_paid=True,
                          rates={"gpt-5-mini": {"input": "0", "cached_input": "0", "output": str(output)}})
 
-    def attempt(self, key: str, state: str, reserved: int, settled: int | None = None, purpose: str = "gold_eval"):
+    def attempt(self, key: str, state: str, reserved: int, settled: int | None = None, purpose: str = "gold_eval",
+                stage: str = "s", member: str = "m"):
         with store.open_db(self.db) as conn:
             row = conn.execute("SELECT request_id FROM requests WHERE idempotency_key = ?", (key,)).fetchone()
             rid = row[0] if row else str(uuid.uuid4())
             if row is None:
                 conn.execute("INSERT INTO requests(request_id, member_id, idempotency_key, input_hash, config_hash, "
-                             "scope_json, status, created_at, updated_at) VALUES (?, 'm', ?, 'h', 'c', '[]', "
-                             "'running', 't', 't')", (rid, key))
+                             "scope_json, status, created_at, updated_at) VALUES (?, ?, ?, 'h', 'c', '[]', "
+                             "'running', 't', 't')", (rid, member, key))
             conn.execute("INSERT INTO attempts(attempt_id, request_id, member_id, stage, purpose, model, state, "
                          "reserved_micro_usd, settled_micro_usd, estimated_input_tokens, max_output_tokens, "
-                         "count_method, price_json, created_at) VALUES (?, ?, 'm', 's', ?, 'gpt-5-mini', ?, ?, ?, 0, 0, "
-                         "'t', '{}', 't')", (str(uuid.uuid4()), rid, purpose, state, reserved, settled))
+                         "count_method, price_json, created_at) VALUES (?, ?, ?, ?, ?, 'gpt-5-mini', ?, ?, ?, 0, 0, "
+                         "'t', '{}', 't')", (str(uuid.uuid4()), rid, member, stage, purpose, state, reserved, settled))
         return rid
 
     def settled(self) -> int:
@@ -456,19 +457,15 @@ class PaidLedgerTest(unittest.TestCase):
         with store.open_db(self.db) as conn:
             self.assertEqual(paid._done(conn, folder, json.loads((folder / "run.json").read_text()), "c1"), {0, 1})
 
-    def test_a_stored_answer_whose_output_was_lost_replays_and_is_not_priced_again(self):
-        folder = self.folder("generation", "stopped")
-        record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
-        rid = self.attempt(f"{folder.name}:c1:q1:1", "settled", 10, 8)
-        with store.open_db(self.db) as conn:  # the answer finished in the ledger; c1.json never got written
-            conn.execute("UPDATE requests SET status = 'completed', result_json = ? WHERE request_id = ?",
-                         (json.dumps({"status": "answered"}), rid))
+    def generate(self, folder: Path, questions: list[str], cap: int) -> tuple[list[str], dict]:
+        """The paid generation pass with the candidate's answer path faked: which questions reach `_answer_row`."""
         calls = []
 
         def answer_row(_s, _p, _run, _cid, row, _rec):
             calls.append(row["question_id"])
-            return {"question_id": row["question_id"], "status": "done", "request_id": rid}
-        (folder / "inputs" / "rows.json").write_text(json.dumps([{"question_id": "q1"}]), encoding="utf-8")
+            return {"question_id": row["question_id"], "status": "done"}
+        (folder / "inputs" / "rows.json").write_text(json.dumps([{"question_id": q} for q in questions]),
+                                                     encoding="utf-8")
         (folder / "inputs" / "activation.json").write_text("{}", encoding="utf-8")
         from rfp_assistant.service import answers, service
         owner = SimpleNamespace(transport=object(), tracing=None, close=lambda: None)
@@ -477,11 +474,49 @@ class PaidLedgerTest(unittest.TestCase):
                 mock.patch.object(answers, "PinnedResources", return_value=SimpleNamespace(close=lambda: None)), \
                 mock.patch.object(answers, "_answer_row", answer_row):
             out = worker.generation(folder / "inputs", {"run_key": folder.name, "candidate": "c1",
-                                                        "cap_micro_usd": 10, "ledger_key": f"{folder.name}:c1:",
-                                                        "prices": {"q1": 10}}, "paid")
+                                                        "cap_micro_usd": cap, "ledger_key": f"{folder.name}:c1:"},
+                                    "paid")
+        return calls, out
+
+    def test_a_stored_answer_whose_output_was_lost_replays_and_is_not_priced_again(self):
+        folder = self.folder("generation", "stopped")
+        record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+        rid = self.attempt(f"{folder.name}:c1:q1:1", "settled", 10, 8)
+        with store.open_db(self.db) as conn:  # the answer finished in the ledger; c1.json never got written
+            conn.execute("UPDATE requests SET status = 'completed', result_json = ? WHERE request_id = ?",
+                         (json.dumps({"status": "answered"}), rid))
+        calls, out = self.generate(folder, ["q1"], cap=10)
         self.assertEqual((calls, out.get("status")), (["q1"], None))  # 8 held + 10 priced > 10, yet it replays
         with store.open_db(self.db) as conn:  # and a re-price leaves it out
             self.assertEqual(paid._done(conn, folder, record, "c1"), {"q1"})
+
+    def test_a_settled_answer_whose_result_was_lost_is_never_paid_again(self):
+        folder = self.folder("generation", "stopped")
+        record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+        # The worker died after settling q1's call and before its result was stored: no result, no output.
+        self.attempt(f"{folder.name}:c1:q1:1", "settled", U, U * 8 // 10)
+        calls, out = self.generate(folder, ["q1", "q2"], cap=U * 8 // 10 + U)
+        self.assertEqual(calls, ["q2"])  # q1 would go out again under :q1:2 and leave q2 no room
+        self.assertEqual([r["status"] for r in out["rows"]], ["lost", "done"])
+        with store.open_db(self.db) as conn:  # neither the estimate nor the worker pays for q1 again
+            self.assertEqual(paid._done(conn, folder, record, "c1"), {"q1"})
+
+    def test_an_undispatched_reservation_is_priced_as_unpaid_work(self):
+        folder = self.ocr_folder(1, state="stopped")
+        record = json.loads((folder / "run.json").read_text(encoding="utf-8"))
+        record["candidates"][1]["status"] = "stopped"
+        (folder / "run.json").write_text(json.dumps(record), encoding="utf-8")
+        # The worker died between reserving image 0's read and dispatching it; the gateway has not recovered yet.
+        self.attempt(f"review:{folder.name}:c1:{ocr.OCR_VERSION}", "reserved", U, purpose="ocr", stage="ocr:d0",
+                     member=ocr.REMOTE_MEMBER)
+        stage_review.reprice(self.settings, folder.name)
+        fresh = paid.approve(self.settings, folder.name, "kim")
+        self.assertEqual({k: fresh["candidates"]["c1"][k] for k in ("calls", "max_micro_usd", "committed_micro_usd")},
+                         {"calls": 1, "max_micro_usd": U, "committed_micro_usd": 0})
+        reads = Reads(U * 8 // 10)
+        out = self.read(folder, self.ocr_config(folder, fresh), reads)  # recovery releases it; the read is approved
+        self.assertEqual((reads.calls, out["images"][0]["status"]), (1, "remote"))
+        self.assertLessEqual(self.settled(), U)
 
     def test_a_rate_change_is_repriced_and_never_reserved_above_the_approval(self):
         folder = self.ocr_folder(1)

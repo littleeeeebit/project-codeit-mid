@@ -513,7 +513,8 @@ def _partial(folder: Path, cand: dict) -> dict | None:
 
 VALIDATION = ("technical_error",)
 NOT_DONE = {"blocked": "예산 게이트가 거절했습니다", "unknown_billing": "과금 결과를 알 수 없어 멈췄습니다",
-            "technical": "제공자 호출 전에 실패했습니다"}
+            "technical": "제공자 호출 전에 실패했습니다",
+            "lost": "과금됐지만 답변이 저장되지 않아 다시 결제하지 않았습니다"}
 
 
 def _answer(row: dict, rec: dict | None, index, chunks: dict, titles: dict, replayed: bool = False) -> dict:

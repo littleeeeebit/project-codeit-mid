@@ -125,22 +125,25 @@ def chunking(inputs: Path, config: dict) -> dict:
 
 def committed(conn, key_prefix: str) -> int:
     """What the ledger holds against one candidate's approval across every pass: settled attempts at their cost, every
-    other attempt but a released one at its reservation (an unknown one may yet be billed in full)."""
+    dispatched one at its reservation (an unknown one may yet be billed in full). A reservation never dispatched holds
+    nothing: no pass is live when this is read for an estimate, and the next pass's recovery releases it."""
     return conn.execute(
-        "SELECT COALESCE(SUM(CASE WHEN a.state = 'settled' THEN a.settled_micro_usd WHEN a.state = 'released' THEN 0 "
-        "ELSE a.reserved_micro_usd END), 0) FROM requests r JOIN attempts a ON a.request_id = r.request_id "
+        "SELECT COALESCE(SUM(CASE WHEN a.state = 'settled' THEN a.settled_micro_usd "
+        "WHEN a.state IN ('released', 'reserved') THEN 0 ELSE a.reserved_micro_usd END), 0) "
+        "FROM requests r JOIN attempts a ON a.request_id = r.request_id "
         "WHERE r.idempotency_key LIKE ?", (key_prefix + "%",)).fetchone()[0]
 
 
 def paid_items(conn, key_prefix: str) -> set[str]:
     """What the ledger will never pay for again under one candidate's keys, whatever its output holds: an OCR region
-    (attempt stage `ocr:<region>`) or a question (key `<prefix><question>:<n>`) with an attempt that is not released
-    (it was or may have been billed), and a question whose request stored a finished answer (it replays for free)."""
+    (attempt stage `ocr:<region>`) or a question (key `<prefix><question>:<n>`) with a dispatched attempt (it was or
+    may have been billed; one only reserved never was), and a question whose request stored a finished answer (it
+    replays for free)."""
     items = set()
     for key, result, stage, state in conn.execute(
             "SELECT r.idempotency_key, r.result_json, a.stage, a.state FROM requests r LEFT JOIN attempts a "
             "ON a.request_id = r.request_id WHERE r.idempotency_key LIKE ?", (key_prefix + "%",)).fetchall():
-        billed = state is not None and state != "released"
+        billed = state not in (None, "released", "reserved")
         if key_prefix.startswith("review:"):  # the OCR job: one request, an attempt per region
             if billed and (stage or "").startswith("ocr:"):
                 items.add(stage[4:])
@@ -149,6 +152,16 @@ def paid_items(conn, key_prefix: str) -> set[str]:
         if billed or stored not in (None, "budget_blocked", "technical_error"):
             items.add(key[len(key_prefix):].rsplit(":", 1)[0])
     return items
+
+
+def lost_answers(conn, key_prefix: str) -> set[str]:
+    """Questions whose call settled but whose result was never stored (the worker died in between): `_answer_row`
+    would send them again under a new key, so the worker reports them lost instead."""
+    rows = conn.execute(
+        "SELECT DISTINCT r.idempotency_key FROM requests r JOIN attempts a ON a.request_id = r.request_id "
+        "WHERE r.idempotency_key LIKE ? AND r.result_json IS NULL AND a.state IN ('settled', 'reconciled')",
+        (key_prefix + "%",)).fetchall()
+    return {key[len(key_prefix):].rsplit(":", 1)[0] for (key,) in rows}
 
 
 @contextlib.contextmanager
@@ -190,13 +203,13 @@ def _generation_settings(config: dict):
 
 def generation(inputs: Path, config: dict, mode: str) -> dict:
     from rfp_assistant.service import answers, service
+    from rfp_assistant.storage import store
 
     rows = json.loads((inputs / "rows.json").read_text(encoding="utf-8"))
     serving = json.loads((inputs / "activation.json").read_text(encoding="utf-8"))
     s = _generation_settings(config)
     if mode == "estimate":
         from rfp_assistant.gateway import budget
-        from rfp_assistant.storage import store
 
         pinned = answers.PinnedResources(s, None, serving)
         try:
@@ -224,10 +237,16 @@ def generation(inputs: Path, config: dict, mode: str) -> dict:
         earlier = json.loads(Path(config["previous"]).read_text(encoding="utf-8")).get("rows") or [] \
             if config.get("previous") else []
         finished = {r["question_id"]: r for r in earlier if r.get("status") == "done"}
+        with store.open_db(s.db_path) as conn:  # after the owner's recovery
+            lost = lost_answers(conn, config["ledger_key"])
         with capped_reservations(config):
             for row in rows:
                 if row["question_id"] in finished:
                     out.append(finished[row["question_id"]])
+                    continue
+                if row["question_id"] in lost:
+                    out.append({"finalist": config["candidate"], "question_id": row["question_id"], "status": "lost",
+                                "reason": "paid in the ledger, but its answer was lost; not paid again"})
                     continue
                 record = answers._answer_row(s, pinned, config["run_key"], config["candidate"], row, None)
                 out.append(record)
