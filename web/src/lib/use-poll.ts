@@ -33,7 +33,8 @@ export function usePoll<T>(key: string | null, load: () => Promise<T>, everyMs: 
         setState({ data, loading: false, key });
       } catch (e) {
         if (!alive) return;
-        setState((s) => ({ ...s, error: e instanceof Error ? e.message : String(e), loading: false, key }));
+        // A failed re-poll keeps what this key last showed; a failure under a new key never inherits the old key's data.
+        setState((s) => ({ ...(s.key === key ? s : {}), error: e instanceof Error ? e.message : String(e), loading: false, key }));
       }
       if (alive && everyMs && !finished) timer = setTimeout(tick, everyMs);
     };

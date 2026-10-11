@@ -288,6 +288,31 @@ describe("trace comparison", () => {
     expect(rankOne().textContent).toBe("1E1 · 문서 1 · 12쪽E1 · 문서 1 · 12쪽");
   });
 
+  test("after switching runs, a failed load never shows the previous run's evidence", async () => {
+    const runs = [...SUMMARIES, { ...SUMMARIES[1], run_id: "T-3", created_at: "2026-10-06T09:00:00Z" }];
+    stubApi(api, { "GET /api/verify/compare": comparison,
+                   "GET /api/verify/traces/{run_id}": (o) => o.params?.path?.run_id === "T-3" ? { error: { detail: "실행을 찾을 수 없습니다." } } : RUN });
+    render(<CompareRuns runs={runs} />);
+    await settle();
+    expect(rankOne().textContent).toBe("1E1 · 문서 1 · 12쪽E1 · 문서 1 · 12쪽");  // A is T-1, which packed the chunk
+    fireEvent.change(screen.getByLabelText("실행 A"), { target: { value: "T-3" } });
+    await settle();
+    expect(screen.getByText(/실행 A 정보를 불러오지 못해/)).toBeTruthy();
+    expect(rankOne().textContent).toBe(`1${PACKED.slice(0, 12)}E1 · 문서 1 · 12쪽`);
+  });
+
+  test("a comparison that fails after switching runs shows no table from the previous pair", async () => {
+    const runs = [...SUMMARIES, { ...SUMMARIES[1], run_id: "T-3", created_at: "2026-10-06T09:00:00Z" }];
+    stubApi(api, { "GET /api/verify/compare": (o) => o.params?.query?.a === "T-3" ? { error: { detail: "비교할 수 없습니다." } } : comparison(),
+                   "GET /api/verify/traces/{run_id}": () => RUN });
+    render(<CompareRuns runs={runs} />);
+    await settle();
+    fireEvent.change(screen.getByLabelText("실행 A"), { target: { value: "T-3" } });
+    await settle();
+    expect(screen.getByText("비교할 수 없습니다.")).toBeTruthy();
+    expect(screen.queryByRole("table", { name: "상위 5개 순위" })).toBeNull();
+  });
+
   test("a run that fails to load says so and never reads as unpacked", async () => {
     stubApi(api, { "GET /api/verify/compare": comparison,
                    "GET /api/verify/traces/{run_id}": (o) => o.params?.path?.run_id === "T-1" ? { error: { detail: "실행을 찾을 수 없습니다." } } : RUN });
