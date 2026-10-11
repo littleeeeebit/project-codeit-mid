@@ -385,6 +385,7 @@
     "src/rfp_assistant/evaluation/stage_review.py",
     "src/rfp_assistant/evaluation/stage_review_worker.py",
     "src/rfp_assistant/evaluation/error_analysis.py",
+    "src/rfp_assistant/evaluation/similar_cases.py",
     "src/rfp_assistant/corpus/ingestion.py",
     "src/rfp_assistant/retrieval/chunking.py",
     "src/rfp_assistant/cli.py",

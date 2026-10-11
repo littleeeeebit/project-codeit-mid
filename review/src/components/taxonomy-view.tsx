@@ -110,22 +110,46 @@ export function TaxonomyView() {
   );
 }
 
-/** Writes the bundle of notes in no type yet and copies the sentence that sends the coding agent to it. */
-function ExportPrompt({ unassigned }: { unassigned: number }) {
-  const [out, setOut] = useState<Exported | null>(null);
+/** Asks the server to write a bundle for the coding agent, then copies the sentence that sends the agent to it. */
+function useCopyPrompt<T extends { prompt: string }>(url: string, body: string) {
+  const [out, setOut] = useState<T | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   async function run() {
     setError("");
     setCopied(false);
     try {
-      const made = await postJson<Exported>("/api/taxonomy/export", "{}");
+      const made = await postJson<T>(url, body);
       setOut(made);
       await navigator.clipboard.writeText(made.prompt).then(() => setCopied(true), () => undefined);
     } catch (e) {
       setError((e as Error).message);
     }
   }
+  return { out, copied, error, run };
+}
+
+/** The copied sentence, shown in full so it can be copied by hand when the clipboard is refused. */
+function Copied({ prompt, copied, what, after, error }: {
+  prompt: string | null; copied: boolean; what: string; after: string; error: string;
+}) {
+  return (
+    <>
+      {prompt && (
+        <div className="mt-3 max-w-[860px] rounded-[10px] bg-ok-bg px-4 py-3">
+          <div className="text-[15px] font-semibold text-ok">{copied ? "복사했습니다" : "아래 문장을 복사하세요"} · {what}</div>
+          <p className="mt-1 select-all break-words text-[14px]">{prompt}</p>
+          <p className="mt-1 text-[13px] text-muted">에이전트가 제안을 넣으면 이 화면을 새로 고치세요.{after}</p>
+        </div>
+      )}
+      {error && <p role="alert" className="mt-2 text-[14px] text-bad">{error}</p>}
+    </>
+  );
+}
+
+/** Writes the bundle of notes in no type yet and copies the sentence that sends the coding agent to it. */
+function ExportPrompt({ unassigned }: { unassigned: number }) {
+  const { out, copied, error, run } = useCopyPrompt<Exported>("/api/taxonomy/export", "{}");
   return (
     <div className="mt-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -138,16 +162,7 @@ function ExportPrompt({ unassigned }: { unassigned: number }) {
             : "묶을 메모가 없습니다. 답변에 메모를 달면 여기서 묶을 수 있습니다"}
         </span>
       </div>
-      {out && (
-        <div className="mt-3 max-w-[860px] rounded-[10px] bg-ok-bg px-4 py-3">
-          <div className="text-[15px] font-semibold text-ok">
-            {copied ? "복사했습니다" : "아래 문장을 복사하세요"} · 메모 {out.notes}개
-          </div>
-          <p className="mt-1 select-all break-words text-[14px]">{out.prompt}</p>
-          <p className="mt-1 text-[13px] text-muted">에이전트가 제안을 넣으면 이 화면을 새로 고치세요.</p>
-        </div>
-      )}
-      {error && <p role="alert" className="mt-2 text-[14px] text-bad">{error}</p>}
+      <Copied prompt={out?.prompt ?? null} copied={copied} what={`메모 ${out?.notes}개`} after="" error={error} />
     </div>
   );
 }
@@ -216,35 +231,15 @@ function TypeRow({ t, pending, picked, onPick, decide, reload }: {
 /** Writes one type's search bundle (definition, approved and rejected examples, every stored answer) and copies the
  *  sentence that sends the coding agent to it. */
 function SuggestPrompt({ id }: { id: string }) {
-  const [out, setOut] = useState<SuggestExported | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState("");
-  async function run() {
-    setError("");
-    setCopied(false);
-    try {
-      const made = await postJson<SuggestExported>("/api/taxonomy/suggest-export", JSON.stringify({ type: id }));
-      setOut(made);
-      await navigator.clipboard.writeText(made.prompt).then(() => setCopied(true), () => undefined);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
+  const { out, copied, error, run } = useCopyPrompt<SuggestExported>("/api/taxonomy/suggest-export",
+                                                                      JSON.stringify({ type: id }));
   return (
-    <div className="mt-3 max-w-[860px]">
+    <div className="mt-3">
       <button type="button" onClick={run} className="text-[14px] font-semibold text-primary hover:underline">
         비슷한 사례 찾기 프롬프트 복사
       </button>
-      {out && (
-        <div className="mt-2 rounded-[10px] bg-ok-bg px-4 py-3">
-          <div className="text-[15px] font-semibold text-ok">
-            {copied ? "복사했습니다" : "아래 문장을 복사하세요"} · 저장된 답변 {out.answers}개를 찾게 합니다
-          </div>
-          <p className="mt-1 select-all break-words text-[14px]">{out.prompt}</p>
-          <p className="mt-1 text-[13px] text-muted">에이전트가 제안을 넣으면 이 화면을 새로 고치세요. {NOT_ALL}</p>
-        </div>
-      )}
-      {error && <p role="alert" className="mt-2 text-[14px] text-bad">{error}</p>}
+      <Copied prompt={out?.prompt ?? null} copied={copied} what={`저장된 답변 ${out?.answers}개를 찾게 합니다`}
+              after={` ${NOT_ALL}`} error={error} />
     </div>
   );
 }

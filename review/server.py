@@ -38,7 +38,7 @@ REPO = APP.parent
 # The note store and the failure taxonomy are shared with the CLI and the release report; the module is standard
 # library only, so this server still runs without the project's environment.
 sys.path.insert(0, str(REPO / "src"))
-from rfp_assistant.evaluation import error_analysis as ea  # noqa: E402
+from rfp_assistant.evaluation import error_analysis as ea, similar_cases  # noqa: E402
 from rfp_assistant.evaluation.error_analysis import (  # noqa: E402
     ANNOTATION_SCHEMA, ReviewInputError, annotation_state, annotations_file, field_text, read_annotations, write_lock)
 
@@ -533,7 +533,7 @@ class Handler(BaseHTTPRequestHandler):
             last = re.search(r"[?&]last=(\d{1,4})\b", self.path)
             return self._json(200, ea.progress(self.root, int(last.group(1)) if last else 20))
         if len(parts) == 4 and parts[:3] == ["api", "taxonomy", "suggestions"]:
-            return self._json(200, ea.suggestion_queue(self.root, parts[3]))
+            return self._json(200, similar_cases.suggestion_queue(self.root, parts[3]))
         self._static(path)
 
     def _notes(self, state: dict, run_id: str) -> dict:
@@ -570,9 +570,9 @@ class Handler(BaseHTTPRequestHandler):
         if parts == ["api", "taxonomy", "decide"]:
             return self._json(200, ea.decide(self.root, self._object("decision"), git_author()))
         if parts == ["api", "taxonomy", "suggest-export"]:
-            return self._json(200, ea.suggest_export(self.root, str(self._object("request").get("type"))))
+            return self._json(200, similar_cases.suggest_export(self.root, str(self._object("request").get("type"))))
         if parts == ["api", "taxonomy", "suggestions", "decide"]:
-            return self._json(200, ea.decide_suggestion(self.root, self._object("decision"), git_author()))
+            return self._json(200, similar_cases.decide_suggestion(self.root, self._object("decision"), git_author()))
         raise FileNotFoundError(self.path)
 
     def _static(self, path: str) -> None:

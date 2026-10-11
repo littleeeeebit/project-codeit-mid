@@ -13,6 +13,7 @@ from pathlib import Path
 from unittest import mock
 
 from rfp_assistant.evaluation import error_analysis as ea
+from rfp_assistant.evaluation import similar_cases as sc
 from tests.test_stage_review import server
 
 REPO = Path(__file__).resolve().parents[1]
@@ -238,13 +239,13 @@ class SuggestTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def body(self, *items, type_id=None) -> dict:
-        return {"schema": ea.SUGGESTION_SCHEMA, "bundle": "suggest-x", "type": type_id or self.type,
+        return {"schema": sc.SUGGESTION_SCHEMA, "bundle": "suggest-x", "type": type_id or self.type,
                 "suggestions": [{"run_id": RUN, "question": q, "candidate": c, "field": "summary", "text": t,
                                  "reason": "금액 자리에 비율을 적었다"} | extra for q, c, t, extra in items]}
 
     def refused(self, body, why):
         with self.assertRaisesRegex(ea.ReviewInputError, why):
-            ea.suggest(self.root, body)
+            sc.suggest(self.root, body)
         self.assertFalse((ea.taxonomy_dir(self.root) / "suggestions").exists())
 
     def test_suggest_refuses_unknown_types_and_spans_not_verbatim_in_the_stored_answer(self):
@@ -261,9 +262,9 @@ class SuggestTest(unittest.TestCase):
         self.refused(self.body(("q1", "base", "계약금액의 10", {})), "already a case of 금액 오류")
         self.refused(self.body(("q2", "c1", "10%", {}), ("q2", "c1", "10%", {})), "already suggested")
 
-        out = ea.suggest(self.root, self.body(("q2", "c1", "10%", {}), ("q3", "base", "금", {"start": 7})))
+        out = sc.suggest(self.root, self.body(("q2", "c1", "10%", {}), ("q3", "base", "금", {"start": 7})))
         self.assertEqual((out["type"], out["suggestions"]), ("금액 오류", 2))
-        queue = ea.suggestion_queue(self.root, self.type)
+        queue = sc.suggestion_queue(self.root, self.type)
         self.assertEqual([(s["question"], s["start"], s["end"]) for s in queue["pending"]], [("q2", 11, 14), ("q3", 7, 8)])
         self.assertEqual(queue["pending"][0]["field_text"], ANSWER)
 
@@ -290,13 +291,13 @@ class SuggestTest(unittest.TestCase):
     def test_approve_files_a_note_counted_apart_and_reject_goes_back_to_the_agent(self):
         server.add_annotation(self.root, self.view, {"op": "reviewed", "question": "q4", "candidate": "c1",
                                                      "value": True}, "person")
-        ea.suggest(self.root, self.body(("q2", "c1", "10%", {}), ("q3", "c1", "30일", {})))
-        first, second = [s["id"] for s in ea.suggestion_queue(self.root, self.type)["pending"]]
+        sc.suggest(self.root, self.body(("q2", "c1", "10%", {}), ("q3", "c1", "30일", {})))
+        first, second = [s["id"] for s in sc.suggestion_queue(self.root, self.type)["pending"]]
 
-        queue = ea.decide_suggestion(self.root, {"op": "approve", "suggestion": first}, "approver")
+        queue = sc.decide_suggestion(self.root, {"op": "approve", "suggestion": first}, "approver")
         self.assertEqual(([s["id"] for s in queue["pending"]], queue["approved"]), ([second], 1))
         with self.assertRaisesRegex(ea.ReviewInputError, "already decided"):
-            ea.decide_suggestion(self.root, {"op": "approve", "suggestion": first}, "approver")
+            sc.decide_suggestion(self.root, {"op": "approve", "suggestion": first}, "approver")
         filed = next(n for n in ea.live_notes(self.root).values() if n.get("suggestion") == first)
         self.assertEqual((filed["origin"], filed["approved_by"], filed["text"], filed["note"]),
                          (ea.AI, "approver", "10%", "금액 자리에 비율을 적었다"))
@@ -319,15 +320,15 @@ class SuggestTest(unittest.TestCase):
         with self.assertRaisesRegex(ea.ReviewInputError, "no notes left"):  # nor is it grouped into a new type
             ea.export(self.root)
 
-        ea.decide_suggestion(self.root, {"op": "reject", "suggestion": second, "reason": "기한이지 금액이 아님"}, "approver")
-        bundle = Path(ea.suggest_export(self.root, self.type)["bundle"])
+        sc.decide_suggestion(self.root, {"op": "reject", "suggestion": second, "reason": "기한이지 금액이 아님"}, "approver")
+        bundle = Path(sc.suggest_export(self.root, self.type)["bundle"])
         told = json.loads((bundle / "type.json").read_text(encoding="utf-8"))
         self.assertEqual([(r["text"], r["why_rejected"]) for r in told["rejected"]], [("30일", "기한이지 금액이 아님")])
         self.assertEqual(sorted(a["origin"] for a in told["approved"]), ["ai_suggested", "human"])
         answers = [json.loads(line) for line in (bundle / "answers.jsonl").read_text(encoding="utf-8").splitlines()]
         self.assertEqual((len(answers), sum(a["reviewed"] for a in answers)), (8, 3))  # every stored answer
         with self.assertRaisesRegex(ea.ReviewInputError, "already rejected that span"):
-            ea.suggest(self.root, self.body(("q3", "c1", "30일", {})))
+            sc.suggest(self.root, self.body(("q3", "c1", "30일", {})))
 
 
 class RereviewTest(unittest.TestCase):
