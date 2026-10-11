@@ -23,8 +23,8 @@
     },
     "src/rfp_assistant/api.py": {
       "dup": 8,
-      "lines": 1628,
-      "reason": "review-ui-readable: Decided gains the question text so the dataset's recent decisions read as questions, not candidate IDs. Before that, main-update-banner-button:the header update's four HTTP response models (CommitTitle, PaidWork, UpdateResult, UpdateStatus), its two routes and the lifespan that starts the GitHub watch and installs the paid-work fence; response models stay in api.py under the existing API boundary test, while the status, paid-work check and request live in service/update.py"
+      "lines": 1637,
+      "reason": "maintenance-ingest-timeout-cancel-progress: the POST /api/verify/maintenance/cancel route and the response fields the screen reads (step and run status `cancelled`, `timed_out`, `cancelled_by`, `cancelled_at`, `cancelling`); response models stay in api.py under the API boundary test. Before that, review-ui-readable: Decided gains the question text so the dataset's recent decisions read as questions, not candidate IDs. Before that, main-update-banner-button:the header update's four HTTP response models (CommitTitle, PaidWork, UpdateResult, UpdateStatus), its two routes and the lifespan that starts the GitHub watch and installs the paid-work fence; response models stay in api.py under the existing API boundary test, while the status, paid-work check and request live in service/update.py"
     },
     "src/rfp_assistant/cli.py": {
       "dup": 0,
@@ -38,8 +38,8 @@
     },
     "src/rfp_assistant/corpus/ingestion.py": {
       "dup": 0,
-      "lines": 1412,
-      "reason": "hwp-ocr-from-embedded-images: walk_hwp leaves a picture marker (BinData reference, page share) where each picture, OLE object or drawing sits, body and table cells alike, so OCR text is placed structurally instead of by print page anchors"
+      "lines": 1432,
+      "reason": "maintenance-ingest-timeout-cancel-progress: ingest takes a `parse` callable (maintenance runs _parse_source in a killable child) and a per-file `progress` callback; a timed-out parse returns `timed_out` without any DB write, and `Stopped` (cancel or service stop) ends the loop instead of being recorded as one source's error"
     },
     "src/rfp_assistant/evaluation/compare.py": {
       "dup": 0,
@@ -73,8 +73,8 @@
     },
     "src/rfp_assistant/service/service.py": {
       "dup": 0,
-      "lines": 3102,
-      "reason": "main-update-banner-button: an accepted update must refuse new paid work atomically with admission, so the fence check sits under _runner_lock at each paid admission (request slots, evaluation and judge jobs, maintenance, drafting) and the runner counts admitted slots before their queued row exists; the update status, paid-work check and request moved out to service/update.py"
+      "lines": 3116,
+      "reason": "maintenance-ingest-timeout-cancel-progress: POST /api/verify/maintenance/cancel needs its one service function (verifier check, live-run check and the Korean refusal under _EVAL_LOCK) and the status reports `cancelling`; the cancel registry, its cleanup and the child-process parse worker live in storage/maintenance.py"
     },
     "tools/verify.py": {
       "dup": 0,

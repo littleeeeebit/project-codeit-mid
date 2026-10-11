@@ -4095,7 +4095,7 @@
      },
      "timed_out": {
       "default": [],
-      "description": "Originals whose parse hit the time limit; they keep their previous extraction and the run ends unverified",
+      "description": "Originals past the parse time limit (previous extraction kept)",
       "items": {
        "type": "string"
       },
@@ -8278,7 +8278,7 @@
   },
   "/api/verify/maintenance/cancel": {
    "post": {
-    "description": "Cancels the live run: a running re-parse is killed at once, any other step stops at its end. The run ends\n`cancelled`; what it already wrote stays.",
+    "description": "Cancels the live run: a running re-parse is killed at once, any other step stops at its end.",
     "operationId": "cancel_maintenance_api_verify_maintenance_cancel_post",
     "responses": {
      "200": {

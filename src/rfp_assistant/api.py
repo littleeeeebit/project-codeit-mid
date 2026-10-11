@@ -902,8 +902,7 @@ class MaintenanceRun(_Read):
     serving: dict[str, Any] | None = None
     provider_calls: int | None = None
     reused: bool | None = None
-    timed_out: list[str] = Field(default=[], description="Originals whose parse hit the time limit; they keep their "
-                                 "previous extraction and the run ends unverified")
+    timed_out: list[str] = Field(default=[], description="Originals past the parse time limit (previous extraction kept)")
     cancelled_by: str | None = None
     cancelled_at: str | None = None
 
@@ -1361,8 +1360,7 @@ def _operation_routes(app: FastAPI) -> None:
 
     @app.post("/api/verify/maintenance/cancel", response_model=Started)
     def cancel_maintenance(res: Res, member: Member):
-        """Cancels the live run: a running re-parse is killed at once, any other step stops at its end. The run ends
-        `cancelled`; what it already wrote stays."""
+        """Cancels the live run: a running re-parse is killed at once, any other step stops at its end."""
         return Started(run_id=service.cancel_maintenance(res, member))
 
     @app.get("/api/verify/experiments", response_model=Experiments)

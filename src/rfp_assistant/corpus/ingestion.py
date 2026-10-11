@@ -81,8 +81,7 @@ class IngestionError(RuntimeError):
 
 
 class ParseTimedOut(Exception):
-    """A parse killed at its time limit: the source keeps its extraction and gets no input record, so the next run
-    retries it."""
+    """A parse killed at its time limit: the source keeps its extraction and no input record (retried next run)."""
 
 
 class Stopped(Exception):

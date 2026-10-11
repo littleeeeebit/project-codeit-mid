@@ -39,6 +39,9 @@ ACTOR_NOTE = "maintenance"
 SCRATCH_PREFIX = "rfp_mrestore_"
 # Tables a no-change rerun still writes (the backup's own audit event); they do not make a new backup necessary.
 VOLATILE_TABLES = ("audit_events",)
+# run_id -> {"by", "at"}: a cancel (`service.cancel_maintenance`) the live run in this process has not reached yet.
+# `run` reads its own entry and drops it when it ends.
+CANCELS: dict[str, dict] = {}
 
 
 class StepFailed(RuntimeError):
@@ -456,16 +459,17 @@ def start_state(actor: str) -> dict:
                        "reason": None} for n in STEPS]}
 
 
-def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: False, cancelled=lambda: None,
+def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: False, cancelled=None,
         state: dict | None = None) -> dict:
     """Runs every step in order and writes one report. Stops at the first failed step or paid estimate, or when
-    `cancelled()` returns who cancelled and when ({"by", "at"}): a running parse is killed, any other step finishes
-    first. Nothing already written is rolled back."""
+    `cancelled()` returns who cancelled and when ({"by", "at"}; by default this run's entry in `CANCELS`): a
+    running parse is killed, any other step finishes first. Nothing already written is rolled back."""
     from ..corpus import ingestion
     from ..evaluation import compare
 
     state = state or start_state(actor)
     started = state["started_at"]
+    cancelled = cancelled or (lambda: CANCELS.get(state["run_id"]))
     ingest_step = next(s for s in state["steps"] if s["name"] == "ingest")
 
     def progress(**p) -> None:
@@ -537,6 +541,7 @@ def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: 
     write_text_atomic(root(settings) / "reports" / f"{state['run_id']}.json",
                       json.dumps(state, ensure_ascii=False, indent=1))
     write_text_atomic(root(settings) / "reports" / f"{state['run_id']}.md", report_md(state))
+    CANCELS.pop(state["run_id"], None)
     return state
 
 
