@@ -25,14 +25,16 @@ from tests.test_error_analysis import make_run
 from tests.test_stage_review import server
 
 BS = chr(92)
-MEMBERS = ("spai1303", "teammate07", 'te"am\\!\U0001F600', "team\\")  # hub names hold any character
+MEMBERS = ("spai1303", "teammate07", 'te"am\\!\U0001F600', "team\\",
+           "team\\n")  # hub names hold any character, a backslash and a letter too
 ESCAPED = "\\u%04x" % ord(MEMBERS[0][0]) + MEMBERS[0][1:]  # the first member ID as JSON text that decodes to it
 # the third as JSON text: escaped quote and backslash, a u-escape for "!", a surrogate pair for the emoji
 ODD = json.dumps(MEMBERS[2])[1:-1].replace("!", "\\u0021")
 INTRODUCER = BS + "u005c" + ESCAPED[1:]  # the escape's own backslash spelled as an escape: decoded twice, an ID
 LONE = BS + "ud800"  # JSON text for a surrogate with no pair
+DEEP = "[" * 1500 + "0" + "]" * 1500  # within the trace's 4000-character cap
 DOCS = {"D1": "가 사업", "D2": "나 사업"}
-WINDOW = 17  # 질문하기 requests in window()
+WINDOW = 18  # 질문하기 requests in window()
 
 
 def request(member: str, question: str, mode: str = "single", docs=("D1",), status: str = "completed",
@@ -80,6 +82,9 @@ def window() -> list[dict]:
              request(MEMBERS[0], "끝 역슬래시", status="failed", result={**refused, "error": "schema_invalid: x"},
                      trace={"raw_output": json.dumps({"summary": MEMBERS[3], "claims": [{"text": "그대로"}]})}),
              # a refused string with an unpaired surrogate, which no UTF-8 file can hold
+             # an ID in a refused output nested deeper than a recursive walk can go
+             request(MEMBERS[0], "깊은 중첩", status="failed", result={**refused, "error": "schema_invalid: x"},
+                     trace={"raw_output": '{"summary": "' + MEMBERS[0] + '", "x": ' + DEEP + "}"}),
              request(MEMBERS[1], "짝 없는 서로게이트", status="failed", result={**refused, "error": "schema_invalid: x"},
                      trace={"raw_output": '{"summary": "' + LONE + ' 끝"}'}),
              # validated, though the provider sent no usage so the call's billing stayed unknown
@@ -131,6 +136,18 @@ def run_traffic(root: Path, rows: list[dict], sample: int = 4) -> tuple[dict, li
     return record, opened
 
 
+def readable(text: str) -> str:
+    """Everything a reader can see in the text by decoding JSON escapes as many times as they like, every level
+    joined: the test's own decoder, so the module's is not its own judge."""
+    seen = [text]
+    while True:
+        out = re.sub(r'\\u([0-9a-fA-F]{4})|\\(["\\/bfnrt])', lambda m: chr(int(m[1], 16)) if m[1] else
+                     {"b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t"}.get(m[2], m[2]), seen[-1])
+        if out == seen[-1]:
+            return "\n\x00".join(t.encode("utf-16", "surrogatepass").decode("utf-16", "surrogatepass") for t in seen)
+        seen.append(out)
+
+
 def folder_bytes(folder: Path) -> bytes:
     """Every file of the run folder, gzip members decompressed."""
     return b"".join(gzip.decompress(p.read_bytes()) if p.suffix == ".gz" else p.read_bytes()
@@ -154,7 +171,7 @@ class TrafficRunTest(unittest.TestCase):
         for m in MEMBERS:
             self.assertNotIn(m.encode(), data)
         for m in MEMBERS:  # nor in anything decoding the files, however often, recovers
-            self.assertNotIn(m, tr.unescaped(data.decode()))
+            self.assertNotIn(m, readable(data.decode()))
         self.assertNotIn(b"postgresql://", data)  # the DSN itself is never recorded, only its variable's name
         frozen = [json.loads(line) for line in gzip.decompress(
             (folder / "inputs" / "requests.jsonl.gz").read_bytes()).decode().splitlines()]
@@ -179,6 +196,7 @@ class TrafficRunTest(unittest.TestCase):
         self.assertEqual(json.loads(raw["끝 역슬래시"]),  # still valid JSON after the trailing backslash was replaced
                          {"summary": tr.pseudonym(key, MEMBERS[3]), "claims": [{"text": "그대로"}]})
         self.assertEqual(view["끝 역슬래시"]["summary"], tr.pseudonym(key, MEMBERS[3]))
+        self.assertEqual(raw["깊은 중첩"], '{"summary": "' + tr.pseudonym(key, MEMBERS[0]) + '", "x": ' + DEEP + "}")
         self.assertEqual([p.name for p in folder.rglob("*.key")], [])  # the key stays outside the run folder
 
     def test_pseudonyms_are_stable_across_runs_and_differ_per_member(self):
@@ -223,7 +241,7 @@ class TrafficRunTest(unittest.TestCase):
         self.assertEqual((unreadable["summary"], unreadable["rejected_shown"]), (raw, True))  # shown as it came
         self.assertEqual((unreadable["missing"], unreadable["cost_micro_usd"]), ([{"doc_id": None, "field": "",
                                                                                    "reason": None}], 0))
-        deep = '{"summary":' + "[" * 1500 + "0" + "]" * 1500 + "}"  # within the trace's 4000-character cap
+        deep = '{"summary":' + DEEP + "}"
         pure = json.JSONDecoder()
         pure.scan_once = json.scanner.py_make_scanner(pure)  # the decoder without its C accelerator recurses
         with mock.patch.object(tr.json, "loads", pure.decode):
@@ -247,18 +265,24 @@ class TrafficRunTest(unittest.TestCase):
                      {"raw": '{"who": "' + INTRODUCER + '"}'}, {"raw": INTRODUCER},  # the introducer escaped too
                      {"who": MEMBERS[2]}, {"raw": '{"who": "' + ODD + '"}'},
                      {"raw": json.dumps(re.sub(r"u([0-9a-f]{4})", lambda m: "u" + m[1].upper(), ODD))},  # upper hex
-                     {"raw": json.dumps({"who": MEMBERS[3], "n": 1})}, {"raw": json.dumps({"who": MEMBERS[3]})[:-3]})
+                     {"raw": json.dumps({"who": MEMBERS[3], "n": 1})}, {"raw": json.dumps({"who": MEMBERS[3]})[:-3]},
+                     {"raw": json.dumps({"who": MEMBERS[4]})}, {"raw": json.dumps(json.dumps({"who": MEMBERS[4]}))})
         path = self.root / "x.json"
         for value in spellings:
             written = tr.write_out(path, value, table)
             text = path.read_text(encoding="utf-8")
             for m in MEMBERS:
-                self.assertNotIn(m, tr.unescaped(text), value)
+                self.assertNotIn(m, readable(text), value)
             try:
                 json.loads(value.get("raw", ""))
             except ValueError:
                 continue
             json.loads(written["raw"])  # a JSON text naming a member is still JSON when it is written
+        alone = {MEMBERS[4]: "member-4"}  # with no other member to give it away, seen only one decoding level down
+        self.assertEqual(json.loads(tr.write_out(path, spellings[10], alone)["raw"]), {"who": "member-4"})
+        with mock.patch.object(tr, "scrub", lambda value, table: value):
+            with self.assertRaisesRegex(ReviewError, "member ID survived"):
+                tr.write_out(path, spellings[10], alone)
         self.assertEqual(json.loads(tr.write_out(path, spellings[8], table)["raw"]), {"who": "member-3", "n": 1})
         self.assertEqual(tr.write_out(path, spellings[9], table)["raw"], '{"who": "member-3')  # cut, still readable
         path.unlink()

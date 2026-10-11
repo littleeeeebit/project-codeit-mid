@@ -106,22 +106,30 @@ def pseudonym(key: bytes, member_id: str) -> str:
     return "member-" + hmac.new(key, member_id.encode(), hashlib.sha256).hexdigest()[:8]
 
 
-def unescaped(text: str) -> str:
-    """The text with every JSON escape decoded, level after level until none is left: everything a reader can
-    recover by decoding as often as they like, whatever spells the escape itself (`\\u005c` is a backslash too).
-    Surrogate pairs join into their character. For finding member IDs only, never for writing."""
+def decodings(text: str) -> list[str]:
+    """The text as written and after each further round of JSON escape decoding until none is left: everything a
+    reader can see however many times they decode, whatever spells the escape itself (`\\u005c` is a backslash
+    too). Every level counts, not only the last: an ID holding a backslash and a letter (`team\\n`) reads as itself
+    one level down and as a newline at the bottom. Surrogate pairs join into their character. For finding member
+    IDs only, never for writing."""
+    joined = lambda t: t.encode("utf-16", "surrogatepass").decode("utf-16", "surrogatepass")  # noqa: E731
+    levels = [text]
     while "\\" in text:
         out = ESCAPE.sub(lambda m: chr(int(m[1], 16)) if m[1] else SHORT[m[2]], text)
         if out == text:
             break
         text = out
-    return text.encode("utf-16", "surrogatepass").decode("utf-16", "surrogatepass")
+        levels.append(joined(text))
+    return levels
+
+
+def unescaped(text: str) -> str:
+    return decodings(text)[-1]
 
 
 def _names(text: str, members) -> bool:
-    """A member ID is in the text as written or in what decoding it recovers."""
-    seen = unescaped(text) if "\\" in text else text
-    return any(m in text or m in seen for m in members)
+    """A member ID is in the text as written or at any level decoding it recovers."""
+    return any(m in level for level in decodings(text) for m in members)
 
 
 def scrub(value, table: dict[str, str]):
@@ -144,7 +152,10 @@ def scrub(value, table: dict[str, str]):
         except (ValueError, RecursionError):
             parsed = None
         if isinstance(parsed, (dict, list, str)):
-            return json.dumps(walk(parsed), ensure_ascii=False)
+            try:
+                return json.dumps(walk(parsed), ensure_ascii=False)
+            except RecursionError:
+                pass  # nested too deep to walk or serialise: clean it as text below
         for escaped, alias in spelled:
             s = s.replace(escaped, alias)
         for m in order:

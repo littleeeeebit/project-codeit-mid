@@ -46,4 +46,10 @@ Review round 3, rechecked on the same window (`traffic-20261011T061909Z-bf9e08`,
 - The view is built from the cleaned record, so it shows what the frozen input holds.
 - On this window no member ID is left after decoding every escape, and no string was withheld.
 
+Review round 4, rechecked on the same window (`traffic-20261011T062706Z-064796`, 242 requests, 14 s):
+
+- Member IDs are looked for at every decoding level, not only the text as written and after the last round of decoding. An ID holding a backslash and a letter (`team\n`) reads as itself one level down and as a newline at the bottom.
+- A refused output that names a member and is nested deeper than the cleaner can walk is cleaned as text instead of stopping the run. It stays valid JSON.
+- On this window, still no member ID at any level and nothing withheld.
+
 Found and fixed during the walk: the run list showed a host dash for a traffic run. Pick reasons repeated raw codes that the meta line already shows in Korean. Squares outside the sample were too faint against white (now 3:1). The map had no way to list only the groups the sample missed. Taxonomy spans named "실제 요청" twice.
