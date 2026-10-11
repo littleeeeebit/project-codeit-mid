@@ -217,16 +217,24 @@ export function FactsTable({ answer }: { answer: Answer }) {
 type ListingRow = NonNullable<Answer["listing"]>["rows"][number];
 const LISTING_DATES = ["published_at", "bid_start", "bid_close"];
 
+const PLACEHOLDER_KRW = 1_000_000;  // below this a CSV amount is a placeholder (metadata_query.MIN_AMOUNT_KRW)
+const LISTING_HEAD = ["사업", "발주 기관 · 유형", "사업 금액"];
+
+// Three columns fit the conversation's answer column: the type sits under the institution, and a long name wraps.
 function ListingCells({ row, dates }: { row: ListingRow; dates: string[] }) {
+  const amount = row.amount_krw;
   return (
     <>
-      <td className={cn(td, "whitespace-nowrap")}>{row.institution ?? "미상"}</td>
-      <td className={cn(td, "whitespace-nowrap")}>
-        {row.institution_type ?? <span className="text-muted-foreground">미분류</span>}
-        {row.type_source === "resolution" && <StatusBadge tone="info" className="ml-1.5">검토자 수정</StatusBadge>}
+      <td className={cn(td, "min-w-28 [overflow-wrap:anywhere]")}>
+        <p>{row.institution ?? "미상"}</p>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          {row.institution_type ?? "미분류"}
+          {row.type_source === "resolution" && <StatusBadge tone="info" className="ml-1.5">검토자 수정</StatusBadge>}
+        </p>
       </td>
-      <td className={cn(td, "text-right font-semibold whitespace-nowrap tabular-nums")} title={won(row.amount_krw)}>
-        {row.amount_krw == null ? "금액 없음" : wonShort(row.amount_krw)}
+      <td className={cn(td, "text-right font-semibold whitespace-nowrap tabular-nums",
+                        amount != null && amount < PLACEHOLDER_KRW && "text-warn")} title={won(amount)}>
+        {amount == null ? "금액 없음" : amount < PLACEHOLDER_KRW ? won(amount) : wonShort(amount)}
       </td>
       {dates.map((f) => (
         <td key={f} className={cn(td, "whitespace-nowrap tabular-nums")}>
@@ -244,7 +252,7 @@ export function ListingTable({ answer, cite }: { answer: Answer; cite: Cite }) {
   const l = answer.listing;
   if (!l) return null;
   const dates = l.fields.filter((f) => LISTING_DATES.includes(f));
-  const head = ["사업", "발주 기관", "기관 유형", "사업 금액", ...dates.map((f) => label(FIELD, f))];
+  const head = [...LISTING_HEAD, ...dates.map((f) => label(FIELD, f))];
   return (
     <div className="space-y-8">
       <Section title={`사업 ${l.count}개`} aside={<span className="text-[13px] text-muted-foreground">조건: {l.conditions}</span>}>
@@ -269,16 +277,18 @@ export function ListingTable({ answer, cite }: { answer: Answer; cite: Cite }) {
       {l.review.length > 0 && (
         <Section title={`확인 필요 ${l.review.length}개`}
                  aside={<span className="text-[13px] text-muted-foreground">값이 없거나 검토가 필요해 개수와 순위에 넣지 않았습니다</span>}>
-          <Table caption="확인 필요" head={["사업", "발주 기관", "기관 유형", "사업 금액", ...dates.map((f) => label(FIELD, f)), "사유"]}>
+          <Table caption="확인 필요" head={head}>
             {l.review.map((row) => (
               <tr key={row.doc_id}>
-                <td className={cn(td, "min-w-64 font-medium [overflow-wrap:anywhere]")}>{row.title ?? "제목 없음"}</td>
-                <ListingCells row={row} dates={dates} />
-                <td className={cn(td, "whitespace-nowrap")}>
-                  {row.reasons.map((r) => (
-                    <StatusBadge key={`${r.field}-${r.reason}`} tone="warn" className="mr-1">{r.label}</StatusBadge>
-                  ))}
+                <td className={cn(td, "min-w-64")}>
+                  <p className="font-medium [overflow-wrap:anywhere]">{row.title ?? "제목 없음"}</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1" aria-label="사유">  {/* under the title: no fourth column */}
+                    {row.reasons.map((r) => (
+                      <StatusBadge key={`${r.field}-${r.reason}`} tone="warn">{r.label}</StatusBadge>
+                    ))}
+                  </div>
                 </td>
+                <ListingCells row={row} dates={dates} />
               </tr>
             ))}
           </Table>

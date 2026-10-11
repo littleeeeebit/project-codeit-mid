@@ -14,7 +14,7 @@ import {
 
 export function AnswerBody({ view, answer, cite }: { view: RequestView; answer: Answer; cite: Cite }) {
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">  {/* a wide table scrolls inside its box instead of widening the page */}
       <StateHead answer={answer} cite={cite} />
       <Sentences claims={answer.claims} cite={cite}
                  labelOf={(d) => (answer.mode === "compare" ? docLabel(answer, d) : "")} />

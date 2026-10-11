@@ -135,13 +135,16 @@ Top-k passages can never list every project above an amount, every university's 
 
 ```
 사업 12개                                   조건: 사업 금액 ≥ 100,000,000원
-사업                                발주 기관      기관 유형   사업 금액
-학사 정보시스템 고도화               한국대학교      대학        1억 5,000만원
-  학사 행정 시스템을 통합 고도화하는 사업입니다. [1]
+사업                                발주 기관 · 유형     사업 금액
+학사 정보시스템 고도화               한국대학교          1억 5,000만원
+  학사 행정 시스템을 통합 고도화하는 사업 [1] [2]   대학
 ...
 확인 필요 3개           값이 없거나 검토가 필요해 개수와 순위에 넣지 않았습니다
-캠퍼스 안전 시스템                   ...                        0원        [0원 검토]
+캠퍼스 안전 시스템                   서울시립대학교            0원
+  [0원 검토]                          대학
 ```
+
+The table has three columns so it fits the conversation's answer column beside the evidence pane at 1440 px: the type sits under the institution, a long institution name wraps, and the 확인 필요 reasons sit under the title. An amount below 1,000,000원 is shown as written (0원, 1원) in the warning colour, never rounded to 0만원. Below about 600 px the table scrolls inside its own box.
 
 ### Result states
 

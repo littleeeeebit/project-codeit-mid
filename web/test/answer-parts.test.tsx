@@ -240,13 +240,17 @@ describe("metadata list answer", () => {
     expect(screen.getByText("조건: 기관 유형 = 대학 · 입찰 마감 ≥ 2024-06-01")).toBeTruthy();
     const listed = screen.getByRole("table", { name: "조건에 맞는 사업" });
     expect([...listed.querySelectorAll("th")].map((th) => th.textContent))
-      .toEqual(["사업", "발주 기관", "기관 유형", "사업 금액", "입찰 마감"]);
+      .toEqual(["사업", "발주 기관 · 유형", "사업 금액", "입찰 마감"]);
+    expect(listed.textContent).toContain("한국대학교대학");  // the type under the institution
     expect(listed.textContent).toContain("1억 5,000만원");
     expect(listed.textContent).toContain("원문 색인 없음");
     expect(listed.textContent).toContain("검토자 수정");
     fireEvent.click(screen.getByRole("button", { name: "근거 1 원문 보기" }));
     expect(onCite).toHaveBeenCalledWith("P1");
-    expect(screen.getByRole("table", { name: "확인 필요" }).textContent).toContain("날짜 없음");
+    const review = screen.getByRole("table", { name: "확인 필요" }).textContent;
+    expect(review).toContain("날짜 없음");
+    expect(review).toContain("0원");  // a placeholder amount is shown as is, never as 0만원
+    expect(review).not.toContain("0만원");
     expect(screen.getByRole("heading", { name: "확인 필요 1개" })).toBeTruthy();
   });
 
