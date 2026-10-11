@@ -625,5 +625,89 @@ class MetadataAnswerTest(unittest.TestCase):
         self.assertIn("passed 0/0; metadata questions correct 1/2", server._measure("generation", summary))
 
 
+def generation_run(root: Path) -> dict:
+    """A scored generation run folder as the review server reads it: two candidates answering one question."""
+    run_id = "generation-20261010T000000Z-abc123"
+    answer = {"summary": "보안확약서를 제출한다 😀 그리고 반환한다", "claims": [{"text": "자료는 반출 금지"}],
+              "next_action": "기관에 확인", "conflicts": [{"field": "기간", "alternatives": [{"value": "30일"}]}],
+              "missing": [{"field": "증빙 제출방법"}], "cost_micro_usd": 0}
+    cands = [{"id": cid, "label": cid, "ref": cid, "role": role, "commit": c * 40, "status": "complete"}
+             for cid, role, c in (("base", "baseline", "a"), ("c1", "candidate", "b"))]
+    view = {"schema": server.RUN_SCHEMA, "run_id": run_id, "stage": "generation", "candidates": cands,
+            "questions": [{"key": "q1", "question": "질문", "candidates": {"base": answer, "c1": {**answer, "summary": "다른 답"}}}]}
+    folder = root / "review" / "runs" / run_id
+    folder.mkdir(parents=True)
+    for name in ("run.json", "view.json"):
+        (folder / name).write_text(json.dumps({**view, "created_at": "2026-10-10T00:00:00+00:00"}, ensure_ascii=False),
+                                   encoding="utf-8")
+    return view
+
+
+class AnnotationStoreTest(unittest.TestCase):
+    def test_span_notes_are_append_only_and_checked_against_the_stored_answer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            view = generation_run(root)
+
+            def add(**body):
+                return server.add_annotation(root, view, body, "reviewer")
+            # code-point offsets: the emoji is one character, as Python counts it
+            state = add(op="note", question="q1", candidate="base", field="summary", start=14, end=20,
+                        text="그리고 반환", note="반환 조건이 빠짐")
+            note = state["notes"][0]
+            self.assertEqual({k: note[k] for k in ("question", "candidate", "commit", "field", "start", "end", "author")},
+                             {"question": "q1", "candidate": "base", "commit": "a" * 40, "field": "summary",
+                              "start": 14, "end": 20, "author": "reviewer"})
+            for field, start, text in (("claim.0", 4, "반출"), ("conflict.0.0", 0, "30일"), ("missing.0", 0, "증빙"),
+                                       ("next_action", 0, "기관")):
+                add(op="note", question="q1", candidate="c1", field=field, start=start, end=start + len(text),
+                    text=text, note="확인")
+
+            for bad, why in ((dict(start=14, end=20, text="그리고 반환한"), "offsets"),   # text longer than the span
+                             (dict(start=15, end=21, text="그리고 반환"), "offsets"),     # UTF-16 offsets, off by the emoji
+                             (dict(start=0, end=99, text="보안"), "offsets"),
+                             (dict(field="claim.5", start=0, end=2, text="자료"), "field")):
+                with self.subTest(bad=bad), self.assertRaisesRegex(server.ReviewInputError, why):
+                    add(**{"op": "note", "question": "q1", "candidate": "base", "field": "summary", "note": "x", **bad})
+            with self.assertRaisesRegex(server.ReviewInputError, "no such answer"):
+                add(op="reviewed", question="q9", candidate="base", value=True)
+
+            lines = server.annotations_file(root, view["run_id"]).read_text(encoding="utf-8").splitlines()
+            add(op="edit", target=note["id"], note="반환 기한이 빠짐")
+            last = json.loads(lines[-1])["id"]
+            state = add(op="delete", target=last)
+            with self.assertRaisesRegex(server.ReviewInputError, "deleted"):
+                add(op="edit", target=last, note="다시")
+            after = server.annotations_file(root, view["run_id"]).read_text(encoding="utf-8").splitlines()
+            self.assertEqual(after[:len(lines)], lines)  # nothing earlier was rewritten
+            self.assertEqual([json.loads(line)["op"] for line in after[len(lines):]], ["edit", "delete"])
+            self.assertEqual((len(state["notes"]), state["notes"][0]["note"]), (4, "반환 기한이 빠짐"))
+
+            add(op="reviewed", question="q1", candidate="base", value=True)
+            state = add(op="reviewed", question="q1", candidate="c1", value=False)
+            self.assertEqual([(r["question"], r["candidate"]) for r in state["reviewed"]], [("q1", "base")])
+
+            # export carries the notes; import into another data folder restores them in its store, not the run
+            other = root / "other"
+            exported = server.export_run(root, view["run_id"])
+            self.assertEqual(server.import_run(other, exported), view["run_id"])
+            self.assertFalse((server.runs_dir(other) / view["run_id"] / server.ANNOTATIONS_IN_ZIP).exists())
+            self.assertEqual(server.annotation_state(server.read_annotations(other, view["run_id"])), state)
+            prompt = server.write_decision(other, view, None, {"c1": "loses the condition"}, {})["prompt"]
+            self.assertIn(str(server.annotations_file(other, view["run_id"])), prompt)
+
+            # a zip whose note no longer matches its answer is refused whole
+            forged = io.BytesIO()
+            with zipfile.ZipFile(io.BytesIO(exported)) as z, zipfile.ZipFile(forged, "w") as out:
+                for name in z.namelist():
+                    data = z.read(name)
+                    if name.endswith(server.ANNOTATIONS_IN_ZIP):
+                        data = data.replace("그리고 반환".encode(), "그리고 삭제".encode())
+                    out.writestr(name, data)
+            with self.assertRaisesRegex(server.ReviewInputError, "offsets"):
+                server.import_run(root / "third", forged.getvalue())
+            self.assertFalse(server.runs_dir(root / "third").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

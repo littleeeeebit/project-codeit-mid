@@ -266,6 +266,29 @@ export type Decision = {
 
 export type Saved = { markdown: string; json: string; prompt: string };
 
+/** A live note on a span of one answer field (review/server.py folds the append-only records into these). Offsets
+ *  count Unicode code points of the stored field text, as Python does. */
+export type SpanNote = {
+  id: string;
+  question: string;
+  candidate: string;
+  commit: string;
+  field: string;
+  start: number;
+  end: number;
+  text: string;
+  note: string;
+  author: string;
+  at: string;
+  edited_by?: string;
+  edited_at?: string;
+};
+
+export type Annotations = {
+  notes: SpanNote[];
+  reviewed: { question: string; candidate: string; author: string; at: string }[];
+};
+
 export async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `${res.status}`);
