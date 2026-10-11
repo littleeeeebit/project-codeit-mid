@@ -8,13 +8,13 @@ import json
 import tempfile
 import unittest
 import uuid
-from dataclasses import asdict
+from dataclasses import fields
 from pathlib import Path
 from unittest import mock
 
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from rfp_assistant.contracts import AnswerRequest
+from rfp_assistant.contracts import AnswerRequest, AnswerResult
 from rfp_assistant.corpus import ingestion
 from rfp_assistant.gateway import budget, generation, tracing
 from rfp_assistant.service import metadata_answers as ma
@@ -479,10 +479,39 @@ class FallbackAndTraceTest(Base):
 
     def test_a_follow_up_sees_the_listed_projects(self):
         first = self.ask("가장 싼 사업")
-        text = service._answer_text(asdict(first))
+        with store.open_db(self.env.settings.db_path) as conn:  # as the conversation reads the previous answer
+            row = conn.execute("SELECT result_json FROM requests WHERE request_id = ?", (first.request_id,)).fetchone()
+            text = service._answer_text(service._stored_result(conn, first.request_id, row["result_json"]))
         self.assertIn("조건: 사업 금액 낮은 순 1개(동률 포함)", text)
         self.assertIn("디지털 교과서 플랫폼 · 한국교육학술정보원 · 공공기관 · 30,000,000원", text)
         self.assertIn("확인 필요: CCTV 통합관제 · 1원 (금액 검토)", text)
+
+
+class RollbackTest(Base):
+    def test_stored_answers_keep_the_envelope_an_older_version_rebuilds(self):
+        """A rolled-back version (same database, schema 6) rebuilds result_json as AnswerResult(**) without
+        `listing`: every stored answer leaves it out, and this version joins it back from request_listings."""
+        listed = self.ask("가장 싼 사업")
+        self.transport.structured["metadata_query"] = lambda m: reply({**model(), "metadata_question": False}, m)
+        passage = self.ask("하자보수 기간은 얼마인가요?")
+        older = {f.name for f in fields(AnswerResult)} - {"listing"}
+        with store.open_db(self.env.settings.db_path) as conn:
+            for r in (listed, passage):
+                row = conn.execute("SELECT result_json FROM requests WHERE request_id = ?", (r.request_id,)).fetchone()
+                self.assertEqual(set(json.loads(row["result_json"])), older)
+        consultant = self.env.consultant
+        self.assertEqual(service.request_status(self.res, consultant, listed.request_id).result.listing, listed.listing)
+        self.assertIsNone(service.request_status(self.res, consultant, passage.request_id).result.listing)
+        history = {v.request_id: v.result.listing for v in service.list_requests(self.res, consultant)}
+        self.assertEqual(history[listed.request_id], listed.listing)
+        self.assertEqual(service.export_request(self.res, consultant, listed.request_id)["result"]["listing"]["count"],
+                         listed.listing["count"])
+        with store.open_db(self.env.settings.db_path) as conn:
+            key = conn.execute("SELECT idempotency_key FROM requests WHERE request_id = ?",
+                               (listed.request_id,)).fetchone()[0]
+        replay = service.answer(self.res, consultant, AnswerRequest(
+            idempotency_key=key, generation_id="g", question="가장 싼 사업", scope=[], mode="corpus", as_of=AS_OF))
+        self.assertEqual((replay.request_id, replay.listing), (listed.request_id, listed.listing))
 
 
 if __name__ == "__main__":

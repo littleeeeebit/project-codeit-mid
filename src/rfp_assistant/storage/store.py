@@ -239,6 +239,10 @@ CREATE TABLE IF NOT EXISTS institution_types (
     prompt_version TEXT NOT NULL,
     classified_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS request_listings (  -- outside result_json, which an older version reads as AnswerResult(**)
+    request_id TEXT PRIMARY KEY REFERENCES requests(request_id),
+    listing_json TEXT NOT NULL  -- a corpus metadata answer's listing: the query, every matching project and 확인 필요
+);
 CREATE TABLE IF NOT EXISTS embedding_estimates (
     estimate_id TEXT PRIMARY KEY,
     index_version TEXT NOT NULL,  -- no FK: rebuilding an index version must not be blocked by old estimates
