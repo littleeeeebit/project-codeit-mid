@@ -1,0 +1,1 @@
+Commit `22d811f` keeps the `error-analysis` command thin in `cli.py` and records its growth in the ratchet.

@@ -1,0 +1,1 @@
+The call may have executed and been billed, but its usage is unknown. It holds its reservation as pending. On PostgreSQL it blocks every new dispatch in `mark_dispatching` until resolved. `answers._answer_row` and stage-review workers never resend its key.

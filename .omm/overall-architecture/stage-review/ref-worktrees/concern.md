@@ -1,0 +1,1 @@
+`capped_reservations` monkeypatches `budget.reserve` for the worker process and reads committed spend outside the admission transaction. The code notes (`ponytail`) that this is safe only because one worker per candidate is the only writer to its key prefix.

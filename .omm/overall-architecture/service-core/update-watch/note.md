@@ -1,0 +1,1 @@
+The `update.sh` and systemd units were not read; their behaviour is taken from the module docstring.

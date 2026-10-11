@@ -1,1 +1,0 @@
-Written by `_finish` for any domain outcome: answered, insufficient_evidence, ingestion_unavailable, budget_blocked, or a free-mode answer.

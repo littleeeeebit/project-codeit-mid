@@ -1,0 +1,1 @@
+`_lexical_matches` runs `rank_lexical` (BM25) over allowed rows with Kiwi, or with `WhitespaceAnalyzer` for K0. For one or two selected documents, `scope_redundant_terms` drops terms present in more than half the scope's chunks and restated project-name terms. Codes, digits and negations are never dropped, and the trace records `scope_redundant_terms:`.

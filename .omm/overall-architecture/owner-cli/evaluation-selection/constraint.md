@@ -1,0 +1,1 @@
+Nothing activates on its own. `decided_by` is required, only current `EVAL_VERSION` runs activate, and a stale HR selection serves as H without the reranker until a current trial is activated.

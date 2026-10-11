@@ -1,0 +1,1 @@
+The corpus pipeline turns the `원본 데이터` CSV and originals into reviewed extraction elements and a keyword index. Each step reuses unchanged inputs (`input_key`), and one failing file is recorded without stopping the run.

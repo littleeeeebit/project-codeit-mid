@@ -1,0 +1,1 @@
+Observability only: with the tunnel to the shared Langfuse closed, traces are dropped with a warning and answers continue.

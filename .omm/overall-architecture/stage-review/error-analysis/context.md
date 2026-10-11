@@ -1,0 +1,1 @@
+This is the current branch's feature (`failure-taxonomy-from-notes`). Commit `5673b1e` keeps the human-checked source count, refreshes failure counts when notes change, and commits taxonomy decisions last.

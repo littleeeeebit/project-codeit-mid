@@ -1,1 +1,1 @@
-From the original files to what serving retrieves. Every stage reuses unchanged inputs and records its outcome; a person decides what serves.
+How content moves from the original files to answers, and from answers back to the person's judgement. Each hop is content-addressed or hash-pinned, so a later run can reproduce or refuse what an earlier one measured.

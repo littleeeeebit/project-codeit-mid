@@ -1,1 +1,0 @@
-According to the update.py docstring, `tools/infra/update.sh` (run by `bidmate-update.service`) fast-forwards the checkout to origin/main, rebuilds, restarts `bidmate`, health-checks it and rolls back on failure, writing `result.json` and `update.log` to the state directory.

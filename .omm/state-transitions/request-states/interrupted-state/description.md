@@ -1,0 +1,1 @@
+Set by `RequestRunner.shutdown` (queued always; running only if workers are still pending at the deadline) or by `recover_requests` when a new gateway owner starts. Nothing is replayed automatically. `_finish` keeps `interrupted` if a still-running worker later finishes.

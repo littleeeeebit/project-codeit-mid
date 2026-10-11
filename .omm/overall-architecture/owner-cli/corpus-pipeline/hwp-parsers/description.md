@@ -1,0 +1,1 @@
+`_parse_source` for HWP calls `parse_hwp` (the `hwp5proc` converter to XML, then `walk_hwp`). If pyhwp fails, it calls `load_hwp_hwpx` (the `HwpHwpxLoader` path in `storage/hwp_loader.py`) with fingerprint `hwp_loader` and warning `pyhwp_failed`. Only a loader failure quarantines the source (`parse_status='quarantined'`, `review_status='needs_recovery'`, `reason_code`).

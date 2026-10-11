@@ -1,0 +1,10 @@
+created: 2026-10-11T03:31:36.329Z
+updated: 2026-10-11T03:31:36.330Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: keyword-build
+children: []
+parentPath:
+  - owner-cli
+  - corpus-pipeline

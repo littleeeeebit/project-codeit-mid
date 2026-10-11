@@ -1,1 +1,0 @@
-`tools/infra/bidmate.service` runs the API on the VM with its environment from `/etc/bidmate/server.env` (DSN, hub settings, BIDMATE_ALLOWED_USERS, update paths). PostgreSQL starts through `tools/infra/start-postgresql.sh`.

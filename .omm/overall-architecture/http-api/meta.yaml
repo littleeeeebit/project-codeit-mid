@@ -1,27 +1,37 @@
 created: 2026-10-04 13:34:42.449000+00:00
-updated: 2026-10-11 01:14:50.302000+00:00
-update_count: 27
-last_field: diagram
+updated: 2026-10-11T03:31:16.138Z
+update_count: 28
+last_field: description
 kind: nested-class
 title: http-api
 children:
-- answer-sse
-- ask-routes
-- hub-login
-- hub-sign-in
-- login-store
-- route-groups
-- session-middleware
-- sign-in-routes
-- stream-route
-- update-watch
+  - answer-sse
+  - ask-routes
+  - hub-login
+  - hub-sign-in
+  - login-store
+  - route-groups
+  - session-middleware
+  - sign-in-routes
+  - stream-route
+  - update-watch
 parentPath: []
-prev_diagram: "graph TD\r\n  static-mount[\"Static export mount\\nsrc/rfp_assistant/api.py\"\
-  ] -->|\"screens call /api\"| session-middleware[\"Session gate _Session\\nsrc/rfp_assistant/api.py\"\
-  ]\r\n  session-middleware -->|\"open without session\"| sign-in-routes[\"Hub OAuth\
-  \ routes\\nsrc/rfp_assistant/service/auth.py\"]\r\n  session-middleware -->|\"bind\
-  \ member key, model\"| ask-routes[\"Ask and request routes\\nsrc/rfp_assistant/api.py\"\
-  ]\r\n  session-middleware -->|\"bind member\"| verify-routes[\"Verification routes\\\
-  nsrc/rfp_assistant/api.py\"]\r\n  session-middleware -->|\"bind member\"| dataset-routes[\"\
-  Drafting and gold routes\\nsrc/rfp_assistant/api.py\"]\r\n  sign-in-routes -->|\"\
-  session cookie on /api/\"| session-middleware"
+prev_diagram: "graph TD\r
+
+  \  static-mount[\"Static export mount\\nsrc/rfp_assistant/api.py\"]
+  -->|\"screens call /api\"| session-middleware[\"Session gate
+  _Session\\nsrc/rfp_assistant/api.py\"]\r
+
+  \  session-middleware -->|\"open without session\"| sign-in-routes[\"Hub OAuth
+  routes\\nsrc/rfp_assistant/service/auth.py\"]\r
+
+  \  session-middleware -->|\"bind member key, model\"| ask-routes[\"Ask and
+  request routes\\nsrc/rfp_assistant/api.py\"]\r
+
+  \  session-middleware -->|\"bind member\"| verify-routes[\"Verification
+  routes\\nsrc/rfp_assistant/api.py\"]\r
+
+  \  session-middleware -->|\"bind member\"| dataset-routes[\"Drafting and gold
+  routes\\nsrc/rfp_assistant/api.py\"]\r
+
+  \  sign-in-routes -->|\"session cookie on /api/\"| session-middleware"

@@ -1,0 +1,1 @@
+`parse_pdf` (PyMuPDF) yields page-located paragraph and table elements, with `_page_items` and `_page_labels`. On success, `ocr.merge` places the cached OCR text of raster images next to the surrounding text.

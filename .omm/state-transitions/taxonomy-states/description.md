@@ -1,0 +1,1 @@
+Failure types are derived only from the person's notes. State is folded from proposals and `history.jsonl` by `error_analysis._fold`; `versions/v<N>.json` snapshots are informational.

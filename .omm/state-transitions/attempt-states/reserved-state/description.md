@@ -1,0 +1,1 @@
+Inserted by `reserve` with `reserved_micro_usd = max_cost(...)`. It counts as pending against the cap and its envelope. A restart releases it as 'never dispatched before restart'.

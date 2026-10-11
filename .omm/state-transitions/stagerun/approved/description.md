@@ -1,1 +1,0 @@
-`paid.approve` records `approved_by` and `approved_at` on estimate.json and writes an audit row. It refuses an expired estimate or one that no longer fits the envelope. `resume` then checks `require_approved` and `recheck` (inputs, worker, rate card, refs, remaining budget), and only after that does `approved_env` give the worker OPENAI_API_KEY.

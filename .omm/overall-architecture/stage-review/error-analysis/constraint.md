@@ -1,0 +1,1 @@
+Neither the app nor the CLI groups notes or calls a model; the coding agent does the grouping. The counts appear in `release-report` under 'Human error analysis (not a sealed metric)' and never move a pass line.

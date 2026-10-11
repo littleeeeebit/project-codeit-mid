@@ -1,1 +1,0 @@
-`postgres.require_owner` runs before admission or dispatch and calls `GatewayOwner.check`. `postgres.owner_guard(conn)` runs inside the reserve and dispatch transactions. It refuses with `postgresql_recovery_or_validation` or `gateway_ownership_lost`, verified against the owner connection's backend pid in pg_locks.

@@ -1,0 +1,1 @@
+`--ledger-dsn-env` points paid re-reads at the shared codeit ledger. The fidelity check skips OCR text.

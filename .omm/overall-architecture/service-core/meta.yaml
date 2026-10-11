@@ -1,38 +1,54 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-11 01:14:52.478000+00:00
-update_count: 35
+updated: 2026-10-11T03:31:16.588Z
+update_count: 37
 last_field: diagram
 kind: nested-class
 title: service-core
 children:
-- answer-check
-- answer-pipeline
-- answer-validation
-- app-resources
-- background-jobs
-- conversation-context
-- evidence-reader
-- metered-chat
-- paid-answer
-- partials
-- request-runner
-- resources
-- resources-owner
-- serving-config
-- submit
-- tracing
-- update-fence
-- update-watch
+  - answer-check
+  - answer-execution
+  - answer-pipeline
+  - answer-validation
+  - app-resources
+  - background-jobs
+  - conversation-context
+  - evidence-reader
+  - metered-chat
+  - paid-answer
+  - partials
+  - request-runner
+  - resources
+  - resources-owner
+  - serving-config
+  - submit
+  - tracing
+  - update-fence
+  - update-watch
 parentPath: []
-prev_diagram: "graph TD\r\n  resources-owner[\"Process owner Resources\\nsrc/rfp_assistant/service/service.py\"\
-  ] -->|\"creates on first ask\"| request-runner[\"Bounded executor RequestRunner\\\
-  nsrc/rfp_assistant/service/service.py\"]\r\n  request-runner -->|\"run_queued(request_id)\"\
-  | answer-path[\"Paid answer path\\nsrc/rfp_assistant/service/service.py\"]\r\n \
-  \ answer-path -->|\"index, dense, transport\"| resources-owner\r\n  free-answers[\"\
-  Metadata and inventory answers\\nsrc/rfp_assistant/service/service.py\"] -->|\"\
-  reads index, no ledger\"| resources-owner\r\n  background-jobs[\"Drafting, evaluation,\
-  \ judges, maintenance\\nsrc/rfp_assistant/service/drafting.py\"] -->|\"borrow transport,\
-  \ joined on close\"| resources-owner\r\n  update-watch[\"Update fence UpdateWatch\\\
-  nsrc/rfp_assistant/service/update.py\"] -->|\"fence read at admission\"| resources-owner\r\
-  \n  verifier-traces[\"Frozen verifier runs\\nsrc/rfp_assistant/service/service.py\"\
-  ] -->|\"paid generate via submit_answer\"| request-runner"
+prev_diagram: "graph TD\r
+
+  \  resources-owner[\"Process owner
+  Resources\\nsrc/rfp_assistant/service/service.py\"] -->|\"creates on first
+  ask\"| request-runner[\"Bounded executor
+  RequestRunner\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  request-runner -->|\"run_queued(request_id)\"| answer-path[\"Paid answer
+  path\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  answer-path -->|\"index, dense, transport\"| resources-owner\r
+
+  \  free-answers[\"Metadata and inventory
+  answers\\nsrc/rfp_assistant/service/service.py\"] -->|\"reads index, no
+  ledger\"| resources-owner\r
+
+  \  background-jobs[\"Drafting, evaluation, judges,
+  maintenance\\nsrc/rfp_assistant/service/drafting.py\"] -->|\"borrow transport,
+  joined on close\"| resources-owner\r
+
+  \  update-watch[\"Update fence
+  UpdateWatch\\nsrc/rfp_assistant/service/update.py\"] -->|\"fence read at
+  admission\"| resources-owner\r
+
+  \  verifier-traces[\"Frozen verifier
+  runs\\nsrc/rfp_assistant/service/service.py\"] -->|\"paid generate via
+  submit_answer\"| request-runner"

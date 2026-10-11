@@ -1,0 +1,1 @@
+The transport and ledger together: only the gateway owner process dispatches, every attempt records its `billing_scope`, and reconciliation subtracts only attempts billed to the project it reconciles.

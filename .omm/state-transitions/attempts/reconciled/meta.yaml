@@ -1,9 +1,0 @@
-created: 2026-10-11T02:31:22.571Z
-updated: 2026-10-11T02:31:22.572Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: reconciled
-children: []
-parentPath:
-  - attempts

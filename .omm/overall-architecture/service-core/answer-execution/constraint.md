@@ -1,0 +1,1 @@
+A `_Stop` (cancelled or interrupted) never starts the next paid stage. Already dispatched calls still settle. Any other exception ends the request as `technical_error` instead of leaving it running.

@@ -1,1 +1,0 @@
-Each question resolves its scope through `KeywordIndex.served_extraction`, so it uses the extraction the activated index holds, not a newer `active_extraction_id`. It then retrieves with the activated configuration (see the retrieval nodes).

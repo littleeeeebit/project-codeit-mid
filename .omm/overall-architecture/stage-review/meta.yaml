@@ -1,9 +1,17 @@
 created: 2026-10-10 12:42:01.253000+00:00
-updated: 2026-10-10 12:42:01.907000+00:00
-update_count: 4
-last_field: constraint
+updated: 2026-10-11T03:31:38.960Z
+update_count: 6
+last_field: diagram
 kind: nested-class
 title: stage-review
 children:
-- review-worker
+  - coding-agent
+  - error-analysis
+  - paid-approval
+  - ref-worktrees
+  - review-runner
+  - review-screens
+  - review-server
+  - review-worker
+  - run-folders
 parentPath: []

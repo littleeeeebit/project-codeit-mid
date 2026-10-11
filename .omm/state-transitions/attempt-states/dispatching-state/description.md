@@ -1,0 +1,1 @@
+Set by `mark_dispatching` with `dispatched_at` immediately before the network call. A process that dies here leaves the attempt to `budget.recover`, which marks it `unknown`.

@@ -1,0 +1,1 @@
+Set exactly once by `settle` from reported usage and the attempt's own rates. An overrun above the reservation freezes all admission (`frozen_reason`).

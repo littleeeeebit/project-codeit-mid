@@ -1,0 +1,1 @@
+`run` freezes the inputs, runs each candidate in `run` or `estimate` mode, and records the candidate status, host and packages. A GPU-requiring candidate on a host without CUDA becomes `refused`.

@@ -1,1 +1,0 @@
-Written by `_finish` for `technical_error` and `clarification_required` (a ServiceError during execution), and by `_fail_unscheduled` when the executor refused the submit. The trace and result keep the error, truncated to 300 characters.

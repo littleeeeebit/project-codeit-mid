@@ -1,0 +1,1 @@
+Originals are never modified. A changed original hash refuses ingestion with 'rerun manifest'.

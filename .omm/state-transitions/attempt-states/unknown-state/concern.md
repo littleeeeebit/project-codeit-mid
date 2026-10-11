@@ -1,0 +1,1 @@
+This is the most disruptive state operationally: a single network timeout on any member's answer halts paid answering for the whole team until the owner reconciles it.

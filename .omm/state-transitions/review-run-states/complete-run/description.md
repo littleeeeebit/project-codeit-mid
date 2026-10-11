@@ -1,0 +1,1 @@
+`view.json` exists and the app lists the run. Decisions written by `write_decision` mark it decided (`decisions/<run-id>.json`). `rescore` may rewrite the view from stored outputs at any time.

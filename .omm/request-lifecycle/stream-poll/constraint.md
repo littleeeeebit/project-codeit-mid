@@ -1,0 +1,1 @@
+Only `request_status` delivers the validated outcome; streamed text is never treated as the answer.

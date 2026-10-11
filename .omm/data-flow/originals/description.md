@@ -1,1 +1,0 @@
-`ingestion.import_manifest` (CLI `manifest`) reads `RFP_SOURCE_DIR/data_list.csv` and `files/` into `documents` and `sources`. A doc_id comes from the filename, a source_hash from the bytes; byte-identical files share one source, and conflicting metadata stays visible. `resolve-metadata` records canonical values that filters and ranking then use.

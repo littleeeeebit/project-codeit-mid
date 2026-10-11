@@ -1,0 +1,1 @@
+An authentication error keeps only its type name (`_reason`), because the SDK message quotes part of the key.

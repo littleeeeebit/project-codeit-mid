@@ -1,0 +1,1 @@
+`requests` (input snapshot, trace, result) and `attempts` (reservation, usage, settlement) per question, plus Langfuse traces when configured. Evaluation answer runs and stage-review generation workers create the same rows under keys like `<run>:<finalist>:<question>:<n>`, which is how resumption detects billed but lost items.

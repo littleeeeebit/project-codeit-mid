@@ -1,0 +1,1 @@
+Span notes on generation-run answers (`annotations/<run>.jsonl`, validated against `view.json` answer text and the candidate's commit), then exported bundles, agent proposals, the person's decisions and versioned taxonomies. They flow into `release-report` as a non-gating section and into each candidate's summary in the review app.

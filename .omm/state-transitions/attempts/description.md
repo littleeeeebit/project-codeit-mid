@@ -1,1 +1,0 @@
-Lifecycle of a row in `attempts`, one per paid provider call. Reservations count against the cap as `pending` until they leave `reserved` or `dispatching`.

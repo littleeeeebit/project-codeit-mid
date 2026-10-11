@@ -1,0 +1,12 @@
+graph TD
+  hub-oauth["JupyterHub OAuth sign-in\nsrc/rfp_assistant/service/auth.py"]
+  session-gate["Session and origin gate\nsrc/rfp_assistant/api.py"]
+  member-keys["Per-member API keys\nsrc/rfp_assistant/service/service.py"]
+  paid-dispatch["Paid dispatch\nsrc/rfp_assistant/gateway/generation.py"]
+  worker-env["Worker secret stripping\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  owner-only-cli["Owner-only budget CLI\nsrc/rfp_assistant/cli.py"]
+  hub-oauth -->|allowed username session| session-gate
+  session-gate -->|bind_request contextvars| member-keys
+  member-keys -->|KEY_SESSION selects client| paid-dispatch
+  worker-env -->|key only after approval| paid-dispatch
+  owner-only-cli -->|paid on/off, reconcile| paid-dispatch

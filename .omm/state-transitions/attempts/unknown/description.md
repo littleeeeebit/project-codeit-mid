@@ -1,1 +1,0 @@
-Set by `mark_unknown` for timeouts, connection loss, 5xx, an exception during a stream, a missing usage report or a failed settlement, and by `recover` for attempts left in `dispatching`. While any exist, `set_paid_enabled(True)` refuses and every PostgreSQL dispatch is refused.

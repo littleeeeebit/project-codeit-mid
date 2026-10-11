@@ -1,0 +1,1 @@
+The code itself marks this as a known ceiling (`ponytail: one write mutex serializes admission/idempotency`). Per-account locks are the stated upgrade if measured throughput requires them. Short transactions keep it workable for six users; long work must never run inside one.

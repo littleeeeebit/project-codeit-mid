@@ -1,1 +1,0 @@
-Every approved candidate reported `complete`. `_score_paid` reads each candidate's spend from the ledger, scores the outputs (`score_generation` or `score_ocr`) and writes view.json, so the run appears in the review app. `rescore` re-runs this step without calls or payment.

@@ -1,0 +1,1 @@
+A history record with `op: reject` and no new types. Its ref becomes decided and its notes return to unassigned. The version bumps only if the rejected type had been accepted.

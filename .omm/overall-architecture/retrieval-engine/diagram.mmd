@@ -1,0 +1,15 @@
+graph TD
+  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  corpus-routing["Corpus routing and name-only\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  lexical-channel["Kiwi BM25 channel\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  query-embedding["Query vector cache\nsrc/rfp_assistant/retrieval/dense.py"]
+  dense-channel["Dense pgvector channel\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  fusion-rerank["Fusion and reranker\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  evidence-packer["Evidence packer\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  keyword-index -->|scope rows and title terms| corpus-routing
+  corpus-routing -->|allowed rows| lexical-channel
+  corpus-routing -->|allowed rows| dense-channel
+  query-embedding -->|unit query vector| dense-channel
+  lexical-channel -->|BM25 ranked rows| fusion-rerank
+  dense-channel -->|cosine ranked rows| fusion-rerank
+  fusion-rerank -->|final ranking| evidence-packer

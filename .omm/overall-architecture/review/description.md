@@ -1,1 +1,0 @@
-The stage review app compares a baseline git ref with candidate refs on identical frozen inputs. `stage_review.py` runs the stage; `review/server.py` (standard library only, loopback, a free port) shows the run folder and writes the person's decision and answer notes. The full flow is under `stage-review-loop`.

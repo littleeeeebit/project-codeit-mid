@@ -1,1 +1,0 @@
-The public repository `littleeeeebit/project-codeit-mid` (overridable with BIDMATE_UPDATE_REPO or BIDMATE_UPDATE_GITHUB_API for verification). At most two unauthenticated calls per 5-minute poll, within GitHub's 60-calls-per-hour limit.

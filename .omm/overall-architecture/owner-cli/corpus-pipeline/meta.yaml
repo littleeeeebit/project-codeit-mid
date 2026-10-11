@@ -1,0 +1,16 @@
+created: 2026-10-11T03:31:31.036Z
+updated: 2026-10-11T03:31:31.288Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: corpus-pipeline
+children:
+  - extraction-revision
+  - fidelity-check
+  - hwp-parsers
+  - image-ocr
+  - keyword-build
+  - manifest-import
+  - pdf-parser
+parentPath:
+  - owner-cli

@@ -1,8 +1,15 @@
 created: 2026-10-04 13:34:48.684000+00:00
-updated: 2026-10-10T12:42:01.138Z
-update_count: 19
-last_field: note
+updated: 2026-10-11T03:31:30.248Z
+update_count: 21
+last_field: diagram
 kind: nested-class
 title: owner-cli
-children: []
+children:
+  - answer-runs
+  - budget-admin
+  - command-dispatch
+  - comparison-matrices
+  - corpus-pipeline
+  - evaluation-selection
+  - maintenance-sequence
 parentPath: []

@@ -1,0 +1,1 @@
+The loader gives no picture positions, so documents parsed by the loader get no OCR image text.

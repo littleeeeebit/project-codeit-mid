@@ -1,9 +1,0 @@
-created: 2026-10-11T02:31:13.142Z
-updated: 2026-10-11T02:31:13.143Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: owner
-children: []
-parentPath:
-  - service

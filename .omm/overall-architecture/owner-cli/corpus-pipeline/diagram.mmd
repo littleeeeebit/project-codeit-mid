@@ -1,0 +1,16 @@
+graph TD
+  manifest-import["CSV manifest import\nsrc/rfp_assistant/corpus/ingestion.py"]
+  hwp-parsers["HWP walker and loader\nsrc/rfp_assistant/storage/hwp_loader.py"]
+  pdf-parser["PDF parser\nsrc/rfp_assistant/corpus/ingestion.py"]
+  image-ocr["Image OCR merge\nsrc/rfp_assistant/corpus/ocr.py"]
+  extraction-revision["Extraction revision\nsrc/rfp_assistant/corpus/ingestion.py"]
+  fidelity-check["HWP fidelity check\nsrc/rfp_assistant/corpus/fidelity.py"]
+  keyword-build["Keyword index build\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  manifest-import -->|sources by hash| hwp-parsers
+  manifest-import -->|sources by hash| pdf-parser
+  hwp-parsers -->|elements with picture markers| image-ocr
+  pdf-parser -->|elements around images| image-ocr
+  hwp-parsers -->|loader output, no OCR| extraction-revision
+  image-ocr -->|merged image_text elements| extraction-revision
+  extraction-revision -->|review reset on new output| fidelity-check
+  fidelity-check -->|review status filter| keyword-build

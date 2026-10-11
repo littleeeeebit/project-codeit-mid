@@ -1,0 +1,1 @@
+Not spending. Reached by a guard refusal (`stopped_before_dispatch:<reason>`), `provider_unavailable` (no key), a confirmed pre-execution `ProviderError`, or startup recovery of never-dispatched reservations.
