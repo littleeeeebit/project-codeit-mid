@@ -468,8 +468,7 @@ def access(ctx: Context) -> dict:
 def question_modes(ctx: Context) -> dict:
     return {"answer-modes": ctx.unit("mode-tests", ["tests.test_service.ModesTest", "tests.test_service.SearchFilterTest",
                                                     "tests.test_generation.AnswerFlowTest"]),
-            "sources-and-exports": ctx.unit("source-tests", ["tests.test_service.SourceAndExportTest",
-                                                             "tests.test_generation.SafetyTest"]),
+            "sources-and-exports": ctx.unit("source-tests", ["tests.test_service.SourceAndExportTest", "tests.test_generation.SafetyTest"]),
             "metadata-listing": ctx.unit("metadata-tests", ["tests.test_metadata_query", "tests.test_whole_corpus"])}
 
 
