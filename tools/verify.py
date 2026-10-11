@@ -469,7 +469,8 @@ def question_modes(ctx: Context) -> dict:
     return {"answer-modes": ctx.unit("mode-tests", ["tests.test_service.ModesTest", "tests.test_service.SearchFilterTest",
                                                     "tests.test_generation.AnswerFlowTest"]),
             "sources-and-exports": ctx.unit("source-tests", ["tests.test_service.SourceAndExportTest",
-                                                             "tests.test_generation.SafetyTest"])}
+                                                             "tests.test_generation.SafetyTest"]),
+            "metadata-listing": ctx.unit("metadata-tests", ["tests.test_metadata_query", "tests.test_whole_corpus"])}
 
 
 @flow("request-lifecycle")
@@ -569,7 +570,7 @@ def repository_gates(ctx: Context) -> dict:
     suite = (code == 0, unittest_summary(out, code))
     npm = shutil.which("npm")
     web = []
-    for script in ("lint", "typecheck"):
+    for script in ("lint", "typecheck", "test"):
         code, out = ctx.run(f"web-{script}", [npm, "run", script], 600, cwd=REPO / "web") if npm else (-1, "")
         web.append(f"{script} exit {code}" + (f": {out.strip()[-200:]}" if code else ""))
     checks = (bool(npm) and all(w.endswith("exit 0") for w in web), "; ".join(web) if npm else "npm is not on PATH")

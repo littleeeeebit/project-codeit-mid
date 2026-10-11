@@ -164,25 +164,28 @@ _SMALL = {"천": 1000, "백": 100, "십": 10}
 
 def parse_krw(text: str) -> int | None:
     """A Korean amount as an integer number of won: "1억 2천만원" -> 120000000, "5천만" -> 50000000,
-    "50,000,000원" -> 50000000, "3.5억" -> 350000000. None for anything else (no guess)."""
+    "50,000,000원" -> 50000000, "3.5억" -> 350000000. A written unit keeps the tail in won ("1억 5000원" ->
+    100005000) and a written zero stays zero ("0억원" -> 0). None for anything else (no guess)."""
     # ponytail: Arabic digits with 조/억/만/천/백/십; spelled-out numerals (일, 이, 삼) are refused, not read
-    s = re.sub(r"[\s,]", "", nfc(str(text))).removesuffix("원").removesuffix("KRW")
+    s = re.sub(r"[\s,]", "", nfc(str(text)))
+    stripped = s.removesuffix("원").removesuffix("KRW")
+    in_won, s = stripped != s, stripped
     if not s or "".join(m.group(0) for m in _KRW_TOKEN.finditer(s)) != s:
         return None
-    total, section, num, last = Decimal(0), Decimal(0), None, None
+    total, section, num, written, last = Decimal(0), Decimal(0), None, False, None
     try:
         for digits, big, small in _KRW_TOKEN.findall(s):
             if digits:
-                num = Decimal(digits)
+                num, written = Decimal(digits), True
             elif small:
                 section += (num if num is not None else 1) * _SMALL[small]
-                num = None
-            else:
+                num, written = None, True
+            else:  # a bare 억 is one 억; a written coefficient, zero included, is taken as written
                 section += num or 0
-                total += (section or 1) * _BIG[big]
-                section, num, last = Decimal(0), None, big
+                total += (section if written else 1) * _BIG[big]
+                section, num, written, last = Decimal(0), None, False, big
         tail = section + (num or 0)
-        if last == "억" and 0 < tail < 10 ** 4:  # "1억 5천" and "1억 5000" are spoken for 1억 5천만
+        if last == "억" and not in_won and 0 < tail < 10 ** 4:  # "1억 5천" and "1억 5000" are spoken for 1억 5천만
             tail *= 10 ** 4
         total += tail
     except InvalidOperation:
