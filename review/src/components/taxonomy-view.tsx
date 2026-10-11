@@ -3,14 +3,23 @@
 // Who comes here: the person who wrote notes on answers. What for: turn those notes into named failure types they
 // agree with. The coding agent groups the notes from an exported bundle (this app never calls a model); each type it
 // proposes stands on the person's own notes, and the person accepts, renames, merges, splits or rejects it here.
+// For an accepted type the agent can also search every stored answer for more cases; the person approves or rejects
+// each suggestion in the type's queue, and approved ones are counted apart from the cases the person found.
 
-import { useEffect, useState } from "react";
-import type { Exported, FailureType, Taxonomy, TaxNote } from "@/lib/api";
+import { useCallback, useEffect, useState } from "react";
+import type { Exported, FailureType, SuggestExported, Suggestion, SuggestionQueue, Taxonomy, TaxNote } from "@/lib/api";
 import { getJson, postJson, when } from "@/lib/api";
 import { Badge } from "./ui";
 
 type Decide = (body: Record<string, unknown>) => Promise<void>;
 const keyOf = (t: FailureType) => (t.ref ?? t.id)!;
+const NOT_ALL = "AI 제안은 모든 사례를 찾지 못합니다. 승인한 사례는 사람이 찾은 사례와 따로 세고, 검토한 답변 대비 비율에 넣지 않습니다.";
+/** Which part of the answer a span lies in, as the answer shows it. */
+const part = (field: string) => {
+  const [kind, i] = field.split(".");
+  return ({ summary: "요약", next_action: "다음 조치", claim: `주장 ${Number(i) + 1}`, conflict: "근거 충돌 값",
+            missing: "빠진 항목" } as Record<string, string>)[kind] ?? field;
+};
 const OP: Record<string, string> = { accept: "수락", rename: "이름 바꿈", merge: "합침", split: "나눔", reject: "버림" };
 
 export function TaxonomyView() {
@@ -18,9 +27,10 @@ export function TaxonomyView() {
   const [error, setError] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     getJson<Taxonomy>("/api/taxonomy").then(setState).catch((e: Error) => setError(`유형을 읽지 못했습니다: ${e.message}`));
   }, []);
+  useEffect(load, [load]);
 
   const decide: Decide = async (body) => {
     setError("");
@@ -41,7 +51,8 @@ export function TaxonomyView() {
       <h1 className="text-[24px] font-bold">실패 유형</h1>
       <p className="mt-1 max-w-[760px] text-[14px] text-muted">
         답변에 단 메모를 코딩 에이전트가 묶어 제안하면, 유형마다 받아들이거나 이름을 고치거나 합치고 나누고 버립니다.
-        에이전트는 메모를 묶기만 하고, 메모 없는 유형은 제안할 수 없습니다.
+        에이전트는 메모를 묶기만 하고, 메모 없는 유형은 제안할 수 없습니다. 수락한 유형은 에이전트에게 저장된 모든 답변에서
+        비슷한 사례를 찾게 하고, 제안을 하나씩 승인하거나 거절합니다.
       </p>
       <p className="mt-4 text-[18px] font-semibold tabular-nums">
         수락된 유형 {state.accepted.length}개 <span className="text-muted">· v{state.version}</span>
@@ -69,7 +80,8 @@ export function TaxonomyView() {
         ) : (
           <ol className="divide-y divide-line">
             {state.accepted.map((t) => (
-              <TypeRow key={keyOf(t)} t={t} pending={false} picked={picked.includes(keyOf(t))} onPick={pick} decide={decide} />
+              <TypeRow key={keyOf(t)} t={t} pending={false} picked={picked.includes(keyOf(t))} onPick={pick} decide={decide}
+                       reload={load} />
             ))}
           </ol>
         )}
@@ -140,10 +152,12 @@ function ExportPrompt({ unassigned }: { unassigned: number }) {
   );
 }
 
-function TypeRow({ t, pending, picked, onPick, decide }: {
+function TypeRow({ t, pending, picked, onPick, decide, reload }: {
   t: FailureType; pending: boolean; picked: boolean; onPick: (k: string, on: boolean) => void; decide: Decide;
+  reload?: () => void;
 }) {
   const [mode, setMode] = useState<"" | "edit" | "split">("");
+  const [queue, setQueue] = useState(false);
   const ref = keyOf(t);
   const quiet = "h-9 rounded-[10px] px-3 text-[14px] font-semibold hover:bg-surface";
   return (
@@ -154,7 +168,9 @@ function TypeRow({ t, pending, picked, onPick, decide }: {
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h3 className="text-[20px] font-bold">{t.name}</h3>
           <span className="text-[14px] tabular-nums text-muted">
-            답변 {t.answers}개 · 메모 {t.notes.length}개{t.deleted > 0 && ` · 지워진 메모 ${t.deleted}개`}
+            사람이 찾은 답변 <b className="text-ink">{t.answers}</b>개
+            {t.ai_answers > 0 && <> · <span className="text-primary">AI 제안 승인 <b>{t.ai_answers}</b>개</span></>}
+            {" "}· 메모 {t.notes.length}개{t.deleted > 0 && ` · 지워진 메모 ${t.deleted}개`}
           </span>
           {!pending && t.answers < 3 && <Badge tone="warn">사례 3개 미만</Badge>}
         </div>
@@ -182,9 +198,132 @@ function TypeRow({ t, pending, picked, onPick, decide }: {
               const reason = window.prompt(pending ? "이 제안을 버리는 이유 (비워도 됩니다)" : "이 유형을 버리는 이유 (비워도 됩니다). 메모는 다시 묶을 수 있게 남습니다.");
               if (reason !== null) decide({ op: "reject", ref, reason }).catch(() => undefined);
             }}>버리기</button>
+            {!pending && (t.suggested ?? 0) > 0 && (
+              <button type="button" aria-expanded={queue} onClick={() => setQueue((q) => !q)}
+                      className="h-9 rounded-[10px] bg-primary-bg px-3 text-[14px] font-semibold text-primary">
+                AI 제안 {t.suggested}개 검토
+              </button>
+            )}
           </div>
         )}
+        {mode === "" && !pending && <SuggestPrompt id={ref} />}
+        {queue && !pending && <Queue id={ref} onChanged={() => reload?.()} />}
       </div>
+    </li>
+  );
+}
+
+/** Writes one type's search bundle (definition, approved and rejected examples, every stored answer) and copies the
+ *  sentence that sends the coding agent to it. */
+function SuggestPrompt({ id }: { id: string }) {
+  const [out, setOut] = useState<SuggestExported | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState("");
+  async function run() {
+    setError("");
+    setCopied(false);
+    try {
+      const made = await postJson<SuggestExported>("/api/taxonomy/suggest-export", JSON.stringify({ type: id }));
+      setOut(made);
+      await navigator.clipboard.writeText(made.prompt).then(() => setCopied(true), () => undefined);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  return (
+    <div className="mt-3 max-w-[860px]">
+      <button type="button" onClick={run} className="text-[14px] font-semibold text-primary hover:underline">
+        비슷한 사례 찾기 프롬프트 복사
+      </button>
+      {out && (
+        <div className="mt-2 rounded-[10px] bg-ok-bg px-4 py-3">
+          <div className="text-[15px] font-semibold text-ok">
+            {copied ? "복사했습니다" : "아래 문장을 복사하세요"} · 저장된 답변 {out.answers}개를 찾게 합니다
+          </div>
+          <p className="mt-1 select-all break-words text-[14px]">{out.prompt}</p>
+          <p className="mt-1 text-[13px] text-muted">에이전트가 제안을 넣으면 이 화면을 새로 고치세요. {NOT_ALL}</p>
+        </div>
+      )}
+      {error && <p role="alert" className="mt-2 text-[14px] text-bad">{error}</p>}
+    </div>
+  );
+}
+
+/** The type's waiting suggestions, each highlighted in its stored answer with the agent's reason. Approving files
+ *  the span as a note under the type; rejecting keeps it, with the reason, for the agent's next search. */
+function Queue({ id, onChanged }: { id: string; onChanged: () => void }) {
+  const [q, setQ] = useState<SuggestionQueue | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    getJson<SuggestionQueue>(`/api/taxonomy/suggestions/${id}`).then(setQ).catch((e: Error) => setError(e.message));
+  }, [id]);
+  async function decide(body: Record<string, unknown>) {
+    setError("");
+    try {
+      setQ(await postJson<SuggestionQueue>("/api/taxonomy/suggestions/decide", JSON.stringify(body)));
+      onChanged();
+    } catch (e) {
+      setError(`저장하지 못했습니다: ${(e as Error).message}`);
+    }
+  }
+  if (!q) return error ? <p role="alert" className="mt-3 text-bad">{error}</p> : <p className="mt-3 text-muted">불러오는 중…</p>;
+  return (
+    <section aria-label={`${q.type.name} AI 제안`} className="mt-4 max-w-[900px] rounded-[10px] border border-line px-5 py-4">
+      <h4 className="text-[16px] font-bold">AI 제안 {q.pending.length}개 남음
+        <span className="ml-2 text-[14px] font-normal text-muted">승인 {q.approved} · 거절 {q.rejected.length}</span>
+      </h4>
+      <p className="text-[13px] text-muted">{NOT_ALL}</p>
+      {error && <p role="alert" className="mt-2 text-[14px] text-bad">{error}</p>}
+      {q.pending.length === 0 && <p className="mt-3 text-[15px] text-muted">남은 제안이 없습니다.</p>}
+      <ol className="mt-2 divide-y divide-line">
+        {q.pending.map((s) => <SuggestionItem key={s.id} s={s} decide={decide} />)}
+      </ol>
+      {q.rejected.length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-[14px] font-semibold">거절한 제안 {q.rejected.length}개 · 다음에 에이전트에게 함께 보냅니다</summary>
+          <ul className="mt-1 text-[14px]">
+            {q.rejected.map((s) => (
+              <li key={s.id} className="py-1">“{s.text}”<span className="text-muted"> — {s.reason_rejected ?? "이유 없음"} · {s.decided_by}</span></li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
+function SuggestionItem({ s, decide }: { s: Suggestion; decide: (body: Record<string, unknown>) => Promise<void> }) {
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
+  const chars = Array.from(s.field_text ?? "");  // offsets count code points, as Python does
+  return (
+    <li className="py-4">
+      <p className="text-[13px] text-muted">{s.question_text ?? s.question} · {s.candidate_label} · {part(s.field)}</p>
+      <p className="mt-1 whitespace-pre-line break-words text-[16px] leading-relaxed">
+        {s.field_text != null ? (
+          <>{chars.slice(0, s.start).join("")}
+            <mark className="rounded-sm bg-primary-bg px-0.5 text-inherit underline decoration-primary decoration-dashed decoration-2 underline-offset-4">
+              {chars.slice(s.start, s.end).join("")}
+            </mark>{chars.slice(s.end).join("")}</>
+        ) : <mark className="bg-primary-bg">{s.text}</mark>}
+      </p>
+      <p className="mt-1 text-[15px]"><span className="font-semibold text-primary">AI</span> {s.reason}</p>
+      {rejecting ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <input value={reason} onChange={(e) => setReason(e.target.value)} autoFocus placeholder="거절 이유 (비워도 됩니다)"
+                 aria-label="거절 이유" className="h-9 w-[420px] max-w-full rounded-[10px] border border-line px-3 text-[14px] focus:border-primary" />
+          <button type="button" onClick={() => decide({ op: "reject", suggestion: s.id, reason })}
+                  className="h-9 rounded-[10px] bg-bad px-4 text-[14px] font-semibold text-white">거절</button>
+          <button type="button" onClick={() => setRejecting(false)} className="h-9 rounded-[10px] px-3 text-[14px] font-semibold hover:bg-surface">취소</button>
+        </div>
+      ) : (
+        <div className="mt-2 flex items-center gap-1">
+          <button type="button" onClick={() => decide({ op: "approve", suggestion: s.id })}
+                  className="h-9 rounded-[10px] bg-primary px-4 text-[14px] font-semibold text-white">승인</button>
+          <button type="button" onClick={() => setRejecting(true)}
+                  className="h-9 rounded-[10px] px-3 text-[14px] font-semibold text-bad hover:bg-surface">거절…</button>
+        </div>
+      )}
     </li>
   );
 }
@@ -197,9 +336,10 @@ function Spans({ notes }: { notes: TaxNote[] }) {
     <ul className="mt-3 flex max-w-[860px] flex-col gap-3">
       {shown.map((n) => (
         <li key={n.id}>
-          <blockquote className="border-l-[3px] border-bad pl-3 text-[15px]">“{n.text}”</blockquote>
+          <blockquote className={`border-l-[3px] pl-3 text-[15px] ${n.origin ? "border-primary" : "border-bad"}`}>“{n.text}”</blockquote>
           <p className="pl-3.5 text-[15px] font-medium">{n.note}</p>
           <p className="pl-3.5 text-[13px] text-muted">
+            {n.origin && <b className="text-primary">AI 제안 · {n.approved_by} 승인 · </b>}
             {n.question_text ?? n.question} · {n.candidate_label} · {n.edited_by ?? n.author}
           </p>
         </li>

@@ -83,7 +83,8 @@ export default function Page() {
       <main className="min-w-0 flex-1 px-10 pb-24 pt-8">
         {message && <p role="alert" className="mb-4 rounded-[10px] bg-bad-bg px-4 py-3 text-[14px] text-bad">{message}</p>}
         {screen === "taxonomy" && <TaxonomyView />}
-        {screen === "progress" && <ProgressView openTaxonomy={() => setScreen("taxonomy")} />}
+        {screen === "progress" && <ProgressView openTaxonomy={() => setScreen("taxonomy")}
+                                                openRun={(id) => { setSelected(id); setScreen("run"); }} />}
         {screen === "run" && runs && runs.length === 0 && <EmptyState />}
         {screen === "run" && current && view && (
           <>

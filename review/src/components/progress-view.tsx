@@ -11,7 +11,7 @@ import { Badge, Metric, Metrics, Segmented } from "./ui";
 
 const WINDOWS = ["10", "20", "50"] as const;
 
-export function ProgressView({ openTaxonomy }: { openTaxonomy: () => void }) {
+export function ProgressView({ openTaxonomy, openRun }: { openTaxonomy: () => void; openRun: (id: string) => void }) {
   const [last, setLast] = useState<(typeof WINDOWS)[number]>("20");
   const [p, setP] = useState<Progress | null>(null);
   const [error, setError] = useState("");
@@ -32,7 +32,8 @@ export function ProgressView({ openTaxonomy }: { openTaxonomy: () => void }) {
       <h1 className="text-[24px] font-bold">오류 분석 진행</h1>
       <p className="mt-1 max-w-[760px] text-[14px] text-muted">
         수락된 유형마다 그 유형 메모가 달린 답변 수를 사람이 검토한 답변 수로 나눕니다. 다음에 고칠 것을 고르는 근거이고,
-        릴리스 기준이나 봉인된 평가 수치가 아닙니다.
+        릴리스 기준이나 봉인된 평가 수치가 아닙니다. AI가 제안하고 승인한 사례는 따로 보이며 비율에 넣지 않습니다. AI 제안은
+        모든 사례를 찾지 못합니다.
       </p>
 
       <Metrics>
@@ -41,7 +42,16 @@ export function ProgressView({ openTaxonomy }: { openTaxonomy: () => void }) {
         <Metric value={p.new_in_last} label={`최근 ${p.last}개 검토 답변에서 처음 나온 유형`}
                 tone={p.new_in_last > 0 ? "text-warn" : ""} />
         <Metric value={thin} label={`사례 ${p.thin}개 미만 유형`} tone={thin ? "text-warn" : ""} />
+        <Metric value={p.rereview} label="기준 추가 후 다시 볼 답변" tone={p.rereview ? "text-warn" : ""} />
       </Metrics>
+      {p.rereview > 0 && (
+        <p className="mt-3 text-[15px]">
+          &apos;문제 없음&apos;으로 표시한 뒤에 유형이 생긴 답변 {p.rereview}개가 남았습니다. 실행을 열고 &apos;다시 볼 답변&apos;에서 봅니다:{" "}
+          {p.rereview_runs.map((r) => (
+            <button key={r} type="button" onClick={() => openRun(r)} className="mr-2 font-semibold text-primary hover:underline">{r}</button>
+          ))}
+        </p>
+      )}
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <span className="text-[14px] text-muted">최근 몇 개를 볼까요</span>
         <Segmented value={last} onChange={setLast} options={WINDOWS.map((w) => [w, `${w}개`])} />
@@ -71,10 +81,19 @@ export function ProgressView({ openTaxonomy }: { openTaxonomy: () => void }) {
                   </div>
                   <p className="mt-1 text-[14px] text-muted">{t.definition}</p>
                 </div>
-                <div className="flex items-center gap-2 text-right">
-                  {t.thin && <Badge tone="warn">사례 {p.thin}개 미만</Badge>}
-                  <span className="text-[18px] font-bold tabular-nums">{t.answers}</span>
-                  <span className="text-[14px] tabular-nums text-muted">/ {p.reviewed} 답변</span>
+                <div className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    {t.thin && <Badge tone="warn">사례 {p.thin}개 미만</Badge>}
+                    <span className="text-[18px] font-bold tabular-nums">{t.answers}</span>
+                    <span className="text-[14px] tabular-nums text-muted">/ {p.reviewed} 답변 (사람이 찾음)</span>
+                  </div>
+                  {(t.ai_answers > 0 || t.rereview > 0) && (
+                    <div className="text-[13px] tabular-nums">
+                      {t.ai_answers > 0 && <span className="text-primary">AI 제안 승인 +{t.ai_answers}</span>}
+                      {t.ai_answers > 0 && t.rereview > 0 && " · "}
+                      {t.rereview > 0 && <span className="text-warn">다시 볼 답변 {t.rereview}</span>}
+                    </div>
+                  )}
                 </div>
               </li>
             ))}

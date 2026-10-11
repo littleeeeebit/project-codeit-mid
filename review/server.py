@@ -5,8 +5,9 @@
 
 Standard library only, so a machine without the project's Python environment can still view imported runs. It reads
 run folders, imports and exports them as zip files, writes decision files and answer notes, and records the person's
-decisions on failure types grouped from those notes (src/rfp_assistant/evaluation/error_analysis.py, also standard
-library only; the coding agent does the grouping from an exported bundle). It never runs a pipeline, loads a model
+decisions on failure types grouped from those notes and on further cases of them the agent suggests
+(src/rfp_assistant/evaluation/error_analysis.py, also standard library only; the coding agent does the grouping and
+the searching from an exported bundle). It never runs a pipeline, loads a model
 or calls a paid service; runs come from `python -m rfp_assistant.cli stage-review run ...`, and a paid run (generation,
 ocr) appears here only after its approved estimate was paid (`stage-review resume`).
 """
@@ -39,7 +40,7 @@ REPO = APP.parent
 sys.path.insert(0, str(REPO / "src"))
 from rfp_assistant.evaluation import error_analysis as ea  # noqa: E402
 from rfp_assistant.evaluation.error_analysis import (  # noqa: E402
-    ReviewInputError, annotation_state, annotations_file, read_annotations, write_lock)
+    ANNOTATION_SCHEMA, ReviewInputError, annotation_state, annotations_file, field_text, read_annotations, write_lock)
 
 OUT = APP / "out"
 RUN_SCHEMA = "review-run-1"
@@ -224,33 +225,15 @@ def import_run(root: Path, data: bytes) -> str:
 # A person's notes on spans of generated answers, and which answers they read and found fine. One append-only JSONL
 # file per run under <data>/review/annotations, outside the run folder and outside git: an edit or a deletion is a
 # new record naming the note it changes, so the history of every note stays readable to the agent that fixes it.
-# Reading and folding the store lives in error_analysis, which groups the notes into failure types.
+# Reading and folding the store lives in error_analysis, which groups the notes into failure types and writes the
+# notes a person approves from the agent's suggestions (origin ai_suggested); this app's own notes never carry one.
 
-ANNOTATION_SCHEMA = "review-annotation-1"
 ANNOTATIONS_IN_ZIP = "annotations.jsonl"
-FIELD = re.compile(r"^(summary|next_action|claim\.(\d+)|conflict\.(\d+)\.(\d+)|missing\.(\d+))$")
 OPS = ("note", "edit", "delete", "reviewed")
 
 
 def _append(root: Path, run_id: str, records: list[dict]) -> None:
     ea.append_jsonl(annotations_file(root, run_id), records)
-
-
-def field_text(answer: dict, field: str) -> str | None:
-    """The stored answer text a span lies in: what the app renders for that field, character for character."""
-    m = FIELD.match(field or "")
-    try:
-        if not m:
-            return None
-        if field in ("summary", "next_action"):
-            return answer.get(field)
-        if m.group(2):
-            return answer["claims"][int(m.group(2))]["text"]
-        if m.group(3):
-            return answer["conflicts"][int(m.group(3))]["alternatives"][int(m.group(4))]["value"]
-        return answer["missing"][int(m.group(5))]["field"]
-    except (KeyError, IndexError, TypeError):
-        return None
 
 
 def _answer(view: dict, question: str, candidate: str) -> dict:
@@ -288,6 +271,8 @@ def check_annotations(view: dict, records: list[dict]) -> None:
                 raise ReviewInputError("the offsets do not select that text in the stored answer")
             if not str(r.get("note") or "").strip():
                 raise ReviewInputError("write what is wrong with the selected text")
+            if r.get("origin") not in (None, ea.AI) or (r.get("origin") and not r.get("approved_by")):
+                raise ReviewInputError("a suggested note names who approved it")
             notes.add(r["id"])
         elif r["op"] in ("edit", "delete"):
             if r.get("target") not in notes:
@@ -534,7 +519,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, export_run(self.root, parts[2]), "application/zip",
                                   {"Content-Disposition": f'attachment; filename="{parts[2]}.zip"'})
             if len(parts) == 4 and parts[3] == "annotations":
-                return self._json(200, annotation_state(read_annotations(self.root, folder.name)))
+                return self._json(200, self._notes(annotation_state(read_annotations(self.root, folder.name)),
+                                                   folder.name))
             if len(parts) == 4 and parts[3] == "failure-types":
                 return self._json(200, ea.run_counts(self.root, folder.name))
             if len(parts) == 4 and parts[3] == "decision":
@@ -546,7 +532,22 @@ class Handler(BaseHTTPRequestHandler):
         if parts == ["api", "taxonomy", "progress"]:
             last = re.search(r"[?&]last=(\d{1,4})\b", self.path)
             return self._json(200, ea.progress(self.root, int(last.group(1)) if last else 20))
+        if len(parts) == 4 and parts[:3] == ["api", "taxonomy", "suggestions"]:
+            return self._json(200, ea.suggestion_queue(self.root, parts[3]))
         self._static(path)
+
+    def _notes(self, state: dict, run_id: str) -> dict:
+        """A run's note snapshot with the answers marked fine before a type that wait for a second look."""
+        return {**state, "rereview": ea.rereview(self.root, run_id)}
+
+    def _object(self, what: str) -> dict:
+        try:
+            body = json.loads(self._body(1024 ** 2))
+        except ValueError:
+            raise ReviewInputError(f"the {what} is not JSON") from None
+        if not isinstance(body, dict):
+            raise ReviewInputError(f"the {what} is not a JSON object")
+        return body
 
     def _post(self) -> None:
         parts = [p for p in self.path.split("?", 1)[0].split("/") if p]
@@ -562,23 +563,16 @@ class Handler(BaseHTTPRequestHandler):
                                                   body.get("notes") or {}))
         if len(parts) == 4 and parts[:2] == ["api", "runs"] and parts[3] == "annotations":
             view = read_view(self.root, parts[2])
-            try:
-                body = json.loads(self._body(1024 ** 2))
-            except ValueError:
-                raise ReviewInputError("the note is not JSON") from None
-            if not isinstance(body, dict):
-                raise ReviewInputError("the note is not a JSON object")
-            return self._json(200, add_annotation(self.root, view, body, git_author()))
+            return self._json(200, self._notes(add_annotation(self.root, view, self._object("note"), git_author()),
+                                               view["run_id"]))
         if parts == ["api", "taxonomy", "export"]:
             return self._json(200, ea.export(self.root))
         if parts == ["api", "taxonomy", "decide"]:
-            try:
-                body = json.loads(self._body(1024 ** 2))
-            except ValueError:
-                raise ReviewInputError("the decision is not JSON") from None
-            if not isinstance(body, dict):
-                raise ReviewInputError("the decision is not a JSON object")
-            return self._json(200, ea.decide(self.root, body, git_author()))
+            return self._json(200, ea.decide(self.root, self._object("decision"), git_author()))
+        if parts == ["api", "taxonomy", "suggest-export"]:
+            return self._json(200, ea.suggest_export(self.root, str(self._object("request").get("type"))))
+        if parts == ["api", "taxonomy", "suggestions", "decide"]:
+            return self._json(200, ea.decide_suggestion(self.root, self._object("decision"), git_author()))
         raise FileNotFoundError(self.path)
 
     def _static(self, path: str) -> None:
