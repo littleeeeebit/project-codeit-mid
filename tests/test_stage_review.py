@@ -5,7 +5,10 @@ import importlib.util
 import io
 import json
 import os
+import subprocess
+import sys
 import tempfile
+import time
 import unittest
 import uuid
 import xml.etree.ElementTree as ET
@@ -745,6 +748,62 @@ class AnnotationStoreTest(unittest.TestCase):
             with self.assertRaisesRegex(server.ReviewInputError, "share the id"):
                 server.import_run(root / "other", reused.getvalue())
             self.assertFalse(installed(root / "other"))
+
+    def test_two_server_processes_never_lose_each_others_notes(self):
+        """Two launchers may serve one data folder. Writer A pauses right after reading the store; writer B, in
+        another process, must wait for A instead of reading the same bytes and replacing A's note."""
+        writer = """
+import importlib.util, json, sys, time
+from pathlib import Path
+server_py, root, name, start, text = sys.argv[1], Path(sys.argv[2]), sys.argv[3], int(sys.argv[4]), sys.argv[5]
+spec = importlib.util.spec_from_file_location("review_server", server_py)
+server = importlib.util.module_from_spec(spec); spec.loader.exec_module(server)
+read = Path.read_bytes
+def paused(self):
+    data = read(self)
+    if self.suffix == ".jsonl":
+        (root / f"read-{name}").touch()
+        while not (root / f"go-{name}").exists():
+            time.sleep(0.02)
+    return data
+Path.read_bytes = paused
+view = json.loads(next((root / "review" / "runs").iterdir()).joinpath("view.json").read_text(encoding="utf-8"))
+server.add_annotation(root, view, {"op": "note", "question": "q1", "candidate": "base", "field": "summary",
+                                   "start": start, "end": start + len(text), "text": text, "note": name}, name)
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            view = generation_run(root)
+            server.add_annotation(root, view, {"op": "reviewed", "question": "q1", "candidate": "c1", "value": True}, "x")
+            (root / "writer.py").write_text(writer, encoding="utf-8")
+
+            def start(name, at, text):
+                return subprocess.Popen([sys.executable, "-B", str(root / "writer.py"), str(SERVER), tmp, name, str(at),
+                                         text])
+
+            def wait_for(path):
+                deadline = time.monotonic() + 30
+                while not path.exists():
+                    self.assertLess(time.monotonic(), deadline, f"{path.name} never appeared")
+                    time.sleep(0.02)
+
+            (root / "go-B").touch()
+            writers = [start("A", 0, "보안확약서")]
+            try:
+                wait_for(root / "read-A")
+                writers.append(start("B", 14, "그리고 반환"))
+                time.sleep(2)
+                self.assertFalse((root / "read-B").exists())  # B waits for A's whole write, not just its replace
+                (root / "go-A").touch()
+                self.assertEqual([w.wait(30) for w in writers], [0, 0])
+            finally:  # a failure must not leave a writer paused forever
+                (root / "go-A").touch()
+                for w in writers:
+                    if w.poll() is None:
+                        w.kill()
+                    w.wait(30)
+            state = server.annotation_state(server.read_annotations(root, view["run_id"]))
+            self.assertEqual((sorted(n["note"] for n in state["notes"]), len(state["reviewed"])), (["A", "B"], 1))
 
 
 if __name__ == "__main__":

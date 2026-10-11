@@ -12,6 +12,7 @@ ocr) appears here only after its approved estimate was paid (`stage-review resum
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import io
 import json
@@ -203,14 +204,50 @@ def import_run(root: Path, data: bytes) -> str:
             {"imported_at": datetime.now(timezone.utc).isoformat()}), encoding="utf-8")
         # The notes go into the store before the run is installed: a failure here leaves no run behind, and a run
         # that then fails to install is imported again with its notes recognised as already stored.
-        with ANNOTATION_LOCK:
+        with write_lock(root):
+            if target.exists():  # again under the lock: another server may have imported it meanwhile
+                raise ReviewInputError(f"{run_id} is already here")
             existing = read_annotations(root, run_id)
             have = {r["id"]: r for r in existing}
             new = [r for r in carried if have.get(r["id"]) != r]
             check_annotations(view, existing + new)
             _append(root, run_id, new)
-        (Path(tmp) / run_id).rename(target)
+            (Path(tmp) / run_id).rename(target)
     return run_id
+
+
+@contextlib.contextmanager
+def write_lock(root: Path):
+    """Every write under <data>/review: one at a time across threads and across processes, since the launcher may
+    start a second server on another port over the same data folder. An OS lock on a file, released by the OS if
+    the process dies, held around a whole read-check-write."""
+    path = root / "review" / ".write.lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with WRITE_LOCK, path.open("a+b") as f:
+        if os.name == "nt":
+            import msvcrt
+            f.seek(0)
+            while True:
+                try:
+                    msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)  # retries for 10 s, then raises: wait again
+                    break
+                except OSError:
+                    continue
+            try:
+                yield
+            finally:
+                f.seek(0)
+                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(f, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
+
+
+WRITE_LOCK = threading.Lock()
 
 
 # ---------------------------------------------------------------- annotations
@@ -221,7 +258,6 @@ def import_run(root: Path, data: bytes) -> str:
 
 ANNOTATION_SCHEMA = "review-annotation-1"
 ANNOTATIONS_IN_ZIP = "annotations.jsonl"
-ANNOTATION_LOCK = threading.Lock()
 FIELD = re.compile(r"^(summary|next_action|claim\.(\d+)|conflict\.(\d+)\.(\d+)|missing\.(\d+))$")
 OPS = ("note", "edit", "delete", "reviewed")
 
@@ -352,7 +388,7 @@ def add_annotation(root: Path, view: dict, body: dict, author: str) -> dict:
             record["note"] = str(body.get("note") or "").strip()
     elif op == "reviewed":
         record["value"] = body.get("value")
-    with ANNOTATION_LOCK:
+    with write_lock(root):
         existing = read_annotations(root, view["run_id"])
         check_annotations(view, existing + [record])
         _append(root, view["run_id"], [record])
@@ -417,9 +453,11 @@ def write_decision(root: Path, view: dict, chosen: str | None, reasons: dict, no
     folder = decisions_dir(root)
     folder.mkdir(parents=True, exist_ok=True)
     md, js = folder / f"{view['run_id']}.md", folder / f"{view['run_id']}.json"
-    # The .json marks the run decided in the list, so it is written last: a failed .md never shows as decided.
-    md.write_text(decision_markdown(record, runs_dir(root) / view["run_id"]), encoding="utf-8")
-    js.write_text(json.dumps(record, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    # The .json marks the run decided in the list, so it is written last: a failed .md never shows as decided. Both
+    # under the write lock, so two servers saving at once never leave one's .md beside the other's .json.
+    with write_lock(root):
+        md.write_text(decision_markdown(record, runs_dir(root) / view["run_id"]), encoding="utf-8")
+        js.write_text(json.dumps(record, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     spans = annotations_file(root, view["run_id"])
     return {"markdown": str(md), "json": str(js), "prompt": agent_prompt(record, md, js, spans if spans.exists() else None)}
 
