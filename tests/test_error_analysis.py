@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -371,6 +372,42 @@ class SuggestTest(unittest.TestCase):
                 "op": "reviewed", "question": "q4", "candidate": "base", "value": True}, "person")["notes"]
             self.assertEqual((arrived, filed, [n["suggestion"] for n in shown if n.get("origin")]),
                              ([first], [(first, "approver")], [first]))
+
+    def test_an_approval_failing_while_a_run_is_exported_does_not_leave_with_it(self):
+        failed = []
+
+        def approve_and_fail():
+            sc.suggest(self.root, self.body(("q2", "c1", "10%", {})))
+            sid = sc.suggestion_queue(self.root, self.type)["pending"][0]["id"]
+            real = sc.append_jsonl
+
+            def no_history(path, records):
+                if path.name == "history.jsonl":
+                    raise OSError("disk full")
+                real(path, records)
+
+            with mock.patch.object(sc, "append_jsonl", no_history):
+                try:
+                    sc.decide_suggestion(self.root, {"op": "approve", "suggestion": sid}, "approver")
+                except OSError:
+                    failed.append(sid)
+
+        statuses, other = ea.unconfirmed_suggestions, threading.Thread(target=approve_and_fail)
+
+        def meanwhile(root):  # the export has read one side; the approval gets a second to run before the other
+            out = statuses(root)
+            if threading.current_thread() is not other:
+                other.start()
+                other.join(timeout=1)
+            return out
+
+        with mock.patch.object(ea, "unconfirmed_suggestions", meanwhile):
+            data = server.export_run(self.root, RUN)
+        other.join()
+        with tempfile.TemporaryDirectory() as dest:
+            server.import_run(Path(dest), data)
+            arrived = [r for r in ea.read_annotations(Path(dest), RUN) if r.get("origin")]
+        self.assertEqual((len(failed), arrived), (1, []))
 
 
 class RereviewTest(unittest.TestCase):

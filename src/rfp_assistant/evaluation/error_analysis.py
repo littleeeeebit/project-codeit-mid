@@ -190,8 +190,11 @@ def _runs_with_notes(root: Path) -> dict[str, dict]:
     folder = root / "review" / "annotations"
     if not folder.exists():
         return {}
+    # Records first, statuses second, so no lock is needed (callers may hold it): an orphan note read here had its
+    # suggestion stored before it was written, so the later read finds it unapproved, or its approval committed.
+    records = {p.stem: read_jsonl(p) for p in sorted(folder.glob("*.jsonl"))}
     unconfirmed = unconfirmed_suggestions(root)
-    return {p.stem: annotation_state(read_jsonl(p), unconfirmed) for p in sorted(folder.glob("*.jsonl"))}
+    return {run: annotation_state(r, unconfirmed) for run, r in records.items()}
 
 
 def _view(root: Path, run_id: str) -> dict:

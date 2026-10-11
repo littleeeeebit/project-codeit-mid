@@ -143,9 +143,9 @@ def export_run(root: Path, run_id: str) -> bytes:
     an approval whose commit failed stays behind: every AI note that leaves was approved here, and is live wherever
     it is imported, which holds none of this store's suggestions."""
     folder = run_folder(root, run_id)
-    unconfirmed = ea.unconfirmed_suggestions(root)
-    carried = [r for r in read_annotations(root, run_id)
-               if not (r["op"] == "note" and r.get("origin") and r.get("suggestion") in unconfirmed)]
+    with write_lock(root):  # no approval can write its note between the two reads
+        records, unconfirmed = read_annotations(root, run_id), ea.unconfirmed_suggestions(root)
+    carried = [r for r in records if not (r["op"] == "note" and r.get("origin") and r.get("suggestion") in unconfirmed)]
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as z:
         for path in sorted(folder.rglob("*")):
@@ -525,8 +525,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, export_run(self.root, parts[2]), "application/zip",
                                   {"Content-Disposition": f'attachment; filename="{parts[2]}.zip"'})
             if len(parts) == 4 and parts[3] == "annotations":
-                return self._json(200, self._notes(annotation_state(read_annotations(self.root, folder.name),
-                                                                    ea.unconfirmed_suggestions(self.root)), folder.name))
+                records = read_annotations(self.root, folder.name)  # before the statuses: see _runs_with_notes
+                return self._json(200, self._notes(annotation_state(records, ea.unconfirmed_suggestions(self.root)),
+                                                   folder.name))
             if len(parts) == 4 and parts[3] == "failure-types":
                 return self._json(200, ea.run_counts(self.root, folder.name))
             if len(parts) == 4 and parts[3] == "decision":
