@@ -22,4 +22,11 @@ The run `traffic-20261011T053115Z-c8939c` froze 242 finished 질문하기 reques
 
 Screens: [sample](sample-top.jpg), [refused answer with a note](reading-refused-noted.jpg), [map outside the sample, one added](map-uncovered-added.jpg), [map marks](map-marks.jpg), [taxonomy with sources](taxonomy-sources.jpg), [progress by source](progress-by-source.jpg).
 
+Review round 1, rechecked on the same window (`traffic-20261011T055429Z-0546cb`, 242 requests, 46 groups, 30 drawn, in an isolated data folder):
+
+- Member IDs are now also looked for behind JSON escapes, at any depth, both when replaced and at the exit gate. None of the 20 member IDs appears in the folder, plainly or after decoding.
+- A refused answer that broke its schema no longer stops the run. A field of the wrong type is dropped, and output with nothing readable is shown as it came. 18 of 27 validation failures show the refused answer, as before.
+- Two first runs at once now share one pseudonym key: the key is made under the review write lock and published whole.
+- A group reads 검증 통과 only when an answer call settled and no failure was recorded. Six requests (two 기본 정보 and four 요구사항 목록 answers) had no answer call and read 검증 안 함 ([map](map-not-validated.jpg)). Every 근거 부족 answer in this window had a validated answer call. Runs frozen before this change read 검증 실패 기록 없음.
+
 Found and fixed during the walk: the run list showed a host dash for a traffic run. Pick reasons repeated raw codes that the meta line already shows in Korean. Squares outside the sample were too faint against white (now 3:1). The map had no way to list only the groups the sample missed. Taxonomy spans named "실제 요청" twice.

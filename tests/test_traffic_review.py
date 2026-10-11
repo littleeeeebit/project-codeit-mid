@@ -8,6 +8,8 @@ import gzip
 import json
 import os
 import tempfile
+import threading
+import time
 import unittest
 import uuid
 from pathlib import Path
@@ -22,7 +24,9 @@ from tests.test_error_analysis import make_run
 from tests.test_stage_review import server
 
 MEMBERS = ("spai1303", "teammate07")
+ESCAPED = "\\u%04x" % ord(MEMBERS[0][0]) + MEMBERS[0][1:]  # the first member ID as JSON text that decodes to it
 DOCS = {"D1": "가 사업", "D2": "나 사업"}
+WINDOW = 12  # 질문하기 requests in window()
 
 
 def request(member: str, question: str, mode: str = "single", docs=("D1",), status: str = "completed",
@@ -38,7 +42,8 @@ def request(member: str, question: str, mode: str = "single", docs=("D1",), stat
             "request_json": json.dumps({"question": question, "scope": scope, "mode": mode, "idempotency_key": key,
                                         "verifier_run_id": "", "capabilities": ["consultant"]}, ensure_ascii=False),
             "result_json": json.dumps(result, ensure_ascii=False),
-            "trace_json": json.dumps(trace or {"billing": [{"settled_micro_usd": 700}]}, ensure_ascii=False),
+            "trace_json": json.dumps(trace if trace is not None else {"billing": [
+                {"stage": "generation", "state": "settled", "settled_micro_usd": 700}]}, ensure_ascii=False),
             "created_at": f"2026-10-0{len(question) % 9 + 1}T01:00:00+00:00"}
 
 
@@ -54,6 +59,15 @@ def window() -> list[dict]:
              # member IDs planted where pseudonymisation must reach: the question, a trace value and a trace key
              request(MEMBERS[0], f"{MEMBERS[1]}님이 물은 것과 같나요", trace={"note": f"by {MEMBERS[0]}",
                                                                           MEMBERS[1]: {"x": 1}}),
+             # a refused answer that broke its schema, with a member ID hidden behind a JSON escape in the raw output
+             request(MEMBERS[1], "스키마가 깨진 답", status="failed",
+                     result={**refused, "error": "schema_invalid: claims.0.doc_id"},
+                     trace={"raw_output": '{"summary": "' + ESCAPED + ' 확인", "claims": [{"text": "x", "doc_id": {}, '
+                                          '"evidence_ids": 5}], "conflicts": [{"alternatives": 7}]}'}),
+             # no answer call ran: an inventory answer and an early insufficient-evidence exit were never validated
+             request(MEMBERS[0], "문서 목록", mode="inventory", docs=(), trace={}),
+             request(MEMBERS[1], "근거 없는 질문", trace={"billing": [{"stage": "embedding", "state": "settled"}]},
+                     result={"status": "insufficient_evidence", "summary": "근거를 찾지 못했습니다.", "claims": []}),
              # not 질문하기 traffic: an evaluation request and a verifier generation never enter the window
              request(MEMBERS[0], "평가 질문", key="A-run:main:q1:1"),
              request(MEMBERS[0], "검증 생성", key="vgen-R1")]
@@ -119,6 +133,7 @@ class TrafficRunTest(unittest.TestCase):
         data = folder_bytes(folder)
         for m in MEMBERS:
             self.assertNotIn(m.encode(), data)
+            self.assertNotIn(m, tr.plain(data.decode()))  # nor behind a JSON escape, at any depth
         self.assertNotIn(b"postgresql://", data)  # the DSN itself is never recorded, only its variable's name
         frozen = [json.loads(line) for line in gzip.decompress(
             (folder / "inputs" / "requests.jsonl.gz").read_bytes()).decode().splitlines()]
@@ -127,6 +142,8 @@ class TrafficRunTest(unittest.TestCase):
         self.assertEqual(planted["member"], tr.pseudonym(key, MEMBERS[0]))
         self.assertTrue(planted["request"]["question"].startswith(tr.pseudonym(key, MEMBERS[1])))
         self.assertIn(tr.pseudonym(key, MEMBERS[1]), planted["trace"])  # the key too
+        broken = next(f for f in frozen if f["request"]["question"] == "스키마가 깨진 답")
+        self.assertEqual(json.loads(broken["trace"]["raw_output"])["summary"], f"{tr.pseudonym(key, MEMBERS[0])} 확인")
         self.assertEqual([p.name for p in folder.rglob("*.key")], [])  # the key stays outside the run folder
 
     def test_pseudonyms_are_stable_across_runs_and_differ_per_member(self):
@@ -140,10 +157,10 @@ class TrafficRunTest(unittest.TestCase):
         record, _ = run_traffic(self.root, window())
         view = self.view(record["run_id"])
         questions = {q["question"] for q in view["questions"]}
-        self.assertEqual(len(view["questions"]), 9)
+        self.assertEqual(len(view["questions"]), WINDOW)
         self.assertNotIn("평가 질문", questions)
         self.assertNotIn("검증 생성", questions)
-        self.assertEqual(sum(len(g["requests"]) for g in view["groups"]), 9)  # the map holds the whole window
+        self.assertEqual(sum(len(g["requests"]) for g in view["groups"]), WINDOW)  # the map holds the whole window
 
     def test_refused_answer_is_shown_from_the_trace(self):
         record, _ = run_traffic(self.root, window())
@@ -157,10 +174,58 @@ class TrafficRunTest(unittest.TestCase):
         failed = tr.answer({"status": "technical_error", "error": "InternalServerError: 503"}, {}, {})
         self.assertEqual((failed["validation"], failed["failure"]), (None, "InternalServerError: 503"))
 
+    def test_a_refused_answer_that_broke_its_schema_is_read_not_crashed_on(self):
+        record, _ = run_traffic(self.root, window())  # the broken row is in the window and the run still writes
+        q = next(q for q in self.view(record["run_id"])["questions"] if q["question"] == "스키마가 깨진 답")
+        a = q["candidates"]["traffic"]
+        self.assertEqual((a["claims"][0]["doc"], a["claims"][0]["evidence_ids"], a["conflicts"][0]["alternatives"]),
+                         (None, [], []))
+        refused = {"status": "technical_error", "error": "schema_invalid: x"}
+        raw = '{"summary": 3, "claims": [{"text": {}}], "missing_fields": [{"doc_id": [], "field": 1}]}'
+        unreadable = tr.answer(refused, {"raw_output": raw, "billing": [{"settled_micro_usd": "9"}]}, {})
+        self.assertEqual((unreadable["summary"], unreadable["rejected_shown"]), (raw, True))  # shown as it came
+        self.assertEqual((unreadable["missing"], unreadable["cost_micro_usd"]), ([{"doc_id": None, "field": "",
+                                                                                   "reason": None}], 0))
+
+    def test_groups_say_passed_only_where_an_answer_call_was_validated(self):
+        record, _ = run_traffic(self.root, window())
+        view = self.view(record["run_id"])
+        by_question = {q["question"]: json.loads(q["group"])[2] for q in view["questions"]}
+        self.assertEqual((by_question["질문 0"], by_question["문서 목록"], by_question["근거 없는 질문"],
+                          by_question["검증에 걸린 질문"]),
+                         ("passed", "not_validated", "not_validated", "claim_without_evidence"))
+        unchecked = next(g for g in view["groups"] if g["validation"] == "not_validated")
+        self.assertNotEqual(unchecked["priority"], 0)  # not a failure either
+
     def test_exit_gate_refuses_a_surviving_member_id(self):
-        with self.assertRaisesRegex(ReviewError, "member ID survived"):
-            tr.write_out(self.root / "x.json", {"who": MEMBERS[0]}, list(MEMBERS))
+        for value in ({"who": MEMBERS[0]}, {"raw": '{"who": "' + ESCAPED + '"}'},
+                      {"raw": ESCAPED.replace("\\", "\\\\\\")}):  # plain, escaped, escaped twice over
+            with self.assertRaisesRegex(ReviewError, "member ID survived"):
+                tr.write_out(self.root / "x.json", value, list(MEMBERS))
         self.assertFalse((self.root / "x.json").exists())
+
+    def test_first_runs_at_once_share_one_pseudonym_key(self):
+        settings, keys = SimpleNamespace(data_dir=self.root), []
+        made = iter([(0.05, b"A" * 32), (0.4, b"B" * 32)])  # unlocked, the second run overwrites after the first read
+        barrier = threading.Barrier(2)
+
+        def slow_token(n):
+            delay, key = next(made)
+            time.sleep(delay)  # meanwhile the other run looks for the key
+            return key
+
+        def first_run():
+            barrier.wait()
+            keys.append(tr.pseudonym_key(settings))
+        with mock.patch.object(tr.secrets, "token_bytes", slow_token):
+            threads = [threading.Thread(target=first_run) for _ in range(2)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        stored = (self.root / "review" / "traffic" / "pseudonym.key").read_bytes()
+        self.assertEqual(keys, [stored, stored])
+        self.assertEqual(list((self.root / "review" / "traffic").glob("*.part")), [])
 
     def test_a_missing_window_sample_or_dsn_is_refused_before_connecting(self):
         settings = SimpleNamespace(data_dir=self.root)
@@ -176,7 +241,7 @@ class TrafficRunTest(unittest.TestCase):
         record, _ = run_traffic(self.root, window())
         run_id = record["run_id"]
         view = self.view(run_id)
-        self.assertEqual(server.list_runs(self.root)[0]["window"]["requests"], 9)
+        self.assertEqual(server.list_runs(self.root)[0]["window"]["requests"], WINDOW)
         q = view["questions"][0]
         text = q["candidates"]["traffic"]["claims"][0]["text"]
         state = server.add_annotation(self.root, view, {"op": "note", "question": q["key"], "candidate": "traffic",
@@ -208,21 +273,21 @@ def items(groups: dict[str, int]) -> list[dict]:
     out = []
     for name, size in groups.items():
         mode, outcome, validation = name.split("/")
-        g = tr.group_of(mode, outcome, None if validation == "none" else validation, None, ["D1"])
+        g = tr.group_of(mode, outcome, None if validation == "passed" else validation, None, ["D1"], True)
         out += [{"key": f"{name}#{i}", "group": g} for i in range(size)]
     return out
 
 
 class DrawTest(unittest.TestCase):
     def test_failures_first_then_non_answers_then_size(self):
-        groups, picks = tr.draw(items({"single/answered/none": 9, "single/insufficient_evidence/none": 2,
+        groups, picks = tr.draw(items({"single/answered/passed": 9, "single/insufficient_evidence/passed": 2,
                                        "single/technical_error/claim_without_evidence": 1}), 2, seed=7)
         self.assertEqual([g["outcome"] for g in groups], ["technical_error", "insufficient_evidence", "answered"])
         self.assertEqual([p["kind"] for p in picks], ["representative", "representative"])
         self.assertEqual({p["group"] for p in picks}, {groups[0]["key"], groups[1]["key"]})
 
     def test_extra_picks_follow_group_size_and_reasons_explain_them(self):
-        groups, picks = tr.draw(items({"corpus/answered/none": 30, "single/answered/none": 3}), 8, seed=1)
+        groups, picks = tr.draw(items({"corpus/answered/passed": 30, "single/answered/passed": 3}), 8, seed=1)
         per = {g["key"]: sum(p["group"] == g["key"] for p in picks) for g in groups}
         self.assertEqual(list(per.values()), [7, 1])
         self.assertEqual(len({p["key"] for p in picks}), 8)
@@ -230,11 +295,11 @@ class DrawTest(unittest.TestCase):
         self.assertIn("큰 묶음 추가 표본", reason)
         self.assertIn("30건", reason)
         self.assertIn("시드 1", tr.reason(picks[0], 1))
-        self.assertEqual(tr.draw(items({"corpus/answered/none": 30}), 8, seed=1)[1],
-                         tr.draw(items({"corpus/answered/none": 30}), 8, seed=1)[1])  # a seed redraws the same
+        self.assertEqual(tr.draw(items({"corpus/answered/passed": 30}), 8, seed=1)[1],
+                         tr.draw(items({"corpus/answered/passed": 30}), 8, seed=1)[1])  # a seed redraws the same
 
     def test_a_sample_larger_than_the_window_takes_everything_once(self):
-        _, picks = tr.draw(items({"single/answered/none": 2, "compare/answered/none": 1}), 10, seed=3)
+        _, picks = tr.draw(items({"single/answered/passed": 2, "compare/answered/passed": 1}), 10, seed=3)
         self.assertEqual(len(picks), 3)
 
 

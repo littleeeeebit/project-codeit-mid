@@ -13,7 +13,12 @@ import { Badge, Metric, Metrics, Segmented } from "./ui";
 import { AnnotationProvider, useAnnotationVersion, useReview, useSample } from "./annotations";
 import { FailureTypes, MODE, OUTCOME, ReadingView } from "./generation-view";
 
-const CHECK: Record<string, string> = { none: "검증 통과", processing_failure: "처리 실패" };
+// passed: an answer call settled and its output passed the validator; not_validated: no answer call to check;
+// none: a run frozen before the two were told apart, so only the absence of a failure is known.
+const CHECK: Record<string, string> = {
+  passed: "검증 통과", not_validated: "검증 안 함", none: "검증 실패 기록 없음", processing_failure: "처리 실패",
+};
+const failed = (g: TrafficGroup) => !["passed", "not_validated", "none"].includes(g.validation);
 const check = (v: string) => CHECK[v] ?? label(VALIDATION, v);
 const groupName = (g: TrafficGroup) => `${label(MODE, g.mode)} · ${OUTCOME[g.outcome] ?? g.outcome} · ${check(g.validation)}`;
 const day = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }) : "");
@@ -174,7 +179,7 @@ function GroupRow({ g, questions, inSample, drawn, read, noted, open }: {
     <li className="py-3">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-6">
         <button type="button" onClick={() => setShown(!shown)} aria-expanded={shown} className="min-w-0 text-left">
-          <span className={`text-[15px] font-semibold ${g.validation !== "none" ? "text-bad" : ""}`}>{groupName(g)}</span>
+          <span className={`text-[15px] font-semibold ${failed(g) ? "text-bad" : ""}`}>{groupName(g)}</span>
           <span className="ml-2 text-[14px] text-muted">{g.doc}</span>
         </button>
         <span className={`whitespace-nowrap text-[14px] tabular-nums ${sampled ? "text-muted" : "font-semibold text-warn"}`}>

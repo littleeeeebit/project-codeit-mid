@@ -35,14 +35,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ..settings import Settings
+from .error_analysis import write_lock
 from .stage_review import SCHEMA, ReviewError, review_dir
 
 STATUSES = ("completed", "failed")
 ASK_KEY = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 CANDIDATE = "traffic"
 CORPUS = "전체 문서"
-NONE = "none"
+PASSED = "passed"  # the answer call settled and the validator accepted its output
+UNCHECKED = "not_validated"  # no answer call to validate: a deterministic metadata or inventory answer
 PROCESSING = "processing_failure"  # a failure without a validator verdict, e.g. a provider error
+CLEAN = (PASSED, UNCHECKED)
+# A JSON escape, at any depth of escaping, of a character a member ID can hold. Never a quote, backslash or control
+# character, so decoding one keeps every enclosing JSON document valid.
+ESCAPE = re.compile(r"\\+u([0-9a-fA-F]{4})|\\+(/)")
 
 
 # ---------------------------------------------------------------- the read
@@ -82,28 +88,47 @@ def pseudonym_key(settings: Settings) -> bytes:
     """This data folder's pseudonym key: created once, kept outside every run folder, so the same member gets the
     same pseudonym in every traffic run here and a run folder alone cannot be reversed."""
     path = review_dir(settings) / "traffic" / "pseudonym.key"
-    if not path.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(secrets.token_bytes(32))
-    return path.read_bytes()
+    with write_lock(settings.data_dir):  # two first runs at once must not each make a key
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            part = path.with_name(f"{path.name}.{uuid.uuid4().hex}.part")
+            part.write_bytes(secrets.token_bytes(32))
+            os.replace(part, path)  # a reader never sees a half-written key
+        key = path.read_bytes()
+    if len(key) != 32:
+        raise ReviewError(f"{path} is not a 32-byte pseudonym key; nothing was written")
+    return key
 
 
 def pseudonym(key: bytes, member_id: str) -> str:
     return "member-" + hmac.new(key, member_id.encode(), hashlib.sha256).hexdigest()[:8]
 
 
+def plain(text: str) -> str:
+    """The text with every escape of a member-ID character decoded, however deeply escaped. A model's raw output is
+    JSON inside JSON, so an escaped letter there reads back as part of a member ID."""
+    while True:
+        out = ESCAPE.sub(lambda m: m[2] or (c if (c := chr(int(m[1], 16))).isalnum() or c in "._@+-" else m[0]), text)
+        if out == text:
+            return out
+        text = out
+
+
 def scrub(value, table: dict[str, str]):
-    """Every string and key with each known member ID replaced by its pseudonym, longest first.
+    """Every string and key with each known member ID replaced by its pseudonym, longest first. A string that hides
+    one behind JSON escapes is decoded first.
     ponytail: substring replacement, so a member ID that is also a common word would be replaced inside text too;
     a token-aware match if member IDs ever get that short."""
     order = sorted(table, key=len, reverse=True)
 
     def walk(v):
         if isinstance(v, str):
+            seen = plain(v) if "\\" in v else v
+            if not any(m in seen for m in order):
+                return v
             for m in order:
-                if m in v:
-                    v = v.replace(m, table[m])
-            return v
+                seen = seen.replace(m, table[m])
+            return seen
         if isinstance(v, dict):
             return {walk(k): walk(x) for k, x in v.items()}
         if isinstance(v, list):
@@ -113,9 +138,11 @@ def scrub(value, table: dict[str, str]):
 
 
 def write_out(path: Path, value, members: list[str]) -> bytes:
-    """The only way anything enters a traffic run folder: serialised, refused if any member ID survived, written."""
+    """The only way anything enters a traffic run folder: serialised, refused if any member ID survived (plainly or
+    behind JSON escapes), then written."""
     data = json.dumps(value, ensure_ascii=False).encode("utf-8")
-    leaked = [m for m in members if m and m.encode("utf-8") in data]
+    text = plain(data.decode("utf-8"))
+    leaked = [m for m in members if m and m in text]
     if leaked:
         raise ReviewError(f"{path.name}: a member ID survived pseudonymisation; nothing was written")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -150,62 +177,79 @@ def _rejected(trace: dict) -> tuple[dict | None, bool]:
     return (parsed if isinstance(parsed, dict) else None), True
 
 
+def _text(v) -> str | None:
+    return v if isinstance(v, str) else None
+
+
+def _dicts(v) -> list[dict]:
+    return [x for x in v if isinstance(x, dict)] if isinstance(v, list) else []
+
+
+def _ids(v) -> list[str]:
+    return [i for i in v if isinstance(i, str)] if isinstance(v, list) else []
+
+
 def answer(result: dict, trace: dict, titles: dict[str, str]) -> dict:
     """The stored outcome in the generation view's answer shape. A validation failure shows the refused answer, as
-    the consultant never saw it, so its spans can be noted."""
-    title = lambda d: titles.get(d, d)  # noqa: E731
-    status = result.get("status") or ""
-    error = result.get("error") or ""
+    the consultant never saw it, so its spans can be noted. The refused answer failed its schema, so every field is
+    read as untrusted: a field of the wrong type is dropped, and output with nothing readable is shown as it came.
+    `checked`: an answer call settled, so the validator saw its output (popped into the group by `run`)."""
+    title = lambda d: titles.get(d, d) if isinstance(d, str) else None  # noqa: E731
+    status = _text(result.get("status")) or ""
+    error = _text(result.get("error")) or ""
     code = error.split(":", 1)[0]
     validation = code if error and status == "technical_error" and re.fullmatch(r"[a-z_]+", code) else None
     body, cut = (_rejected(trace) if validation else (None, False))
     shown = body if isinstance(body, dict) else result
-
-    def listed(key: str) -> list:
-        v = shown.get(key)
-        return [x for x in v if isinstance(x, dict)] if isinstance(v, list) else []
-
+    claims = [{"text": _text(c.get("text")) or "", "kind": _text(c.get("kind")), "doc": title(c.get("doc_id")),
+               "evidence_ids": _ids(c.get("evidence_ids")), "supported": None, "links": []}
+              for c in _dicts(shown.get("claims"))]
+    summary = _text(shown.get("summary")) or ""
+    raw = _text(trace.get("raw_output")) if validation else None
+    if raw and not summary and not any(c["text"] for c in claims):
+        summary = raw  # nothing readable parsed out of the refused output
     evidence = {}
-    for eid, e in (result.get("evidence") or {}).items():
-        where = (e.get("location") or {}).get("section_path") or []
-        evidence[eid] = {"doc": title(e.get("doc_id")), "quote": e.get("quote"),
-                         "section": " > ".join(where) if isinstance(where, list) else "", "text": None}
-    billing = trace.get("billing") or []
+    for eid, e in (result.get("evidence") if isinstance(result.get("evidence"), dict) else {}).items():
+        e = e if isinstance(e, dict) else {}
+        where = (e.get("location") if isinstance(e.get("location"), dict) else {}).get("section_path")
+        evidence[eid] = {"doc": title(e.get("doc_id")), "quote": _text(e.get("quote")),
+                         "section": " > ".join(_ids(where)), "text": None}
+    billing = _dicts(trace.get("billing"))
     return {
         "outcome": status, "passed": None, "status_ok": status != "technical_error", "metadata": False,
-        "summary": shown.get("summary") if isinstance(shown.get("summary"), str) else "",
-        "claims": [{"text": c.get("text") or "", "kind": c.get("kind"), "doc": title(c.get("doc_id")),
-                    "evidence_ids": [i for i in c.get("evidence_ids") or [] if isinstance(i, str)],
-                    "supported": None, "links": []} for c in listed("claims")],
-        "evidence": evidence,
-        "conflicts": [{"field": c.get("field"), "alternatives": [
-            {"doc": title(a.get("doc_id")), "value": a.get("value") or "",
-             "evidence_ids": [i for i in a.get("evidence_ids") or [] if isinstance(i, str)]}
-            for a in c.get("alternatives") or [] if isinstance(a, dict)]} for c in listed("conflicts")],
-        "next_action": shown.get("next_action") if isinstance(shown.get("next_action"), str) else None,
-        "missing": [{"doc_id": m.get("doc_id"), "field": m.get("field") or "", "reason": m.get("reason")}
-                    for m in listed("missing_fields")],
-        "facts": result.get("facts") or [],
+        "summary": summary, "claims": claims, "evidence": evidence,
+        "conflicts": [{"field": _text(c.get("field")), "alternatives": [
+            {"doc": title(a.get("doc_id")), "value": _text(a.get("value")) or "",
+             "evidence_ids": _ids(a.get("evidence_ids"))} for a in _dicts(c.get("alternatives"))]}
+            for c in _dicts(shown.get("conflicts"))],
+        "next_action": _text(shown.get("next_action")),
+        "missing": [{"doc_id": _text(m.get("doc_id")), "field": _text(m.get("field")) or "",
+                     "reason": _text(m.get("reason"))} for m in _dicts(shown.get("missing_fields"))],
+        "facts": _dicts(result.get("facts")),
         "validation": validation, "validation_detail": error if validation else None,
         "failure": error if error and not validation else None,
-        "rejected_shown": isinstance(body, dict), "rejected_cut": cut,
-        "required": [], "cost_micro_usd": sum(a.get("settled_micro_usd") or 0 for a in billing if isinstance(a, dict)),
-        "latency_ms": None, "replayed": False, "trace_url": None}
+        "rejected_shown": isinstance(body, dict) or bool(raw) and summary == raw, "rejected_cut": cut,
+        "checked": any(a.get("stage") == "generation" and a.get("state") == "settled" for a in billing),
+        "required": [], "latency_ms": None, "replayed": False, "trace_url": None,
+        "cost_micro_usd": sum(a["settled_micro_usd"] for a in billing if isinstance(a.get("settled_micro_usd"), int))}
 
 
 # ---------------------------------------------------------------- groups and the sample
 
 
-def group_of(mode: str, outcome: str, validation: str | None, failure: str | None, docs: list[str]) -> dict:
+def group_of(mode: str, outcome: str, validation: str | None, failure: str | None, docs: list[str],
+             checked: bool) -> dict:
+    """`checked`: an answer call settled, so with no failure recorded the validator passed its output. Without one
+    nothing was validated (a deterministic answer), and the group says so rather than claim a pass."""
     doc = CORPUS if mode == "corpus" or not docs else " · ".join(sorted(docs))
-    v = validation or (PROCESSING if failure else NONE)
+    v = validation or (PROCESSING if failure else PASSED if checked else UNCHECKED)
     return {"key": json.dumps([mode, outcome, v, doc], ensure_ascii=False), "mode": mode, "outcome": outcome,
             "validation": v, "doc": doc}
 
 
 def _priority(g: dict) -> int:
     """Failures first, then answers that were not plain answers, then the rest."""
-    return 0 if g["validation"] != NONE else 1 if g["outcome"] != "answered" else 2
+    return 0 if g["validation"] not in CLEAN else 1 if g["outcome"] != "answered" else 2
 
 
 def draw(items: list[dict], n: int, seed: int) -> tuple[list[dict], list[dict]]:
@@ -277,7 +321,7 @@ def run(settings: Settings, since: str | None, sample: int | None, source_dsn_en
         frozen.append(scrub(record, table))
         a = answer(result, trace, titles)
         docs = [titles.get(s.get("doc_id"), s.get("doc_id")) for s in record["scope"]]
-        g = group_of(record["mode"], a["outcome"], a["validation"], a["failure"], docs)
+        g = group_of(record["mode"], a["outcome"], a["validation"], a["failure"], docs, a.pop("checked"))
         items.append({"key": r["request_id"], "group": g})
         questions.append({"key": r["request_id"], "id": r["request_id"], "question": snap.get("question") or "",
                           "standalone_question": result.get("standalone_question") or "",
