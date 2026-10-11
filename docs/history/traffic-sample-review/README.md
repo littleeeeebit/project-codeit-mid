@@ -35,4 +35,15 @@ Review round 2, rechecked on the same window (`traffic-20261011T060612Z-941072`,
 - Refused output too deeply nested for the decoder falls back to its raw text instead of stopping the run.
 - An answer call counts as validated in any ledger state after it was sent, including `unknown` when the provider returned no usage. The counts on this window are unchanged: 199 passed, 6 not validated.
 
+Review round 3, rechecked on the same window (`traffic-20261011T061909Z-bf9e08`, 242 requests, 46 groups, 30 drawn):
+
+- Matching every spelling of a member ID kept missing one, such as an escape whose own backslash is spelled as an escape. `write_out` now both cleans and checks, and is the only way into the folder:
+  - Detection decodes every JSON escape, level after level, until none are left, which is everything a reader can recover however often they decode.
+  - A string that names a member is cleaned value by value if it is JSON text, so it stays valid JSON. Other text has the ID replaced where it is spelled plainly or JSON-escaped.
+  - A string where an ID still hides behind an escape is withheld whole, as `[구성원 ID가 인코딩된 채 들어 있어 가렸습니다]`.
+  - Strings that name no member are written exactly as they were.
+- An unpaired surrogate, which no UTF-8 file can hold, is written as U+FFFD instead of stopping the run.
+- The view is built from the cleaned record, so it shows what the frozen input holds.
+- On this window no member ID is left after decoding every escape, and no string was withheld.
+
 Found and fixed during the walk: the run list showed a host dash for a traffic run. Pick reasons repeated raw codes that the meta line already shows in Korean. Squares outside the sample were too faint against white (now 3:1). The map had no way to list only the groups the sample missed. Taxonomy spans named "실제 요청" twice.

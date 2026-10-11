@@ -24,12 +24,15 @@ from rfp_assistant.evaluation.stage_review import ReviewError
 from tests.test_error_analysis import make_run
 from tests.test_stage_review import server
 
-MEMBERS = ("spai1303", "teammate07", 'te"am\\!\U0001F600')  # a hub name may hold any character
+BS = chr(92)
+MEMBERS = ("spai1303", "teammate07", 'te"am\\!\U0001F600', "team\\")  # hub names hold any character
 ESCAPED = "\\u%04x" % ord(MEMBERS[0][0]) + MEMBERS[0][1:]  # the first member ID as JSON text that decodes to it
-# the third as JSON text: escaped quote and backslash, ! for "!", a surrogate pair for the emoji
+# the third as JSON text: escaped quote and backslash, a u-escape for "!", a surrogate pair for the emoji
 ODD = json.dumps(MEMBERS[2])[1:-1].replace("!", "\\u0021")
+INTRODUCER = BS + "u005c" + ESCAPED[1:]  # the escape's own backslash spelled as an escape: decoded twice, an ID
+LONE = BS + "ud800"  # JSON text for a surrogate with no pair
 DOCS = {"D1": "가 사업", "D2": "나 사업"}
-WINDOW = 14  # 질문하기 requests in window()
+WINDOW = 17  # 질문하기 requests in window()
 
 
 def request(member: str, question: str, mode: str = "single", docs=("D1",), status: str = "completed",
@@ -70,6 +73,15 @@ def window() -> list[dict]:
              # an escaped punctuated member ID beside an unrelated literal escape, which must stay as it was frozen
              request(MEMBERS[0], "특수 이름", status="failed", result={**refused, "error": "schema_invalid: x"},
                      trace={"raw_output": '{"summary": "' + ODD + ' 님", "claims": [{"text": "literal \\\\u0041"}]}'}),
+             # an ID behind an escaped escape introducer (\u005c then u0073): decoded twice it names the member
+             request(MEMBERS[1], "감춘 이름", status="failed", result={**refused, "error": "schema_invalid: x"},
+                     trace={"raw_output": '{"summary": "' + INTRODUCER + ' 요약", "claims": [{"text": "다른 내용"}]}'}),
+             # an ID ending in a backslash, in a raw output that must stay valid JSON
+             request(MEMBERS[0], "끝 역슬래시", status="failed", result={**refused, "error": "schema_invalid: x"},
+                     trace={"raw_output": json.dumps({"summary": MEMBERS[3], "claims": [{"text": "그대로"}]})}),
+             # a refused string with an unpaired surrogate, which no UTF-8 file can hold
+             request(MEMBERS[1], "짝 없는 서로게이트", status="failed", result={**refused, "error": "schema_invalid: x"},
+                     trace={"raw_output": '{"summary": "' + LONE + ' 끝"}'}),
              # validated, though the provider sent no usage so the call's billing stayed unknown
              request(MEMBERS[1], "사용량 모름", trace={"billing": [{"stage": "generation", "state": "unknown"}]}),
              # no answer call ran: an inventory answer and an early insufficient-evidence exit were never validated
@@ -141,7 +153,8 @@ class TrafficRunTest(unittest.TestCase):
         data = folder_bytes(folder)
         for m in MEMBERS:
             self.assertNotIn(m.encode(), data)
-        self.assertIsNone(tr.identities(MEMBERS).search(data.decode()))  # nor in any JSON spelling, at any depth
+        for m in MEMBERS:  # nor in anything decoding the files, however often, recovers
+            self.assertNotIn(m, tr.unescaped(data.decode()))
         self.assertNotIn(b"postgresql://", data)  # the DSN itself is never recorded, only its variable's name
         frozen = [json.loads(line) for line in gzip.decompress(
             (folder / "inputs" / "requests.jsonl.gz").read_bytes()).decode().splitlines()]
@@ -155,9 +168,17 @@ class TrafficRunTest(unittest.TestCase):
         odd = json.loads(next(f for f in frozen if f["request"]["question"] == "특수 이름")["trace"]["raw_output"])
         self.assertEqual(odd["summary"], f"{tr.pseudonym(key, MEMBERS[2])} 님")
         shown = next(q for q in self.view(record["run_id"])["questions"] if q["question"] == "특수 이름")
-        # only the ID changed: the literal A beside it is frozen as it was and reads the same in the view
+        # only the ID changed: the literal u-escape text beside it is frozen as it was and reads the same in the view
         self.assertEqual(odd["claims"][0]["text"], "literal \\u0041")
         self.assertEqual(shown["candidates"]["traffic"]["claims"][0]["text"], odd["claims"][0]["text"])
+        raw = {f["request"]["question"]: f["trace"]["raw_output"] for f in frozen if "raw_output" in f["trace"]}
+        view = {q["question"]: q["candidates"]["traffic"] for q in self.view(record["run_id"])["questions"]}
+        hidden = json.loads(raw["감춘 이름"])  # the string hiding an ID is withheld, the rest of the answer kept
+        self.assertEqual((hidden["summary"], hidden["claims"]), (tr.WITHHELD, [{"text": "다른 내용"}]))
+        self.assertEqual((view["감춘 이름"]["summary"], view["감춘 이름"]["claims"][0]["text"]), (tr.WITHHELD, "다른 내용"))
+        self.assertEqual(json.loads(raw["끝 역슬래시"]),  # still valid JSON after the trailing backslash was replaced
+                         {"summary": tr.pseudonym(key, MEMBERS[3]), "claims": [{"text": "그대로"}]})
+        self.assertEqual(view["끝 역슬래시"]["summary"], tr.pseudonym(key, MEMBERS[3]))
         self.assertEqual([p.name for p in folder.rglob("*.key")], [])  # the key stays outside the run folder
 
     def test_pseudonyms_are_stable_across_runs_and_differ_per_member(self):
@@ -194,6 +215,8 @@ class TrafficRunTest(unittest.TestCase):
         a = q["candidates"]["traffic"]
         self.assertEqual((a["claims"][0]["doc"], a["claims"][0]["evidence_ids"], a["conflicts"][0]["alternatives"]),
                          (None, [], []))
+        lone = next(q for q in self.view(record["run_id"])["questions"] if q["question"] == "짝 없는 서로게이트")
+        self.assertEqual(lone["candidates"]["traffic"]["summary"], "� 끝")  # written as U+FFFD, the run kept
         refused = {"status": "technical_error", "error": "schema_invalid: x"}
         raw = '{"summary": 3, "claims": [{"text": {}}], "missing_fields": [{"doc_id": [], "field": 1}]}'
         unreadable = tr.answer(refused, {"raw_output": raw, "billing": [{"settled_micro_usd": "9"}]}, {})
@@ -217,14 +240,33 @@ class TrafficRunTest(unittest.TestCase):
         unchecked = next(g for g in view["groups"] if g["validation"] == "not_validated")
         self.assertNotEqual(unchecked["priority"], 0)  # not a failure either
 
-    def test_exit_gate_refuses_a_surviving_member_id(self):
-        for value in ({"who": MEMBERS[0]}, {"raw": '{"who": "' + ESCAPED + '"}'},
-                      {"raw": ESCAPED.replace("\\", "\\\\\\")},  # plain, escaped, escaped twice over
-                      {"who": MEMBERS[2]}, {"raw": '{"who": "' + ODD + '"}'},
-                      {"raw": json.dumps(re.sub(r"u([0-9a-f]{4})", lambda m: "u" + m[1].upper(), ODD))}):  # upper hex
-            with self.assertRaisesRegex(ReviewError, "member ID survived"):
-                tr.write_out(self.root / "x.json", value, list(MEMBERS))
-        self.assertFalse((self.root / "x.json").exists())
+    def test_the_exit_cleans_every_spelling_and_refuses_what_is_left(self):
+        table = {m: f"member-{i}" for i, m in enumerate(MEMBERS)}
+        spellings = ({"who": MEMBERS[0]}, {"raw": '{"who": "' + ESCAPED + '"}'},
+                     {"raw": ESCAPED.replace(BS, BS * 3)},  # plain, escaped, escaped twice over
+                     {"raw": '{"who": "' + INTRODUCER + '"}'}, {"raw": INTRODUCER},  # the introducer escaped too
+                     {"who": MEMBERS[2]}, {"raw": '{"who": "' + ODD + '"}'},
+                     {"raw": json.dumps(re.sub(r"u([0-9a-f]{4})", lambda m: "u" + m[1].upper(), ODD))},  # upper hex
+                     {"raw": json.dumps({"who": MEMBERS[3], "n": 1})}, {"raw": json.dumps({"who": MEMBERS[3]})[:-3]})
+        path = self.root / "x.json"
+        for value in spellings:
+            written = tr.write_out(path, value, table)
+            text = path.read_text(encoding="utf-8")
+            for m in MEMBERS:
+                self.assertNotIn(m, tr.unescaped(text), value)
+            try:
+                json.loads(value.get("raw", ""))
+            except ValueError:
+                continue
+            json.loads(written["raw"])  # a JSON text naming a member is still JSON when it is written
+        self.assertEqual(json.loads(tr.write_out(path, spellings[8], table)["raw"]), {"who": "member-3", "n": 1})
+        self.assertEqual(tr.write_out(path, spellings[9], table)["raw"], '{"who": "member-3')  # cut, still readable
+        path.unlink()
+        with mock.patch.object(tr, "scrub", lambda value, table: value):  # were the cleaning skipped, nothing leaves
+            for value in spellings:
+                with self.assertRaisesRegex(ReviewError, "member ID survived"):
+                    tr.write_out(path, value, table)
+        self.assertFalse(path.exists())
 
     def test_first_runs_at_once_share_one_pseudonym_key(self):
         settings, keys = SimpleNamespace(data_dir=self.root), []

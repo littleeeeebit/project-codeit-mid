@@ -21,7 +21,6 @@ writes to the source database or calls a model.
 
 from __future__ import annotations
 
-import functools
 import gzip
 import hashlib
 import hmac
@@ -48,7 +47,10 @@ UNCHECKED = "not_validated"  # no answer call to validate: a deterministic metad
 PROCESSING = "processing_failure"  # a failure without a validator verdict, e.g. a provider error
 CLEAN = (PASSED, UNCHECKED)
 RAN = ("dispatching", "settled", "unknown", "reconciled")  # ledger states of an answer call that was sent
-SHORT_ESCAPES = {'"': '"', "\\": "\\", "/": "/", "\b": "b", "\f": "f", "\n": "n", "\r": "r", "\t": "t"}
+ESCAPE = re.compile(r'\\u([0-9a-fA-F]{4})|\\(["\\/bfnrt])')  # one JSON escape
+SHORT = {'"': '"', "\\": "\\", "/": "/", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t"}
+LONE = re.compile("[\ud800-\udfff]")  # a surrogate left unpaired: no UTF-8 file can hold it
+WITHHELD = "[구성원 ID가 인코딩된 채 들어 있어 가렸습니다]"
 
 
 # ---------------------------------------------------------------- the read
@@ -104,36 +106,54 @@ def pseudonym(key: bytes, member_id: str) -> str:
     return "member-" + hmac.new(key, member_id.encode(), hashlib.sha256).hexdigest()[:8]
 
 
-def _encoded(c: str) -> str:
-    """One character as a pattern for every way JSON text can spell it: itself, its \\u escape (either hex case,
-    a surrogate pair above U+FFFF) or its short escape, behind any number of backslashes, since a model's raw output
-    is JSON inside JSON inside the frozen record."""
-    o = ord(c)
-    units = [o] if o < 0x10000 else [0xD800 + ((o - 0x10000) >> 10), 0xDC00 + ((o - 0x10000) & 0x3FF)]
-    ways = [re.escape(c), "".join(r"\\+u(?i:%04x)" % u for u in units)]
-    if c in SHORT_ESCAPES:
-        ways.append(r"\\+" + re.escape(SHORT_ESCAPES[c]))
-    return "(?:" + "|".join(ways) + ")"
+def unescaped(text: str) -> str:
+    """The text with every JSON escape decoded, level after level until none is left: everything a reader can
+    recover by decoding as often as they like, whatever spells the escape itself (`\\u005c` is a backslash too).
+    Surrogate pairs join into their character. For finding member IDs only, never for writing."""
+    while "\\" in text:
+        out = ESCAPE.sub(lambda m: chr(int(m[1], 16)) if m[1] else SHORT[m[2]], text)
+        if out == text:
+            break
+        text = out
+    return text.encode("utf-16", "surrogatepass").decode("utf-16", "surrogatepass")
 
 
-@functools.lru_cache(maxsize=4)
-def identities(members: tuple[str, ...]) -> re.Pattern:
-    """Every member ID in any JSON spelling, longest first, each in a group named by its index in `members`. Only
-    the matched span is ever replaced, so the text around an ID stays as it was frozen."""
-    order = sorted((i for i, m in enumerate(members) if m), key=lambda i: -len(members[i]))
-    return re.compile("|".join(f"(?P<m{i}>{''.join(map(_encoded, members[i]))})" for i in order) or r"(?!)")
+def _names(text: str, members) -> bool:
+    """A member ID is in the text as written or in what decoding it recovers."""
+    seen = unescaped(text) if "\\" in text else text
+    return any(m in text or m in seen for m in members)
 
 
 def scrub(value, table: dict[str, str]):
-    """Every string and key with each known member ID, in any JSON spelling, replaced by its pseudonym.
+    """Every string and key with no member ID left in it, however escaped. A string that names none stays as it was.
+    One that does: a JSON text is cleaned value by value and serialised again (valid JSON, every other value the
+    same); other text has the ID replaced where it is spelled plainly or JSON-escaped; if an ID still hides behind
+    an escape, the whole string is withheld, since what cannot be told apart is not written as text. A surrogate
+    left unpaired, which no UTF-8 file holds, becomes U+FFFD.
     ponytail: substring match, so a member ID that is also a common word would be replaced inside text too;
     a token-aware match if member IDs ever get that short."""
-    members = tuple(table)
-    found = identities(members)
+    order = sorted((m for m in table if m), key=len, reverse=True)
+    spelled = [(json.dumps(m, ensure_ascii=False)[1:-1], table[m]) for m in order]
+
+    def text(s: str) -> str:
+        s = LONE.sub("�", s)
+        if not _names(s, order):
+            return s
+        try:
+            parsed = json.loads(s)
+        except (ValueError, RecursionError):
+            parsed = None
+        if isinstance(parsed, (dict, list, str)):
+            return json.dumps(walk(parsed), ensure_ascii=False)
+        for escaped, alias in spelled:
+            s = s.replace(escaped, alias)
+        for m in order:
+            s = s.replace(m, table[m])
+        return WITHHELD if _names(s, order) else s
 
     def walk(v):
         if isinstance(v, str):
-            return found.sub(lambda m: table[members[int(m.lastgroup[1:])]], v)
+            return text(v)
         if isinstance(v, dict):
             return {walk(k): walk(x) for k, x in v.items()}
         if isinstance(v, list):
@@ -142,11 +162,12 @@ def scrub(value, table: dict[str, str]):
     return walk(value)
 
 
-def write_out(path: Path, value, members: list[str]) -> bytes:
-    """The only way anything enters a traffic run folder: serialised, refused if any member ID survived in any JSON
-    spelling, then written."""
+def write_out(path: Path, value, table: dict[str, str]):
+    """The only way anything enters a traffic run folder: scrubbed, serialised, refused if any member ID can still
+    be recovered from the file however often it is decoded, then written. Returns what was written."""
+    value = scrub(value, table)
     data = json.dumps(value, ensure_ascii=False).encode("utf-8")
-    if identities(tuple(members)).search(data.decode("utf-8")):
+    if _names(data.decode("utf-8"), [m for m in table if m]):
         raise ReviewError(f"{path.name}: a member ID survived pseudonymisation; nothing was written")
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.suffix == ".gz":
@@ -155,7 +176,7 @@ def write_out(path: Path, value, members: list[str]) -> bytes:
             f.write(lines)
     else:
         path.write_bytes(data)
-    return data
+    return value
 
 
 # ---------------------------------------------------------------- one answer as the review app shows it
@@ -320,11 +341,14 @@ def run(settings: Settings, since: str | None, sample: int | None, source_dsn_en
     for r in rows:
         snap, result, trace = (json.loads(r[k] or "{}") for k in ("request_json", "result_json", "trace_json"))
         snap.pop("idempotency_key", None)  # equal to the generation id, kept once
-        record = {"request_id": r["request_id"], "member": table.get(r["member_id"], pseudonym(key, r["member_id"])),
-                  "status": r["status"], "mode": r["mode"] or snap.get("mode"), "created_at": r["created_at"],
-                  "scope": json.loads(r["scope_json"] or "[]"), "request": snap, "result": result, "trace": trace}
-        frozen.append(scrub(record, table))
-        a = answer(result, trace, titles)
+        member = table.get(r["member_id"]) or pseudonym(key, r["member_id"])
+        record = scrub({"request_id": r["request_id"], "member": member, "status": r["status"],
+                        "mode": r["mode"] or snap.get("mode"), "created_at": r["created_at"],
+                        "scope": json.loads(r["scope_json"] or "[]"), "request": snap, "result": result,
+                        "trace": trace}, table)
+        frozen.append(record)
+        snap, result = record["request"], record["result"]
+        a = answer(result, record["trace"], titles)  # from the frozen record, so the view never disagrees with it
         docs = [titles.get(s.get("doc_id"), s.get("doc_id")) for s in record["scope"]]
         g = group_of(record["mode"], a["outcome"], a["validation"], a["failure"], docs, a.pop("checked"))
         items.append({"key": r["request_id"], "group": g})
@@ -355,10 +379,10 @@ def run(settings: Settings, since: str | None, sample: int | None, source_dsn_en
               "groups": len(groups), "candidates": [candidate]}
     try:
         inputs = folder / "inputs" / "requests.jsonl.gz"
-        write_out(inputs, frozen, members)
+        write_out(inputs, frozen, table)
         record["input_sha256"] = {inputs.name: hashlib.sha256(inputs.read_bytes()).hexdigest()}
-        write_out(folder / "view.json", scrub(view, table), members)
-        write_out(folder / "run.json", scrub(record, table), members)  # last: the app lists a run once it is there
+        write_out(folder / "view.json", view, table)
+        write_out(folder / "run.json", record, table)  # last: the app lists a run once it is there
     except BaseException:
         shutil.rmtree(folder, ignore_errors=True)
         raise
