@@ -25,6 +25,7 @@ import gzip
 import hashlib
 import hmac
 import json
+import os
 import random
 import re
 import secrets
@@ -250,11 +251,15 @@ RULE = ("요청을 모드 · 결과 · 검증 실패 · 문서가 모두 같은 
 # ---------------------------------------------------------------- the run
 
 
-def run(settings: Settings, since: str, sample: int, source_dsn_env: str, dsn: str) -> dict:
+def run(settings: Settings, since: str | None, sample: int | None, source_dsn_env: str, dsn: str | None = None) -> dict:
+    """Freeze one window and its sample; returns what the CLI prints. The DSN comes from source_dsn_env unless given."""
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", since or ""):
-        raise ReviewError("--since takes a date, YYYY-MM-DD")
-    if sample < 1:
-        raise ReviewError("--sample takes a positive number of requests")
+        raise ReviewError("stage-review run traffic needs --since <YYYY-MM-DD>")
+    if not sample or sample < 1:
+        raise ReviewError("stage-review run traffic needs --sample <n>, a positive number of requests")
+    dsn = dsn or os.environ.get(source_dsn_env)
+    if not dsn:
+        raise ReviewError(f"{source_dsn_env} must hold the DSN of the serving database to read")
     rows, members, titles = read_window(dsn, since)
     if not rows:
         raise ReviewError(f"no finished 질문하기 request since {since} in the database of {source_dsn_env}")
@@ -308,4 +313,5 @@ def run(settings: Settings, since: str, sample: int, source_dsn_env: str, dsn: s
     except BaseException:
         shutil.rmtree(folder, ignore_errors=True)
         raise
-    return record
+    return {"run_id": run_id, "folder": str(folder), "requests": len(rows), "groups": len(groups),
+            "sampled": len(picks)}

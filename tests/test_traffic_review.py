@@ -6,6 +6,7 @@ from __future__ import annotations
 import contextlib
 import gzip
 import json
+import os
 import tempfile
 import unittest
 import uuid
@@ -160,6 +161,16 @@ class TrafficRunTest(unittest.TestCase):
         with self.assertRaisesRegex(ReviewError, "member ID survived"):
             tr.write_out(self.root / "x.json", {"who": MEMBERS[0]}, list(MEMBERS))
         self.assertFalse((self.root / "x.json").exists())
+
+    def test_a_missing_window_sample_or_dsn_is_refused_before_connecting(self):
+        settings = SimpleNamespace(data_dir=self.root)
+        with mock.patch("psycopg.connect", side_effect=AssertionError("connected")), \
+                mock.patch.dict(os.environ, {"CODEIT_DATABASE_DSN": ""}):
+            for since, sample, words in ((None, 4, "--since"), ("2026-10-01", None, "--sample"),
+                                         ("2026-10-01", 4, "CODEIT_DATABASE_DSN must hold")):
+                with self.assertRaisesRegex(ReviewError, words):
+                    tr.run(settings, since, sample, "CODEIT_DATABASE_DSN")
+        self.assertFalse((self.root / "review" / "runs").exists())
 
     def test_traffic_answers_take_notes_and_hand_added_samples_like_gold(self):
         record, _ = run_traffic(self.root, window())

@@ -295,8 +295,9 @@ def cmd_stage_review(args, settings) -> int:
     from .evaluation import stage_review
     from .evaluation import stage_review_paid as paid
 
-    if args.action == "run" and args.stage == "traffic":
-        return cmd_traffic_review(args, settings)
+    if args.action == "run" and args.stage == "traffic":  # real answers frozen read-only; no refs to run
+        from .evaluation import traffic_review
+        return _print(traffic_review.run(settings, args.since, args.sample, args.source_dsn_env)) or 0
     if args.action == "run" and not (args.stage and args.base):
         raise ValueError("stage-review run needs a stage and --base")
     if args.action != "run" and not args.run:
@@ -320,20 +321,6 @@ def cmd_stage_review(args, settings) -> int:
                            for c in record["candidates"]]})
     if record.get("state") == "needs_approval":
         _print(paid.estimate_report(paid.load_estimate(stage_review.run_folder(settings, record["run_id"]))))
-    return 0
-
-
-def cmd_traffic_review(args, settings) -> int:
-    from .evaluation import traffic_review
-
-    if not (args.since and args.sample):
-        raise ValueError("stage-review run traffic needs --since <YYYY-MM-DD> and --sample <n>")
-    dsn = os.environ.get(args.source_dsn_env)
-    if not dsn:
-        raise ValueError(f"{args.source_dsn_env} must hold the DSN of the serving database to read")
-    record = traffic_review.run(settings, args.since, args.sample, args.source_dsn_env, dsn)
-    _print({"run_id": record["run_id"], "folder": str(settings.data_dir / "review" / "runs" / record["run_id"]),
-            "requests": record["window"]["requests"], "groups": record["groups"], "sampled": record["sample"]["drawn"]})
     return 0
 
 
@@ -850,7 +837,7 @@ def _retrieval_commands(sub) -> None:
                                            "rescore re-scores a paid run from its stored outputs without paying")
     s.add_argument("action", choices=["run", "approve", "resume", "rescore", "reprice"])
     s.add_argument("stage", nargs="?", choices=["retriever", "chunking", "generation", "ocr", "traffic"],
-                   help="run: the stage; traffic freezes real 질문하기 answers read-only for review, no refs")
+                   help="run: the stage; traffic freezes real 질문하기 answers read-only, needs no refs")
     s.add_argument("--base", help="run: baseline git ref, e.g. main")
     s.add_argument("--cand", action="append", default=[], help="candidate git ref, repeatable; '.' is the working tree")
     s.add_argument("--inputs-from", help="reuse the frozen inputs of this earlier run ID (chunking then needs no "
@@ -859,9 +846,7 @@ def _retrieval_commands(sub) -> None:
     s.add_argument("--approved-by", help="approve: the person approving the estimate")
     s.add_argument("--since", help="traffic: first day of the window, YYYY-MM-DD")
     s.add_argument("--sample", type=int, help="traffic: how many requests to draw for review")
-    s.add_argument("--source-dsn-env", default="RFP_DATABASE_DSN",
-                   help="traffic: environment variable with the DSN of the serving database to read, read-only "
-                        "(codeit's through the tunnel, e.g. CODEIT_DATABASE_DSN)")
+    s.add_argument("--source-dsn-env", default="RFP_DATABASE_DSN", help="traffic: variable holding the DSN to read")
     s.add_argument("--ledger-dsn-env", help="ocr: environment variable with the DSN of the shared ledger the paid reads "
                                             "settle in (default the corpus database)")
     s = sub.add_parser("error-analysis", help="free, no database: export the answer notes in no failure type yet with "
@@ -1070,9 +1055,8 @@ def main(argv: list[str] | None = None) -> int:
             return COMMANDS[args.command](args, load_settings(provider="fake", database_dsn_env="RFP_POSTGRES_TEST_DSN"))
         if args.command == "error-analysis" or (args.command == "stage-review" and (
                 args.stage == "chunking" and args.inputs_from or args.stage == "traffic")):
-            # No database: error analysis reads files under <data>/review only, and chunking from an earlier run's
-            # frozen inputs reads none either (a Mac teammate's checkout has none). Traffic opens only its own
-            # read-only session to the serving database it names, never the runner's.
+            # No database: error analysis reads files under <data>/review only, chunking from an earlier run's frozen
+            # inputs none either (a Mac teammate's checkout has none), traffic only its own read-only source session.
             os.environ.setdefault("RFP_NO_DATABASE_DSN", "unused")
             return COMMANDS[args.command](args, load_settings(provider="fake", database_dsn_env="RFP_NO_DATABASE_DSN"))
         settings = load_settings()
