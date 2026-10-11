@@ -1,14 +1,14 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-11 03:31:44.489000+00:00
-update_count: 52
+updated: 2026-10-11 05:00:06.594000+00:00
+update_count: 54
 last_field: diagram
-git_commit: 5673b1e
-git_branch: failure-taxonomy-from-notes
+git_commit: 6e034f5
+git_branch: similar-case-proposals
 children:
 - answer-stream
 - answer-validation
 - ask-page
-- ask-screen
+- ask-post
 - ask-submit
 - cancellation
 - evidence-retrieval
@@ -16,19 +16,21 @@ children:
 - finish-request
 - finish-step
 - generate
-- generation-stage
 - langfuse-tracing
 - metered-call
+- metered-generation
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
 - paid-answer-stages
 - paid-call
+- persist-admit
 - poll-and-stream
-- retrieval-stage
+- retrieve-price
+- rewrite
 - run-queued
 - screen-attachment
-- session-gate
+- screen-poll
 - status-poll
 - stream-and-poll
 - stream-poll
@@ -36,16 +38,20 @@ children:
 - submit-answer
 - turn-render
 - validate-and-finish
+- validate-finish
 - validation
-- worker-thread
-prev_diagram: "graph TD\r\n  ask[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  admit[\"Submit and admit\\nsrc/rfp_assistant/service/service.py\"]\r\n  worker[\"\
-  Queued worker\\nsrc/rfp_assistant/service/service.py\"]\r\n  prepare[\"Rewrite,\
-  \ retrieve, price\\nsrc/rfp_assistant/service/service.py\"]\r\n  generate[\"Metered\
-  \ generation\\nsrc/rfp_assistant/service/service.py\"]\r\n  validate[\"Citation\
-  \ validation\\nsrc/rfp_assistant/gateway/generation.py\"]\r\n  finish[\"Store outcome\\\
-  nsrc/rfp_assistant/service/service.py\"]\r\n  ask -->|POST /api/ask| admit\r\n \
-  \ admit -->|request id to executor| worker\r\n  worker -->|claimed running request|\
-  \ prepare\r\n  prepare -->|messages and estimate| generate\r\n  generate -->|partials\
-  \ via SSE| ask\r\n  generate -->|provider response| validate\r\n  validate -->|validated\
-  \ payload| finish\r\n  finish -->|polled status and result| ask"
+- worker-claim
+prev_diagram: "graph TD\r\n  ask-screen[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
+  ]\r\n  session-gate[\"Session middleware\\nsrc/rfp_assistant/api.py\"]\r\n  submit-answer[\"\
+  Submit and persist\\nsrc/rfp_assistant/service/service.py\"]\r\n  worker-thread[\"\
+  Executor worker\\nsrc/rfp_assistant/service/service.py\"]\r\n  retrieval-stage[\"\
+  Retrieve and price\\nsrc/rfp_assistant/service/service.py\"]\r\n  generation-stage[\"\
+  Metered generation\\nsrc/rfp_assistant/service/service.py\"]\r\n  finish-record[\"\
+  Validate and finish\\nsrc/rfp_assistant/service/service.py\"]\r\n  stream-poll[\"\
+  Stream and status poll\\nweb/src/lib/use-answer-stream.ts\"]\r\n  ask-screen -->|POST\
+  \ /api/ask| session-gate\r\n  session-gate -->|bind key, model, scope| submit-answer\r\
+  \n  submit-answer -->|queued row, request id| worker-thread\r\n  worker-thread -->|claim\
+  \ queued to running| retrieval-stage\r\n  retrieval-stage -->|messages and estimate|\
+  \ generation-stage\r\n  generation-stage -->|deltas into partials| stream-poll\r\
+  \n  generation-stage -->|provider response| finish-record\r\n  finish-record -->|result_json,\
+  \ done event| stream-poll"

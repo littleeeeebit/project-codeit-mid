@@ -1,1 +1,0 @@
-Inserted by `_create(..., 'queued')` after a runner slot is admitted. No paid call has happened. A cancel here is conclusive and free (`result_json` reads 'cancelled before execution').

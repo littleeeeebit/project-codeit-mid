@@ -1,0 +1,9 @@
+created: 2026-10-11T05:00:01.631Z
+updated: 2026-10-11T05:00:01.847Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: run-activation
+children: []
+parentPath:
+  - corpus-pipeline

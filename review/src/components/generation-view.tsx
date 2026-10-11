@@ -33,7 +33,7 @@ const answersOf = (questions: GenerationQuestion[], candidates: Candidate[]) =>
   questions.flatMap((q) => candidates.filter((c) => q.candidates[c.id]).map((c) => ({ q, c })));
 
 function Answers({ view, notes, setNote, decide }: Notes & { view: View; decide: React.ReactNode }) {
-  const [filter, setFilter] = useState<"differs" | "all">("differs");
+  const [filter, setFilter] = useState<"differs" | "all" | "again">("differs");
   const [mode, setMode] = useState<"compare" | "read">("compare");
   const [at, setAt] = useState(0);
   const { shown: cands, all, picker } = useShown(view.candidates, 2);  // answers are long: two columns at most
@@ -49,9 +49,14 @@ function Answers({ view, notes, setNote, decide }: Notes & { view: View; decide:
       (f) => mine === asked.current && setFailures(f), () => mine === asked.current && setFailures(null));
   }, [view.run_id, annotations]);
   const differing = view.questions.filter((q) => q.differs).length;
-  const shown = filter === "all" ? view.questions : view.questions.filter((q) => q.differs);
-  const reading = answersOf(shown, view.candidates);
   const everyAnswer = answersOf(view.questions, view.candidates);
+  // Answers marked '문제 없음' before a type was accepted: their questions, to read again against the new type.
+  const again = everyAnswer.filter(({ q, c }) => review.again(q.key, c.id).length > 0);
+  const againKeys = new Set(again.map(({ q }) => q.key));
+  const shown = filter === "all" ? view.questions
+    : view.questions.filter((q) => (filter === "again" ? againKeys.has(q.key) : q.differs));
+  const reading = answersOf(shown, view.candidates)
+    .filter(({ q, c }) => filter !== "again" || review.again(q.key, c.id).length > 0);
   const done = everyAnswer.filter(({ q, c }) => review.reviewed(q.key, c.id)).length;
   const read = (q: GenerationQuestion, c: Candidate) => {
     const i = reading.findIndex((r) => r.q.key === q.key && r.c.id === c.id);
@@ -74,6 +79,7 @@ function Answers({ view, notes, setNote, decide }: Notes & { view: View; decide:
           <Segmented value={mode} onChange={setMode} options={[["compare", "나란히 비교"], ["read", "한 답변씩 읽기"]]} />
           <Segmented value={filter} onChange={(f) => { setFilter(f); setAt(0); }} options={[
             ["differs", `결과가 다른 질문 ${differing}`], ["all", `전체 ${view.questions.length}`],
+            ...(again.length > 0 || filter === "again" ? [["again", `다시 볼 답변 ${again.length}`] as ["again", string]] : []),
           ]} />
           {mode === "compare" && picker}
           <span className="text-[14px] tabular-nums text-muted" title="'검토함 · 문제 없음'으로 표시했거나 메모를 단 답변">
@@ -82,7 +88,9 @@ function Answers({ view, notes, setNote, decide }: Notes & { view: View; decide:
           {decide}
         </div>
         {shown.length === 0 && (
-          <p className="py-10 text-center text-muted">결과가 다른 질문이 없습니다. &apos;전체&apos;에서 답변을 봅니다.</p>
+          <p className="py-10 text-center text-muted">
+            {filter === "again" ? "다시 볼 답변을 모두 봤습니다." : "결과가 다른 질문이 없습니다. '전체'에서 답변을 봅니다."}
+          </p>
         )}
         {mode === "read" && reading.length > 0 ? (
           <ReadingView key={`${filter}`} items={reading} at={Math.min(at, reading.length - 1)} setAt={setAt}
@@ -143,16 +151,23 @@ function Summary({ s, c, reviewed, types }: {
   );
 }
 
-/** Answers of this candidate with a note of each accepted failure type, over its answers a person reviewed. */
+/** Answers of this candidate a person found each accepted failure type in, over its answers a person reviewed; the
+ *  answers holding a type only through an approved AI suggestion are added apart and are not part of the rate. */
 function FailureTypes({ f, c }: { f: RunFailures; c: Candidate }) {
   const n = f.reviewed[c.id] ?? 0;
-  const rows = f.types.map((t) => ({ t, k: t.by_candidate[c.id] ?? 0 })).filter((r) => r.k > 0).sort((a, b) => b.k - a.k);
+  const rows = f.types.map((t) => ({ t, k: t.by_candidate[c.id] ?? 0, ai: t.ai_by_candidate[c.id] ?? 0 }))
+    .filter((r) => r.k + r.ai > 0).sort((a, b) => b.k - a.k || b.ai - a.ai);
   return (
     <div className="mt-2">
-      <div className="text-[13px] font-semibold text-muted">실패 유형 v{f.version} · 검토한 답변 {n}개 중</div>
+      <div className="text-[13px] font-semibold text-muted">실패 유형 v{f.version} · 사람이 찾은 답변 / 검토한 답변 {n}개</div>
       {rows.length === 0 ? <p className="text-[14px] text-muted">해당하는 유형 없음</p> : (
         <ul className="text-[14px] tabular-nums">
-          {rows.map(({ t, k }) => <li key={t.id} title={t.definition}>{t.name} <b className="text-bad">{k}</b>/{n}</li>)}
+          {rows.map(({ t, k, ai }) => (
+            <li key={t.id} title={t.definition}>
+              {t.name} <b className="text-bad">{k}</b>/{n}
+              {ai > 0 && <span className="text-primary" title="AI가 제안하고 사람이 승인한 답변. 비율에 넣지 않습니다"> · AI 제안 승인 +{ai}</span>}
+            </li>
+          ))}
         </ul>
       )}
     </div>

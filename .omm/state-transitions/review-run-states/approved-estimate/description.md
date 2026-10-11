@@ -1,1 +1,0 @@
-`approve` stamps the approver into the estimate and the audit log. `require_approved` and `recheck` gate `resume`; an expired or rate-changed estimate needs a new `reprice` and approval.

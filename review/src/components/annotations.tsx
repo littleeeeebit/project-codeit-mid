@@ -16,6 +16,7 @@ type Ctx = {
   version: number;
   notes: SpanNote[];
   reviewedMarks: Set<string>;
+  again: Map<string, string[]>;
   send: (body: Record<string, unknown>) => Promise<void>;
   show: (p: Pop) => void;
 };
@@ -23,6 +24,8 @@ type Ctx = {
 const AnnotationContext = createContext<Ctx | null>(null);
 const pair = (q: string, c: string) => `${q}\u0000${c}`;
 const codePoints = (s: string) => Array.from(s).length;
+/** A note the person wrote themselves, as opposed to an AI suggestion they approved. */
+export const human = (n: SpanNote) => !n.origin;
 
 function useAnnotations() {
   const ctx = useContext(AnnotationContext);
@@ -89,6 +92,7 @@ export function AnnotationProvider({ run, children }: { run: string; children: R
     version: state.version,
     notes: state.notes,
     reviewedMarks: new Set(state.reviewed.map((r) => pair(r.question, r.candidate))),
+    again: new Map((state.rereview ?? []).map((r) => [pair(r.question, r.candidate), r.types])),
     send,
     show: setPop,
   }), [state, send]);
@@ -118,13 +122,15 @@ export function Annotatable({ q, c, field, text, className = "" }: {
         const piece = chars.slice(s, e).join("");
         const over = mine.filter((n) => n.start <= s && n.end >= e);
         if (!over.length) return <Fragment key={s}>{piece}</Fragment>;
+        // An approved AI suggestion is marked apart (dashed, blue) from what the person found themselves.
+        const look = over.some(human) ? "bg-bad-bg decoration-bad" : "bg-primary-bg decoration-primary decoration-dashed";
         return (
-          <mark key={s} title={over.map((n) => n.note).join("\n")}
+          <mark key={s} title={over.map((n) => (human(n) ? n.note : `AI 제안 · ${n.note}`)).join("\n")}
                 onClick={(ev) => {
                   if (!window.getSelection()?.isCollapsed) return;  // the end of a new selection, not a click on a mark
                   show({ kind: "notes", ids: over.map((n) => n.id), ...place(ev.currentTarget.getBoundingClientRect()) });
                 }}
-                className="cursor-pointer rounded-sm bg-bad-bg text-inherit underline decoration-bad decoration-2 underline-offset-4">
+                className={`cursor-pointer rounded-sm text-inherit underline decoration-2 underline-offset-4 ${look}`}>
             {piece}
           </mark>
         );
@@ -207,7 +213,10 @@ function NoteBox({ pop, onClose }: { pop: Pop; onClose: () => void }) {
                 <>
                   <p className="mt-1 whitespace-pre-line break-words text-[15px]">{n.note}</p>
                   <div className="mt-1 flex items-center gap-3 text-[13px] text-muted">
-                    <span>{n.edited_by ?? n.author} · {when(n.edited_at ?? n.at)}{n.edited_at && " 고침"}</span>
+                    <span>
+                      {!human(n) && <b className="text-primary">AI 제안 · {n.approved_by} 승인 · </b>}
+                      {n.edited_by ?? n.author} · {when(n.edited_at ?? n.at)}{n.edited_at && " 고침"}
+                    </span>
                     <button type="button" className="ml-auto font-medium text-primary hover:underline"
                             onClick={() => { setEditing(n.id); setDraft(n.note); }}>고치기</button>
                     <button type="button" disabled={busy} className="font-medium text-bad hover:underline"
@@ -231,34 +240,58 @@ export function useAnnotationVersion() {
   return useAnnotations().version;
 }
 
-/** Reviewed: marked '검토함 · 문제 없음', or carrying at least one note. */
+/** Reviewed: marked '검토함 · 문제 없음', or carrying at least one note the person wrote. An approved AI suggestion
+ *  does not make an answer reviewed: the person read that span, not the answer. */
 export function useReview() {
-  const { notes, reviewedMarks, send } = useAnnotations();
+  const { notes, reviewedMarks, again, send } = useAnnotations();
   return useMemo(() => {
     const noted = new Map<string, number>();
-    for (const n of notes) noted.set(pair(n.question, n.candidate), (noted.get(pair(n.question, n.candidate)) ?? 0) + 1);
+    const suggested = new Map<string, number>();
+    for (const n of notes) {
+      const into = human(n) ? noted : suggested;
+      into.set(pair(n.question, n.candidate), (into.get(pair(n.question, n.candidate)) ?? 0) + 1);
+    }
     return {
       noteCount: (q: string, c: string) => noted.get(pair(q, c)) ?? 0,
+      suggestedCount: (q: string, c: string) => suggested.get(pair(q, c)) ?? 0,
       marked: (q: string, c: string) => reviewedMarks.has(pair(q, c)),
       reviewed: (q: string, c: string) => reviewedMarks.has(pair(q, c)) || noted.has(pair(q, c)),
+      /** Types accepted after this answer was marked '문제 없음': it was read without them. */
+      again: (q: string, c: string) => again.get(pair(q, c)) ?? [],
       mark: (q: string, c: string, value: boolean) => send({ op: "reviewed", question: q, candidate: c, value }),
     };
-  }, [notes, reviewedMarks, send]);
+  }, [notes, reviewedMarks, again, send]);
 }
 
 export function ReviewedMark({ q, c }: { q: string; c: string }) {
   const review = useReview();
   const [error, setError] = useState("");
   const n = review.noteCount(q, c);
-  if (n > 0) return <p className="mt-3 text-[14px] font-semibold text-bad">메모 {n}개 · 검토함</p>;
+  const ai = review.suggestedCount(q, c);
+  const again = review.again(q, c);
+  const save = (value: boolean) => review.mark(q, c, value).then(() => setError(""),
+    (err: Error) => setError(`저장하지 못했습니다: ${err.message}`));
+  const suggestedLine = ai > 0 && <p className="mt-1 text-[13px] font-semibold text-primary">AI 제안 승인 {ai}개</p>;
+  if (n > 0) return <><p className="mt-3 text-[14px] font-semibold text-bad">메모 {n}개 · 검토함</p>{suggestedLine}</>;
   return (
     <div className="mt-3">
+      {again.length > 0 && (
+        <div className="mb-2 rounded-[10px] bg-warn-bg px-3 py-2">
+          <p className="text-[14px] font-semibold text-warn">기준 추가 후 다시 보기 ({again.join(", ")})</p>
+          <p className="text-[13px] text-warn">이 답변을 &apos;문제 없음&apos;으로 표시한 뒤에 생긴 유형입니다. 그 기준으로 다시 읽고,
+            문제가 있으면 메모를 다세요.</p>
+          <button type="button" onClick={() => save(true)}
+                  className="mt-1.5 h-8 rounded-[10px] bg-white px-3 text-[13px] font-semibold text-ink shadow-sm">
+            다시 봤음 · 여전히 문제 없음
+          </button>
+        </div>
+      )}
       <label className="inline-flex cursor-pointer items-center gap-2 text-[14px] font-medium">
         <input type="checkbox" checked={review.marked(q, c)} className="size-4 accent-[var(--color-ok)]"
-               onChange={(e) => review.mark(q, c, e.target.checked).then(() => setError(""),
-                 (err: Error) => setError(`저장하지 못했습니다: ${err.message}`))} />
+               onChange={(e) => save(e.target.checked)} />
         <span className={review.marked(q, c) ? "text-ok" : ""}>검토함 · 문제 없음</span>
       </label>
+      {suggestedLine}
       {error && <p role="alert" className="text-[13px] text-bad">{error}</p>}
     </div>
   );

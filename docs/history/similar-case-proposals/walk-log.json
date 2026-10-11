@@ -1,0 +1,109 @@
+[
+ {
+  "step": "accept the proposed type",
+  "observed": "수락된 유형 1개 · v1"
+ },
+ {
+  "step": "copy the similar-case prompt",
+  "observed": "clipboard == shown prompt: True; Read C:\\Users\\dasdk\\walk-similar-cases\\data\\review\\taxonomy\\suggest-exports\\suggest-20261011T040239Z-e5f701\\prompt.md and follow it: find other answers in C:\\Users\\dasdk\\walk-similar-cases\\data\\review\\taxonomy\\suggest-exports\\suggest-20261011T040239Z-e5f701\\answers.jsonl showing the failure type “내부 근거 표기 노출” defined in C:\\Users\\dasdk\\walk-similar-cases\\data\\review\\taxonomy\\suggest-exports\\suggest-20261011T040239Z-e5f701\\type.json, then submit them with `python -m rfp_assistant.cli error-analysis suggest --file C:\\Users\\dasdk\\walk-similar-cases\\data\\review\\taxonomy\\suggest-exports\\suggest-20261011T040239Z-e5f701\\suggestions.json`."
+ },
+ {
+  "step": "page errors (accept)",
+  "observed": "none"
+ },
+ {
+  "step": "open the type's queue",
+  "observed": "AI 제안 9개 남음승인 0 · 거절 0; 9 items; marks ['[ E11, E13 ]', '(E7,E11)', '(고려대: E1, E7)', '(doc: e6fa61a5', '(증거: E2)', '(doc_id: c666c44b', '근거문서는 E1, E2, E4, E6, E8입니다.', '(문서: e97f31e2', 'TER-002']; reasons ['AI 근거 번호 E11, E13이 대괄호로 본문에 남아 있다', 'AI 다음 조치 문장 끝에 내부 근거 번호가 붙어 있다', 'AI 기관명 옆에 근거 번호 E1, E7이 그대로 보인다', 'AI 문서 ID가 괄호 안에 그대로 노출된다', \"AI '증거: E2'라는 내부 근거 표기가 본문에 남았다\", 'AI doc_id 필드명과 문서 ID가 함께 노출된다', 'AI 근거 번호 목록을 사용자에게 문장으로 알려 준다', \"AI 문서 ID가 '문서:' 표기와 함께 노출된다\", 'AI 괄호 안 식별 번호가 근거 표기처럼 붙어 있다']"
+ },
+ {
+  "step": "the queue states suggestions miss cases",
+  "observed": "AI 제안은 모든 사례를 찾지 못합니다. 승인한 사례는 사람이 찾은 사례와 따로 세고, 검토한 답변 대비 비율에 넣지 않습니다."
+ },
+ {
+  "step": "approve",
+  "observed": "“[ E11, E13 ]” approved; AI 제안 8개 남음승인 1 · 거절 0"
+ },
+ {
+  "step": "approve",
+  "observed": "“(E7,E11)” approved; AI 제안 7개 남음승인 2 · 거절 0"
+ },
+ {
+  "step": "approve",
+  "observed": "“(고려대: E1, E7)” approved; AI 제안 6개 남음승인 3 · 거절 0"
+ },
+ {
+  "step": "approve",
+  "observed": "“(doc: e6fa61a5” approved; AI 제안 5개 남음승인 4 · 거절 0"
+ },
+ {
+  "step": "approve",
+  "observed": "“(증거: E2)” approved; AI 제안 4개 남음승인 5 · 거절 0"
+ },
+ {
+  "step": "approve",
+  "observed": "“(doc_id: c666c44b” approved; AI 제안 3개 남음승인 6 · 거절 0"
+ },
+ {
+  "step": "approve",
+  "observed": "“근거문서는 E1, E2, E4, E6, E8입니다.” approved; AI 제안 2개 남음승인 7 · 거절 0"
+ },
+ {
+  "step": "approve",
+  "observed": "“(문서: e97f31e2” approved; AI 제안 1개 남음승인 8 · 거절 0"
+ },
+ {
+  "step": "reject with a reason",
+  "observed": "AI 제안 0개 남음승인 8 · 거절 1; “TER-002” — 일반 문장 속 숫자이지 내부 근거 표기가 아님 · local-user"
+ },
+ {
+  "step": "counts on the type",
+  "observed": "사람이 찾은 답변 2개 · AI 제안 승인 7개 · 메모 10개"
+ },
+ {
+  "step": "spans behind the type",
+  "observed": "['“[ E7 ]”', '“(doc: 6a6f639c”', '“[ E11, E13 ]”', '“(E7,E11)”']; AI labels 2"
+ },
+ {
+  "step": "progress (progress)",
+  "observed": "metrics ['1 수락된 유형 (폭)', '8 사람이 검토한 답변', '1 최근 8개 검토 답변에서 처음 나온 유형', '1 사례 3개 미만 유형', '6 기준 추가 후 다시 볼 답변', '사례 3개 미만 2 / 8 답변 (사람이 찾음) AI 제안 승인 +7 · 다시 볼 답변 6']; type line 내부 근거 표기 노출 | 검토 순서 7번째 답변에서 처음 나옴 |  | 답변 본문에 근거 번호나 문서 ID 같은 내부 표기가 그대로 드러난다. |  | 사례 3개 미만 | 2 | / 8 답변 (사람이 찾음) | AI 제안 승인 +7 · 다시 볼 답변 6"
+ },
+ {
+  "step": "progress states suggestions miss cases",
+  "observed": "수락된 유형마다 그 유형 메모가 달린 답변 수를 사람이 검토한 답변 수로 나눕니다. 다음에 고칠 것을 고르는 근거이고, 릴리스 기준이나 봉인된 평가 수치가 아닙니다. AI가 제안하고 승인한 사례는 따로 보이며 비율에 넣지 않습니다. AI 제안은 모든 사례를 찾지 못합니다."
+ },
+ {
+  "step": "page errors (queue)",
+  "observed": "none"
+ },
+ {
+  "step": "generation run, 다시 볼 답변 filter",
+  "observed": "6 flags: ['기준 추가 후 다시 보기 (내부 근거 표기 노출)', '기준 추가 후 다시 보기 (내부 근거 표기 노출)', '기준 추가 후 다시 보기 (내부 근거 표기 노출)', '기준 추가 후 다시 보기 (내부 근거 표기 노출)', '기준 추가 후 다시 보기 (내부 근거 표기 노출)', '기준 추가 후 다시 보기 (내부 근거 표기 노출)']"
+ },
+ {
+  "step": "candidate summaries",
+  "observed": [
+   "내부 근거 표기 노출 1/6 · AI 제안 승인 +6",
+   "내부 근거 표기 노출 1/2 · AI 제안 승인 +1"
+  ]
+ },
+ {
+  "step": "approved AI spans in answers",
+  "observed": "2 dashed marks: ['(고려대: E1, E7)', '(doc: e6fa61a5']"
+ },
+ {
+  "step": "second look done on one answer",
+  "observed": "5 flags left"
+ },
+ {
+  "step": "progress (progress-after)",
+  "observed": "metrics ['1 수락된 유형 (폭)', '8 사람이 검토한 답변', '1 최근 8개 검토 답변에서 처음 나온 유형', '1 사례 3개 미만 유형', '5 기준 추가 후 다시 볼 답변', '사례 3개 미만 2 / 8 답변 (사람이 찾음) AI 제안 승인 +7 · 다시 볼 답변 5']; type line 내부 근거 표기 노출 | 검토 순서 7번째 답변에서 처음 나옴 |  | 답변 본문에 근거 번호나 문서 ID 같은 내부 표기가 그대로 드러난다. |  | 사례 3개 미만 | 2 | / 8 답변 (사람이 찾음) | AI 제안 승인 +7 · 다시 볼 답변 5"
+ },
+ {
+  "step": "progress states suggestions miss cases",
+  "observed": "수락된 유형마다 그 유형 메모가 달린 답변 수를 사람이 검토한 답변 수로 나눕니다. 다음에 고칠 것을 고르는 근거이고, 릴리스 기준이나 봉인된 평가 수치가 아닙니다. AI가 제안하고 승인한 사례는 따로 보이며 비율에 넣지 않습니다. AI 제안은 모든 사례를 찾지 못합니다."
+ },
+ {
+  "step": "page errors (rereview)",
+  "observed": "none"
+ }
+]

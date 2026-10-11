@@ -1,47 +1,37 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-11T03:31:19.600Z
-update_count: 49
+updated: 2026-10-11 04:59:52.842000+00:00
+update_count: 51
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
 children:
-  - corpus-route
-  - corpus-router
-  - corpus-routing
-  - dense-channel
-  - dense-search
-  - evidence-packer
-  - fusion
-  - fusion-rerank
-  - keyword-index
-  - lexical-channel
-  - local-reranker
-  - query-embedding
-  - reranker
-  - scope-routing
-  - serving-activation
-  - serving-config
+- corpus-route
+- corpus-router
+- corpus-routing
+- dense-channel
+- dense-search
+- evidence-packing
+- fusion
+- fusion-rerank
+- keyword-index
+- lexical-channels
+- local-reranker
+- query-embedding
+- query-vector
+- reranker
+- scope-routing
+- serving-activation
+- serving-config
 parentPath: []
-prev_diagram: "graph TD\r
-
-  \  serving-activation[\"Active serving
-  config\\nsrc/rfp_assistant/service/service.py\"] -->|\"mode, limits, index
-  version\"| keyword-index[\"Kiwi BM25
-  KeywordIndex\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
-
-  \  keyword-index -->|\"scope terms, rows\"| corpus-routing[\"Corpus routing
-  and scope\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
-
-  \  corpus-routing -->|\"allowed rows\"| lexical-channel[\"Exact codes and
-  BM25\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
-
-  \  corpus-routing -->|\"allowed rows\"| dense-channel[\"Query vector and
-  pgvector\\nsrc/rfp_assistant/retrieval/vector_store.py\"]\r
-
-  \  lexical-channel -->|\"ranked rows\"| fusion-rerank[\"Keyword-first RRF,
-  reranker\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
-
-  \  dense-channel -->|\"cosine top k\"| fusion-rerank\r
-
-  \  fusion-rerank -->|\"final ranking\"| evidence-packing[\"Evidence
-  packing\\nsrc/rfp_assistant/retrieval/retrieval.py\"]"
+prev_diagram: "graph TD\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  corpus-routing[\"Corpus routing and name-only\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  lexical-channel[\"Kiwi BM25 channel\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  query-embedding[\"Query vector cache\\nsrc/rfp_assistant/retrieval/dense.py\"\
+  ]\r\n  dense-channel[\"Dense pgvector channel\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
+  ]\r\n  fusion-rerank[\"Fusion and reranker\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  evidence-packer[\"Evidence packer\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  keyword-index -->|scope rows and title terms| corpus-routing\r\n  corpus-routing\
+  \ -->|allowed rows| lexical-channel\r\n  corpus-routing -->|allowed rows| dense-channel\r\
+  \n  query-embedding -->|unit query vector| dense-channel\r\n  lexical-channel -->|BM25\
+  \ ranked rows| fusion-rerank\r\n  dense-channel -->|cosine ranked rows| fusion-rerank\r\
+  \n  fusion-rerank -->|final ranking| evidence-packer"

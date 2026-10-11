@@ -1,9 +1,0 @@
-created: 2026-10-11T03:31:57.510Z
-updated: 2026-10-11T03:31:57.511Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: accepted-type
-children: []
-parentPath:
-  - taxonomy-states

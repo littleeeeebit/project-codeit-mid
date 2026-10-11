@@ -1,61 +1,88 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-11 03:31:15.335000+00:00
-update_count: 54
+updated: 2026-10-11T04:59:48.692Z
+update_count: 56
 last_field: diagram
-git_commit: 5673b1e
-git_branch: failure-taxonomy-from-notes
+git_commit: 6e034f5
+git_branch: similar-case-proposals
 children:
-- api
-- api-layer
-- api-routes
-- api-shell
-- budget-ledger
-- cli
-- corpus-pipeline
-- data-stores
-- evaluation
-- evaluation-suite
-- external-services
-- gateway
-- http
-- http-api
-- langfuse-tracing
-- offline-pipelines
-- openai-transport
-- owner-cli
-- paid-gateway
-- persistence
-- postgres-storage
-- postgres-store
-- postgresql-store
-- provider-transport
-- retrieval
-- retrieval-engine
-- runtime-artifacts
-- screens
-- self-update
-- service
-- service-core
-- service-layer
-- stage-review
-- storage
-- storage-layer
-- stores
-- tracing
-- web
-- web-pages
-- web-screens
-- workflows
-prev_diagram: "graph TD\r\n  screens[\"Web screens\\nweb/src/app/page.tsx\"]\r\n \
-  \ api[\"FastAPI routes and session\\nsrc/rfp_assistant/api.py\"]\r\n  service[\"\
-  Service core\\nsrc/rfp_assistant/service/service.py\"]\r\n  retrieval[\"Retrieval\
-  \ engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  gateway[\"Paid gateway\
-  \ and ledger\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n  stores[\"PostgreSQL and\
-  \ runtime files\\nsrc/rfp_assistant/storage/postgres.py\"]\r\n  cli[\"Owner CLI\\\
-  nsrc/rfp_assistant/cli.py\"]\r\n  review[\"Stage review app\\nreview/server.py\"\
-  ]\r\n  screens -->|JSON calls and SSE| api\r\n  api -->|one service call per route|\
-  \ service\r\n  cli -->|same service and pipelines| service\r\n  service -->|scoped\
-  \ question| retrieval\r\n  service -->|reserve, call, settle| gateway\r\n  retrieval\
-  \ -->|index files and pgvector| stores\r\n  gateway -->|attempt rows| stores\r\n\
-  \  service -->|requests, traces, results| stores\r\n  cli -->|writes run folders|\
-  \ review"
+  - api
+  - api-layer
+  - api-routes
+  - api-shell
+  - budget-ledger
+  - cli
+  - corpus-pipeline
+  - data-stores
+  - evaluation
+  - evaluation-suite
+  - external-services
+  - gateway
+  - http
+  - http-api
+  - langfuse-tracing
+  - offline-pipelines
+  - openai-transport
+  - owner-cli
+  - paid-gateway
+  - persistence
+  - postgres-storage
+  - postgres-store
+  - postgresql-store
+  - provider-transport
+  - retrieval
+  - retrieval-engine
+  - runtime-artifacts
+  - screens
+  - self-update
+  - service
+  - service-core
+  - service-layer
+  - stage-review
+  - stage-review-app
+  - storage
+  - storage-layer
+  - stores
+  - tracing
+  - web
+  - web-pages
+  - web-screens
+  - workflows
+prev_diagram: "graph TD\r
+
+  \  web-screens[\"Consultant screens\\nweb/src/components/ask/ask-page.tsx\"]\r
+
+  \  http-api[\"HTTP API and session gate\\nsrc/rfp_assistant/api.py\"]\r
+
+  \  service-core[\"Service core and request
+  runner\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  retrieval-engine[\"Retrieval
+  engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
+
+  \  paid-gateway[\"Paid gateway and
+  ledger\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  storage-layer[\"PostgreSQL and runtime
+  files\\nsrc/rfp_assistant/storage/postgres.py\"]\r
+
+  \  owner-cli[\"Owner CLI and pipelines\\nsrc/rfp_assistant/cli.py\"]\r
+
+  \  stage-review[\"Stage review app\\nreview/server.py\"]\r
+
+  \  web-screens -->|fetch /api JSON and SSE| http-api\r
+
+  \  http-api -->|one service call per route| service-core\r
+
+  \  service-core -->|retrieve scoped evidence| retrieval-engine\r
+
+  \  service-core -->|reserve, dispatch, settle| paid-gateway\r
+
+  \  retrieval-engine -->|chunks and vector search| storage-layer\r
+
+  \  paid-gateway -->|attempt rows| storage-layer\r
+
+  \  owner-cli -->|ingest, build, activate| storage-layer\r
+
+  \  owner-cli -->|same Resources owner| service-core\r
+
+  \  owner-cli -->|writes review run folders| stage-review"

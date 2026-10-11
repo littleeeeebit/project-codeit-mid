@@ -1,12 +1,18 @@
 created: 2026-10-06 22:40:16.184000+00:00
-updated: 2026-10-07 06:24:22.509000+00:00
-update_count: 6
-last_field: concern
+updated: 2026-10-11T04:59:57.440Z
+update_count: 8
+last_field: diagram
 kind: nested-class
 title: storage
 children:
-- connection-pool
-- maintenance-sequence
-- postgres-target
-- schema-and-store
+  - application-tables
+  - backup-restore
+  - connection-pool
+  - maintenance-sequence
+  - postgres-target
+  - runtime-artifacts
+  - schema-and-store
+  - startup-validation
+  - vector-sets
+  - write-mutex
 parentPath: []

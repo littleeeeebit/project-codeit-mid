@@ -1,9 +1,9 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-11 03:31:49.634000+00:00
-update_count: 50
+updated: 2026-10-11 05:00:09.859000+00:00
+update_count: 52
 last_field: diagram
-git_commit: 5673b1e
-git_branch: failure-taxonomy-from-notes
+git_commit: 6e034f5
+git_branch: similar-case-proposals
 children:
 - attempt-billing
 - attempt-record
@@ -15,19 +15,20 @@ children:
 - gold-candidate-states
 - interrupted
 - owner-reconcile
-- request-states
 - request-status
-- review-run-states
 - running
 - serving-activation
 - source-review-states
-- taxonomy-states
+- stage-review-run
+- taxonomy-decisions
 - update-fence
 - update-states
-prev_diagram: "graph TD\r\n  requests[\"Request status\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  attempts[\"Billing attempt state\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  stagerun[\"Paid stage review run\\nsrc/rfp_assistant/evaluation/stage_review.py\"\
-  ]\r\n  activation[\"Serving activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  requests -->|stop check in dispatch| attempts\r\n  attempts -->|billing state\
-  \ on result| requests\r\n  stagerun -->|reserves via gateway| attempts\r\n  activation\
-  \ -->|config snapshot per request| requests"
+prev_diagram: "graph TD\r\n  request-states[\"Request status\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  attempt-states[\"Billing attempt state\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  review-run-states[\"Stage review run state\\nsrc/rfp_assistant/evaluation/stage_review.py\"\
+  ]\r\n  taxonomy-states[\"Failure type state\\nsrc/rfp_assistant/evaluation/error_analysis.py\"\
+  ]\r\n  serving-activation[\"Serving activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
+  ]\r\n  request-states -->|each paid stage opens| attempt-states\r\n  attempt-states\
+  \ -->|billing_state precedence| request-states\r\n  review-run-states -->|answers\
+  \ via service.answer| request-states\r\n  review-run-states -->|generation answers\
+  \ annotated| taxonomy-states\r\n  serving-activation -->|pins retrieval for| request-states"

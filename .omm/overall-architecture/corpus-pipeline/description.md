@@ -1,0 +1,1 @@
+The owner-run path from the original HWP and PDF files to searchable, reviewable extractions and an activated serving configuration. Each step reuses unchanged inputs, so a rerun with nothing changed does no work. Nothing changes what serves until a person activates a run.

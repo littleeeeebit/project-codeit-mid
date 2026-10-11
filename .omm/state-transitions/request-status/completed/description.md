@@ -1,0 +1,1 @@
+`_finish` stored a result with status `completed`. The result may still be a non-answer domain status such as `insufficient_evidence` or `budget_blocked`.

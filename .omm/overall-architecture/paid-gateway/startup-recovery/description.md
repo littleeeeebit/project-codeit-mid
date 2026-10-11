@@ -1,1 +1,0 @@
-`budget.recover` runs once the lock is held. `dispatching` attempts become `unknown` ('process ended during dispatch') and `reserved` attempts become `released`, in both `attempts` and the Gemini `external_attempts`. `service.recover_requests` marks queued and running requests `interrupted`. `Resources.close` re-runs both when a job thread outlives the shutdown deadline.

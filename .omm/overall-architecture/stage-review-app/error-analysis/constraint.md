@@ -1,0 +1,1 @@
+Counts never gate a release, and approved AI suggestions never make an answer reviewed or enter the rate.

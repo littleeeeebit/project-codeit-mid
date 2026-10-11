@@ -1,0 +1,1 @@
+One broken candidate never costs the others their results; it stays in the run with its reason.

@@ -35,6 +35,11 @@
   },
   {
    "a": "README.md",
+   "b": "docs/history/similar-case-proposals/README.md",
+   "kind": "link"
+  },
+  {
+   "a": "README.md",
    "b": "docs/history/workflow-acceptance/README.md",
    "kind": "link"
   },
@@ -706,8 +711,8 @@
   "docs/hwp-loader-preview-review.md"
  ],
  "counts": {
-  "docs": 37,
-  "linked": 27,
+  "docs": 38,
+  "linked": 28,
   "read": 8,
   "orphans": 2,
   "pages": 2,

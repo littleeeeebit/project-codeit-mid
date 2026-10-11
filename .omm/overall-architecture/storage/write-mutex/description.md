@@ -1,0 +1,1 @@
+`tx(conn, immediate=True)` takes `SELECT ... FROM application_mutex WHERE id = 1 FOR UPDATE`. This single global write mutex serializes request idempotency checks, ledger admission, dispatch markers, settlements and request finishes. `read_snapshot` gives a consistent read-only view under REPEATABLE READ.

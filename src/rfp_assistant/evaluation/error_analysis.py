@@ -7,12 +7,20 @@ it stands on the person's own notes, and the person accepts, renames, merges, sp
 review app. Counts are answers with a note of a type over answers a person reviewed; they guide what to fix next
 and are never a release gate.
 
+For an accepted type the agent may also suggest other spans of it across every stored answer (similar_cases.py): each one
+must quote its stored answer verbatim, and only the person's approval turns it into a note (origin ai_suggested),
+counted apart from the cases a person found. Suggestions add cases, never types, and do not find every case. An
+answer marked reviewed with no issues before a type was accepted is flagged for a second look against it.
+
 Under <data>/review:
   annotations/<run-id>.jsonl        the span notes and reviewed marks (append-only; review/server.py writes them)
   taxonomy/exports/<export-id>/     notes.jsonl (notes in no type yet) and prompt.md, for the coding agent
   taxonomy/proposals/<id>.json      validated proposals; their types wait for the person's decision
-  taxonomy/history.jsonl            every decision on a type, append-only
-  taxonomy/versions/v<N>.json       the accepted taxonomy after each change to it
+  taxonomy/suggest-exports/<id>/    type.json, answers.jsonl and prompt.md: one type's search over stored answers
+  taxonomy/suggestions/<id>.json    validated suggestions; each waits for the person's approval or rejection
+  taxonomy/history.jsonl            every decision on a type or a suggestion, append-only
+  taxonomy/versions/v<N>.json       the accepted taxonomy after each change to its types (an approved suggestion
+                                    adds a case to a type without a new version)
 """
 
 from __future__ import annotations
@@ -29,8 +37,11 @@ from pathlib import Path
 PROPOSAL_SCHEMA = "failure-taxonomy-proposal-1"
 ACTION_SCHEMA = "failure-taxonomy-action-1"
 TAXONOMY_SCHEMA = "failure-taxonomy-1"
+ANNOTATION_SCHEMA = "review-annotation-1"
+AI = "ai_suggested"  # the origin of a note the agent suggested and a person approved; a person's own note has none
 THIN = 3  # a type seen in fewer answers than this is marked: too few cases to know what it is
 HANGUL = re.compile(r"[가-힣]")
+FIELD = re.compile(r"^(summary|next_action|claim\.(\d+)|conflict\.(\d+)\.(\d+)|missing\.(\d+))$")
 
 
 class ReviewInputError(ValueError):
@@ -118,13 +129,24 @@ def read_annotations(root: Path, run_id: str) -> list[dict]:
     return read_jsonl(annotations_file(root, run_id))
 
 
-def annotation_state(records: list[dict]) -> dict:
-    """The records folded in order: live notes with their latest text, and answers marked reviewed and fine."""
+def unconfirmed_suggestions(root: Path) -> set[str]:
+    """Suggestions stored here whose approval is not committed in history.jsonl. A note naming one was written by an
+    approval whose history record then failed. A note naming another store's suggestion came with an imported run,
+    committed where it was approved (export_run leaves the uncommitted ones out), and stays live."""
+    return {s["id"] for s in suggestions(root) if s["status"] != "approved"}
+
+
+def annotation_state(records: list[dict], unconfirmed: set[str] | frozenset = frozenset()) -> dict:
+    """The records folded in order: live notes with their latest text, and answers marked reviewed and fine. A note
+    from a suggestion in `unconfirmed` (unconfirmed_suggestions) is not shown, counted or kept by a rejection."""
     notes, reviewed = {}, {}
     for r in records:
+        if r["op"] == "note" and r.get("origin") and r.get("suggestion") in unconfirmed:
+            continue
         if r["op"] == "note":
             notes[r["id"]] = {k: r[k] for k in ("id", "question", "candidate", "commit", "field", "start", "end",
                                                 "text", "note", "author", "at")}
+            notes[r["id"]].update({k: r[k] for k in ("origin", "suggestion", "approved_by") if r.get(k)})
         elif r["op"] == "edit" and r["target"] in notes:
             notes[r["target"]].update(note=r["note"], edited_by=r["author"], edited_at=r["at"])
         elif r["op"] == "delete":
@@ -132,25 +154,59 @@ def annotation_state(records: list[dict]) -> dict:
         elif r["op"] == "reviewed":
             key = (r["question"], r["candidate"])
             if r["value"]:
+                # `at` is the latest mark (a second look renews it); `first_at` keeps when the answer was first read.
+                first = reviewed.get(key, {}).get("first_at", r["at"])
                 reviewed[key] = {"question": r["question"], "candidate": r["candidate"], "author": r["author"],
-                                 "at": r["at"]}
+                                 "at": r["at"], "first_at": first}
             else:
                 reviewed.pop(key, None)
     # The store only grows, so its record count orders snapshots: the app keeps the newest it has seen.
     return {"version": len(records), "notes": list(notes.values()), "reviewed": list(reviewed.values())}
 
 
+def human(note: dict) -> bool:
+    """A note a person found, not a suggestion they approved: only these make an answer reviewed or found."""
+    return not note.get("origin")
+
+
+def field_text(answer: dict, field: str) -> str | None:
+    """The stored answer text a span lies in: what the app renders for that field, character for character."""
+    m = FIELD.match(field or "")
+    try:
+        if not m:
+            return None
+        if field in ("summary", "next_action"):
+            return answer.get(field)
+        if m.group(2):
+            return answer["claims"][int(m.group(2))]["text"]
+        if m.group(3):
+            return answer["conflicts"][int(m.group(3))]["alternatives"][int(m.group(4))]["value"]
+        return answer["missing"][int(m.group(5))]["field"]
+    except (KeyError, IndexError, TypeError):
+        return None
+
+
 def _runs_with_notes(root: Path) -> dict[str, dict]:
     folder = root / "review" / "annotations"
-    return {p.stem: annotation_state(read_jsonl(p)) for p in sorted(folder.glob("*.jsonl"))} if folder.exists() else {}
+    if not folder.exists():
+        return {}
+    # Records first, statuses second, so no lock is needed (callers may hold it): an orphan note read here had its
+    # suggestion stored before it was written, so the later read finds it unapproved, or its approval committed.
+    records = {p.stem: read_jsonl(p) for p in sorted(folder.glob("*.jsonl"))}
+    unconfirmed = unconfirmed_suggestions(root)
+    return {run: annotation_state(r, unconfirmed) for run, r in records.items()}
+
+
+def _view(root: Path, run_id: str) -> dict:
+    try:
+        return json.loads((root / "review" / "runs" / run_id / "view.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
 
 
 def _labels(root: Path, run_id: str) -> tuple[dict, dict]:
     """Question text by key and candidate label by id from the run's view, when the run folder is here."""
-    try:
-        view = json.loads((root / "review" / "runs" / run_id / "view.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}, {}
+    view = _view(root, run_id)
     return ({q["key"]: q.get("question") for q in view.get("questions") or []},
             {c["id"]: c.get("label") for c in view.get("candidates") or []})
 
@@ -167,13 +223,14 @@ def live_notes(root: Path) -> dict[str, dict]:
 
 
 def reviewed_answers(root: Path) -> list[dict]:
-    """Every answer a person reviewed (marked fine or noted), once, ordered by when it first counted as reviewed."""
+    """Every answer a person reviewed (marked fine or noted), once, ordered by when it first counted as reviewed. An
+    approved suggestion does not make its answer reviewed: the person read the span, not the answer."""
     out = []
     for run_id, state in _runs_with_notes(root).items():
         first: dict[tuple, str] = {}
         for r in state["reviewed"]:
-            first[(r["question"], r["candidate"])] = r["at"]
-        for n in state["notes"]:
+            first[(r["question"], r["candidate"])] = r["first_at"]
+        for n in filter(human, state["notes"]):
             key = (n["question"], n["candidate"])
             first[key] = min(first.get(key, n["at"]), n["at"])
         out += [{"run_id": run_id, "question": q, "candidate": c, "at": at} for (q, c), at in first.items()]
@@ -210,7 +267,10 @@ def _fold(root: Path) -> dict:
     decided: set[str] = set()
     version = 0
     for a in history:
+        kept = {t["id"] for t in a["types"]}
         for ref in a["refs"]:
+            if ref in kept and ref in accepted:  # renamed or given a case: replaced below, in its place
+                continue
             if accepted.pop(ref, None) is None:
                 decided.add(ref)
         for t in a["types"]:
@@ -242,25 +302,31 @@ def taxonomy_state(root: Path) -> dict:
 
     def resolve(t: dict) -> dict:
         notes = [live[n] for n in t["notes"] if n in live]
+        found = {(n["run_id"], n["question"], n["candidate"]) for n in notes if human(n)}
         return {**{k: v for k, v in t.items() if k != "notes"}, "notes": notes,
-                "deleted": len(t["notes"]) - len(notes),
-                "answers": len({(n["run_id"], n["question"], n["candidate"]) for n in notes})}
+                "deleted": len(t["notes"]) - len(notes), "answers": len(found),
+                "ai_answers": len({(n["run_id"], n["question"], n["candidate"]) for n in notes} - found)}
 
     assigned = _assigned(fold)
-    return {"version": fold["version"],
-            "accepted": [resolve(t) for t in fold["accepted"].values()],
+    waiting: dict[str, int] = {}
+    for s in suggestions(root, fold):
+        if s["status"] == "pending":
+            waiting[s["type"]] = waiting.get(s["type"], 0) + 1
+    # seq counts every committed decision, suggestions' included, so the app keeps the newest of overlapping replies
+    return {"version": fold["version"], "seq": len(fold["history"]),
+            "accepted": [resolve(t) | {"suggested": waiting.get(t["id"], 0)} for t in fold["accepted"].values()],
             "pending": [resolve(t) for t in fold["pending"].values()],
-            "unassigned": sum(1 for n in live if n not in assigned),
+            "unassigned": sum(1 for nid, n in live.items() if nid not in assigned and human(n)),
             "history": [{k: a.get(k) for k in ("op", "author", "at", "version", "reason")}
                         | {"names": [t["name"] for t in a["types"]], "refs": a["refs"]}
-                        for a in reversed(fold["history"])]}
+                        for a in reversed(fold["history"]) if not a.get("suggestion")]}
 
 
 def export(root: Path) -> dict:
     """A bundle for the coding agent: every live note in no accepted or proposed type, and the instructions."""
     fold, live = _fold(root), live_notes(root)
     assigned = _assigned(fold)
-    notes = [n for nid, n in live.items() if nid not in assigned]
+    notes = [n for nid, n in live.items() if nid not in assigned and human(n)]
     if not notes:
         raise ReviewInputError("no notes left to group: every note is already in a type, or none was written")
     export_id = _stamp("export")
@@ -327,6 +393,9 @@ def propose(root: Path, proposal) -> dict:
             for nid in ids:
                 if not isinstance(nid, str) or nid not in live:
                     raise ReviewInputError(f"{name}: note {nid} does not exist or was deleted")
+                if not human(live[nid]):
+                    raise ReviewInputError(f"{name}: note {nid} is an approved suggestion; a type stands on the "
+                                           "person's own notes")
                 if nid in seen:
                     raise ReviewInputError(f"note {nid} is in both {seen[nid]} and {name}")
                 if nid in assigned:
@@ -345,19 +414,23 @@ def propose(root: Path, proposal) -> dict:
 
 
 def run_cli(root: Path, action: str, file: str | None) -> dict:
-    """`error-analysis export` or `error-analysis propose --file <proposal.json>`."""
+    """`error-analysis export`, `error-analysis propose --file <proposal.json>` or
+    `error-analysis suggest --file <suggestions.json>`."""
     if action == "export":
         return export(root)
     if not file:
-        raise ReviewInputError("error-analysis propose needs --file <proposal.json>")
+        raise ReviewInputError(f"error-analysis {action} needs --file <{'proposal' if action == 'propose' else 'suggestions'}.json>")
     path = Path(file)
     if not path.is_file():
         raise ReviewInputError(f"no such file: {path}")
     try:
-        proposal = json.loads(path.read_text(encoding="utf-8"))
+        body = json.loads(path.read_text(encoding="utf-8"))
     except ValueError:
         raise ReviewInputError(f"{path} is not JSON") from None
-    return propose(root, proposal)
+    if action == "suggest":
+        from .similar_cases import suggest  # it builds on this module
+        return suggest(root, body)
+    return propose(root, body)
 
 
 def decide(root: Path, body: dict, author: str) -> dict:
@@ -380,13 +453,16 @@ def decide(root: Path, body: dict, author: str) -> dict:
             raise ReviewInputError("only an accepted type is renamed; accept a proposed one with its new name")
         notes = [n for r in refs for n in items[r]["notes"] if n in live]  # a deleted note is not carried on
         now = _now()
+        # Since when the criterion has existed: a reviewed mark older than this was given without it. A rename, merge
+        # or split of accepted types keeps the earliest; a type accepted from a proposal starts now.
+        since = min([_since(fold["accepted"][r]) for r in refs if r in fold["accepted"]], default=now)
 
         def new(name, definition, ids, keep_id=None):
             name, definition = check_type(name, definition)
             if not ids:
                 raise ReviewInputError(f"{name}: no live note is left in it; reject it instead")
             return {"id": keep_id or uuid.uuid4().hex[:12], "name": name, "definition": definition, "notes": ids,
-                    "decided_by": author, "decided_at": now}
+                    "decided_by": author, "decided_at": now, "since": since}
 
         if op == "accept":
             t = items[refs[0]]
@@ -430,56 +506,68 @@ def decide(root: Path, body: dict, author: str) -> dict:
 # ---------------------------------------------------------------- counts
 
 
-def _type_answers(root: Path) -> tuple[dict, dict[str, set]]:
-    """The accepted types (version folded in) and, for each, the answers (run, question, candidate) holding one of
-    its live notes."""
+def _type_answers(root: Path) -> tuple[dict, dict[str, set], dict[str, set]]:
+    """The accepted types (version folded in) and, for each, the answers (run, question, candidate) a person found
+    it in (a note of their own) and the further answers it holds only through an approved suggestion. Only the first
+    are a rate over reviewed answers: suggestions were searched across every stored answer and miss cases."""
     fold, live = _fold(root), live_notes(root)
-    return fold, {tid: {(live[n]["run_id"], live[n]["question"], live[n]["candidate"]) for n in t["notes"] if n in live}
-                  for tid, t in fold["accepted"].items()}
+    found, suggested = {}, {}
+    for tid, t in fold["accepted"].items():
+        notes = [live[n] for n in t["notes"] if n in live]
+        found[tid] = {(n["run_id"], n["question"], n["candidate"]) for n in notes if human(n)}
+        suggested[tid] = {(n["run_id"], n["question"], n["candidate"]) for n in notes} - found[tid]
+    return fold, found, suggested
 
 
 def progress(root: Path, last: int = 20) -> dict:
-    """Breadth (how many types), depth (answers per type, thin ones marked) and saturation: how many types first
-    appeared among the last `last` reviewed answers."""
-    fold, answers = _type_answers(root)
+    """Breadth (how many types), depth (answers per type, thin ones marked), saturation (how many types first
+    appeared among the last `last` reviewed answers) and the answers marked fine before a type that wait for a
+    second look."""
+    fold, answers, ai = _type_answers(root)
     reviewed = reviewed_answers(root)
     order = {(a["run_id"], a["question"], a["candidate"]): i for i, a in enumerate(reviewed)}
     window = min(max(1, last), len(reviewed)) if reviewed else 0
+    again = rereview(root)
     types = []
     for tid, t in fold["accepted"].items():
         seen = [order[a] for a in answers[tid] if a in order]
         types.append({"id": tid, "name": t["name"], "definition": t["definition"], "answers": len(answers[tid]),
-                      "thin": len(answers[tid]) < THIN, "first": min(seen) + 1 if seen else None,
-                      "runs": sorted({a[0] for a in answers[tid]})})
+                      "ai_answers": len(ai[tid]), "thin": len(answers[tid]) < THIN,
+                      "first": min(seen) + 1 if seen else None, "runs": sorted({a[0] for a in answers[tid]}),
+                      "rereview": sum(1 for a in again if t["name"] in a["types"])})
     types.sort(key=lambda t: (-t["answers"], t["name"]))
     new = [t["name"] for t in types if t["first"] is not None and t["first"] > len(reviewed) - window]
     state = taxonomy_state(root)
     return {"version": fold["version"], "reviewed": len(reviewed), "breadth": len(types), "types": types,
             "last": window, "new_in_last": len(new), "new_names": new, "thin": THIN,
-            "pending": len(state["pending"]), "unassigned": state["unassigned"]}
+            "pending": len(state["pending"]), "unassigned": state["unassigned"], "rereview": len(again),
+            "rereview_runs": sorted({a["run_id"] for a in again})}
 
 
 def run_counts(root: Path, run_id: str) -> dict:
-    """For one run's candidates: answers with a note of each accepted type, over that candidate's reviewed answers."""
-    fold, answers = _type_answers(root)
+    """For one run's candidates: answers a person found each accepted type in, over that candidate's reviewed
+    answers, and apart from them the answers holding it through an approved suggestion."""
+    fold, answers, ai = _type_answers(root)
     reviewed: dict[str, int] = {}
     for a in reviewed_answers(root):
         if a["run_id"] == run_id:
             reviewed[a["candidate"]] = reviewed.get(a["candidate"], 0) + 1
-    types = []
-    for tid, t in fold["accepted"].items():
-        by = {}
-        for run, _, cand in answers[tid]:
+
+    def by(keys):
+        out: dict[str, int] = {}
+        for run, _, cand in keys:
             if run == run_id:
-                by[cand] = by.get(cand, 0) + 1
-        types.append({"id": tid, "name": t["name"], "definition": t["definition"], "by_candidate": by})
+                out[cand] = out.get(cand, 0) + 1
+        return out
+    types = [{"id": tid, "name": t["name"], "definition": t["definition"], "by_candidate": by(answers[tid]),
+              "ai_by_candidate": by(ai[tid])} for tid, t in fold["accepted"].items()]
     return {"version": fold["version"], "reviewed": reviewed, "types": types}
 
 
 def release_summary(root: Path) -> dict:
     """The release report's human error analysis: types, counts, denominators and source runs. Not a sealed
     metric and not a gate."""
-    fold, answers = _type_answers(root)
+    fold, answers, ai = _type_answers(root)
     reviewed: dict[str, int] = {}
     for a in reviewed_answers(root):
         reviewed[a["run_id"]] = reviewed.get(a["run_id"], 0) + 1
@@ -489,7 +577,7 @@ def release_summary(root: Path) -> dict:
         for run, _, _ in answers[tid]:
             per_run[run] = per_run.get(run, 0) + 1
         types.append({"name": t["name"], "definition": t["definition"], "answers": len(answers[tid]),
-                      "per_run": per_run})
+                      "ai_answers": len(ai[tid]), "per_run": per_run})
     types.sort(key=lambda t: (-t["answers"], t["name"]))
     return {"sealed_metric": False, "gate": False, "version": fold["version"], "reviewed": sum(reviewed.values()),
             "reviewed_by_run": reviewed, "types": types, "pending": len(fold["pending"]), "thin": THIN}
@@ -505,12 +593,59 @@ def release_lines(summary: dict) -> list[str]:
                     "`python -m rfp_assistant.cli error-analysis export` and decide the proposal on 실패 유형"]
     runs = ", ".join(f"`{r}` {n}" for r, n in sorted(summary["reviewed_by_run"].items()))
     L += [f"- taxonomy version v{summary['version']}; reviewed answers {summary['reviewed']} ({runs}); "
-          f"proposed types not yet decided {summary['pending']}", "",
-          "| Failure type | Definition | Answers with this type / reviewed | Source runs (answers / reviewed) |",
-          "| --- | --- | --- | --- |"]
+          f"proposed types not yet decided {summary['pending']}",
+          "- The rate counts only answers a person found the type in. Approved AI suggestions are further answers "
+          "the coding agent proposed across every stored answer and the person approved one by one; they are not a "
+          "rate and the search does not find every case.", "",
+          "| Failure type | Definition | Answers with this type / reviewed | Source runs (answers / reviewed) "
+          "| Further answers from approved AI suggestions |",
+          "| --- | --- | --- | --- | --- |"]
     for t in summary["types"]:
         thin = f" (fewer than {summary['thin']} cases)" if t["answers"] < summary["thin"] else ""
         sources = ", ".join(f"`{r}` {n}/{summary['reviewed_by_run'].get(r, 0)}" for r, n in sorted(t["per_run"].items()))
         definition = t["definition"].replace("|", "\\|")
-        L.append(f"| {t['name']} | {definition} | {t['answers']}/{summary['reviewed']}{thin} | {sources or '-'} |")
+        L.append(f"| {t['name']} | {definition} | {t['answers']}/{summary['reviewed']}{thin} | {sources or '-'} "
+                 f"| {t.get('ai_answers', 0)} |")
     return L
+
+
+# ---------------------------------------------------------------- similar cases the agent suggests
+
+
+def _since(t: dict) -> str:
+    """When a type's criterion began; a type accepted before this was recorded began when it was decided."""
+    return t.get("since") or t["decided_at"]
+
+
+def suggestions(root: Path, fold: dict | None = None) -> list[dict]:
+    """Every stored suggestion, by id <batch>/<n>, with its status from history: pending, approved or rejected."""
+    fold = fold or _fold(root)
+    decided = {a["suggestion"]: a for a in fold["history"] if a.get("suggestion")}
+    folder = taxonomy_dir(root) / "suggestions"
+    out = []
+    for path in sorted(folder.glob("*.json")) if folder.exists() else []:
+        batch = json.loads(path.read_text(encoding="utf-8"))
+        for i, s in enumerate(batch["suggestions"], 1):
+            sid = f"{batch['batch_id']}/{i}"
+            a = decided.get(sid)
+            out.append({**s, "id": sid, "type": batch["type"], "type_name": batch["type_name"],
+                        "suggested_at": batch["suggested_at"],
+                        "status": "pending" if a is None else "approved" if a["op"] == "suggestion-approve" else "rejected",
+                        "decided_by": a and a["author"], "decided_at": a and a["at"], "reason_rejected": a and a["reason"]})
+    return out
+
+
+def rereview(root: Path, run_id: str | None = None) -> list[dict]:
+    """Answers a person marked reviewed with no issues (and no note of their own) before an accepted type's
+    criterion existed, with the names of those types. Marking the answer again, or clearing the mark, settles it."""
+    since = [(_since(t), t["name"]) for t in _fold(root)["accepted"].values()]
+    out = []
+    for run, state in _runs_with_notes(root).items():
+        if run_id not in (None, run):
+            continue
+        noted = {(n["question"], n["candidate"]) for n in state["notes"] if human(n)}
+        for r in state["reviewed"]:
+            names = sorted(name for at, name in since if r["at"] < at)
+            if names and (r["question"], r["candidate"]) not in noted:
+                out.append({"run_id": run, "question": r["question"], "candidate": r["candidate"], "types": names})
+    return out

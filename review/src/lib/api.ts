@@ -282,19 +282,25 @@ export type SpanNote = {
   at: string;
   edited_by?: string;
   edited_at?: string;
+  origin?: "ai_suggested"; // a span the coding agent suggested and a person approved; a person's own note has none
+  suggestion?: string;
+  approved_by?: string;
 };
 
 export type Annotations = {
   version: number; // the store's record count; it only grows, so a larger one is a newer snapshot
   notes: SpanNote[];
-  reviewed: { question: string; candidate: string; author: string; at: string }[];
+  reviewed: { question: string; candidate: string; author: string; at: string; first_at: string }[];
+  /** Answers marked '문제 없음' before an accepted type existed, with those types' names. */
+  rereview?: { question: string; candidate: string; types: string[] }[];
 };
 
 /** A note as the failure taxonomy shows it: with the run, question text and candidate label it came from. */
 export type TaxNote = SpanNote & { run_id: string; question_text: string | null; candidate_label: string };
 
 /** A failure type: proposed (`ref`, waiting for the person) or accepted (`id`). `answers` counts distinct answers
- *  holding one of its live notes; `deleted` counts notes deleted since it was grouped. */
+ *  holding one of the person's own notes of it, `ai_answers` the further answers holding only an approved
+ *  suggestion; `deleted` counts notes deleted since it was grouped; `suggested` the suggestions waiting. */
 export type FailureType = {
   id?: string;
   ref?: string;
@@ -303,6 +309,8 @@ export type FailureType = {
   notes: TaxNote[];
   deleted: number;
   answers: number;
+  ai_answers: number;
+  suggested?: number;
   decided_by?: string;
   decided_at?: string;
   proposed_at?: string;
@@ -310,6 +318,7 @@ export type FailureType = {
 
 export type Taxonomy = {
   version: number;
+  seq: number;
   accepted: FailureType[];
   pending: FailureType[];
   unassigned: number;
@@ -318,24 +327,63 @@ export type Taxonomy = {
 
 export type Exported = { export_id: string; bundle: string; notes: number; prompt: string };
 
+export type SuggestExported = { export_id: string; bundle: string; type: string; answers: number; prompt: string };
+
+/** A span the coding agent suggests as another case of an accepted type; it is a note only once approved. */
+export type Suggestion = {
+  id: string;
+  type: string;
+  run_id: string;
+  question: string;
+  candidate: string;
+  field: string;
+  start: number;
+  end: number;
+  text: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  decided_by: string | null;
+  reason_rejected: string | null;
+  question_text?: string | null;
+  candidate_label?: string;
+  field_text?: string | null; // the whole stored field, so the span shows in its answer
+};
+
+export type SuggestionQueue = {
+  seq: number;
+  type: { id: string; name: string; definition: string };
+  pending: Suggestion[];
+  approved: number;
+  rejected: Suggestion[];
+};
+
 export type Progress = {
   version: number;
   reviewed: number;
   breadth: number;
-  types: { id: string; name: string; definition: string; answers: number; thin: boolean; first: number | null; runs: string[] }[];
+  types: {
+    id: string; name: string; definition: string; answers: number; ai_answers: number; thin: boolean;
+    first: number | null; runs: string[]; rereview: number;
+  }[];
   last: number;
   new_in_last: number;
   new_names: string[];
   thin: number;
   pending: number;
   unassigned: number;
+  rereview: number;
+  rereview_runs: string[];
 };
 
-/** One run's answers with a note of each accepted type, per candidate, over that candidate's reviewed answers. */
+/** One run's answers a person found each accepted type in, per candidate, over that candidate's reviewed answers,
+ *  and apart from them the answers holding it only through an approved suggestion. */
 export type RunFailures = {
   version: number;
   reviewed: Record<string, number>;
-  types: { id: string; name: string; definition: string; by_candidate: Record<string, number> }[];
+  types: {
+    id: string; name: string; definition: string; by_candidate: Record<string, number>;
+    ai_by_candidate: Record<string, number>;
+  }[];
 };
 
 export async function getJson<T>(url: string): Promise<T> {

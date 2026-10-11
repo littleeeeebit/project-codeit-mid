@@ -1,17 +1,17 @@
 graph TD
-  original-files["Original RFP files\nsrc/rfp_assistant/corpus/ingestion.py"]
-  extraction-elements["Extraction elements\nsrc/rfp_assistant/corpus/ingestion.py"]
-  keyword-chunks["Keyword index chunks\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  vector-payloads["Embedding sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  originals["Original RFP files\n원본 데이터/files"]
+  extractions["Extractions and elements\nsrc/rfp_assistant/corpus/ingestion.py"]
+  keyword-indexes["Keyword index versions\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  vector-sets["pgvector sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
   retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  active-run["Active run setting\nsrc/rfp_assistant/service/service.py"]
-  answer-records["Request and attempt rows\nsrc/rfp_assistant/service/service.py"]
-  review-notes["Review notes and taxonomy\nsrc/rfp_assistant/evaluation/error_analysis.py"]
-  original-files -->|parse and OCR merge| extraction-elements
-  extraction-elements -->|chunk profile build| keyword-chunks
-  keyword-chunks -->|embed payloads| vector-payloads
-  keyword-chunks -->|scored against gold spans| retrieval-runs
-  vector-payloads -->|dense and hybrid runs| retrieval-runs
-  retrieval-runs -->|person activates| active-run
-  active-run -->|serving config per request| answer-records
-  answer-records -->|stage review answers annotated| review-notes
+  active-serving["Active serving config\nsrc/rfp_assistant/service/service.py"]
+  answer-records["Requests and ledger\nsrc/rfp_assistant/storage/store.py"]
+  review-store["Review notes and decisions\nsrc/rfp_assistant/evaluation/error_analysis.py"]
+  originals -->|"ingest parses"| extractions
+  extractions -->|"build-keyword chunks"| keyword-indexes
+  keyword-indexes -->|"build-dense embeds"| vector-sets
+  keyword-indexes -->|"evaluate-retrieval, compare"| retrieval-runs
+  vector-sets -->|"dense and hybrid rows"| retrieval-runs
+  retrieval-runs -->|"activate-run writes"| active-serving
+  active-serving -->|"read per request"| answer-records
+  answer-records -->|"generation run answers"| review-store

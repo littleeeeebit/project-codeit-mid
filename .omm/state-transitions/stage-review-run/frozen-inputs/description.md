@@ -1,0 +1,1 @@
+`freeze` copies the serving activation, rows, elements or OCR image set into `inputs/`, and `input_hashes` records their digests. Every candidate reads the same inputs, and `recheck` refuses payment if they change.

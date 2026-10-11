@@ -1,0 +1,1 @@
+HWP and PDF files under `RFP_SOURCE_DIR/files`, associated through `data_list.csv`. They are never modified. Hashes are verified on every ingest, and `GET /api/originals/{doc_id}/{source_hash}` (`service.original_download`) serves them for the evidence pane.

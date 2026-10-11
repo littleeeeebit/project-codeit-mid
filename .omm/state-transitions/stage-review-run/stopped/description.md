@@ -1,0 +1,1 @@
+At least one approved candidate did not complete: it hit its approved maximum, met `unknown_billing`, was blocked by the ledger, or failed with a full disk or lost connection. Finished answers are kept, ledger-billed answers whose output was lost are not paid again, and `resume` pays only for what remains.

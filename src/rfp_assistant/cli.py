@@ -843,10 +843,10 @@ def _retrieval_commands(sub) -> None:
     s.add_argument("--ledger-dsn-env", help="ocr: environment variable with the DSN of the shared ledger the paid reads "
                                             "settle in (default the corpus database)")
     s = sub.add_parser("error-analysis", help="free, no database: export the answer notes in no failure type yet with "
-                                             "a prompt for the coding agent, or validate and store its proposal for "
-                                             "the person to decide in the review app")
-    s.add_argument("action", choices=["export", "propose"])
-    s.add_argument("--file", help="propose: the proposal JSON the agent wrote")
+                                             "a prompt for the coding agent, or validate and store its proposal or "
+                                             "suggested cases for the person to decide in the review app")
+    s.add_argument("action", choices=["export", "propose", "suggest"])
+    s.add_argument("--file", help="propose, suggest: the proposal or suggestions JSON the agent wrote")
 
 
 def _release_commands(sub) -> None:

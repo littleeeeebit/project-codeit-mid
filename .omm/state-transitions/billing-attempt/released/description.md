@@ -1,0 +1,1 @@
+Never executed. Causes are a dispatch guard refusal (`stopped_before_dispatch:*`), a missing provider key, a provable 4xx pre-execution rejection, or a reservation left open at restart.

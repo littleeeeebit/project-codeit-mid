@@ -1,1 +1,0 @@
-Where identity, keys and secrets are enforced. These boundaries decide who may spend, and on which key.

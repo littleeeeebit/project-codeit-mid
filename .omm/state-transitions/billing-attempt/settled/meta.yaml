@@ -1,0 +1,9 @@
+created: 2026-10-11T05:00:13.233Z
+updated: 2026-10-11T05:00:13.234Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: settled
+children: []
+parentPath:
+  - billing-attempt

@@ -1,0 +1,9 @@
+created: 2026-10-11T04:59:53.644Z
+updated: 2026-10-11T04:59:53.860Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: query-vector
+children: []
+parentPath:
+  - retrieval-engine

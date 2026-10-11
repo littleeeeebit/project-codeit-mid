@@ -1,1 +1,0 @@
-A type in the folded `accepted` map, keyed by a 12-hex ID with `decided_by` and `decided_at`. Every change bumps the taxonomy version. Rename keeps the ID; merge and split create new IDs and retire the old refs.

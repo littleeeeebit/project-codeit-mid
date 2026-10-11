@@ -1,0 +1,1 @@
+One `extractions` row and one `elements.jsonl` artifact per revision, with `elements` rows (kind, raw and search text, location, table). `sources.active_extraction_id` moves on a re-parse, but serving reads through the activated index's `source_extraction`. Old revisions stay for pinned gold rows and citations.

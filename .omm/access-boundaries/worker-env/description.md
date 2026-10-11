@@ -1,1 +1,0 @@
-`stage_review.execute` removes every secret-prefixed variable from candidate workers and runs them isolated (`-I -B`, offline model hubs, a read-only database session for free stages). `OPENAI_API_KEY` is injected only by `paid.approved_env` in `paid` mode, after `require_approved` and `recheck`.

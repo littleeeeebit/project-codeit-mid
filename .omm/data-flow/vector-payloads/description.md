@@ -1,1 +1,0 @@
-Each model's vectors over one keyword index's payloads. They are reused across rebuilds by payload hash and published only when every row is verified. Query vectors share the cache, keyed with kind `query`.

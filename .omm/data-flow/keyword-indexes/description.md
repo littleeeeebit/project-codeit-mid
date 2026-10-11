@@ -1,0 +1,1 @@
+Immutable directories `.runtime/indexes/<version>/` (manifest, chunks, tokens, scope terms) plus `indexes` and `chunks` rows. The version is a hash of the chunker, analyzer, IDF policy, extraction list and metadata terms. The keyword pointer is `app_settings.active_index`.

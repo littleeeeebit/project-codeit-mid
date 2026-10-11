@@ -1,0 +1,1 @@
+A candidate whose schema version differs from the database's is refused, because its `init_schema` would otherwise migrate the shared database.

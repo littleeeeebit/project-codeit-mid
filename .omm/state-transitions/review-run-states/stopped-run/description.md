@@ -1,1 +1,0 @@
-At least one approved candidate has not completed (budget refusal, `unknown_billing`, its approved maximum, a crash or a full disk). Finished answers and paid OCR reads are kept, and the ledger's key prefix prevents paying for any item twice.

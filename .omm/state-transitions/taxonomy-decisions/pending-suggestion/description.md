@@ -1,0 +1,1 @@
+Stored in `taxonomy/suggestions/<batch>.json` by `similar_cases.suggest` and shown in `suggestion_queue` with its full field text. It is decided only while its type is still accepted. If the type was merged or split since, the approval is refused with instructions to ask the agent again.

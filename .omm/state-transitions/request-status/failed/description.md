@@ -1,0 +1,1 @@
+The request ended through `done(..., request_status='failed')`: a technical error, a validation failure, a model or settlement failure, a `ServiceError`, or a scheduling failure (`_fail_unscheduled`). Its billing still reflects any attempt that was settled or left unknown.

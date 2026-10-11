@@ -1,9 +1,0 @@
-created: 2026-10-11T03:31:55.817Z
-updated: 2026-10-11T03:31:55.819Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: approved-estimate
-children: []
-parentPath:
-  - review-run-states

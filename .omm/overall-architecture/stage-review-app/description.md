@@ -1,0 +1,1 @@
+A coding agent delivers a retriever, chunking, generation or OCR change as a git ref. The CLI runs the baseline and the candidates on identical frozen inputs, and the person compares them and records decisions that the agent then reads. The review app only displays runs and writes decisions and notes. It runs no pipeline, loads no model and pays nothing.

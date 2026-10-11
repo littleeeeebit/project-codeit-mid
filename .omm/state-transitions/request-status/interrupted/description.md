@@ -1,0 +1,1 @@
+Set by `RequestRunner.shutdown` (queued requests always; running ones when workers remain pending) or by `recover_requests` when a new gateway owner starts. Nothing is replayed automatically. A later `_finish` keeps this status.
