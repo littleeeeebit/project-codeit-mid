@@ -15,6 +15,11 @@
   },
   {
    "a": "README.md",
+   "b": "docs/history/failure-taxonomy/README.md",
+   "kind": "link"
+  },
+  {
+   "a": "README.md",
    "b": "docs/history/postgresql-migration/README.md",
    "kind": "link"
   },
@@ -701,8 +706,8 @@
   "docs/hwp-loader-preview-review.md"
  ],
  "counts": {
-  "docs": 36,
-  "linked": 26,
+  "docs": 37,
+  "linked": 27,
   "read": 8,
   "orphans": 2,
   "pages": 2,
