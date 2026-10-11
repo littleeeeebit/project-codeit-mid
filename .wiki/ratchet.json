@@ -16,10 +16,20 @@
       "lines": 84,
       "reason": "baseline at adoption"
     },
+    "review/src/lib/labels.ts": {
+      "dup": 6,
+      "lines": 43,
+      "reason": "review-ui-readable: the review app is a separate static build that never imports from web/, so it repeats web/src/lib/format.ts's fact-field and fact-state labels (FIELD, FACT_STATE) to show answer facts in Korean"
+    },
+    "web/src/lib/format.ts": {
+      "dup": 6,
+      "lines": 180,
+      "reason": "review-ui-readable: the other side of review/src/lib/labels.ts's FIELD and FACT_STATE copy; the two builds share no module"
+    },
     "src/rfp_assistant/api.py": {
       "dup": 8,
-      "lines": 1627,
-      "reason": "main-update-banner-button: the header update's four HTTP response models (CommitTitle, PaidWork, UpdateResult, UpdateStatus), its two routes and the lifespan that starts the GitHub watch and installs the paid-work fence; response models stay in api.py under the existing API boundary test, while the status, paid-work check and request live in service/update.py"
+      "lines": 1628,
+      "reason": "review-ui-readable: Decided gains the question text so the dataset's recent decisions read as questions, not candidate IDs. Before that, main-update-banner-button:the header update's four HTTP response models (CommitTitle, PaidWork, UpdateResult, UpdateStatus), its two routes and the lifespan that starts the GitHub watch and installs the paid-work fence; response models stay in api.py under the existing API boundary test, while the status, paid-work check and request live in service/update.py"
     },
     "src/rfp_assistant/cli.py": {
       "dup": 0,
