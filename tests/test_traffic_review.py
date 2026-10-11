@@ -7,6 +7,7 @@ import contextlib
 import gzip
 import json
 import os
+import re
 import tempfile
 import threading
 import time
@@ -23,10 +24,12 @@ from rfp_assistant.evaluation.stage_review import ReviewError
 from tests.test_error_analysis import make_run
 from tests.test_stage_review import server
 
-MEMBERS = ("spai1303", "teammate07")
+MEMBERS = ("spai1303", "teammate07", 'te"am\\!\U0001F600')  # a hub name may hold any character
 ESCAPED = "\\u%04x" % ord(MEMBERS[0][0]) + MEMBERS[0][1:]  # the first member ID as JSON text that decodes to it
+# the third as JSON text: escaped quote and backslash, ! for "!", a surrogate pair for the emoji
+ODD = json.dumps(MEMBERS[2])[1:-1].replace("!", "\\u0021")
 DOCS = {"D1": "가 사업", "D2": "나 사업"}
-WINDOW = 12  # 질문하기 requests in window()
+WINDOW = 14  # 질문하기 requests in window()
 
 
 def request(member: str, question: str, mode: str = "single", docs=("D1",), status: str = "completed",
@@ -64,6 +67,11 @@ def window() -> list[dict]:
                      result={**refused, "error": "schema_invalid: claims.0.doc_id"},
                      trace={"raw_output": '{"summary": "' + ESCAPED + ' 확인", "claims": [{"text": "x", "doc_id": {}, '
                                           '"evidence_ids": 5}], "conflicts": [{"alternatives": 7}]}'}),
+             # an escaped punctuated member ID beside an unrelated literal escape, which must stay as it was frozen
+             request(MEMBERS[0], "특수 이름", status="failed", result={**refused, "error": "schema_invalid: x"},
+                     trace={"raw_output": '{"summary": "' + ODD + ' 님", "claims": [{"text": "literal \\\\u0041"}]}'}),
+             # validated, though the provider sent no usage so the call's billing stayed unknown
+             request(MEMBERS[1], "사용량 모름", trace={"billing": [{"stage": "generation", "state": "unknown"}]}),
              # no answer call ran: an inventory answer and an early insufficient-evidence exit were never validated
              request(MEMBERS[0], "문서 목록", mode="inventory", docs=(), trace={}),
              request(MEMBERS[1], "근거 없는 질문", trace={"billing": [{"stage": "embedding", "state": "settled"}]},
@@ -133,7 +141,7 @@ class TrafficRunTest(unittest.TestCase):
         data = folder_bytes(folder)
         for m in MEMBERS:
             self.assertNotIn(m.encode(), data)
-            self.assertNotIn(m, tr.plain(data.decode()))  # nor behind a JSON escape, at any depth
+        self.assertIsNone(tr.identities(MEMBERS).search(data.decode()))  # nor in any JSON spelling, at any depth
         self.assertNotIn(b"postgresql://", data)  # the DSN itself is never recorded, only its variable's name
         frozen = [json.loads(line) for line in gzip.decompress(
             (folder / "inputs" / "requests.jsonl.gz").read_bytes()).decode().splitlines()]
@@ -144,6 +152,12 @@ class TrafficRunTest(unittest.TestCase):
         self.assertIn(tr.pseudonym(key, MEMBERS[1]), planted["trace"])  # the key too
         broken = next(f for f in frozen if f["request"]["question"] == "스키마가 깨진 답")
         self.assertEqual(json.loads(broken["trace"]["raw_output"])["summary"], f"{tr.pseudonym(key, MEMBERS[0])} 확인")
+        odd = json.loads(next(f for f in frozen if f["request"]["question"] == "특수 이름")["trace"]["raw_output"])
+        self.assertEqual(odd["summary"], f"{tr.pseudonym(key, MEMBERS[2])} 님")
+        shown = next(q for q in self.view(record["run_id"])["questions"] if q["question"] == "특수 이름")
+        # only the ID changed: the literal A beside it is frozen as it was and reads the same in the view
+        self.assertEqual(odd["claims"][0]["text"], "literal \\u0041")
+        self.assertEqual(shown["candidates"]["traffic"]["claims"][0]["text"], odd["claims"][0]["text"])
         self.assertEqual([p.name for p in folder.rglob("*.key")], [])  # the key stays outside the run folder
 
     def test_pseudonyms_are_stable_across_runs_and_differ_per_member(self):
@@ -186,20 +200,28 @@ class TrafficRunTest(unittest.TestCase):
         self.assertEqual((unreadable["summary"], unreadable["rejected_shown"]), (raw, True))  # shown as it came
         self.assertEqual((unreadable["missing"], unreadable["cost_micro_usd"]), ([{"doc_id": None, "field": "",
                                                                                    "reason": None}], 0))
+        deep = '{"summary":' + "[" * 1500 + "0" + "]" * 1500 + "}"  # within the trace's 4000-character cap
+        pure = json.JSONDecoder()
+        pure.scan_once = json.scanner.py_make_scanner(pure)  # the decoder without its C accelerator recurses
+        with mock.patch.object(tr.json, "loads", pure.decode):
+            nested = tr.answer(refused, {"raw_output": deep}, {})
+        self.assertEqual((nested["summary"], nested["rejected_shown"], nested["rejected_cut"]), (deep, True, False))
 
     def test_groups_say_passed_only_where_an_answer_call_was_validated(self):
         record, _ = run_traffic(self.root, window())
         view = self.view(record["run_id"])
         by_question = {q["question"]: json.loads(q["group"])[2] for q in view["questions"]}
-        self.assertEqual((by_question["질문 0"], by_question["문서 목록"], by_question["근거 없는 질문"],
-                          by_question["검증에 걸린 질문"]),
-                         ("passed", "not_validated", "not_validated", "claim_without_evidence"))
+        self.assertEqual((by_question["질문 0"], by_question["사용량 모름"], by_question["문서 목록"],
+                          by_question["근거 없는 질문"], by_question["검증에 걸린 질문"]),
+                         ("passed", "passed", "not_validated", "not_validated", "claim_without_evidence"))
         unchecked = next(g for g in view["groups"] if g["validation"] == "not_validated")
         self.assertNotEqual(unchecked["priority"], 0)  # not a failure either
 
     def test_exit_gate_refuses_a_surviving_member_id(self):
         for value in ({"who": MEMBERS[0]}, {"raw": '{"who": "' + ESCAPED + '"}'},
-                      {"raw": ESCAPED.replace("\\", "\\\\\\")}):  # plain, escaped, escaped twice over
+                      {"raw": ESCAPED.replace("\\", "\\\\\\")},  # plain, escaped, escaped twice over
+                      {"who": MEMBERS[2]}, {"raw": '{"who": "' + ODD + '"}'},
+                      {"raw": json.dumps(re.sub(r"u([0-9a-f]{4})", lambda m: "u" + m[1].upper(), ODD))}):  # upper hex
             with self.assertRaisesRegex(ReviewError, "member ID survived"):
                 tr.write_out(self.root / "x.json", value, list(MEMBERS))
         self.assertFalse((self.root / "x.json").exists())

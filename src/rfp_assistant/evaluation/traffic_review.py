@@ -21,6 +21,7 @@ writes to the source database or calls a model.
 
 from __future__ import annotations
 
+import functools
 import gzip
 import hashlib
 import hmac
@@ -42,13 +43,12 @@ STATUSES = ("completed", "failed")
 ASK_KEY = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 CANDIDATE = "traffic"
 CORPUS = "전체 문서"
-PASSED = "passed"  # the answer call settled and the validator accepted its output
+PASSED = "passed"  # an answer call was sent and the validator accepted its output
 UNCHECKED = "not_validated"  # no answer call to validate: a deterministic metadata or inventory answer
 PROCESSING = "processing_failure"  # a failure without a validator verdict, e.g. a provider error
 CLEAN = (PASSED, UNCHECKED)
-# A JSON escape, at any depth of escaping, of a character a member ID can hold. Never a quote, backslash or control
-# character, so decoding one keeps every enclosing JSON document valid.
-ESCAPE = re.compile(r"\\+u([0-9a-fA-F]{4})|\\+(/)")
+RAN = ("dispatching", "settled", "unknown", "reconciled")  # ledger states of an answer call that was sent
+SHORT_ESCAPES = {'"': '"', "\\": "\\", "/": "/", "\b": "b", "\f": "f", "\n": "n", "\r": "r", "\t": "t"}
 
 
 # ---------------------------------------------------------------- the read
@@ -104,31 +104,36 @@ def pseudonym(key: bytes, member_id: str) -> str:
     return "member-" + hmac.new(key, member_id.encode(), hashlib.sha256).hexdigest()[:8]
 
 
-def plain(text: str) -> str:
-    """The text with every escape of a member-ID character decoded, however deeply escaped. A model's raw output is
-    JSON inside JSON, so an escaped letter there reads back as part of a member ID."""
-    while True:
-        out = ESCAPE.sub(lambda m: m[2] or (c if (c := chr(int(m[1], 16))).isalnum() or c in "._@+-" else m[0]), text)
-        if out == text:
-            return out
-        text = out
+def _encoded(c: str) -> str:
+    """One character as a pattern for every way JSON text can spell it: itself, its \\u escape (either hex case,
+    a surrogate pair above U+FFFF) or its short escape, behind any number of backslashes, since a model's raw output
+    is JSON inside JSON inside the frozen record."""
+    o = ord(c)
+    units = [o] if o < 0x10000 else [0xD800 + ((o - 0x10000) >> 10), 0xDC00 + ((o - 0x10000) & 0x3FF)]
+    ways = [re.escape(c), "".join(r"\\+u(?i:%04x)" % u for u in units)]
+    if c in SHORT_ESCAPES:
+        ways.append(r"\\+" + re.escape(SHORT_ESCAPES[c]))
+    return "(?:" + "|".join(ways) + ")"
+
+
+@functools.lru_cache(maxsize=4)
+def identities(members: tuple[str, ...]) -> re.Pattern:
+    """Every member ID in any JSON spelling, longest first, each in a group named by its index in `members`. Only
+    the matched span is ever replaced, so the text around an ID stays as it was frozen."""
+    order = sorted((i for i, m in enumerate(members) if m), key=lambda i: -len(members[i]))
+    return re.compile("|".join(f"(?P<m{i}>{''.join(map(_encoded, members[i]))})" for i in order) or r"(?!)")
 
 
 def scrub(value, table: dict[str, str]):
-    """Every string and key with each known member ID replaced by its pseudonym, longest first. A string that hides
-    one behind JSON escapes is decoded first.
-    ponytail: substring replacement, so a member ID that is also a common word would be replaced inside text too;
+    """Every string and key with each known member ID, in any JSON spelling, replaced by its pseudonym.
+    ponytail: substring match, so a member ID that is also a common word would be replaced inside text too;
     a token-aware match if member IDs ever get that short."""
-    order = sorted(table, key=len, reverse=True)
+    members = tuple(table)
+    found = identities(members)
 
     def walk(v):
         if isinstance(v, str):
-            seen = plain(v) if "\\" in v else v
-            if not any(m in seen for m in order):
-                return v
-            for m in order:
-                seen = seen.replace(m, table[m])
-            return seen
+            return found.sub(lambda m: table[members[int(m.lastgroup[1:])]], v)
         if isinstance(v, dict):
             return {walk(k): walk(x) for k, x in v.items()}
         if isinstance(v, list):
@@ -138,12 +143,10 @@ def scrub(value, table: dict[str, str]):
 
 
 def write_out(path: Path, value, members: list[str]) -> bytes:
-    """The only way anything enters a traffic run folder: serialised, refused if any member ID survived (plainly or
-    behind JSON escapes), then written."""
+    """The only way anything enters a traffic run folder: serialised, refused if any member ID survived in any JSON
+    spelling, then written."""
     data = json.dumps(value, ensure_ascii=False).encode("utf-8")
-    text = plain(data.decode("utf-8"))
-    leaked = [m for m in members if m and m in text]
-    if leaked:
+    if identities(tuple(members)).search(data.decode("utf-8")):
         raise ReviewError(f"{path.name}: a member ID survived pseudonymisation; nothing was written")
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.suffix == ".gz":
@@ -166,14 +169,14 @@ def _rejected(trace: dict) -> tuple[dict | None, bool]:
         return None, False
     try:
         return json.loads(raw), False
-    except ValueError:
+    except (ValueError, RecursionError):  # the pure-Python decoder recurses per nesting level
         pass
     try:
         from pydantic_core import from_json
 
         parsed = from_json(raw, allow_partial="trailing-strings")
-    except ValueError:
-        return None, True
+    except (ValueError, RecursionError):
+        return None, False  # unreadable, not known to be cut: `answer` shows the raw text as it came
     return (parsed if isinstance(parsed, dict) else None), True
 
 
@@ -193,7 +196,7 @@ def answer(result: dict, trace: dict, titles: dict[str, str]) -> dict:
     """The stored outcome in the generation view's answer shape. A validation failure shows the refused answer, as
     the consultant never saw it, so its spans can be noted. The refused answer failed its schema, so every field is
     read as untrusted: a field of the wrong type is dropped, and output with nothing readable is shown as it came.
-    `checked`: an answer call settled, so the validator saw its output (popped into the group by `run`)."""
+    `checked`: an answer call was sent (any ledger state but reserved or released), popped into the group by `run`."""
     title = lambda d: titles.get(d, d) if isinstance(d, str) else None  # noqa: E731
     status = _text(result.get("status")) or ""
     error = _text(result.get("error")) or ""
@@ -229,7 +232,7 @@ def answer(result: dict, trace: dict, titles: dict[str, str]) -> dict:
         "validation": validation, "validation_detail": error if validation else None,
         "failure": error if error and not validation else None,
         "rejected_shown": isinstance(body, dict) or bool(raw) and summary == raw, "rejected_cut": cut,
-        "checked": any(a.get("stage") == "generation" and a.get("state") == "settled" for a in billing),
+        "checked": any(a.get("stage") == "generation" and a.get("state") in RAN for a in billing),
         "required": [], "latency_ms": None, "replayed": False, "trace_url": None,
         "cost_micro_usd": sum(a["settled_micro_usd"] for a in billing if isinstance(a.get("settled_micro_usd"), int))}
 
@@ -239,8 +242,10 @@ def answer(result: dict, trace: dict, titles: dict[str, str]) -> dict:
 
 def group_of(mode: str, outcome: str, validation: str | None, failure: str | None, docs: list[str],
              checked: bool) -> dict:
-    """`checked`: an answer call settled, so with no failure recorded the validator passed its output. Without one
-    nothing was validated (a deterministic answer), and the group says so rather than claim a pass."""
+    """`checked`: an answer call was sent. The service validates every response it gets back and stores an error for
+    every call that returned none (service.py `_call_and_settle`, `_paid_answer`), so with no failure recorded the
+    validator passed its output, whether or not the call's usage settled. Without a call nothing was validated (a
+    deterministic answer), and the group says so rather than claim a pass."""
     doc = CORPUS if mode == "corpus" or not docs else " · ".join(sorted(docs))
     v = validation or (PROCESSING if failure else PASSED if checked else UNCHECKED)
     return {"key": json.dumps([mode, outcome, v, doc], ensure_ascii=False), "mode": mode, "outcome": outcome,

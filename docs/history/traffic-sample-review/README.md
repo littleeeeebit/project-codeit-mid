@@ -29,4 +29,10 @@ Review round 1, rechecked on the same window (`traffic-20261011T055429Z-0546cb`,
 - Two first runs at once now share one pseudonym key: the key is made under the review write lock and published whole.
 - A group reads 검증 통과 only when an answer call settled and no failure was recorded. Six requests (two 기본 정보 and four 요구사항 목록 answers) had no answer call and read 검증 안 함 ([map](map-not-validated.jpg)). Every 근거 부족 answer in this window had a validated answer call. Runs frozen before this change read 검증 실패 기록 없음.
 
+Review round 2, rechecked on the same window (`traffic-20261011T060612Z-941072`, 242 requests, 46 groups, 30 drawn):
+
+- Member IDs are no longer found by decoding escapes, which could only decode a whitelist of characters and rewrote whole strings. Each ID is now matched in every JSON spelling of each of its characters: the character itself, its `\u` escape in either hex case (a surrogate pair above U+FFFF), or its short escape, behind any number of backslashes. Only the matched span is replaced, so the frozen text around it stays as it was. The exit gate uses the same matcher. No member ID appears in the folder in any spelling (the 20 real names are all plain ASCII; the tests use one with a quote, a backslash, `!` and an emoji).
+- Refused output too deeply nested for the decoder falls back to its raw text instead of stopping the run.
+- An answer call counts as validated in any ledger state after it was sent, including `unknown` when the provider returned no usage. The counts on this window are unchanged: 199 passed, 6 not validated.
+
 Found and fixed during the walk: the run list showed a host dash for a traffic run. Pick reasons repeated raw codes that the meta line already shows in Korean. Squares outside the sample were too faint against white (now 3:1). The map had no way to list only the groups the sample missed. Taxonomy spans named "실제 요청" twice.
