@@ -1,7 +1,7 @@
 created: 2026-10-09T10:52:16.493Z
-updated: 2026-10-09T10:52:16.789Z
-update_count: 3
-last_field: constraint
+updated: 2026-10-11T01:14:58.912Z
+update_count: 4
+last_field: description
 kind: nested-class
 title: hwp-loader-fallback
 children: []

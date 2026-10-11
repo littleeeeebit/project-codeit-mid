@@ -1,7 +1,7 @@
 created: 2026-10-05T04:06:19.282Z
-updated: 2026-10-10T12:41:58.275Z
-update_count: 6
-last_field: description
+updated: 2026-10-11T01:14:55.382Z
+update_count: 8
+last_field: concern
 kind: nested-class
 title: dispatch-marker
 children: []

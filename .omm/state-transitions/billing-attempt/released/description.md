@@ -1,1 +1,0 @@
-No spend. Reached when a reservation is never dispatched (guard refusal, no key, restart recovery) or a provider error proves pre-execution (`confirmed_pre_execution=True`).

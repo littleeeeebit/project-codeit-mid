@@ -1,0 +1,1 @@
+The 12-hour lifetime and the in-memory session store come from README and the api.py docstring. `Login.member` and `sign_in` bodies were not read line by line.

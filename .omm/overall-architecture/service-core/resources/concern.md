@@ -1,0 +1,1 @@
+Member API keys and streamed partials exist only in process memory. A restart (including the self-update) silently requires every member to enter their key again on 설정.

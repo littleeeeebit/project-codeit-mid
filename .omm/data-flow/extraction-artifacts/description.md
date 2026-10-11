@@ -1,1 +1,0 @@
-`elements.jsonl` under `.runtime/extracted/<hash>/<fingerprint>[/<content-id>]/`, mirrored row by row in `elements`. Each element has an element_id, source_order, kind (paragraph, table, cell, image_text and so on), raw_text, search_text, location and table JSON. OCR text is merged as `image_text` with an `image_ocr` location, which `open_evidence` labels `ocr_text`.

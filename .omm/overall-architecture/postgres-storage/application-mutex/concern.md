@@ -1,0 +1,1 @@
+There is one global write mutex for the whole application. The code marks it as a deliberate simplification (`ponytail:` comment) with per-account locks as the upgrade path if measured throughput requires them.

@@ -1,1 +1,0 @@
-`reviews` and `fidelity_checks` (human and automatic extraction verdicts), `gold_candidates` and `gold_reviews` (the dataset review queue and its decision log), `corrections`, `audit_events` (owner and member actions, recorded with the hub username), `eval_estimates` and `embedding_estimates` (priced plans that expire).

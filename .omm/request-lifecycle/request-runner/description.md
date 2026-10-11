@@ -1,0 +1,1 @@
+On an executor thread, `run_queued` atomically flips `queued` → `running`, only while `cancel_requested = 0`. A request already cancelled or interrupted is skipped. It rebuilds the `AnswerRequest` and `Principal` from `request_json` and calls `_execute` under the submitting request's copied context (key session, model, billing scope).

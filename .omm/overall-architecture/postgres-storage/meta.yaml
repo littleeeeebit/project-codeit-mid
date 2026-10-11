@@ -1,16 +1,26 @@
-created: 2026-10-10T23:15:00.154Z
-updated: 2026-10-10T23:15:00.445Z
-update_count: 3
-last_field: constraint
+created: 2026-10-10 23:15:00.154000+00:00
+updated: 2026-10-11 01:14:56.495000+00:00
+update_count: 5
+last_field: diagram
 kind: nested-class
 title: postgres-storage
 children:
-  - app-settings
-  - corpus-tables
-  - index-tables
-  - ledger-tables
-  - request-tables
-  - review-tables
-  - runtime-files
-  - vector-tables
+- application-mutex
+- corpus-tables
+- ledger-tables
+- request-tables
+- runtime-files
+- validation-gate
 parentPath: []
+prev_diagram: "graph TD\r\n  corpus-tables[\"sources, documents, extractions, elements\\\
+  nsrc/rfp_assistant/storage/store.py\"] -->|\"active extraction\"| index-tables[\"\
+  indexes, chunks, requirements\\nsrc/rfp_assistant/storage/store.py\"]\r\n  index-tables\
+  \ -->|\"chunk foreign key\"| vector-tables[\"embedding payloads, sets, rows\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
+  ]\r\n  app-settings[\"app_settings, activations\\nsrc/rfp_assistant/storage/store.py\"\
+  ] -->|\"active_run, active_index\"| index-tables\r\n  request-tables[\"requests,\
+  \ verifier_runs\\nsrc/rfp_assistant/storage/store.py\"] -->|\"attempts.request_id\"\
+  | ledger-tables[\"attempts, adjustments, budget_settings\\nsrc/rfp_assistant/storage/store.py\"\
+  ]\r\n  review-tables[\"reviews, fidelity, gold, audit\\nsrc/rfp_assistant/storage/store.py\"\
+  ] -->|\"review_status updates\"| corpus-tables\r\n  runtime-files[\"Runtime artifacts\
+  \ .runtime\\nsrc/rfp_assistant/settings.py\"] -->|\"artifact paths, hashes\"| corpus-tables\r\
+  \n  runtime-files -->|\"index manifests\"| index-tables"

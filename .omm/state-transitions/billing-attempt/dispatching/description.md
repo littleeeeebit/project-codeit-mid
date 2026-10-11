@@ -1,1 +1,0 @@
-Set by `mark_dispatching` immediately before the provider call, in the same transaction as the stop and ownership checks. This is the durable evidence that a call may have executed.

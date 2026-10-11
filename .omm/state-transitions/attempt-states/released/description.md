@@ -1,0 +1,1 @@
+No cost: refused at dispatch (cancelled, interrupted, maintenance, lost ownership, an unknown attempt elsewhere), no key (`provider_unavailable`), a 4xx before execution, or never dispatched before a restart.

@@ -1,31 +1,31 @@
 created: 2026-10-04 13:34:42.449000+00:00
-updated: 2026-10-10 23:14:54.905000+00:00
-update_count: 25
+updated: 2026-10-11 01:14:50.302000+00:00
+update_count: 27
 last_field: diagram
 kind: nested-class
 title: http-api
 children:
+- account-routes
 - answer-sse
 - ask-routes
 - dataset-routes
 - hub-login
+- hub-sign-in
 - login-store
+- request-routes
 - route-groups
 - session-middleware
 - sign-in-routes
-- static-mount
 - stream-route
 - update-watch
 - verify-routes
 parentPath: []
-prev_diagram: "graph TD\r\n  session-gate[\"_Session middleware\\nsrc/rfp_assistant/api.py\"\
-  ]\r\n  hub-login[\"JupyterHub OAuth sign-in\\nsrc/rfp_assistant/service/auth.py\"\
-  ]\r\n  ask-routes[\"Ask and request routes\\nsrc/rfp_assistant/api.py\"]\r\n  answer-sse[\"\
-  Stream route events()\\nsrc/rfp_assistant/api.py\"]\r\n  verify-routes[\"Verify,\
-  \ drafting, gold routes\\nsrc/rfp_assistant/api.py\"]\r\n  update-watch[\"UpdateWatch\
-  \ fence\\nsrc/rfp_assistant/service/update.py\"]\r\n  static-mount[\"Static web/out\
-  \ mount\\nsrc/rfp_assistant/api.py\"]\r\n  hub-login -->|\"session cookie on /api/\"\
-  | session-gate\r\n  session-gate -->|\"bind_request contextvars\"| ask-routes\r\n\
-  \  session-gate -->|\"member principal\"| verify-routes\r\n  ask-routes -->|\"same\
-  \ request id\"| answer-sse\r\n  update-watch -->|\"fence read at admission\"| ask-routes\r\
-  \n  session-gate -->|\"non-/api paths pass\"| static-mount"
+prev_diagram: "graph TD\r\n  static-mount[\"Static export mount\\nsrc/rfp_assistant/api.py\"\
+  ] -->|\"screens call /api\"| session-middleware[\"Session gate _Session\\nsrc/rfp_assistant/api.py\"\
+  ]\r\n  session-middleware -->|\"open without session\"| sign-in-routes[\"Hub OAuth\
+  \ routes\\nsrc/rfp_assistant/service/auth.py\"]\r\n  session-middleware -->|\"bind\
+  \ member key, model\"| ask-routes[\"Ask and request routes\\nsrc/rfp_assistant/api.py\"\
+  ]\r\n  session-middleware -->|\"bind member\"| verify-routes[\"Verification routes\\\
+  nsrc/rfp_assistant/api.py\"]\r\n  session-middleware -->|\"bind member\"| dataset-routes[\"\
+  Drafting and gold routes\\nsrc/rfp_assistant/api.py\"]\r\n  sign-in-routes -->|\"\
+  session cookie on /api/\"| session-middleware"

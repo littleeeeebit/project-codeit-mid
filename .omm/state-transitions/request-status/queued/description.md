@@ -1,1 +1,0 @@
-Inserted by `_create` with a held executor slot. Only `run_queued` leaves it toward running, with an atomic `UPDATE ... WHERE status='queued' AND cancel_requested=0`.

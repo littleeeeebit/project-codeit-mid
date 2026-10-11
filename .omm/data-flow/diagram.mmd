@@ -1,9 +1,8 @@
 graph TD
-  original-files["Originals and data_list.csv\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"sha256, parse, OCR merge"| extraction-artifacts["Element artifacts\nsrc/rfp_assistant/corpus/ingestion.py"]
-  extraction-artifacts -->|"chunk profile, Kiwi tokens"| keyword-index["Keyword index version\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  keyword-index -->|"payload hashes"| embedding-sets["pgvector embedding sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  keyword-index -->|"index_version"| serving-config["active_run setting\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  embedding-sets -->|"dense_version"| serving-config
-  serving-config -->|"retrieve and pack"| evidence-units["EvidenceUnit list\nsrc/rfp_assistant/contracts.py"]
-  evidence-units -->|"validated answer JSON"| request-records["requests.result_json\nsrc/rfp_assistant/storage/store.py"]
-  request-records -->|"open_evidence by ID"| evidence-pane["Evidence pane\nweb/src/components/ask/answer-parts.tsx"]
+  original-files["Originals and data_list.csv\nRFP_SOURCE_DIR"] -->|hash, parse, OCR merge| extractions["Extractions and elements\ncorpus/ingestion.py"]
+  extractions -->|chunk profile build| keyword-index-files["Keyword index\n.runtime/indexes"]
+  keyword-index-files -->|unique payloads embedded| vector-sets["pgvector sets\nretrieval/vector_store.py"]
+  keyword-index-files -->|packed evidence units| request-records["Request records\nrequests.result_json"]
+  vector-sets -->|dense candidates| request-records
+  request-records -->|evidence_id lookup| evidence-view["Evidence and original\nservice.py (open_evidence)"]
+  request-records -->|trace seeded by request_id| langfuse-traces["Langfuse traces\ngateway/tracing.py"]

@@ -1,0 +1,1 @@
+Validation, technical, provider or settlement errors, and `clarification_required` from a `ServiceError` inside execution, all go through `done(..., request_status='failed')`. `_fail_unscheduled` also fails a queued row that could not be handed to the executor.

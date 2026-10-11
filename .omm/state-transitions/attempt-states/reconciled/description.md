@@ -1,0 +1,1 @@
+Covered by an owner `reconcile` over a closed, non-overlapping interval for one provider project scope. The adjustment records the provider total minus the local settled cost. Unscoped attempts (server-environment key) must be explicitly included or excluded.

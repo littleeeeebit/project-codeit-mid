@@ -1,0 +1,1 @@
+One unresolved `unknown` attempt anywhere blocks every PostgreSQL dispatch for all members, both answers and embeddings, until the owner reconciles it (`unresolved` / `settle` / `reconcile`).

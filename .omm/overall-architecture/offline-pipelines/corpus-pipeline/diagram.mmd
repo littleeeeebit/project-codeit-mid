@@ -1,9 +1,0 @@
-graph TD
-  manifest-import["CSV manifest import\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"hwp sources"| hwp-parser["HWP pyhwp or loader\nsrc/rfp_assistant/storage/hwp_loader.py"]
-  manifest-import -->|"pdf sources"| pdf-parser["PDF parse PyMuPDF\nsrc/rfp_assistant/corpus/ingestion.py"]
-  ocr-reader["OCR PaddleOCR-VL, gpt-5-mini\nsrc/rfp_assistant/corpus/ocr.py"] -->|"cached image_text"| hwp-parser
-  ocr-reader -->|"cached image_text"| pdf-parser
-  hwp-parser -->|"raw elements"| revision-assignment["Output-bound revision\nsrc/rfp_assistant/corpus/ingestion.py"]
-  pdf-parser -->|"raw elements"| revision-assignment
-  revision-assignment -->|"active extraction"| fidelity-check["Hancom print comparison\nsrc/rfp_assistant/corpus/fidelity.py"]
-  fidelity-check -->|"auto verdict"| review-records["Human review records\nsrc/rfp_assistant/corpus/ingestion.py"]

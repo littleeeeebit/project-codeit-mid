@@ -1,24 +1,23 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-10 23:15:13.135000+00:00
-update_count: 44
+updated: 2026-10-11 01:15:07.772000+00:00
+update_count: 46
 last_field: diagram
-git_commit: 759fac6
-git_branch: shared-langfuse-on-codeit
+git_commit: 5bfcd5d
+git_branch: review-ui-readable
 children:
 - activation
 - corpus-ingestion
 - embedding-set
-- embedding-sets
-- evidence-pane
-- evidence-units
+- evidence-view
 - extraction
-- extraction-artifacts
+- extractions
 - fidelity-and-ocr
 - fidelity-check
 - fidelity-ocr
 - frozen-runs
 - index-build
-- keyword-index
+- keyword-index-files
+- langfuse-traces
 - maintenance-sequence
 - ocr-merge
 - original-corpus
@@ -29,19 +28,17 @@ children:
 - retrieval-runs
 - retrieval-selection
 - run-selection
-- serving-config
 - source-originals
 - vector-sets
-prev_diagram: "graph TD\r\n  source-originals[\"Originals and data_list.csv\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  extraction-revisions[\"Extraction artifacts and elements\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  ocr-reads[\"OCR region cache\\nsrc/rfp_assistant/corpus/ocr.py\"]\r\n  keyword-index[\"\
-  Immutable keyword index\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  vector-sets[\"\
-  Embedding vector sets\\nsrc/rfp_assistant/retrieval/vector_store.py\"]\r\n  serving-activation[\"\
-  active_run and active_index\\nsrc/rfp_assistant/evaluation/evaluation.py\"]\r\n\
-  \  evidence-map[\"Request evidence map\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  source-originals -->|\"sha256 source_hash\"| extraction-revisions\r\n  ocr-reads\
-  \ -->|\"image_text elements\"| extraction-revisions\r\n  extraction-revisions -->|\"\
-  chunk profile build\"| keyword-index\r\n  keyword-index -->|\"chunk payloads embedded\"\
-  | vector-sets\r\n  serving-activation -->|\"selects index, dense version\"| keyword-index\r\
-  \n  keyword-index -->|\"packed EvidenceUnit quotes\"| evidence-map\r\n  evidence-map\
-  \ -->|\"open_evidence context\"| extraction-revisions"
+prev_diagram: "graph TD\r\n  original-files[\"Originals and data_list.csv\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ] -->|\"sha256, parse, OCR merge\"| extraction-artifacts[\"Element artifacts\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  extraction-artifacts -->|\"chunk profile, Kiwi tokens\"| keyword-index[\"\
+  Keyword index version\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  keyword-index\
+  \ -->|\"payload hashes\"| embedding-sets[\"pgvector embedding sets\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
+  ]\r\n  keyword-index -->|\"index_version\"| serving-config[\"active_run setting\\\
+  nsrc/rfp_assistant/evaluation/evaluation.py\"]\r\n  embedding-sets -->|\"dense_version\"\
+  | serving-config\r\n  serving-config -->|\"retrieve and pack\"| evidence-units[\"\
+  EvidenceUnit list\\nsrc/rfp_assistant/contracts.py\"]\r\n  evidence-units -->|\"\
+  validated answer JSON\"| request-records[\"requests.result_json\\nsrc/rfp_assistant/storage/store.py\"\
+  ]\r\n  request-records -->|\"open_evidence by ID\"| evidence-pane[\"Evidence pane\\\
+  nweb/src/components/ask/answer-parts.tsx\"]"

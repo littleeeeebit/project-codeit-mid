@@ -1,0 +1,9 @@
+created: 2026-10-11T01:14:56.101Z
+updated: 2026-10-11T01:14:56.233Z
+update_count: 2
+last_field: note
+kind: nested-class
+title: owner-ledger-cli
+children: []
+parentPath:
+  - paid-gateway

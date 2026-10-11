@@ -1,9 +1,5 @@
 graph TD
-  update-fence["Update fence\nsrc/rfp_assistant/service/update.py"] -->|"refuses new admission"| request-status["Request status\nsrc/rfp_assistant/service/service.py"]
-  request-status -->|"each paid stage"| billing-attempt["Billing attempt\nsrc/rfp_assistant/gateway/budget.py"]
-  budget-control["Paid switch, cap, freeze\nsrc/rfp_assistant/gateway/budget.py"] -->|"gates reservation"| billing-attempt
-  billing-attempt -->|"overrun freezes"| budget-control
-  billing-attempt -->|"open work blocks update"| update-fence
-  source-review["Source parse and review\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"index eligibility"| serving-activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  gold-candidate["Gold candidate\nsrc/rfp_assistant/evaluation/gold.py"] -->|"approved rows score runs"| serving-activation
-  serving-activation -->|"retrieval config per request"| request-status
+  request-states["Request status\nrequests.status"] -->|each paid stage opens| attempt-states["Attempt state\nattempts.state"]
+  attempt-states -->|billing_state rollup| request-states
+  serving-activation["Serving activation\napp_settings.active_run"] -->|config snapshot per request| request-states
+  stage-review-run["Stage review run\n.runtime/review/runs run.json"] -->|paid workers reserve| attempt-states

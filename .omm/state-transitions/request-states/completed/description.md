@@ -1,0 +1,1 @@
+Written by `_finish` with the domain status inside `result_json`: answered, insufficient_evidence, ingestion_unavailable, budget_blocked and similar statuses still complete the request. If `cancel_requested` was set meanwhile, `_finish` stores cancelled instead.

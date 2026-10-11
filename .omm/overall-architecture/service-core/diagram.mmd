@@ -1,8 +1,7 @@
 graph TD
-  resources-owner["Process owner Resources\nsrc/rfp_assistant/service/service.py"] -->|"creates on first ask"| request-runner["Bounded executor RequestRunner\nsrc/rfp_assistant/service/service.py"]
-  request-runner -->|"run_queued(request_id)"| answer-path["Paid answer path\nsrc/rfp_assistant/service/service.py"]
-  answer-path -->|"index, dense, transport"| resources-owner
-  free-answers["Metadata and inventory answers\nsrc/rfp_assistant/service/service.py"] -->|"reads index, no ledger"| resources-owner
-  background-jobs["Drafting, evaluation, judges, maintenance\nsrc/rfp_assistant/service/drafting.py"] -->|"borrow transport, joined on close"| resources-owner
-  update-watch["Update fence UpdateWatch\nsrc/rfp_assistant/service/update.py"] -->|"fence read at admission"| resources-owner
-  verifier-traces["Frozen verifier runs\nsrc/rfp_assistant/service/service.py"] -->|"paid generate via submit_answer"| request-runner
+  resources["Resources owner\nservice.py (Resources)"] -->|lazy bounded executor| request-runner["Request runner\nservice.py (RequestRunner)"]
+  request-runner -->|run_queued by request ID| answer-execution["Answer execution\nservice.py (_execute)"]
+  answer-execution -->|follow-up turns| conversation-rewrite["Conversation rewrite\nservice.py (_conversation, _rewrite)"]
+  answer-execution -->|index, dense, reranker, transport| resources
+  verifier-runs["Verifier runs\nservice.py (verifier_trace)"] -->|frozen evidence regenerated| answer-execution
+  background-jobs["Background jobs\nservice.py (start_drafting, start_maintenance)"] -->|borrow transport and tracing| resources

@@ -1,9 +1,9 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-10T23:14:53.377Z
-update_count: 48
+updated: 2026-10-11T01:14:48.798Z
+update_count: 50
 last_field: diagram
-git_commit: 759fac6
-git_branch: shared-langfuse-on-codeit
+git_commit: 5bfcd5d
+git_branch: review-ui-readable
 children:
   - api-layer
   - api-routes
@@ -12,6 +12,7 @@ children:
   - corpus-pipeline
   - data-stores
   - evaluation
+  - evaluation-selection
   - evaluation-suite
   - external-services
   - http
@@ -34,6 +35,7 @@ children:
   - service-core
   - service-layer
   - stage-review
+  - stage-review-app
   - storage
   - tracing
   - web
@@ -42,50 +44,31 @@ children:
   - workflows
 prev_diagram: "graph TD\r
 
-  \  web-screens[\"Next.js screens\\nweb/src/components/ask/ask-page.tsx\"]\r
+  \  web-screens[\"Next.js screens\\nweb/src\"] -->|\"fetch /api, SSE stream\"|
+  http-api[\"FastAPI app\\nsrc/rfp_assistant/api.py\"]\r
 
-  \  http-api[\"FastAPI app and session gate\\nsrc/rfp_assistant/api.py\"]\r
+  \  http-api -->|\"one service call per route\"| service-core[\"Service
+  core\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  service-core[\"Service core and request
-  executor\\nsrc/rfp_assistant/service/service.py\"]\r
+  \  http-api -->|\"hub OAuth code exchange\"| external-services[\"OpenAI,
+  Langfuse, JupyterHub, GitHub\\nsrc/rfp_assistant/gateway/generation.py\"]\r
 
-  \  retrieval-engine[\"Retrieval
+  \  service-core -->|\"retrieve evidence\"| retrieval-engine[\"Retrieval
   engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
 
-  \  paid-gateway[\"Budget ledger and OpenAI
-  transport\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+  \  service-core -->|\"reserve, call, settle\"| paid-gateway[\"Paid
+  gateway\\nsrc/rfp_assistant/gateway/budget.py\"]\r
 
-  \  postgres-store[\"PostgreSQL store and gateway
-  lock\\nsrc/rfp_assistant/storage/postgres.py\"]\r
+  \  service-core -->|\"request rows, audit\"| postgres-storage[\"PostgreSQL and
+  pgvector\\nsrc/rfp_assistant/storage/store.py\"]\r
 
-  \  corpus-pipeline[\"Corpus ingestion, OCR,
-  fidelity\\nsrc/rfp_assistant/corpus/ingestion.py\"]\r
+  \  retrieval-engine -->|\"index rows, vector search\"| postgres-storage\r
 
-  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"]\r
+  \  paid-gateway -->|\"ledger transactions\"| postgres-storage\r
 
-  \  stage-review[\"Stage review runner and
-  app\\nsrc/rfp_assistant/evaluation/stage_review.py\"]\r
+  \  paid-gateway -->|\"chat, embeddings, traces\"| external-services\r
 
-  \  web-screens -->|\"fetch /api with session\"| http-api\r
+  \  offline-pipelines[\"Owner CLI pipelines\\nsrc/rfp_assistant/cli.py\"]
+  -->|\"build, evaluate, activate\"| postgres-storage\r
 
-  \  http-api -->|\"one service call per route\"| service-core\r
-
-  \  service-core -->|\"scoped retrieve per question\"| retrieval-engine\r
-
-  \  service-core -->|\"reserve, dispatch, settle\"| paid-gateway\r
-
-  \  service-core -->|\"requests rows, result_json\"| postgres-store\r
-
-  \  paid-gateway -->|\"attempts in locked tx\"| postgres-store\r
-
-  \  retrieval-engine -->|\"active index, vectors\"| postgres-store\r
-
-  \  corpus-pipeline -->|\"extractions, elements, chunks\"| postgres-store\r
-
-  \  owner-cli -->|\"ingest, build, activate\"| corpus-pipeline\r
-
-  \  owner-cli -->|\"settle, reconcile, paid on\"| paid-gateway\r
-
-  \  owner-cli -->|\"stage-review run, resume\"| stage-review\r
-
-  \  stage-review -->|\"paid candidates via ledger\"| paid-gateway"
+  \  offline-pipelines -->|\"paid steps through\"| paid-gateway"

@@ -1,1 +1,9 @@
-An ASGI class `_Session` that wraps every `/api/` path. Checks run in order. (1) A non-GET/HEAD/OPTIONS request whose `Origin` is neither the request host nor, with `BIDMATE_LOCAL_MEMBER`, the dev origins `:8510` gets 403. (2) `login.problem` (sign-in misconfigured) gets 503 for every call. (3) The three sign-in routes pass through. (4) No valid `bidmate_session` cookie gets 401. (5) An `X-BidMate-Account` header naming someone else gets 409 plus `X-BidMate-Account-Changed`. (6) A state-changing call without that header gets 428. Otherwise it stores the member in `scope.state` and calls `service.bind_request`. That function sets the context variables `KEY_SESSION`, `REQUEST_MODEL` and `BILLING_SCOPE` to the member's current key session. Because executor and job threads start from `contextvars.copy_context()`, all work the request starts keeps that key and model even if the member later changes them.
+`_Session` is ASGI middleware applied to `/api/*` only, in this order:
+1. A non-GET request whose `Origin` host is neither the request `Host` nor (with `BIDMATE_LOCAL_MEMBER` only) a dev origin on :8510 gets 403.
+2. A `Login.problem` (missing sign-in settings) gets 503 on every call.
+3. The sign-in routes pass through.
+4. Without a valid `bidmate_session` cookie the call gets 401.
+5. `X-BidMate-Account` naming a different member gets 409 with `X-BidMate-Account-Changed`.
+6. A state-changing call without that header gets 428.
+
+Then `service.bind_request` sets the context variables `KEY_SESSION`, `REQUEST_MODEL` and `BILLING_SCOPE` to the member's current key session, model and billing project for the request. Everything it starts (executor submits via `contextvars.copy_context`) keeps those values, so a later key change never affects running work.

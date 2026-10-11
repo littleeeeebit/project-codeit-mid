@@ -1,11 +1,10 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-10 23:15:08.065000+00:00
-update_count: 46
+updated: 2026-10-11 01:15:03.106000+00:00
+update_count: 48
 last_field: diagram
-git_commit: 759fac6
-git_branch: shared-langfuse-on-codeit
+git_commit: 5bfcd5d
+git_branch: review-ui-readable
 children:
-- admission
 - answer-stream
 - answer-validation
 - ask-page
@@ -19,36 +18,35 @@ children:
 - langfuse-tracing
 - metered-call
 - metered-chat
-- metered-generation
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
 - paid-answer-stages
 - paid-call
 - poll-and-stream
-- query-rewrite
-- retrieve-and-price
+- request-runner
+- retrieve-evidence
 - run-queued
 - screen-attachment
-- screen-polling
+- status-and-stream
 - status-poll
 - stream-and-poll
 - submit-and-admit
 - submit-answer
 - turn-render
 - validate-and-finish
+- validate-finish
 - validation
-- worker-claim
-prev_diagram: "graph TD\r\n  ask-composer[\"Ask composer postAsk\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  session-gate[\"Session and account check\\nsrc/rfp_assistant/api.py\"]\r\n\
-  \  request-admission[\"ask and submit_answer\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  worker-execution[\"run_queued and _paid_answer\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  paid-stages[\"Rewrite, embed, generate\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  outcome-store[\"_finish result_json\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  screen-attachment[\"TurnView poll and stream\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  ask-composer -->|\"POST /api/ask\"| session-gate\r\n  session-gate -->|\"\
-  member, key, model bound\"| request-admission\r\n  request-admission -->|\"queued\
-  \ row, executor submit\"| worker-execution\r\n  worker-execution -->|\"checkpoint\
-  \ before each\"| paid-stages\r\n  paid-stages -->|\"validated payload or failure\"\
-  | outcome-store\r\n  request-admission -->|\"request_id, generation_id, target\"\
-  | screen-attachment\r\n  screen-attachment -->|\"poll view, SSE partials\"| outcome-store"
+prev_diagram: "graph TD\r\n  ask-route[\"POST /api/ask\\nsrc/rfp_assistant/api.py\"\
+  ] -->|\"scope, question, mode\"| admission[\"Validate and persist\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  admission -->|\"queued row, slot held\"| worker-claim[\"Executor claim run_queued\\\
+  nsrc/rfp_assistant/service/service.py\"]\r\n  worker-claim -->|\"follow-up with\
+  \ history\"| query-rewrite[\"Standalone query rewrite\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  worker-claim -->|\"first turn\"| retrieve-and-price[\"Retrieve and price\
+  \ prompt\\nsrc/rfp_assistant/service/service.py\"]\r\n  query-rewrite -->|\"rewritten\
+  \ question\"| retrieve-and-price\r\n  retrieve-and-price -->|\"messages, estimate\"\
+  | metered-generation[\"Metered streamed generation\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  metered-generation -->|\"response\"| validate-and-finish[\"Validate citations,\
+  \ finish\\nsrc/rfp_assistant/service/service.py\"]\r\n  metered-generation -->|\"\
+  partials over SSE\"| screen-polling[\"Poll status and stream\\nweb/src/components/ask/ask-page.tsx\"\
+  ]\r\n  validate-and-finish -->|\"result_json, billing state\"| screen-polling"

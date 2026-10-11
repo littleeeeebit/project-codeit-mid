@@ -1,1 +1,6 @@
-`gateway/` holds the only paths that spend money: `budget.py`, the ledger state machine in PostgreSQL; `generation.py`, the only OpenAI SDK call site, prompts and answer validation; and `tracing.py`, Langfuse observability. Every paid stage, whether answer, rewrite, query embedding, drafting, judge, OCR fallback or stage review, follows the same cycle. It reserves the maximum cost atomically against cap and envelope, marks the attempt dispatching in a transaction that re-checks stop conditions and gateway ownership, makes one call with SDK retries disabled, then settles from reported usage, releases (proven pre-execution) or marks unknown.
+Every paid provider call goes through the same three steps:
+1. Reserve the maximum cost atomically against the cap and the purpose envelope.
+2. Mark the attempt dispatching inside a transaction that re-checks the request and the gateway.
+3. Call the provider once, with no SDK retries, then settle from the reported usage, release when the call provably never executed, or mark it unknown.
+
+`gateway/generation.py` is the only OpenAI SDK call site. Tracing is observability only; admission and settlement never read it.

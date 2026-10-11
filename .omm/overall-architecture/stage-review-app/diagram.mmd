@@ -1,0 +1,8 @@
+graph TD
+  stage-review-cli["stage-review CLI\nevaluation/stage_review.py (run)"] -->|git worktree per ref| ref-worker["Ref worker process\nevaluation/stage_review_worker.py"]
+  ref-worker -->|candidate output and bounds| run-folder["Run folder\n.runtime/review/runs"]
+  stage-review-cli -->|paid stage stops priced| paid-approval["Estimate and approval\nevaluation/stage_review_paid.py"]
+  paid-approval -->|resume hands key to worker| ref-worker
+  run-folder -->|view.json, docs, images| review-server["Review server\nreview/server.py"]
+  review-ui["Review UI\nreview/src/app/page.tsx"] -->|loopback GET and POST| review-server
+  review-server -->|write_decision md and json| decision-files["Decision files\n.runtime/review/decisions"]
