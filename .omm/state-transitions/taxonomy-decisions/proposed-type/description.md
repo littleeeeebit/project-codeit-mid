@@ -1,1 +1,0 @@
-A type inside `taxonomy/proposals/<id>.json`, admitted by `error-analysis propose`. Its ref `<proposal-id>/<n>` stays pending until a history record names it.

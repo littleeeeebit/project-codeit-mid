@@ -1,0 +1,1 @@
+`_metadata_answer` (CSV and resolved metadata facts with provenance and conflicts) and `_inventory_answer` (the requirement inventory from the active index's `requirements` rows). They make no paid call, finish inline from `submit_answer`, and so have no attempts. traffic_review labels them `not_validated`.

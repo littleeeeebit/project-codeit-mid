@@ -1,0 +1,1 @@
+Decided design: PaddleOCR-VL with a gpt-5-mini fallback on the owner's personal key, and HWP text taken from embedded pictures rather than the Hancom print.

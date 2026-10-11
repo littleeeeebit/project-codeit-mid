@@ -1,0 +1,1 @@
+The static screens served from web/out on the same origin. Writes must carry the account header and come from the same host. The dev server on :8510 is trusted only when `BIDMATE_LOCAL_MEMBER` is set (`DEV_ORIGINS`).

@@ -1,0 +1,1 @@
+This is the current branch (`traffic-sample-review`). Rounds 3–4 of its review made `write_out` the single exit that both cleans and checks, decoding every JSON escape level, and made scrubbing survive deep nesting (`RecursionError` paths).

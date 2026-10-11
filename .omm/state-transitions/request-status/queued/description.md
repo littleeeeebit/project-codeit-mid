@@ -1,1 +1,1 @@
-The row was inserted by `_create` after admission took a runner slot. Nothing has been reserved or dispatched yet. `cancel_request` finishes it immediately as cancelled with '유료 호출은 없습니다'.
+Inserted by `_create` with a runner slot held. A queued row has never dispatched anything, so cancelling it is conclusive and free. Trigger for leaving: the worker claim, `cancel_request` / `abandon_request`, `RequestRunner.shutdown`, or `recover_requests` on the next start.

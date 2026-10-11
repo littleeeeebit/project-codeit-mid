@@ -1,1 +1,0 @@
-`import_manifest` reads `원본 데이터/data_list.csv` and maps the Korean column names through `CSV_COLUMNS`. `doc_id` is uuid5 of the NFC-normalized file name under a fixed namespace. It hashes each original into `sources` and records duplicates and conflicts. Byte-identical associations share one source, but each keeps its own metadata and scope.

@@ -1,15 +1,14 @@
 graph TD
-  keyword-index["KeywordIndex\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  scope-routing["Scope routing\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  lexical-channels["Exact and BM25 channels\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  chunk-profiles["Chunk profiles\nsrc/rfp_assistant/retrieval/chunking.py"]
+  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  serving-config["Serving activation\nsrc/rfp_assistant/service/service.py"]
   query-vector["Query vector cache\nsrc/rfp_assistant/retrieval/dense.py"]
-  dense-search["pgvector search\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  fusion-rerank["Fusion and reranker\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  evidence-packing["Evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  keyword-index -->|"rows per extraction"| scope-routing
-  scope-routing -->|"allowed row ids"| lexical-channels
-  query-vector -->|"verified vector"| dense-search
-  scope-routing -->|"allowed row ids"| dense-search
-  lexical-channels -->|"exact and BM25 ranks"| fusion-rerank
-  dense-search -->|"cosine ranks"| fusion-rerank
-  fusion-rerank -->|"final ranking"| evidence-packing
+  dense-index["pgvector dense index\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  reranker["Local reranker\nsrc/rfp_assistant/retrieval/dense.py"]
+  fuse-and-pack["Fuse and pack evidence\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  chunk-profiles -->|chunks per profile| keyword-index
+  serving-config -->|mode, limits, versions| fuse-and-pack
+  keyword-index -->|exact and BM25 hits| fuse-and-pack
+  query-vector -->|query embedding| dense-index
+  dense-index -->|in-scope neighbours| fuse-and-pack
+  reranker -->|rescored order| fuse-and-pack

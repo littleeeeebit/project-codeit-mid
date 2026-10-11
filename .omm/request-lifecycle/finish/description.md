@@ -1,0 +1,1 @@
+In one transaction `_finish` reads the request's attempts, derives `billing_state`, resolves the final status (it keeps cancelled or interrupted, and turns completed-with-cancel into cancelled), and writes `status`, `trace_json` and `result_json`. It then pops `res.partials`. `_trace_outcome` writes the Langfuse output and scores.

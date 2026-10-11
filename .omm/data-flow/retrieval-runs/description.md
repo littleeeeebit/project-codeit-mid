@@ -1,1 +1,0 @@
-`.runtime/runs/<run_id>/` holds `config.json`, `traces.jsonl`, `scores.json` and `report.md`. Each run is frozen by dataset hash, evaluated population, index manifest, analyzer, dense version, limits and `EVAL_VERSION`. Runs over different populations are never compared, and a run whose population changed is blocked until rerun.

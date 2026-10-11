@@ -1,10 +1,12 @@
 graph TD
   request-status["Request status\nsrc/rfp_assistant/service/service.py"]
-  billing-attempt["Ledger attempt state\nsrc/rfp_assistant/gateway/budget.py"]
-  stage-review-run["Stage review run state\nsrc/rfp_assistant/evaluation/stage_review.py"]
-  taxonomy-decisions["Taxonomy and suggestions\nsrc/rfp_assistant/evaluation/error_analysis.py"]
-  request-status -->|"each paid stage reserves"| billing-attempt
-  stage-review-run -->|"worker answers reserve"| billing-attempt
-  billing-attempt -->|"rolls up billing_state"| request-status
-  billing-attempt -->|"unknown stops candidate"| stage-review-run
-  stage-review-run -->|"generation answers get notes"| taxonomy-decisions
+  attempt-ledger["Attempt ledger states\nsrc/rfp_assistant/gateway/budget.py"]
+  serving-activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  update-fence["Update fence\nsrc/rfp_assistant/service/update.py"]
+  stage-review-run["Stage review run states\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  request-status -->|derives billing_state| attempt-ledger
+  attempt-ledger -->|unknown blocks dispatch| request-status
+  serving-activation -->|mode and versions| request-status
+  update-fence -->|refuses new admission| request-status
+  attempt-ledger -->|open work refuses update| update-fence
+  stage-review-run -->|paid answers settle| attempt-ledger

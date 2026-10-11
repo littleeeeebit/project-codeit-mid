@@ -1,0 +1,1 @@
+`budget.reserve` at the maximum cost → a `paid_refusal` check → `mark_dispatching` with the request stop guard → `transport.chat` (streaming `on_delta` into `res.partials[request_id]`) → `settle` / `release` / `mark_unknown`. It never retries. A refusal returns `fail(...)`, which becomes the request outcome.

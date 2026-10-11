@@ -1,0 +1,1 @@
+Never ran: refused at dispatch (`stopped_before_dispatch:<reason>`), `provider_unavailable`, a confirmed pre-execution provider error, or never dispatched before a restart. It holds no money.

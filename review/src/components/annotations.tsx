@@ -17,6 +17,7 @@ type Ctx = {
   notes: SpanNote[];
   reviewedMarks: Set<string>;
   again: Map<string, string[]>;
+  sampled: Map<string, { reason: string | null; author: string }>;
   send: (body: Record<string, unknown>) => Promise<void>;
   show: (p: Pop) => void;
 };
@@ -93,6 +94,7 @@ export function AnnotationProvider({ run, children }: { run: string; children: R
     notes: state.notes,
     reviewedMarks: new Set(state.reviewed.map((r) => pair(r.question, r.candidate))),
     again: new Map((state.rereview ?? []).map((r) => [pair(r.question, r.candidate), r.types])),
+    sampled: new Map((state.sampled ?? []).map((s) => [s.question, s])),
     send,
     show: setPop,
   }), [state, send]);
@@ -261,6 +263,15 @@ export function useReview() {
       mark: (q: string, c: string, value: boolean) => send({ op: "reviewed", question: q, candidate: c, value }),
     };
   }, [notes, reviewedMarks, again, send]);
+}
+
+/** Traffic runs: requests a person added to the drawn sample, and adding or taking one back. */
+export function useSample() {
+  const { sampled, send } = useAnnotations();
+  return useMemo(() => ({
+    added: sampled,
+    set: (q: string, value: boolean, reason = "") => send({ op: "sample", question: q, value, reason }),
+  }), [sampled, send]);
 }
 
 export function ReviewedMark({ q, c }: { q: string; c: string }) {

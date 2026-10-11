@@ -1,1 +1,0 @@
-A decided ref absent from the accepted set. Its notes return to the unassigned pool and can be exported for grouping again.

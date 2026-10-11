@@ -1,0 +1,1 @@
+Per-region OCR results under `.runtime/ocr/<hash>/` are part of the ingest `input_key`, so a changed cache triggers a reparse. Merged text is chunked apart, cited as OCR, and skipped by the fidelity check.

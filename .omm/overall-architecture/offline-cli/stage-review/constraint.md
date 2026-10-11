@@ -1,0 +1,1 @@
+A generation `resume` against codeit's database must own the gateway lock, so `bidmate.service` has to be stopped for the duration (about 25–40 minutes per 55-question candidate on 2026-10-10).

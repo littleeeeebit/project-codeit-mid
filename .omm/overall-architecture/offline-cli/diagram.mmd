@@ -1,0 +1,14 @@
+graph TD
+  corpus-ingest["Manifest and ingest\nsrc/rfp_assistant/corpus/ingestion.py"]
+  ocr["Embedded image OCR\nsrc/rfp_assistant/corpus/ocr.py"]
+  fidelity["HWP fidelity check\nsrc/rfp_assistant/corpus/fidelity.py"]
+  index-build["Index and dense builds\nsrc/rfp_assistant/retrieval/dense.py"]
+  evaluation["Evaluation and activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  stage-review["Stage review runner\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  traffic-review["Traffic review freeze\nsrc/rfp_assistant/evaluation/traffic_review.py"]
+  ocr -->|cached region text| corpus-ingest
+  corpus-ingest -->|extractions and elements| index-build
+  fidelity -->|review_status verdicts| index-build
+  index-build -->|index and vector versions| evaluation
+  evaluation -->|scorer fingerprint| stage-review
+  traffic-review -->|same run folder layout| stage-review

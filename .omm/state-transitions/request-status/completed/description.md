@@ -1,1 +1,1 @@
-`_finish` stored a result with status `completed`. The result may still be a non-answer domain status such as `insufficient_evidence` or `budget_blocked`.
+Written by `_finish` for any domain outcome stored as an answer: answered, `insufficient_evidence`, `ingestion_unavailable`, `budget_blocked`, metadata or inventory. `budget_blocked` uses the default `completed` request status.

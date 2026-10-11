@@ -1,0 +1,1 @@
+An immutable keyword index directory plus `indexes`/`chunks`/`requirements` rows, and pgvector sets per model, dims and keyword index version, published after verification. The query-vector cache is keyed by payload hash, model and dims.

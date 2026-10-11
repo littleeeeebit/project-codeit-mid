@@ -1,0 +1,1 @@
+`RequestRunner._run` → `run_queued` claims the row atomically (`queued → running` only if not cancelled), reconstructs `AnswerRequest` and `Principal` from `request_json`, and calls `_execute` inside the copied contextvars (key session, model, billing scope). It always releases the slot afterwards.

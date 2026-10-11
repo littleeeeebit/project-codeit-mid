@@ -1,0 +1,1 @@
+Span notes from both gold generation runs and traffic runs feed one taxonomy (`error_analysis`). Grouping is done by the coding agent from an exported bundle. The app and CLI only validate and display. Counts are answers with a type over reviewed answers, shown per candidate and in `release-report` beside, never inside, the release gates.

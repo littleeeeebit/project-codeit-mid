@@ -1,1 +1,0 @@
-The ledger's `attempts.state`. Spending is computed as the settled sum, and pending is the reserved amount of `reserved`, `dispatching` and `unknown` attempts. `available = cap − spent − pending` is what admission checks.

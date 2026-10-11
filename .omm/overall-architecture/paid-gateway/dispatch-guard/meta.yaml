@@ -1,7 +1,7 @@
 created: 2026-10-05T23:55:18.341Z
-updated: 2026-10-10T23:14:59.383Z
-update_count: 6
-last_field: constraint
+updated: 2026-10-11T06:52:24.783Z
+update_count: 7
+last_field: description
 kind: nested-class
 title: dispatch-guard
 children: []

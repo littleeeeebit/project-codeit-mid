@@ -6,7 +6,11 @@
 
 import { useEffect, useState } from "react";
 import type { Progress } from "@/lib/api";
-import { getJson } from "@/lib/api";
+import { getJson, SOURCE } from "@/lib/api";
+
+/** "골드 12 · 실제 요청 3": a count split by where its answers came from. */
+const bySource = (counts: Record<string, number>) =>
+  Object.entries(counts).sort().map(([s, n]) => `${SOURCE[s] ?? s} ${n}`).join(" · ");
 import { Badge, Metric, Metrics, Segmented } from "./ui";
 
 const WINDOWS = ["10", "20", "50"] as const;
@@ -38,7 +42,7 @@ export function ProgressView({ openTaxonomy, openRun }: { openTaxonomy: () => vo
 
       <Metrics>
         <Metric lead value={p.breadth} label="수락된 유형 (폭)" />
-        <Metric value={p.reviewed} label="사람이 검토한 답변" />
+        <Metric value={p.reviewed} label={`사람이 검토한 답변${p.reviewed ? ` (${bySource(p.reviewed_by_source)})` : ""}`} />
         <Metric value={p.new_in_last} label={`최근 ${p.last}개 검토 답변에서 처음 나온 유형`}
                 tone={p.new_in_last > 0 ? "text-warn" : ""} />
         <Metric value={thin} label={`사례 ${p.thin}개 미만 유형`} tone={thin ? "text-warn" : ""} />
@@ -87,6 +91,7 @@ export function ProgressView({ openTaxonomy, openRun }: { openTaxonomy: () => vo
                     <span className="text-[18px] font-bold tabular-nums">{t.answers}</span>
                     <span className="text-[14px] tabular-nums text-muted">/ {p.reviewed} 답변 (사람이 찾음)</span>
                   </div>
+                  {t.answers > 0 && <div className="text-[13px] tabular-nums text-muted">{bySource(t.by_source)}</div>}
                   {(t.ai_answers > 0 || t.rereview > 0) && (
                     <div className="text-[13px] tabular-nums">
                       {t.ai_answers > 0 && <span className="text-primary">AI 제안 승인 +{t.ai_answers}</span>}

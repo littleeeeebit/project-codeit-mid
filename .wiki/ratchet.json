@@ -28,8 +28,8 @@
     },
     "src/rfp_assistant/cli.py": {
       "dup": 0,
-      "lines": 1073,
-      "reason": "failure-taxonomy-from-notes: the error-analysis subcommand (export | propose --file), its five-line parser entry, a dispatcher that prints the result and the prompt, and its no-database route merged with the chunking one; reading the proposal file, validation and the store live in evaluation/error_analysis.py. Before that, review-app-generation-ocr: stage-review gains the paid stages generation and ocr with approve, resume, rescore and reprice (--run, --approved-by, --ledger-dsn-env) and the approve branch that prints the next step; pricing on the ledger and the estimate printout live in evaluation/stage_review*.py"
+      "lines": 1080,
+      "reason": "traffic-sample-review: stage-review run traffic routes in three lines to evaluation/traffic_review.py, which validates --since and --sample, reads the DSN from --source-dsn-env and returns the printout; the three flags take one line each and traffic joins the no-database route. Before that, failure-taxonomy-from-notes: the error-analysis subcommand (export | propose --file), its five-line parser entry, a dispatcher that prints the result and the prompt, and its no-database route merged with the chunking one; reading the proposal file, validation and the store live in evaluation/error_analysis.py. Before that, review-app-generation-ocr: stage-review gains the paid stages generation and ocr with approve, resume, rescore and reprice (--run, --approved-by, --ledger-dsn-env) and the approve branch that prints the next step; pricing on the ledger and the estimate printout live in evaluation/stage_review*.py"
     },
     "src/rfp_assistant/contracts.py": {
       "dup": 8,
@@ -78,8 +78,8 @@
     },
     "tools/verify.py": {
       "dup": 0,
-      "lines": 1189,
-      "reason": "review-app-retriever-chunking: the stage-review flow, the repository gate's focused check, registers in verify.py like every other flow (its assertion ids must appear in the flow source); the served-app scenario lives in tools/verification/stage_review_served.py; duplication allowance remains zero"
+      "lines": 1190,
+      "reason": "traffic-sample-review: the stage-review flow's unit list gains tests.test_traffic_review and wraps once. Before that, review-app-retriever-chunking: the stage-review flow, the repository gate's focused check, registers in verify.py like every other flow (its assertion ids must appear in the flow source); the served-app scenario lives in tools/verification/stage_review_served.py; duplication allowance remains zero"
     },
     "web/src/components/verify/evaluation.tsx": {
       "dup": 6,

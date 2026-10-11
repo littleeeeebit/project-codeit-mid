@@ -1,1 +1,1 @@
-Each candidate has priced its work without a key (estimate mode), and `run.json` is written before pricing. `reprice` computes `estimate.json` at today's rates from the recorded token bounds. The app does not list the run until it is paid.
+`run.json` is written before pricing. The CLI then calls `on_ledger('reprice')`, which opens the ledger connection only after the local work, to write `estimate.json` from the token bounds each candidate recorded. The app does not list the run yet. `reprice` can be repeated after a rate change, an expiry (24 h) or a failed pricing step.

@@ -1,0 +1,1 @@
+`Handler._local` accepts only a loopback Host on its own port, and for writes a same-origin Origin. Every write under `<data>/review` takes `error_analysis.write_lock`, an OS file lock, so two servers over one data folder never interleave notes or decisions.

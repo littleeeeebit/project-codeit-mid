@@ -1,0 +1,1 @@
+Matching is by substring (marked `ponytail:` in the code). A member ID that is also a common word would be replaced inside answer text too. The upgrade path named in the code is token-aware matching if IDs get that short.

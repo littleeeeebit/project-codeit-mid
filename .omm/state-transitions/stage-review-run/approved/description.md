@@ -1,0 +1,1 @@
+`stage-review approve --approved-by <name>` records the person in the run and the audit log. It refuses an expired estimate or one that no longer fits the envelope. `resume` re-checks the inputs, worker, rate card, refs, working-tree hash and remaining budget, then runs only unfinished candidates with the key.

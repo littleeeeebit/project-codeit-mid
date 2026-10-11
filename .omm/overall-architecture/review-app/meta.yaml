@@ -1,0 +1,16 @@
+created: 2026-10-11T06:52:27.093Z
+updated: 2026-10-11T06:52:27.447Z
+update_count: 3
+last_field: constraint
+kind: nested-class
+title: review-app
+children:
+  - decision-files
+  - failure-taxonomy
+  - release-report
+  - review-server
+  - review-ui
+  - run-folders
+  - similar-cases
+  - span-notes
+parentPath: []

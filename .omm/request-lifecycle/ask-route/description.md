@@ -1,0 +1,1 @@
+`ask` in api.py passes `date.today()` as `as_of`. `service.ask` mints a UUID used as both idempotency key and generation ID, calls `submit_answer`, and returns the `target_key` hash of scope, question, mode, date and the previous turn. A `ServiceError` (validation, full queue, update fence) returns 400 with nothing persisted beyond what `_create` committed.

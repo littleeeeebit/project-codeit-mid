@@ -1,20 +1,21 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-11 04:59:52.842000+00:00
-update_count: 51
+updated: 2026-10-11 06:52:23.155000+00:00
+update_count: 53
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
 children:
+- chunk-profiles
 - corpus-route
 - corpus-router
 - corpus-routing
 - dense-channel
+- dense-index
 - dense-search
-- evidence-packing
+- fuse-and-pack
 - fusion
 - fusion-rerank
 - keyword-index
-- lexical-channels
 - local-reranker
 - query-embedding
 - query-vector
@@ -23,15 +24,15 @@ children:
 - serving-activation
 - serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  corpus-routing[\"Corpus routing and name-only\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  lexical-channel[\"Kiwi BM25 channel\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  query-embedding[\"Query vector cache\\nsrc/rfp_assistant/retrieval/dense.py\"\
-  ]\r\n  dense-channel[\"Dense pgvector channel\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
+prev_diagram: "graph TD\r\n  keyword-index[\"KeywordIndex\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  scope-routing[\"Scope routing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  lexical-channels[\"Exact and BM25 channels\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  query-vector[\"Query vector cache\\nsrc/rfp_assistant/retrieval/dense.py\"\
+  ]\r\n  dense-search[\"pgvector search\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
   ]\r\n  fusion-rerank[\"Fusion and reranker\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  evidence-packer[\"Evidence packer\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  keyword-index -->|scope rows and title terms| corpus-routing\r\n  corpus-routing\
-  \ -->|allowed rows| lexical-channel\r\n  corpus-routing -->|allowed rows| dense-channel\r\
-  \n  query-embedding -->|unit query vector| dense-channel\r\n  lexical-channel -->|BM25\
-  \ ranked rows| fusion-rerank\r\n  dense-channel -->|cosine ranked rows| fusion-rerank\r\
-  \n  fusion-rerank -->|final ranking| evidence-packer"
+  ]\r\n  evidence-packing[\"Evidence packing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  keyword-index -->|\"rows per extraction\"| scope-routing\r\n  scope-routing\
+  \ -->|\"allowed row ids\"| lexical-channels\r\n  query-vector -->|\"verified vector\"\
+  | dense-search\r\n  scope-routing -->|\"allowed row ids\"| dense-search\r\n  lexical-channels\
+  \ -->|\"exact and BM25 ranks\"| fusion-rerank\r\n  dense-search -->|\"cosine ranks\"\
+  | fusion-rerank\r\n  fusion-rerank -->|\"final ranking\"| evidence-packing"

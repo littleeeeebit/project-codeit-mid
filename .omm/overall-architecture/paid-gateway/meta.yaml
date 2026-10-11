@@ -1,41 +1,63 @@
 created: 2026-10-05 04:06:18.173000+00:00
-updated: 2026-10-11 04:59:55.200000+00:00
-update_count: 40
+updated: 2026-10-11T06:52:24.394Z
+update_count: 42
 last_field: diagram
 kind: nested-class
 title: paid-gateway
 children:
-- answer-validation
-- budget-admission
-- budget-ledger
-- dispatch-guard
-- dispatch-marker
-- fake
-- gateway-lock
-- gateway-owner
-- key-sessions
-- langfuse-tracing
-- ledger
-- openai-transport
-- owner-ledger-cli
-- owner-reconciliation
-- provider-transport
-- reserve
-- settlement
-- trace-export
-- tracing
-- transport
+  - answer-validation
+  - budget-admission
+  - budget-ledger
+  - dispatch-guard
+  - dispatch-marker
+  - fake
+  - gateway-lock
+  - gateway-owner
+  - key-sessions
+  - langfuse-tracing
+  - ledger
+  - openai-transport
+  - owner-ledger-cli
+  - owner-lock
+  - owner-reconciliation
+  - provider-transport
+  - reconciliation
+  - reserve
+  - settlement
+  - trace-export
+  - tracing
+  - transport
 parentPath: []
-prev_diagram: "graph TD\r\n  gateway-owner[\"Gateway advisory lock\\nsrc/rfp_assistant/storage/postgres.py\"\
-  ]\r\n  startup-recovery[\"Startup recovery\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  admission[\"Reserve admission\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n\
-  \  dispatch-marker[\"Dispatch marker and guard\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  provider-transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\n  settlement[\"Settle, release or unknown\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  trace-export[\"Langfuse tracing\\nsrc/rfp_assistant/gateway/tracing.py\"\
-  ]\r\n  gateway-owner -->|acquired, then recover| startup-recovery\r\n  gateway-owner\
-  \ -->|owner_guard in each tx| admission\r\n  admission -->|reserved attempt id|\
-  \ dispatch-marker\r\n  dispatch-marker -->|dispatching, then call| provider-transport\r\
-  \n  gateway-owner -->|owner check before call| provider-transport\r\n  provider-transport\
-  \ -->|usage or ProviderError| settlement\r\n  provider-transport -->|generation\
-  \ spans| trace-export"
+prev_diagram: "graph TD\r
+
+  \  gateway-owner[\"Gateway advisory
+  lock\\nsrc/rfp_assistant/storage/postgres.py\"]\r
+
+  \  reserve[\"Atomic reservation\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  dispatch-marker[\"Dispatch
+  marker\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"]\r
+
+  \  settlement[\"Settle, release or
+  unknown\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  answer-validation[\"Answer
+  validation\\nsrc/rfp_assistant/gateway/generation.py\"]\r
+
+  \  tracing[\"Langfuse tracing\\nsrc/rfp_assistant/gateway/tracing.py\"]\r
+
+  \  gateway-owner -->|\"owner_guard in admission\"| reserve\r
+
+  \  reserve -->|\"attempt_id when admitted\"| dispatch-marker\r
+
+  \  dispatch-marker -->|\"call after durable marker\"| transport\r
+
+  \  gateway-owner -->|\"owner_check before call\"| transport\r
+
+  \  transport -->|\"usage or ProviderError\"| settlement\r
+
+  \  transport -->|\"structured content\"| answer-validation\r
+
+  \  transport -->|\"generation span, usage\"| tracing"
