@@ -239,7 +239,7 @@ class ReleaseReportTest(unittest.TestCase):
             path = release.write_release_report(env.settings, "latest")
             text = path.read_text(encoding="utf-8")
             self.assertIn("## Human error analysis (not a sealed metric)", text)
-            self.assertIn(f"| 기한 오류 | 기한을 틀린다. | 1/1 (fewer than 3 cases) | `{notes.RUN}` 1/1 |", text)
+            self.assertIn(f"| 기한 오류 | 기한을 틀린다. | 1/1 (fewer than 3 cases) | `{notes.RUN}` (gold) 1/1 |", text)
             human = json.loads((path.parent / "evaluation.json").read_text(encoding="utf-8"))["human_error_analysis"]
             self.assertEqual((human["sealed_metric"], human["gate"], human["reviewed"]), (False, False, 1))
             checked = json.loads((path.parent / "coverage.json").read_text(encoding="utf-8"))["human_checked_sources"]

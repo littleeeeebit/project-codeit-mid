@@ -8,7 +8,7 @@ import { Badge, LedgerLine, Metric, Metrics, NotedList, Segmented, Summaries, co
 import { NoteField } from "./note-field";
 import { Annotatable, AnnotationProvider, ReviewedMark, useAnnotationVersion, useReview } from "./annotations";
 
-const OUTCOME: Record<string, string> = {
+export const OUTCOME: Record<string, string> = {
   answered: "답변", insufficient_evidence: "근거 부족", clarification_required: "되묻기",
   conflicting_evidence: "근거 충돌", technical_error: "답변 거부됨", ingestion_unavailable: "문서 없음",
   budget_blocked: "예산 거절",
@@ -153,7 +153,7 @@ function Summary({ s, c, reviewed, types }: {
 
 /** Answers of this candidate a person found each accepted failure type in, over its answers a person reviewed; the
  *  answers holding a type only through an approved AI suggestion are added apart and are not part of the rate. */
-function FailureTypes({ f, c }: { f: RunFailures; c: Candidate }) {
+export function FailureTypes({ f, c }: { f: RunFailures; c: Candidate }) {
   const n = f.reviewed[c.id] ?? 0;
   const rows = f.types.map((t) => ({ t, k: t.by_candidate[c.id] ?? 0, ai: t.ai_by_candidate[c.id] ?? 0 }))
     .filter((r) => r.k + r.ai > 0).sort((a, b) => b.k - a.k || b.ai - a.ai);
@@ -176,16 +176,34 @@ function FailureTypes({ f, c }: { f: RunFailures; c: Candidate }) {
 
 const sec = (ms: number | null | undefined) => (ms == null ? "—" : `${(ms / 1000).toFixed(1)}초`);
 
+export const MODE: Record<string, string> = {
+  single: "단일 문서", compare: "두 문서 비교", corpus: "전체 문서", metadata: "기본 정보", inventory: "요구사항 목록",
+};
+
 function QuestionHead({ q, size = "text-[17px]" }: { q: GenerationQuestion; size?: string }) {
+  const traffic = q.type === "traffic";
   return (
     <>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted">
-        <Badge tone="info">{q.mode === "compare" ? "두 문서 비교" : "단일 문서"}</Badge>
-        <span title={q.type}>{label(TYPE, q.type)}</span>
-        <span>기대: {OUTCOME[q.expected_status] ?? q.expected_status}</span>
+        <Badge tone="info">{label(MODE, q.mode) || "단일 문서"}</Badge>
+        {traffic ? (
+          <>
+            <span>실제 요청 · {q.created_at && new Date(q.created_at).toLocaleString("ko-KR")}</span>
+            {q.follow_up && <Badge>후속 질문</Badge>}
+          </>
+        ) : (
+          <>
+            <span title={q.type}>{label(TYPE, q.type)}</span>
+            <span>기대: {OUTCOME[q.expected_status] ?? q.expected_status}</span>
+          </>
+        )}
       </div>
-      <h3 className={`mt-2 max-w-[960px] font-semibold leading-snug ${size}`} title={`질문 ID ${q.id}`}>{q.question}</h3>
-      <p className="mt-1 text-[13px] text-muted">{q.docs.join(" · ")}</p>
+      <h3 className={`mt-2 max-w-[960px] font-semibold leading-snug ${size}`} title={`${traffic ? "요청" : "질문"} ID ${q.id}`}>{q.question}</h3>
+      {q.standalone_question && q.standalone_question !== q.question && (
+        <p className="mt-1 max-w-[960px] text-[14px] text-muted">대화를 풀어 쓴 질문: {q.standalone_question}</p>
+      )}
+      <p className="mt-1 text-[13px] text-muted">{q.docs.length ? q.docs.join(" · ") : traffic ? "전체 문서" : ""}</p>
+      {q.pick && <p className="mt-2 max-w-[960px] rounded-[10px] bg-primary-bg px-3 py-2 text-[14px] text-primary">왜 골랐나 · {q.pick}</p>}
     </>
   );
 }
@@ -210,8 +228,9 @@ function QuestionRow({ q, candidates, all, note, setNote, read }: {
 
 /** One answer at a time: the question and its required claims on top, the answer large on the left and the
  *  evidence it opens beside it. ← → (or j k) move between answers. */
-function ReadingView({ items, at, setAt, notes, setNote }: Notes & {
+export function ReadingView({ items, at, setAt, notes, setNote, extra }: Partial<Notes> & {
   items: { q: GenerationQuestion; c: Candidate }[]; at: number; setAt: (i: number) => void;
+  extra?: (q: GenerationQuestion) => React.ReactNode;
 }) {
   const { q, c } = items[at];
   const a = q.candidates[c.id];
@@ -252,6 +271,7 @@ function ReadingView({ items, at, setAt, notes, setNote }: Notes & {
         <div className="min-w-0">
           {a && <AnswerBody q={q} c={c} a={a} open={open} setOpen={setOpen} large />}
           <ReviewedMark q={q.key} c={c.id} />
+          {extra?.(q)}
         </div>
         <aside aria-label="열린 근거" className="sticky top-20 self-start">
           {open && a?.evidence?.[open]
@@ -259,7 +279,7 @@ function ReadingView({ items, at, setAt, notes, setNote }: Notes & {
             : <p className="rounded-[10px] bg-surface px-3 py-6 text-center text-[14px] text-muted">인용 번호를 누르면 근거가 여기 열립니다</p>}
         </aside>
       </div>
-      <div className="mt-6"><NoteField value={notes[q.key] ?? ""} onChange={(v) => setNote(q.key, v)} /></div>
+      {notes && setNote && <div className="mt-6"><NoteField value={notes[q.key] ?? ""} onChange={(v) => setNote(q.key, v)} /></div>}
     </article>
   );
 }
@@ -334,6 +354,7 @@ function AnswerBody({ q, c, a, open, setOpen, large = false, read }: {
       {a.validation && (
         <p className="mt-2 rounded-md bg-bad-bg px-2 py-1 text-[14px] text-bad" title={a.validation_detail ?? a.validation}>
           <span className="font-semibold">검증 실패: {label(VALIDATION, a.validation)}</span> · 이 답변은 사용자에게 보이지 않습니다
+          {a.rejected_shown && <> · 아래는 트레이스에 남은 거부된 답변{a.rejected_cut && " (4000자에서 잘림)"}</>}
         </p>
       )}
       {a.failure && (

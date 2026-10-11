@@ -9,7 +9,9 @@ decisions on failure types grouped from those notes and on further cases of them
 (src/rfp_assistant/evaluation/error_analysis.py, also standard library only; the coding agent does the grouping and
 the searching from an exported bundle). It never runs a pipeline, loads a model
 or calls a paid service; runs come from `python -m rfp_assistant.cli stage-review run ...`, and a paid run (generation,
-ocr) appears here only after its approved estimate was paid (`stage-review resume`).
+ocr) appears here only after its approved estimate was paid (`stage-review resume`). A traffic run
+(`stage-review run traffic`, real consultant answers frozen read-only) takes span notes and hand-added sample
+records like a generation run's answers, and no decision.
 """
 
 from __future__ import annotations
@@ -45,7 +47,7 @@ from rfp_assistant.evaluation.error_analysis import (  # noqa: E402
 OUT = APP / "out"
 RUN_SCHEMA = "review-run-1"
 DECISION_SCHEMA = "review-decision-1"
-RUN_ID = re.compile(r"^(retriever|chunking|generation|ocr)-\d{8}T\d{6}Z-[0-9a-f]{6}$")
+RUN_ID = re.compile(r"^(retriever|chunking|generation|ocr|traffic)-\d{8}T\d{6}Z-[0-9a-f]{6}$")
 SKIP = {"node_modules", "out", ".next", "__pycache__"}
 MAX_IMPORT = 2 * 1024 ** 3
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json",
@@ -132,7 +134,7 @@ def list_runs(root: Path) -> list[dict]:
         decision = decisions_dir(root) / f"{run['run_id']}.json"
         out.append({"run_id": run["run_id"], "stage": run["stage"], "created_at": run["created_at"],
                     "imported": json.loads(imported.read_text(encoding="utf-8")) if imported.exists() else None,
-                    "decided": decision.exists(),
+                    "decided": decision.exists(), "window": run.get("window"),
                     "candidates": [{k: c.get(k) for k in ("id", "label", "role", "commit", "status", "host")}
                                    for c in run["candidates"]]})
     return sorted(out, key=lambda r: r["created_at"], reverse=True)
@@ -235,7 +237,7 @@ def import_run(root: Path, data: bytes) -> str:
 # notes a person approves from the agent's suggestions (origin ai_suggested); this app's own notes never carry one.
 
 ANNOTATIONS_IN_ZIP = "annotations.jsonl"
-OPS = ("note", "edit", "delete", "reviewed")
+OPS = ("note", "edit", "delete", "reviewed", "sample")  # sample: a person adds a traffic request to the sample
 
 
 def _append(root: Path, run_id: str, records: list[dict]) -> None:
@@ -243,8 +245,8 @@ def _append(root: Path, run_id: str, records: list[dict]) -> None:
 
 
 def _answer(view: dict, question: str, candidate: str) -> dict:
-    if view["stage"] != "generation":
-        raise ReviewInputError("only generated answers take span notes")
+    if view["stage"] not in ea.SOURCES:
+        raise ReviewInputError("only generated answers and traffic answers take span notes")
     q = next((q for q in view["questions"] if q["key"] == question), None)
     if q is None or not isinstance(q["candidates"].get(candidate), dict):
         raise ReviewInputError("no such answer in this run")
@@ -280,6 +282,12 @@ def check_annotations(view: dict, records: list[dict]) -> None:
             if r.get("origin") not in (None, ea.AI) or (r.get("origin") and not r.get("approved_by")):
                 raise ReviewInputError("a suggested note names who approved it")
             notes.add(r["id"])
+        elif r["op"] == "sample":
+            if view["stage"] != "traffic" or not any(q["key"] == r.get("question") for q in view["questions"]):
+                raise ReviewInputError("only a request of a traffic run is added to its sample")
+            if not isinstance(r.get("value"), bool) or not isinstance(r.get("reason"), (str, type(None))) \
+                    or len(r.get("reason") or "") > 300:
+                raise ReviewInputError("a sample record is true or false with a reason of at most 300 characters")
         elif r["op"] in ("edit", "delete"):
             if r.get("target") not in notes:
                 raise ReviewInputError("that note does not exist or was deleted")
@@ -307,6 +315,9 @@ def add_annotation(root: Path, view: dict, body: dict, author: str) -> dict:
             record["note"] = str(body.get("note") or "").strip()
     elif op == "reviewed":
         record["value"] = body.get("value")
+    elif op == "sample":
+        record.update(question=body.get("question"), value=body.get("value"),
+                      reason=str(body.get("reason") or "").strip() or None)
     with write_lock(root):
         existing = read_annotations(root, view["run_id"])
         check_annotations(view, existing + [record])
@@ -341,6 +352,8 @@ def _items(view: dict) -> dict[str, str]:
 
 def write_decision(root: Path, view: dict, chosen: str | None, reasons: dict, notes: dict) -> dict:
     """Validate the person's decision on one run and write <stage>-<id>.md and .json under review/decisions."""
+    if view["stage"] == "traffic":
+        raise ReviewInputError("a traffic run has no candidates to choose between; it takes notes only")
     cands = {c["id"]: c for c in view["candidates"]}
     if chosen is not None and (chosen not in cands or cands[chosen]["role"] != "candidate"
                                or cands[chosen]["status"] != "complete"):

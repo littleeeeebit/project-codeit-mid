@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Exported, FailureType, SuggestExported, Suggestion, SuggestionQueue, Taxonomy, TaxNote } from "@/lib/api";
-import { getJson, postJson, when } from "@/lib/api";
+import { getJson, postJson, SOURCE, sourceOf, when } from "@/lib/api";
 import { Badge } from "./ui";
 
 type Decide = (body: Record<string, unknown>) => Promise<void>;
@@ -295,7 +295,9 @@ function SuggestionItem({ s, decide }: { s: Suggestion; decide: (body: Record<st
   const chars = Array.from(s.field_text ?? "");  // offsets count code points, as Python does
   return (
     <li className="py-4">
-      <p className="text-[13px] text-muted">{s.question_text ?? s.question} · {s.candidate_label} · {part(s.field)}</p>
+      <p className="text-[13px] text-muted">
+        <b>{SOURCE[sourceOf(s.run_id) ?? ""] ?? s.run_id}</b> · {s.question_text ?? s.question} · {s.candidate_label} · {part(s.field)}
+      </p>
       <p className="mt-1 whitespace-pre-line break-words text-[16px] leading-relaxed">
         {s.field_text != null ? (
           <>{chars.slice(0, s.start).join("")}
@@ -337,7 +339,8 @@ function Spans({ notes }: { notes: TaxNote[] }) {
           <p className="pl-3.5 text-[15px] font-medium">{n.note}</p>
           <p className="pl-3.5 text-[13px] text-muted">
             {n.origin && <b className="text-primary">AI 제안 · {n.approved_by} 승인 · </b>}
-            {n.question_text ?? n.question} · {n.candidate_label} · {n.edited_by ?? n.author}
+            <b className={n.source === "traffic" ? "text-warn" : ""}>{SOURCE[n.source ?? ""] ?? n.run_id}</b> ·{" "}
+            {n.question_text ?? n.question} · {n.source !== "traffic" && `${n.candidate_label} · `}{n.edited_by ?? n.author}
           </p>
         </li>
       ))}

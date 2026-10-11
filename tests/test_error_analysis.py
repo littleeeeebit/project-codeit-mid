@@ -192,7 +192,7 @@ class DecisionTest(unittest.TestCase):
             self.assertEqual((summary["sealed_metric"], summary["gate"]), (False, False))
             lines = "\n".join(ea.release_lines(summary))
             self.assertIn("## Human error analysis (not a sealed metric)", lines)
-            self.assertIn(f"| 금액 오류 | 금액을 틀린다. | 2/5 (fewer than 3 cases) | `{RUN}` 2/5 |", lines)
+            self.assertIn(f"| 금액 오류 | 금액을 틀린다. | 2/5 (fewer than 3 cases) | `{RUN}` (gold) 2/5 |", lines)
 
             # a deleted note no longer counts, and a type whose last note is gone can only be rejected
             server.add_annotation(root, view, {"op": "delete", "target": n3}, "person")
@@ -318,7 +318,7 @@ class SuggestTest(unittest.TestCase):
                          (3, 1, 1))
         counts = ea.run_counts(self.root, RUN)["types"][0]
         self.assertEqual((counts["by_candidate"], counts["ai_by_candidate"]), ({"base": 1}, {"c1": 1}))
-        self.assertIn("| 1/3 (fewer than 3 cases) | `" + RUN + "` 1/3 | 1 |",
+        self.assertIn("| 1/3 (fewer than 3 cases) | `" + RUN + "` (gold) 1/3 | 1 |",
                       "\n".join(ea.release_lines(ea.release_summary(self.root))))
         with self.assertRaisesRegex(ea.ReviewInputError, "no notes left"):  # nor is it grouped into a new type
             ea.export(self.root)

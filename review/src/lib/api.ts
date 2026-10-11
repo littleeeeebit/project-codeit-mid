@@ -23,7 +23,10 @@ export type Candidate = {
 /** A candidate's spend as the shared ledger records it (paid stages). */
 export type Ledger = { settled_micro_usd: number; attempts: number; open: number; target: string };
 
-export type Stage = "retriever" | "chunking" | "generation" | "ocr";
+export type Stage = "retriever" | "chunking" | "generation" | "ocr" | "traffic";
+
+/** The read window of a traffic run (src/rfp_assistant/evaluation/traffic_review.py). */
+export type TrafficWindow = { since: string; until: string; source_dsn_env: string; requests: number; filter: string };
 
 export type RunListItem = {
   run_id: string;
@@ -31,6 +34,7 @@ export type RunListItem = {
   created_at: string;
   imported: { imported_at: string } | null;
   decided: boolean;
+  window?: TrafficWindow | null;
   candidates: Pick<Candidate, "id" | "label" | "role" | "commit" | "status" | "host">[];
 };
 
@@ -161,6 +165,8 @@ export type Answer = {
   latency_ms?: number | null;
   replayed?: boolean;
   trace_url?: string | null;
+  rejected_shown?: boolean; // traffic: the refused answer, read back from the trace's raw output
+  rejected_cut?: boolean; // ... which the trace keeps only up to 4000 characters
 };
 
 export type GenerationQuestion = {
@@ -175,6 +181,12 @@ export type GenerationQuestion = {
   required: { claim_id: string; text: string; critical: boolean }[];
   candidates: Record<string, Answer>;
   differs: boolean;
+  // traffic only
+  created_at?: string;
+  follow_up?: boolean;
+  standalone_question?: string;
+  group?: string;
+  pick?: string; // why it is in the sample, set by the traffic view
 };
 
 export type GenerationSummary = {
@@ -256,7 +268,24 @@ export type OcrView = {
   images: OcrImage[];
 };
 
-export type RunView = RetrieverView | ChunkingView | GenerationView | OcrView;
+/** Rule-based group of a traffic window: requests sharing mode, outcome, validation failure and document. */
+export type TrafficGroup = {
+  key: string; mode: string; outcome: string; validation: string; doc: string; requests: string[]; priority: number;
+};
+
+export type TrafficView = {
+  stage: "traffic";
+  run_id: string;
+  candidates: Candidate[]; // one: "traffic"
+  window: TrafficWindow;
+  rule: string;
+  seed: number;
+  groups: TrafficGroup[];
+  sample: { key: string; group: string; kind: "representative" | "extra"; reason: string }[];
+  questions: GenerationQuestion[]; // every request of the window
+};
+
+export type RunView = RetrieverView | ChunkingView | GenerationView | OcrView | TrafficView;
 
 export type Decision = {
   chosen: string | null;
@@ -293,10 +322,20 @@ export type Annotations = {
   reviewed: { question: string; candidate: string; author: string; at: string; first_at: string }[];
   /** Answers marked '문제 없음' before an accepted type existed, with those types' names. */
   rereview?: { question: string; candidate: string; types: string[] }[];
+  /** Traffic runs: requests a person added to the sample by hand. */
+  sampled?: { question: string; reason: string | null; author: string; at: string }[];
 };
 
+/** Where a note's answer came from: a generation run on the gold set, or real consultant traffic. */
+export type Source = "gold" | "traffic";
+export const SOURCE: Record<string, string> = { gold: "골드", traffic: "실제 요청" };
+export const sourceOf = (runId: string): Source | null =>
+  runId.startsWith("traffic-") ? "traffic" : runId.startsWith("generation-") ? "gold" : null;
+
 /** A note as the failure taxonomy shows it: with the run, question text and candidate label it came from. */
-export type TaxNote = SpanNote & { run_id: string; question_text: string | null; candidate_label: string };
+export type TaxNote = SpanNote & {
+  run_id: string; source: Source | null; question_text: string | null; candidate_label: string;
+};
 
 /** A failure type: proposed (`ref`, waiting for the person) or accepted (`id`). `answers` counts distinct answers
  *  holding one of the person's own notes of it, `ai_answers` the further answers holding only an approved
@@ -360,10 +399,11 @@ export type SuggestionQueue = {
 export type Progress = {
   version: number;
   reviewed: number;
+  reviewed_by_source: Record<string, number>;
   breadth: number;
   types: {
-    id: string; name: string; definition: string; answers: number; ai_answers: number; thin: boolean;
-    first: number | null; runs: string[]; rereview: number;
+    id: string; name: string; definition: string; answers: number; by_source: Record<string, number>;
+    ai_answers: number; thin: boolean; first: number | null; runs: string[]; rereview: number;
   }[];
   last: number;
   new_in_last: number;

@@ -16,12 +16,12 @@ import uuid
 from pathlib import Path
 
 from .error_analysis import (
-    ACTION_SCHEMA, AI, ANNOTATION_SCHEMA, ReviewInputError, _fold, _labels, _now, _stamp, _view, _write_json,
+    ACTION_SCHEMA, AI, ANNOTATION_SCHEMA, SOURCES, ReviewInputError, _fold, _labels, _now, _stamp, _view, _write_json,
     annotations_file, append_jsonl, field_text, live_notes, read_annotations, reviewed_answers, suggestions,
     taxonomy_dir, write_lock)
 
 SUGGESTION_SCHEMA = "failure-type-suggestions-1"
-RUN_FOLDER = re.compile(r"^generation-\d{8}T\d{6}Z-[0-9a-f]{6}$")
+RUN_FOLDER = re.compile(rf"^({'|'.join(SOURCES)})-\d{{8}}T\d{{6}}Z-[0-9a-f]{{6}}$")
 
 
 def answer_fields(answer: dict) -> dict[str, str]:
@@ -34,16 +34,17 @@ def answer_fields(answer: dict) -> dict[str, str]:
 
 
 def _stored_answer(root: Path, run_id: str, question: str, candidate: str) -> tuple[dict, dict | None]:
-    """The generation run's view and one of its stored answers (None when there is no such answer)."""
+    """The generation or traffic run's view and one of its stored answers (None when there is no such answer)."""
     view = _view(root, run_id) if isinstance(run_id, str) and RUN_FOLDER.match(run_id) else {}
     q = next((q for q in view.get("questions") or [] if q.get("key") == question), None) \
-        if view.get("stage") == "generation" else None
+        if view.get("stage") in SOURCES else None
     answer = (q or {}).get("candidates", {}).get(candidate)
     return view, answer if isinstance(answer, dict) else None
 
 
 def _stored_answers(root: Path) -> list[dict]:
-    """Every answer of every generation run here, reviewed or not, with each field that takes span notes."""
+    """Every answer of every generation and traffic run here, reviewed or not, with each field that takes span
+    notes."""
     reviewed = {(a["run_id"], a["question"], a["candidate"]) for a in reviewed_answers(root)}
     out = []
     folder = root / "review" / "runs"

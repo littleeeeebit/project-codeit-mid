@@ -12,5 +12,6 @@ children:
   - run-folders
   - similar-cases
   - stage-runner
+  - traffic-sampler
   - worker-process
 parentPath: []

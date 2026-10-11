@@ -5,7 +5,8 @@ so do the CLI (`error-analysis export | propose`) and the release report. Nothin
 service. The coding agent groups an exported bundle of notes into a proposal file; `propose` admits a type only if
 it stands on the person's own notes, and the person accepts, renames, merges, splits or rejects every type in the
 review app. Counts are answers with a note of a type over answers a person reviewed; they guide what to fix next
-and are never a release gate.
+and are never a release gate. Notes come from generation runs (source gold) and traffic runs (source traffic, real
+consultant answers); both feed the same types and counts, and every note and count names its source.
 
 For an accepted type the agent may also suggest other spans of it across every stored answer (similar_cases.py): each one
 must quote its stored answer verbatim, and only the person's approval turns it into a note (origin ai_suggested),
@@ -40,6 +41,9 @@ TAXONOMY_SCHEMA = "failure-taxonomy-1"
 ANNOTATION_SCHEMA = "review-annotation-1"
 AI = "ai_suggested"  # the origin of a note the agent suggested and a person approved; a person's own note has none
 THIN = 3  # a type seen in fewer answers than this is marked: too few cases to know what it is
+# Runs whose answers take span notes, and the source their notes are labelled by: a generation run answers the gold
+# development set, a traffic run holds real consultant answers (traffic_review.py).
+SOURCES = {"generation": "gold", "traffic": "traffic"}
 HANGUL = re.compile(r"[가-힣]")
 FIELD = re.compile(r"^(summary|next_action|claim\.(\d+)|conflict\.(\d+)\.(\d+)|missing\.(\d+))$")
 
@@ -136,10 +140,16 @@ def unconfirmed_suggestions(root: Path) -> set[str]:
     return {s["id"] for s in suggestions(root) if s["status"] != "approved"}
 
 
+def source(run_id: str) -> str | None:
+    """gold or traffic, from the stage the run ID starts with."""
+    return SOURCES.get(str(run_id).split("-", 1)[0])
+
+
 def annotation_state(records: list[dict], unconfirmed: set[str] | frozenset = frozenset()) -> dict:
-    """The records folded in order: live notes with their latest text, and answers marked reviewed and fine. A note
-    from a suggestion in `unconfirmed` (unconfirmed_suggestions) is not shown, counted or kept by a rejection."""
-    notes, reviewed = {}, {}
+    """The records folded in order: live notes with their latest text, answers marked reviewed and fine, and (traffic
+    runs) requests a person added to the sample. A note from a suggestion in `unconfirmed` (unconfirmed_suggestions)
+    is not shown, counted or kept by a rejection."""
+    notes, reviewed, sampled = {}, {}, {}
     for r in records:
         if r["op"] == "note" and r.get("origin") and r.get("suggestion") in unconfirmed:
             continue
@@ -160,8 +170,15 @@ def annotation_state(records: list[dict], unconfirmed: set[str] | frozenset = fr
                                  "at": r["at"], "first_at": first}
             else:
                 reviewed.pop(key, None)
+        elif r["op"] == "sample":
+            if r["value"]:
+                sampled[r["question"]] = {"question": r["question"], "reason": r.get("reason"), "author": r["author"],
+                                          "at": r["at"]}
+            else:
+                sampled.pop(r["question"], None)
     # The store only grows, so its record count orders snapshots: the app keeps the newest it has seen.
-    return {"version": len(records), "notes": list(notes.values()), "reviewed": list(reviewed.values())}
+    return {"version": len(records), "notes": list(notes.values()), "reviewed": list(reviewed.values()),
+            "sampled": list(sampled.values())}
 
 
 def human(note: dict) -> bool:
@@ -217,7 +234,7 @@ def live_notes(root: Path) -> dict[str, dict]:
     for run_id, state in _runs_with_notes(root).items():
         questions, labels = _labels(root, run_id)
         for n in state["notes"]:
-            out[n["id"]] = {**n, "run_id": run_id, "question_text": questions.get(n["question"]),
+            out[n["id"]] = {**n, "run_id": run_id, "source": source(run_id), "question_text": questions.get(n["question"]),
                             "candidate_label": labels.get(n["candidate"], n["candidate"])}
     return out
 
@@ -233,7 +250,8 @@ def reviewed_answers(root: Path) -> list[dict]:
         for n in filter(human, state["notes"]):
             key = (n["question"], n["candidate"])
             first[key] = min(first.get(key, n["at"]), n["at"])
-        out += [{"run_id": run_id, "question": q, "candidate": c, "at": at} for (q, c), at in first.items()]
+        out += [{"run_id": run_id, "source": source(run_id), "question": q, "candidate": c, "at": at}
+                for (q, c), at in first.items()]
     return sorted(out, key=lambda a: (a["at"], a["run_id"], a["question"], a["candidate"]))
 
 
@@ -519,6 +537,15 @@ def _type_answers(root: Path) -> tuple[dict, dict[str, set], dict[str, set]]:
     return fold, found, suggested
 
 
+def _by_source(answers) -> dict[str, int]:
+    """Answers (tuples starting with their run ID) counted per source, gold or traffic."""
+    out: dict[str, int] = {}
+    for a in answers:
+        s = source(a[0]) or "other"
+        out[s] = out.get(s, 0) + 1
+    return out
+
+
 def progress(root: Path, last: int = 20) -> dict:
     """Breadth (how many types), depth (answers per type, thin ones marked), saturation (how many types first
     appeared among the last `last` reviewed answers) and the answers marked fine before a type that wait for a
@@ -532,13 +559,15 @@ def progress(root: Path, last: int = 20) -> dict:
     for tid, t in fold["accepted"].items():
         seen = [order[a] for a in answers[tid] if a in order]
         types.append({"id": tid, "name": t["name"], "definition": t["definition"], "answers": len(answers[tid]),
+                      "by_source": _by_source(answers[tid]),
                       "ai_answers": len(ai[tid]), "thin": len(answers[tid]) < THIN,
                       "first": min(seen) + 1 if seen else None, "runs": sorted({a[0] for a in answers[tid]}),
                       "rereview": sum(1 for a in again if t["name"] in a["types"])})
     types.sort(key=lambda t: (-t["answers"], t["name"]))
     new = [t["name"] for t in types if t["first"] is not None and t["first"] > len(reviewed) - window]
     state = taxonomy_state(root)
-    return {"version": fold["version"], "reviewed": len(reviewed), "breadth": len(types), "types": types,
+    return {"version": fold["version"], "reviewed": len(reviewed),
+            "reviewed_by_source": _by_source([(a["run_id"],) for a in reviewed]), "breadth": len(types), "types": types,
             "last": window, "new_in_last": len(new), "new_names": new, "thin": THIN,
             "pending": len(state["pending"]), "unassigned": state["unassigned"], "rereview": len(again),
             "rereview_runs": sorted({a["run_id"] for a in again})}
@@ -568,8 +597,9 @@ def release_summary(root: Path) -> dict:
     """The release report's human error analysis: types, counts, denominators and source runs. Not a sealed
     metric and not a gate."""
     fold, answers, ai = _type_answers(root)
+    listed = reviewed_answers(root)
     reviewed: dict[str, int] = {}
-    for a in reviewed_answers(root):
+    for a in listed:
         reviewed[a["run_id"]] = reviewed.get(a["run_id"], 0) + 1
     types = []
     for tid, t in fold["accepted"].items():
@@ -577,22 +607,25 @@ def release_summary(root: Path) -> dict:
         for run, _, _ in answers[tid]:
             per_run[run] = per_run.get(run, 0) + 1
         types.append({"name": t["name"], "definition": t["definition"], "answers": len(answers[tid]),
-                      "ai_answers": len(ai[tid]), "per_run": per_run})
+                      "by_source": _by_source(answers[tid]), "ai_answers": len(ai[tid]), "per_run": per_run})
     types.sort(key=lambda t: (-t["answers"], t["name"]))
     return {"sealed_metric": False, "gate": False, "version": fold["version"], "reviewed": sum(reviewed.values()),
-            "reviewed_by_run": reviewed, "types": types, "pending": len(fold["pending"]), "thin": THIN}
+            "reviewed_by_run": reviewed, "reviewed_by_source": _by_source([(a["run_id"],) for a in listed]),
+            "types": types, "pending": len(fold["pending"]), "thin": THIN}
 
 
 def release_lines(summary: dict) -> list[str]:
     L = ["", "## Human error analysis (not a sealed metric)", "",
          "- Failure types the person named and accepted from their own span notes on stage-review generation runs "
-         "(development questions). They say what to fix next; they are not a release gate, not a sealed-set "
-         "measurement and do not move any pass line above."]
+         "(gold: development questions) and on traffic runs (traffic: real consultant answers, a rule-based sample "
+         "that does not cover every request). They say what to fix next; they are not a release gate, not a "
+         "sealed-set measurement and do not move any pass line above."]
     if not summary["types"]:
         return L + ["- no accepted failure type yet: write notes in the review app, then "
                     "`python -m rfp_assistant.cli error-analysis export` and decide the proposal on 실패 유형"]
-    runs = ", ".join(f"`{r}` {n}" for r, n in sorted(summary["reviewed_by_run"].items()))
-    L += [f"- taxonomy version v{summary['version']}; reviewed answers {summary['reviewed']} ({runs}); "
+    runs = ", ".join(f"`{r}` ({source(r)}) {n}" for r, n in sorted(summary["reviewed_by_run"].items()))
+    by_source = ", ".join(f"{s} {n}" for s, n in sorted(summary.get("reviewed_by_source", {}).items()))
+    L += [f"- taxonomy version v{summary['version']}; reviewed answers {summary['reviewed']} ({by_source}: {runs}); "
           f"proposed types not yet decided {summary['pending']}",
           "- The rate counts only answers a person found the type in. Approved AI suggestions are further answers "
           "the coding agent proposed across every stored answer and the person approved one by one; they are not a "
@@ -602,7 +635,8 @@ def release_lines(summary: dict) -> list[str]:
           "| --- | --- | --- | --- | --- |"]
     for t in summary["types"]:
         thin = f" (fewer than {summary['thin']} cases)" if t["answers"] < summary["thin"] else ""
-        sources = ", ".join(f"`{r}` {n}/{summary['reviewed_by_run'].get(r, 0)}" for r, n in sorted(t["per_run"].items()))
+        sources = ", ".join(f"`{r}` ({source(r)}) {n}/{summary['reviewed_by_run'].get(r, 0)}"
+                            for r, n in sorted(t["per_run"].items()))
         definition = t["definition"].replace("|", "\\|")
         L.append(f"| {t['name']} | {definition} | {t['answers']}/{summary['reviewed']}{thin} | {sources or '-'} "
                  f"| {t.get('ai_answers', 0)} |")

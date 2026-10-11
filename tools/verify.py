@@ -597,7 +597,8 @@ def evaluation_release(ctx: Context) -> dict:
 @flow("stage-review")
 def stage_review(ctx: Context) -> dict:
     """The run-folder contract tests, then review/server.py itself serving a fixture run (no database or npm)."""
-    tests = ctx.unit("stage-review-tests", ["tests.test_stage_review", "tests.test_error_analysis"], 300)
+    tests = ctx.unit("stage-review-tests", ["tests.test_stage_review", "tests.test_error_analysis",
+                                            "tests.test_traffic_review"], 300)
     code, out = ctx.run("stage-review-served", [ctx.python, "-B", "tools/verification/stage_review_served.py",
                                                 str(ctx.work)], 300)
     try:

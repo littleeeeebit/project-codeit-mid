@@ -386,11 +386,13 @@
     "src/rfp_assistant/evaluation/stage_review_worker.py",
     "src/rfp_assistant/evaluation/error_analysis.py",
     "src/rfp_assistant/evaluation/similar_cases.py",
+    "src/rfp_assistant/evaluation/traffic_review.py",
     "src/rfp_assistant/corpus/ingestion.py",
     "src/rfp_assistant/retrieval/chunking.py",
     "src/rfp_assistant/cli.py",
     "tests/test_stage_review.py",
     "tests/test_error_analysis.py",
+    "tests/test_traffic_review.py",
     "tools/verify.py",
     "verification.json"
    ],
@@ -398,7 +400,7 @@
    "assertions": [
     {
      "id": "contract-tests",
-     "expected": "tests.test_stage_review passes: run-folder schema, chunking title check, export/import, decision files, gold rank, variant validation, the paid-run approval gate, paid recovery, repricing and admission on a real ledger, the generation and OCR views, and the append-only answer annotation store (offsets checked against the stored answer, carried through export and import); tests.test_error_analysis passes: error-analysis export and propose through the CLI without a database, a proposed failure type refused without a Korean name, a one-sentence definition or an existing human note, and accept, rename, merge, split and reject versioned and counted over reviewed answers; error-analysis suggest through the CLI refusing an unknown type or a span not verbatim in its stored answer, approve filing an ai_suggested note counted apart from human cases and reject carried into the next bundle, and answers marked fine before a type flagged until looked at again"
+     "expected": "tests.test_stage_review passes: run-folder schema, chunking title check, export/import, decision files, gold rank, variant validation, the paid-run approval gate, paid recovery, repricing and admission on a real ledger, the generation and OCR views, and the append-only answer annotation store (offsets checked against the stored answer, carried through export and import); tests.test_error_analysis passes: error-analysis export and propose through the CLI without a database, a proposed failure type refused without a Korean name, a one-sentence definition or an existing human note, and accept, rename, merge, split and reject versioned and counted over reviewed answers; error-analysis suggest through the CLI refusing an unknown type or a span not verbatim in its stored answer, approve filing an ai_suggested note counted apart from human cases and reject carried into the next bundle, and answers marked fine before a type flagged until looked at again; tests.test_traffic_review passes: a traffic window read in a read-only session keeps only 질문하기 requests, no member ID (planted in the question, a trace value and a trace key) reaches any file of the run folder, pseudonyms stay stable across runs, the sample takes failures first and extra picks by group size with a stated reason, and traffic answers take notes, hand-added samples and the same taxonomy counts labelled by source"
     },
     {
      "id": "served-import",

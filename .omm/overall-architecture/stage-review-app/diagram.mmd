@@ -7,6 +7,10 @@ graph TD
   review-screens["Review screens\nreview/src"]
   error-analysis["Notes and taxonomy\nsrc/rfp_assistant/evaluation/error_analysis.py"]
   similar-cases["Similar-case suggestions\nsrc/rfp_assistant/evaluation/similar_cases.py"]
+  traffic-sampler["Traffic sample\nsrc/rfp_assistant/evaluation/traffic_review.py"]
+  serving-db[("Serving database\ncodeit, read-only session")]
+  traffic-sampler -->|"read-only window"| serving-db
+  traffic-sampler -->|"pseudonymised view.json, run.json"| run-folders
   stage-runner -->|"worktree per ref"| worker-process
   paid-approval -->|"key only when approved"| worker-process
   stage-runner -->|"view.json, run.json"| run-folders

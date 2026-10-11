@@ -12,11 +12,13 @@ import { RetrieverView } from "@/components/retriever-view";
 import { ChunkingView } from "@/components/chunking-view";
 import { GenerationView } from "@/components/generation-view";
 import { OcrView } from "@/components/ocr-view";
+import { TrafficView } from "@/components/traffic-view";
 import { DecisionPanel } from "@/components/decision-panel";
 import { TaxonomyView } from "@/components/taxonomy-view";
 import { ProgressView } from "@/components/progress-view";
 
-const STAGE = { retriever: "리트리버", chunking: "청킹", generation: "답변 생성", ocr: "OCR" } as const;
+const STAGE = { retriever: "리트리버", chunking: "청킹", generation: "답변 생성", ocr: "OCR", traffic: "실제 요청" } as const;
+const day = (iso: string) => new Date(iso).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
 
 /** One run's comparison, or one of the error-analysis screens built from the notes on every run. */
 type Screen = "run" | "taxonomy" | "progress";
@@ -86,7 +88,24 @@ export default function Page() {
         {screen === "progress" && <ProgressView openTaxonomy={() => setScreen("taxonomy")}
                                                 openRun={(id) => { setSelected(id); setScreen("run"); }} />}
         {screen === "run" && runs && runs.length === 0 && <EmptyState />}
-        {screen === "run" && current && view && (
+        {screen === "run" && current && view && view.stage === "traffic" && (
+          <>
+            <header className="flex flex-wrap items-start gap-4">
+              <div className="min-w-0">
+                <h1 className="text-[24px] font-bold">실제 요청 검토</h1>
+                <p className="mt-1 text-[14px] text-muted">
+                  {day(view.window.since)} ~ {day(view.window.until)} · 질문하기 요청 {view.window.requests}건 · 읽기 전용으로 얼린
+                  사본 · 구성원은 가명 · <code>{view.run_id}</code>
+                </p>
+              </div>
+              <a href={`/api/runs/${view.run_id}/export`} className="ml-auto h-10 rounded-[10px] bg-surface px-4 text-[14px] font-semibold leading-10">
+                내보내기 (.zip)
+              </a>
+            </header>
+            <div className="mt-6"><TrafficView view={view} /></div>
+          </>
+        )}
+        {screen === "run" && current && view && view.stage !== "traffic" && (
           <>
             <header className="flex flex-wrap items-start gap-4">
               <div className="min-w-0">
@@ -174,13 +193,16 @@ function RunRail({ runs, selected, screen, onScreen, onSelect, onImported, onErr
                 <div className="flex items-center gap-2">
                   <span className="text-[15px] font-semibold">{STAGE[r.stage]}</span>
                   <span className="text-[13px] text-muted">{when(r.created_at)}</span>
-                  <span className="ml-auto">{r.decided ? <Badge tone="ok">결정됨</Badge> : <Badge>결정 전</Badge>}</span>
+                  {r.stage !== "traffic" && (
+                    <span className="ml-auto">{r.decided ? <Badge tone="ok">결정됨</Badge> : <Badge>결정 전</Badge>}</span>
+                  )}
                 </div>
                 <div className="mt-0.5 truncate text-[13px] text-muted">
-                  {r.candidates.slice(1).map((c) => c.label).join(", ")}
+                  {r.window ? `${day(r.window.since)} ~ ${day(r.window.until)} · 요청 ${r.window.requests}건`
+                    : r.candidates.slice(1).map((c) => c.label).join(", ")}
                 </div>
                 <div className="mt-0.5 flex flex-wrap gap-x-2 text-[13px] text-muted">
-                  <span>{hostLabel(r.candidates[0]?.host)}</span>
+                  {r.stage !== "traffic" && <span>{hostLabel(r.candidates[0]?.host)}</span>}
                   {r.imported && <span>가져옴</span>}
                   {failed > 0 && <span className="text-bad">결과 없음 {failed}</span>}
                 </div>
@@ -206,7 +228,8 @@ function EmptyState() {
         python -m rfp_assistant.cli stage-review run chunking --base main --cand .{"\n"}
         python -m rfp_assistant.cli stage-review run generation --base main --cand {"<branch>"}{"\n"}
         python -m rfp_assistant.cli stage-review approve --run {"<run id>"} --approved-by {"<name>"}{"\n"}
-        python -m rfp_assistant.cli stage-review resume --run {"<run id>"}
+        python -m rfp_assistant.cli stage-review resume --run {"<run id>"}{"\n"}
+        python -m rfp_assistant.cli stage-review run traffic --since {"<YYYY-MM-DD>"} --sample 30 --source-dsn-env CODEIT_DATABASE_DSN
       </pre>
     </div>
   );
