@@ -201,10 +201,15 @@ def import_run(root: Path, data: bytes) -> str:
         (Path(tmp) / run_id / ANNOTATIONS_IN_ZIP).unlink(missing_ok=True)  # they live in the store, not the run
         (Path(tmp) / run_id / ".imported.json").write_text(json.dumps(
             {"imported_at": datetime.now(timezone.utc).isoformat()}), encoding="utf-8")
+        # The notes go into the store before the run is installed: a failure here leaves no run behind, and a run
+        # that then fails to install is imported again with its notes recognised as already stored.
+        with ANNOTATION_LOCK:
+            existing = read_annotations(root, run_id)
+            have = {r["id"]: r for r in existing}
+            new = [r for r in carried if have.get(r["id"]) != r]
+            check_annotations(view, existing + new)
+            _append(root, run_id, new)
         (Path(tmp) / run_id).rename(target)
-    with ANNOTATION_LOCK:
-        have = {r["id"] for r in read_annotations(root, run_id)}
-        _append(root, run_id, [r for r in carried if r["id"] not in have])
     return run_id
 
 
@@ -233,12 +238,16 @@ def read_annotations(root: Path, run_id: str) -> list[dict]:
 
 
 def _append(root: Path, run_id: str, records: list[dict]) -> None:
+    """Add records after the existing ones. The file is replaced whole, so a failed write leaves it as it was
+    rather than ending in half a line; nothing already recorded changes."""
     if not records:
         return
     path = annotations_file(root, run_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records))
+    before = path.read_bytes() if path.exists() else b""
+    tmp = path.with_suffix(".jsonl.tmp")
+    tmp.write_bytes(before + "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records).encode("utf-8"))
+    os.replace(tmp, path)
 
 
 def field_text(answer: dict, field: str) -> str | None:
@@ -271,11 +280,14 @@ def check_annotations(view: dict, records: list[dict]) -> None:
     """Every record names this run, a known operation and, for a note, a span whose offsets select exactly its
     text in the stored answer; an edit or deletion names a note recorded earlier."""
     commits = {c["id"]: c["commit"] for c in view["candidates"]}
-    notes = set()
+    notes, ids = set(), set()
     for r in records:
         if not isinstance(r, dict) or r.get("schema") != ANNOTATION_SCHEMA or r.get("run_id") != view["run_id"] \
                 or r.get("op") not in OPS or not isinstance(r.get("id"), str) or not r.get("author") or not r.get("at"):
             raise ReviewInputError(f"not a {ANNOTATION_SCHEMA} record of {view['run_id']}")
+        if r["id"] in ids:  # an edit or deletion names its note by id, so two records may never share one
+            raise ReviewInputError(f"two records share the id {r['id']}")
+        ids.add(r["id"])
         if r["op"] in ("note", "reviewed"):
             _answer(view, r.get("question"), r.get("candidate"))
             if r.get("commit") != commits.get(r["candidate"]):
@@ -320,7 +332,8 @@ def annotation_state(records: list[dict]) -> dict:
                                  "at": r["at"]}
             else:
                 reviewed.pop(key, None)
-    return {"notes": list(notes.values()), "reviewed": list(reviewed.values())}
+    # The store only grows, so its record count orders snapshots: the app keeps the newest it has seen.
+    return {"version": len(records), "notes": list(notes.values()), "reviewed": list(reviewed.values())}
 
 
 def add_annotation(root: Path, view: dict, body: dict, author: str) -> dict:
@@ -404,8 +417,9 @@ def write_decision(root: Path, view: dict, chosen: str | None, reasons: dict, no
     folder = decisions_dir(root)
     folder.mkdir(parents=True, exist_ok=True)
     md, js = folder / f"{view['run_id']}.md", folder / f"{view['run_id']}.json"
-    js.write_text(json.dumps(record, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    # The .json marks the run decided in the list, so it is written last: a failed .md never shows as decided.
     md.write_text(decision_markdown(record, runs_dir(root) / view["run_id"]), encoding="utf-8")
+    js.write_text(json.dumps(record, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     spans = annotations_file(root, view["run_id"])
     return {"markdown": str(md), "json": str(js), "prompt": agent_prompt(record, md, js, spans if spans.exists() else None)}
 

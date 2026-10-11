@@ -708,6 +708,44 @@ class AnnotationStoreTest(unittest.TestCase):
                 server.import_run(root / "third", forged.getvalue())
             self.assertFalse(server.runs_dir(root / "third").exists())
 
+    def test_a_failed_or_conflicting_annotation_import_installs_nothing_and_can_be_retried(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            view = generation_run(root)
+            for start, text in ((0, "보안확약서"), (14, "그리고 반환")):
+                state = server.add_annotation(root, view, {"op": "note", "question": "q1", "candidate": "base",
+                                                           "field": "summary", "start": start,
+                                                           "end": start + len(text), "text": text, "note": "x"}, "me")
+            self.assertEqual(state["version"], 2)  # the record count orders the app's snapshots
+            exported = server.export_run(root, view["run_id"])
+            installed = lambda dest: (server.runs_dir(dest) / view["run_id"]).exists()  # noqa: E731
+
+            dest = root / "dest"
+            with mock.patch.object(server.os, "replace", side_effect=OSError("disk full")):
+                with self.assertRaises(OSError):
+                    server.import_run(dest, exported)
+            self.assertEqual((installed(dest), server.read_annotations(dest, view["run_id"])), (False, []))
+            with mock.patch.object(Path, "rename", side_effect=OSError("locked")):  # notes stored, run not installed
+                with self.assertRaises(OSError):
+                    server.import_run(dest, exported)
+            self.assertEqual(server.import_run(dest, exported), view["run_id"])
+            self.assertEqual(server.annotation_state(server.read_annotations(dest, view["run_id"])),
+                             server.annotation_state(server.read_annotations(root, view["run_id"])))
+
+            # a second note reusing the first one's id would silently replace it
+            reused = io.BytesIO()
+            with zipfile.ZipFile(io.BytesIO(exported)) as z, zipfile.ZipFile(reused, "w") as out:
+                for name in z.namelist():
+                    data = z.read(name)
+                    if name.endswith(server.ANNOTATIONS_IN_ZIP):
+                        first, second = (json.loads(line) for line in data.decode().splitlines())
+                        data = "".join(json.dumps(r, ensure_ascii=False) + "\n"
+                                       for r in (first, {**second, "id": first["id"]})).encode()
+                    out.writestr(name, data)
+            with self.assertRaisesRegex(server.ReviewInputError, "share the id"):
+                server.import_run(root / "other", reused.getvalue())
+            self.assertFalse(installed(root / "other"))
+
 
 if __name__ == "__main__":
     unittest.main()

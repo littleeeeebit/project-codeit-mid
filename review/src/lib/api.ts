@@ -285,6 +285,7 @@ export type SpanNote = {
 };
 
 export type Annotations = {
+  version: number; // the store's record count; it only grows, so a larger one is a newer snapshot
   notes: SpanNote[];
   reviewed: { question: string; candidate: string; author: string; at: string }[];
 };

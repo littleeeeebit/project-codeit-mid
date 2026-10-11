@@ -22,7 +22,7 @@ type Notes = { notes: Record<string, string>; setNote: (key: string, note: strin
 
 export function GenerationView(props: Notes & { view: View; decide: React.ReactNode }) {
   return (
-    <AnnotationProvider run={props.view.run_id}>
+    <AnnotationProvider key={props.view.run_id} run={props.view.run_id}>
       <Answers {...props} />
     </AnnotationProvider>
   );

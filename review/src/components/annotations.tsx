@@ -35,20 +35,23 @@ function place(rect: DOMRect) {
 }
 
 export function AnnotationProvider({ run, children }: { run: string; children: React.ReactNode }) {
-  const [state, setState] = useState<Annotations>({ notes: [], reviewed: [] });
+  const [state, setState] = useState<Annotations>({ version: -1, notes: [], reviewed: [] });
   const [pop, setPop] = useState<Pop | null>(null);
   const [error, setError] = useState("");
+  // Every response is a whole snapshot; one that arrives after a newer one (the first read landing after a save)
+  // is dropped instead of undoing what is already stored.
+  const take = useCallback((next: Annotations) => setState((s) => (next.version >= s.version ? next : s)), []);
 
   useEffect(() => {
     let live = true;
-    getJson<Annotations>(`/api/runs/${run}/annotations`).then((a) => live && setState(a))
+    getJson<Annotations>(`/api/runs/${run}/annotations`).then((a) => live && take(a))
       .catch((e: Error) => live && setError(`메모를 읽지 못했습니다: ${e.message}`));
     return () => { live = false; };
-  }, [run]);
+  }, [run, take]);
 
   const send = useCallback(async (body: Record<string, unknown>) => {
-    setState(await postJson<Annotations>(`/api/runs/${run}/annotations`, JSON.stringify(body)));
-  }, [run]);
+    take(await postJson<Annotations>(`/api/runs/${run}/annotations`, JSON.stringify(body)));
+  }, [run, take]);
 
   // A finished selection inside one answer field opens the note box under it. A selection that runs past the field
   // (a triple click, a drag into the next line) is cut at the field's edge.
