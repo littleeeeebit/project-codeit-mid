@@ -1,8 +1,17 @@
 graph TD
-  original-files["Originals and data_list.csv\nRFP_SOURCE_DIR"] -->|hash, parse, OCR merge| extractions["Extractions and elements\ncorpus/ingestion.py"]
-  extractions -->|chunk profile build| keyword-index-files["Keyword index\n.runtime/indexes"]
-  keyword-index-files -->|unique payloads embedded| vector-sets["pgvector sets\nretrieval/vector_store.py"]
-  keyword-index-files -->|packed evidence units| request-records["Request records\nrequests.result_json"]
-  vector-sets -->|dense candidates| request-records
-  request-records -->|evidence_id lookup| evidence-view["Evidence and original\nservice.py (open_evidence)"]
-  request-records -->|trace seeded by request_id| langfuse-traces["Langfuse traces\ngateway/tracing.py"]
+  originals["Originals and data_list.csv\nsrc/rfp_assistant/corpus/ingestion.py"]
+  ingest["Ingest with OCR merge\nsrc/rfp_assistant/corpus/ingestion.py"]
+  fidelity["Fidelity and review status\nsrc/rfp_assistant/corpus/fidelity.py"]
+  keyword["Keyword index build\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  vectors["Vector sets\nsrc/rfp_assistant/retrieval/dense.py"]
+  gold["Gold review queue\nsrc/rfp_assistant/evaluation/gold.py"]
+  evaluate["Runs, comparison, activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  serving["Serving retrieval\nsrc/rfp_assistant/service/service.py"]
+  originals -->|manifest rows, source hashes| ingest
+  ingest -->|elements and artifact| fidelity
+  fidelity -->|review status filter| keyword
+  keyword -->|chunk payloads| vectors
+  keyword -->|index version| evaluate
+  vectors -->|dense version| evaluate
+  gold -->|approved dataset rows| evaluate
+  evaluate -->|active_run setting| serving

@@ -1,1 +1,0 @@
-`open_evidence` resolves an `evidence_id` from the request's stored evidence map to the quote, its neighbouring elements in extraction order (`_ordered_elements`), the location, and source warnings (`source_unreviewed`, `source_auto_flagged`). `original_download` returns the original bytes for `doc_id`/`source_hash`.

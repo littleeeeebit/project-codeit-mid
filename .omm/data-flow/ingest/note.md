@@ -1,0 +1,1 @@
+OCR (ocr.py: PaddleOCR-VL on the GPU, gpt-5-mini fallback from the `ocr` envelope) is described from the README and the merge call sites; its internals were not read.

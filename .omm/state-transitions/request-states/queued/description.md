@@ -1,1 +1,0 @@
-Created by `_create` for paid modes after a runner slot was admitted. It has never dispatched anything. `cancel_request` or `abandon_request` cancels it outright with a stored 'no paid call' result.

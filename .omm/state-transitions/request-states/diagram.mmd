@@ -1,9 +1,0 @@
-graph TD
-  queued["queued\nservice.py (_create)"] -->|run_queued claims| running["running\nservice.py (run_queued)"]
-  queued -->|cancel_request| cancelled["cancelled\nservice.py (cancel_request)"]
-  queued -->|shutdown or restart| interrupted["interrupted\nservice.py (recover_requests)"]
-  queued -->|executor submit failed| failed["failed\nservice.py (_fail_unscheduled)"]
-  running -->|finished answer| completed["completed\nservice.py (_finish)"]
-  running -->|refusal or error| failed
-  running -->|cancel_requested honored| cancelled
-  running -->|shutdown or restart| interrupted

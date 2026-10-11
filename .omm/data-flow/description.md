@@ -1,1 +1,1 @@
-Where data originates, how it is transformed, and what persists, from originals to a cited answer. Each artifact is immutable and versioned by content hash: source hash → extraction ID → index version → dense version. A citation issued earlier therefore stays resolvable after rebuilds, because old extractions and indexes are kept.
+From the original files to what serving retrieves. Every stage reuses unchanged inputs and records its outcome; a person decides what serves.

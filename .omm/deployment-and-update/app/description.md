@@ -1,0 +1,1 @@
+The same `create_app` process described under the API node. Its lifespan wires `UpdateWatch.fenced` into `Resources.update_fence` and starts the poll thread. GET /api/update/status returns `update.update_status` (configured, running and latest commit, commits ahead, open paid work, in progress, last result). POST /api/update calls `request_update`.

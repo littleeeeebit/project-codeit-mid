@@ -1,0 +1,1 @@
+Set by `run_queued`'s conditional UPDATE. `cancel_request` on a running row sets only `cancel_requested = 1`. The next `_checkpoint` or dispatch guard then refuses further paid stages, but a call already dispatched still settles.

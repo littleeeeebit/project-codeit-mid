@@ -1,0 +1,1 @@
+The component internals were not read; their behaviour is taken from the server contract and the README.

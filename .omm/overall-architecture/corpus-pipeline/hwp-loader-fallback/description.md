@@ -1,1 +1,0 @@
-When pyhwp fails, `_parse_source` calls `load_hwp_hwpx` (`storage/hwp_loader.py`, HwpHwpxLoader). It adds warning `pyhwp_failed` and uses its own parser fingerprint (`hwp_loader`). It gives no picture positions, so such a document gets no OCR text. Only a loader failure (`hwp_loader_failed`, `hwp_loader_result_invalid`, `hwp_empty_output`) quarantines the source.

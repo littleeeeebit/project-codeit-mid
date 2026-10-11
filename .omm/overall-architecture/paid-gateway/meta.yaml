@@ -19,7 +19,6 @@ children:
 - openai-transport
 - owner-ledger-cli
 - owner-reconciliation
-- settlement
 - tracing
 - transport
 parentPath: []

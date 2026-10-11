@@ -1,0 +1,13 @@
+graph TD
+  serving["Activated serving config\nsrc/rfp_assistant/service/service.py"]
+  route["Corpus routing and exact codes\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  bm25["Kiwi BM25 channel\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  dense["Dense pgvector channel\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  fusion["Keyword-first RRF and rerank\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  pack["Evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  serving -->|mode, limits, embedding| route
+  route -->|allowed chunk rows| bm25
+  route -->|allowed chunk rows| dense
+  bm25 -->|ranked lexical rows| fusion
+  dense -->|nearest rows| fusion
+  fusion -->|final ranking| pack

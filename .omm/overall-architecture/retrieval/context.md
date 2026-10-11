@@ -1,0 +1,1 @@
+The serving default since 2026-10-07 is dragonkue/BGE-m3-ko at 1,024 dimensions, hybrid row H-5b2565f606: the BM25 top 6 keep their order, the rest come from weighted RRF (k 60), 50 candidates go into fusion and 10 evidence units go to the model, using exact pgvector search because HNSW missed recall@20 0.99 (README).

@@ -1,0 +1,1 @@
+Every write under `<data>/review` takes `write_lock`: a threading lock plus an OS file lock (msvcrt or fcntl) on `.write.lock`, because two servers over one data folder must not overwrite each other's notes or decisions.

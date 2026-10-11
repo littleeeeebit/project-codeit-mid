@@ -1,0 +1,1 @@
+update.sh itself was not read; its steps are as stated in the update.py docstring.

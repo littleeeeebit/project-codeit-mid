@@ -1,0 +1,1 @@
+Any attempt in state `unknown` blocks every PostgreSQL dispatch in `mark_dispatching` until the owner settles or reconciles it. One timeout halts all paid work for every member.

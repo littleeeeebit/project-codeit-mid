@@ -1,8 +1,0 @@
-graph TD
-  hub-sign-in["Hub sign-in\nsrc/rfp_assistant/service/auth.py"] -->|session cookie on /api/| session-middleware["Session gate\napi.py (_Session)"]
-  session-middleware -->|member bound per request| account-routes["Account routes\napi.py (_account_routes)"]
-  session-middleware -->|member bound| ask-routes["Ask routes\napi.py (_ask_routes)"]
-  session-middleware -->|member bound| request-routes["Request routes\napi.py (_request_routes)"]
-  session-middleware -->|member bound| verify-routes["Verify routes\napi.py (_verify_routes)"]
-  session-middleware -->|member bound| dataset-routes["Dataset routes\napi.py (_dataset_routes)"]
-  update-watch["Update watch\nsrc/rfp_assistant/service/update.py"] -->|status and request marker| account-routes

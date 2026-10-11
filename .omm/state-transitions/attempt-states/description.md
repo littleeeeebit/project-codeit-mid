@@ -1,1 +1,0 @@
-The ledger state of one paid call (`budget.py`). Spending counts settled cost plus open reservations (`reserved`, `dispatching`, `unknown`) against the cap and the envelope. A request's `billing_state` uses precedence unknown > pending (reserved or dispatching) > reconciled > settled > released.

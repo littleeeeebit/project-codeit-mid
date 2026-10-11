@@ -1,9 +1,0 @@
-created: 2026-10-11T01:15:05.780Z
-updated: 2026-10-11T01:15:05.781Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: completed
-children: []
-parentPath:
-  - request-states

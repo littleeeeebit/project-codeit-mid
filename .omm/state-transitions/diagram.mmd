@@ -1,5 +1,9 @@
 graph TD
-  request-states["Request status\nrequests.status"] -->|each paid stage opens| attempt-states["Attempt state\nattempts.state"]
-  attempt-states -->|billing_state rollup| request-states
-  serving-activation["Serving activation\napp_settings.active_run"] -->|config snapshot per request| request-states
-  stage-review-run["Stage review run\n.runtime/review/runs run.json"] -->|paid workers reserve| attempt-states
+  requests["Request status\nsrc/rfp_assistant/service/service.py"]
+  attempts["Billing attempt state\nsrc/rfp_assistant/gateway/budget.py"]
+  stagerun["Paid stage review run\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  requests -->|stop check in dispatch| attempts
+  attempts -->|billing state on result| requests
+  stagerun -->|reserves via gateway| attempts
+  activation -->|config snapshot per request| requests

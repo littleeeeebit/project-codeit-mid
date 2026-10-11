@@ -1,13 +1,15 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-11 01:15:04.943000+00:00
-update_count: 46
+updated: 2026-10-11 02:31:20.062000+00:00
+update_count: 48
 last_field: diagram
-git_commit: 5bfcd5d
-git_branch: review-ui-readable
+git_commit: 202d3f1
+git_branch: answer-span-annotation
 children:
+- activation
 - attempt-billing
 - attempt-record
 - attempt-states
+- attempts
 - billing-attempt
 - billing-attempt-states
 - gateway-owner
@@ -15,23 +17,17 @@ children:
 - gold-candidate-states
 - interrupted
 - owner-reconcile
-- request-states
 - request-status
+- requests
 - running
 - serving-activation
 - source-review-states
-- stage-review-run
+- stagerun
 - update-fence
 - update-states
-prev_diagram: "graph TD\r\n  update-fence[\"Update fence\\nsrc/rfp_assistant/service/update.py\"\
-  ] -->|\"refuses new admission\"| request-status[\"Request status\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  request-status -->|\"each paid stage\"| billing-attempt[\"Billing attempt\\\
-  nsrc/rfp_assistant/gateway/budget.py\"]\r\n  budget-control[\"Paid switch, cap,\
-  \ freeze\\nsrc/rfp_assistant/gateway/budget.py\"] -->|\"gates reservation\"| billing-attempt\r\
-  \n  billing-attempt -->|\"overrun freezes\"| budget-control\r\n  billing-attempt\
-  \ -->|\"open work blocks update\"| update-fence\r\n  source-review[\"Source parse\
-  \ and review\\nsrc/rfp_assistant/corpus/ingestion.py\"] -->|\"index eligibility\"\
-  | serving-activation[\"Serving activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  gold-candidate[\"Gold candidate\\nsrc/rfp_assistant/evaluation/gold.py\"\
-  ] -->|\"approved rows score runs\"| serving-activation\r\n  serving-activation -->|\"\
-  retrieval config per request\"| request-status"
+prev_diagram: "graph TD\r\n  request-states[\"Request status\\nrequests.status\"]\
+  \ -->|each paid stage opens| attempt-states[\"Attempt state\\nattempts.state\"]\r\
+  \n  attempt-states -->|billing_state rollup| request-states\r\n  serving-activation[\"\
+  Serving activation\\napp_settings.active_run\"] -->|config snapshot per request|\
+  \ request-states\r\n  stage-review-run[\"Stage review run\\n.runtime/review/runs\
+  \ run.json\"] -->|paid workers reserve| attempt-states"

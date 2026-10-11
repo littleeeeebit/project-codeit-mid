@@ -1,1 +1,0 @@
-The middleware binds the member's key session, model and billing scope to the request context. `service.ask` mints `generation_id` (also the idempotency key) and passes `as_of` = today and `previous_request_id`. It returns `{request_id, generation_id, target}`, which the turn keeps as its ownership record.

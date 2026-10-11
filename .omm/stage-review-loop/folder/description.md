@@ -1,0 +1,1 @@
+`<data>/review/runs/<run-id>/` holds `run.json` (schema review-run-1, full commits, input and worker hashes, host and packages per candidate, and the state for paid runs), `inputs/`, `candidates/<id>.json` with the raw output, `view.json` for the app, and `docs/` or `images/` for chunking and OCR.

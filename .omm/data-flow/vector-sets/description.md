@@ -1,1 +1,0 @@
-pgvector payload vectors per model, dimensions and prefix policy, deduplicated by `payload_hash`. Query vectors are cached by normalized text, model and dimensions. Every compared embedding model has its own set; the serving set is the one the activated run evaluated.

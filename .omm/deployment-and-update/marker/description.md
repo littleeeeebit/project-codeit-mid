@@ -1,0 +1,1 @@
+`write_request` writes `{requested_by, requested_at, running_commit}` to `<marker>.part` and then renames it with `os.replace`, so the path unit sees either a complete file or none. The content is informational only; the updater reads nothing from it and always takes origin/main.

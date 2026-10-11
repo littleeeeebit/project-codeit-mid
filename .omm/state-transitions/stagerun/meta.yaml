@@ -1,0 +1,13 @@
+created: 2026-10-11T02:31:22.696Z
+updated: 2026-10-11T02:31:22.827Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: stagerun
+children:
+  - approved
+  - complete
+  - frozen
+  - needsapproval
+  - stopped
+parentPath: []

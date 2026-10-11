@@ -1,1 +1,0 @@
-Immutable `.runtime/indexes/<version>/` files mirrored by `chunks`, `requirements` and `indexes` rows. Chunks carry spans back to element IDs and offsets, `chunk_type` and `requirement_key`, which is how evidence maps back to the original's location.

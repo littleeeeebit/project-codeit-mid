@@ -1,8 +1,0 @@
-graph TD
-  gateway-owner["Gateway owner lock\nstorage/postgres.py (GatewayOwner)"] -->|owner_guard in transaction| budget-admission["Admission\ngateway/budget.py (reserve)"]
-  budget-admission -->|reserved attempt| dispatch-marker["Dispatch marker\nbudget.py (mark_dispatching)"]
-  dispatch-marker -->|dispatching, then call| openai-transport["OpenAI transport\ngateway/generation.py (OpenAITransport)"]
-  gateway-owner -->|owner_check before call| openai-transport
-  openai-transport -->|usage or provider error| settlement["Settle, release, unknown\nbudget.py (settle, release, mark_unknown)"]
-  settlement -->|usage and cost on span| langfuse-tracing["Langfuse tracing\ngateway/tracing.py"]
-  owner-ledger-cli["Owner ledger CLI\nsrc/rfp_assistant/cli.py"] -->|reconcile, settle, adjust| settlement

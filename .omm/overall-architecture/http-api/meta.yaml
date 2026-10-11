@@ -5,20 +5,16 @@ last_field: diagram
 kind: nested-class
 title: http-api
 children:
-- account-routes
 - answer-sse
 - ask-routes
-- dataset-routes
 - hub-login
 - hub-sign-in
 - login-store
-- request-routes
 - route-groups
 - session-middleware
 - sign-in-routes
 - stream-route
 - update-watch
-- verify-routes
 parentPath: []
 prev_diagram: "graph TD\r\n  static-mount[\"Static export mount\\nsrc/rfp_assistant/api.py\"\
   ] -->|\"screens call /api\"| session-middleware[\"Session gate _Session\\nsrc/rfp_assistant/api.py\"\

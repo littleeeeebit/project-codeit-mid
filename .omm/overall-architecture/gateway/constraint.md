@@ -1,0 +1,1 @@
+SDK retries are disabled (`max_retries=0`) and nothing retries automatically. A billed failure is recorded and the request ends.

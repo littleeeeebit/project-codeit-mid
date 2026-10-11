@@ -1,0 +1,1 @@
+A paid CLI run (`build-dense`, `run-answers`, `stage-review resume`) needs the gateway advisory lock, so the serving process (`bidmate.service` on codeit) must be stopped first. Never copy the database to create a second ledger that can spend independently.
