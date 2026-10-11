@@ -1,0 +1,8 @@
+graph TD
+  run-loop["Step loop and state\nsrc/rfp_assistant/storage/maintenance.py"] -->|"backup then restore"| backup-restore["Backup and restore check\nsrc/rfp_assistant/storage/maintenance.py"]
+  run-loop -->|"ingest step"| ingest-step["Manifest and ingest\nsrc/rfp_assistant/corpus/ingestion.py"]
+  ingest-step -->|"parse each original"| parse-worker["ParseWorker child process\nsrc/rfp_assistant/storage/maintenance.py"]
+  run-loop -->|"keyword, embedding"| index-embed["Index and vector rebuild\nsrc/rfp_assistant/evaluation/compare.py"]
+  run-loop -->|"regression, report"| regression-report["Regression and report\nsrc/rfp_assistant/evaluation/compare.py"]
+  cancel-registry["Cancel registry\nsrc/rfp_assistant/storage/maintenance.py"] -->|"stop between steps"| run-loop
+  cancel-registry -->|"stop() kills parse"| parse-worker

@@ -1,62 +1,40 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-11T06:52:21.398Z
-update_count: 41
+updated: 2026-10-11 09:34:22.836000+00:00
+update_count: 43
 last_field: diagram
 kind: nested-class
 title: service-core
 children:
-  - answer-check
-  - answer-execution
-  - answer-pipeline
-  - answer-validation
-  - app-resources
-  - background-jobs
-  - conversation-context
-  - evidence-reader
-  - execute
-  - free-answers
-  - metered-chat
-  - paid-answer
-  - partials
-  - request-runner
-  - resources
-  - resources-owner
-  - runner
-  - serving-config
-  - session-binding
-  - submit
-  - tracing
-  - update-fence
-  - update-watch
+- answer-check
+- answer-execution
+- answer-pipeline
+- answer-validation
+- app-resources
+- background-jobs
+- conversation-context
+- evidence-reader
+- metered-chat
+- paid-answer
+- partials
+- request-runner
+- resources
+- resources-owner
+- serving-config
+- session-binding
+- submit
+- submit-answer
+- tracing
+- update-fence
+- update-watch
 parentPath: []
-prev_diagram: "graph TD\r
-
-  \  session-binding[\"Session
-  binding\\nsrc/rfp_assistant/service/service.py\"]\r
-
-  \  resources[\"Resources owner\\nsrc/rfp_assistant/service/service.py\"]\r
-
-  \  request-runner[\"RequestRunner
-  executor\\nsrc/rfp_assistant/service/service.py\"]\r
-
-  \  answer-pipeline[\"Answer
-  pipeline\\nsrc/rfp_assistant/service/service.py\"]\r
-
-  \  background-jobs[\"Drafting, evaluation,
-  maintenance\\nsrc/rfp_assistant/service/drafting.py\"]\r
-
-  \  update-watch[\"Update watch\\nsrc/rfp_assistant/service/update.py\"]\r
-
-  \  session-binding -->|\"key, model contextvars\"| answer-pipeline\r
-
-  \  request-runner -->|\"run_queued request_id\"| answer-pipeline\r
-
-  \  resources -->|\"index, dense, transport\"| answer-pipeline\r
-
-  \  update-watch -->|\"fence refuses admission\"| request-runner\r
-
-  \  update-watch -->|\"fence refuses job start\"| background-jobs\r
-
-  \  resources -->|\"close joins and recovers\"| background-jobs\r
-
-  \  resources -->|\"shutdown interrupts queued\"| request-runner"
+prev_diagram: "graph TD\r\n  resources[\"Process owner Resources\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  submit[\"submit_answer and _create\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  runner[\"Bounded request runner\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  execute[\"_execute_traced dispatcher\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  free-answers[\"Metadata and inventory answers\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  paid-answer[\"Paid answer pipeline\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  background-jobs[\"Verifier background jobs\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  submit -->|queued row, admitted slot| runner\r\n  submit -->|free modes inline|\
+  \ execute\r\n  runner -->|run_queued claim| execute\r\n  execute -->|metadata, inventory|\
+  \ free-answers\r\n  execute -->|single, compare, corpus| paid-answer\r\n  resources\
+  \ -->|index, dense, transport| paid-answer\r\n  resources -->|owns and joins| background-jobs"

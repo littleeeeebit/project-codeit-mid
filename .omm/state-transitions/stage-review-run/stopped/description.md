@@ -1,1 +1,0 @@
-Set when any approved candidate did not complete: budget maximum reached, `unknown_billing`, a failure, or a lost connection. Finished answers are kept. The ledger tells the worker which items were already billed, so they are never paid again. A new approval is needed for what is left.

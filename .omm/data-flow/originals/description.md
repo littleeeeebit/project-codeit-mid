@@ -1,1 +1,0 @@
-`RFP_SOURCE_DIR` (default `<repo>/원본 데이터`) holds `data_list.csv` and `files/` (about 100 associations, 98 active sources). `import_manifest` records `documents` (CSV metadata per row) and `sources` (unique by SHA-256). Byte-identical associations share one extraction but keep their own metadata. `ingest_source` re-hashes the original before every parse.

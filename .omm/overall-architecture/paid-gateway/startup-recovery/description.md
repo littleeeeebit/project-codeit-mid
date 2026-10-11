@@ -1,0 +1,1 @@
+`budget.recover` runs under fresh ownership (`Resources._own`) and again in `close()` if jobs are still alive. 'dispatching' attempts become 'unknown' ('process ended during dispatch') and 'reserved' attempts become 'released'. The same rule applies to `external_attempts` (the Gemini ledger). Nothing is replayed.

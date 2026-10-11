@@ -1,1 +1,1 @@
-Set directly from queued, or by `_finish` when a running request had `cancel_requested` (or stopped at a checkpoint). The result is stored for history and `may_attach` refuses to render it as the current answer.
+Terminal. The outcome is kept for history but never attached to the screen (`may_attach` refuses). Already dispatched calls keep their attempt until they settle or become unknown.

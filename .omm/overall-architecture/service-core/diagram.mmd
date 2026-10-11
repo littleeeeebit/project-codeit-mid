@@ -1,15 +1,8 @@
 graph TD
-  resources["Process owner Resources\nsrc/rfp_assistant/service/service.py"]
-  submit["submit_answer and _create\nsrc/rfp_assistant/service/service.py"]
-  runner["Bounded request runner\nsrc/rfp_assistant/service/service.py"]
-  execute["_execute_traced dispatcher\nsrc/rfp_assistant/service/service.py"]
-  free-answers["Metadata and inventory answers\nsrc/rfp_assistant/service/service.py"]
-  paid-answer["Paid answer pipeline\nsrc/rfp_assistant/service/service.py"]
-  background-jobs["Verifier background jobs\nsrc/rfp_assistant/service/service.py"]
-  submit -->|queued row, admitted slot| runner
-  submit -->|free modes inline| execute
-  runner -->|run_queued claim| execute
-  execute -->|metadata, inventory| free-answers
-  execute -->|single, compare, corpus| paid-answer
-  resources -->|index, dense, transport| paid-answer
-  resources -->|owns and joins| background-jobs
+  resources-owner["Process owner Resources\nsrc/rfp_assistant/service/service.py"] -->|"lazily creates"| request-runner["Bounded RequestRunner\nsrc/rfp_assistant/service/service.py"]
+  submit-answer["submit_answer\nsrc/rfp_assistant/service/service.py"] -->|"try_admit, queued row"| request-runner
+  request-runner -->|"run_queued on worker"| paid-answer["_paid_answer pipeline\nsrc/rfp_assistant/service/service.py"]
+  paid-answer -->|"rewrite and generation calls"| metered-chat["_metered_chat\nsrc/rfp_assistant/service/service.py"]
+  update-fence["Update fence\nsrc/rfp_assistant/service/update.py"] -->|"refuse new paid work"| request-runner
+  update-fence -->|"refuse new jobs"| background-jobs["Background jobs\nsrc/rfp_assistant/service/service.py"]
+  resources-owner -->|"close joins threads"| background-jobs

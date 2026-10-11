@@ -1,0 +1,1 @@
+A process killed mid-check leaves its `rfp_mrestore_*` database behind for the owner to drop by name.

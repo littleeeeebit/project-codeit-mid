@@ -1,1 +1,1 @@
-Claimed by `run_queued`, or created running for free modes. `cancel_request` only sets `cancel_requested=1`, which the next `_checkpoint` or `_dispatch_guard` turns into `_Stop('cancelled')`. A call already dispatched still settles.
+Claimed by a worker, or created running for free modes. Partials stream only in this state, while the generation matches and no cancel is pending. `_stop_reason` returns 'interrupted' if the row is no longer running or Resources is closing.

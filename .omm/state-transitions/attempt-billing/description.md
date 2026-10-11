@@ -1,0 +1,1 @@
+The `attempts.state` machine. A request's billing_state is the first of unknown > pending (reserved or dispatching) > reconciled > settled > released found among its attempts (`_billing`).

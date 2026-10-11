@@ -1,1 +1,0 @@
-The durable marker written before the network call. It is set only if the request guard, ownership, paid admission and the no-unknown-attempts check all pass in that transaction.

@@ -1,0 +1,1 @@
+The embedding or regression step needs a paid embedding. The estimate is stored on the step; after approval, a rerun reuses everything before that step.

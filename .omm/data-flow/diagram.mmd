@@ -1,16 +1,9 @@
 graph TD
-  originals["Original HWP and PDF files\nsrc/rfp_assistant/corpus/ingestion.py"]
-  ocr-cache["OCR region cache\nsrc/rfp_assistant/corpus/ocr.py"]
-  extractions["Extractions and elements\nsrc/rfp_assistant/corpus/ingestion.py"]
-  indexes["Keyword index and vectors\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  serving["Activated serving row\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  requests-store["Requests, traces, attempts\nsrc/rfp_assistant/service/service.py"]
-  traffic-review["Traffic review run\nsrc/rfp_assistant/evaluation/traffic_review.py"]
-  failure-notes["Notes and failure types\nsrc/rfp_assistant/evaluation/error_analysis.py"]
-  originals -->|manifest, ingest| extractions
-  ocr-cache -->|image_text elements| extractions
-  extractions -->|build-keyword, build-dense| indexes
-  indexes -->|evaluate, activate-run| serving
-  serving -->|retrieval per request| requests-store
-  requests-store -->|read-only window| traffic-review
-  traffic-review -->|annotated answers| failure-notes
+  source-originals["Originals and data_list.csv\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"manifest import, sha256"| extraction-revisions["Extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
+  fidelity-ocr["OCR and fidelity witness\nsrc/rfp_assistant/corpus/ocr.py"] -->|"image_text, review status"| extraction-revisions
+  extraction-revisions -->|"chunk active extractions"| keyword-index-build["Keyword index build\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  keyword-index-build -->|"chunk payloads"| vector-sets["Embedding vector sets\nsrc/rfp_assistant/retrieval/dense.py"]
+  keyword-index-build -->|"frozen index version"| evaluation-runs["Evaluated runs and tables\nsrc/rfp_assistant/evaluation/compare.py"]
+  vector-sets -->|"dense_version"| evaluation-runs
+  evaluation-runs -->|"person picks a row"| activation-record["Activation record\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  activation-record -->|"active_run, active_index"| serving-retrieval["Serving retrieval\nsrc/rfp_assistant/service/service.py"]

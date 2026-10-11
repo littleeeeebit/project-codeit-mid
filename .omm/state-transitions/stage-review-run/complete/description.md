@@ -1,1 +1,0 @@
-Every approved candidate completed. `_score_paid` reads ledger spend and writes `view.json`. `rescore` can re-score stored outputs later with no calls.

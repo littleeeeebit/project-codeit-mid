@@ -1,0 +1,1 @@
+`_stored_quote` scans `idx.chunks` linearly for every evidence unit. That is fine at 18,983 chunks × 10 units, but it is O(chunks) per citation.

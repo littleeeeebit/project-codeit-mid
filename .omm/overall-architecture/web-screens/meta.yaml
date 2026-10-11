@@ -1,17 +1,21 @@
 created: 2026-10-04 13:34:42.331000+00:00
-updated: 2026-10-11T04:59:49.644Z
-update_count: 40
-last_field: description
+updated: 2026-10-11T09:34:20.416Z
+update_count: 42
+last_field: diagram
 kind: nested-class
 title: web-screens
 children:
+  - answer-stream
   - answer-stream-hook
   - api-client
   - ask-page
+  - dataset-workbench
+  - maintenance-panel
   - settings-page
   - sign-in-redirect
   - update-banner
   - verify-page
+  - verify-workbench
 parentPath: []
 prev_diagram: "graph TD\r
 

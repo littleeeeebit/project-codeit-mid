@@ -1,0 +1,1 @@
+RFP_SOURCE_DIR ('원본 데이터') holds data_list.csv and files/ (HWP and PDF). `import_manifest` hashes every file and upserts `sources(source_hash, format, original_path)` and per-row `documents`. Byte-identical files share one source and extraction but keep their own CSV metadata, with conflicts recorded. `resolve-metadata` records canonical values used by filters and the prompt.

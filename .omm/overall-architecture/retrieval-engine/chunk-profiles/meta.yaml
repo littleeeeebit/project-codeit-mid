@@ -1,9 +1,0 @@
-created: 2026-10-11T06:52:23.280Z
-updated: 2026-10-11T06:52:23.281Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: chunk-profiles
-children: []
-parentPath:
-  - retrieval-engine

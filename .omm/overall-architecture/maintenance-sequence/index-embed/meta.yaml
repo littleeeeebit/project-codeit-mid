@@ -1,0 +1,9 @@
+created: 2026-10-11T09:34:27.979Z
+updated: 2026-10-11T09:34:27.980Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: index-embed
+children: []
+parentPath:
+  - maintenance-sequence

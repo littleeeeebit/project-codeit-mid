@@ -1,1 +1,1 @@
-Set by `RequestRunner.shutdown` (queued, plus running if still pending at the deadline), by `Resources.close` when jobs outlive the wait, and by `recover_requests` when a new owner claims the gateway. Its attempts are recovered separately: dispatching → unknown.
+Terminal. Set by controlled shutdown or restart recovery. Nothing is replayed; a running request's attempt goes through `budget.recover`.

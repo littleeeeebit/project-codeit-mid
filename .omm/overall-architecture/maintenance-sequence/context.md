@@ -1,0 +1,1 @@
+Branch maintenance-ingest-timeout-cancel-progress added the per-file parse time limit, per-file progress, and the run-bound cancel (commit 9245c39a). docs/history/maintenance-timeout-cancel/README.md records the root cause and browser walk.

@@ -1,1 +1,0 @@
-Covered by an imported provider total for a closed interval and billing scope (`reconcile`). It stops holding a reservation. A later true usage settles it with a negative adjustment so the cost is not double counted.

@@ -1,1 +1,0 @@
-`chunking.build_profile` turns an extraction's ordered elements into chunks and a requirement inventory. The profiles are `structural` (serving) and the fixed baselines `fixed-256-32`, `fixed-512-64` and `fixed-800-96`, all with source-span maps. Internals were not traced in this pass; behaviour is as described in README.

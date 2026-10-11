@@ -1,1 +1,0 @@
-`pseudonym_key` creates `<data>/review/traffic/pseudonym.key` (32 random bytes) once under the write lock with an atomic replace, outside every run folder. `pseudonym` = `member-` + the first 8 hex characters of HMAC-SHA256. The same member gets the same alias across runs in one data folder, and a run folder alone cannot be reversed.

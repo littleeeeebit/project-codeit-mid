@@ -1,0 +1,7 @@
+graph TD
+  session-middleware["Session gate\nsrc/rfp_assistant/api.py"] -->|"open sign-in paths"| hub-oauth["JupyterHub OAuth\nsrc/rfp_assistant/service/auth.py"]
+  session-middleware -->|"member bound to contextvars"| route-groups["Route groups\nsrc/rfp_assistant/api.py"]
+  route-groups -->|"GET /requests/id/stream"| sse-stream["SSE answer stream\nsrc/rfp_assistant/api.py"]
+  route-groups -->|"update status, request"| update-watch["Update watch\nsrc/rfp_assistant/service/update.py"]
+  update-watch -->|"fence paid admission"| route-groups
+  static-mount["Static screens\nweb/out"] -->|"mounted after /api"| route-groups

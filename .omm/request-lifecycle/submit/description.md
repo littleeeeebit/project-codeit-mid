@@ -1,1 +1,0 @@
-Validates, checks the conversation chain, and inserts `requests` with status `queued` after taking a runner slot (`try_admit`). If `runner.submit` fails, it releases the slot and marks the row failed with `technical_error` (`_fail_unscheduled`). Free modes skip the runner and complete inline.

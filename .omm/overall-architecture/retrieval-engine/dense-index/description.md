@@ -1,1 +1,0 @@
-`vector_store.PgDenseIndex` loads a published, verified vector set for one keyword index version. `search(query, allowed, k)` returns neighbours restricted to the allowed rows. Serving uses exact search because HNSW missed recall@20 0.99 on scoped questions (README).

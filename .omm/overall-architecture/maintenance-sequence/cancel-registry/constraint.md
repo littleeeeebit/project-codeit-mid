@@ -1,0 +1,1 @@
+The registry is per process: a cancel reaches only a run started in the same server process. A CLI `maintain` run cannot be cancelled from the screen.

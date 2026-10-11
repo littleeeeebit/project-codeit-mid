@@ -1,0 +1,1 @@
+A step raised: `StepFailed`, a parse error, a fidelity failure, a restore check failure, or the service stopping (`closing()`, or Stopped without a cancel). `stopped_at` names the step and the reason is capped at 600 characters. Work already written is not rolled back.

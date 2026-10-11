@@ -1,0 +1,1 @@
+PUT /api/settings/api-key validates a member's own OpenAI key against the chosen model before storing it in process memory. PUT /api/settings/model changes the member's answer model for future requests. PUT /api/budget/limit changes the shared cumulative cap and requires a reason. app-header.tsx also polls /api/budget for cap warnings.
