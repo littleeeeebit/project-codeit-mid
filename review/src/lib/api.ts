@@ -142,18 +142,30 @@ export type Claim = {
 
 export type Evidence = { doc: string | null; quote: string | null; section: string; text: string | null };
 
+export type ListingDate = { value: string; precision: "date" | "timestamp" } | null;
+
 export type ListingRow = {
   title: string;
   institution: string | null;
   institution_type: string | null;
+  type_source: string | null; // "resolution": a reviewer corrected the type
   amount_krw: number | null;
+  published_at: ListingDate;
+  bid_start: ListingDate;
+  bid_close: ListingDate;
   description: string | null;
   evidence_ids: string[];
   note: string | null;
   reasons?: string[]; // 확인 필요 rows: why the project is not counted
 };
 
-export type Listing = { conditions: string; count_only: boolean; rows: ListingRow[]; review: ListingRow[] };
+export type Listing = {
+  conditions: string;
+  count_only: boolean;
+  fields: ("published_at" | "bid_start" | "bid_close")[]; // the date columns the consultant's table showed
+  rows: ListingRow[];
+  review: ListingRow[];
+};
 
 export type Answer = {
   error?: string;

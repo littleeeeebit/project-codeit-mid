@@ -2,7 +2,8 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import type {
-  Answer, Candidate, Claim, Evidence, GenerationQuestion, GenerationView as View, ListingRow, RunFailures,
+  Answer, Candidate, Claim, Evidence, GenerationQuestion, GenerationView as View, Listing, ListingDate, ListingRow,
+  RunFailures,
 } from "@/lib/api";
 import { getJson, usd } from "@/lib/api";
 import { FACT_STATE, FIELD, label, TYPE, VALIDATION } from "@/lib/labels";
@@ -342,6 +343,7 @@ function AnswerBody({ q, c, a, open, setOpen, large = false, read }: {
   const at = (field: string, text: string, className = "") =>
     <Annotatable q={q.key} c={c.id} field={field} text={text} className={className} />;
   const body = large ? "text-[17px]" : "text-[14px]";
+  const dates = a.listing?.fields ?? [];  // a run frozen before date columns were kept has none
   if (a.error) {
     return (
       <>
@@ -393,7 +395,7 @@ function AnswerBody({ q, c, a, open, setOpen, large = false, read }: {
             {a.listing.rows.map((row, i) => (
               <li key={i} className={`border-l-[3px] border-line pl-2 leading-relaxed ${body}`}>
                 <span className="font-semibold">{row.title}</span>
-                <span className="text-muted"> · {projectLine(row)}</span>
+                <span className="text-muted"> · {projectLine(row, dates)}</span>
                 {row.description ? (
                   <span className="block">
                     {at(`listing.${i}`, row.description, "break-words")}
@@ -408,7 +410,7 @@ function AnswerBody({ q, c, a, open, setOpen, large = false, read }: {
               <span className="font-semibold text-warn">확인 필요</span>
               <ul>
                 {a.listing.review.map((row, i) => (
-                  <li key={i}>{row.title} · {projectLine(row)} ({(row.reasons ?? []).join(", ")})</li>
+                  <li key={i}>{row.title} · {projectLine(row, dates)} ({(row.reasons ?? []).join(", ")})</li>
                 ))}
               </ul>
             </div>
@@ -446,10 +448,16 @@ function AnswerBody({ q, c, a, open, setOpen, large = false, read }: {
   );
 }
 
-/** A listed project's institution, type and amount as the consultant's list showed them. */
-const projectLine = (row: ListingRow) =>
-  [row.institution ?? "기관 없음", row.institution_type ?? "유형 미분류",
-   row.amount_krw == null ? "금액 없음" : `${row.amount_krw.toLocaleString("ko-KR")}원`].join(" · ");
+/** A listed project's institution, type, amount and the dates the query filtered or sorted on, as the consultant's
+ *  table showed them (web/src/components/ask/answer-parts.tsx ListingCells). */
+const projectLine = (row: ListingRow, dates: Listing["fields"]) =>
+  [row.institution ?? "기관 없음",
+   (row.institution_type ?? "유형 미분류") + (row.type_source === "resolution" ? " (검토자 수정)" : ""),
+   row.amount_krw == null ? "금액 없음" : `${row.amount_krw.toLocaleString("ko-KR")}원`,
+   ...dates.map((f) => `${label(FIELD, f)} ${when(row[f])}`)].join(" · ");
+
+const when = (d: ListingDate) =>
+  !d ? "미상" : d.precision === "timestamp" ? d.value.slice(0, 16).replace("T", " ") : d.value;
 
 function ColumnHead({ c, a, read }: { c: Candidate; a: Answer; read?: () => void }) {
   return (

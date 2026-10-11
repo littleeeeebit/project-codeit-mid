@@ -47,6 +47,7 @@ UNCHECKED = "not_validated"  # no answer call to validate: a deterministic metad
 PROCESSING = "processing_failure"  # a failure without a validator verdict, e.g. a provider error
 CLEAN = (PASSED, UNCHECKED)
 RAN = ("dispatching", "settled", "unknown", "reconciled")  # ledger states of an answer call that was sent
+LISTING_DATES = ("published_at", "bid_start", "bid_close")  # a listing's date columns (answer-parts.tsx LISTING_DATES)
 ESCAPE = re.compile(r'\\u([0-9a-fA-F]{4})|\\(["\\/bfnrt])')  # one JSON escape
 SHORT = {'"': '"', "\\": "\\", "/": "/", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t"}
 LONE = re.compile("[\ud800-\udfff]")  # a surrogate left unpaired: no UTF-8 file can hold it
@@ -235,14 +236,22 @@ def _listing(v) -> dict | None:
     if not isinstance(v, dict):
         return None
 
+    def when(d) -> dict | None:  # a stored date as the consultant's table read it: {value, precision}
+        ok = isinstance(d, dict) and isinstance(d.get("value"), str) and d.get("precision") in ("date", "timestamp")
+        return {"value": d["value"], "precision": d["precision"]} if ok else None
+
     def row(r: dict) -> dict:
         amount = r.get("amount_krw")
         return {"title": _text(r.get("title")) or "", "institution": _text(r.get("institution")),
                 "institution_type": _text(r.get("institution_type")),
+                "type_source": _text(r.get("type_source")),
                 "amount_krw": amount if isinstance(amount, int) and not isinstance(amount, bool) else None,
+                **{f: when(r.get(f)) for f in LISTING_DATES},
                 "description": _text(r.get("description")), "evidence_ids": _ids(r.get("evidence_ids")),
                 "note": _text(r.get("note"))}
     return {"conditions": _text(v.get("conditions")) or "", "count_only": v.get("count_only") is True,
+            # the date columns the consultant's table showed: the dates the query filtered or sorted on
+            "fields": [f for f in _ids(v.get("fields")) if f in LISTING_DATES],
             "rows": [row(r) for r in _dicts(v.get("rows"))],
             "review": [row(r) | {"reasons": [_text(x.get("label")) or "" for x in _dicts(r.get("reasons"))]}
                        for r in _dicts(v.get("review"))]}

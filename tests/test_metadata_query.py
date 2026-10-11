@@ -516,10 +516,14 @@ class RollbackTest(Base):
             idempotency_key=key, generation_id="g", question="가장 싼 사업", scope=[], mode="corpus", as_of=AS_OF))
         self.assertEqual((replay.request_id, replay.listing), (listed.request_id, listed.listing))
 
-    def test_a_traffic_run_freezes_and_shows_the_listing_the_consultant_saw(self):
-        key = str(uuid.uuid4())  # a 질문하기 request: idempotency key = generation id
+    def traffic(self, question: str):
+        """`question` asked as a 질문하기 request (idempotency key = generation id), then a traffic run over its
+        window: (the answer, its frozen record, its answer in the run's view). Every value the consultant's table
+        showed must come through: titles, descriptions, types and their source, amounts, the queried date columns,
+        and the 확인 필요 reasons."""
+        key = str(uuid.uuid4())
         asked = service.answer(self.res, self.env.consultant, AnswerRequest(
-            idempotency_key=key, generation_id=key, question="5천만원 이상인 사업", scope=[], mode="corpus", as_of=AS_OF))
+            idempotency_key=key, generation_id=key, question=question, scope=[], mode="corpus", as_of=AS_OF))
         self.assertTrue(asked.listing["rows"] and asked.listing["review"])
         run = traffic_review.run(self.env.settings, "2000-01-01", 5, "UNUSED",
                                  dsn=os.environ[self.env.settings.database_dsn_env])
@@ -527,15 +531,37 @@ class RollbackTest(Base):
         frozen = [json.loads(line) for line in gzip.decompress(
             (folder / "inputs" / "requests.jsonl.gz").read_bytes()).decode("utf-8").splitlines()]
         (record,) = [r for r in frozen if r["request_id"] == asked.request_id]
-        texts = lambda rows: [(r["title"], r.get("description")) for r in rows]  # noqa: E731 - member-free fields
-        self.assertEqual(texts(record["result"]["listing"]["rows"]), texts(asked.listing["rows"]))
         view = json.loads((folder / "view.json").read_text(encoding="utf-8"))
-        (question,) = [q for q in view["questions"] if q["id"] == asked.request_id]
-        shown = question["candidates"][traffic_review.CANDIDATE]
+        (q,) = [q for q in view["questions"] if q["id"] == asked.request_id]
+        shown = q["candidates"][traffic_review.CANDIDATE]
+        columns = lambda rows: [  # noqa: E731 - member-free fields, as the consultant's table showed them
+            (r["title"], r.get("description"), r["institution_type"], r["type_source"], r["amount_krw"],
+             r["published_at"], r["bid_start"], r["bid_close"]) for r in rows]
+        for part in ("rows", "review"):
+            self.assertEqual(columns(record["result"]["listing"][part]), columns(asked.listing[part]))
+            self.assertEqual(columns(shown["listing"][part]), columns(asked.listing[part]))
         self.assertEqual(shown["listing"]["conditions"], asked.listing["conditions"])
-        self.assertEqual(texts(shown["listing"]["rows"]), texts(asked.listing["rows"]))
+        self.assertEqual(shown["listing"]["fields"],
+                         [f for f in asked.listing["fields"] if f in traffic_review.LISTING_DATES])
         self.assertEqual([r["reasons"] for r in shown["listing"]["review"]],
                          [[x["label"] for x in r["reasons"]] for r in asked.listing["review"]])
+        return asked, record, shown
+
+    def test_a_traffic_run_shows_the_queried_dates_and_a_corrected_type(self):
+        first = self.ask("2024년 6월 중에 입찰 마감된 사업")
+        corrected = first.listing["rows"][0]["doc_id"]
+        ingestion.resolve_metadata(self.env.settings, corrected, "institution_type", "연구기관", "fixture correction",
+                                   "기관 홈페이지", "reviewer")
+        asked, _, shown = self.traffic("2024년 6월 중에 입찰 마감된 사업")
+        self.assertEqual(shown["listing"]["fields"], ["bid_close"])
+        self.assertTrue(all(r["bid_close"] for r in shown["listing"]["rows"]), "every match has its closing date")
+        self.assertIn(None, [r["bid_close"] for r in shown["listing"]["review"]], "날짜 없음 stays visible as none")
+        (row,) = [r for r, a in zip(shown["listing"]["rows"], asked.listing["rows"]) if a["doc_id"] == corrected]
+        self.assertEqual((row["institution_type"], row["type_source"]), ("연구기관", "resolution"))
+
+    def test_a_traffic_run_freezes_and_shows_the_listing_the_consultant_saw(self):
+        _, _, shown = self.traffic("5천만원 이상인 사업")
+        self.assertEqual(shown["listing"]["fields"], [])  # an amount question shows no date column
         cited = {i for r in shown["listing"]["rows"] for i in r["evidence_ids"]}
         self.assertTrue(cited and cited <= set(shown["evidence"]), "each description opens its passage")
         described = next(i for i, r in enumerate(shown["listing"]["rows"]) if r["description"])
