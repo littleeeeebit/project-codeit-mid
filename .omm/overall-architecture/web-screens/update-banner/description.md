@@ -1,1 +1,0 @@
-Reads GET /api/update/status (running commit against GitHub main, open paid work, last updater result) and POSTs /api/update. The server refuses the update while any paid work is open (service/update.py `request_update`).

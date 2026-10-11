@@ -1,0 +1,1 @@
+Every non-frozen corpus-mode question now pays for one translation call before retrieval, even when it turns out not to be a metadata question. If that call is refused, for example as budget_blocked, the request ends instead of falling back to the free retrieval path.

@@ -1,6 +1,1 @@
-Paid or long jobs run as daemon threads registered in `res._jobs`, so `close()` joins them:
-- answer evaluation (`start_answer_evaluation` → answers.run_answers, gold_eval envelope),
-- judge runs (`start_judges` → judges.run, judge_eval),
-- drafting (`start_drafting`),
-- maintenance (`start_maintenance` → maintenance.run).
-The evaluation and judge starts take `_EVAL_LOCK` and `_refuse_closed_or_busy` (one evaluation or judge run at a time). `_start_job` re-checks closed, key and update fence under `_runner_lock` before starting. Maintenance allows one run per process (`_MAINTENANCE_JOB`). A job failure is written to `last-error.txt` in its run directory; rerunning resumes from recorded progress.
+`start_maintenance`, `start_judges`, `start_answer_evaluation` and `start_drafting` first publish a run record, so the overview lists it on the next read. They then start a daemon thread under `_EVAL_LOCK` and `res._runner_lock`, and append it to `res._jobs`. The start is refused when the service is closing, under the update fence, when no key is available (`paid_refusal`), or while another evaluation or judge job is alive. At most one maintenance sequence runs per process (`_MAINTENANCE_JOB`). A judge failure writes `last-error.txt` into its run directory, and finished judgements are kept.

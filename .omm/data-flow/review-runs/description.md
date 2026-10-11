@@ -1,0 +1,1 @@
+Stage-review run folders, decisions, annotations and the failure taxonomy live under `.runtime/review/`. The traffic stage copies finished requests' `request_json`, `result_json` and `trace_json`, with members replaced by pseudonyms, into `inputs/requests.jsonl.gz`. These files sit outside git and outside the serving database.

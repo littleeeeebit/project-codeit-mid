@@ -1,0 +1,1 @@
+Plan rule: pipelines run every variant, and a person chooses from the comparison tables and activates. Nothing runs on a schedule or changes what serves until the person clicks.

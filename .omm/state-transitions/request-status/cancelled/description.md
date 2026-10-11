@@ -1,1 +1,1 @@
-Terminal. The outcome is kept for history but never attached to the screen (`may_attach` refuses). Already dispatched calls keep their attempt until they settle or become unknown.
+Reached by a cancel while queued, which is conclusive and costs nothing. It is also reached by `_finish` converting a would-be completed outcome to `cancelled` when the flag was set during `running`. The stored outcome stays in the history and is never attached as the screen's current answer.

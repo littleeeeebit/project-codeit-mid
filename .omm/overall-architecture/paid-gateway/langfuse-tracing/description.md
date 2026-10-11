@@ -1,6 +1,1 @@
-`Tracing.from_settings` exists only when all three LANGFUSE_* variables resolve. `tracing.run` opens one trace per executed request (trace ID derived from request_id; user = member; environment server/local; release `<branch>@<commit>`). `tracing.step` adds the spans:
-- retrieve-evidence
-- assemble-evidence
-- rewrite-question and generate-answer (generations with usage and ledger cost)
-- validate-answer (guardrail)
-There are three free scores: citation_valid, insufficient_evidence and evidence_tokens. A secret-shaped value mask runs on export. Per README and the `_guard` helper, tracing failures never change answers or the ledger.
+`tracing.run` opens one trace per executed request, named `answer-question`. Its id is seeded by the request id, its user is the member, and its tags are ask and the mode. The steps recorded are `rewrite-question`, `metadata-query-translation`, `classify-institutions`, `describe-batch-k`, `retrieve-evidence`, `assemble-evidence`, `generate-answer` and `validate-answer`, with free scores `citation_valid`, `insufficient_evidence` and `evidence_tokens`. The `Tracing` client is created alongside the OpenAI transport (`Tracing.from_settings`) when LANGFUSE_* are set. Tracing is observability only: admission, reservation and settlement never read it. Per the README, a stopped Langfuse drops traces with a warning and answers carry on.

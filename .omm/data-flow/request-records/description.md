@@ -1,0 +1,1 @@
+Each question writes a `requests` row (input snapshot, `trace_json`, `result_json`) and its `attempts` ledger rows. Metadata answers also add `institution_types` classifications with provenance (model, the request as run id, prompt version, date). Key, model, budget-limit and update actions write `audit_events` rows that record who acted but never the key value.

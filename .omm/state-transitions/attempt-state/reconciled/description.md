@@ -1,0 +1,1 @@
+Covered by an operator reconciliation against the provider's total (`budget.reconcile`, which checks covered attempts within an interval). If the real usage arrives later, `settle` books a negative adjustment so the cost is not counted twice. The internals of `reconcile` were read only at signature level.

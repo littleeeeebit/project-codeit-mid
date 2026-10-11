@@ -1,7 +1,13 @@
 graph TD
-  session-middleware["Session gate\nsrc/rfp_assistant/api.py"] -->|"open sign-in paths"| hub-oauth["JupyterHub OAuth\nsrc/rfp_assistant/service/auth.py"]
-  session-middleware -->|"member bound to contextvars"| route-groups["Route groups\nsrc/rfp_assistant/api.py"]
-  route-groups -->|"GET /requests/id/stream"| sse-stream["SSE answer stream\nsrc/rfp_assistant/api.py"]
-  route-groups -->|"update status, request"| update-watch["Update watch\nsrc/rfp_assistant/service/update.py"]
-  update-watch -->|"fence paid admission"| route-groups
-  static-mount["Static screens\nweb/out"] -->|"mounted after /api"| route-groups
+  session-middleware["Session middleware\nsrc/rfp_assistant/api.py"]
+  sign-in-routes["Sign-in routes\nsrc/rfp_assistant/api.py"]
+  ask-routes["Ask and request routes\nsrc/rfp_assistant/api.py"]
+  verify-routes["Verification routes\nsrc/rfp_assistant/api.py"]
+  dataset-routes["Dataset routes\nsrc/rfp_assistant/api.py"]
+  static-export["Static screens mount\nweb/src/app/layout.tsx"]
+  session-middleware -->|sign-in paths pass through| sign-in-routes
+  session-middleware -->|member bound to context| ask-routes
+  session-middleware -->|member bound to context| verify-routes
+  session-middleware -->|member bound to context| dataset-routes
+  session-middleware -->|non-api paths bypass| static-export
+  sign-in-routes -->|session cookie on /api/| session-middleware

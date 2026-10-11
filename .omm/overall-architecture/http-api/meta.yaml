@@ -1,40 +1,30 @@
 created: 2026-10-04 13:34:42.449000+00:00
-updated: 2026-10-11T09:34:21.649Z
-update_count: 31
+updated: 2026-10-11 21:57:53.686000+00:00
+update_count: 33
 last_field: diagram
 kind: nested-class
 title: http-api
 children:
-  - answer-sse
-  - ask-routes
-  - hub-login
-  - hub-oauth
-  - hub-sign-in
-  - login-store
-  - route-groups
-  - session-middleware
-  - sign-in-routes
-  - sse-stream
-  - static-mount
-  - stream-route
-  - update-watch
+- answer-sse
+- ask-routes
+- dataset-routes
+- hub-login
+- hub-sign-in
+- login-store
+- route-groups
+- session-middleware
+- sign-in-routes
+- sse-stream
+- static-export
+- stream-route
+- update-watch
+- verify-routes
 parentPath: []
-prev_diagram: "graph TD\r
-
-  \  static-mount[\"Static export mount\\nsrc/rfp_assistant/api.py\"]
-  -->|\"screens call /api\"| session-middleware[\"Session gate
-  _Session\\nsrc/rfp_assistant/api.py\"]\r
-
-  \  session-middleware -->|\"open without session\"| sign-in-routes[\"Hub OAuth
-  routes\\nsrc/rfp_assistant/service/auth.py\"]\r
-
-  \  session-middleware -->|\"bind member key, model\"| ask-routes[\"Ask and
-  request routes\\nsrc/rfp_assistant/api.py\"]\r
-
-  \  session-middleware -->|\"bind member\"| verify-routes[\"Verification
-  routes\\nsrc/rfp_assistant/api.py\"]\r
-
-  \  session-middleware -->|\"bind member\"| dataset-routes[\"Drafting and gold
-  routes\\nsrc/rfp_assistant/api.py\"]\r
-
-  \  sign-in-routes -->|\"session cookie on /api/\"| session-middleware"
+prev_diagram: "graph TD\r\n  session-middleware[\"Session gate\\nsrc/rfp_assistant/api.py\"\
+  ] -->|\"open sign-in paths\"| hub-oauth[\"JupyterHub OAuth\\nsrc/rfp_assistant/service/auth.py\"\
+  ]\r\n  session-middleware -->|\"member bound to contextvars\"| route-groups[\"Route\
+  \ groups\\nsrc/rfp_assistant/api.py\"]\r\n  route-groups -->|\"GET /requests/id/stream\"\
+  | sse-stream[\"SSE answer stream\\nsrc/rfp_assistant/api.py\"]\r\n  route-groups\
+  \ -->|\"update status, request\"| update-watch[\"Update watch\\nsrc/rfp_assistant/service/update.py\"\
+  ]\r\n  update-watch -->|\"fence paid admission\"| route-groups\r\n  static-mount[\"\
+  Static screens\\nweb/out\"] -->|\"mounted after /api\"| route-groups"

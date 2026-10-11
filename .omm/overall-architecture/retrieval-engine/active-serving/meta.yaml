@@ -1,0 +1,9 @@
+created: 2026-10-11T21:57:56.916Z
+updated: 2026-10-11T21:57:56.917Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: active-serving
+children: []
+parentPath:
+  - retrieval-engine

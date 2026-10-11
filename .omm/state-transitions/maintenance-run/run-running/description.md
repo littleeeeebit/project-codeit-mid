@@ -1,1 +1,0 @@
-Written by `start_state` and published before `start_maintenance` returns. LIVE membership makes it cancellable.

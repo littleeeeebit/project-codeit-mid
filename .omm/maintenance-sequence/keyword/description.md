@@ -1,0 +1,1 @@
+`step_keyword` requires an activated run and fails with 'activate a run before maintenance' otherwise. It rebuilds the served index's profile and review scope with `build_keyword_index(..., activate=False)` and stores `ctx['rebuilt_index']`. It reports whether the rebuilt version equals the one being served.

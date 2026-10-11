@@ -1,0 +1,11 @@
+graph TD
+  manifest-import["Manifest import\nsrc/rfp_assistant/corpus/ingestion.py"]
+  source-parsing["HWP and PDF parsing\nsrc/rfp_assistant/corpus/ingestion.py"]
+  ocr-merge["OCR text merge\nsrc/rfp_assistant/corpus/ocr.py"]
+  fidelity-check["Fidelity check\nsrc/rfp_assistant/corpus/fidelity.py"]
+  chunk-index["Chunking and keyword index\nsrc/rfp_assistant/retrieval/chunking.py"]
+  manifest-import -->|hashed unique sources| source-parsing
+  ocr-merge -->|image_text elements| source-parsing
+  source-parsing -->|active HWP extraction| fidelity-check
+  source-parsing -->|ordered elements| chunk-index
+  fidelity-check -->|auto review status| chunk-index

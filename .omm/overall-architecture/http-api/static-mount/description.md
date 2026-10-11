@@ -1,1 +1,0 @@
-`StaticFiles(directory=web/out, html=True)` is mounted at '/' only if the build exists, after all /api routes, so the API keeps precedence. One process and one port serve both. In development, `npm run dev` on :8510 proxies /api/* to the API on :8511.

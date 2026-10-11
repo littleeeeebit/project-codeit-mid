@@ -1,0 +1,1 @@
+From memory notes: the local Langfuse uses its own loopback host (127.0.0.2), never localhost, and reuses the shared login.

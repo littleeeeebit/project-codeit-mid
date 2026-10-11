@@ -1,25 +1,24 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-11 09:34:29.067000+00:00
-update_count: 58
+updated: 2026-10-11 21:58:02.935000+00:00
+update_count: 60
 last_field: diagram
-git_commit: 19b378c8
-git_branch: maintenance-ingest-timeout-cancel-progress
+git_commit: 80caf0d6
+git_branch: corpus-metadata-filter-list-answers
 children:
-- answer-generation
 - answer-stream
 - answer-validation
-- ask-composer
 - ask-page
+- ask-screen
 - ask-submit
 - cancellation
 - evidence-retrieval
+- execute-answer
 - finish-record
 - finish-request
 - finish-step
 - generate
 - langfuse-tracing
 - metered-call
-- outcome-delivery
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
@@ -27,30 +26,30 @@ children:
 - paid-call
 - persist-admit
 - poll-and-stream
-- query-rewrite
+- request-record
+- request-runner
 - run-queued
-- runner-worker
 - screen-attachment
 - screen-poll
+- session-gate
 - status-poll
 - stream-and-poll
 - stream-poll
-- submit-admission
 - submit-and-admit
 - submit-answer
 - turn-render
 - validate-and-finish
 - validation
-prev_diagram: "graph TD\r\n  ask-page[\"Ask page\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  ask-route[\"POST /api/ask\\nsrc/rfp_assistant/api.py\"]\r\n  submit[\"submit_answer\\\
-  nsrc/rfp_assistant/service/service.py\"]\r\n  worker[\"Runner worker thread\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  paid-answer[\"_paid_answer\\nsrc/rfp_assistant/service/service.py\"]\r\n\
-  \  metered-chat[\"_metered_chat\\nsrc/rfp_assistant/service/service.py\"]\r\n  finish[\"\
-  _finish\\nsrc/rfp_assistant/service/service.py\"]\r\n  answer-stream[\"Stream and\
-  \ poll hooks\\nweb/src/lib/use-answer-stream.ts\"]\r\n  ask-page -->|scope, question,\
-  \ mode| ask-route\r\n  ask-route -->|AnswerRequest| submit\r\n  submit -->|queued\
-  \ request_id| worker\r\n  worker -->|claimed snapshot| paid-answer\r\n  paid-answer\
-  \ -->|rewrite and answer calls| metered-chat\r\n  metered-chat -->|response, partials|\
-  \ paid-answer\r\n  paid-answer -->|validated or failed result| finish\r\n  finish\
-  \ -->|status and result read| answer-stream\r\n  answer-stream -->|attachable outcome|\
-  \ ask-page"
+prev_diagram: "graph TD\r\n  ask-composer[\"Ask composer\\nweb/src/components/ask/ask-page.tsx\"\
+  ] -->|\"POST /api/ask\"| submit-admission[\"Validation and admission\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  submit-admission -->|\"queued row, executor\"| runner-worker[\"Runner worker\
+  \ claim\\nsrc/rfp_assistant/service/service.py\"]\r\n  runner-worker -->|\"follow-up\
+  \ only\"| query-rewrite[\"Standalone rewrite\\nsrc/rfp_assistant/gateway/generation.py\"\
+  ]\r\n  runner-worker -->|\"scope and question\"| evidence-retrieval[\"Retrieval\
+  \ and pricing\\nsrc/rfp_assistant/service/service.py\"]\r\n  query-rewrite -->|\"\
+  rewritten question\"| evidence-retrieval\r\n  evidence-retrieval -->|\"messages,\
+  \ estimate\"| answer-generation[\"Metered streamed answer\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  answer-generation -->|\"structured output\"| answer-validation[\"Citation\
+  \ validation\\nsrc/rfp_assistant/gateway/generation.py\"]\r\n  answer-validation\
+  \ -->|\"result_json, billing\"| outcome-delivery[\"Poll, stream, attach\\nweb/src/lib/use-answer-stream.ts\"\
+  ]\r\n  answer-generation -->|\"partial text\"| outcome-delivery"

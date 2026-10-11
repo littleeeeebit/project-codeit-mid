@@ -1,8 +1,15 @@
 created: 2026-10-05 21:24:06.553000+00:00
-updated: 2026-10-08 21:42:06.049000+00:00
-update_count: 9
-last_field: concern
-git_commit: 86d9b1f
-git_branch: gpt5-mini-answer-embedding-comparison
+updated: 2026-10-11T21:58:10.955Z
+update_count: 11
+last_field: diagram
+git_commit: 80caf0d6
+git_branch: corpus-metadata-filter-list-answers
 children:
-- restore-check
+  - backup
+  - embedding
+  - fidelity
+  - ingest
+  - keyword
+  - regression
+  - report
+  - restore-check

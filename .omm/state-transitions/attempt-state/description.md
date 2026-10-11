@@ -1,0 +1,1 @@
+Each paid provider call has one `attempts` row. `reserved` and `dispatching` count as pending against the cap and envelopes. `budget.recover` runs at startup under the new owner and turns `dispatching` into `unknown` and `reserved` into `released`. The same rule applies to the Gemini `external_attempts` ledger.

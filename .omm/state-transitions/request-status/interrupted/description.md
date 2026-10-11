@@ -1,1 +1,1 @@
-Terminal. Set by controlled shutdown or restart recovery. Nothing is replayed; a running request's attempt goes through `budget.recover`.
+Set by a controlled shutdown (`RequestRunner.shutdown`) or by restart recovery (`recover_requests`, run when a new process acquires the gateway). Requests are never replayed automatically; the member asks again.

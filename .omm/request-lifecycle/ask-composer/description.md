@@ -1,1 +1,0 @@
-The member picks documents (/api/documents: metadata filters plus keyword snippets, askable first) or All documents, then a mode and a question. `postAsk` sends {scope, question, mode, previous_request_id}; the previous id is the conversation's last turn. It stores the returned Owned record as a new Turn; the previous turn's ownership moves on.

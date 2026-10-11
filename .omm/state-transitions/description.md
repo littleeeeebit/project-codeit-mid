@@ -1,7 +1,1 @@
-Five interacting lifecycles govern what may happen next:
-- the request row's status,
-- the ledger attempt's billing state,
-- the maintenance run's status in state.json,
-- the update fence,
-- startup and shutdown recovery.
-A cancel or interrupt never kills a provider call already sent; it only blocks the next dispatch, and the sent call still settles or stays unknown.
+Four durable state machines gate paid work: request status (`requests.status` plus `cancel_requested`), attempt state (`attempts.state`), maintenance run status (`.runtime/maintenance/state.json`), and the update fence (marker file plus the updater's `result.json`). They are coupled. A cancel or interrupt is enforced inside the attempt's dispatch transaction. Any `unknown` attempt blocks every dispatch. Open attempts, queued or running requests, or live jobs make an update refuse. An accepted update refuses new admissions and job starts.

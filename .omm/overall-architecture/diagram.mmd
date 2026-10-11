@@ -1,13 +1,19 @@
 graph TD
-  web-screens["Next.js screens\nweb/src"] -->|"fetch /api with session"| http-api["FastAPI app\nsrc/rfp_assistant/api.py"]
-  http-api -->|"one service call per route"| service-core["Service core\nsrc/rfp_assistant/service/service.py"]
-  owner-cli["Owner CLI\nsrc/rfp_assistant/cli.py"] -->|"builds same Resources"| service-core
-  service-core -->|"retrieve evidence"| retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  service-core -->|"reserve, dispatch, settle"| paid-gateway["Paid gateway\nsrc/rfp_assistant/gateway/budget.py"]
-  retrieval-engine -->|"paid query embedding"| paid-gateway
-  service-core -->|"start maintenance thread"| maintenance-sequence["Maintenance sequence\nsrc/rfp_assistant/storage/maintenance.py"]
-  maintenance-sequence -->|"rebuild index, embed"| retrieval-engine
-  paid-gateway -->|"attempts, advisory lock"| postgres-store["PostgreSQL + pgvector\nsrc/rfp_assistant/storage/postgres.py"]
-  service-core -->|"requests, audit rows"| postgres-store
-  retrieval-engine -->|"chunks, vectors, activation"| postgres-store
-  maintenance-sequence -->|"extractions, backups"| postgres-store
+  web-screens["Next.js screens\nweb/src/app/page.tsx"]
+  http-api["FastAPI wrapper\nsrc/rfp_assistant/api.py"]
+  service-core["Service core\nsrc/rfp_assistant/service/service.py"]
+  retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  paid-gateway["Paid gateway and ledger\nsrc/rfp_assistant/gateway/budget.py"]
+  postgres-store["PostgreSQL and pgvector\nsrc/rfp_assistant/storage/postgres.py"]
+  corpus-pipeline["Corpus pipeline\nsrc/rfp_assistant/corpus/ingestion.py"]
+  stage-review-app["Stage review app\nreview/server.py"]
+  web-screens -->|typed fetch and SSE| http-api
+  http-api -->|one service call per route| service-core
+  service-core -->|scoped evidence query| retrieval-engine
+  service-core -->|reserve, dispatch, settle| paid-gateway
+  service-core -->|requests and audit rows| postgres-store
+  service-core -->|maintenance reparses originals| corpus-pipeline
+  retrieval-engine -->|index records and vectors| postgres-store
+  paid-gateway -->|attempt ledger rows| postgres-store
+  corpus-pipeline -->|sources and extractions| postgres-store
+  stage-review-app -->|read-only frozen inputs| postgres-store

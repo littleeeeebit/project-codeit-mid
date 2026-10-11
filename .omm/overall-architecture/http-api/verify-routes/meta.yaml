@@ -1,0 +1,9 @@
+created: 2026-10-11T21:57:54.715Z
+updated: 2026-10-11T21:57:54.716Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: verify-routes
+children: []
+parentPath:
+  - http-api

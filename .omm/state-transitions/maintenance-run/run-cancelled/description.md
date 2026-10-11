@@ -1,1 +1,0 @@
-A cancel for this run_id was admitted. A running parse is killed at once, any other step finishes first, and the step is marked cancelled with cancelled_by and cancelled_at. A cancel admitted during the last step still ends the run cancelled, 'during its last step, which finished'.

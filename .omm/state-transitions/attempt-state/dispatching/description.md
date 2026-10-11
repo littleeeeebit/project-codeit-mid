@@ -1,0 +1,1 @@
+Set by `mark_dispatching`, with `dispatched_at`, immediately before the network call. Because the call may have executed, restart recovery turns it into `unknown` and never into `released`.

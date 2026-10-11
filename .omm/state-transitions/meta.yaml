@@ -1,12 +1,13 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-11 09:34:31.025000+00:00
-update_count: 56
+updated: 2026-10-11 21:58:04.622000+00:00
+update_count: 58
 last_field: diagram
-git_commit: 19b378c8
-git_branch: maintenance-ingest-timeout-cancel-progress
+git_commit: 80caf0d6
+git_branch: corpus-metadata-filter-list-answers
 children:
 - attempt-billing
 - attempt-record
+- attempt-state
 - attempt-states
 - billing-attempt
 - billing-attempt-states
@@ -14,22 +15,20 @@ children:
 - gold-candidate
 - gold-candidate-states
 - interrupted
-- maintenance-run
+- maintenance-run-status
 - owner-reconcile
 - request-status
-- restart-recovery
 - running
 - serving-activation
 - source-review-states
 - update-fence
 - update-states
 prev_diagram: "graph TD\r\n  request-status[\"Request status\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  attempt-ledger[\"Attempt ledger states\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  serving-activation[\"Serving activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  update-fence[\"Update fence\\nsrc/rfp_assistant/service/update.py\"]\r\n\
-  \  stage-review-run[\"Stage review run states\\nsrc/rfp_assistant/evaluation/stage_review.py\"\
-  ]\r\n  request-status -->|derives billing_state| attempt-ledger\r\n  attempt-ledger\
-  \ -->|unknown blocks dispatch| request-status\r\n  serving-activation -->|mode and\
-  \ versions| request-status\r\n  update-fence -->|refuses new admission| request-status\r\
-  \n  attempt-ledger -->|open work refuses update| update-fence\r\n  stage-review-run\
-  \ -->|paid answers settle| attempt-ledger"
+  ] -->|\"dispatch guard reads\"| attempt-billing[\"Attempt billing state\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  attempt-billing -->|\"billing_state in result\"| request-status\r\n  restart-recovery[\"\
+  Restart and shutdown recovery\\nsrc/rfp_assistant/service/service.py\"] -->|\"interrupt\
+  \ unfinished\"| request-status\r\n  restart-recovery -->|\"dispatching to unknown\"\
+  | attempt-billing\r\n  update-fence[\"Update fence\\nsrc/rfp_assistant/service/update.py\"\
+  ] -->|\"blocks admission\"| request-status\r\n  update-fence -->|\"blocks start\"\
+  | maintenance-run[\"Maintenance run status\\nsrc/rfp_assistant/storage/maintenance.py\"\
+  ]\r\n  attempt-billing -->|\"open work blocks update\"| update-fence"

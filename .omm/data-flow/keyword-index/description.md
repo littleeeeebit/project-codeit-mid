@@ -1,0 +1,1 @@
+Versioned index directories under `.runtime` hold the chunks, BM25 data, `scope-terms.json` and a manifest of file hashes, and each version is recorded in the database. `active_index` names the version being served. Old versions are kept for issued citations and rollback. An index built under another analyzer or query policy is still served, but marked `index_outdated:`.

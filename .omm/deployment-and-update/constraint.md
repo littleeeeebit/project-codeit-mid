@@ -1,0 +1,1 @@
+Ask before creating cloud resources or touching teammates' files on codeit (sprint-ai-01), and reuse the existing team VM. When the VM's address changes, update `BIDMATE_HUB_URL`, `BIDMATE_OAUTH_REDIRECT_URI` and the hub's `oauth_redirect_uri` together (runbook 3.1).

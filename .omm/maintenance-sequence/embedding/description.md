@@ -1,0 +1,1 @@
+`step_embedding` is skipped when the activated run is keyword-only. Otherwise `compare.ensure_dense` embeds the rebuilt index's uncached chunks with the activated embedding model. A local model does this for free. A paid model raises `NeedsApproval` with the estimate id, and the run stops at `needs_approval` until `compare --approve`.
