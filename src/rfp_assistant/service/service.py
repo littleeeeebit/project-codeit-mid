@@ -2512,17 +2512,17 @@ def maintenance_status(res: Resources, principal: Principal) -> dict:
             "cancelling": running and bool(state) and state["run_id"] in maintenance.CANCELS}
 
 
-def cancel_maintenance(res: Resources, principal: Principal) -> str:
-    """Cancels the live run (`maintenance.run`): a running parse is killed at once, any other step finishes first."""
+def cancel_maintenance(res: Resources, principal: Principal, run_id: str) -> str:
+    """Cancels live run `run_id`, the one the screen shows: a late cancel of an earlier run never hits its successor."""
     principal = _authorize(res, principal, "verifier")
     from ..storage import maintenance
 
     with _EVAL_LOCK:
-        state = maintenance.last(res.settings) or {}
-        if not (any(t.is_alive() for t in _MAINTENANCE_JOB) and state.get("run_id")
-                and maintenance.request_cancel(state["run_id"], principal.member_id)):
+        if not any(t.is_alive() for t in _MAINTENANCE_JOB):
             raise ServiceError("실행 중인 유지보수가 없습니다.")
-    return state["run_id"]
+        if not maintenance.request_cancel(run_id, principal.member_id):
+            raise ServiceError(f"취소하려던 유지보수 {run_id}은(는) 이미 끝났습니다.")
+    return run_id
 
 
 def start_maintenance(res: Resources, principal: Principal) -> str:

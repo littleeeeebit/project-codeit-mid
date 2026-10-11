@@ -23,8 +23,8 @@
     },
     "src/rfp_assistant/api.py": {
       "dup": 8,
-      "lines": 1637,
-      "reason": "maintenance-ingest-timeout-cancel-progress: the POST /api/verify/maintenance/cancel route and the response fields the screen reads (step and run status `cancelled`, `timed_out`, `cancelled_by`, `cancelled_at`, `cancelling`); response models stay in api.py under the API boundary test. Before that, review-ui-readable: Decided gains the question text so the dataset's recent decisions read as questions, not candidate IDs. Before that, main-update-banner-button:the header update's four HTTP response models (CommitTitle, PaidWork, UpdateResult, UpdateStatus), its two routes and the lifespan that starts the GitHub watch and installs the paid-work fence; response models stay in api.py under the existing API boundary test, while the status, paid-work check and request live in service/update.py"
+      "lines": 1641,
+      "reason": "maintenance-ingest-timeout-cancel-progress review round 2, F4: the cancel's request model (CancelIn, the run the screen shows) so a late cancel never stops the next run. Before that, maintenance-ingest-timeout-cancel-progress: the POST /api/verify/maintenance/cancel route and the response fields the screen reads (step and run status `cancelled`, `timed_out`, `cancelled_by`, `cancelled_at`, `cancelling`); response models stay in api.py under the API boundary test. Before that, review-ui-readable: Decided gains the question text so the dataset's recent decisions read as questions, not candidate IDs. Before that, main-update-banner-button:the header update's four HTTP response models (CommitTitle, PaidWork, UpdateResult, UpdateStatus), its two routes and the lifespan that starts the GitHub watch and installs the paid-work fence; response models stay in api.py under the existing API boundary test, while the status, paid-work check and request live in service/update.py"
     },
     "src/rfp_assistant/cli.py": {
       "dup": 0,

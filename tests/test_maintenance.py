@@ -257,10 +257,10 @@ class SequenceTest(unittest.TestCase):
         res = service.Resources(self.s, transport=FakeTransport())
         try:
             with self.assertRaisesRegex(service.ServiceError, "실행 중인 유지보수가 없습니다"):
-                service.cancel_maintenance(res, self.env.verifier)
+                service.cancel_maintenance(res, self.env.verifier, "M-20261011-000000-000000")
             run_id = self.start_hanging(res)
             asked = time.monotonic()
-            self.assertEqual(service.cancel_maintenance(res, self.env.verifier), run_id)
+            self.assertEqual(service.cancel_maintenance(res, self.env.verifier, run_id), run_id)
             service._MAINTENANCE_JOB[0].join(10)
             self.assertLess(time.monotonic() - asked, 5)
             status = service.maintenance_status(res, self.env.verifier)
@@ -272,7 +272,7 @@ class SequenceTest(unittest.TestCase):
             self.assertTrue((maintenance.root(self.s) / "reports" / f"{run_id}.md").exists())
             self.assertEqual(multiprocessing.active_children(), [])
             with self.assertRaisesRegex(service.ServiceError, "실행 중인 유지보수가 없습니다"):
-                service.cancel_maintenance(res, self.env.verifier)
+                service.cancel_maintenance(res, self.env.verifier, run_id)
             with mock.patch.dict(maintenance.STEP_FUNCTIONS, {n: reused for n in maintenance.STEP_FUNCTIONS}):
                 again = service.start_maintenance(res, self.env.verifier)  # the slot is free right away
                 service._MAINTENANCE_JOB[0].join(10)
@@ -304,14 +304,34 @@ class SequenceTest(unittest.TestCase):
                 mock.patch.object(compare, "golden_counts", lambda s: (block(), golden(s))[1]):
             run_id = service.start_maintenance(res, self.env.verifier)
             self.assertTrue(entered.wait(30))
-            self.assertEqual(service.cancel_maintenance(res, self.env.verifier), run_id)
+            self.assertEqual(service.cancel_maintenance(res, self.env.verifier, run_id), run_id)
             self.assertTrue(service.maintenance_status(res, self.env.verifier)["cancelling"])
             release.set()
             service._MAINTENANCE_JOB[0].join(30)
         self.assertNotIn(run_id, maintenance.CANCELS)
         with self.assertRaisesRegex(service.ServiceError, "실행 중인 유지보수가 없습니다"):
-            service.cancel_maintenance(res, self.env.verifier)
+            service.cancel_maintenance(res, self.env.verifier, run_id)
         return maintenance.last(self.s)
+
+    def test_a_late_or_repeated_cancel_of_an_earlier_run_never_stops_the_next(self):
+        # review round 2, F4: a cancel names the run the screen showed, so a delayed or replayed one misses run B
+        res = service.Resources(self.s, transport=FakeTransport())
+        try:
+            with mock.patch.dict(maintenance.STEP_FUNCTIONS, {n: reused for n in maintenance.STEP_FUNCTIONS}):
+                a = service.start_maintenance(res, self.env.verifier)  # the screen shows run A
+                service._MAINTENANCE_JOB[0].join(30)
+            b = self.start_hanging(res)  # often in A's second; the run id's random suffix keeps the two apart
+            self.assertNotEqual(a, b)
+            with self.assertRaisesRegex(service.ServiceError, f"취소하려던 유지보수 {a}은\\(는\\) 이미 끝났습니다"):
+                service.cancel_maintenance(res, self.env.verifier, a)  # A's cancel, delivered or replayed now
+            time.sleep(1)
+            self.assertTrue(service._MAINTENANCE_JOB[0].is_alive())
+            self.assertEqual((maintenance.last(self.s)["status"], b in maintenance.CANCELS), ("running", False))
+            self.assertEqual(service.cancel_maintenance(res, self.env.verifier, b), b)
+            service._MAINTENANCE_JOB[0].join(10)
+            self.assertEqual(maintenance.last(self.s)["status"], "cancelled")
+        finally:
+            res.close()
 
     def test_a_cancel_admitted_during_the_last_step_or_as_a_step_stops_is_recorded(self):
         # review round 1, F2: a cancel accepted after the run's last check must still reach its final state

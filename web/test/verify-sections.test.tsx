@@ -193,10 +193,10 @@ describe("maintenance", () => {
 
   test("a live run shows n/total, the file being read, both elapsed times, and cancels", async () => {
     vi.useFakeTimers({ now: Date.parse("2026-10-11T09:02:05Z"), toFake: ["Date"] });
-    let cancels = 0;
+    const cancels: unknown[] = [];
     stubApi(api, {
       "GET /api/verify/maintenance": () => ({ backup_root: "D:/backups", running: true, run: live() }),
-      "POST /api/verify/maintenance/cancel": () => { cancels++; return { run_id: "M-2" }; },
+      "POST /api/verify/maintenance/cancel": (opts) => { cancels.push((opts as { body?: unknown }).body); return { run_id: live().run_id }; },
     });
     render(<MaintenanceSection />);
     await settle();
@@ -204,7 +204,7 @@ describe("maintenance", () => {
     expect(screen.getByText("60 / 98 읽는 중 · 케빈랩.hwp · 이 파일 0:35")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     await settle();
-    expect(cancels).toBe(1);
+    expect(cancels).toEqual([{ run_id: live().run_id }]);  // the run on screen, never "whatever runs now"
     vi.useRealTimers();
   });
 

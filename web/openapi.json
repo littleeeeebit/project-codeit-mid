@@ -752,6 +752,20 @@
     "title": "BudgetSnapshot",
     "type": "object"
    },
+   "CancelIn": {
+    "properties": {
+     "run_id": {
+      "description": "The run the screen shows; a cancel naming an earlier run is refused",
+      "title": "Run Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "run_id"
+    ],
+    "title": "CancelIn",
+    "type": "object"
+   },
    "Cancelled": {
     "properties": {
      "status": {
@@ -8278,8 +8292,18 @@
   },
   "/api/verify/maintenance/cancel": {
    "post": {
-    "description": "Cancels the live run: a running re-parse is killed at once, any other step stops at its end.",
+    "description": "Cancels the named live run: a running re-parse is killed at once, any other step stops at its end.",
     "operationId": "cancel_maintenance_api_verify_maintenance_cancel_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CancelIn"
+       }
+      }
+     },
+     "required": true
+    },
     "responses": {
      "200": {
       "content": {
@@ -8290,6 +8314,16 @@
        }
       },
       "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
      }
     },
     "summary": "Cancel Maintenance"

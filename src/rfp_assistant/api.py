@@ -1255,6 +1255,10 @@ class ActivateIn(BaseModel):
     note: str = ""
 
 
+class CancelIn(BaseModel):
+    run_id: str = Field(description="The run the screen shows; a cancel naming an earlier run is refused")
+
+
 class Activated(_Read):
     run_id: str
     mode: str
@@ -1359,9 +1363,9 @@ def _operation_routes(app: FastAPI) -> None:
         return Started(run_id=service.start_maintenance(res, member))
 
     @app.post("/api/verify/maintenance/cancel", response_model=Started)
-    def cancel_maintenance(res: Res, member: Member):
-        """Cancels the live run: a running re-parse is killed at once, any other step stops at its end."""
-        return Started(run_id=service.cancel_maintenance(res, member))
+    def cancel_maintenance(body: CancelIn, res: Res, member: Member):
+        """Cancels the named live run: a running re-parse is killed at once, any other step stops at its end."""
+        return Started(run_id=service.cancel_maintenance(res, member, body.run_id))
 
     @app.get("/api/verify/experiments", response_model=Experiments)
     def experiments(res: Res, member: Member):

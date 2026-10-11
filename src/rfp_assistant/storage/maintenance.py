@@ -477,7 +477,8 @@ def _write(settings: Settings, state: dict) -> None:
 def start_state(actor: str) -> dict:
     """A new run's state; the run is live (it admits a cancel) from here until `run` finishes its steps."""
     now = utcnow()
-    run_id = "M-" + now[:19].replace("-", "").replace(":", "").replace("T", "-")
+    # unique even for two runs in one second, so a cancel naming one run can never match another
+    run_id = "M-" + now[:19].replace("-", "").replace(":", "").replace("T", "-") + "-" + uuid.uuid4().hex[:6]
     with CANCEL_LOCK:
         LIVE.add(run_id)
     return {"run_id": run_id, "actor": actor,

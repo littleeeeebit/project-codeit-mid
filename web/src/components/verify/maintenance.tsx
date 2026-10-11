@@ -107,9 +107,10 @@ export function MaintenanceSection() {
   if (st.error) return <Notice tone="bad">{st.error}</Notice>;
   if (!st.data) return <Skeleton className="h-96 w-full" />;
   const run = st.data.run;
-  const send = (path: "/api/verify/maintenance/start" | "/api/verify/maintenance/cancel") => async () => {
+  // A cancel names the run on screen, so a late or repeated one can never stop the run after it.
+  const send = (go: () => Promise<{ error?: unknown }>) => async () => {
     setState({ busy: true });
-    const { error } = await api.POST(path);
+    const { error } = await go();
     setState(error ? { error: errorText(error) } : {});
     st.reload();
   };
@@ -151,9 +152,9 @@ export function MaintenanceSection() {
           </Notice>
         ) : null}
         <div className="flex flex-wrap items-center gap-4">
-          <Button size="lg" onClick={send("/api/verify/maintenance/start")} disabled={state.busy || st.data.running}>{st.data.running ? "실행 중…" : "유지보수 실행"}</Button>
-          {st.data.running && (
-            <Button size="lg" variant="outline" onClick={send("/api/verify/maintenance/cancel")} disabled={state.busy || st.data.cancelling}>
+          <Button size="lg" onClick={send(() => api.POST("/api/verify/maintenance/start"))} disabled={state.busy || st.data.running}>{st.data.running ? "실행 중…" : "유지보수 실행"}</Button>
+          {st.data.running && run && (
+            <Button size="lg" variant="outline" onClick={send(() => api.POST("/api/verify/maintenance/cancel", { body: { run_id: run.run_id } }))} disabled={state.busy || st.data.cancelling}>
               {st.data.cancelling ? "취소하는 중…" : "취소"}
             </Button>
           )}
