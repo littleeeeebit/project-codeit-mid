@@ -321,6 +321,27 @@ def cmd_stage_review(args, settings) -> int:
     return 0
 
 
+def cmd_error_analysis(args, settings) -> int:
+    from .evaluation import error_analysis
+
+    if args.action == "export":
+        out = error_analysis.export(settings.data_dir)
+        _print({k: out[k] for k in ("export_id", "bundle", "notes")})
+        print(out["prompt"])
+        return 0
+    if not args.file:
+        raise ValueError("error-analysis propose needs --file <proposal.json>")
+    path = Path(args.file)
+    if not path.is_file():
+        raise ValueError(f"no such file: {path}")
+    try:
+        proposal = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError:
+        raise ValueError(f"{path} is not JSON") from None
+    _print(error_analysis.propose(settings.data_dir, proposal))
+    return 0
+
+
 def cmd_draft_activation(args, settings) -> int:
     draft = evaluation.draft_activation(settings, [r.strip() for r in args.runs.split(",") if r.strip()],
                                         Path(args.out), select=args.select)
@@ -832,6 +853,11 @@ def _retrieval_commands(sub) -> None:
     s.add_argument("--approved-by", help="approve: the person approving the estimate")
     s.add_argument("--ledger-dsn-env", help="ocr: environment variable with the DSN of the shared ledger the paid reads "
                                             "settle in (default the corpus database)")
+    s = sub.add_parser("error-analysis", help="free, no database: export the answer notes in no failure type yet with "
+                                             "a prompt for the coding agent, or validate and store its proposal for "
+                                             "the person to decide in the review app")
+    s.add_argument("action", choices=["export", "propose"])
+    s.add_argument("--file", help="propose: the proposal JSON the agent wrote")
 
 
 def _release_commands(sub) -> None:
@@ -1003,7 +1029,7 @@ COMMANDS = {"init": cmd_init, "set-limit": cmd_set_limit, "register-embedding-ra
             "golden-counts": cmd_golden_counts, "judge-set": cmd_judge_set, "run-judges": cmd_run_judges,
             "maintain": cmd_maintain,
             "compare-runs": cmd_compare_runs, "draft-activation": cmd_draft_activation,
-            "stage-review": cmd_stage_review,
+            "stage-review": cmd_stage_review, "error-analysis": cmd_error_analysis,
             "fidelity": cmd_fidelity, "ocr": cmd_ocr, "build-keyword": cmd_build_keyword, "check": cmd_check, "validate-gold": cmd_validate_gold,
             "configure-budget": cmd_configure_budget, "budget-status": cmd_budget_status,
             "budget-report": cmd_budget_report,
@@ -1035,6 +1061,9 @@ def main(argv: list[str] | None = None) -> int:
             # Chunking from an earlier run's frozen inputs reads no database (a Mac teammate's checkout has none).
             os.environ.setdefault("RFP_NO_DATABASE_DSN", "unused")
             return cmd_stage_review(args, load_settings(provider="fake", database_dsn_env="RFP_NO_DATABASE_DSN"))
+        if args.command == "error-analysis":  # files under <data>/review only
+            os.environ.setdefault("RFP_NO_DATABASE_DSN", "unused")
+            return cmd_error_analysis(args, load_settings(provider="fake", database_dsn_env="RFP_NO_DATABASE_DSN"))
         settings = load_settings()
         with store.database_lifecycle(settings.db_path):
             if args.command != "init":

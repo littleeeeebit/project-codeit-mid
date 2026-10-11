@@ -13,12 +13,18 @@ import { ChunkingView } from "@/components/chunking-view";
 import { GenerationView } from "@/components/generation-view";
 import { OcrView } from "@/components/ocr-view";
 import { DecisionPanel } from "@/components/decision-panel";
+import { TaxonomyView } from "@/components/taxonomy-view";
+import { ProgressView } from "@/components/progress-view";
 
 const STAGE = { retriever: "리트리버", chunking: "청킹", generation: "답변 생성", ocr: "OCR" } as const;
+
+/** One run's comparison, or one of the error-analysis screens built from the notes on every run. */
+type Screen = "run" | "taxonomy" | "progress";
 
 export default function Page() {
   const [runs, setRuns] = useState<RunListItem[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [screen, setScreen] = useState<Screen>("run");
   const [view, setView] = useState<RunView | null>(null);
   const [decision, setDecision] = useState<Decision | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -35,16 +41,23 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const wantedScreen = params.get("screen");
+    if (wantedScreen === "taxonomy" || wantedScreen === "progress") setScreen(wantedScreen);
     loadRuns().then((list) => {
-      const wanted = new URLSearchParams(window.location.search).get("run");
+      const wanted = params.get("run");
       setSelected(list.find((r) => r.run_id === wanted)?.run_id ?? list[0]?.run_id ?? null);
     }).catch((e: Error) => setMessage(`실행 목록을 읽지 못했습니다: ${e.message}`));
   }, [loadRuns]);
 
   useEffect(() => {
+    if (screen !== "run") window.history.replaceState(null, "", `?screen=${screen}`);
+    else if (selected) window.history.replaceState(null, "", `?run=${selected}`);
+  }, [screen, selected]);
+
+  useEffect(() => {
     if (!selected) return;
     let live = true;
-    window.history.replaceState(null, "", `?run=${selected}`);
     setView(null);
     Promise.all([getJson<RunView>(`/api/runs/${selected}`), getJson<Decision | null>(`/api/runs/${selected}/decision`)])
       .then(([v, d]) => {
@@ -63,13 +76,16 @@ export default function Page() {
 
   return (
     <div className="flex min-h-screen">
-      <RunRail runs={runs} selected={selected} onSelect={setSelected}
-               onImported={async (id) => { await loadRuns(); setSelected(id); setMessage(""); }}
+      <RunRail runs={runs} selected={screen === "run" ? selected : null} screen={screen} onScreen={setScreen}
+               onSelect={(id) => { setSelected(id); setScreen("run"); }}
+               onImported={async (id) => { await loadRuns(); setSelected(id); setScreen("run"); setMessage(""); }}
                onError={setMessage} />
       <main className="min-w-0 flex-1 px-10 pb-24 pt-8">
         {message && <p role="alert" className="mb-4 rounded-[10px] bg-bad-bg px-4 py-3 text-[14px] text-bad">{message}</p>}
-        {runs && runs.length === 0 && <EmptyState />}
-        {current && view && (
+        {screen === "taxonomy" && <TaxonomyView />}
+        {screen === "progress" && <ProgressView openTaxonomy={() => setScreen("taxonomy")} />}
+        {screen === "run" && runs && runs.length === 0 && <EmptyState />}
+        {screen === "run" && current && view && (
           <>
             <header className="flex flex-wrap items-start gap-4">
               <div className="min-w-0">
@@ -96,15 +112,17 @@ export default function Page() {
             <DecisionPanel key={view.run_id} view={view} notes={notes} initial={decision} onSaved={loadRuns} />
           </>
         )}
-        {selected && !view && !message && <p className="text-muted">불러오는 중…</p>}
+        {screen === "run" && selected && !view && !message && <p className="text-muted">불러오는 중…</p>}
       </main>
     </div>
   );
 }
 
-function RunRail({ runs, selected, onSelect, onImported, onError }: {
+function RunRail({ runs, selected, screen, onScreen, onSelect, onImported, onError }: {
   runs: RunListItem[] | null;
   selected: string | null;
+  screen: Screen;
+  onScreen: (s: Screen) => void;
   onSelect: (id: string) => void;
   onImported: (id: string) => Promise<void>;
   onError: (m: string) => void;
@@ -135,6 +153,16 @@ function RunRail({ runs, selected, onSelect, onImported, onError }: {
         <input ref={input} type="file" accept=".zip,application/zip" className="hidden"
                onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
       </div>
+      <div className="border-b border-line px-3 pb-3">
+        <div className="px-2 text-[13px] font-semibold text-muted">오류 분석 · 모든 실행의 메모</div>
+        {([["taxonomy", "실패 유형"], ["progress", "진행 상황"]] as const).map(([s, label]) => (
+          <button key={s} type="button" onClick={() => onScreen(s)} aria-current={screen === s}
+                  className={`mt-1 block h-10 w-full rounded-[10px] px-3 text-left text-[15px] font-semibold ${screen === s ? "bg-white shadow-sm" : "hover:bg-white/60"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="px-5 pt-3 text-[13px] font-semibold text-muted">비교 실행</div>
       <ol className="flex-1 overflow-y-auto px-3 pb-6">
         {runs?.map((r) => {
           const failed = r.candidates.filter((c) => c.status !== "complete").length;

@@ -1,8 +1,8 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import type { Answer, Candidate, Claim, Evidence, GenerationQuestion, GenerationView as View } from "@/lib/api";
-import { usd } from "@/lib/api";
+import type { Answer, Candidate, Claim, Evidence, GenerationQuestion, GenerationView as View, RunFailures } from "@/lib/api";
+import { getJson, usd } from "@/lib/api";
 import { FACT_STATE, FIELD, label, TYPE, VALIDATION } from "@/lib/labels";
 import { Badge, LedgerLine, Metric, Metrics, NotedList, Segmented, Summaries, columns, useShown } from "./ui";
 import { NoteField } from "./note-field";
@@ -38,6 +38,10 @@ function Answers({ view, notes, setNote, decide }: Notes & { view: View; decide:
   const [at, setAt] = useState(0);
   const { shown: cands, all, picker } = useShown(view.candidates, 2);  // answers are long: two columns at most
   const review = useReview();
+  const [failures, setFailures] = useState<RunFailures | null>(null);
+  useEffect(() => {
+    getJson<RunFailures>(`/api/runs/${view.run_id}/failure-types`).then(setFailures, () => setFailures(null));
+  }, [view.run_id]);
   const differing = view.questions.filter((q) => q.differs).length;
   const shown = filter === "all" ? view.questions : view.questions.filter((q) => q.differs);
   const reading = answersOf(shown, view.candidates);
@@ -55,7 +59,7 @@ function Answers({ view, notes, setNote, decide }: Notes & { view: View; decide:
         설정({view.activation.run_id ?? "기본"} · {view.activation.mode})으로 같고, 후보의 코드와 review-variant.json만
         다릅니다. 비용은 공유 원장의 정산 금액입니다.
       </>}>
-        {(s, c) => <Summary s={s} c={c} reviewed={everyAnswer.filter((r) => r.c.id === c.id)} />}
+        {(s, c) => <Summary s={s} c={c} reviewed={everyAnswer.filter((r) => r.c.id === c.id)} types={failures} />}
       </Summaries>
 
       <section aria-label="질문별 답변" className="mt-10">
@@ -87,7 +91,9 @@ function Answers({ view, notes, setNote, decide }: Notes & { view: View; decide:
   );
 }
 
-function Summary({ s, c, reviewed }: { s: View["summary"][string]; c: Candidate; reviewed: { q: GenerationQuestion }[] }) {
+function Summary({ s, c, reviewed, types }: {
+  s: View["summary"][string]; c: Candidate; reviewed: { q: GenerationQuestion }[]; types: RunFailures | null;
+}) {
   const failures = Object.entries(s.validation_failures);
   const review = useReview();
   const done = reviewed.filter(({ q }) => review.reviewed(q.key, c.id)).length;
@@ -117,6 +123,7 @@ function Summary({ s, c, reviewed }: { s: View["summary"][string]; c: Candidate;
       <p className="text-[14px] tabular-nums">
         사람이 읽은 답변 {done}/{reviewed.length} · <span className={noted ? "font-semibold text-bad" : ""}>메모 달린 답변 {noted}</span>
       </p>
+      {types && types.types.length > 0 && <FailureTypes f={types} c={c} />}
       {s.technical_failures > 0 && (
         <p className="mt-1 text-[13px] text-warn">처리 실패(제공자 오류 등) {s.technical_failures}/{s.answered}</p>
       )}
@@ -127,6 +134,22 @@ function Summary({ s, c, reviewed }: { s: View["summary"][string]; c: Candidate;
       </p>
       <LedgerLine ledger={s.ledger ?? c.ledger} />
     </>
+  );
+}
+
+/** Answers of this candidate with a note of each accepted failure type, over its answers a person reviewed. */
+function FailureTypes({ f, c }: { f: RunFailures; c: Candidate }) {
+  const n = f.reviewed[c.id] ?? 0;
+  const rows = f.types.map((t) => ({ t, k: t.by_candidate[c.id] ?? 0 })).filter((r) => r.k > 0).sort((a, b) => b.k - a.k);
+  return (
+    <div className="mt-2">
+      <div className="text-[13px] font-semibold text-muted">실패 유형 v{f.version} · 검토한 답변 {n}개 중</div>
+      {rows.length === 0 ? <p className="text-[14px] text-muted">해당하는 유형 없음</p> : (
+        <ul className="text-[14px] tabular-nums">
+          {rows.map(({ t, k }) => <li key={t.id} title={t.definition}>{t.name} <b className="text-bad">{k}</b>/{n}</li>)}
+        </ul>
+      )}
+    </div>
   );
 }
 

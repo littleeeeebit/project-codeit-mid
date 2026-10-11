@@ -20,7 +20,7 @@ from ..gateway import budget, generation
 from ..settings import REPO_ROOT, Settings
 from ..storage.postgres import read_snapshot
 from ..storage.store import get_app_setting, open_db, utcnow, write_text_atomic
-from . import evaluation
+from . import error_analysis, evaluation
 
 COPIED_TREES = ("datasets", "sealed", "runs", "releases")
 MAX_COPY_BYTES = 512 * 1024 * 1024  # the mutable trees are small; refuse to copy a mistaken multi-GB folder
@@ -219,6 +219,8 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
     release_manifest["checks"] = structured_checks(hard, quality, ans, served, lat)
     coverage_rep = _coverage_report(manifest_rep, human, identity)
     evaluation_rep = _evaluation_report(validation, frozen, retrieval_runs, answer_runs, sealed_runs, latency, checks)
+    # Beside the gates, never in them: the person's failure types guide the next fix and move no pass line.
+    evaluation_rep["human_error_analysis"] = human = error_analysis.release_summary(settings.data_dir)
     for name, data in (("manifest", release_manifest), ("coverage", coverage_rep), ("evaluation", evaluation_rep),
                        ("budget", _budget_report(snap, db))):
         write_text_atomic(out / f"{name}.json", json.dumps(data, ensure_ascii=False, indent=1, default=str))
@@ -227,6 +229,7 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
     L += _dataset_and_run_lines(validation, frozen, retrieval_runs)
     L += _answer_lines(answer_runs, sealed_runs)
     L += _measurement_lines(latency, checks, hard, quality)
+    L += error_analysis.release_lines(human)
     L += _budget_lines(snap, db)
     L += _walkthrough_and_restore_lines(walkthrough, browser, rid, restore)
     L.append("")
