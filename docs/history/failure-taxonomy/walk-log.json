@@ -1,0 +1,62 @@
+[
+ {
+  "step": "open 실패 유형",
+  "observed": "7 proposed types waiting: 내부 근거 표기 노출, 기준 바꿔 적기, 세부 항목 뭉뚱그림, 모호한 표현, 질문 회피, 처리 실패 문구 노출, 읽기 어려운 형식; button disabled=True (every note is in a proposal)"
+ },
+ {
+  "step": "quoted spans behind a type",
+  "observed": "내부 근거 표기 노출 shows ['“[ E7 ]”', '“(doc: 6a6f639c”', '“(고려대: E1, E7)”']"
+ },
+ {
+  "step": "accept",
+  "observed": "수락된 유형 1개 · v1 · 결정 대기 6개"
+ },
+ {
+  "step": "rename while accepting",
+  "observed": "기준 바꿔 적기 accepted as 기준 금액 바꿔치기"
+ },
+ {
+  "step": "merge",
+  "observed": "세부 항목 뭉뚱그림 + 모호한 표현 -> 흐릿한 요구사항, quotes ['“서약서 제출”', '“문서(문서형태)”']"
+ },
+ {
+  "step": "split",
+  "observed": "읽기 어려운 형식 -> 지나치게 긴 문장 (2 notes) + 특수 문자 섞임 (1 note)"
+ },
+ {
+  "step": "reject and accept the rest",
+  "observed": "질문 회피 rejected with a reason; 처리 실패 문구 노출 accepted; no proposal left"
+ },
+ {
+  "step": "accepted taxonomy",
+  "observed": "수락된 유형 6개 · v5: 내부 근거 표기 노출, 기준 금액 바꿔치기, 흐릿한 요구사항, 지나치게 긴 문장, 특수 문자 섞임, 처리 실패 문구 노출"
+ },
+ {
+  "step": "copy the grouping prompt",
+  "observed": "the rejected type's note is free again; clipboard: Read C:\\Users\\dasdk\\AppData\\Local\\Temp\\taxwalk.COTv\\data\\review\\taxonomy\\exports\\export-20261011T025422Z-d267d…"
+ },
+ {
+  "step": "after reload",
+  "observed": "수락된 유형 6개 · v5"
+ },
+ {
+  "step": "progress (last 20)",
+  "observed": "오류 분석 진행 ·  · 수락된 유형마다 그 유형 메모가 달린 답변 수를 사람이 검토한 답변 수로 나눕니다. 다음에 고칠 것을 고르는 근거이고, 릴리스 기준이나 봉인된 평가 수치가 아닙니다. ·  · 6 · 수락된 유형 (폭) · 21 · 사람이 검토한 답변 · 5 · 최근 20개 검토 답변에서 처음 나온 유형 · 5 · 사례 3개 미만 유형 · 최근 몇 개를 볼까요 · 10개 · 20개 · 50개 ·  · 최근 20개에서 새 유형 5개(지나치게 긴 문장, 흐릿한 요구사항, 기준 금액 바꿔치기, 처리 실패 문구 노출, 특수 문자 섞임)가 나왔습니다. 더 검토하면 유형이 늘 수 있습니다. ·  · "
+ },
+ {
+  "step": "progress (last 10)",
+  "observed": "최근 10개에서 새 유형이 나오지 않았습니다. 유형이 거의 다 모였을 수 있습니다."
+ },
+ {
+  "step": "generation summary column 1",
+  "observed": "사람이 읽은 답변 12/55 · 메모 달린 답변 6 ·  · 실패 유형 v5 · 검토한 답변 12개 중 · 지나치게 긴 문장 2/12 · 내부 근거 표기 노출 1/12 · 특수 문자 섞임 1/12 · 처리 실패 문구 노출 1/12 ·  · "
+ },
+ {
+  "step": "generation summary column 2",
+  "observed": "사람이 읽은 답변 9/55 · 메모 달린 답변 5 ·  · 실패 유형 v5 · 검토한 답변 9개 중 · 내부 근거 표기 노출 2/9 · 흐릿한 요구사항 2/9 · 기준 금액 바꿔치기 1/9 ·  · 처리 실패(제공자 오류 등) 1/55 ·  · "
+ },
+ {
+  "step": "page errors",
+  "observed": "none"
+ }
+]
