@@ -23,6 +23,9 @@ import hashlib
 import json
 import multiprocessing
 import os
+import signal
+import subprocess
+import threading
 import time
 import traceback
 import uuid
@@ -39,9 +42,21 @@ ACTOR_NOTE = "maintenance"
 SCRATCH_PREFIX = "rfp_mrestore_"
 # Tables a no-change rerun still writes (the backup's own audit event); they do not make a new backup necessary.
 VOLATILE_TABLES = ("audit_events",)
-# run_id -> {"by", "at"}: a cancel (`service.cancel_maintenance`) the live run in this process has not reached yet.
-# `run` reads its own entry and drops it when it ends.
+# run_id -> {"by", "at"}: a cancel the live run in this process accepted (`request_cancel`). Under CANCEL_LOCK, a
+# cancel is admitted only while its run is in LIVE, and `run` leaves LIVE and takes its entry in one step, so every
+# admitted cancel is in the run's final state.
 CANCELS: dict[str, dict] = {}
+LIVE: set[str] = set()
+CANCEL_LOCK = threading.Lock()
+
+
+def request_cancel(run_id: str, by: str) -> bool:
+    """Admits a cancel of this live run; False once the run has finished its steps (its outcome is being written)."""
+    with CANCEL_LOCK:
+        if run_id not in LIVE:
+            return False
+        CANCELS.setdefault(run_id, {"by": by, "at": utcnow()})
+        return True
 
 
 class StepFailed(RuntimeError):
@@ -211,6 +226,8 @@ def step_restore_check(settings: Settings, ctx: dict, **_) -> dict:
 def _parse_child(conn, target) -> None:
     """The child process: parses each (settings, src, original) the parent sends and returns the result, or the
     exception with its traceback, through the pipe's pickling (no text decoding, so no filename can break it)."""
+    if os.name != "nt":
+        os.setsid()  # its own process group, so `ParseWorker.close` kills the converter it starts along with it
     conn.send(("ready", None, ""))
     while True:
         try:
@@ -267,8 +284,6 @@ class ParseWorker:
         if self.proc is None:
             ctx = multiprocessing.get_context("spawn")  # never fork the serving process's threads and locks
             self.conn, child = ctx.Pipe()
-            # ponytail: a kill ends the child only; a converter it started (hwp5proc) runs on to its own
-            # converter_timeout_seconds. Kill the process tree if converter hangs show up.
             self.proc = ctx.Process(target=_parse_child, args=(child, self.target), daemon=True,
                                     name="rfp-maintenance-parse")
             self.proc.start()
@@ -278,7 +293,15 @@ class ParseWorker:
         return self._wait(time.monotonic() + self.limit)
 
     def close(self) -> None:
+        """Kills the child with every process it started (a converter's own timeout dies with the child)."""
         if self.proc is not None:
+            if os.name == "nt":  # while the child lives, so its descendants still name it as their parent
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(self.proc.pid)], capture_output=True, timeout=30)
+            else:
+                try:
+                    os.killpg(self.proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
             self.proc.kill()
             self.proc.join(10)
             self.conn.close()
@@ -452,24 +475,31 @@ def _write(settings: Settings, state: dict) -> None:
 
 
 def start_state(actor: str) -> dict:
+    """A new run's state; the run is live (it admits a cancel) from here until `run` finishes its steps."""
     now = utcnow()
-    return {"run_id": "M-" + now[:19].replace("-", "").replace(":", "").replace("T", "-"), "actor": actor,
+    run_id = "M-" + now[:19].replace("-", "").replace(":", "").replace("T", "-")
+    with CANCEL_LOCK:
+        LIVE.add(run_id)
+    return {"run_id": run_id, "actor": actor,
             "started_at": now, "finished_at": None, "status": "running", "stopped_at": None, "reason": None,
             "steps": [{"name": n, "status": "pending", "started_at": None, "finished_at": None, "detail": {},
                        "reason": None} for n in STEPS]}
 
 
-def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: False, cancelled=None,
+def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: False,
         state: dict | None = None) -> dict:
-    """Runs every step in order and writes one report. Stops at the first failed step or paid estimate, or when
-    `cancelled()` returns who cancelled and when ({"by", "at"}; by default this run's entry in `CANCELS`): a
-    running parse is killed, any other step finishes first. Nothing already written is rolled back."""
+    """Runs every step in order and writes one report. Stops at the first failed step or paid estimate, or at a
+    cancel (`request_cancel`): a running parse is killed, any other step finishes first. A cancel admitted during
+    the last step still ends the run `cancelled`. Nothing already written is rolled back."""
     from ..corpus import ingestion
     from ..evaluation import compare
 
     state = state or start_state(actor)
     started = state["started_at"]
-    cancelled = cancelled or (lambda: CANCELS.get(state["run_id"]))
+
+    def cancelled() -> dict | None:
+        return CANCELS.get(state["run_id"])
+
     ingest_step = next(s for s in state["steps"] if s["name"] == "ingest")
 
     def progress(**p) -> None:
@@ -517,6 +547,18 @@ def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: 
         _write(settings, state)
         if state["status"] != "running":
             break
+    with CANCEL_LOCK:  # no cancel is admitted after this, so the one taken here is the last
+        LIVE.discard(state["run_id"])
+        who = CANCELS.pop(state["run_id"], None)
+    if who and not state.get("cancelled_by"):  # admitted after the last check: during the last step, or as it stopped
+        late = f"cancelled by {who['by']} at {who['at']}"
+        if state["status"] == "running":
+            last_step = next(s["name"] for s in reversed(state["steps"]) if s["started_at"])
+            state.update(status="cancelled", stopped_at=last_step, reason=f"{late}, during its last step, which "
+                                                                          "finished")
+        else:
+            state["reason"] = f"{state['reason']}; {late}, as it stopped"
+        state.update(cancelled_by=who["by"], cancelled_at=who["at"])
     serving_after = _serving(settings)
     lost = next((s["detail"].get("needs_evidence_review") for s in state["steps"] if s["name"] == "regression"), None)
     timed_out = ctx.get("timed_out") or []
@@ -541,7 +583,6 @@ def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: 
     write_text_atomic(root(settings) / "reports" / f"{state['run_id']}.json",
                       json.dumps(state, ensure_ascii=False, indent=1))
     write_text_atomic(root(settings) / "reports" / f"{state['run_id']}.md", report_md(state))
-    CANCELS.pop(state["run_id"], None)
     return state
 
 

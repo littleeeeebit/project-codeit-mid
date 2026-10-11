@@ -2518,10 +2518,10 @@ def cancel_maintenance(res: Resources, principal: Principal) -> str:
     from ..storage import maintenance
 
     with _EVAL_LOCK:
-        if not any(t.is_alive() for t in _MAINTENANCE_JOB) or (state := maintenance.last(res.settings) or {}).get(
-                "status") != "running":
+        state = maintenance.last(res.settings) or {}
+        if not (any(t.is_alive() for t in _MAINTENANCE_JOB) and state.get("run_id")
+                and maintenance.request_cancel(state["run_id"], principal.member_id)):
             raise ServiceError("실행 중인 유지보수가 없습니다.")
-        maintenance.CANCELS.setdefault(state["run_id"], {"by": principal.member_id, "at": utcnow()})
     return state["run_id"]
 
 

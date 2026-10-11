@@ -17,6 +17,7 @@ from unittest import mock
 import psycopg
 
 from rfp_assistant.corpus import ingestion
+from rfp_assistant.evaluation import compare
 from rfp_assistant.gateway.generation import FakeTransport
 from rfp_assistant.retrieval.retrieval import KeywordIndex, build_keyword_index
 from rfp_assistant.service import service
@@ -49,6 +50,26 @@ def hang_on(settings, src, original, ref, marker=None, also=()):
         Path(marker).touch()
     while True:
         time.sleep(1)
+
+
+def alive(pid: int) -> bool:
+    """Whether a process runs, without signalling it (os.kill on Windows would terminate it)."""
+    if os.name == "nt":
+        import ctypes
+
+        kernel = ctypes.windll.kernel32
+        handle = kernel.OpenProcess(0x00100000, False, pid)  # SYNCHRONIZE
+        if not handle:
+            return False
+        try:
+            return kernel.WaitForSingleObject(handle, 0) == 0x102  # WAIT_TIMEOUT: still running
+        finally:
+            kernel.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
 
 
 def ingest_with(target, **kw):
@@ -183,6 +204,36 @@ class SequenceTest(unittest.TestCase):
         with store.open_db(self.s.db_path) as conn:
             return conn.execute("SELECT COUNT(DISTINCT active_source_hash) FROM documents").fetchone()[0]
 
+    def test_a_killed_parse_takes_its_converter_with_it(self):
+        # review round 1, F1: the converter's own timeout lives in the killed child, so it must die with it
+        import sys
+
+        pidfile, script = self.root / "converter.pid", self.root / "converter.py"
+        script.write_text(f"import os, time\nopen({str(pidfile)!r}, 'w').write(str(os.getpid()))\n"
+                          "while True:\n    time.sleep(1)\n", encoding="utf-8")
+        if os.name == "nt":
+            converter = self.root / "converter.cmd"
+            converter.write_text(f'@"{sys.executable}" "{script}" %*\n', encoding="utf-8")
+        else:
+            converter = script
+            script.write_text(f"#!{sys.executable}\n" + script.read_text(encoding="utf-8"), encoding="utf-8")
+            script.chmod(0o755)
+        s = dataclasses.replace(self.s, hwp_converter=converter, parse_timeout_seconds=3)
+        original = s.source_dir / "files" / "기관E_재난 관리 시스템.hwp"
+        worker = maintenance.ParseWorker(s)
+        with self.assertRaises(ingestion.ParseTimedOut):
+            worker(s, {"source_hash": ingestion.sha256_file(original), "format": "hwp"}, original)
+        pid = int(pidfile.read_text())
+        try:
+            for _ in range(50):
+                if not alive(pid):
+                    break
+                time.sleep(0.1)
+            self.assertFalse(alive(pid), f"converter {pid} outlived its killed parse")
+        finally:
+            if alive(pid):
+                os.kill(pid, 9)
+
     def start_hanging(self, res):
         """Starts the button's run with one original's parse hanging; returns once that parse is running. The
         patches stay until the test ends, since the run's thread reads them after this returns."""
@@ -227,6 +278,57 @@ class SequenceTest(unittest.TestCase):
                 service._MAINTENANCE_JOB[0].join(10)
             self.assertEqual(maintenance.last(self.s)["run_id"], again)
             self.assertEqual(maintenance.last(self.s)["status"], "complete")
+        finally:
+            res.close()
+
+    def cancel_inside(self, res, **steps):
+        """Starts the button's run with every step reused, cancels it while `golden_counts` (the report step) or a
+        step given as "block" is blocked, releases it and returns the final state."""
+        entered, release = threading.Event(), threading.Event()
+
+        def block(*_, **__):
+            entered.set()
+            self.assertTrue(release.wait(30))
+            return {"status": "reused"}
+
+        def raise_after(exc):
+            def step(*a, **kw):
+                block()
+                raise exc
+            return step
+
+        fakes = {n: reused for n in maintenance.STEP_FUNCTIONS}
+        fakes.update({n: raise_after(f) if isinstance(f, Exception) else f for n, f in steps.items()})
+        golden = compare.golden_counts
+        with mock.patch.dict(maintenance.STEP_FUNCTIONS, fakes), \
+                mock.patch.object(compare, "golden_counts", lambda s: (block(), golden(s))[1]):
+            run_id = service.start_maintenance(res, self.env.verifier)
+            self.assertTrue(entered.wait(30))
+            self.assertEqual(service.cancel_maintenance(res, self.env.verifier), run_id)
+            self.assertTrue(service.maintenance_status(res, self.env.verifier)["cancelling"])
+            release.set()
+            service._MAINTENANCE_JOB[0].join(30)
+        self.assertNotIn(run_id, maintenance.CANCELS)
+        with self.assertRaisesRegex(service.ServiceError, "실행 중인 유지보수가 없습니다"):
+            service.cancel_maintenance(res, self.env.verifier)
+        return maintenance.last(self.s)
+
+    def test_a_cancel_admitted_during_the_last_step_or_as_a_step_stops_is_recorded(self):
+        # review round 1, F2: a cancel accepted after the run's last check must still reach its final state
+        res = service.Resources(self.s, transport=FakeTransport())
+        try:
+            state = self.cancel_inside(res)
+            self.assertEqual((state["status"], state["stopped_at"], state["cancelled_by"]),
+                             ("cancelled", "report", self.env.verifier.member_id))
+            self.assertIn("during its last step", state["reason"])
+            report = (maintenance.root(self.s) / "reports" / f"{state['run_id']}.md").read_text(encoding="utf-8")
+            self.assertIn("**cancelled** at `report`", report)
+            for name, exc, status in (("restore_check", maintenance.StepFailed("no restore"), "failed"),
+                                      ("embedding", maintenance.NeedsApproval({}, "approve e1"), "needs_approval")):
+                state = self.cancel_inside(res, **{name: exc})
+                self.assertEqual((state["status"], state["stopped_at"], state["cancelled_by"]),
+                                 (status, name, self.env.verifier.member_id))
+                self.assertIn(f"{exc}; cancelled by {self.env.verifier.member_id}", state["reason"])
         finally:
             res.close()
 
