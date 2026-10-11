@@ -129,18 +129,19 @@ def read_annotations(root: Path, run_id: str) -> list[dict]:
     return read_jsonl(annotations_file(root, run_id))
 
 
-def approved_suggestions(root: Path) -> set[str]:
-    """Suggestion ids whose approval is committed in history.jsonl."""
-    return {a["suggestion"] for a in read_jsonl(taxonomy_dir(root) / "history.jsonl") if a["op"] == "suggestion-approve"}
+def unconfirmed_suggestions(root: Path) -> set[str]:
+    """Suggestions stored here whose approval is not committed in history.jsonl. A note naming one was written by an
+    approval whose history record then failed. A note naming another store's suggestion came with an imported run,
+    committed where it was approved (export_run leaves the uncommitted ones out), and stays live."""
+    return {s["id"] for s in suggestions(root) if s["status"] != "approved"}
 
 
-def annotation_state(records: list[dict], approved: set[str] | frozenset = frozenset()) -> dict:
+def annotation_state(records: list[dict], unconfirmed: set[str] | frozenset = frozenset()) -> dict:
     """The records folded in order: live notes with their latest text, and answers marked reviewed and fine. A note
-    from a suggestion is live only once its approval is committed (`approved`, from approved_suggestions): one
-    written by an approval whose history record then failed is not shown, counted or kept by a rejection."""
+    from a suggestion in `unconfirmed` (unconfirmed_suggestions) is not shown, counted or kept by a rejection."""
     notes, reviewed = {}, {}
     for r in records:
-        if r["op"] == "note" and r.get("origin") and r.get("suggestion") not in approved:
+        if r["op"] == "note" and r.get("origin") and r.get("suggestion") in unconfirmed:
             continue
         if r["op"] == "note":
             notes[r["id"]] = {k: r[k] for k in ("id", "question", "candidate", "commit", "field", "start", "end",
@@ -189,8 +190,8 @@ def _runs_with_notes(root: Path) -> dict[str, dict]:
     folder = root / "review" / "annotations"
     if not folder.exists():
         return {}
-    approved = approved_suggestions(root)
-    return {p.stem: annotation_state(read_jsonl(p), approved) for p in sorted(folder.glob("*.jsonl"))}
+    unconfirmed = unconfirmed_suggestions(root)
+    return {p.stem: annotation_state(read_jsonl(p), unconfirmed) for p in sorted(folder.glob("*.jsonl"))}
 
 
 def _view(root: Path, run_id: str) -> dict:

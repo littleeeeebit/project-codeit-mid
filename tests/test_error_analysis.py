@@ -332,7 +332,7 @@ class SuggestTest(unittest.TestCase):
         with self.assertRaisesRegex(ea.ReviewInputError, "already rejected that span"):
             sc.suggest(self.root, self.body(("q3", "c1", "30일", {})))
 
-    def test_an_approval_whose_commit_fails_files_no_note(self):
+    def test_an_approval_whose_commit_fails_files_no_note_here_or_where_the_run_is_imported(self):
         sc.suggest(self.root, self.body(("q2", "c1", "10%", {}), ("q3", "c1", "30일", {})))
         first, second = [s["id"] for s in sc.suggestion_queue(self.root, self.type)["pending"]]
         real = sc.append_jsonl
@@ -360,6 +360,17 @@ class SuggestTest(unittest.TestCase):
         live = [n["suggestion"] for n in ea.live_notes(self.root).values() if n.get("origin")]
         self.assertEqual(live, [first])
         self.assertEqual(ea.taxonomy_state(self.root)["accepted"][0]["notes"][-1]["suggestion"], first)
+
+        # another store holds none of these suggestions: the approved note arrives live, the orphan stays behind
+        with tempfile.TemporaryDirectory() as other:
+            dest = Path(other)
+            server.import_run(dest, server.export_run(self.root, RUN))
+            arrived = [r["suggestion"] for r in ea.read_annotations(dest, RUN) if r.get("origin")]
+            filed = [(n["suggestion"], n["approved_by"]) for n in ea.live_notes(dest).values() if n.get("origin")]
+            shown = server.add_annotation(dest, server.read_view(dest, RUN), {
+                "op": "reviewed", "question": "q4", "candidate": "base", "value": True}, "person")["notes"]
+            self.assertEqual((arrived, filed, [n["suggestion"] for n in shown if n.get("origin")]),
+                             ([first], [(first, "approver")], [first]))
 
 
 class RereviewTest(unittest.TestCase):

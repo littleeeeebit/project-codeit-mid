@@ -139,15 +139,21 @@ def list_runs(root: Path) -> list[dict]:
 
 
 def export_run(root: Path, run_id: str) -> bytes:
-    """The run folder, plus its annotations (kept outside the folder) as <run-id>/annotations.jsonl."""
+    """The run folder, plus its annotations (kept outside the folder) as <run-id>/annotations.jsonl. A note left by
+    an approval whose commit failed stays behind: every AI note that leaves was approved here, and is live wherever
+    it is imported, which holds none of this store's suggestions."""
     folder = run_folder(root, run_id)
+    unconfirmed = ea.unconfirmed_suggestions(root)
+    carried = [r for r in read_annotations(root, run_id)
+               if not (r["op"] == "note" and r.get("origin") and r.get("suggestion") in unconfirmed)]
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as z:
         for path in sorted(folder.rglob("*")):
             if path.is_file() and path.name not in (".imported.json", ANNOTATIONS_IN_ZIP):
                 z.write(path, f"{run_id}/{path.relative_to(folder).as_posix()}")
-        if annotations_file(root, run_id).exists():
-            z.write(annotations_file(root, run_id), f"{run_id}/{ANNOTATIONS_IN_ZIP}")
+        if carried:
+            z.writestr(f"{run_id}/{ANNOTATIONS_IN_ZIP}",
+                       "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in carried))
     return buffer.getvalue()
 
 
@@ -305,7 +311,7 @@ def add_annotation(root: Path, view: dict, body: dict, author: str) -> dict:
         existing = read_annotations(root, view["run_id"])
         check_annotations(view, existing + [record])
         _append(root, view["run_id"], [record])
-        return annotation_state(existing + [record], ea.approved_suggestions(root))
+        return annotation_state(existing + [record], ea.unconfirmed_suggestions(root))
 
 
 def git_author() -> str:
@@ -520,7 +526,7 @@ class Handler(BaseHTTPRequestHandler):
                                   {"Content-Disposition": f'attachment; filename="{parts[2]}.zip"'})
             if len(parts) == 4 and parts[3] == "annotations":
                 return self._json(200, self._notes(annotation_state(read_annotations(self.root, folder.name),
-                                                                    ea.approved_suggestions(self.root)), folder.name))
+                                                                    ea.unconfirmed_suggestions(self.root)), folder.name))
             if len(parts) == 4 and parts[3] == "failure-types":
                 return self._json(200, ea.run_counts(self.root, folder.name))
             if len(parts) == 4 and parts[3] == "decision":
