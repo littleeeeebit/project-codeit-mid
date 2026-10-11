@@ -1,1 +1,11 @@
-The `_trace_routes`, `_evaluation_routes`, `_operation_routes` and `_review_routes` groups. Overview (`evaluation_overview` plus `gold_awaiting_second_review`). Frozen retrieval traces (`run_trace`, then `verifier_trace`; `generate_from_run_id` makes one idempotent paid request per run under key `vgen-<run_id>`). Answer evaluation plan and start (`answers.plan_run`, `answers.run_answers`). Judge plan and start. Maintenance status and start. Experiment tables and activation (`activate_experiment`, which reaches `evaluation.activate_decision`). Fidelity overview, page PNG and confirm. Ingestion overview, corrections, history, and gold second review.
+`/api/verify/*` and gold second review:
+- Retrieval traces: `verifier_trace` stores a frozen retrieval-only run in `verifier_runs`. `generate_from_run_id` answers from exactly that frozen evidence under its consented estimate.
+- `compare_verifier_runs`.
+- Answer evaluation: `plan_answer_evaluation` and `start_answer_evaluation`.
+- Judges: `plan_judges`, `start_judges` and their results.
+- Maintenance: `maintenance_status` and `start_maintenance`.
+- Experiments: `experiments`, `experiment_questions` and `activate_experiment`, which goes through `evaluation.activate_decision`.
+- Fidelity: overview, rendered page PNG and `confirm_fidelity`.
+- Ingestion overview, corrections and history.
+
+Starts refuse while the update fence is up or another job of the same kind is alive.

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Candidate, OcrImage, OcrView as View, Read } from "@/lib/api";
 import { usd } from "@/lib/api";
-import { Badge, LedgerLine, Metric, Metrics, NotedList, Segmented, Summaries } from "./ui";
+import { Badge, LedgerLine, Metric, Metrics, NotedList, Segmented, Summaries, useShown } from "./ui";
 import { NoteField } from "./note-field";
 
 const STATUS: Record<Read["status"], [string, "ok" | "warn" | "bad" | "neutral" | "info"]> = {
@@ -19,12 +19,14 @@ const reason = (r: string) => REASON[r] ?? (r.startsWith("unavailable:") ? `디�
 // The image column, then one column per candidate.
 const grid = (n: number) => ({ gridTemplateColumns: `minmax(220px, 320px) repeat(${n}, minmax(260px, 1fr))` });
 
-export function OcrView({ view, notes, setNote }: {
+export function OcrView({ view, notes, setNote, decide }: {
   view: View;
   notes: Record<string, string>;
   setNote: (key: string, note: string) => void;
+  decide: React.ReactNode;
 }) {
   const [filter, setFilter] = useState<"differs" | "all">("differs");
+  const { shown: cands, picker } = useShown(view.candidates, 2);  // beside the image column
   const differing = view.images.filter((i) => i.differs).length;
   const shown = filter === "all" ? view.images : view.images.filter((i) => i.differs);
   return (
@@ -44,13 +46,15 @@ export function OcrView({ view, notes, setNote }: {
           <Segmented value={filter} onChange={setFilter} options={[
             ["differs", `판독이 다른 이미지 ${differing}`], ["all", `전체 ${view.images.length}`],
           ]} />
+          {picker}
           <span className="text-[13px] text-muted">
             <ins className="bg-ok-bg text-ok no-underline">추가</ins> · <del className="bg-bad-bg text-bad">삭제</del> 는 기준 후보의 글과 비교한 글자 차이입니다
           </span>
+          {decide}
         </div>
         {shown.length === 0 && <p className="py-10 text-center text-muted">판독이 다른 이미지가 없습니다.</p>}
         <NotedList items={shown} keyOf={(img) => String(img.n)} notes={notes} setNote={setNote} row={(img, note, set) => (
-          <ImageRow img={img} view={view} note={note} setNote={set} />
+          <ImageRow img={img} view={view} candidates={cands} note={note} setNote={set} />
         )} />
       </section>
     </>
@@ -75,8 +79,8 @@ function Summary({ s, c }: { s: View["summary"][string]; c: Candidate }) {
   );
 }
 
-function ImageRow({ img, view, note, setNote }: {
-  img: OcrImage; view: View; note: string; setNote: (v: string) => void;
+function ImageRow({ img, view, candidates, note, setNote }: {
+  img: OcrImage; view: View; candidates: Candidate[]; note: string; setNote: (v: string) => void;
 }) {
   return (
     <li className="py-8">
@@ -87,7 +91,7 @@ function ImageRow({ img, view, note, setNote }: {
         {img.cached_reasons.length > 0 && <span>캐시 판정: {img.cached_reasons.map(reason).join(", ")}</span>}
       </div>
       <div className="mt-3 overflow-x-auto">
-        <div className="grid gap-5" style={grid(view.candidates.length)}>
+        <div className="grid gap-5" style={grid(candidates.length)}>
           <div className="min-w-0">
             {img.shown ? (
               <a href={`/api/runs/${view.run_id}/images/${img.n}.png`} target="_blank" rel="noreferrer">
@@ -99,7 +103,7 @@ function ImageRow({ img, view, note, setNote }: {
               <p className="rounded-md bg-surface px-3 py-6 text-center text-[13px] text-muted">이 기기에서 그릴 수 없는 이미지</p>
             )}
           </div>
-          {view.candidates.map((c, i) => <ReadColumn key={c.id} c={c} r={img.candidates[c.id]} base={i === 0} />)}
+          {candidates.map((c, i) => <ReadColumn key={c.id} c={c} r={img.candidates[c.id]} base={i === 0} />)}
         </div>
       </div>
       <div className="mt-3"><NoteField value={note} onChange={setNote} /></div>

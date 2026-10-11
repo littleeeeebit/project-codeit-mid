@@ -1,11 +1,10 @@
 created: 2026-10-05 04:06:18.173000+00:00
-updated: 2026-10-10 23:14:59.013000+00:00
-update_count: 34
+updated: 2026-10-11 01:14:55.017000+00:00
+update_count: 36
 last_field: diagram
 kind: nested-class
 title: paid-gateway
 children:
-- admission
 - answer-validation
 - budget-admission
 - budget-ledger
@@ -18,21 +17,19 @@ children:
 - langfuse-tracing
 - ledger
 - openai-transport
+- owner-ledger-cli
 - owner-reconciliation
 - settlement
 - tracing
 - transport
 parentPath: []
-prev_diagram: "graph TD\r\n  reserve-admission[\"reserve() atomic admission\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  dispatch-marker[\"mark_dispatching() guard\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  gateway-owner[\"GatewayOwner advisory lock\\nsrc/rfp_assistant/storage/postgres.py\"\
-  ]\r\n  openai-transport[\"OpenAITransport per-key clients\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\n  settlement[\"settle, release, mark_unknown\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  owner-reconcile[\"reconcile and adjustments\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  langfuse-tracing[\"Langfuse tracing steps\\nsrc/rfp_assistant/gateway/tracing.py\"\
-  ]\r\n  gateway-owner -->|\"owner_guard in each tx\"| reserve-admission\r\n  reserve-admission\
-  \ -->|\"attempt reserved\"| dispatch-marker\r\n  dispatch-marker -->|\"dispatching,\
-  \ then call\"| openai-transport\r\n  gateway-owner -->|\"owner_check before call\"\
-  | openai-transport\r\n  openai-transport -->|\"usage or ProviderError\"| settlement\r\
-  \n  owner-reconcile -->|\"unknown becomes reconciled\"| settlement\r\n  settlement\
-  \ -->|\"usage and cost on span\"| langfuse-tracing"
+prev_diagram: "graph TD\r\n  gateway-lock[\"DB advisory lock GatewayOwner\\nsrc/rfp_assistant/storage/postgres.py\"\
+  ] -->|\"owner_guard in transaction\"| admission[\"Atomic reservation reserve\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  admission -->|\"attempt reserved\"| dispatch-guard[\"Dispatch marker mark_dispatching\\\
+  nsrc/rfp_assistant/gateway/budget.py\"]\r\n  dispatch-guard -->|\"dispatching, then\
+  \ call\"| openai-transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"\
+  ]\r\n  gateway-lock -->|\"owner_check before call\"| openai-transport\r\n  openai-transport\
+  \ -->|\"usage or error\"| settlement[\"Settle, release or unknown\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  openai-transport -->|\"generation observed\"| langfuse-tracing[\"Langfuse\
+  \ tracing\\nsrc/rfp_assistant/gateway/tracing.py\"]\r\n  settlement -->|\"settled\
+  \ cost shown\"| langfuse-tracing"

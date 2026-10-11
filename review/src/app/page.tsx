@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Decision, RunListItem, RunView } from "@/lib/api";
 import { getJson, hostLabel, postJson, short, when } from "@/lib/api";
-import { Badge } from "@/components/ui";
+import { Badge, DecideLink } from "@/components/ui";
 import { RetrieverView } from "@/components/retriever-view";
 import { ChunkingView } from "@/components/chunking-view";
 import { GenerationView } from "@/components/generation-view";
@@ -55,6 +55,7 @@ export default function Page() {
 
   const setNote = useCallback((key: string, note: string) => setNotes((n) => ({ ...n, [key]: note })), []);
   const current = runs?.find((r) => r.run_id === selected);
+  const decide = <DecideLink decided={!!current?.decided} />;
 
   return (
     <div className="flex min-h-screen">
@@ -76,19 +77,17 @@ export default function Page() {
                 </p>
               </div>
               <div className="ml-auto flex items-center gap-3">
-                <a href="#decision" className="h-10 rounded-[10px] bg-primary px-4 text-[14px] font-semibold leading-10 text-white">
-                  {current.decided ? "결정 다시 보기" : "결정하러 가기"}
-                </a>
                 <a href={`/api/runs/${view.run_id}/export`} className="h-10 rounded-[10px] bg-surface px-4 text-[14px] font-semibold leading-10">
                   내보내기 (.zip)
                 </a>
+                {decide}
               </div>
             </header>
             <div className="mt-8">
-              {view.stage === "retriever" && <RetrieverView view={view} notes={notes} setNote={setNote} />}
-              {view.stage === "chunking" && <ChunkingView view={view} notes={notes} setNote={setNote} />}
-              {view.stage === "generation" && <GenerationView view={view} notes={notes} setNote={setNote} />}
-              {view.stage === "ocr" && <OcrView view={view} notes={notes} setNote={setNote} />}
+              {view.stage === "retriever" && <RetrieverView view={view} notes={notes} setNote={setNote} decide={decide} />}
+              {view.stage === "chunking" && <ChunkingView view={view} notes={notes} setNote={setNote} decide={decide} />}
+              {view.stage === "generation" && <GenerationView view={view} notes={notes} setNote={setNote} decide={decide} />}
+              {view.stage === "ocr" && <OcrView view={view} notes={notes} setNote={setNote} decide={decide} />}
             </div>
             <DecisionPanel key={view.run_id} view={view} notes={notes} initial={decision} onSaved={loadRuns} />
           </>
@@ -142,7 +141,7 @@ function RunRail({ runs, selected, onSelect, onImported, onError }: {
                 <div className="flex items-center gap-2">
                   <span className="text-[15px] font-semibold">{STAGE[r.stage]}</span>
                   <span className="text-[13px] text-muted">{when(r.created_at)}</span>
-                  {r.decided && <span className="ml-auto"><Badge tone="ok">결정됨</Badge></span>}
+                  <span className="ml-auto">{r.decided ? <Badge tone="ok">결정됨</Badge> : <Badge>결정 전</Badge>}</span>
                 </div>
                 <div className="mt-0.5 truncate text-[13px] text-muted">
                   {r.candidates.slice(1).map((c) => c.label).join(", ")}

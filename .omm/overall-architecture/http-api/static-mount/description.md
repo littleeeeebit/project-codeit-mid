@@ -1,1 +1,0 @@
-If `web/out` exists, `create_app` mounts it at `/` with `StaticFiles(html=True)`, last, so `/api/*` routes always win. Without a build, the API still serves and the screens are absent. During screen development, `npm run dev` on `:8510` forwards `/api/*` to an API on `:8511`, which is trusted only with `BIDMATE_LOCAL_MEMBER` (`DEV_ORIGINS`).

@@ -28,7 +28,7 @@ export function DevBadge({ ov }: { ov: Overview["evaluation"] }) {
   const v = ov.dev_validation;
   if (!v) return <StatusBadge tone="neutral">검증 기록 없음</StatusBadge>;
   if (!v.ok) return <StatusBadge tone="bad">오류 {v.errors.length}건</StatusBadge>;
-  return v.label === "gold" ? <StatusBadge tone="ok">gold</StatusBadge> : <StatusBadge tone="warn">파일럿(목표 미달)</StatusBadge>;
+  return v.label === "gold" ? <StatusBadge tone="ok">골드(목표 충족)</StatusBadge> : <StatusBadge tone="warn">파일럿(목표 미달)</StatusBadge>;
 }
 
 export function DatasetState({ ov }: { ov: Overview }) {
@@ -40,8 +40,14 @@ export function DatasetState({ ov }: { ov: Overview }) {
       <Section title="개발 데이터셋" aside={<DevBadge ov={e} />}>
         {!v ? <Empty>개발 데이터셋 검증 기록이 없습니다. CLI: validate-gold --dataset dev</Empty> : (
           <>
-            <p className="text-sm text-muted-foreground">
-              {v.rows}문항 · {frozen ? (frozen.current ? "고정됨" : "고정 이후 바뀜") : "고정 전"} · 검증 {stamp(v.validated_at)}
+            <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              {(() => {
+                const short = Object.values(v.targets).filter((x) => !x.met).length;
+                return <span className={cn("text-xl font-bold", short ? "text-warn" : "text-ok")}>{short ? `유형 ${Object.keys(v.targets).length}개 중 ${short}개 목표 미달` : "모든 유형이 목표 충족"}</span>;
+              })()}
+              <span className="text-sm text-muted-foreground">
+                {v.rows}문항 · {frozen ? (frozen.current ? "고정됨" : "고정 이후 바뀜") : "고정 전"} · 검증 {stamp(v.validated_at)}
+              </span>
             </p>
             <Table caption="유형별 목표" head={["유형", "문항", "목표", "충족"]}>
               {Object.entries(v.targets).map(([t, x]) => (
@@ -79,10 +85,10 @@ export function RecentDecisions() {
         <Table caption="최근 검토 결정" head={["질문", "결과", "검토자", "시각", "거절 사유"]}>
           {recent.data.map((r) => (
             <tr key={r.candidate_id}>
-              <td className={cn(td, "font-mono text-xs")}>{r.candidate_id}</td>
+              <td className={cn(td, "max-w-[520px]")} title={r.candidate_id}>{r.question ?? <span className="font-mono text-xs">{r.candidate_id}</span>}</td>
               <td className={td}>{r.status === "approved" ? <StatusBadge tone="ok">승인</StatusBadge> : <StatusBadge tone="bad">거절</StatusBadge>}</td>
-              <td className={td}>{r.decided_by ?? "-"}</td>
-              <td className={cn(td, "whitespace-nowrap tabular-nums")}>{stamp(r.decided_at)}</td>
+              <td className={cn(td, "text-[13px] text-muted-foreground")}>{r.decided_by ?? "-"}</td>
+              <td className={cn(td, "whitespace-nowrap text-[13px] text-muted-foreground tabular-nums")}>{stamp(r.decided_at)}</td>
               <td className={td}>{r.categories.map((c) => label(cats.data ?? {}, c)).join(", ") || "-"}</td>
             </tr>
           ))}
@@ -97,10 +103,7 @@ export function WaitingRow({ w, active, onOpen }: { w: Waiting; active: boolean;
     <button type="button" onClick={onOpen} aria-current={active || undefined}
             className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none hover:bg-secondary/70 focus-visible:ring-3 focus-visible:ring-ring/50",
               active && "bg-accent hover:bg-accent")}>
-      <span className="min-w-0 flex-1">
-        <span className="block text-base font-semibold">{w.question}</span>
-        <span className="font-mono text-xs text-muted-foreground">{w.candidate_id}</span>
-      </span>
+      <span className="min-w-0 flex-1 text-base font-semibold" title={w.candidate_id}>{w.question}</span>
       <StatusBadge tone="info">2차 검토</StatusBadge>
     </button>
   );
@@ -124,8 +127,7 @@ export function SecondReviewDetail({ w, onDone }: { w: Waiting; onDone: () => vo
     <article className="space-y-6">
       <header className="space-y-2">
         <StatusBadge tone="info" size="md">2차 검토 대기</StatusBadge>
-        <h3 className="text-lg font-bold leading-snug">{w.question}</h3>
-        <p className="font-mono text-xs text-muted-foreground">{w.candidate_id}</p>
+        <h3 className="text-lg font-bold leading-snug" title={w.candidate_id}>{w.question}</h3>
       </header>
       <ClaimsAndEvidence w={w} />
       <form onSubmit={submit} className="space-y-4 rounded-2xl bg-secondary/60 p-4">
@@ -153,12 +155,11 @@ function ClaimsAndEvidence({ w }: { w: Waiting }) {
   return (
     <>
       <Section title={`필수 주장 ${w.required_claims.length}개`}>
-        <Table caption="필수 주장" head={["주장", "형식", "값", "중요도", "근거 그룹"]}>
+        <Table caption="필수 주장" head={["값", "형식", "중요도", "근거 그룹"]}>
           {w.required_claims.map((c, i) => (
             <tr key={c.claim_id ?? i}>
-              <td className={cn(td, "font-mono text-xs")}>{c.claim_id}</td>
+              <td className={cn(td, "font-medium")} title={c.claim_id ?? undefined}>{Object.entries(c.match).filter(([k]) => k !== "type").map(([, v]) => String(v)).join(" · ")}</td>
               <td className={td}>{label(MATCH, String(c.match.type ?? ""))}</td>
-              <td className={td}>{Object.entries(c.match).filter(([k]) => k !== "type").map(([, v]) => String(v)).join(" · ")}</td>
               <td className={td}>{c.critical_kind ? <StatusBadge tone="warn">{label(CRITICAL, c.critical_kind)}</StatusBadge> : "보통"}</td>
               <td className={td}>{c.support_groups.join(", ")}</td>
             </tr>

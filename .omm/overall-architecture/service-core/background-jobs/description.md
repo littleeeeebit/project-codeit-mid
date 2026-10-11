@@ -1,1 +1,6 @@
-`start_drafting`, `start_answer_evaluation`, `start_judges` and `start_maintenance` each publish their run (a file or state row) before returning. They start one daemon thread from `contextvars.copy_context()`, so the starting member's key session pays, and register it in `res._jobs`, which `close()` joins. Each kind runs one at a time (`_DRAFT_JOBS`, `_EVAL_JOBS`/`_JUDGE_JOBS` under `_EVAL_LOCK`, `_MAINTENANCE_JOB`) and refuses while closed, keyless or fenced. Failures are written as `error.txt`, `interrupted.txt` or `last-error.txt` in the run directory, and the overview reads them back. Finished paid rows stay settled, and rerunning resumes.
+Daemon threads started from the 검증 and 데이터셋 screens on the serving process's own gateway:
+- `start_drafting` runs gpt-6-luna drafting through `drafting._generate`, within the consented maximum, charged to `gold_eval`.
+- `start_answer_evaluation` and `start_judges` run evaluation work.
+- `start_maintenance` runs `storage.maintenance.run`.
+
+Each start checks the update fence and whether a job of its kind is already alive, then appends the thread to `res._jobs`. Results go to files under `.runtime` (drafts, maintenance state). An exception becomes `error.txt`; during shutdown it becomes `interrupted.txt`.

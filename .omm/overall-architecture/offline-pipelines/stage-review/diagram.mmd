@@ -1,7 +1,0 @@
-graph TD
-  stage-runner["stage-review run\nsrc/rfp_assistant/evaluation/stage_review.py"] -->|"git worktree per ref"| ref-worktrees["Detached ref worktrees\nsrc/rfp_assistant/evaluation/stage_review.py"]
-  stage-runner -->|"isolated worker subprocess"| review-worker["Candidate worker\nsrc/rfp_assistant/evaluation/stage_review_worker.py"]
-  ref-worktrees -->|"ref package code"| review-worker
-  stage-runner -->|"generation, ocr estimates"| paid-approval["Estimate, approve, resume\nsrc/rfp_assistant/evaluation/stage_review_paid.py"]
-  review-worker -->|"candidates, view.json"| review-server["Local review app\nreview/server.py"]
-  review-server -->|"writes person's pick"| decision-files["Decision files\nreview/server.py"]

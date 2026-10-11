@@ -1,0 +1,1 @@
+Final cost from the reported usage at the reserved rates. A settlement above the reservation freezes the whole ledger (`frozen_reason`). Settling a reconciled attempt writes a negative late-settlement adjustment so the provider total is not counted twice.

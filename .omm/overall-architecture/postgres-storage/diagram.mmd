@@ -1,8 +1,6 @@
 graph TD
-  corpus-tables["sources, documents, extractions, elements\nsrc/rfp_assistant/storage/store.py"] -->|"active extraction"| index-tables["indexes, chunks, requirements\nsrc/rfp_assistant/storage/store.py"]
-  index-tables -->|"chunk foreign key"| vector-tables["embedding payloads, sets, rows\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  app-settings["app_settings, activations\nsrc/rfp_assistant/storage/store.py"] -->|"active_run, active_index"| index-tables
-  request-tables["requests, verifier_runs\nsrc/rfp_assistant/storage/store.py"] -->|"attempts.request_id"| ledger-tables["attempts, adjustments, budget_settings\nsrc/rfp_assistant/storage/store.py"]
-  review-tables["reviews, fidelity, gold, audit\nsrc/rfp_assistant/storage/store.py"] -->|"review_status updates"| corpus-tables
-  runtime-files["Runtime artifacts .runtime\nsrc/rfp_assistant/settings.py"] -->|"artifact paths, hashes"| corpus-tables
-  runtime-files -->|"index manifests"| index-tables
+  validation-gate["Import validation gate\nstorage/postgres.py (require_imported_database)"] -->|startup allowed| application-mutex["Write mutex\npostgres.py (tx immediate)"]
+  application-mutex -->|serialized writes| request-tables["Request tables\nstorage/store.py (requests, verifier_runs)"]
+  application-mutex -->|serialized writes| ledger-tables["Ledger tables\nstore.py (attempts, adjustments, budget_settings)"]
+  application-mutex -->|serialized writes| corpus-tables["Corpus tables\nstore.py (sources, extractions, chunks, indexes)"]
+  corpus-tables -->|manifest and artifact paths| runtime-files["Runtime files\n.runtime (RFP_DATA_DIR)"]

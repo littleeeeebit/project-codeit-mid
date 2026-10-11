@@ -1,0 +1,9 @@
+created: 2026-10-11T01:15:02.751Z
+updated: 2026-10-11T01:15:02.752Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: decision-files
+children: []
+parentPath:
+  - stage-review-app

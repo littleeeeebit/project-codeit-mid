@@ -1,1 +1,10 @@
-`sources` (one row per original's SHA-256: format, original path, active extraction, `parse_status` pending/parsed/quarantined, `review_status`, reason, warnings). `documents` (one per CSV row: filename, active source hash, raw, normalized and quality metadata; byte-identical files share a source). `extractions` (immutable revisions: parser fingerprint, artifact path, recovery record). `elements` (ordered element rows with raw text, search text, location and table JSON). Also `extraction_inputs` (the reuse key per source) and `metadata_resolutions`.
+Corpus tables:
+- `sources`: one row per unique original hash, with parse and review status, active extraction and quarantine reason.
+- `documents`: CSV associations, with byte-identical files sharing a source.
+- `extractions` and `elements`: parser output revisions.
+- `extraction_inputs`: the reuse key per source.
+- `fidelity_checks` and `reviews`.
+- `metadata_resolutions`.
+- `indexes`, `chunks` and `requirements`.
+- `gold_candidates` and `gold_reviews`.
+- `embedding_estimates` and `eval_estimates`.

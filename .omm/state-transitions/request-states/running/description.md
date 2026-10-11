@@ -1,0 +1,1 @@
+Set by `run_queued`; free modes are created directly as running. `cancel_request` on a running request only sets `cancel_requested = 1`. The next `_checkpoint` or dispatch guard raises `_Stop('cancelled')`, while a call already in flight still settles.

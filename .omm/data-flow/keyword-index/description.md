@@ -1,1 +1,0 @@
-`indexes/<version>/` holds `chunks.jsonl` (spans back to element IDs and offsets, payload, body, token count, chunk type, requirement key, linked siblings), `tokens.jsonl`, `requirements.jsonl`, `scope-terms.json` and a hashed `manifest.json`, mirrored in the `chunks` and `requirements` tables. `KeywordIndex.load` re-verifies every hash before serving.

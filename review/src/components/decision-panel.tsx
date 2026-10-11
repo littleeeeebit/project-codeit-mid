@@ -17,10 +17,12 @@ export function DecisionPanel({ view, notes, initial, onSaved }: {
   const [reasons, setReasons] = useState<Record<string, string>>(
     Object.fromEntries((initial?.candidates ?? []).map((c) => [c.id, c.reason ?? ""])));
   const [saved, setSaved] = useState<Saved | null>(null);
+  const [kept, setKept] = useState(initial ? (initial.chosen ?? NONE) : "");  // the choice the decision file holds
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const missing = candidates.filter((c) => c.status === "complete" && c.id !== chosen && !(reasons[c.id] ?? "").trim());
   const noteCount = Object.values(notes).filter((v) => v.trim()).length;
+  const recorded = kept === NONE ? "선택하지 않음 · 기준 유지" : `${candidates.find((c) => c.id === kept)?.label ?? kept} 남김`;
 
   async function save() {
     setError("");
@@ -29,6 +31,7 @@ export function DecisionPanel({ view, notes, initial, onSaved }: {
       setSaved(await postJson<Saved>(`/api/runs/${view.run_id}/decision`, JSON.stringify({
         chosen: chosen === NONE ? null : chosen, reasons, notes,
       })));
+      setKept(chosen);
       onSaved();
     } catch (e) {
       setError((e as Error).message);
@@ -42,8 +45,11 @@ export function DecisionPanel({ view, notes, initial, onSaved }: {
   }
 
   return (
-    <section id="decision" aria-labelledby="decision-title" className="mt-14 border-t-2 border-ink pt-6">
+    <section id="decision" aria-labelledby="decision-title" className="mt-14 scroll-mt-6 border-t-2 border-ink pt-6">
       <h2 id="decision-title" className="text-[22px] font-bold">결정</h2>
+      <p className={`mt-2 text-[18px] font-semibold ${kept ? "text-ok" : "text-warn"}`}>
+        {kept ? `기록된 결정: ${recorded}` : "아직 결정하지 않았습니다"}
+      </p>
       <p className="mt-1 text-[14px] text-muted">
         후보 하나를 고르거나 고르지 않습니다. 고르지 않은 후보마다 이유를 적으면 결정 파일과 에이전트용 문장이 만들어집니다.
       </p>

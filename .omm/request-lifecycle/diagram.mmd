@@ -1,10 +1,9 @@
 graph TD
-  ask-route["POST /api/ask\nsrc/rfp_assistant/api.py"] -->|"scope, question, mode"| admission["Validate and persist\nsrc/rfp_assistant/service/service.py"]
-  admission -->|"queued row, slot held"| worker-claim["Executor claim run_queued\nsrc/rfp_assistant/service/service.py"]
-  worker-claim -->|"follow-up with history"| query-rewrite["Standalone query rewrite\nsrc/rfp_assistant/service/service.py"]
-  worker-claim -->|"first turn"| retrieve-and-price["Retrieve and price prompt\nsrc/rfp_assistant/service/service.py"]
-  query-rewrite -->|"rewritten question"| retrieve-and-price
-  retrieve-and-price -->|"messages, estimate"| metered-generation["Metered streamed generation\nsrc/rfp_assistant/service/service.py"]
-  metered-generation -->|"response"| validate-and-finish["Validate citations, finish\nsrc/rfp_assistant/service/service.py"]
-  metered-generation -->|"partials over SSE"| screen-polling["Poll status and stream\nweb/src/components/ask/ask-page.tsx"]
-  validate-and-finish -->|"result_json, billing state"| screen-polling
+  ask-route["POST /api/ask\nsrc/rfp_assistant/api.py"] -->|validated AskIn| submit-answer["submit_answer\nservice/service.py"]
+  submit-answer -->|queued row, slot admitted| request-runner["Worker claim\nservice.py (run_queued)"]
+  request-runner -->|claimed running| paid-answer["Paid answer\nservice.py (_paid_answer)"]
+  paid-answer -->|question, scope, limits| retrieve-evidence["Retrieve and price\nservice.py (retrieve, _priced)"]
+  retrieve-evidence -->|messages and estimate| metered-chat["Metered call\nservice.py (_metered_chat)"]
+  metered-chat -->|provider response| validate-finish["Validate and finish\nservice.py (_validated, _finish)"]
+  metered-chat -->|partial text| status-and-stream["Status poll and SSE\napi.py (request, stream)"]
+  validate-finish -->|result_json stored| status-and-stream

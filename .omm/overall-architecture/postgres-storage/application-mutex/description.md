@@ -1,0 +1,1 @@
+`tx(conn, immediate=True)` locks `application_mutex` row 1 (`FOR UPDATE`) at the start of every writing transaction. This includes request creation and idempotency, admission, dispatch, settle, cancel, activation, ingestion and index records. It makes idempotency-key checks and cap arithmetic race-free.

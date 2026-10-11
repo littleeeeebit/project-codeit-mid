@@ -1169,6 +1169,7 @@ class VerificationEvent(_Read):
 
 class Decided(_Read):
     candidate_id: str
+    question: str | None = None
     status: str
     decided_by: str | None = None
     decided_at: str | None = None

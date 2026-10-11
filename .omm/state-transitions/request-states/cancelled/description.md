@@ -1,0 +1,1 @@
+Reached from queued directly, or from running via `_Stop` or `_finish`'s cancel conversion. A cancelled request's result never attaches (`may_attach`), and the SSE partial is withdrawn with `data: null`.

@@ -1,12 +1,12 @@
 graph TD
-  web-screens["Next.js screens\nweb/src"] -->|"fetch /api, SSE stream"| http-api["FastAPI app\nsrc/rfp_assistant/api.py"]
-  http-api -->|"one service call per route"| service-core["Service core\nsrc/rfp_assistant/service/service.py"]
-  http-api -->|"hub OAuth code exchange"| external-services["OpenAI, Langfuse, JupyterHub, GitHub\nsrc/rfp_assistant/gateway/generation.py"]
-  service-core -->|"retrieve evidence"| retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  service-core -->|"reserve, call, settle"| paid-gateway["Paid gateway\nsrc/rfp_assistant/gateway/budget.py"]
-  service-core -->|"request rows, audit"| postgres-storage["PostgreSQL and pgvector\nsrc/rfp_assistant/storage/store.py"]
-  retrieval-engine -->|"index rows, vector search"| postgres-storage
-  paid-gateway -->|"ledger transactions"| postgres-storage
-  paid-gateway -->|"chat, embeddings, traces"| external-services
-  offline-pipelines["Owner CLI pipelines\nsrc/rfp_assistant/cli.py"] -->|"build, evaluate, activate"| postgres-storage
-  offline-pipelines -->|"paid steps through"| paid-gateway
+  web-screens["Next.js screens\nweb/src"] -->|fetch JSON, SSE stream| http-api["FastAPI app\nsrc/rfp_assistant/api.py"]
+  http-api -->|one service call per route| service-core["Service core\nsrc/rfp_assistant/service/service.py"]
+  service-core -->|retrieve under activation| retrieval-engine["Retrieval engine\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  service-core -->|reserve, dispatch, settle| paid-gateway["Paid gateway\nsrc/rfp_assistant/gateway/budget.py"]
+  retrieval-engine -->|reads index and vectors| postgres-storage["PostgreSQL and runtime files\nsrc/rfp_assistant/storage/store.py"]
+  paid-gateway -->|attempt ledger rows| postgres-storage
+  service-core -->|maintenance thread runs| corpus-pipeline["Corpus pipeline\nsrc/rfp_assistant/corpus/ingestion.py"]
+  corpus-pipeline -->|extractions, chunks, indexes| postgres-storage
+  evaluation-selection["Evaluation and selection\nsrc/rfp_assistant/evaluation/evaluation.py"] -->|answer runs via service.answer| service-core
+  evaluation-selection -->|activate sets active_run| postgres-storage
+  stage-review-app["Stage review app\nreview/server.py"] -->|CLI freezes serving inputs| postgres-storage

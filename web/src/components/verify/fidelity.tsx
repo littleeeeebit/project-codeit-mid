@@ -73,12 +73,12 @@ function FidelityHeader({ s }: { s: Source }) {
         <StatusBadge tone={REVIEW_TONE[s.review_status] ?? "neutral"} size="md">{label(REVIEW, s.review_status)}</StatusBadge>
         <h3 className="text-lg font-bold leading-snug">{s.filename}</h3>
         {m ? (
-          <dl className="grid grid-cols-2 gap-4 rounded-xl border border-input p-4 text-sm sm:grid-cols-4">
-            {([["확인할 곳", s.findings.length], ["전체 쪽", m.pages], ["추출에만 있는 글자", m.extraction_unmatched],
-              ["인쇄본에만 있는 글자", m.rendering_unmatched]] as const).map(([k, v]) => (
-              <div key={k}><dt className="text-xs text-muted-foreground">{k}</dt><dd className="font-semibold tabular-nums">{Number(v).toLocaleString("ko-KR")}</dd></div>
-            ))}
-          </dl>
+          <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <span className="text-xl font-bold tabular-nums">확인할 곳 {s.findings.length.toLocaleString("ko-KR")}</span>
+            <span className="text-[13px] text-muted-foreground tabular-nums">
+              전체 {m.pages.toLocaleString("ko-KR")}쪽 · 추출에만 있는 글자 {m.extraction_unmatched.toLocaleString("ko-KR")} · 인쇄본에만 있는 글자 {m.rendering_unmatched.toLocaleString("ko-KR")}
+            </span>
+          </p>
         ) : <Notice tone="warn">아직 자동 대조 전입니다. CLI: python -m rfp_assistant.cli fidelity run</Notice>}
         {!!m?.image_pages.length && (
           <details className="text-[13px] text-muted-foreground"><summary className="min-h-8 cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-ring/50">그림 포함 {m.image_pages.length}쪽 · 그림 속 글자는 대조 범위 밖</summary><p className="pt-2">{m.image_pages.join(", ")}</p></details>

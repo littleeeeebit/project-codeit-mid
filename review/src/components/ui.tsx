@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import type { Candidate } from "@/lib/api";
 import { hostLabel, short } from "@/lib/api";
 
@@ -40,6 +40,17 @@ export function Segmented<T extends string>({ value, onChange, options }: {
   );
 }
 
+/** The decision, one click away: in the page header and at the end of every sticky toolbar, so it is reachable from
+ *  any question, and saying whether the run still waits for one. */
+export function DecideLink({ decided }: { decided: boolean }) {
+  return (
+    <a href="#decision" className={`ml-auto flex h-10 shrink-0 items-center gap-2 rounded-[10px] px-3 text-[14px] font-semibold ${decided ? "bg-surface text-ink" : "bg-primary text-white"}`}>
+      <span className={`rounded-md px-1.5 text-[13px] ${decided ? "bg-ok-bg text-ok" : "bg-white/20"}`}>{decided ? "결정됨" : "결정 전"}</span>
+      {decided ? "결정 다시 보기" : "결정하러 가기"}
+    </a>
+  );
+}
+
 /** A stopped paid candidate keeps what it finished: shown with its reason, never as a complete result. */
 export function Stopped({ c }: { c: Candidate }) {
   if (c.status !== "stopped") return null;
@@ -68,10 +79,10 @@ export function CandidateHead({ c }: { c: Candidate }) {
         <span className="truncate text-[15px] font-bold" title={c.ref}>{c.label}</span>
         {c.role === "baseline" && <Badge tone="info">기준</Badge>}
       </div>
-      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-muted">
+      <div className="mt-0.5 truncate text-[13px] text-muted" title={hostLabel(c.host)}>
         <code title={c.commit}>{short(c.commit)}</code>
-        <span>{hostLabel(c.host)}</span>
-        {c.variant && <span title={JSON.stringify(c.variant)}>설정 변경</span>}
+        {c.variant && <span title={JSON.stringify(c.variant)}> · 설정 변경</span>}
+        {" "}· {hostLabel(c.host)}
       </div>
     </div>
   );
@@ -86,7 +97,26 @@ export function Failure({ c }: { c: Candidate }) {
   );
 }
 
-export const columns = (n: number) => ({ gridTemplateColumns: `repeat(${n}, minmax(280px, 1fr))` });
+/** n equal columns that never shrink below `min`; past that the row scrolls sideways instead of squeezing text. */
+export const columns = (n: number, min = 280) => ({ gridTemplateColumns: `repeat(${n}, minmax(${min}px, 1fr))` });
+
+/** Which candidates the per-item rows show. Up to `fit` candidates sit side by side; past that the rows show the
+ *  baseline beside one picked candidate, or all of them at a readable minimum width with sideways scrolling. */
+export function useShown(candidates: Candidate[], fit: number) {
+  const [pick, setPick] = useState(candidates.length > fit ? candidates[1]?.id ?? "all" : "all");
+  const shown = pick === "all" ? candidates : candidates.filter((c) => c.role === "baseline" || c.id === pick);
+  const picker = candidates.length > fit && (
+    <label className="flex items-center gap-2 text-[14px]">
+      <span className="font-medium text-muted">나란히 볼 후보</span>
+      <select value={pick} onChange={(e) => setPick(e.target.value)}
+              className="h-9 max-w-[320px] rounded-[10px] border border-line bg-white px-2 text-[14px]">
+        {candidates.filter((c) => c.role === "candidate").map((c) => <option key={c.id} value={c.id}>기준 대 {c.label}</option>)}
+        <option value="all">모두 {candidates.length}개 (옆으로 넘기기)</option>
+      </select>
+    </label>
+  );
+  return { shown, all: pick === "all", picker };
+}
 
 /** Every candidate's results side by side under its head, and what makes them comparable underneath. A candidate
  *  without results shows why instead; a stopped paid one shows what it finished. */
@@ -98,7 +128,7 @@ export function Summaries<S>({ candidates, summary, note, children }: {
 }) {
   return (
     <section aria-label="후보별 결과" className="overflow-x-auto">
-      <div className="grid gap-4" style={columns(candidates.length)}>
+      <div className="grid gap-4" style={columns(candidates.length, 200)}>
         {candidates.map((c) => {
           const s = summary[c.id];
           return (

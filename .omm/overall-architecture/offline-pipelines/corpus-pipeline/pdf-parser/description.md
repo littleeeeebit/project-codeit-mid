@@ -1,1 +1,0 @@
-`parse_pdf` (PyMuPDF) extracts page blocks with labels and columns. `ocr.merge` places each image's OCR text next to the original text around it, found through anchors.

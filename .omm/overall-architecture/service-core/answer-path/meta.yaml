@@ -1,9 +1,0 @@
-created: 2026-10-10T23:14:56.628Z
-updated: 2026-10-10T23:14:56.629Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: answer-path
-children: []
-parentPath:
-  - service-core

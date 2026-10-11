@@ -1,0 +1,9 @@
+created: 2026-10-11T01:14:58.311Z
+updated: 2026-10-11T01:14:58.313Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: ingest
+children: []
+parentPath:
+  - corpus-pipeline

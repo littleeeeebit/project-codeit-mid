@@ -3,7 +3,8 @@
 import { Fragment, useState } from "react";
 import type { Answer, Candidate, Claim, Evidence, GenerationQuestion, GenerationView as View } from "@/lib/api";
 import { usd } from "@/lib/api";
-import { Badge, LedgerLine, Metric, Metrics, NotedList, Segmented, Summaries, columns } from "./ui";
+import { FACT_STATE, FIELD, label, TYPE, VALIDATION } from "@/lib/labels";
+import { Badge, LedgerLine, Metric, Metrics, NotedList, Segmented, Summaries, columns, useShown } from "./ui";
 import { NoteField } from "./note-field";
 
 const OUTCOME: Record<string, string> = {
@@ -11,17 +12,19 @@ const OUTCOME: Record<string, string> = {
   conflicting_evidence: "근거 충돌", technical_error: "답변 거부됨", ingestion_unavailable: "문서 없음",
   budget_blocked: "예산 거절",
 };
-const VERDICT: Record<string, [string, "ok" | "warn" | "bad" | "neutral"]> = {
-  correct: ["정답", "ok"], wrong_value: ["값 틀림", "bad"], contested: ["상충", "warn"],
-  incomplete_qualifier: ["조건 빠짐", "warn"], missing: ["누락", "bad"], needs_review: ["검토 필요", "neutral"],
+const VERDICT: Record<string, [string, string]> = {
+  correct: ["정답", "text-ok"], wrong_value: ["값 틀림", "text-bad"], contested: ["상충", "text-warn"],
+  incomplete_qualifier: ["조건 빠짐", "text-warn"], missing: ["누락", "text-bad"], needs_review: ["검토 필요", "text-muted"],
 };
 
-export function GenerationView({ view, notes, setNote }: {
+export function GenerationView({ view, notes, setNote, decide }: {
   view: View;
   notes: Record<string, string>;
   setNote: (key: string, note: string) => void;
+  decide: React.ReactNode;
 }) {
   const [filter, setFilter] = useState<"differs" | "all">("differs");
+  const { shown: cands, all, picker } = useShown(view.candidates, 2);  // answers are long: two columns at most
   const differing = view.questions.filter((q) => q.differs).length;
   const shown = filter === "all" ? view.questions : view.questions.filter((q) => q.differs);
   return (
@@ -41,12 +44,14 @@ export function GenerationView({ view, notes, setNote }: {
           <Segmented value={filter} onChange={setFilter} options={[
             ["differs", `결과가 다른 질문 ${differing}`], ["all", `전체 ${view.questions.length}`],
           ]} />
+          {picker}
+          {decide}
         </div>
         {shown.length === 0 && (
           <p className="py-10 text-center text-muted">결과가 다른 질문이 없습니다. &apos;전체&apos;에서 답변을 봅니다.</p>
         )}
         <NotedList items={shown} keyOf={(q) => q.key} notes={notes} setNote={setNote} row={(q, note, set) => (
-          <QuestionRow q={q} candidates={view.candidates} note={note} setNote={set} />
+          <QuestionRow q={q} candidates={cands} all={all} note={note} setNote={set} />
         )} />
       </section>
     </>
@@ -66,25 +71,25 @@ function Summary({ s, c }: { s: View["summary"][string]; c: Candidate }) {
         <Metric value={`${s.validation_failed}/${s.answered}`} label="검증에서 거부된 답변"
                 tone={s.validation_failed ? "text-bad" : ""} />
       </Metrics>
-      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 text-[14px] tabular-nums">
-        {/* Support is decided only by a verbatim quote or a review, so the unjudged rest is shown, not hidden. */}
-        <dt className="text-muted">주장 {s.claims}개</dt>
-        <dd>
-          원문 그대로 인용 {s.claims_supported} · <span className={s.claims_rejected ? "text-bad" : ""}>근거 아님 {s.claims_rejected}</span>
-          {" "}· 사람 확인 필요 {s.claims - s.claims_supported - s.claims_rejected}
-        </dd>
-        <dt className="text-muted">열리지 않는 인용</dt><dd>{s.links_invalid}/{s.links}</dd>
-        <dt className="text-muted">비용</dt><dd>{usd(s.cost_micro_usd)} · 유료 답변 {s.paid_answers}개</dd>
-        <dt className="text-muted">지연</dt>
-        <dd>p50 {sec(s.latency_ms.p50)} · p95 {sec(s.latency_ms.p95)} · 측정 {s.latency_ms.n}/{s.answered}개</dd>
-      </dl>
       {failures.length > 0 && (
-        <p className="mt-2 text-[13px] text-bad">{failures.map(([code, n]) => `${code} ${n}`).join(" · ")}</p>
+        <ul className="mt-2 text-[13px] leading-snug text-bad">
+          {failures.map(([code, n]) => <li key={code} title={code}>{label(VALIDATION, code)} {n}</li>)}
+        </ul>
       )}
+      {/* Support is decided only by a verbatim quote or a review, so the unjudged rest is shown, not hidden. */}
+      <p className="mt-3 text-[14px] tabular-nums">
+        주장 {s.claims}개: 원문 그대로 인용 {s.claims_supported} · <span className={s.claims_rejected ? "text-bad" : ""}>근거 아님 {s.claims_rejected}</span>
+        {" "}· 사람 확인 필요 {s.claims - s.claims_supported - s.claims_rejected}
+      </p>
+      <p className="text-[14px] tabular-nums">열리지 않는 인용 {s.links_invalid}/{s.links}</p>
       {s.technical_failures > 0 && (
         <p className="mt-1 text-[13px] text-warn">처리 실패(제공자 오류 등) {s.technical_failures}/{s.answered}</p>
       )}
       {s.not_done > 0 && <p className="mt-1 text-[13px] text-warn">답하지 못한 질문 {s.not_done}개</p>}
+      <p className="mt-2 text-[13px] tabular-nums text-muted">
+        {usd(s.cost_micro_usd)} · 유료 답변 {s.paid_answers}개 · 지연 p50 {sec(s.latency_ms.p50)} · p95 {sec(s.latency_ms.p95)}
+        {" "}({s.latency_ms.n}/{s.answered}개 측정)
+      </p>
       <LedgerLine ledger={s.ledger ?? c.ledger} />
     </>
   );
@@ -92,32 +97,22 @@ function Summary({ s, c }: { s: View["summary"][string]; c: Candidate }) {
 
 const sec = (ms: number | null | undefined) => (ms == null ? "—" : `${(ms / 1000).toFixed(1)}초`);
 
-function QuestionRow({ q, candidates, note, setNote }: {
-  q: GenerationQuestion; candidates: Candidate[]; note: string; setNote: (v: string) => void;
+function QuestionRow({ q, candidates, all, note, setNote }: {
+  q: GenerationQuestion; candidates: Candidate[]; all: boolean; note: string; setNote: (v: string) => void;
 }) {
   return (
     <li className="py-8">
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted">
-        <Badge tone="info">{q.mode === "compare" ? "비교" : "단일 문서"}</Badge>
-        <span>{q.type}</span>
+        <Badge tone="info">{q.mode === "compare" ? "두 문서 비교" : "단일 문서"}</Badge>
+        <span title={q.type}>{label(TYPE, q.type)}</span>
         <span>기대: {OUTCOME[q.expected_status] ?? q.expected_status}</span>
-        <code>{q.id}</code>
       </div>
-      <h3 className="mt-2 max-w-[960px] text-[17px] font-semibold leading-snug">{q.question}</h3>
+      <h3 className="mt-2 max-w-[960px] text-[17px] font-semibold leading-snug" title={`질문 ID ${q.id}`}>{q.question}</h3>
       <p className="mt-1 text-[13px] text-muted">{q.docs.join(" · ")}</p>
-      {q.required.length > 0 && (
-        <div className="mt-3 max-w-[960px] text-[14px]">
-          <span className="mr-2 font-semibold text-muted">필수 주장</span>
-          {q.required.map((r, i) => (
-            <span key={r.claim_id} className="mr-2 inline rounded bg-cite px-1 leading-7" title={r.claim_id}>
-              <span className="font-semibold">{i + 1}{r.critical && " ★"}</span> {r.text}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="mt-4 overflow-x-auto">
-        <div className="grid gap-6" style={columns(candidates.length)}>
-          {candidates.map((c) => <AnswerColumn key={c.id} c={c} a={q.candidates[c.id]} q={q} />)}
+      {q.required.length > 0 && <Required q={q} candidates={candidates} />}
+      <div className="mt-5 overflow-x-auto">
+        <div className="grid gap-6" style={columns(candidates.length, all ? 340 : 280)}>
+          {candidates.map((c) => <AnswerColumn key={c.id} c={c} a={q.candidates[c.id]} />)}
         </div>
       </div>
       <div className="mt-3"><NoteField value={note} onChange={setNote} /></div>
@@ -125,7 +120,42 @@ function QuestionRow({ q, candidates, note, setNote }: {
   );
 }
 
-function AnswerColumn({ c, a, q }: { c: Candidate; a: Answer | undefined; q: GenerationQuestion }) {
+/** Each required claim of the gold beside the verdict every shown candidate's answer got on it. */
+function Required({ q, candidates }: { q: GenerationQuestion; candidates: Candidate[] }) {
+  const verdict = (c: Candidate, claimId: string) =>
+    q.candidates[c.id]?.required?.find((r) => r.claim_id === claimId)?.verdict;
+  return (
+    <table className="mt-4 text-[14px]">
+      <caption className="sr-only">필수 주장별 판정</caption>
+      <thead>
+        <tr className="text-left text-[13px] text-muted">
+          <th className="pb-1 pr-4 font-semibold">필수 주장 <span className="font-normal">· ★ 틀리면 치명</span></th>
+          {candidates.map((c) => (
+            <th key={c.id} className="pb-1 pr-3 font-semibold"><span className="block w-[8.5rem] truncate" title={c.label}>{c.label}</span></th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {q.required.map((r, i) => (
+          <tr key={r.claim_id} className="border-t border-line align-baseline">
+            <td className="max-w-[640px] py-1.5 pr-6 leading-relaxed" title={`주장 ID ${r.claim_id}`}>
+              <span className="mr-1.5 font-semibold tabular-nums">{i + 1}</span>
+              {r.critical && <span className="mr-1 text-warn" title="틀리면 치명 오류">★</span>}{r.text}
+            </td>
+            {candidates.map((c) => {
+              // No verdict reads as a dash; a verdict code with no label yet shows as itself rather than vanishing.
+              const v = verdict(c, r.claim_id);
+              const [text, tone] = (v && VERDICT[v]) || [v || "—", "text-muted"];
+              return <td key={c.id} className={`whitespace-nowrap py-1.5 pr-3 font-semibold ${tone}`} title={v}>{text}</td>;
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function AnswerColumn({ c, a }: { c: Candidate; a: Answer | undefined }) {
   const [open, setOpen] = useState<string | null>(null);
   if (!a) return <p className="self-start text-[14px] text-muted">{c.label}: 결과 없음</p>;
   if (a.error) {
@@ -136,13 +166,12 @@ function AnswerColumn({ c, a, q }: { c: Candidate; a: Answer | undefined; q: Gen
       </div>
     );
   }
-  const verdicts = Object.fromEntries((a.required ?? []).map((r) => [r.claim_id, r.verdict]));
   return (
     <div className="min-w-0">
       <ColumnHead c={c} a={a} />
       {a.validation && (
-        <p className="mt-2 rounded-md bg-bad-bg px-2 py-1 text-[14px] text-bad" title={a.validation_detail ?? ""}>
-          검증 실패 <code>{a.validation}</code> · 이 답변은 사용자에게 보이지 않습니다
+        <p className="mt-2 rounded-md bg-bad-bg px-2 py-1 text-[14px] text-bad" title={a.validation_detail ?? a.validation}>
+          <span className="font-semibold">검증 실패: {label(VALIDATION, a.validation)}</span> · 이 답변은 사용자에게 보이지 않습니다
         </p>
       )}
       {a.failure && (
@@ -179,22 +208,14 @@ function AnswerColumn({ c, a, q }: { c: Candidate; a: Answer | undefined; q: Gen
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 text-[14px]">
           {a.facts!.map((f) => (
             <Fragment key={`${f.doc_id} ${f.field}`}>
-              <dt className="text-muted">{f.field}</dt>
-              <dd className="break-words">{f.state}{f.value != null && ` · ${String(f.value)}`}</dd>
+              <dt className="text-muted" title={f.field}>{label(FIELD, f.field)}</dt>
+              <dd className="break-words">{label(FACT_STATE, f.state)}{f.value != null && ` · ${String(f.value)}`}</dd>
             </Fragment>
           ))}
         </dl>
       )}
       {(a.missing ?? []).length > 0 && (
-        <p className="mt-2 text-[13px] text-muted">빠진 항목: {a.missing!.map((m) => m.field).join(", ")}</p>
-      )}
-      {q.required.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {q.required.map((r, i) => {
-            const [label, tone] = VERDICT[verdicts[r.claim_id]] ?? ["—", "neutral"];
-            return <Badge key={r.claim_id} tone={tone}>필수 {i + 1} {label}</Badge>;
-          })}
-        </div>
+        <p className="mt-2 text-[13px] text-muted">빠진 항목: {a.missing!.map((m) => label(FIELD, m.field)).join(", ")}</p>
       )}
     </div>
   );
@@ -203,13 +224,13 @@ function AnswerColumn({ c, a, q }: { c: Candidate; a: Answer | undefined; q: Gen
 function ColumnHead({ c, a }: { c: Candidate; a: Answer }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line pb-1.5">
-      <span className="truncate text-[14px] font-semibold text-muted">{c.label}</span>
+      <span className="w-full truncate text-[13px] font-semibold text-muted" title={c.ref}>{c.label}</span>
       {a.outcome && (a.metadata ? (
-        <span className={`text-[15px] font-bold ${a.metadata_correct ? "text-ok" : "text-bad"}`}>
+        <span className={`text-[18px] font-bold ${a.metadata_correct ? "text-ok" : "text-bad"}`}>
           {OUTCOME[a.outcome] ?? a.outcome} · 메타데이터 {a.metadata_correct ? "정답" : "오답"}
         </span>
       ) : (
-        <span className={`text-[15px] font-bold ${a.passed ? "text-ok" : a.status_ok ? "" : "text-bad"}`}>
+        <span className={`text-[18px] font-bold ${a.passed ? "text-ok" : a.status_ok ? "" : "text-bad"}`}>
           {OUTCOME[a.outcome] ?? a.outcome}{a.passed ? " · 통과" : ""}
         </span>
       ))}

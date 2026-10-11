@@ -1,0 +1,1 @@
+`write_decision` validates the choice against the run's candidates and writes `.runtime/review/decisions/<run-id>.md` and `.json`. `agent_prompt` returns a short prompt pointing the coding agent at the file. An accepted variant is then reproduced through `compare` and `activate-run`; the variant file itself is not merged.

@@ -64,12 +64,11 @@ function PaidRun({ onStarted, running }: { onStarted: () => void; running: boole
       </div>
       {est && (
         <>
-          <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            {[["후보", est.finalists.join(", ")], ["남은 답변", `${est.rows_remaining}개`], ["최대 비용", usd(est.max_micro_usd, 4)],
-              ["평가 예산 남음", usd(est.envelope_remaining_micro_usd, 4)]].map(([k, v]) => (
-              <div key={k}><dt className="text-xs text-muted-foreground">{k}</dt><dd className="font-semibold tabular-nums">{v}</dd></div>
-            ))}
-          </dl>
+          <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1 tabular-nums">
+            <span className="text-xl font-bold">최대 {usd(est.max_micro_usd, 4)}</span>
+            <span className="text-sm">남은 답변 {est.rows_remaining}개</span>
+            <span className="text-[13px] text-muted-foreground">평가 예산 남음 {usd(est.envelope_remaining_micro_usd, 4)} · 후보 {est.finalists.join(", ")}</span>
+          </p>
           {!est.fits ? <Notice tone="bad">최대 비용이 평가 예산 또는 운영 한도를 넘어 실행할 수 없습니다.</Notice> : (
             <div className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 text-sm">

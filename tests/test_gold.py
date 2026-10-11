@@ -75,6 +75,8 @@ class GoldReviewTest(DevCorpusCase):
         self.assertIn('inference_status: "pending"', page)
         self.assertIn("[r2](r2.md)", (gold.rejections_dir(s) / "index.md").read_text(encoding="utf-8"))
         self.assertEqual(gold.check(s), [])
+        self.assertEqual({r["candidate_id"]: r["question"] for r in gold.recent(s)},
+                         {"r1": "하자보수 기간은?", "r2": "하자보수는 몇 년인가?"})  # the list reads as questions
         with self.assertRaises(gold.GoldError):  # first decision wins
             gold.decide(s, "r1", "reject", "v2", self.sha("r1"), ["too_easy"])
 

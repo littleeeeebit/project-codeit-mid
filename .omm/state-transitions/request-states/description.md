@@ -1,0 +1,1 @@
+Terminal statuses are completed, failed, cancelled and interrupted. Only a terminal turn may be continued (`_conversation`). Nothing interrupted is ever replayed automatically.

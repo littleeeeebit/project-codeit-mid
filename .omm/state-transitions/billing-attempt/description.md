@@ -1,1 +1,0 @@
-The `attempts.state` lifecycle in `budget.py`. Every transition is a conditional UPDATE (`_transition`) that bumps the settings revision. Pending spend is reserved plus dispatching plus unknown. Spent is settled plus adjustments.

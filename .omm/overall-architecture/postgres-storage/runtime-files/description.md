@@ -1,1 +1,13 @@
-Under `settings.data_dir` (`.runtime` by default, resolved from the repository location and never from the working directory): `extracted/<hash>/<fingerprint>/elements.jsonl`, `indexes/<version>/` (manifest and hashed files), `ocr/<hash>/`, `reviews/printed/` (Hancom PDFs), `runs/<run_id>/`, `compare/` (tables, cells, estimates), `drafts/`, `datasets/` and `sealed/`, `maintenance/`, `review/` (stage-review runs) and `archive/` (cold dumps). Writes go through `write_text_atomic` and `write_jsonl_atomic`.
+`.runtime` (`RFP_DATA_DIR`) holds:
+- `indexes/<version>/` and the extraction artifacts
+- `ocr/<hash>/` region cache
+- `reviews/printed/<hash16>.pdf` Hancom prints and `reviews/rendered/`
+- `runs/<run_id>/` frozen retrieval runs
+- `compare/` (cells, estimates, tables)
+- `datasets/dev.jsonl` and `sealed/test.jsonl`
+- drafting run folders
+- `maintenance/` state and reports
+- `review/runs` and `review/decisions`
+- `archive/` cold dumps
+
+The originals under `RFP_SOURCE_DIR` are never modified.

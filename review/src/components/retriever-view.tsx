@@ -2,18 +2,21 @@
 
 import { useState } from "react";
 import type { Candidate, Passage, Question, QuestionResult, RetrieverView as View } from "@/lib/api";
-import { Badge, Metric, Metrics, NotedList, Segmented, Summaries, columns } from "./ui";
+import { label, TYPE } from "@/lib/labels";
+import { Badge, Metric, Metrics, NotedList, Segmented, Summaries, columns, useShown } from "./ui";
 import { NoteField } from "./note-field";
 
 type Filter = "outcome" | "ranking" | "all";
 
-export function RetrieverView({ view, notes, setNote }: {
+export function RetrieverView({ view, notes, setNote, decide }: {
   view: View;
   notes: Record<string, string>;
   setNote: (key: string, note: string) => void;
+  decide: React.ReactNode;
 }) {
   const [filter, setFilter] = useState<Filter>("outcome");
   const [population, setPopulation] = useState<"all" | "dev" | "needle">("all");
+  const { shown: cands, all, picker } = useShown(view.candidates, 3);
   const inPopulation = view.questions.filter((q) => population === "all" || q.population === population);
   const counts = {
     outcome: inPopulation.filter((q) => q.outcome_differs ?? q.differs).length,
@@ -52,6 +55,8 @@ export function RetrieverView({ view, notes, setNote }: {
           <Segmented value={population} onChange={setPopulation} options={[
             ["all", "모두"], ["dev", "개발 질문"], ["needle", "니들"],
           ]} />
+          {picker}
+          {decide}
         </div>
         {shown.length === 0 && (
           <p className="py-10 text-center text-muted">
@@ -61,25 +66,24 @@ export function RetrieverView({ view, notes, setNote }: {
           </p>
         )}
         <NotedList items={shown} keyOf={(q) => q.key} notes={notes} setNote={setNote} row={(q, note, set) => (
-          <QuestionRow q={q} candidates={view.candidates} note={note} setNote={set} />
+          <QuestionRow q={q} candidates={cands} all={all} note={note} setNote={set} />
         )} />
       </section>
     </>
   );
 }
 
-function QuestionRow({ q, candidates, note, setNote }: {
-  q: Question; candidates: Candidate[]; note: string; setNote: (v: string) => void;
+function QuestionRow({ q, candidates, all, note, setNote }: {
+  q: Question; candidates: Candidate[]; all: boolean; note: string; setNote: (v: string) => void;
 }) {
   const [more, setMore] = useState(false);
   return (
     <li className="py-8">
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted">
         <Badge tone={q.population === "dev" ? "info" : "neutral"}>{q.population === "dev" ? "개발" : "니들"}</Badge>
-        <span>{q.type}</span>
-        <code>{q.id}</code>
+        <span title={q.type}>{label(TYPE, q.type)}</span>
       </div>
-      <h3 className="mt-2 max-w-[960px] text-[17px] font-semibold leading-snug">{q.question}</h3>
+      <h3 className="mt-2 max-w-[960px] text-[17px] font-semibold leading-snug" title={`질문 ID ${q.id}`}>{q.question}</h3>
       <div className="mt-3 max-w-[960px] text-[14px]">
         <span className="mr-2 font-semibold text-muted">정답 근거</span>
         {q.gold.map((g) => (
@@ -87,7 +91,7 @@ function QuestionRow({ q, candidates, note, setNote }: {
         ))}
       </div>
       <div className="mt-4 overflow-x-auto">
-        <div className="grid gap-4" style={columns(candidates.length)}>
+        <div className="grid gap-4" style={columns(candidates.length, all ? 320 : 280)}>
           {candidates.map((c) => (
             <Column key={c.id} c={c} r={q.candidates[c.id]} depth={more ? 10 : 5} showDoc={q.population === "needle"} />
           ))}
@@ -114,7 +118,7 @@ function Column({ c, r, depth, showDoc }: {
     <div className="min-w-0">
       <div className="flex items-baseline gap-3 border-b border-line pb-1.5">
         <span className="truncate text-[14px] font-semibold text-muted">{c.label}</span>
-        <span className="ml-auto whitespace-nowrap text-[15px] font-bold tabular-nums">
+        <span className="ml-auto whitespace-nowrap text-[18px] font-bold tabular-nums">
           {r.gold_rank ? `정답 ${r.gold_rank}위` : (r.sides?.length ?? 0) > 1 ? "문서별 검색" : "top-20 밖"}
         </span>
         <span className="whitespace-nowrap text-[13px] tabular-nums text-muted">nDCG {r.ndcg?.toFixed(2) ?? "—"}</span>

@@ -1,0 +1,1 @@
+Command names come from README.md; the bodies traced are `budget.reconcile`, `add_adjustment` and `service.settle_from_evidence`/`reconcile`. `cli.py` argument parsing was not read.

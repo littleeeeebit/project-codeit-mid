@@ -1560,6 +1560,17 @@
       ],
       "title": "Decided By"
      },
+     "question": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Question"
+     },
      "status": {
       "title": "Status",
       "type": "string"

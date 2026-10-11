@@ -264,11 +264,12 @@ function Interval({ a }: { a: Arm }) {
 const usdOrUnpriced = (a: Arm) => (a.usd.priced ? usd(a.usd.settled_micro_usd, 3) : "가격 미제공");
 
 /** The four numbers a reader compares; everything else waits in the fold below. */
-const KEY_METRICS: { title: string; value: (a: Arm) => React.ReactNode }[] = [
+// Agreement and false accepts decide the comparison; time and cost read smaller beside them.
+const KEY_METRICS: { title: string; value: (a: Arm) => React.ReactNode; minor?: boolean }[] = [
   { title: "기준과 일치", value: (a) => <>{pct(a.agreement.rate)}<Interval a={a} /></> },
   { title: "틀린 답 통과", value: (a) => <>{a.false_accepts}<span className="text-sm font-normal text-muted-foreground"> / {a.reference_negatives}건</span></> },
-  { title: "한 건 판정 시간", value: (a) => sec(a.latency_ms.p50) },
-  { title: "비용", value: usdOrUnpriced },
+  { title: "한 건 판정 시간", value: (a) => sec(a.latency_ms.p50), minor: true },
+  { title: "비용", value: usdOrUnpriced, minor: true },
 ];
 const COLS = "md:grid-cols-[minmax(13rem,1.3fr)_repeat(4,minmax(0,1fr))]";
 
@@ -292,7 +293,7 @@ function Comparison({ r }: { r: Results }) {
               {KEY_METRICS.map((m) => (
                 <dl key={m.title} className="min-w-0">
                   <dt className="text-sm text-muted-foreground md:sr-only">{m.title}</dt>
-                  <dd className="text-xl font-semibold tabular-nums">{m.value(a)}</dd>
+                  <dd className={cn("tabular-nums", m.minor ? "text-sm md:pt-1.5" : "text-xl font-semibold")}>{m.value(a)}</dd>
                 </dl>
               ))}
             </li>
@@ -453,13 +454,11 @@ function Plan({ fitted, running, onStarted }: { fitted: boolean; running: boolea
       <p className="text-xs text-muted-foreground">{running ? "실행 중인 부분이 끝나면 다시 추정할 수 있습니다." : "추정은 호출 없이 남은 번역·판정 호출의 최대 비용만 계산합니다. 이미 끝난 항목은 다시 부르지 않습니다."}</p>
       {est && (
         <div className="space-y-4 rounded-xl bg-secondary/60 p-4">
-          <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
-            {[["항목", `${est.items}개`], ["번역 호출", `${est.translation.attempts}회 (${est.translation.segments ?? 0}조각)`],
-              ["Luna 판정 호출", `${est.judge.attempts}회`], ["Jev 호출", `${est.jev.calls}회 · 가격 미제공`],
-              ["최대 비용", usd(est.max_micro_usd, 4)], ["judge_eval 남음", est.envelope_remaining_micro_usd == null ? "배정 안 됨" : usd(est.envelope_remaining_micro_usd, 4)]].map(([k, v]) => (
-              <div key={k}><dt className="text-xs text-muted-foreground">{k}</dt><dd className="font-semibold tabular-nums">{v}</dd></div>
-            ))}
-          </dl>
+          <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1 tabular-nums">
+            <span className="text-xl font-bold">최대 {usd(est.max_micro_usd, 4)}</span>
+            <span className="text-sm">항목 {est.items}개 · 번역 {est.translation.attempts}회 ({est.translation.segments ?? 0}조각) · Luna 판정 {est.judge.attempts}회 · Jev {est.jev.calls}회</span>
+            <span className="text-[13px] text-muted-foreground">judge_eval 남음 {est.envelope_remaining_micro_usd == null ? "배정 안 됨" : usd(est.envelope_remaining_micro_usd, 4)} · Jev 가격 미제공</span>
+          </p>
           {!est.translation.attempts && !est.judge.attempts && !est.jev.calls ? <Notice tone="ok">이 부분은 모든 항목을 판정했습니다. 다시 실행할 호출이 없습니다.</Notice>
             : !est.fits ? <Notice tone="bad">실행할 수 없습니다: {est.blocked}</Notice> : (
             <div className="flex flex-wrap items-center gap-3">

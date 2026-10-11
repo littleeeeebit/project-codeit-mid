@@ -1,0 +1,9 @@
+created: 2026-10-11T01:15:01.035Z
+updated: 2026-10-11T01:15:01.036Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: activation
+children: []
+parentPath:
+  - evaluation-selection
