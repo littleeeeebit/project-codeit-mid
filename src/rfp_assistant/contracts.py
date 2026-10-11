@@ -92,6 +92,7 @@ class AnswerResult:
     limitations: list[str] = field(default_factory=list)
     summary_evidence_ids: list[str] = field(default_factory=list)
     standalone_question: str = ""  # a follow-up rewritten from the conversation; what retrieval and the answer used
+    listing: dict | None = None  # corpus metadata question: the query, every matching project and 확인 필요
 
 
 REQUEST_STATUSES = ("queued", "running", "completed", "failed", "cancelled", "interrupted")

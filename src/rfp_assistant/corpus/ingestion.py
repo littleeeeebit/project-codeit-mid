@@ -212,6 +212,10 @@ def read_manifest_csv(settings: Settings) -> list[dict]:
 
 
 CONFLICT_FIELDS = ("institution", "title", "notice", "bid_close", "amount_krw")
+# Kinds of ordering institution (service.metadata_query classifies each institution once); a person corrects one
+# document's type with `resolve-metadata --field institution_type`, which needs no recorded conflict.
+INSTITUTION_TYPES = ("대학", "지방자치단체", "중앙행정기관", "공공기관", "협회·단체", "연구기관", "의료기관", "기타")
+RESOLVABLE_FIELDS = (*CONFLICT_FIELDS, "institution_type")
 
 
 def import_manifest(settings: Settings) -> dict:
@@ -1376,23 +1380,26 @@ def _valid_when(v) -> bool:
 def resolve_metadata(settings: Settings, doc_id: str, field: str, value, rationale: str, evidence: str,
                      actor: str) -> str:
     """Canonical value for one association's conflicting field, with a written source/notice rationale. The
-    competing CSV values stay recorded and visible; CSV order is never authority."""
-    if field not in CONFLICT_FIELDS:
-        raise IngestionError(f"field must be one of {CONFLICT_FIELDS}")
+    competing CSV values stay recorded and visible; CSV order is never authority. `institution_type` corrects the
+    association's institution type (one of INSTITUTION_TYPES) over its classification, with no conflict needed."""
+    if field not in RESOLVABLE_FIELDS:
+        raise IngestionError(f"field must be one of {RESOLVABLE_FIELDS}")
     if not rationale.strip() or not evidence.strip() or not actor.strip():
         raise IngestionError("a resolution needs a rationale, the source/notice evidence and the actor")
     valid = {"amount_krw": lambda v: isinstance(v, int) and not isinstance(v, bool) and v >= 0,
-             "bid_close": _valid_when}.get(field, lambda v: isinstance(v, str) and v.strip() != "")
+             "bid_close": _valid_when, "institution_type": lambda v: v in INSTITUTION_TYPES,
+             }.get(field, lambda v: isinstance(v, str) and v.strip() != "")
     if not valid(value):
         raise IngestionError(f"value has the wrong shape for {field} (amount_krw: integer KRW; bid_close: "
-                             '{"value": ISO text, "precision": "date"|"timestamp"}; others: text)')
+                             '{"value": ISO text, "precision": "date"|"timestamp"}; institution_type: one of '
+                             f'{INSTITUTION_TYPES}; others: text)')
     resolution_id = str(uuid.uuid4())
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
         doc = conn.execute("SELECT quality_json FROM documents WHERE doc_id = ?", (doc_id,)).fetchone()
         if doc is None:
             raise IngestionError("unknown doc_id")
         conflicts = {c["field"] for c in json.loads(doc["quality_json"]).get("provenance_conflicts", [])}
-        if field not in conflicts:
+        if field in CONFLICT_FIELDS and field not in conflicts:
             raise IngestionError(f"{field} has no recorded provenance conflict for this document")
         conn.execute(
             "INSERT INTO metadata_resolutions(resolution_id, doc_id, field, value_json, rationale, evidence, actor, "
