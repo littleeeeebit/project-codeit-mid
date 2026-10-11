@@ -253,6 +253,8 @@ class SuggestTest(unittest.TestCase):
         self.refused(self.body(("q2", "c1", "10 %", {})), "not verbatim")
         self.refused(self.body(("q2", "c1", "금", {})), "occurs 2 times in its field; give start")
         self.refused(self.body(("q2", "c1", "10%", {"start": 3})), "not at offset 3")
+        with self.assertRaisesRegex(ea.ReviewInputError, "occurs 2 times"):  # overlapping occurrences are two
+            sc._span("가가가", "가가", None)
         self.refused(self.body(("q9", "c1", "10%", {})), "no stored generation answer")
         self.refused(self.body(("q2", "c1", "10%", {"field": "claim.0"})), "no field")
         self.refused(self.body(("q2", "c1", "10%", {"reason": "첫 줄\n둘째 줄"})), "one-line reason")
@@ -329,6 +331,35 @@ class SuggestTest(unittest.TestCase):
         self.assertEqual((len(answers), sum(a["reviewed"] for a in answers)), (8, 3))  # every stored answer
         with self.assertRaisesRegex(ea.ReviewInputError, "already rejected that span"):
             sc.suggest(self.root, self.body(("q3", "c1", "30일", {})))
+
+    def test_an_approval_whose_commit_fails_files_no_note(self):
+        sc.suggest(self.root, self.body(("q2", "c1", "10%", {}), ("q3", "c1", "30일", {})))
+        first, second = [s["id"] for s in sc.suggestion_queue(self.root, self.type)["pending"]]
+        real = sc.append_jsonl
+
+        def no_history(path, records):
+            if path.name == "history.jsonl":
+                raise OSError("disk full")
+            real(path, records)
+
+        for sid in (first, second):
+            with mock.patch.object(sc, "append_jsonl", no_history), self.assertRaises(OSError):
+                sc.decide_suggestion(self.root, {"op": "approve", "suggestion": sid}, "approver")
+        # the note written before the failed commit is in the file but not live, for the store or the app
+        ai = [n for n in ea.live_notes(self.root).values() if n.get("origin")]
+        shown = server.add_annotation(self.root, self.view, {"op": "reviewed", "question": "q4", "candidate": "c1",
+                                                             "value": True}, "person")["notes"]
+        self.assertEqual((ai, [n for n in shown if n.get("origin")]), ([], []))
+        self.assertEqual(ea.taxonomy_state(self.root)["accepted"][0]["ai_answers"], 0)
+
+        # approving again reuses the orphan note; rejecting leaves it hidden for good
+        sc.decide_suggestion(self.root, {"op": "approve", "suggestion": first}, "approver")
+        sc.decide_suggestion(self.root, {"op": "reject", "suggestion": second}, "approver")
+        notes = [r for r in ea.read_annotations(self.root, RUN) if r["op"] == "note" and r.get("origin")]
+        self.assertEqual(len(notes), 2)
+        live = [n["suggestion"] for n in ea.live_notes(self.root).values() if n.get("origin")]
+        self.assertEqual(live, [first])
+        self.assertEqual(ea.taxonomy_state(self.root)["accepted"][0]["notes"][-1]["suggestion"], first)
 
 
 class RereviewTest(unittest.TestCase):

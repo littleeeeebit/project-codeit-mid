@@ -17,7 +17,8 @@ from pathlib import Path
 
 from .error_analysis import (
     ACTION_SCHEMA, AI, ANNOTATION_SCHEMA, ReviewInputError, _fold, _labels, _now, _stamp, _view, _write_json,
-    annotations_file, append_jsonl, field_text, live_notes, reviewed_answers, suggestions, taxonomy_dir, write_lock)
+    annotations_file, append_jsonl, field_text, live_notes, read_annotations, reviewed_answers, suggestions,
+    taxonomy_dir, write_lock)
 
 SUGGESTION_SCHEMA = "failure-type-suggestions-1"
 RUN_FOLDER = re.compile(r"^generation-\d{8}T\d{6}Z-[0-9a-f]{6}$")
@@ -129,12 +130,12 @@ def _span(text: str, quote, start) -> tuple[int, int]:
         if not isinstance(start, int) or isinstance(start, bool) or start < 0 or text[start:start + len(quote)] != quote:
             raise ReviewInputError(f"“{quote}” is not at offset {start} of its stored field")
         return start, start + len(quote)
-    hits = text.count(quote)
-    if hits == 0:
+    hits = [i for i in range(len(text)) if text.startswith(quote, i)]  # str.count skips overlapping occurrences
+    if not hits:
         raise ReviewInputError(f"“{quote}” is not verbatim in its stored answer field")
-    if hits > 1:
-        raise ReviewInputError(f"“{quote}” occurs {hits} times in its field; give start")
-    return text.index(quote), text.index(quote) + len(quote)
+    if len(hits) > 1:
+        raise ReviewInputError(f"“{quote}” occurs {len(hits)} times in its field; give start")
+    return hits[0], hits[0] + len(quote)
 
 
 def suggest(root: Path, body) -> dict:
@@ -214,7 +215,8 @@ def suggestion_queue(root: Path, type_id: str) -> dict:
         label = next((c.get("label") for c in view.get("candidates") or [] if c["id"] == s["candidate"]), s["candidate"])
         waiting.append({**s, "question_text": q.get("question"), "candidate_label": label,
                         "field_text": field_text(answer, s["field"]) if answer else None})
-    return {"type": {"id": type_id, "name": t["name"], "definition": t["definition"]}, "pending": waiting,
+    return {"seq": len(fold["history"]), "type": {"id": type_id, "name": t["name"], "definition": t["definition"]},
+            "pending": waiting,
             "approved": sum(s["status"] == "approved" for s in mine),
             "rejected": [s for s in mine if s["status"] == "rejected"]}
 
@@ -227,7 +229,7 @@ def decide_suggestion(root: Path, body: dict, author: str) -> dict:
     if op not in ("approve", "reject"):
         raise ReviewInputError("approve or reject")
     with write_lock(root):
-        fold, live = _fold(root), live_notes(root)
+        fold = _fold(root)
         s = next((s for s in suggestions(root, fold) if s["id"] == sid), None)
         if s is None or s["status"] != "pending":
             raise ReviewInputError("that suggestion does not exist or was already decided")
@@ -243,9 +245,11 @@ def decide_suggestion(root: Path, body: dict, author: str) -> dict:
             view, answer = _stored_answer(root, s["run_id"], s["question"], s["candidate"])
             if answer is None or (field_text(answer, s["field"]) or "")[s["start"]:s["end"]] != s["text"]:
                 raise ReviewInputError("the stored answer no longer holds that span")
-            # The note goes in first and the history record commits it; a note left by a failed commit is found
-            # by its suggestion id and reused when the approval is sent again.
-            nid = next((n["id"] for n in live.values() if n.get("suggestion") == sid), None)
+            # The note goes in first and the history record commits it: until then annotation_state hides it. A
+            # note left by a failed commit is found among the raw records by its suggestion id and reused when the
+            # approval is sent again; a rejection leaves it hidden for good.
+            nid = next((r["id"] for r in read_annotations(root, s["run_id"])
+                        if r["op"] == "note" and r.get("suggestion") == sid), None)
             if nid is None:
                 nid = uuid.uuid4().hex
                 commit = next(c["commit"] for c in view["candidates"] if c["id"] == s["candidate"])

@@ -318,6 +318,7 @@ export type FailureType = {
 
 export type Taxonomy = {
   version: number;
+  seq: number;
   accepted: FailureType[];
   pending: FailureType[];
   unassigned: number;
@@ -349,6 +350,7 @@ export type Suggestion = {
 };
 
 export type SuggestionQueue = {
+  seq: number;
   type: { id: string; name: string; definition: string };
   pending: Suggestion[];
   approved: number;

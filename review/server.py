@@ -305,7 +305,7 @@ def add_annotation(root: Path, view: dict, body: dict, author: str) -> dict:
         existing = read_annotations(root, view["run_id"])
         check_annotations(view, existing + [record])
         _append(root, view["run_id"], [record])
-        return annotation_state(existing + [record])
+        return annotation_state(existing + [record], ea.approved_suggestions(root))
 
 
 def git_author() -> str:
@@ -519,8 +519,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, export_run(self.root, parts[2]), "application/zip",
                                   {"Content-Disposition": f'attachment; filename="{parts[2]}.zip"'})
             if len(parts) == 4 and parts[3] == "annotations":
-                return self._json(200, self._notes(annotation_state(read_annotations(self.root, folder.name)),
-                                                   folder.name))
+                return self._json(200, self._notes(annotation_state(read_annotations(self.root, folder.name),
+                                                                    ea.approved_suggestions(self.root)), folder.name))
             if len(parts) == 4 and parts[3] == "failure-types":
                 return self._json(200, ea.run_counts(self.root, folder.name))
             if len(parts) == 4 and parts[3] == "decision":

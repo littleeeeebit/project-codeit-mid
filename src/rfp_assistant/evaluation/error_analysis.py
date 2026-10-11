@@ -129,10 +129,19 @@ def read_annotations(root: Path, run_id: str) -> list[dict]:
     return read_jsonl(annotations_file(root, run_id))
 
 
-def annotation_state(records: list[dict]) -> dict:
-    """The records folded in order: live notes with their latest text, and answers marked reviewed and fine."""
+def approved_suggestions(root: Path) -> set[str]:
+    """Suggestion ids whose approval is committed in history.jsonl."""
+    return {a["suggestion"] for a in read_jsonl(taxonomy_dir(root) / "history.jsonl") if a["op"] == "suggestion-approve"}
+
+
+def annotation_state(records: list[dict], approved: set[str] | frozenset = frozenset()) -> dict:
+    """The records folded in order: live notes with their latest text, and answers marked reviewed and fine. A note
+    from a suggestion is live only once its approval is committed (`approved`, from approved_suggestions): one
+    written by an approval whose history record then failed is not shown, counted or kept by a rejection."""
     notes, reviewed = {}, {}
     for r in records:
+        if r["op"] == "note" and r.get("origin") and r.get("suggestion") not in approved:
+            continue
         if r["op"] == "note":
             notes[r["id"]] = {k: r[k] for k in ("id", "question", "candidate", "commit", "field", "start", "end",
                                                 "text", "note", "author", "at")}
@@ -178,7 +187,10 @@ def field_text(answer: dict, field: str) -> str | None:
 
 def _runs_with_notes(root: Path) -> dict[str, dict]:
     folder = root / "review" / "annotations"
-    return {p.stem: annotation_state(read_jsonl(p)) for p in sorted(folder.glob("*.jsonl"))} if folder.exists() else {}
+    if not folder.exists():
+        return {}
+    approved = approved_suggestions(root)
+    return {p.stem: annotation_state(read_jsonl(p), approved) for p in sorted(folder.glob("*.jsonl"))}
 
 
 def _view(root: Path, run_id: str) -> dict:
@@ -296,7 +308,8 @@ def taxonomy_state(root: Path) -> dict:
     for s in suggestions(root, fold):
         if s["status"] == "pending":
             waiting[s["type"]] = waiting.get(s["type"], 0) + 1
-    return {"version": fold["version"],
+    # seq counts every committed decision, suggestions' included, so the app keeps the newest of overlapping replies
+    return {"version": fold["version"], "seq": len(fold["history"]),
             "accepted": [resolve(t) | {"suggested": waiting.get(t["id"], 0)} for t in fold["accepted"].values()],
             "pending": [resolve(t) for t in fold["pending"].values()],
             "unassigned": sum(1 for nid, n in live.items() if nid not in assigned and human(n)),

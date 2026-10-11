@@ -21,6 +21,8 @@ const part = (field: string) => {
             missing: "빠진 항목" } as Record<string, string>)[kind] ?? field;
 };
 const OP: Record<string, string> = { accept: "수락", rename: "이름 바꿈", merge: "합침", split: "나눔", reject: "버림" };
+/** Replies can arrive out of order when decisions overlap; keep the one that saw more committed decisions. */
+const newest = <T extends { seq: number }>(next: T) => (cur: T | null) => (!cur || next.seq >= cur.seq ? next : cur);
 
 export function TaxonomyView() {
   const [state, setState] = useState<Taxonomy | null>(null);
@@ -28,14 +30,14 @@ export function TaxonomyView() {
   const [picked, setPicked] = useState<string[]>([]);
 
   const load = useCallback(() => {
-    getJson<Taxonomy>("/api/taxonomy").then(setState).catch((e: Error) => setError(`유형을 읽지 못했습니다: ${e.message}`));
+    getJson<Taxonomy>("/api/taxonomy").then((s) => setState(newest(s))).catch((e: Error) => setError(`유형을 읽지 못했습니다: ${e.message}`));
   }, []);
   useEffect(load, [load]);
 
   const decide: Decide = async (body) => {
     setError("");
     try {
-      setState(await postJson<Taxonomy>("/api/taxonomy/decide", JSON.stringify(body)));
+      setState(newest(await postJson<Taxonomy>("/api/taxonomy/decide", JSON.stringify(body))));
       setPicked([]);
     } catch (e) {
       setError(`저장하지 못했습니다: ${(e as Error).message}`);
@@ -250,12 +252,12 @@ function Queue({ id, onChanged }: { id: string; onChanged: () => void }) {
   const [q, setQ] = useState<SuggestionQueue | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
-    getJson<SuggestionQueue>(`/api/taxonomy/suggestions/${id}`).then(setQ).catch((e: Error) => setError(e.message));
+    getJson<SuggestionQueue>(`/api/taxonomy/suggestions/${id}`).then((s) => setQ(newest(s))).catch((e: Error) => setError(e.message));
   }, [id]);
   async function decide(body: Record<string, unknown>) {
     setError("");
     try {
-      setQ(await postJson<SuggestionQueue>("/api/taxonomy/suggestions/decide", JSON.stringify(body)));
+      setQ(newest(await postJson<SuggestionQueue>("/api/taxonomy/suggestions/decide", JSON.stringify(body))));
       onChanged();
     } catch (e) {
       setError(`저장하지 못했습니다: ${(e as Error).message}`);
