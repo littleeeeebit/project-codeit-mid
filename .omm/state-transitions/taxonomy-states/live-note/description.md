@@ -1,0 +1,1 @@
+An `op: note` record in `annotations/<run>.jsonl` that no later `delete` targets; `edit` records replace its text. A deleted note silently leaves every type; `taxonomy_state` reports how many notes were deleted per type.

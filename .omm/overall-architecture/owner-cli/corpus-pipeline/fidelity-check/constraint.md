@@ -1,0 +1,1 @@
+Printing takes 20–30 s per document and needs the Windows default printer, so it cannot run on the Linux team host.

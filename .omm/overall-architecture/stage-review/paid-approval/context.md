@@ -1,0 +1,1 @@
+To count against the shared ledger, generation runs against codeit's database through the tunnel. `bidmate.service` holds the gateway lock there and must be stopped for `resume` (25–40 minutes per 55-question candidate, as measured 2026-10-10).

@@ -1,0 +1,1 @@
+A broken candidate is recorded as `failed` or `refused` with its reason and never costs the other candidates their results.

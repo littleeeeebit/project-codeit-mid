@@ -1,0 +1,1 @@
+The prompt version is `generation.PROMPT_VERSION = grounded-answer-13`. The rewrite uses `REWRITE_PROMPT_VERSION` and `validate_rewrite`.

@@ -1,18 +1,16 @@
 created: 2026-10-08 21:41:50.148000+00:00
-updated: 2026-10-11T02:31:11.159Z
+updated: 2026-10-11 02:31:11.159000+00:00
 update_count: 4
 last_field: diagram
 kind: nested-class
 title: service
 children:
-  - completion
-  - evidence
-  - fence
-  - jobs
-  - owner
-  - paid
-  - preparation
-  - resources
-  - runner
-  - tracer
+- completion
+- evidence
+- fence
+- jobs
+- paid
+- preparation
+- resources
+- tracer
 parentPath: []

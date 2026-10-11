@@ -1,1 +1,0 @@
-Lifecycle of a row in `requests`. A free mode, and the synchronous `service.answer`, insert the row directly as `running`. Nothing is ever replayed: restart recovery and shutdown only mark rows interrupted.

@@ -1,0 +1,9 @@
+created: 2026-10-11T03:31:26.422Z
+updated: 2026-10-11T03:31:26.674Z
+update_count: 2
+last_field: concern
+kind: nested-class
+title: settlement
+children: []
+parentPath:
+  - paid-gateway

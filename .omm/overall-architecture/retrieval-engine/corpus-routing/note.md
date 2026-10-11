@@ -1,0 +1,1 @@
+`active_serving` refuses an activated run whose recorded `limits.corpus_route` differs from `corpus_route_record()` and serves the keyword default with `fallback_reason: activated_corpus_route_requires_rerun`.

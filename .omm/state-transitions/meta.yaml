@@ -1,15 +1,13 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-11 02:31:20.062000+00:00
-update_count: 48
+updated: 2026-10-11 03:31:49.634000+00:00
+update_count: 50
 last_field: diagram
-git_commit: 202d3f1
-git_branch: answer-span-annotation
+git_commit: 5673b1e
+git_branch: failure-taxonomy-from-notes
 children:
-- activation
 - attempt-billing
 - attempt-record
 - attempt-states
-- attempts
 - billing-attempt
 - billing-attempt-states
 - gateway-owner
@@ -17,17 +15,19 @@ children:
 - gold-candidate-states
 - interrupted
 - owner-reconcile
+- request-states
 - request-status
-- requests
+- review-run-states
 - running
 - serving-activation
 - source-review-states
-- stagerun
+- taxonomy-states
 - update-fence
 - update-states
-prev_diagram: "graph TD\r\n  request-states[\"Request status\\nrequests.status\"]\
-  \ -->|each paid stage opens| attempt-states[\"Attempt state\\nattempts.state\"]\r\
-  \n  attempt-states -->|billing_state rollup| request-states\r\n  serving-activation[\"\
-  Serving activation\\napp_settings.active_run\"] -->|config snapshot per request|\
-  \ request-states\r\n  stage-review-run[\"Stage review run\\n.runtime/review/runs\
-  \ run.json\"] -->|paid workers reserve| attempt-states"
+prev_diagram: "graph TD\r\n  requests[\"Request status\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  attempts[\"Billing attempt state\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  stagerun[\"Paid stage review run\\nsrc/rfp_assistant/evaluation/stage_review.py\"\
+  ]\r\n  activation[\"Serving activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
+  ]\r\n  requests -->|stop check in dispatch| attempts\r\n  attempts -->|billing state\
+  \ on result| requests\r\n  stagerun -->|reserves via gateway| attempts\r\n  activation\
+  \ -->|config snapshot per request| requests"

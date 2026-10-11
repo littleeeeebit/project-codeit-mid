@@ -1,0 +1,1 @@
+Reached directly from queued, or from running when `_finish` sees `cancel_requested` with a `completed` outcome, or when a checkpoint raises `_Stop('cancelled')`. Already dispatched calls still settle; the outcome is stored as history and never attached as the current answer.

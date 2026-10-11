@@ -1,1 +1,0 @@
-Set by `RequestRunner.shutdown` (queued rows, and running rows while futures are pending) and by `recover_requests` when a new owner starts. A worker that finishes after this keeps `interrupted` and stores its outcome only for history; any dispatched attempt becomes `unknown` through `budget.recover`.

@@ -1,0 +1,9 @@
+created: 2026-10-11T03:31:25.977Z
+updated: 2026-10-11T03:31:26.226Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: provider-transport
+children: []
+parentPath:
+  - paid-gateway

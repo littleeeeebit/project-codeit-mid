@@ -1,0 +1,1 @@
+HWP and PDF originals under `RFP_SOURCE_DIR/files` with `data_list.csv`. They are identified by SHA-256 (`source_hash`) and downloadable through `/api/originals/{doc_id}/{source_hash}` (`service.original_download`). Their recorded hashes are part of the validated-import references.

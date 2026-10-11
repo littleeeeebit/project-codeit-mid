@@ -4,7 +4,9 @@
     python review/server.py --port 8520 --no-browser --no-build
 
 Standard library only, so a machine without the project's Python environment can still view imported runs. It reads
-run folders, imports and exports them as zip files and writes decision files. It never runs a pipeline, loads a model
+run folders, imports and exports them as zip files, writes decision files and answer notes, and records the person's
+decisions on failure types grouped from those notes (src/rfp_assistant/evaluation/error_analysis.py, also standard
+library only; the coding agent does the grouping from an exported bundle). It never runs a pipeline, loads a model
 or calls a paid service; runs come from `python -m rfp_assistant.cli stage-review run ...`, and a paid run (generation,
 ocr) appears here only after its approved estimate was paid (`stage-review resume`).
 """
@@ -12,7 +14,6 @@ ocr) appears here only after its approved estimate was paid (`stage-review resum
 from __future__ import annotations
 
 import argparse
-import contextlib
 import hashlib
 import io
 import json
@@ -23,7 +24,6 @@ import socketserver
 import subprocess
 import sys
 import tempfile
-import threading
 import uuid
 import webbrowser
 import zipfile
@@ -34,6 +34,13 @@ from pathlib import Path
 
 APP = Path(__file__).resolve().parent
 REPO = APP.parent
+# The note store and the failure taxonomy are shared with the CLI and the release report; the module is standard
+# library only, so this server still runs without the project's environment.
+sys.path.insert(0, str(REPO / "src"))
+from rfp_assistant.evaluation import error_analysis as ea  # noqa: E402
+from rfp_assistant.evaluation.error_analysis import (  # noqa: E402
+    ReviewInputError, annotation_state, annotations_file, read_annotations, write_lock)
+
 OUT = APP / "out"
 RUN_SCHEMA = "review-run-1"
 DECISION_SCHEMA = "review-decision-1"
@@ -43,10 +50,6 @@ MAX_IMPORT = 2 * 1024 ** 3
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json",
          ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".woff2": "font/woff2",
          ".txt": "text/plain; charset=utf-8"}
-
-
-class ReviewInputError(ValueError):
-    pass
 
 
 def data_dir() -> Path:
@@ -216,45 +219,12 @@ def import_run(root: Path, data: bytes) -> str:
     return run_id
 
 
-@contextlib.contextmanager
-def write_lock(root: Path):
-    """Every write under <data>/review: one at a time across threads and across processes, since the launcher may
-    start a second server on another port over the same data folder. An OS lock on a file, released by the OS if
-    the process dies, held around a whole read-check-write."""
-    path = root / "review" / ".write.lock"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with WRITE_LOCK, path.open("a+b") as f:
-        if os.name == "nt":
-            import msvcrt
-            f.seek(0)
-            while True:
-                try:
-                    msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)  # retries for 10 s, then raises: wait again
-                    break
-                except OSError:
-                    continue
-            try:
-                yield
-            finally:
-                f.seek(0)
-                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(f, fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
-
-
-WRITE_LOCK = threading.Lock()
-
-
 # ---------------------------------------------------------------- annotations
 
 # A person's notes on spans of generated answers, and which answers they read and found fine. One append-only JSONL
 # file per run under <data>/review/annotations, outside the run folder and outside git: an edit or a deletion is a
 # new record naming the note it changes, so the history of every note stays readable to the agent that fixes it.
+# Reading and folding the store lives in error_analysis, which groups the notes into failure types.
 
 ANNOTATION_SCHEMA = "review-annotation-1"
 ANNOTATIONS_IN_ZIP = "annotations.jsonl"
@@ -262,28 +232,8 @@ FIELD = re.compile(r"^(summary|next_action|claim\.(\d+)|conflict\.(\d+)\.(\d+)|m
 OPS = ("note", "edit", "delete", "reviewed")
 
 
-def annotations_file(root: Path, run_id: str) -> Path:
-    return root / "review" / "annotations" / f"{run_id}.jsonl"
-
-
-def read_annotations(root: Path, run_id: str) -> list[dict]:
-    path = annotations_file(root, run_id)
-    if not path.exists():
-        return []
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-
-
 def _append(root: Path, run_id: str, records: list[dict]) -> None:
-    """Add records after the existing ones. The file is replaced whole, so a failed write leaves it as it was
-    rather than ending in half a line; nothing already recorded changes."""
-    if not records:
-        return
-    path = annotations_file(root, run_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    before = path.read_bytes() if path.exists() else b""
-    tmp = path.with_suffix(".jsonl.tmp")
-    tmp.write_bytes(before + "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records).encode("utf-8"))
-    os.replace(tmp, path)
+    ea.append_jsonl(annotations_file(root, run_id), records)
 
 
 def field_text(answer: dict, field: str) -> str | None:
@@ -348,28 +298,6 @@ def check_annotations(view: dict, records: list[dict]) -> None:
                 notes.discard(r["target"])
         elif not isinstance(r.get("value"), bool):
             raise ReviewInputError("reviewed is true or false")
-
-
-def annotation_state(records: list[dict]) -> dict:
-    """The records folded in order: live notes with their latest text, and answers marked reviewed and fine."""
-    notes, reviewed = {}, {}
-    for r in records:
-        if r["op"] == "note":
-            notes[r["id"]] = {k: r[k] for k in ("id", "question", "candidate", "commit", "field", "start", "end",
-                                                "text", "note", "author", "at")}
-        elif r["op"] == "edit" and r["target"] in notes:
-            notes[r["target"]].update(note=r["note"], edited_by=r["author"], edited_at=r["at"])
-        elif r["op"] == "delete":
-            notes.pop(r["target"], None)
-        elif r["op"] == "reviewed":
-            key = (r["question"], r["candidate"])
-            if r["value"]:
-                reviewed[key] = {"question": r["question"], "candidate": r["candidate"], "author": r["author"],
-                                 "at": r["at"]}
-            else:
-                reviewed.pop(key, None)
-    # The store only grows, so its record count orders snapshots: the app keeps the newest it has seen.
-    return {"version": len(records), "notes": list(notes.values()), "reviewed": list(reviewed.values())}
 
 
 def add_annotation(root: Path, view: dict, body: dict, author: str) -> dict:
@@ -607,10 +535,17 @@ class Handler(BaseHTTPRequestHandler):
                                   {"Content-Disposition": f'attachment; filename="{parts[2]}.zip"'})
             if len(parts) == 4 and parts[3] == "annotations":
                 return self._json(200, annotation_state(read_annotations(self.root, folder.name)))
+            if len(parts) == 4 and parts[3] == "failure-types":
+                return self._json(200, ea.run_counts(self.root, folder.name))
             if len(parts) == 4 and parts[3] == "decision":
                 saved = decisions_dir(self.root) / f"{parts[2]}.json"
                 return self._json(200, json.loads(saved.read_text(encoding="utf-8")) if saved.exists() else None)
             raise FileNotFoundError(path)
+        if parts == ["api", "taxonomy"]:
+            return self._json(200, ea.taxonomy_state(self.root))
+        if parts == ["api", "taxonomy", "progress"]:
+            last = re.search(r"[?&]last=(\d{1,4})\b", self.path)
+            return self._json(200, ea.progress(self.root, int(last.group(1)) if last else 20))
         self._static(path)
 
     def _post(self) -> None:
@@ -634,6 +569,16 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(body, dict):
                 raise ReviewInputError("the note is not a JSON object")
             return self._json(200, add_annotation(self.root, view, body, git_author()))
+        if parts == ["api", "taxonomy", "export"]:
+            return self._json(200, ea.export(self.root))
+        if parts == ["api", "taxonomy", "decide"]:
+            try:
+                body = json.loads(self._body(1024 ** 2))
+            except ValueError:
+                raise ReviewInputError("the decision is not JSON") from None
+            if not isinstance(body, dict):
+                raise ReviewInputError("the decision is not a JSON object")
+            return self._json(200, ea.decide(self.root, body, git_author()))
         raise FileNotFoundError(self.path)
 
     def _static(self, path: str) -> None:

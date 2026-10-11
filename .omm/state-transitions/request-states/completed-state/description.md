@@ -1,0 +1,1 @@
+Written by `_finish` with any domain outcome that is not a failure, including `insufficient_evidence`, `ingestion_unavailable` and `budget_blocked` (which keeps `completed` because it is a normal refusal).

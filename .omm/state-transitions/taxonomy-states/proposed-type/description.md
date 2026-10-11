@@ -1,0 +1,1 @@
+Each type in `proposals/<id>.json` is referenced as `<proposal-id>/<n>` and stays pending until a history record lists that ref.

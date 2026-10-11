@@ -1,0 +1,1 @@
+Frozen K0/K1/D/H/HR runs and compare-matrix rows under `.runtime/runs/`, bound to the dataset, population, index manifest, analyzer, dense version and limits. Runs over different populations are never compared, and a run whose population changed is blocked until rerun.

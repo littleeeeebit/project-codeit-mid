@@ -1,1 +1,0 @@
-The shared instance on the GCP VM `codeit` and the in-page update path. The serving process exposes the update banner and request routes, but it never runs git or systemctl itself.

@@ -1,1 +1,0 @@
-Paid stage-review runs (generation, ocr). Retriever and chunking runs have no state: `stage_review.run` scores them and writes view.json directly. The CLI calls `on_ledger('reprice')` right after `run`, so the ledger connection is opened only after the workers' local reads. A run with no view.json is not listed by the review app.

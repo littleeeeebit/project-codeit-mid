@@ -1,1 +1,0 @@
-run.json says `needs_approval`, and `paid.estimate` has written estimate.json (expiring after 24 h, `approved_by: null`). `reprice` re-prices from the recorded token bounds at the ledger's current rates without running any worker. An earlier approval never carries over to a replaced estimate.

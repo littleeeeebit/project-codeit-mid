@@ -1,0 +1,10 @@
+created: 2026-10-11T03:31:34.309Z
+updated: 2026-10-11T03:31:34.801Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: extraction-revision
+children: []
+parentPath:
+  - owner-cli
+  - corpus-pipeline

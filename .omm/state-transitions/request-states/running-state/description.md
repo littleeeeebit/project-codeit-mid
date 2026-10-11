@@ -1,0 +1,1 @@
+Set by `run_queued`, or directly by `_create` for free modes and synchronous `answer`. Every new paid stage first calls `_checkpoint`, and `mark_dispatching` repeats the stop check atomically. `cancel_request` on a running request only sets `cancel_requested=1`.

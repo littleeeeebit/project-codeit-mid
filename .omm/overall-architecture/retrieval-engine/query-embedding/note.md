@@ -1,0 +1,1 @@
+The selected default (2026-10-07) is `dragonkue/BGE-m3-ko`, a local model at 1,024 dimensions, so query embedding is normally a GPU call rather than a paid one.

@@ -1,0 +1,16 @@
+graph TD
+  resources-owner["Resources owner\nsrc/rfp_assistant/service/service.py"]
+  request-runner["Bounded request runner\nsrc/rfp_assistant/service/service.py"]
+  answer-execution["Answer execution\nsrc/rfp_assistant/service/service.py"]
+  metered-chat["Metered chat call\nsrc/rfp_assistant/service/service.py"]
+  answer-validation["Answer validation\nsrc/rfp_assistant/gateway/generation.py"]
+  background-jobs["Background jobs\nsrc/rfp_assistant/service/drafting.py"]
+  update-watch["Update watch and fence\nsrc/rfp_assistant/service/update.py"]
+  resources-owner -->|creates on first paid ask| request-runner
+  request-runner -->|run_queued by request id| answer-execution
+  answer-execution -->|rewrite and generate stages| metered-chat
+  metered-chat -->|provider response| answer-validation
+  answer-validation -->|validated payload| answer-execution
+  update-watch -->|fence checked at admission| request-runner
+  resources-owner -->|joins threads on close| background-jobs
+  update-watch -->|counts open paid work| resources-owner

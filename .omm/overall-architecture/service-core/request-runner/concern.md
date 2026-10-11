@@ -1,0 +1,1 @@
+A full queue is refused with a ServiceError before any paid work, so the screen must retry; nothing waits beyond the 12 slots.

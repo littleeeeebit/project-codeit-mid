@@ -1,0 +1,1 @@
+Maintenance never changes what serves; activation stays a separate human step.

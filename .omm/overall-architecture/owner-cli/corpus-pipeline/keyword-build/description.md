@@ -1,0 +1,1 @@
+`cmd_build_keyword` calls `build_keyword_index` (see retrieval-engine/keyword-index). `--include-unreviewed` builds the operating index over every parsed source and labels the unreviewed ones, which surface as `index_includes_unreviewed_sources` in every retrieval. `--reviewed-only` and the fixed profiles build comparison indexes that never serve.

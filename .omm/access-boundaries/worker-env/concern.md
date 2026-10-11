@@ -1,0 +1,1 @@
+Candidate code runs with the runner's filesystem access and, in paid mode, with the key and a writable database connection. The approval gate limits spend, but not what a malicious ref could do; the design assumes refs come from trusted team branches.

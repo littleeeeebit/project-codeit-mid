@@ -1,0 +1,13 @@
+graph TD
+  connection-pools["Pooled connections\nsrc/rfp_assistant/storage/postgres.py"]
+  import-validation["Validated import gate\nsrc/rfp_assistant/storage/postgres.py"]
+  application-mutex["Application write mutex\nsrc/rfp_assistant/storage/postgres.py"]
+  relational-schema["Schema and records\nsrc/rfp_assistant/storage/store.py"]
+  vector-sets["pgvector sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  runtime-files["Runtime artifacts\nsrc/rfp_assistant/storage/store.py"]
+  connection-pools -->|checked at startup| import-validation
+  import-validation -->|hashes artifacts in| runtime-files
+  connection-pools -->|tx immediate locks| application-mutex
+  application-mutex -->|serializes writes to| relational-schema
+  relational-schema -->|chunks referenced by| vector-sets
+  relational-schema -->|paths and hashes of| runtime-files

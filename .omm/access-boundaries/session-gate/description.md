@@ -1,0 +1,1 @@
+See `overall-architecture/http-api`: foreign-origin writes get 403, a missing session 401, an account mismatch 409, and a write without the account header 428. Every route records the hub username as `member_id` on requests, decisions, corrections and audit rows.

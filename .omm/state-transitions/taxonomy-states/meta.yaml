@@ -1,0 +1,13 @@
+created: 2026-10-11T03:31:56.393Z
+updated: 2026-10-11T03:31:56.593Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: taxonomy-states
+children:
+  - accepted-type
+  - live-note
+  - proposed-type
+  - rejected-type
+  - unassigned-note
+parentPath: []

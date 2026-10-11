@@ -1,0 +1,1 @@
+A live note held by no accepted or pending type (`_assigned`). `export` refuses when none are left.

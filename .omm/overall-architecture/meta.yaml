@@ -1,9 +1,9 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-11 02:31:08.634000+00:00
-update_count: 52
+updated: 2026-10-11 03:31:15.335000+00:00
+update_count: 54
 last_field: diagram
-git_commit: 202d3f1
-git_branch: answer-span-annotation
+git_commit: 5673b1e
+git_branch: failure-taxonomy-from-notes
 children:
 - api
 - api-layer
@@ -31,7 +31,6 @@ children:
 - provider-transport
 - retrieval
 - retrieval-engine
-- review
 - runtime-artifacts
 - screens
 - self-update
@@ -40,24 +39,23 @@ children:
 - service-layer
 - stage-review
 - storage
+- storage-layer
 - stores
 - tracing
 - web
 - web-pages
 - web-screens
 - workflows
-prev_diagram: "graph TD\r\n  web-screens[\"Next.js screens\\nweb/src\"] -->|fetch\
-  \ JSON, SSE stream| http-api[\"FastAPI app\\nsrc/rfp_assistant/api.py\"]\r\n  http-api\
-  \ -->|one service call per route| service-core[\"Service core\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  service-core -->|retrieve under activation| retrieval-engine[\"Retrieval\
-  \ engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  service-core -->|reserve,\
-  \ dispatch, settle| paid-gateway[\"Paid gateway\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  retrieval-engine -->|reads index and vectors| postgres-storage[\"PostgreSQL\
-  \ and runtime files\\nsrc/rfp_assistant/storage/store.py\"]\r\n  paid-gateway -->|attempt\
-  \ ledger rows| postgres-storage\r\n  service-core -->|maintenance thread runs| corpus-pipeline[\"\
-  Corpus pipeline\\nsrc/rfp_assistant/corpus/ingestion.py\"]\r\n  corpus-pipeline\
-  \ -->|extractions, chunks, indexes| postgres-storage\r\n  evaluation-selection[\"\
-  Evaluation and selection\\nsrc/rfp_assistant/evaluation/evaluation.py\"] -->|answer\
-  \ runs via service.answer| service-core\r\n  evaluation-selection -->|activate sets\
-  \ active_run| postgres-storage\r\n  stage-review-app[\"Stage review app\\nreview/server.py\"\
-  ] -->|CLI freezes serving inputs| postgres-storage"
+prev_diagram: "graph TD\r\n  screens[\"Web screens\\nweb/src/app/page.tsx\"]\r\n \
+  \ api[\"FastAPI routes and session\\nsrc/rfp_assistant/api.py\"]\r\n  service[\"\
+  Service core\\nsrc/rfp_assistant/service/service.py\"]\r\n  retrieval[\"Retrieval\
+  \ engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  gateway[\"Paid gateway\
+  \ and ledger\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n  stores[\"PostgreSQL and\
+  \ runtime files\\nsrc/rfp_assistant/storage/postgres.py\"]\r\n  cli[\"Owner CLI\\\
+  nsrc/rfp_assistant/cli.py\"]\r\n  review[\"Stage review app\\nreview/server.py\"\
+  ]\r\n  screens -->|JSON calls and SSE| api\r\n  api -->|one service call per route|\
+  \ service\r\n  cli -->|same service and pipelines| service\r\n  service -->|scoped\
+  \ question| retrieval\r\n  service -->|reserve, call, settle| gateway\r\n  retrieval\
+  \ -->|index files and pgvector| stores\r\n  gateway -->|attempt rows| stores\r\n\
+  \  service -->|requests, traces, results| stores\r\n  cli -->|writes run folders|\
+  \ review"

@@ -1,0 +1,1 @@
+Fusion parameters come from the activated run's `limits` through `run_settings`, not from the process configuration.

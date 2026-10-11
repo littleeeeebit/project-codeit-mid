@@ -1,0 +1,1 @@
+It never runs a pipeline, loads a model or pays. Every write under `<data>/review` takes the OS file lock `review/.write.lock` (msvcrt or fcntl) plus a process lock, so two servers over one data folder never interleave.

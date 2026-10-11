@@ -1,0 +1,9 @@
+created: 2026-10-11T03:31:20.332Z
+updated: 2026-10-11T03:31:20.616Z
+update_count: 2
+last_field: note
+kind: nested-class
+title: corpus-routing
+children: []
+parentPath:
+  - retrieval-engine

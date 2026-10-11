@@ -1,1 +1,0 @@
-Set by `mark_dispatching` just before the network call, after the request guard, owner, paid-admission and no-unknown checks pass in the same transaction. This durable marker is what turns a crash into `unknown` instead of an unrecorded charge.

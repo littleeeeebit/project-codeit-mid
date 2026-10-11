@@ -15,7 +15,7 @@ from rfp_assistant.service import answers, auth, service
 from rfp_assistant.gateway import budget, generation
 from rfp_assistant import cli
 from rfp_assistant.retrieval import dense
-from rfp_assistant.evaluation import evaluation, release, sealed
+from rfp_assistant.evaluation import error_analysis, evaluation, release, sealed
 from rfp_assistant.storage import postgres, store
 from rfp_assistant.contracts import AnswerRequest
 from rfp_assistant.gateway.generation import FakeTransport
@@ -229,8 +229,21 @@ class ReleaseReportTest(unittest.TestCase):
     def test_a_draft_report_lists_what_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = fixtures.make_env(Path(tmp))
+            # the person's accepted failure types are reported beside the gates, labelled as no sealed metric
+            from tests import test_error_analysis as notes
+            view = notes.make_run(env.settings.data_dir)
+            n = notes.note(env.settings.data_dir, view, "q1", "c1", "30일", "기한이 원문과 다름")
+            error_analysis.propose(env.settings.data_dir, notes.proposal(("기한 오류", "기한을 틀린다.", [n])))
+            ref = error_analysis.taxonomy_state(env.settings.data_dir)["pending"][0]["ref"]
+            error_analysis.decide(env.settings.data_dir, {"op": "accept", "ref": ref}, "person")
             path = release.write_release_report(env.settings, "latest")
             text = path.read_text(encoding="utf-8")
+            self.assertIn("## Human error analysis (not a sealed metric)", text)
+            self.assertIn(f"| 기한 오류 | 기한을 틀린다. | 1/1 (fewer than 3 cases) | `{notes.RUN}` 1/1 |", text)
+            human = json.loads((path.parent / "evaluation.json").read_text(encoding="utf-8"))["human_error_analysis"]
+            self.assertEqual((human["sealed_metric"], human["gate"], human["reviewed"]), (False, False, 1))
+            checked = json.loads((path.parent / "coverage.json").read_text(encoding="utf-8"))["human_checked_sources"]
+            self.assertIn(f"human-checked sources {checked} (", text)  # the Markdown and coverage.json agree
             self.assertIn("draft-", path.parent.name)
             self.assertIn("## Decision: **limited**", text)
             self.assertIn("no saved check results", text)

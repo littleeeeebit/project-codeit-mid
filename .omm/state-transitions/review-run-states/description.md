@@ -1,0 +1,1 @@
+A free stage (retriever, chunking) is written complete with `view.json` in one `run` call. A paid stage (generation, ocr) moves through `run.json state`, and each candidate carries its own `status` (`complete`, `failed`, `refused`, `stopped`).

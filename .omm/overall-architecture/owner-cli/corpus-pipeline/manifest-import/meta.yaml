@@ -1,0 +1,10 @@
+created: 2026-10-11T03:31:31.536Z
+updated: 2026-10-11T03:31:31.537Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: manifest-import
+children: []
+parentPath:
+  - owner-cli
+  - corpus-pipeline

@@ -1,1 +1,0 @@
-Set by a refused dispatch (`stopped_before_dispatch:<reason>`), a missing key (`provider_unavailable`), a provider error confirmed to precede execution, or recovery of a reservation that was never dispatched.

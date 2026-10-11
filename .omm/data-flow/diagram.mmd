@@ -1,17 +1,17 @@
 graph TD
-  originals["Originals and data_list.csv\nsrc/rfp_assistant/corpus/ingestion.py"]
-  ingest["Ingest with OCR merge\nsrc/rfp_assistant/corpus/ingestion.py"]
-  fidelity["Fidelity and review status\nsrc/rfp_assistant/corpus/fidelity.py"]
-  keyword["Keyword index build\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  vectors["Vector sets\nsrc/rfp_assistant/retrieval/dense.py"]
-  gold["Gold review queue\nsrc/rfp_assistant/evaluation/gold.py"]
-  evaluate["Runs, comparison, activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  serving["Serving retrieval\nsrc/rfp_assistant/service/service.py"]
-  originals -->|manifest rows, source hashes| ingest
-  ingest -->|elements and artifact| fidelity
-  fidelity -->|review status filter| keyword
-  keyword -->|chunk payloads| vectors
-  keyword -->|index version| evaluate
-  vectors -->|dense version| evaluate
-  gold -->|approved dataset rows| evaluate
-  evaluate -->|active_run setting| serving
+  original-files["Original RFP files\nsrc/rfp_assistant/corpus/ingestion.py"]
+  extraction-elements["Extraction elements\nsrc/rfp_assistant/corpus/ingestion.py"]
+  keyword-chunks["Keyword index chunks\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  vector-payloads["Embedding sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  active-run["Active run setting\nsrc/rfp_assistant/service/service.py"]
+  answer-records["Request and attempt rows\nsrc/rfp_assistant/service/service.py"]
+  review-notes["Review notes and taxonomy\nsrc/rfp_assistant/evaluation/error_analysis.py"]
+  original-files -->|parse and OCR merge| extraction-elements
+  extraction-elements -->|chunk profile build| keyword-chunks
+  keyword-chunks -->|embed payloads| vector-payloads
+  keyword-chunks -->|scored against gold spans| retrieval-runs
+  vector-payloads -->|dense and hybrid runs| retrieval-runs
+  retrieval-runs -->|person activates| active-run
+  active-run -->|serving config per request| answer-records
+  answer-records -->|stage review answers annotated| review-notes

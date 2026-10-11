@@ -1,0 +1,1 @@
+Set by owner `reconcile` for unknown attempts dispatched inside a closed interval and billed to that provider project. The reconciliation adjustment carries the provider total minus local settled cost, and a later settlement compensates.

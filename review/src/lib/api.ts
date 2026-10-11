@@ -290,6 +290,54 @@ export type Annotations = {
   reviewed: { question: string; candidate: string; author: string; at: string }[];
 };
 
+/** A note as the failure taxonomy shows it: with the run, question text and candidate label it came from. */
+export type TaxNote = SpanNote & { run_id: string; question_text: string | null; candidate_label: string };
+
+/** A failure type: proposed (`ref`, waiting for the person) or accepted (`id`). `answers` counts distinct answers
+ *  holding one of its live notes; `deleted` counts notes deleted since it was grouped. */
+export type FailureType = {
+  id?: string;
+  ref?: string;
+  name: string;
+  definition: string;
+  notes: TaxNote[];
+  deleted: number;
+  answers: number;
+  decided_by?: string;
+  decided_at?: string;
+  proposed_at?: string;
+};
+
+export type Taxonomy = {
+  version: number;
+  accepted: FailureType[];
+  pending: FailureType[];
+  unassigned: number;
+  history: { op: string; author: string; at: string; version: number; reason: string | null; names: string[] }[];
+};
+
+export type Exported = { export_id: string; bundle: string; notes: number; prompt: string };
+
+export type Progress = {
+  version: number;
+  reviewed: number;
+  breadth: number;
+  types: { id: string; name: string; definition: string; answers: number; thin: boolean; first: number | null; runs: string[] }[];
+  last: number;
+  new_in_last: number;
+  new_names: string[];
+  thin: number;
+  pending: number;
+  unassigned: number;
+};
+
+/** One run's answers with a note of each accepted type, per candidate, over that candidate's reviewed answers. */
+export type RunFailures = {
+  version: number;
+  reviewed: Record<string, number>;
+  types: { id: string; name: string; definition: string; by_candidate: Record<string, number> }[];
+};
+
 export async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `${res.status}`);

@@ -1,16 +1,17 @@
 graph TD
-  ask["Ask screen\nweb/src/components/ask/ask-page.tsx"]
-  admit["Submit and admit\nsrc/rfp_assistant/service/service.py"]
-  worker["Queued worker\nsrc/rfp_assistant/service/service.py"]
-  prepare["Rewrite, retrieve, price\nsrc/rfp_assistant/service/service.py"]
-  generate["Metered generation\nsrc/rfp_assistant/service/service.py"]
-  validate["Citation validation\nsrc/rfp_assistant/gateway/generation.py"]
-  finish["Store outcome\nsrc/rfp_assistant/service/service.py"]
-  ask -->|POST /api/ask| admit
-  admit -->|request id to executor| worker
-  worker -->|claimed running request| prepare
-  prepare -->|messages and estimate| generate
-  generate -->|partials via SSE| ask
-  generate -->|provider response| validate
-  validate -->|validated payload| finish
-  finish -->|polled status and result| ask
+  ask-screen["Ask screen\nweb/src/components/ask/ask-page.tsx"]
+  session-gate["Session middleware\nsrc/rfp_assistant/api.py"]
+  submit-answer["Submit and persist\nsrc/rfp_assistant/service/service.py"]
+  worker-thread["Executor worker\nsrc/rfp_assistant/service/service.py"]
+  retrieval-stage["Retrieve and price\nsrc/rfp_assistant/service/service.py"]
+  generation-stage["Metered generation\nsrc/rfp_assistant/service/service.py"]
+  finish-record["Validate and finish\nsrc/rfp_assistant/service/service.py"]
+  stream-poll["Stream and status poll\nweb/src/lib/use-answer-stream.ts"]
+  ask-screen -->|POST /api/ask| session-gate
+  session-gate -->|bind key, model, scope| submit-answer
+  submit-answer -->|queued row, request id| worker-thread
+  worker-thread -->|claim queued to running| retrieval-stage
+  retrieval-stage -->|messages and estimate| generation-stage
+  generation-stage -->|deltas into partials| stream-poll
+  generation-stage -->|provider response| finish-record
+  finish-record -->|result_json, done event| stream-poll

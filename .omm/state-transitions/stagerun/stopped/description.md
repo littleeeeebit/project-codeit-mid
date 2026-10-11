@@ -1,1 +1,0 @@
-Some approved candidate did not finish (a budget refusal, `unknown_billing`, its approved maximum, a moved ref, a changed working tree, or a crash). Finished answers and paid OCR reads are kept; the ledger knows every billed item, so a resume never pays for one again.

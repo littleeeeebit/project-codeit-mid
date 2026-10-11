@@ -1,0 +1,17 @@
+graph TD
+  review-runner["Stage review runner\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  ref-worktrees["Ref worktrees and worker\nsrc/rfp_assistant/evaluation/stage_review_worker.py"]
+  paid-approval["Estimate, approve, resume\nsrc/rfp_assistant/evaluation/stage_review_paid.py"]
+  run-folders["Run folders\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  review-server["Review server\nreview/server.py"]
+  review-screens["Review screens\nreview/src/app/page.tsx"]
+  error-analysis["Failure taxonomy store\nsrc/rfp_assistant/evaluation/error_analysis.py"]
+  coding-agent["Coding agent\noutside the app"]
+  review-runner -->|checkout ref, spawn worker| ref-worktrees
+  review-runner -->|paid stages stop at estimate| paid-approval
+  paid-approval -->|key only after approval| ref-worktrees
+  review-runner -->|run.json and view.json| run-folders
+  review-screens -->|fetch /api/runs and /api/taxonomy| review-server
+  review-server -->|reads views, writes decisions| run-folders
+  review-server -->|notes, decide types| error-analysis
+  error-analysis -->|export bundle, proposal file| coding-agent

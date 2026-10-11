@@ -343,6 +343,8 @@
     "src/rfp_assistant/evaluation/evaluation.py",
     "src/rfp_assistant/evaluation/gold.py",
     "src/rfp_assistant/evaluation/release.py",
+    "src/rfp_assistant/evaluation/error_analysis.py",
+    "tests/test_error_analysis.py",
     "src/rfp_assistant/evaluation/sealed.py",
     "src/rfp_assistant/service/service.py",
     "src/rfp_assistant/storage/store.py",
@@ -382,10 +384,12 @@
     "review.command",
     "src/rfp_assistant/evaluation/stage_review.py",
     "src/rfp_assistant/evaluation/stage_review_worker.py",
+    "src/rfp_assistant/evaluation/error_analysis.py",
     "src/rfp_assistant/corpus/ingestion.py",
     "src/rfp_assistant/retrieval/chunking.py",
     "src/rfp_assistant/cli.py",
     "tests/test_stage_review.py",
+    "tests/test_error_analysis.py",
     "tools/verify.py",
     "verification.json"
    ],
@@ -393,7 +397,7 @@
    "assertions": [
     {
      "id": "contract-tests",
-     "expected": "tests.test_stage_review passes: run-folder schema, chunking title check, export/import, decision files, gold rank, variant validation, the paid-run approval gate, paid recovery, repricing and admission on a real ledger, the generation and OCR views, and the append-only answer annotation store (offsets checked against the stored answer, carried through export and import)"
+     "expected": "tests.test_stage_review passes: run-folder schema, chunking title check, export/import, decision files, gold rank, variant validation, the paid-run approval gate, paid recovery, repricing and admission on a real ledger, the generation and OCR views, and the append-only answer annotation store (offsets checked against the stored answer, carried through export and import); tests.test_error_analysis passes: error-analysis export and propose through the CLI without a database, a proposed failure type refused without a Korean name, a one-sentence definition or an existing human note, and accept, rename, merge, split and reject versioned and counted over reviewed answers"
     },
     {
      "id": "served-import",

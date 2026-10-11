@@ -1,0 +1,1 @@
+`tx(conn, immediate=True)` begins a transaction and takes `SELECT id FROM application_mutex WHERE id=1 FOR UPDATE`. Every immediate write is serialized this way: request creation and finish, reservation, dispatch marking, settlement, activation and index recording.

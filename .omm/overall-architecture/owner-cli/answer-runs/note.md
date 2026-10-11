@@ -1,0 +1,1 @@
+Embedding comparison (`E-…` runs) uses exact McNemar tests with Holm adjustment against the first run.

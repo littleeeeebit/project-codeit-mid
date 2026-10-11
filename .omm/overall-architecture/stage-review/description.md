@@ -1,0 +1,1 @@
+Stage review compares a baseline git ref with candidate refs for one stage (retriever, chunking, generation, ocr) on identical frozen inputs. The CLI does all the running; the app only displays runs and records the person's decisions and notes for the coding agent.

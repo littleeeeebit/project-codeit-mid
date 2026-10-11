@@ -1,0 +1,1 @@
+Sessions live in server memory, so a restart signs everyone out.

@@ -1,16 +1,12 @@
 created: 2026-10-08 21:41:51.990000+00:00
-updated: 2026-10-11T02:31:13.812Z
+updated: 2026-10-11 02:31:13.812000+00:00
 update_count: 5
 last_field: context
 kind: nested-class
 title: retrieval
 children:
-  - bm25
-  - dense
-  - fusion
-  - lexical
-  - pack
-  - route
-  - scope
-  - serving
+- dense
+- fusion
+- lexical
+- scope
 parentPath: []

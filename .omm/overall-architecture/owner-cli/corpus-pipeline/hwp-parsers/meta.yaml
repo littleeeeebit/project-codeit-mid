@@ -1,0 +1,10 @@
+created: 2026-10-11T03:31:31.892Z
+updated: 2026-10-11T03:31:32.199Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: hwp-parsers
+children: []
+parentPath:
+  - owner-cli
+  - corpus-pipeline

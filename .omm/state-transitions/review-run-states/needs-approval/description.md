@@ -1,0 +1,1 @@
+`run.json` is written before pricing, so a failed pricing step costs a `reprice`, not the local reads. There is no `view.json` yet, so `list_runs` hides the run from the app.

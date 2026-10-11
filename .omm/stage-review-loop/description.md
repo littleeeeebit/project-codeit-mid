@@ -1,1 +1,0 @@
-A coding agent delivers a retriever, chunking, generation or OCR change as a branch; a person compares it with the baseline on identical frozen inputs and records a decision that the agent then reads. The CLI does all execution. The review app never runs a pipeline, loads a model or pays.

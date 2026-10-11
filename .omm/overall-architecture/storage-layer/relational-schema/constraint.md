@@ -1,0 +1,1 @@
+`init` never resets spending. A stage-review generation worker whose `SCHEMA_VERSION` differs from the shared database is refused, so a candidate branch cannot migrate the shared ledger.

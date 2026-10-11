@@ -1,1 +1,0 @@
-`stage_review.run` freezes the inputs (`paid.freeze`; for generation, also the serving `activation.json`). It checks out each ref into its own worktree and runs the worker in `estimate` mode without API keys. The worker writes `<id>.estimate.json` with the token bound of every call it may make. A candidate that needs CUDA on a host without it is `refused`.

@@ -1,23 +1,22 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-11 02:31:18.402000+00:00
-update_count: 50
+updated: 2026-10-11 03:31:44.489000+00:00
+update_count: 52
 last_field: diagram
-git_commit: 202d3f1
-git_branch: answer-span-annotation
+git_commit: 5673b1e
+git_branch: failure-taxonomy-from-notes
 children:
-- admit
 - answer-stream
 - answer-validation
-- ask
 - ask-page
+- ask-screen
 - ask-submit
 - cancellation
 - evidence-retrieval
-- finish
 - finish-record
 - finish-request
 - finish-step
 - generate
+- generation-stage
 - langfuse-tracing
 - metered-call
 - ownership-and-polling
@@ -26,26 +25,27 @@ children:
 - paid-answer-stages
 - paid-call
 - poll-and-stream
-- prepare
+- retrieval-stage
 - run-queued
 - screen-attachment
+- session-gate
 - status-poll
 - stream-and-poll
+- stream-poll
 - submit-and-admit
 - submit-answer
 - turn-render
-- validate
 - validate-and-finish
 - validation
-- worker
-prev_diagram: "graph TD\r\n  ask-route[\"POST /api/ask\\nsrc/rfp_assistant/api.py\"\
-  ] -->|validated AskIn| submit-answer[\"submit_answer\\nservice/service.py\"]\r\n\
-  \  submit-answer -->|queued row, slot admitted| request-runner[\"Worker claim\\\
-  nservice.py (run_queued)\"]\r\n  request-runner -->|claimed running| paid-answer[\"\
-  Paid answer\\nservice.py (_paid_answer)\"]\r\n  paid-answer -->|question, scope,\
-  \ limits| retrieve-evidence[\"Retrieve and price\\nservice.py (retrieve, _priced)\"\
-  ]\r\n  retrieve-evidence -->|messages and estimate| metered-chat[\"Metered call\\\
-  nservice.py (_metered_chat)\"]\r\n  metered-chat -->|provider response| validate-finish[\"\
-  Validate and finish\\nservice.py (_validated, _finish)\"]\r\n  metered-chat -->|partial\
-  \ text| status-and-stream[\"Status poll and SSE\\napi.py (request, stream)\"]\r\n\
-  \  validate-finish -->|result_json stored| status-and-stream"
+- worker-thread
+prev_diagram: "graph TD\r\n  ask[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
+  ]\r\n  admit[\"Submit and admit\\nsrc/rfp_assistant/service/service.py\"]\r\n  worker[\"\
+  Queued worker\\nsrc/rfp_assistant/service/service.py\"]\r\n  prepare[\"Rewrite,\
+  \ retrieve, price\\nsrc/rfp_assistant/service/service.py\"]\r\n  generate[\"Metered\
+  \ generation\\nsrc/rfp_assistant/service/service.py\"]\r\n  validate[\"Citation\
+  \ validation\\nsrc/rfp_assistant/gateway/generation.py\"]\r\n  finish[\"Store outcome\\\
+  nsrc/rfp_assistant/service/service.py\"]\r\n  ask -->|POST /api/ask| admit\r\n \
+  \ admit -->|request id to executor| worker\r\n  worker -->|claimed running request|\
+  \ prepare\r\n  prepare -->|messages and estimate| generate\r\n  generate -->|partials\
+  \ via SSE| ask\r\n  generate -->|provider response| validate\r\n  validate -->|validated\
+  \ payload| finish\r\n  finish -->|polled status and result| ask"
