@@ -1,5 +1,11 @@
 [
  {
+  "step": "head",
+  "commit": "edbb38e58a9c55b06c1b71e2c255ca16dd38cdc7",
+  "dirty": "",
+  "t": "18:00:57"
+ },
+ {
   "step": "corpus",
   "kind": "fixture corpus + 12 real HWP originals",
   "originals": [
@@ -16,21 +22,21 @@
    "경상북도 봉화군_봉화군 재난통합관리시스템 고도화 사업(협상)(긴급).hwp",
    "케빈랩 주식회사_평택시 강소형 스마트시티 AI 기반의 영상감시 시스템 .hwp"
   ],
-  "work": "C:\\Users\\Public\\Documents\\ESTsoft\\CreatorTemp\\verify-maintenance-walk-3hxckqhl",
-  "t": "17:12:20"
+  "work": "C:\\Users\\Public\\Documents\\ESTsoft\\CreatorTemp\\verify-maintenance-walk-b3tzy_iv",
+  "t": "18:01:01"
  },
  {
   "step": "progress",
-  "heading": "실행 중0:08 경과",
+  "heading": "실행 중0:04 경과",
   "ingest": "3 · 매니페스트·수집 · 실행 중 · 3 / 15 읽는 중 · 기관E_재난 관리 시스템.hwp · 이 파일 0:00",
-  "t": "17:12:47"
+  "t": "18:01:18"
  },
  {
   "step": "finished",
   "heading": "끝났지만 검증되지 않음",
   "ingest": "3 · 매니페스트·수집 · 완료 · 원문 16개 추출 모두 그대로 (1개는 입력 설정이 달라 다시 읽었지만 결과가 같음) · 1초 안에 못 읽은 12개는 이전 추출 유지",
-  "text": "마지막 실행 M-20261011-081238 · verify-verifier-26288 · 2026-10-11 08:12\n\n끝났지만 검증되지 않음\n\n시간 제한 안에 읽지 못한 원문 12개가 이전 추출로 남았습니다. 서비스 중인 검색은 그대로입니다. 외부 호출 0회.\n\n시간 제한 안에 읽지 못한 원문 12개는 이전 추출을 그대로 두었고, 다음 실행에서 다시 읽습니다: (사)벤처기업협회_2024년 벤처확인종합관리시스템 기능 고도화 용역사업 .hwp, (사)부산국제영화제_2024년 BIFF & ACFM 온라인서비스 재개발 및 행사지원시.hwp, (사）한국대학스포츠협의회_KUSF 체육특기자 경기기록 관리시스템 개발.hwp, (재)예술경영지원센터_통합 정보시스템 구축 사전 컨설팅.hwp, 2025 구미 아시아육상경기선수권대회 조직위원회_2025 구미아시아육상경.hwp, BioIN_의료기기산업 종합정보시스템(정보관리기관) 기능개선 사업(2차).hwp, KOICA 전자조달_[긴급] [지문] [국제] 우즈베키스탄 열린 의정활동 상하원 .hwp, 경기도 안양시_호계체육관 배드민턴장 및 탁구장 예약시스템 구축 용역.hwp, 경기도 평택시_2024년도 평택시 버스정보시스템(BIS) 구축사업.hwp, 경기도사회서비스원_2024년 통합사회정보시스템 운영지원.hwp, 경상북도 봉화군_봉화군 재난통합관리시스템 고도화 사업(협상)(긴급).hwp, 케빈랩 주식회사_평택시 강소형 스마트시티 AI 기반의 영상감시 시스템 .hwp\n\n유지보수 실행\n\nCLI의 maintain과 같은 순서입니다. 바뀐 것이 없으면 모두 재사용하고 호출하지 않습니다. 유료 임베딩은 추정에서 멈추고, 실패한 단계에서 멈추며, 어느 경우에도 서비스 중인 검색은 바꾸지 않습니다. 백업 위치 C:\\Users\\Public\\Documents\\ESTsof",
-  "t": "17:13:14"
+  "text": "마지막 실행 M-20261011-090114 · verify-verifier-8852 · 2026-10-11 09:01\n\n끝났지만 검증되지 않음\n\n시간 제한 안에 읽지 못한 원문 12개가 이전 추출로 남았습니다. 서비스 중인 검색은 그대로입니다. 외부 호출 0회.\n\n시간 제한 안에 읽지 못한 원문 12개는 이전 추출을 그대로 두었고, 다음 실행에서 다시 읽습니다: (사)벤처기업협회_2024년 벤처확인종합관리시스템 기능 고도화 용역사업 .hwp, (사)부산국제영화제_2024년 BIFF & ACFM 온라인서비스 재개발 및 행사지원시.hwp, (사）한국대학스포츠협의회_KUSF 체육특기자 경기기록 관리시스템 개발.hwp, (재)예술경영지원센터_통합 정보시스템 구축 사전 컨설팅.hwp, 2025 구미 아시아육상경기선수권대회 조직위원회_2025 구미아시아육상경.hwp, BioIN_의료기기산업 종합정보시스템(정보관리기관) 기능개선 사업(2차).hwp, KOICA 전자조달_[긴급] [지문] [국제] 우즈베키스탄 열린 의정활동 상하원 .hwp, 경기도 안양시_호계체육관 배드민턴장 및 탁구장 예약시스템 구축 용역.hwp, 경기도 평택시_2024년도 평택시 버스정보시스템(BIS) 구축사업.hwp, 경기도사회서비스원_2024년 통합사회정보시스템 운영지원.hwp, 경상북도 봉화군_봉화군 재난통합관리시스템 고도화 사업(협상)(긴급).hwp, 케빈랩 주식회사_평택시 강소형 스마트시티 AI 기반의 영상감시 시스템 .hwp\n\n유지보수 실행\n\nCLI의 maintain과 같은 순서입니다. 바뀐 것이 없으면 모두 재사용하고 호출하지 않습니다. 유료 임베딩은 추정에서 멈추고, 실패한 단계에서 멈추며, 어느 경우에도 서비스 중인 검색은 바꾸지 않습니다. 백업 위치 C:\\Users\\Public\\Documents\\ESTsoft",
+  "t": "18:01:40"
  },
  {
   "step": "state",
@@ -60,43 +66,48 @@
    "regression": "done",
    "report": "done"
   },
-  "t": "17:13:14"
+  "t": "18:01:40"
+ },
+ {
+  "step": "converters left running after the timed-out parses",
+  "pids": [],
+  "t": "18:01:43"
  },
  {
   "step": "started",
   "heading": "실행 중0:00 경과",
-  "t": "17:13:30"
+  "t": "18:01:53"
  },
  {
   "step": "progress",
-  "heading": "실행 중0:06 경과",
-  "ingest": "3 · 매니페스트·수집 · 실행 중 · 4 / 15 읽는 중 · (사)벤처기업협회_2024년 벤처확인종합관리시스템 기능 고도화 용역사업 .hwp · 이 파일 0:00",
-  "t": "17:13:36"
+  "heading": "실행 중0:02 경과",
+  "ingest": "3 · 매니페스트·수집 · 실행 중 · 3 / 15 읽는 중 · 기관E_재난 관리 시스템.hwp · 이 파일 0:00",
+  "t": "18:01:55"
  },
  {
   "step": "progress later",
-  "heading": "실행 중0:10 경과",
-  "ingest": "3 · 매니페스트·수집 · 실행 중 · 4 / 15 읽는 중 · (사)벤처기업협회_2024년 벤처확인종합관리시스템 기능 고도화 용역사업 .hwp · 이 파일 0:04",
-  "t": "17:13:40"
+  "heading": "실행 중0:06 경과",
+  "ingest": "3 · 매니페스트·수집 · 실행 중 · 4 / 15 읽는 중 · (사)벤처기업협회_2024년 벤처확인종합관리시스템 기능 고도화 용역사업 .hwp · 이 파일 0:03",
+  "t": "18:01:59"
  },
  {
   "step": "cancelled",
   "seconds": 2.4,
   "heading": "매니페스트·수집에서 취소됨",
   "ingest": "3 · 매니페스트·수집 · 취소됨 · 3 / 15까지 읽고 멈춤 · (사)벤처기업협회_2024년 벤처확인종합관리시스템 기능 고도화 용역사업 .hwp 읽던 중 취소",
-  "text": "마지막 실행 M-20261011-081329 · verify-verifier-26288 · 2026-10-11 08:13\n\n매니페스트·수집에서 취소됨\n\nverify-verifier-26288이(가) 2026-10-11 08:13에 취소했습니다. 이미 쓴 결과는 그대로 남습니다. 서비스 중인 검색은 그대로입니다. 외부 호출 0회.\n\n유지보수 실행\n\nCLI의 maintain과 같은 순서입니다. 바뀐 것이 없으면 모두 재사용하고 호출하지 않습니다. 유료 임베딩은 추정에서 멈추고, 실패한 단계에서 멈추며, 어느 경우에도 서비스 중인 검색은 바꾸지 않습니다. 백업 위치 C:\\Users\\Public\\Documents\\ESTsoft\\CreatorTemp\\verify-maintenance-walk-3hxckqhl\\back",
-  "t": "17:13:42"
+  "text": "마지막 실행 M-20261011-090153 · verify-verifier-8852 · 2026-10-11 09:01\n\n매니페스트·수집에서 취소됨\n\nverify-verifier-8852이(가) 2026-10-11 09:02에 취소했습니다. 이미 쓴 결과는 그대로 남습니다. 서비스 중인 검색은 그대로입니다. 외부 호출 0회.\n\n유지보수 실행\n\nCLI의 maintain과 같은 순서입니다. 바뀐 것이 없으면 모두 재사용하고 호출하지 않습니다. 유료 임베딩은 추정에서 멈추고, 실패한 단계에서 멈추며, 어느 경우에도 서비스 중인 검색은 바꾸지 않습니다. 백업 위치 C:\\Users\\Public\\Documents\\ESTsoft\\CreatorTemp\\verify-maintenance-walk-b3tzy_iv\\backup",
+  "t": "18:02:02"
  },
  {
   "step": "state",
   "running": false,
   "status": "cancelled",
   "stopped_at": "ingest",
-  "cancelled_by": "verify-verifier-26288",
-  "cancelled_at": "2026-10-11T08:13:40.599622+00:00",
+  "cancelled_by": "verify-verifier-8852",
+  "cancelled_at": "2026-10-11T09:02:00.001055+00:00",
   "start_enabled": true,
-  "report": "C:\\Users\\Public\\Documents\\ESTsoft\\CreatorTemp\\verify-maintenance-walk-3hxckqhl\\fixture\\data\\maintenance\\reports\\M-20261011-081329.md",
-  "t": "17:13:43"
+  "report": "C:\\Users\\Public\\Documents\\ESTsoft\\CreatorTemp\\verify-maintenance-walk-b3tzy_iv\\fixture\\data\\maintenance\\reports\\M-20261011-090153.md",
+  "t": "18:02:02"
  },
  {
   "step": "cancel with no live run",
@@ -104,6 +115,6 @@
   "body": {
    "detail": "실행 중인 유지보수가 없습니다."
   },
-  "t": "17:13:43"
+  "t": "18:02:02"
  }
 ]

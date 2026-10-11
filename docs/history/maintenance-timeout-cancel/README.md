@@ -38,7 +38,8 @@ re-parses them with pyhwp. Identical output reuses the earlier extraction ids. T
 
 ## Browser walk
 
-2026-10-11, Chromium through Playwright at 1440×1000, the API and the built screens on one uvicorn worker. The
+2026-10-11, at commit `edbb38e` with a clean tree (the first line of [walk-log.json](walk-log.json)): Chromium
+through Playwright at 1440×1000, the API and the built screens on one uvicorn worker. The
 corpus was the fixture corpus, its keyword index activated, plus 12 real HWP originals added to the manifest:
 11 others and the 케빈랩 one, 15 unique originals in all. The local converter was used and the provider was fake.
 A copy of the full local corpus was not used, because its `pg_dump` alone ran past 10 minutes. Steps are in
@@ -46,9 +47,22 @@ A copy of the full local corpus was not used, because its `pg_dump` alone ran pa
 
 | Run | Observed |
 | --- | --- |
-| `parse_timeout_seconds: 1` | The 12 new HWPs each hit the limit; the fixture HWP read in time. The heading reads 끝났지만 검증되지 않음, followed by one Korean sentence ("시간 제한 안에 읽지 못한 원문 12개가 이전 추출로 남았습니다") and a notice listing the 12 filenames. Ingest reads "원문 16개 추출 모두 그대로 … · 1초 안에 못 읽은 12개는 이전 추출 유지". Fidelity, keyword, embedding, regression and report all ran. API status `unverified`, `timed_out` = the 12 names ([screen](timed-out-unverified.jpg)). |
-| Default limit, 취소 | Backup and restore check done, then "실행 중 0:06 경과 · 4 / 15 읽는 중 · (사)벤처기업협회_… .hwp · 이 파일 0:00". Four seconds later: "0:10 경과 … 이 파일 0:04" ([1](progress-1.jpg), [2](progress-2.jpg)). The page showed the cancelled state 2.4 s after 취소 was pressed: heading 매니페스트·수집에서 취소됨, then "verify-verifier-…이(가) 2026-10-11 08:13에 취소했습니다. 이미 쓴 결과는 그대로 남습니다." Ingest reads "3 / 15까지 읽고 멈춤 · … 읽던 중 취소", and later steps read 대기 ([screen](cancelled.jpg)). API status `cancelled`, `stopped_at` `ingest`, `cancelled_by` and `cancelled_at` set. The report `.md` was written, and 유지보수 실행 was enabled again. |
+| `parse_timeout_seconds: 1` | The 12 new HWPs each hit the limit; the fixture HWP read in time. The heading reads 끝났지만 검증되지 않음, followed by one Korean sentence ("시간 제한 안에 읽지 못한 원문 12개가 이전 추출로 남았습니다") and a notice listing the 12 filenames. Ingest reads "원문 16개 추출 모두 그대로 … · 1초 안에 못 읽은 12개는 이전 추출 유지". Fidelity, keyword, embedding, regression and report all ran. API status `unverified`, `timed_out` = the 12 names ([screen](timed-out-unverified.jpg)). Two seconds after the run ended, no `hwp5proc` started during the walk was still running: each killed parse took its converter with it. |
+| Default limit, 취소 | Backup and restore check done, then "실행 중 0:02 경과 · 3 / 15 읽는 중 · 기관E_재난 관리 시스템.hwp · 이 파일 0:00". Four seconds later: "0:06 경과 · 4 / 15 읽는 중 · (사)벤처기업협회_… .hwp · 이 파일 0:03" ([1](progress-1.jpg), [2](progress-2.jpg)). The page showed the cancelled state 2.4 s after 취소 was pressed: heading 매니페스트·수집에서 취소됨, then "verify-verifier-…이(가) 2026-10-11 09:02에 취소했습니다. 이미 쓴 결과는 그대로 남습니다." Ingest reads "3 / 15까지 읽고 멈춤 · … 읽던 중 취소", and later steps read 대기 ([screen](cancelled.jpg)). API status `cancelled`, `stopped_at` `ingest`, `cancelled_by` and `cancelled_at` set. The report `.md` was written, and 유지보수 실행 was enabled again. |
 | Cancel with no live run | `POST /api/verify/maintenance/cancel` answered 400 "실행 중인 유지보수가 없습니다." |
 
 The first walk also found a bug, fixed before the runs above: a new original that timed out was also listed as
 changed, because `before` is read before the manifest import.
+
+## Focused checks at the same commit
+
+`tools/verify.py stage-review` runs neither the maintenance tests nor the frontend checks, so they were run at
+`edbb38e` on their own; the output is in [receipts.txt](receipts.txt):
+`unittest tests.test_maintenance tests.test_api tests.test_ingestion` (71 tests, OK), and in `web/`
+`vitest run` (85 passed), `tsc --noEmit -p .` and `eslint src test` (both exit 0).
+
+Review round 1 added two regressions to `tests.test_maintenance`. A stub converter that records its PID and blocks
+outlived its killed parse on the earlier code; it no longer does. A cancel accepted while the report step was blocked
+left the run `complete` on the earlier code; it now ends `cancelled` at `report`. The Linux branch of the tree kill
+(own process group, `killpg`) was checked in a `python:3.12-slim` container, where the converter was gone after
+the timeout.
