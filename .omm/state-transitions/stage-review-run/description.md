@@ -1,0 +1,1 @@
+Retriever and chunking runs go straight from frozen inputs to a scored view. Paid stages (generation, OCR) cycle through pricing, human approval and resumable payment. The `run.json` states are `needs_approval`, `stopped` and `complete`. Approval is not a `run.json` state; it is `approved_by`/`approved_at` in `estimate.json`.

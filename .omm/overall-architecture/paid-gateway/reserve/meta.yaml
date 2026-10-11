@@ -1,0 +1,9 @@
+created: 2026-10-11T04:59:55.634Z
+updated: 2026-10-11T04:59:55.820Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: reserve
+children: []
+parentPath:
+  - paid-gateway

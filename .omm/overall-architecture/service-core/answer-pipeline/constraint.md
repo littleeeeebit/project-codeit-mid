@@ -1,0 +1,1 @@
+Nothing is retried automatically. A billed call whose output cannot be validated is recorded as `technical_error` with its cost settled.

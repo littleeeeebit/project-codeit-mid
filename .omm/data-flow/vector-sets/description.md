@@ -1,0 +1,1 @@
+Per model, dimensions and policy, built from one keyword index version. Vectors are reused through the payload-hash cache, so rebuilding an index re-embeds only new payloads. Paid OpenAI builds go through `plan-embeddings` and `build-dense` with an estimate ID and the `embedding` envelope. Local models embed on the GPU only and refuse to run without CUDA.

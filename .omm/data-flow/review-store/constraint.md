@@ -1,0 +1,1 @@
+Every write goes through `error_analysis.write_lock` (an OS file lock), so two review servers over one data folder never overwrite each other.

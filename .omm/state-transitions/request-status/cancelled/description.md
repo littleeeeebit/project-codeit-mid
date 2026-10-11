@@ -1,0 +1,1 @@
+Set by `cancel_request` while the request was queued, by a `_Stop('cancelled')` at a checkpoint or dispatch guard, or by `_finish` when a completed result met `cancel_requested`. Its outcome is kept as history and never attached as the current answer.

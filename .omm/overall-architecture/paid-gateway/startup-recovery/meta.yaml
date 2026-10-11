@@ -1,9 +1,0 @@
-created: 2026-10-11T03:31:25.224Z
-updated: 2026-10-11T03:31:25.225Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: startup-recovery
-children: []
-parentPath:
-  - paid-gateway

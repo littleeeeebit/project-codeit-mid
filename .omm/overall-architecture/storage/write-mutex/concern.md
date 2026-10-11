@@ -1,0 +1,1 @@
+The source marks this as a deliberate `ponytail:` simplification. Per-account locks would be needed only if measured throughput requires them.

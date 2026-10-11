@@ -1,0 +1,1 @@
+A full queue is rejected with '요청이 많아…(유료 호출 없음)' before anything is reserved.

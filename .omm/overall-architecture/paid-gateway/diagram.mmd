@@ -1,15 +1,15 @@
 graph TD
   gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
-  startup-recovery["Startup recovery\nsrc/rfp_assistant/gateway/budget.py"]
-  admission["Reserve admission\nsrc/rfp_assistant/gateway/budget.py"]
-  dispatch-marker["Dispatch marker and guard\nsrc/rfp_assistant/gateway/budget.py"]
-  provider-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
+  reserve["Atomic reservation\nsrc/rfp_assistant/gateway/budget.py"]
+  dispatch-marker["Dispatch marker\nsrc/rfp_assistant/gateway/budget.py"]
+  transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
   settlement["Settle, release or unknown\nsrc/rfp_assistant/gateway/budget.py"]
-  trace-export["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
-  gateway-owner -->|acquired, then recover| startup-recovery
-  gateway-owner -->|owner_guard in each tx| admission
-  admission -->|reserved attempt id| dispatch-marker
-  dispatch-marker -->|dispatching, then call| provider-transport
-  gateway-owner -->|owner check before call| provider-transport
-  provider-transport -->|usage or ProviderError| settlement
-  provider-transport -->|generation spans| trace-export
+  answer-validation["Answer validation\nsrc/rfp_assistant/gateway/generation.py"]
+  tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
+  gateway-owner -->|"owner_guard in admission"| reserve
+  reserve -->|"attempt_id when admitted"| dispatch-marker
+  dispatch-marker -->|"call after durable marker"| transport
+  gateway-owner -->|"owner_check before call"| transport
+  transport -->|"usage or ProviderError"| settlement
+  transport -->|"structured content"| answer-validation
+  transport -->|"generation span, usage"| tracing

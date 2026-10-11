@@ -1,0 +1,16 @@
+graph TD
+  span-note["Human span note\nreview/server.py"]
+  proposed-type["Proposed type\nsrc/rfp_assistant/evaluation/error_analysis.py"]
+  accepted-type["Accepted type\nsrc/rfp_assistant/evaluation/error_analysis.py"]
+  rejected-type["Rejected type\nsrc/rfp_assistant/evaluation/error_analysis.py"]
+  pending-suggestion["Pending suggestion\nsrc/rfp_assistant/evaluation/similar_cases.py"]
+  approved-suggestion["Approved suggestion\nsrc/rfp_assistant/evaluation/similar_cases.py"]
+  rejected-suggestion["Rejected suggestion\nsrc/rfp_assistant/evaluation/similar_cases.py"]
+  span-note -->|"agent proposal admitted"| proposed-type
+  proposed-type -->|"accept, rename, merge, split"| accepted-type
+  proposed-type -->|"reject with reason"| rejected-type
+  rejected-type -->|"notes regroupable"| span-note
+  accepted-type -->|"agent suggest admitted"| pending-suggestion
+  pending-suggestion -->|"person approves"| approved-suggestion
+  pending-suggestion -->|"person rejects"| rejected-suggestion
+  approved-suggestion -->|"ai_suggested note filed"| accepted-type

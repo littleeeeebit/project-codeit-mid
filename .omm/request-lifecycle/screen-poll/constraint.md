@@ -1,0 +1,1 @@
+Streamed text is provisional. Only `request_status` delivers the validated outcome.

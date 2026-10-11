@@ -1,1 +1,0 @@
-One row in `attempts` per paid call: reserved → dispatching → settled; dispatching → unknown → settled or reconciled; reconciled → settled (late usage, with a compensating adjustment); reserved → released; dispatching → released only on confirmed pre-execution rejection (docstring of `gateway/budget.py`).

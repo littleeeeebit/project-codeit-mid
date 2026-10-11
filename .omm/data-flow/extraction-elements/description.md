@@ -1,1 +1,0 @@
-`elements` rows plus an `elements.jsonl` artifact per extraction revision, with element IDs, source order, kind, raw and search text, location and table cells. Gold labels, citations (`EvidenceUnit.element_ids`) and stage-review chunking inputs pin to these IDs; `gold repin` moves pending rows after a parser revision.

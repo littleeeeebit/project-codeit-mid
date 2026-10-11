@@ -1,0 +1,1 @@
+The call may have executed but its cost is unrecorded: a timeout, connection loss, a stream that failed mid-way, a missing `usage`, or a settlement failure. While any attempt is in this state, `mark_dispatching` refuses every new PostgreSQL dispatch and `paid on` refuses to enable paid work. `build-dense` and paid evaluation queries also stop.

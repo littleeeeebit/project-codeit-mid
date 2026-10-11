@@ -1,1 +1,0 @@
-`RequestRunner._run` → `run_queued` performs an atomic `UPDATE ... SET status='running' WHERE status='queued' AND cancel_requested=0`. A request cancelled or interrupted in the meantime is skipped without any paid stage. The request is rebuilt from `request_json` and `_execute` runs it. `release()` frees the admission slot in `finally`.

@@ -1,0 +1,1 @@
+`require_imported_database` refuses to start when recovery is blocked, when `migration_import.state` is not `complete`, when `validation_ready` is false, or when any artifact listed in `migration_validation.references_json` is missing or changed. Every command except `check`, `load-check` and `restore-check` runs against `RFP_DATABASE_DSN` and goes through this check.

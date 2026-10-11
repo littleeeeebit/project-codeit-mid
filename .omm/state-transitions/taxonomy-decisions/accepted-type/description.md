@@ -1,0 +1,1 @@
+Present in `_fold(...)['accepted']`. A change to the accepted set writes `versions/v<N>.json`. A rename, merge or split keeps the earliest acceptance time. Answers marked fine before acceptance are listed by `rereview` as '기준 추가 후 다시 보기'.

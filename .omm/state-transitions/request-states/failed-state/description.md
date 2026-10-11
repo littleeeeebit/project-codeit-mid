@@ -1,1 +1,0 @@
-Written by `_finish` with `request_status='failed'`: technical errors, validation failures after a billed call, ServiceErrors (`clarification_required`), consented-maximum refusals, or `_fail_unscheduled` when executor submission failed.

@@ -1,0 +1,1 @@
+Pipelines run every variant, and a person picks one. Nothing activates on its own or on a schedule.

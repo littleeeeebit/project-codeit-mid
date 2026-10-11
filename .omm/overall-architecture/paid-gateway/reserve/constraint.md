@@ -1,0 +1,1 @@
+`paid on` must set both the ledger switch and PostgreSQL paid admission. Budget administration (settle, reconcile, adjust, paid, audit) is owner CLI only and needs `--actor` and a reason.

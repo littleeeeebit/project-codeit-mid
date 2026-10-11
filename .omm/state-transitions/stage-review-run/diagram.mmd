@@ -1,0 +1,13 @@
+graph TD
+  frozen-inputs["Frozen inputs\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  needs-approval["needs_approval\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  approved-estimate["Approved estimate\nsrc/rfp_assistant/evaluation/stage_review_paid.py"]
+  stopped["stopped\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  complete["complete\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  frozen-inputs -->|"retriever or chunking scored"| complete
+  frozen-inputs -->|"paid stage priced"| needs-approval
+  needs-approval -->|"approve --approved-by"| approved-estimate
+  approved-estimate -->|"resume, all candidates done"| complete
+  approved-estimate -->|"resume, a candidate stops"| stopped
+  stopped -->|"resume within approval"| approved-estimate
+  stopped -->|"reprice voids approval"| needs-approval

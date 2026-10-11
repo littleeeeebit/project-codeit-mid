@@ -1,0 +1,1 @@
+Failure types and suggestions are never stored as mutable rows. `_fold` and `suggestions()` derive their state by replaying `history.jsonl` over the proposal and suggestion files. Only the person's decisions, written through `review/server.py`, append to history.

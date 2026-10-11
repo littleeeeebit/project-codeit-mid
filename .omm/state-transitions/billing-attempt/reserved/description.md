@@ -1,0 +1,1 @@
+Inserted by `budget.reserve` after every admission check passes. The maximum cost counts as pending against the cap and the purpose envelope.

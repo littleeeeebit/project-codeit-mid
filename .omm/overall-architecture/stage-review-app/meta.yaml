@@ -1,0 +1,16 @@
+created: 2026-10-11T05:00:02.290Z
+updated: 2026-10-11T05:00:02.638Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: stage-review-app
+children:
+  - error-analysis
+  - paid-approval
+  - review-screens
+  - review-server
+  - run-folders
+  - similar-cases
+  - stage-runner
+  - worker-process
+parentPath: []

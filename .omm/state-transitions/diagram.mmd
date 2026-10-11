@@ -1,11 +1,10 @@
 graph TD
-  request-states["Request status\nsrc/rfp_assistant/service/service.py"]
-  attempt-states["Billing attempt state\nsrc/rfp_assistant/gateway/budget.py"]
-  review-run-states["Stage review run state\nsrc/rfp_assistant/evaluation/stage_review.py"]
-  taxonomy-states["Failure type state\nsrc/rfp_assistant/evaluation/error_analysis.py"]
-  serving-activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  request-states -->|each paid stage opens| attempt-states
-  attempt-states -->|billing_state precedence| request-states
-  review-run-states -->|answers via service.answer| request-states
-  review-run-states -->|generation answers annotated| taxonomy-states
-  serving-activation -->|pins retrieval for| request-states
+  request-status["Request status\nsrc/rfp_assistant/service/service.py"]
+  billing-attempt["Ledger attempt state\nsrc/rfp_assistant/gateway/budget.py"]
+  stage-review-run["Stage review run state\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  taxonomy-decisions["Taxonomy and suggestions\nsrc/rfp_assistant/evaluation/error_analysis.py"]
+  request-status -->|"each paid stage reserves"| billing-attempt
+  stage-review-run -->|"worker answers reserve"| billing-attempt
+  billing-attempt -->|"rolls up billing_state"| request-status
+  billing-attempt -->|"unknown stops candidate"| stage-review-run
+  stage-review-run -->|"generation answers get notes"| taxonomy-decisions

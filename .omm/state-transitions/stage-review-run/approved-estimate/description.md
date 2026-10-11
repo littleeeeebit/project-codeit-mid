@@ -1,0 +1,1 @@
+`approve` checked the name, the 24-hour expiry and that the estimate fits the envelope and cap, and audited the approval. `resume` may now hand `OPENAI_API_KEY` to workers through `approved_env`.

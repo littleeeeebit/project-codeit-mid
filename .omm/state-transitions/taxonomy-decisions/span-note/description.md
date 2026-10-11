@@ -1,0 +1,1 @@
+A `note` record in `annotations/<run>.jsonl` written by `add_annotation`. The server refuses offsets that do not select the exact stored text, and refuses duplicate IDs. Only human notes, which have no `origin`, make an answer reviewed.

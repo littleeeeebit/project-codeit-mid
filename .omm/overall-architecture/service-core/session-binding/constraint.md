@@ -1,0 +1,1 @@
+No file, row, log or trace ever holds a member's key.

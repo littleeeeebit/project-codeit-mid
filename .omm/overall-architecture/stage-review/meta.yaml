@@ -1,17 +1,14 @@
 created: 2026-10-10 12:42:01.253000+00:00
-updated: 2026-10-11T03:31:38.960Z
+updated: 2026-10-11 03:31:38.960000+00:00
 update_count: 6
 last_field: diagram
 kind: nested-class
 title: stage-review
 children:
-  - coding-agent
-  - error-analysis
-  - paid-approval
-  - ref-worktrees
-  - review-runner
-  - review-screens
-  - review-server
-  - review-worker
-  - run-folders
+- error-analysis
+- paid-approval
+- ref-worktrees
+- review-runner
+- review-server
+- review-worker
 parentPath: []

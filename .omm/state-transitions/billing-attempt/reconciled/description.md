@@ -1,0 +1,1 @@
+The owner covered the attempt with a provider-total reconciliation (`budget.reconcile`, CLI only, needs a reason). If usage arrives later, `settle` records it and inserts an offsetting negative adjustment, so the attempt is not counted twice.

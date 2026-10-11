@@ -1,1 +1,0 @@
-`.runtime/indexes/<version>/chunks.jsonl` and the `chunks` table, carrying spans back to element offsets, the payload, the token count, the chunk type and the requirement key. Evidence quotes shown to the model and checked by the validator come from the chunk body; `_stored_quote` re-reads it.

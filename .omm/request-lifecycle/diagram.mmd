@@ -1,17 +1,17 @@
 graph TD
-  ask-screen["Ask screen\nweb/src/components/ask/ask-page.tsx"]
-  session-gate["Session middleware\nsrc/rfp_assistant/api.py"]
-  submit-answer["Submit and persist\nsrc/rfp_assistant/service/service.py"]
-  worker-thread["Executor worker\nsrc/rfp_assistant/service/service.py"]
-  retrieval-stage["Retrieve and price\nsrc/rfp_assistant/service/service.py"]
-  generation-stage["Metered generation\nsrc/rfp_assistant/service/service.py"]
-  finish-record["Validate and finish\nsrc/rfp_assistant/service/service.py"]
-  stream-poll["Stream and status poll\nweb/src/lib/use-answer-stream.ts"]
-  ask-screen -->|POST /api/ask| session-gate
-  session-gate -->|bind key, model, scope| submit-answer
-  submit-answer -->|queued row, request id| worker-thread
-  worker-thread -->|claim queued to running| retrieval-stage
-  retrieval-stage -->|messages and estimate| generation-stage
-  generation-stage -->|deltas into partials| stream-poll
-  generation-stage -->|provider response| finish-record
-  finish-record -->|result_json, done event| stream-poll
+  ask-post["POST /api/ask\nsrc/rfp_assistant/api.py"]
+  persist-admit["Persist and admit\nsrc/rfp_assistant/service/service.py"]
+  worker-claim["Worker claim\nsrc/rfp_assistant/service/service.py"]
+  rewrite["Follow-up rewrite\nsrc/rfp_assistant/service/service.py"]
+  retrieve-price["Retrieve and price\nsrc/rfp_assistant/service/service.py"]
+  metered-generation["Metered generation\nsrc/rfp_assistant/service/service.py"]
+  validate-finish["Validate and finish\nsrc/rfp_assistant/service/service.py"]
+  screen-poll["Poll and stream\nweb/src/components/ask/ask-page.tsx"]
+  ask-post -->|"AnswerRequest, new generation_id"| persist-admit
+  persist-admit -->|"queued request_id"| worker-claim
+  worker-claim -->|"follow-up only"| rewrite
+  worker-claim -->|"first turn"| retrieve-price
+  rewrite -->|"standalone question"| retrieve-price
+  retrieve-price -->|"messages, estimate"| metered-generation
+  metered-generation -->|"response, partials"| validate-finish
+  screen-poll -->|"status poll, SSE"| validate-finish

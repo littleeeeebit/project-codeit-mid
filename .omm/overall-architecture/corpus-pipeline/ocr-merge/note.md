@@ -1,0 +1,1 @@
+OCR model internals were not traced; this describes the merge interface called from `_parse_source` and the documented cache contract.

@@ -1,0 +1,1 @@
+Free retrieval (verifier traces, evaluations without `--allow-paid-queries`) uses cached vectors only.

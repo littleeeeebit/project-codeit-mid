@@ -1,0 +1,1 @@
+Each candidate has priced its work without a key (estimate mode), and `run.json` is written before pricing. `reprice` computes `estimate.json` at today's rates from the recorded token bounds. The app does not list the run until it is paid.

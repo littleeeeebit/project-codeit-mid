@@ -1,6 +1,6 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-11T03:31:16.588Z
-update_count: 37
+updated: 2026-10-11T04:59:50.442Z
+update_count: 39
 last_field: diagram
 kind: nested-class
 title: service-core
@@ -20,6 +20,7 @@ children:
   - resources
   - resources-owner
   - serving-config
+  - session-binding
   - submit
   - tracing
   - update-fence
@@ -27,28 +28,39 @@ children:
 parentPath: []
 prev_diagram: "graph TD\r
 
-  \  resources-owner[\"Process owner
-  Resources\\nsrc/rfp_assistant/service/service.py\"] -->|\"creates on first
-  ask\"| request-runner[\"Bounded executor
-  RequestRunner\\nsrc/rfp_assistant/service/service.py\"]\r
+  \  resources-owner[\"Resources
+  owner\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  request-runner -->|\"run_queued(request_id)\"| answer-path[\"Paid answer
-  path\\nsrc/rfp_assistant/service/service.py\"]\r
+  \  request-runner[\"Bounded request
+  runner\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  answer-path -->|\"index, dense, transport\"| resources-owner\r
+  \  answer-execution[\"Answer
+  execution\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  free-answers[\"Metadata and inventory
-  answers\\nsrc/rfp_assistant/service/service.py\"] -->|\"reads index, no
-  ledger\"| resources-owner\r
+  \  metered-chat[\"Metered chat
+  call\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  background-jobs[\"Drafting, evaluation, judges,
-  maintenance\\nsrc/rfp_assistant/service/drafting.py\"] -->|\"borrow transport,
-  joined on close\"| resources-owner\r
+  \  answer-validation[\"Answer
+  validation\\nsrc/rfp_assistant/gateway/generation.py\"]\r
 
-  \  update-watch[\"Update fence
-  UpdateWatch\\nsrc/rfp_assistant/service/update.py\"] -->|\"fence read at
-  admission\"| resources-owner\r
+  \  background-jobs[\"Background
+  jobs\\nsrc/rfp_assistant/service/drafting.py\"]\r
 
-  \  verifier-traces[\"Frozen verifier
-  runs\\nsrc/rfp_assistant/service/service.py\"] -->|\"paid generate via
-  submit_answer\"| request-runner"
+  \  update-watch[\"Update watch and
+  fence\\nsrc/rfp_assistant/service/update.py\"]\r
+
+  \  resources-owner -->|creates on first paid ask| request-runner\r
+
+  \  request-runner -->|run_queued by request id| answer-execution\r
+
+  \  answer-execution -->|rewrite and generate stages| metered-chat\r
+
+  \  metered-chat -->|provider response| answer-validation\r
+
+  \  answer-validation -->|validated payload| answer-execution\r
+
+  \  update-watch -->|fence checked at admission| request-runner\r
+
+  \  resources-owner -->|joins threads on close| background-jobs\r
+
+  \  update-watch -->|counts open paid work| resources-owner"

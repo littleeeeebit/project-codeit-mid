@@ -1,0 +1,1 @@
+Only `resume` pays. `reprice` creates a new estimate, and an earlier approval does not carry over to it.

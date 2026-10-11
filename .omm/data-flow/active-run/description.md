@@ -1,1 +1,0 @@
-The activated run's configuration (mode, index, dense version, embedding, reranker, limits, `eval_version`) that `active_serving` and `run_settings` apply to every request. Each request snapshots it in `trace_json.config.serving`.

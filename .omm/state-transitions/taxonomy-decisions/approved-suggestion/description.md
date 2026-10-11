@@ -1,0 +1,1 @@
+`decide_suggestion` re-checks that the span is still at those offsets, appends the note (`origin: ai_suggested`, `approved_by`), then appends the `suggestion-approve` history record that commits it. A note whose commit failed stays hidden through `unconfirmed_suggestions` and is reused on retry. It counts separately as 'AI 제안 승인 +n'.
