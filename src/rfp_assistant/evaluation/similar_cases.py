@@ -29,7 +29,8 @@ def answer_fields(answer: dict) -> dict[str, str]:
     ids = ["summary", "next_action", *(f"claim.{i}" for i in range(len(answer.get("claims") or []))),
            *(f"conflict.{i}.{j}" for i, c in enumerate(answer.get("conflicts") or [])
              for j in range(len(c.get("alternatives") or []))),
-           *(f"missing.{i}" for i in range(len(answer.get("missing") or [])))]
+           *(f"missing.{i}" for i in range(len(answer.get("missing") or []))),
+           *(f"listing.{i}" for i in range(len((answer.get("listing") or {}).get("rows") or [])))]
     return {f: t for f in ids if isinstance(t := field_text(answer, f), str) and t}
 
 

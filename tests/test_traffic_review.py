@@ -117,6 +117,8 @@ class FakeConnection:
         yield
 
     def execute(self, sql: str, params=()):
+        if "to_regclass('request_listings')" in sql:  # a database no version with corpus listings has served
+            return mock.Mock(fetchone=lambda: {"present": False})
         if sql.startswith("SELECT request_id"):
             since = params[1]
             return mock.Mock(fetchall=lambda: [r for r in self.rows if r["created_at"] >= since])

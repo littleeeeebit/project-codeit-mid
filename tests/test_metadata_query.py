@@ -3,8 +3,10 @@ set of matching projects computed by the service over every project's metadata, 
 provider. Each pinned question's expected set is computed directly from the stored metadata by the oracle below,
 independently of `metadata_query.run_query`."""
 
+import gzip
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 import uuid
@@ -16,6 +18,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 from rfp_assistant.contracts import AnswerRequest, AnswerResult
 from rfp_assistant.corpus import ingestion
+from rfp_assistant.evaluation import error_analysis, similar_cases, traffic_review
 from rfp_assistant.gateway import budget, generation, tracing
 from rfp_assistant.service import metadata_answers as ma
 from rfp_assistant.service import metadata_query as mq
@@ -512,6 +515,33 @@ class RollbackTest(Base):
         replay = service.answer(self.res, consultant, AnswerRequest(
             idempotency_key=key, generation_id="g", question="가장 싼 사업", scope=[], mode="corpus", as_of=AS_OF))
         self.assertEqual((replay.request_id, replay.listing), (listed.request_id, listed.listing))
+
+    def test_a_traffic_run_freezes_and_shows_the_listing_the_consultant_saw(self):
+        key = str(uuid.uuid4())  # a 질문하기 request: idempotency key = generation id
+        asked = service.answer(self.res, self.env.consultant, AnswerRequest(
+            idempotency_key=key, generation_id=key, question="5천만원 이상인 사업", scope=[], mode="corpus", as_of=AS_OF))
+        self.assertTrue(asked.listing["rows"] and asked.listing["review"])
+        run = traffic_review.run(self.env.settings, "2000-01-01", 5, "UNUSED",
+                                 dsn=os.environ[self.env.settings.database_dsn_env])
+        folder = Path(run["folder"])
+        frozen = [json.loads(line) for line in gzip.decompress(
+            (folder / "inputs" / "requests.jsonl.gz").read_bytes()).decode("utf-8").splitlines()]
+        (record,) = [r for r in frozen if r["request_id"] == asked.request_id]
+        texts = lambda rows: [(r["title"], r.get("description")) for r in rows]  # noqa: E731 - member-free fields
+        self.assertEqual(texts(record["result"]["listing"]["rows"]), texts(asked.listing["rows"]))
+        view = json.loads((folder / "view.json").read_text(encoding="utf-8"))
+        (question,) = [q for q in view["questions"] if q["id"] == asked.request_id]
+        shown = question["candidates"][traffic_review.CANDIDATE]
+        self.assertEqual(shown["listing"]["conditions"], asked.listing["conditions"])
+        self.assertEqual(texts(shown["listing"]["rows"]), texts(asked.listing["rows"]))
+        self.assertEqual([r["reasons"] for r in shown["listing"]["review"]],
+                         [[x["label"] for x in r["reasons"]] for r in asked.listing["review"]])
+        cited = {i for r in shown["listing"]["rows"] for i in r["evidence_ids"]}
+        self.assertTrue(cited and cited <= set(shown["evidence"]), "each description opens its passage")
+        described = next(i for i, r in enumerate(shown["listing"]["rows"]) if r["description"])
+        self.assertEqual(error_analysis.field_text(shown, f"listing.{described}"),  # takes span notes like a claim
+                         shown["listing"]["rows"][described]["description"])
+        self.assertIn(f"listing.{described}", similar_cases.answer_fields(shown))
 
 
 if __name__ == "__main__":

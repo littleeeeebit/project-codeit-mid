@@ -66,10 +66,15 @@ def read_window(dsn: str, since: str) -> tuple[list[dict], list[str], dict[str, 
                          options="-c default_transaction_read_only=on") as conn:
         conn.read_only = True
         with conn.transaction():
+            # A corpus metadata answer keeps its listing outside result_json (service._envelope); a database no
+            # version with listings has served has no such table.
+            listings = conn.execute("SELECT to_regclass('request_listings') IS NOT NULL AS present").fetchone()
+            listing = ("(SELECT l.listing_json FROM request_listings l WHERE l.request_id = requests.request_id)"
+                       if listings["present"] else "NULL")
             rows = conn.execute(
                 "SELECT request_id, member_id, idempotency_key, generation_id, status, mode, scope_json, "
-                "request_json, result_json, trace_json, created_at FROM requests WHERE request_json IS NOT NULL "
-                "AND result_json IS NOT NULL AND status = ANY(%s) AND created_at >= %s "
+                f"request_json, result_json, trace_json, created_at, {listing} AS listing_json FROM requests "
+                "WHERE request_json IS NOT NULL AND result_json IS NOT NULL AND status = ANY(%s) AND created_at >= %s "
                 "ORDER BY created_at, request_id", (list(STATUSES), since)).fetchall()
             members = [r["member_id"] for r in conn.execute("SELECT DISTINCT member_id FROM requests")]
             titles = {r["doc_id"]: (json.loads(r["normalized_metadata_json"] or "{}").get("title") or r["doc_id"])
@@ -224,6 +229,25 @@ def _ids(v) -> list[str]:
     return [i for i in v if isinstance(i, str)] if isinstance(v, list) else []
 
 
+def _listing(v) -> dict | None:
+    """A corpus metadata answer's list as the consultant saw it: every matching project with its cited description,
+    and 확인 필요 with its reasons. Read as untrusted like the rest of the stored answer."""
+    if not isinstance(v, dict):
+        return None
+
+    def row(r: dict) -> dict:
+        amount = r.get("amount_krw")
+        return {"title": _text(r.get("title")) or "", "institution": _text(r.get("institution")),
+                "institution_type": _text(r.get("institution_type")),
+                "amount_krw": amount if isinstance(amount, int) and not isinstance(amount, bool) else None,
+                "description": _text(r.get("description")), "evidence_ids": _ids(r.get("evidence_ids")),
+                "note": _text(r.get("note"))}
+    return {"conditions": _text(v.get("conditions")) or "", "count_only": v.get("count_only") is True,
+            "rows": [row(r) for r in _dicts(v.get("rows"))],
+            "review": [row(r) | {"reasons": [_text(x.get("label")) or "" for x in _dicts(r.get("reasons"))]}
+                       for r in _dicts(v.get("review"))]}
+
+
 def answer(result: dict, trace: dict, titles: dict[str, str]) -> dict:
     """The stored outcome in the generation view's answer shape. A validation failure shows the refused answer, as
     the consultant never saw it, so its spans can be noted. The refused answer failed its schema, so every field is
@@ -260,7 +284,7 @@ def answer(result: dict, trace: dict, titles: dict[str, str]) -> dict:
         "next_action": _text(shown.get("next_action")),
         "missing": [{"doc_id": _text(m.get("doc_id")), "field": _text(m.get("field")) or "",
                      "reason": _text(m.get("reason"))} for m in _dicts(shown.get("missing_fields"))],
-        "facts": _dicts(result.get("facts")),
+        "facts": _dicts(result.get("facts")), "listing": _listing(result.get("listing")),
         "validation": validation, "validation_detail": error if validation else None,
         "failure": error if error and not validation else None,
         "rejected_shown": isinstance(body, dict) or bool(raw) and summary == raw, "rejected_cut": cut,
@@ -351,6 +375,8 @@ def run(settings: Settings, since: str | None, sample: int | None, source_dsn_en
     frozen, questions, items = [], [], []
     for r in rows:
         snap, result, trace = (json.loads(r[k] or "{}") for k in ("request_json", "result_json", "trace_json"))
+        if r.get("listing_json"):  # the answer as the consultant saw it, before it is scrubbed and frozen
+            result["listing"] = json.loads(r["listing_json"])
         snap.pop("idempotency_key", None)  # equal to the generation id, kept once
         member = table.get(r["member_id"]) or pseudonym(key, r["member_id"])
         record = scrub({"request_id": r["request_id"], "member": member, "status": r["status"],
