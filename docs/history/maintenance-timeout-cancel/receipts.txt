@@ -1,10 +1,11 @@
-HEAD edbb38e58a9c55b06c1b71e2c255ca16dd38cdc7
+HEAD 9245c39aef6ae4c80b5336559d1804418b9c7fda
 test_the_converter_beside_the_interpreter_is_found_without_path (tests.test_maintenance.ConverterTest.test_the_converter_beside_the_interpreter_is_found_without_path) ... ok
 test_a_cancel_admitted_during_the_last_step_or_as_a_step_stops_is_recorded (tests.test_maintenance.SequenceTest.test_a_cancel_admitted_during_the_last_step_or_as_a_step_stops_is_recorded) ... ok
 test_a_damaged_backup_is_neither_reused_nor_trusted (tests.test_maintenance.SequenceTest.test_a_damaged_backup_is_neither_reused_nor_trusted) ... ok
 test_a_failed_reparse_leaves_the_served_extraction_available (tests.test_maintenance.SequenceTest.test_a_failed_reparse_leaves_the_served_extraction_available) ... ok
 test_a_failed_step_stops_the_sequence_and_names_itself (tests.test_maintenance.SequenceTest.test_a_failed_step_stops_the_sequence_and_names_itself) ... ok
 test_a_killed_parse_takes_its_converter_with_it (tests.test_maintenance.SequenceTest.test_a_killed_parse_takes_its_converter_with_it) ... ok
+test_a_late_or_repeated_cancel_of_an_earlier_run_never_stops_the_next (tests.test_maintenance.SequenceTest.test_a_late_or_repeated_cancel_of_an_earlier_run_never_stops_the_next) ... ok
 test_a_missing_referenced_artifact_voids_the_cached_restore_check (tests.test_maintenance.SequenceTest.test_a_missing_referenced_artifact_voids_the_cached_restore_check) ... ok
 test_a_paid_embedding_stops_at_its_estimate (tests.test_maintenance.SequenceTest.test_a_paid_embedding_stops_at_its_estimate) ... ok
 test_a_parse_that_never_returns_is_killed_and_the_run_ends_unverified (tests.test_maintenance.SequenceTest.test_a_parse_that_never_returns_is_killed_and_the_run_ends_unverified) ... ok
@@ -70,12 +71,12 @@ test_converter_success_alone_cannot_become_reviewed (tests.test_ingestion.Review
 test_stale_revision_unknown_location_or_missing_reviewer_imports_nothing (tests.test_ingestion.ReviewImportTest.test_stale_revision_unknown_location_or_missing_reviewer_imports_nothing) ... ok
 test_valid_review_is_appended_with_its_coverage (tests.test_ingestion.ReviewImportTest.test_valid_review_is_appended_with_its_coverage) ... ok
 test_different_output_under_one_parser_fingerprint_is_a_new_revision (tests.test_ingestion.RevisionIdentityTest.test_different_output_under_one_parser_fingerprint_is_a_new_revision) ... ok
-Ran 71 tests in 106.454s
+Ran 72 tests in 103.240s
 OK
 exit 0
 
 ## web (cd web)
-HEAD edbb38e58a9c55b06c1b71e2c255ca16dd38cdc7
+HEAD 9245c39aef6ae4c80b5336559d1804418b9c7fda
 ## vitest
  Test Files  8 passed (8)
       Tests  85 passed (85)
