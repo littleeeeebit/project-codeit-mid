@@ -1,0 +1,1 @@
+After a final `_checkpoint`, `_generate` calls `_metered_chat` with `on_delta`, which writes `res.partials[request_id]`. `answer_progress` returns `generation.partial_answer(content)` only while the row is running, not cancel-requested, and the generation id matches; otherwise it returns null, which withdraws the provisional text on screen.

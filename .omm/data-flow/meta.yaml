@@ -1,44 +1,44 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-11 01:15:07.772000+00:00
-update_count: 46
+updated: 2026-10-11 02:31:24.238000+00:00
+update_count: 48
 last_field: diagram
-git_commit: 5bfcd5d
-git_branch: review-ui-readable
+git_commit: 202d3f1
+git_branch: answer-span-annotation
 children:
 - activation
 - corpus-ingestion
 - embedding-set
-- evidence-view
+- evaluate
 - extraction
-- extractions
+- fidelity
 - fidelity-and-ocr
 - fidelity-check
 - fidelity-ocr
 - frozen-runs
+- gold
 - index-build
-- keyword-index-files
-- langfuse-traces
+- ingest
+- keyword
 - maintenance-sequence
 - ocr-merge
 - original-corpus
 - original-files
 - originals
 - preview
-- request-records
 - retrieval-runs
 - retrieval-selection
 - run-selection
+- serving
 - source-originals
 - vector-sets
-prev_diagram: "graph TD\r\n  original-files[\"Originals and data_list.csv\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ] -->|\"sha256, parse, OCR merge\"| extraction-artifacts[\"Element artifacts\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  extraction-artifacts -->|\"chunk profile, Kiwi tokens\"| keyword-index[\"\
-  Keyword index version\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  keyword-index\
-  \ -->|\"payload hashes\"| embedding-sets[\"pgvector embedding sets\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
-  ]\r\n  keyword-index -->|\"index_version\"| serving-config[\"active_run setting\\\
-  nsrc/rfp_assistant/evaluation/evaluation.py\"]\r\n  embedding-sets -->|\"dense_version\"\
-  | serving-config\r\n  serving-config -->|\"retrieve and pack\"| evidence-units[\"\
-  EvidenceUnit list\\nsrc/rfp_assistant/contracts.py\"]\r\n  evidence-units -->|\"\
-  validated answer JSON\"| request-records[\"requests.result_json\\nsrc/rfp_assistant/storage/store.py\"\
-  ]\r\n  request-records -->|\"open_evidence by ID\"| evidence-pane[\"Evidence pane\\\
-  nweb/src/components/ask/answer-parts.tsx\"]"
+- vectors
+prev_diagram: "graph TD\r\n  original-files[\"Originals and data_list.csv\\nRFP_SOURCE_DIR\"\
+  ] -->|hash, parse, OCR merge| extractions[\"Extractions and elements\\ncorpus/ingestion.py\"\
+  ]\r\n  extractions -->|chunk profile build| keyword-index-files[\"Keyword index\\\
+  n.runtime/indexes\"]\r\n  keyword-index-files -->|unique payloads embedded| vector-sets[\"\
+  pgvector sets\\nretrieval/vector_store.py\"]\r\n  keyword-index-files -->|packed\
+  \ evidence units| request-records[\"Request records\\nrequests.result_json\"]\r\n\
+  \  vector-sets -->|dense candidates| request-records\r\n  request-records -->|evidence_id\
+  \ lookup| evidence-view[\"Evidence and original\\nservice.py (open_evidence)\"]\r\
+  \n  request-records -->|trace seeded by request_id| langfuse-traces[\"Langfuse traces\\\
+  ngateway/tracing.py\"]"

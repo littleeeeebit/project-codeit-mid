@@ -1,0 +1,1 @@
+After changing a route or its shapes, run `python tools/openapi.py`; `tests/test_api.py` fails while web/openapi.json is stale. Characterization snapshots are in web/test/__snapshots__ and are rewritten only for an intended screen change.

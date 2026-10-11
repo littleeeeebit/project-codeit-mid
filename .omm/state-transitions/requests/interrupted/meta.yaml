@@ -1,0 +1,9 @@
+created: 2026-10-11T02:31:21.379Z
+updated: 2026-10-11T02:31:21.380Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: interrupted
+children: []
+parentPath:
+  - requests

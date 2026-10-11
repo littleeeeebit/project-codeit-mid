@@ -1,0 +1,1 @@
+Set by `settle` from the reported usage, exactly once; a duplicate settle returns the existing cost. A cost above the reservation freezes the budget. Settling a `reconciled` attempt inserts a negative `late-settlement:` adjustment so it is not counted twice.

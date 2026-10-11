@@ -1,9 +1,16 @@
 graph TD
-  ask-route["POST /api/ask\nsrc/rfp_assistant/api.py"] -->|validated AskIn| submit-answer["submit_answer\nservice/service.py"]
-  submit-answer -->|queued row, slot admitted| request-runner["Worker claim\nservice.py (run_queued)"]
-  request-runner -->|claimed running| paid-answer["Paid answer\nservice.py (_paid_answer)"]
-  paid-answer -->|question, scope, limits| retrieve-evidence["Retrieve and price\nservice.py (retrieve, _priced)"]
-  retrieve-evidence -->|messages and estimate| metered-chat["Metered call\nservice.py (_metered_chat)"]
-  metered-chat -->|provider response| validate-finish["Validate and finish\nservice.py (_validated, _finish)"]
-  metered-chat -->|partial text| status-and-stream["Status poll and SSE\napi.py (request, stream)"]
-  validate-finish -->|result_json stored| status-and-stream
+  ask["Ask screen\nweb/src/components/ask/ask-page.tsx"]
+  admit["Submit and admit\nsrc/rfp_assistant/service/service.py"]
+  worker["Queued worker\nsrc/rfp_assistant/service/service.py"]
+  prepare["Rewrite, retrieve, price\nsrc/rfp_assistant/service/service.py"]
+  generate["Metered generation\nsrc/rfp_assistant/service/service.py"]
+  validate["Citation validation\nsrc/rfp_assistant/gateway/generation.py"]
+  finish["Store outcome\nsrc/rfp_assistant/service/service.py"]
+  ask -->|POST /api/ask| admit
+  admit -->|request id to executor| worker
+  worker -->|claimed running request| prepare
+  prepare -->|messages and estimate| generate
+  generate -->|partials via SSE| ask
+  generate -->|provider response| validate
+  validate -->|validated payload| finish
+  finish -->|polled status and result| ask

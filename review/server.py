@@ -12,6 +12,7 @@ ocr) appears here only after its approved estimate was paid (`stage-review resum
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import io
 import json
@@ -22,6 +23,8 @@ import socketserver
 import subprocess
 import sys
 import tempfile
+import threading
+import uuid
 import webbrowser
 import zipfile
 from datetime import datetime, timezone
@@ -132,12 +135,15 @@ def list_runs(root: Path) -> list[dict]:
 
 
 def export_run(root: Path, run_id: str) -> bytes:
+    """The run folder, plus its annotations (kept outside the folder) as <run-id>/annotations.jsonl."""
     folder = run_folder(root, run_id)
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as z:
         for path in sorted(folder.rglob("*")):
-            if path.is_file() and path.name != ".imported.json":
+            if path.is_file() and path.name not in (".imported.json", ANNOTATIONS_IN_ZIP):
                 z.write(path, f"{run_id}/{path.relative_to(folder).as_posix()}")
+        if annotations_file(root, run_id).exists():
+            z.write(annotations_file(root, run_id), f"{run_id}/{ANNOTATIONS_IN_ZIP}")
     return buffer.getvalue()
 
 
@@ -182,13 +188,223 @@ def import_run(root: Path, data: bytes) -> str:
     target = runs_dir(root) / run_id
     if target.exists():
         raise ReviewInputError(f"{run_id} is already here")
+    carried = []
+    if f"{run_id}/{ANNOTATIONS_IN_ZIP}" in names:
+        try:
+            carried = [json.loads(line) for line in z.read(f"{run_id}/{ANNOTATIONS_IN_ZIP}").decode().splitlines()
+                       if line.strip()]
+        except ValueError:
+            raise ReviewInputError(f"{ANNOTATIONS_IN_ZIP} is unreadable") from None
+        check_annotations(view, carried)
     runs_dir(root).mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=runs_dir(root)) as tmp:
         z.extractall(tmp)
+        (Path(tmp) / run_id / ANNOTATIONS_IN_ZIP).unlink(missing_ok=True)  # they live in the store, not the run
         (Path(tmp) / run_id / ".imported.json").write_text(json.dumps(
             {"imported_at": datetime.now(timezone.utc).isoformat()}), encoding="utf-8")
-        (Path(tmp) / run_id).rename(target)
+        # The notes go into the store before the run is installed: a failure here leaves no run behind, and a run
+        # that then fails to install is imported again with its notes recognised as already stored.
+        with write_lock(root):
+            if target.exists():  # again under the lock: another server may have imported it meanwhile
+                raise ReviewInputError(f"{run_id} is already here")
+            existing = read_annotations(root, run_id)
+            have = {r["id"]: r for r in existing}
+            new = [r for r in carried if have.get(r["id"]) != r]
+            check_annotations(view, existing + new)
+            _append(root, run_id, new)
+            (Path(tmp) / run_id).rename(target)
     return run_id
+
+
+@contextlib.contextmanager
+def write_lock(root: Path):
+    """Every write under <data>/review: one at a time across threads and across processes, since the launcher may
+    start a second server on another port over the same data folder. An OS lock on a file, released by the OS if
+    the process dies, held around a whole read-check-write."""
+    path = root / "review" / ".write.lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with WRITE_LOCK, path.open("a+b") as f:
+        if os.name == "nt":
+            import msvcrt
+            f.seek(0)
+            while True:
+                try:
+                    msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)  # retries for 10 s, then raises: wait again
+                    break
+                except OSError:
+                    continue
+            try:
+                yield
+            finally:
+                f.seek(0)
+                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(f, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
+
+
+WRITE_LOCK = threading.Lock()
+
+
+# ---------------------------------------------------------------- annotations
+
+# A person's notes on spans of generated answers, and which answers they read and found fine. One append-only JSONL
+# file per run under <data>/review/annotations, outside the run folder and outside git: an edit or a deletion is a
+# new record naming the note it changes, so the history of every note stays readable to the agent that fixes it.
+
+ANNOTATION_SCHEMA = "review-annotation-1"
+ANNOTATIONS_IN_ZIP = "annotations.jsonl"
+FIELD = re.compile(r"^(summary|next_action|claim\.(\d+)|conflict\.(\d+)\.(\d+)|missing\.(\d+))$")
+OPS = ("note", "edit", "delete", "reviewed")
+
+
+def annotations_file(root: Path, run_id: str) -> Path:
+    return root / "review" / "annotations" / f"{run_id}.jsonl"
+
+
+def read_annotations(root: Path, run_id: str) -> list[dict]:
+    path = annotations_file(root, run_id)
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _append(root: Path, run_id: str, records: list[dict]) -> None:
+    """Add records after the existing ones. The file is replaced whole, so a failed write leaves it as it was
+    rather than ending in half a line; nothing already recorded changes."""
+    if not records:
+        return
+    path = annotations_file(root, run_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    before = path.read_bytes() if path.exists() else b""
+    tmp = path.with_suffix(".jsonl.tmp")
+    tmp.write_bytes(before + "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records).encode("utf-8"))
+    os.replace(tmp, path)
+
+
+def field_text(answer: dict, field: str) -> str | None:
+    """The stored answer text a span lies in: what the app renders for that field, character for character."""
+    m = FIELD.match(field or "")
+    try:
+        if not m:
+            return None
+        if field in ("summary", "next_action"):
+            return answer.get(field)
+        if m.group(2):
+            return answer["claims"][int(m.group(2))]["text"]
+        if m.group(3):
+            return answer["conflicts"][int(m.group(3))]["alternatives"][int(m.group(4))]["value"]
+        return answer["missing"][int(m.group(5))]["field"]
+    except (KeyError, IndexError, TypeError):
+        return None
+
+
+def _answer(view: dict, question: str, candidate: str) -> dict:
+    if view["stage"] != "generation":
+        raise ReviewInputError("only generated answers take span notes")
+    q = next((q for q in view["questions"] if q["key"] == question), None)
+    if q is None or not isinstance(q["candidates"].get(candidate), dict):
+        raise ReviewInputError("no such answer in this run")
+    return q["candidates"][candidate]
+
+
+def check_annotations(view: dict, records: list[dict]) -> None:
+    """Every record names this run, a known operation and, for a note, a span whose offsets select exactly its
+    text in the stored answer; an edit or deletion names a note recorded earlier."""
+    commits = {c["id"]: c["commit"] for c in view["candidates"]}
+    notes, ids = set(), set()
+    for r in records:
+        if not isinstance(r, dict) or r.get("schema") != ANNOTATION_SCHEMA or r.get("run_id") != view["run_id"] \
+                or r.get("op") not in OPS or not isinstance(r.get("id"), str) or not r.get("author") or not r.get("at"):
+            raise ReviewInputError(f"not a {ANNOTATION_SCHEMA} record of {view['run_id']}")
+        if r["id"] in ids:  # an edit or deletion names its note by id, so two records may never share one
+            raise ReviewInputError(f"two records share the id {r['id']}")
+        ids.add(r["id"])
+        if r["op"] in ("note", "reviewed"):
+            _answer(view, r.get("question"), r.get("candidate"))
+            if r.get("commit") != commits.get(r["candidate"]):
+                raise ReviewInputError("the record names another commit than the run's candidate")
+        if r["op"] == "note":
+            text = field_text(_answer(view, r["question"], r["candidate"]), r.get("field"))
+            start, end = r.get("start"), r.get("end")
+            if text is None:
+                raise ReviewInputError("no such field in that answer")
+            if not (isinstance(start, int) and isinstance(end, int) and 0 <= start < end <= len(text)) \
+                    or text[start:end] != r.get("text"):
+                raise ReviewInputError("the offsets do not select that text in the stored answer")
+            if not str(r.get("note") or "").strip():
+                raise ReviewInputError("write what is wrong with the selected text")
+            notes.add(r["id"])
+        elif r["op"] in ("edit", "delete"):
+            if r.get("target") not in notes:
+                raise ReviewInputError("that note does not exist or was deleted")
+            if r["op"] == "edit" and not str(r.get("note") or "").strip():
+                raise ReviewInputError("an edited note cannot be empty; delete it instead")
+            if r["op"] == "delete":
+                notes.discard(r["target"])
+        elif not isinstance(r.get("value"), bool):
+            raise ReviewInputError("reviewed is true or false")
+
+
+def annotation_state(records: list[dict]) -> dict:
+    """The records folded in order: live notes with their latest text, and answers marked reviewed and fine."""
+    notes, reviewed = {}, {}
+    for r in records:
+        if r["op"] == "note":
+            notes[r["id"]] = {k: r[k] for k in ("id", "question", "candidate", "commit", "field", "start", "end",
+                                                "text", "note", "author", "at")}
+        elif r["op"] == "edit" and r["target"] in notes:
+            notes[r["target"]].update(note=r["note"], edited_by=r["author"], edited_at=r["at"])
+        elif r["op"] == "delete":
+            notes.pop(r["target"], None)
+        elif r["op"] == "reviewed":
+            key = (r["question"], r["candidate"])
+            if r["value"]:
+                reviewed[key] = {"question": r["question"], "candidate": r["candidate"], "author": r["author"],
+                                 "at": r["at"]}
+            else:
+                reviewed.pop(key, None)
+    # The store only grows, so its record count orders snapshots: the app keeps the newest it has seen.
+    return {"version": len(records), "notes": list(notes.values()), "reviewed": list(reviewed.values())}
+
+
+def add_annotation(root: Path, view: dict, body: dict, author: str) -> dict:
+    """Validate one operation from the app against the stored answers and the existing records, then append it."""
+    op = body.get("op")
+    record = {"schema": ANNOTATION_SCHEMA, "id": uuid.uuid4().hex, "run_id": view["run_id"], "op": op,
+              "author": author, "at": datetime.now(timezone.utc).isoformat()}
+    if op in ("note", "reviewed"):
+        commit = next((c["commit"] for c in view["candidates"] if c["id"] == body.get("candidate")), None)
+        record.update(question=body.get("question"), candidate=body.get("candidate"), commit=commit)
+    if op == "note":
+        record.update({k: body.get(k) for k in ("field", "start", "end", "text")}, note=str(body.get("note") or "").strip())
+    elif op in ("edit", "delete"):
+        record["target"] = body.get("target")
+        if op == "edit":
+            record["note"] = str(body.get("note") or "").strip()
+    elif op == "reviewed":
+        record["value"] = body.get("value")
+    with write_lock(root):
+        existing = read_annotations(root, view["run_id"])
+        check_annotations(view, existing + [record])
+        _append(root, view["run_id"], [record])
+        return annotation_state(existing + [record])
+
+
+def git_author() -> str:
+    """The person's git user.name, as the store records it; a note without an author is refused."""
+    try:
+        name = subprocess.run(["git", "config", "user.name"], cwd=REPO, capture_output=True, text=True,
+                              timeout=10).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        name = ""
+    if not name:
+        raise ReviewInputError("set git user.name: every note records who wrote it")
+    return name
 
 
 # ---------------------------------------------------------------- decisions
@@ -237,9 +453,13 @@ def write_decision(root: Path, view: dict, chosen: str | None, reasons: dict, no
     folder = decisions_dir(root)
     folder.mkdir(parents=True, exist_ok=True)
     md, js = folder / f"{view['run_id']}.md", folder / f"{view['run_id']}.json"
-    js.write_text(json.dumps(record, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    md.write_text(decision_markdown(record, runs_dir(root) / view["run_id"]), encoding="utf-8")
-    return {"markdown": str(md), "json": str(js), "prompt": agent_prompt(record, md, js)}
+    # The .json marks the run decided in the list, so it is written last: a failed .md never shows as decided. Both
+    # under the write lock, so two servers saving at once never leave one's .md beside the other's .json.
+    with write_lock(root):
+        md.write_text(decision_markdown(record, runs_dir(root) / view["run_id"]), encoding="utf-8")
+        js.write_text(json.dumps(record, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    spans = annotations_file(root, view["run_id"])
+    return {"markdown": str(md), "json": str(js), "prompt": agent_prompt(record, md, js, spans if spans.exists() else None)}
 
 
 def _measure(stage: str, s: dict | None) -> str:
@@ -305,12 +525,14 @@ def decision_markdown(record: dict, folder: Path) -> str:
     return "\n".join(lines) + "\n"
 
 
-def agent_prompt(record: dict, md: Path, js: Path) -> str:
+def agent_prompt(record: dict, md: Path, js: Path, spans: Path | None = None) -> str:
     chosen = next((c for c in record["candidates"] if c["id"] == record["chosen"]), None)
     what = f"The person chose `{chosen['ref']}` ({chosen['commit'][:12]})." if chosen else \
         "The person accepted none of the candidates."
+    span = (f" Their notes on spans of individual answers are in {spans} (append-only JSONL, {ANNOTATION_SCHEMA}; "
+            "an edit or delete record replaces the note it targets).") if spans else ""
     return (f"Read the {record['stage']} review decision in {md} (JSON: {js}) before changing anything. {what} "
-            "Follow its 'Next step' section and address every rejection reason and note it records.")
+            f"Follow its 'Next step' section and address every rejection reason and note it records.{span}")
 
 
 # ---------------------------------------------------------------- HTTP
@@ -383,6 +605,8 @@ class Handler(BaseHTTPRequestHandler):
             if len(parts) == 4 and parts[3] == "export":
                 return self._send(200, export_run(self.root, parts[2]), "application/zip",
                                   {"Content-Disposition": f'attachment; filename="{parts[2]}.zip"'})
+            if len(parts) == 4 and parts[3] == "annotations":
+                return self._json(200, annotation_state(read_annotations(self.root, folder.name)))
             if len(parts) == 4 and parts[3] == "decision":
                 saved = decisions_dir(self.root) / f"{parts[2]}.json"
                 return self._json(200, json.loads(saved.read_text(encoding="utf-8")) if saved.exists() else None)
@@ -401,6 +625,15 @@ class Handler(BaseHTTPRequestHandler):
                 raise ReviewInputError("the decision is not JSON") from None
             return self._json(200, write_decision(self.root, view, body.get("chosen"), body.get("reasons") or {},
                                                   body.get("notes") or {}))
+        if len(parts) == 4 and parts[:2] == ["api", "runs"] and parts[3] == "annotations":
+            view = read_view(self.root, parts[2])
+            try:
+                body = json.loads(self._body(1024 ** 2))
+            except ValueError:
+                raise ReviewInputError("the note is not JSON") from None
+            if not isinstance(body, dict):
+                raise ReviewInputError("the note is not a JSON object")
+            return self._json(200, add_annotation(self.root, view, body, git_author()))
         raise FileNotFoundError(self.path)
 
     def _static(self, path: str) -> None:

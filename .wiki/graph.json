@@ -10,6 +10,11 @@
   },
   {
    "a": "README.md",
+   "b": "docs/history/answer-span-annotation/README.md",
+   "kind": "link"
+  },
+  {
+   "a": "README.md",
    "b": "docs/history/postgresql-migration/README.md",
    "kind": "link"
   },
@@ -696,8 +701,8 @@
   "docs/hwp-loader-preview-review.md"
  ],
  "counts": {
-  "docs": 35,
-  "linked": 25,
+  "docs": 36,
+  "linked": 26,
   "read": 8,
   "orphans": 2,
   "pages": 2,

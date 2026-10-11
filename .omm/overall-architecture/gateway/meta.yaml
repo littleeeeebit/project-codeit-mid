@@ -1,0 +1,13 @@
+created: 2026-10-11T02:31:15.750Z
+updated: 2026-10-11T02:31:16.046Z
+update_count: 3
+last_field: constraint
+kind: nested-class
+title: gateway
+children:
+  - caller
+  - ledger
+  - owner
+  - transport
+  - validator
+parentPath: []

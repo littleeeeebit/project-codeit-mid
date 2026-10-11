@@ -1,0 +1,9 @@
+created: 2026-10-11T02:31:14.145Z
+updated: 2026-10-11T02:31:14.146Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: route
+children: []
+parentPath:
+  - retrieval

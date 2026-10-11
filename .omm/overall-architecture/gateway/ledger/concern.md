@@ -1,0 +1,1 @@
+A settlement that exceeds its reservation freezes the whole budget (`frozen_reason`) until someone inspects it. That is deliberate, but it can stop paid service for everyone.

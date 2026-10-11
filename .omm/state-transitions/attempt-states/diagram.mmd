@@ -1,9 +1,0 @@
-graph TD
-  reserved["reserved\nbudget.py (reserve)"] -->|mark_dispatching| dispatching["dispatching\nbudget.py (mark_dispatching)"]
-  reserved -->|guard refusal or restart| released["released\nbudget.py (release)"]
-  dispatching -->|usage reported| settled["settled\nbudget.py (settle)"]
-  dispatching -->|4xx before execution| released
-  dispatching -->|timeout, no usage, crash| unknown["unknown\nbudget.py (mark_unknown)"]
-  unknown -->|late usage evidence| settled
-  unknown -->|provider total imported| reconciled["reconciled\nbudget.py (reconcile)"]
-  reconciled -->|late settlement offset| settled

@@ -24,9 +24,13 @@ export default function Page() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
 
+  // The list is read at start and again after an import or a decision; only the latest read may set it, so the
+  // first one landing late cannot drop a run just imported.
+  const listRead = useRef(0);
   const loadRuns = useCallback(async () => {
+    const mine = ++listRead.current;
     const list = await getJson<RunListItem[]>("/api/runs");
-    setRuns(list);
+    if (mine === listRead.current) setRuns(list);
     return list;
   }, []);
 

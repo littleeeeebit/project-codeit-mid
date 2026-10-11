@@ -1,0 +1,1 @@
+auth.Login (hub token exchange, the allowlist in BIDMATE_ALLOWED_USERS, session storage) is described from the api.py docstring and the README; auth.py was not read.

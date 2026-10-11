@@ -1,52 +1,51 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-11 01:15:03.106000+00:00
-update_count: 48
+updated: 2026-10-11 02:31:18.402000+00:00
+update_count: 50
 last_field: diagram
-git_commit: 5bfcd5d
-git_branch: review-ui-readable
+git_commit: 202d3f1
+git_branch: answer-span-annotation
 children:
+- admit
 - answer-stream
 - answer-validation
+- ask
 - ask-page
-- ask-route
 - ask-submit
 - cancellation
 - evidence-retrieval
+- finish
 - finish-record
 - finish-request
 - finish-step
+- generate
 - langfuse-tracing
 - metered-call
-- metered-chat
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
 - paid-answer-stages
 - paid-call
 - poll-and-stream
-- request-runner
-- retrieve-evidence
+- prepare
 - run-queued
 - screen-attachment
-- status-and-stream
 - status-poll
 - stream-and-poll
 - submit-and-admit
 - submit-answer
 - turn-render
+- validate
 - validate-and-finish
-- validate-finish
 - validation
+- worker
 prev_diagram: "graph TD\r\n  ask-route[\"POST /api/ask\\nsrc/rfp_assistant/api.py\"\
-  ] -->|\"scope, question, mode\"| admission[\"Validate and persist\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  admission -->|\"queued row, slot held\"| worker-claim[\"Executor claim run_queued\\\
-  nsrc/rfp_assistant/service/service.py\"]\r\n  worker-claim -->|\"follow-up with\
-  \ history\"| query-rewrite[\"Standalone query rewrite\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  worker-claim -->|\"first turn\"| retrieve-and-price[\"Retrieve and price\
-  \ prompt\\nsrc/rfp_assistant/service/service.py\"]\r\n  query-rewrite -->|\"rewritten\
-  \ question\"| retrieve-and-price\r\n  retrieve-and-price -->|\"messages, estimate\"\
-  | metered-generation[\"Metered streamed generation\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  metered-generation -->|\"response\"| validate-and-finish[\"Validate citations,\
-  \ finish\\nsrc/rfp_assistant/service/service.py\"]\r\n  metered-generation -->|\"\
-  partials over SSE\"| screen-polling[\"Poll status and stream\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  validate-and-finish -->|\"result_json, billing state\"| screen-polling"
+  ] -->|validated AskIn| submit-answer[\"submit_answer\\nservice/service.py\"]\r\n\
+  \  submit-answer -->|queued row, slot admitted| request-runner[\"Worker claim\\\
+  nservice.py (run_queued)\"]\r\n  request-runner -->|claimed running| paid-answer[\"\
+  Paid answer\\nservice.py (_paid_answer)\"]\r\n  paid-answer -->|question, scope,\
+  \ limits| retrieve-evidence[\"Retrieve and price\\nservice.py (retrieve, _priced)\"\
+  ]\r\n  retrieve-evidence -->|messages and estimate| metered-chat[\"Metered call\\\
+  nservice.py (_metered_chat)\"]\r\n  metered-chat -->|provider response| validate-finish[\"\
+  Validate and finish\\nservice.py (_validated, _finish)\"]\r\n  metered-chat -->|partial\
+  \ text| status-and-stream[\"Status poll and SSE\\napi.py (request, stream)\"]\r\n\
+  \  validate-finish -->|result_json stored| status-and-stream"

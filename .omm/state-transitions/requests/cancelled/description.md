@@ -1,0 +1,1 @@
+Set directly by `cancel_request` on a queued row (with an outcome stating that no call was made), or by `_finish`/`_Stop` once a running request with `cancel_requested` reaches a checkpoint or completes.

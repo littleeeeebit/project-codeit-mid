@@ -6,11 +6,6 @@ kind: nested-class
 title: postgres-storage
 children:
 - application-mutex
-- corpus-tables
-- ledger-tables
-- request-tables
-- runtime-files
-- validation-gate
 parentPath: []
 prev_diagram: "graph TD\r\n  corpus-tables[\"sources, documents, extractions, elements\\\
   nsrc/rfp_assistant/storage/store.py\"] -->|\"active extraction\"| index-tables[\"\

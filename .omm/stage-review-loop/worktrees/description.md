@@ -1,0 +1,1 @@
+`checkout` runs `git worktree add --detach` at the candidate's commit. For '.', it also copies changed and untracked files and records `changed_sha256`; `resume` refuses if that hash has changed. `remove_worktree` force-removes and prunes the worktree after every candidate, whatever the outcome.

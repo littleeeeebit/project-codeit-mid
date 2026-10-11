@@ -1,9 +1,0 @@
-created: 2026-10-10T23:15:01.063Z
-updated: 2026-10-11T01:14:57.105Z
-update_count: 2
-last_field: description
-kind: nested-class
-title: request-tables
-children: []
-parentPath:
-  - postgres-storage

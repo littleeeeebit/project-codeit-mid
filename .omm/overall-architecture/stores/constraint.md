@@ -1,0 +1,1 @@
+`postgres.tx(immediate=True)` takes `SELECT ... FROM application_mutex FOR UPDATE`. That makes one global write mutex for admission and idempotency (a `ponytail:` comment in the code names per-account locks as the upgrade path if throughput requires it). Each connection checks that the server is PostgreSQL 18.6, and pooled connections also check for pgvector 0.8.6.

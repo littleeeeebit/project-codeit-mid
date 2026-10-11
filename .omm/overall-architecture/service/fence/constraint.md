@@ -1,0 +1,1 @@
+`open_paid_work` reads in the order work leaves those places (threads and slots first, then rows, then the ledger). Reading in another order can miss work that is still in flight.

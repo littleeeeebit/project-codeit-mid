@@ -1,0 +1,9 @@
+created: 2026-10-11T02:31:12.895Z
+updated: 2026-10-11T02:31:13.022Z
+update_count: 2
+last_field: constraint
+kind: nested-class
+title: fence
+children: []
+parentPath:
+  - service

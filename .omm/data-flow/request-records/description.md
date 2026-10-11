@@ -1,1 +1,0 @@
-`requests.request_json` is the input snapshot. `trace_json` holds the config snapshot, retrieval, rewrite, admission, usage, settlement and billing attempts. `result_json` holds the answer with its evidence map. They link to `attempts` by `request_id`. `export_request` returns a redacted copy (keys, bearer tokens, host paths, raw messages removed).

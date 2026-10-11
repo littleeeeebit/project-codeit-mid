@@ -1,0 +1,1 @@
+The session store and the allowlist check live in auth.py, which was not read.

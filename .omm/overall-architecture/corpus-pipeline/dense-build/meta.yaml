@@ -1,9 +1,0 @@
-created: 2026-10-11T01:14:59.677Z
-updated: 2026-10-11T01:14:59.678Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: dense-build
-children: []
-parentPath:
-  - corpus-pipeline

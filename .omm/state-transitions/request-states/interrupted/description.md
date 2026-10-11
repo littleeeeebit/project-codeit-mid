@@ -1,1 +1,0 @@
-Set by `RequestRunner.shutdown` (controlled stop: queued always, running when workers did not finish in time) or by `recover_requests` when a new gateway owner starts. `_stop_reason` also treats a closing `Resources` or a non-running row as interrupted, so no further paid stage starts. `_finish` keeps this status when a late worker finishes.

@@ -1,1 +1,0 @@
-The drafting routes call `draft_documents`, `draft_elements`, `draft_slot`, `plan_drafting`, `start_drafting`, `drafting_runs` and `submit_drafts`. The gold routes call `gold_queue`, `candidate_review` and `gold_decide`. They are registered after `/api/gold/recent` and its siblings, so `/api/gold/{candidate_id}` does not shadow those literal paths.

@@ -1,1 +1,0 @@
-설정. `PUT /api/settings/api-key` sends the member's OpenAI key and model. `PUT /api/settings/model` changes the model. `GET /api/budget` and `PUT /api/budget/limit` show and change the shared cumulative cap with a reason. The key is checked server-side by `generation.check_api_key` (a free metadata read) and never echoed back.

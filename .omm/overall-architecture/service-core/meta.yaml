@@ -6,13 +6,11 @@ kind: nested-class
 title: service-core
 children:
 - answer-check
-- answer-execution
 - answer-pipeline
 - answer-validation
 - app-resources
 - background-jobs
 - conversation-context
-- conversation-rewrite
 - evidence-reader
 - metered-chat
 - paid-answer
@@ -25,7 +23,6 @@ children:
 - tracing
 - update-fence
 - update-watch
-- verifier-runs
 parentPath: []
 prev_diagram: "graph TD\r\n  resources-owner[\"Process owner Resources\\nsrc/rfp_assistant/service/service.py\"\
   ] -->|\"creates on first ask\"| request-runner[\"Bounded executor RequestRunner\\\

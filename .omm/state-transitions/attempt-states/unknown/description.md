@@ -1,1 +1,0 @@
-The provider may have billed but no usage was recorded: a timeout, a 5xx, a dropped stream, a response without usage, a failed settlement, or a crash during dispatch. While any attempt is unknown, `mark_dispatching` refuses every PostgreSQL dispatch, and answer runs stop with `unknown_billing`.

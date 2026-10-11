@@ -1,1 +1,0 @@
-The durable marker written before the network call by `mark_dispatching`. If the process dies here, `budget.recover` turns it into unknown, because the provider may have executed.

@@ -1,1 +1,0 @@
-Inserted by `reserve` after every admission check, holding `max_cost` against the cap. `budget.recover` releases it at restart ('never dispatched before restart').

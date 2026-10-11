@@ -1,0 +1,9 @@
+created: 2026-10-11T02:31:21.853Z
+updated: 2026-10-11T02:31:21.853Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: reserved
+children: []
+parentPath:
+  - attempts

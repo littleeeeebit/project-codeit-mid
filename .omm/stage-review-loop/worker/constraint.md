@@ -1,0 +1,1 @@
+A paid generation resume against codeit's ledger needs `bidmate.service` stopped, because the worker takes the gateway advisory lock (README: a 55-question candidate takes about 25–40 minutes).

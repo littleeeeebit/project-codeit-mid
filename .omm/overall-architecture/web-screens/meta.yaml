@@ -5,12 +5,9 @@ last_field: diagram
 kind: nested-class
 title: web-screens
 children:
-- answer-stream
 - answer-stream-hook
 - api-client
 - ask-page
-- dataset-page
-- request-poll
 - settings-page
 - sign-in-redirect
 - update-banner

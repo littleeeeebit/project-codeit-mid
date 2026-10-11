@@ -1,0 +1,13 @@
+graph TD
+  resources["Process owner Resources\nsrc/rfp_assistant/service/service.py"]
+  runner["Bounded request executor\nsrc/rfp_assistant/service/service.py"]
+  jobs["Background job threads\nsrc/rfp_assistant/service/service.py"]
+  fence["Update fence\nsrc/rfp_assistant/service/update.py"]
+  owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
+  tracer["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
+  resources -->|creates lazily| runner
+  resources -->|registers and joins| jobs
+  resources -->|claims at startup| owner
+  fence -->|refuses new admissions| runner
+  fence -->|refuses new jobs| jobs
+  runner -->|one trace per request| tracer

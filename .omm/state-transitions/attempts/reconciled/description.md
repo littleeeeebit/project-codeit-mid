@@ -1,0 +1,1 @@
+Set by the owner's `reconcile`, which covers unknown attempts with a provider total over an interval (`_check_covered`, `_settled_in`).

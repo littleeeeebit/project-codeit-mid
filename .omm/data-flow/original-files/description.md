@@ -1,1 +1,0 @@
-`RFP_SOURCE_DIR` (default `<repo>/원본 데이터`): `data_list.csv` plus `files/` with mostly HWP files and some PDFs. Each is read only to hash, parse, print (Hancom) or download through `original_download`; never modified.

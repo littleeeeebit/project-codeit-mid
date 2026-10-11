@@ -1,0 +1,1 @@
+`_dataset_routes` is registered after /api/gold/recent and similar routes, because /api/gold/{candidate_id} would otherwise shadow them. The session cookie is scoped to /api/ so it never reaches the hub's notebook servers on :8000 of the same host.

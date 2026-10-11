@@ -1,0 +1,1 @@
+Old index versions stay on disk for issued citations and rollback. A metadata correction applies only after the next `build-keyword`.
