@@ -80,6 +80,15 @@ class IngestionError(RuntimeError):
     pass
 
 
+class ParseTimedOut(Exception):
+    """A parse killed at its time limit: the source keeps its extraction and gets no input record, so the next run
+    retries it."""
+
+
+class Stopped(Exception):
+    """The caller stopped ingest (a cancel or the service stopping); it is never recorded as one source's failure."""
+
+
 def nfc(text: str) -> str:
     return unicodedata.normalize("NFC", text)
 
@@ -758,7 +767,8 @@ def diagnose(elements: list[dict], warnings: list[dict]) -> dict:
     }
 
 
-def ingest_source(settings: Settings, source_hash: str, force: bool = False) -> dict:
+def ingest_source(settings: Settings, source_hash: str, force: bool = False, parse=None) -> dict:
+    """`parse` replaces `_parse_source` (maintenance runs it in a child process); every DB write stays here."""
     with open_db(settings.db_path) as conn:
         src = conn.execute("SELECT * FROM sources WHERE source_hash = ?", (source_hash,)).fetchone()
         recovery = conn.execute(
@@ -779,7 +789,10 @@ def ingest_source(settings: Settings, source_hash: str, force: bool = False) -> 
         if reused is not None:
             return reused
     started = time.perf_counter()
-    raw, warnings, reason, fp = _parse_source(settings, src, original)
+    try:
+        raw, warnings, reason, fp = (parse or _parse_source)(settings, dict(src), original)
+    except ParseTimedOut:
+        return {"source_hash": source_hash, "status": "timed_out", "seconds": round(time.perf_counter() - started, 2)}
     seconds = round(time.perf_counter() - started, 2)
     if reason:
         with open_db(settings.db_path) as conn, tx(conn, immediate=True):
@@ -924,16 +937,24 @@ def select_documents(settings: Settings, doc_ids: list[str] | None = None) -> li
     return chosen
 
 
-def ingest(settings: Settings, doc_ids: list[str] | None = None, force: bool = False) -> list[dict]:
+def ingest(settings: Settings, doc_ids: list[str] | None = None, force: bool = False, parse=None,
+           progress=None) -> list[dict]:
     """Every unique original once. One failing file is recorded with its error and the run continues; the
-    caller reports failures (the CLI exits nonzero) rather than dropping them."""
+    caller reports failures (the CLI exits nonzero) rather than dropping them. `progress(done, total, filename)` is
+    called before each unique original; it, or `parse`, may raise `Stopped`, which ends the loop."""
     results = []
     done: dict[str, dict] = {}
-    for d in select_documents(settings, doc_ids):
+    docs = select_documents(settings, doc_ids)
+    total = len({d["active_source_hash"] for d in docs})
+    for d in docs:
         h = d["active_source_hash"]
         if h not in done:  # identical bytes share one extraction
+            if progress is not None:
+                progress(len(done), total, d["filename"])
             try:
-                done[h] = ingest_source(settings, h, force=force)
+                done[h] = ingest_source(settings, h, force=force, parse=parse)
+            except Stopped:
+                raise
             except IngestionError as exc:
                 done[h] = {"source_hash": h, "status": "error", "reason": str(exc)}
             except Exception as exc:  # noqa: BLE001 - an unexpected parser crash stays visible per source

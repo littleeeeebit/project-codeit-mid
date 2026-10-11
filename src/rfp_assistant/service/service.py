@@ -2497,6 +2497,7 @@ def start_judges(res: Resources, principal: Principal, estimate_id: str) -> str:
 
 
 _MAINTENANCE_JOB: list[threading.Thread] = []  # at most one maintenance sequence per process
+_MAINTENANCE_CANCEL: dict[str, dict] = {}  # run_id -> {"by", "at"} of the cancel the live run has not reached yet
 
 
 def maintenance_status(res: Resources, principal: Principal) -> dict:
@@ -2508,7 +2509,22 @@ def maintenance_status(res: Resources, principal: Principal) -> dict:
     state = maintenance.last(res.settings)
     if state and state["status"] == "running" and not running:
         state = {**state, "status": "interrupted", "reason": state.get("reason") or "the process stopped mid-run"}
-    return {"running": running, "run": state, "backup_root": str(maintenance.backup_root(res.settings))}
+    return {"running": running, "run": state, "backup_root": str(maintenance.backup_root(res.settings)),
+            "cancelling": running and bool(state) and state["run_id"] in _MAINTENANCE_CANCEL}
+
+
+def cancel_maintenance(res: Resources, principal: Principal) -> str:
+    """Cancels the live run: a running parse is killed at once, any other step finishes first. The run ends
+    `cancelled` at that step with who cancelled it and when; nothing already written is rolled back."""
+    principal = _authorize(res, principal, "verifier")
+    from ..storage import maintenance
+
+    with _EVAL_LOCK:
+        state = maintenance.last(res.settings)
+        if not any(t.is_alive() for t in _MAINTENANCE_JOB) or not state or state["status"] != "running":
+            raise ServiceError("실행 중인 유지보수가 없습니다.")
+        _MAINTENANCE_CANCEL.setdefault(state["run_id"], {"by": principal.member_id, "at": utcnow()})
+    return state["run_id"]
 
 
 def start_maintenance(res: Resources, principal: Principal) -> str:
@@ -2526,9 +2542,15 @@ def start_maintenance(res: Resources, principal: Principal) -> str:
         state = maintenance.start_state(principal.member_id)
         maintenance._write(res.settings, state)
 
+        run_id = state["run_id"]
+
         def job() -> None:
-            maintenance.run(res.settings, res.analyzer, res.transport, principal.member_id,
-                            closing=lambda: res._closed, state=state)
+            try:
+                maintenance.run(res.settings, res.analyzer, res.transport, principal.member_id,
+                                closing=lambda: res._closed, cancelled=lambda: _MAINTENANCE_CANCEL.get(run_id),
+                                state=state)
+            finally:
+                _MAINTENANCE_CANCEL.pop(run_id, None)
 
         thread = threading.Thread(target=contextvars.copy_context().run, args=(job,), name=f"rfp-maintenance-{state['run_id']}", daemon=True)
         with res._runner_lock:  # close() joins it like every other job that may use the transport

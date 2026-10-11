@@ -1,11 +1,16 @@
 """The maintenance sequence: order, reuse on a rerun, a stop at a failed step or a paid estimate, serving untouched."""
 
 import csv
+import dataclasses
 import io
+import json
+import multiprocessing
 import os
 import tempfile
 import threading
+import time
 import unittest
+from functools import partial
 from pathlib import Path
 from unittest import mock
 
@@ -21,6 +26,33 @@ from tests import fixtures
 
 def reused(*_, **__):
     return {"status": "reused"}
+
+
+# Parse targets run in the maintenance parse child, so they are module-level (picklable) functions.
+
+
+def revised_parse(settings, src, original, ref, fail=None):
+    """The next parser revision: one original's last element changes, or with `fail` reading it fails."""
+    raw, warnings, reason, fp = ingestion._parse_source(settings, src, original)
+    if src["source_hash"] == ref:
+        if fail:
+            return [], warnings, fail, fp
+        raw = [{**e, "raw_text": e["raw_text"] + " (개정)"} if i == len(raw) - 1 else e for i, e in enumerate(raw)]
+    return raw, warnings, reason, fp
+
+
+def hang_on(settings, src, original, ref, marker=None, also=()):
+    """Never returns for one original, and for those in `also` (touching `marker` first); parses every other one."""
+    if src["source_hash"] != ref and src["source_hash"] not in also:
+        return ingestion._parse_source(settings, src, original)
+    if marker:
+        Path(marker).touch()
+    while True:
+        time.sleep(1)
+
+
+def ingest_with(target, **kw):
+    return partial(maintenance.step_ingest, target=partial(target, **kw))
 
 
 class SequenceTest(unittest.TestCase):
@@ -76,12 +108,7 @@ class SequenceTest(unittest.TestCase):
         self.assertEqual(state["provider_calls"], 0)
         self.assertEqual(self.statuses(state)["embedding"], "skipped")  # the fixture serves keyword retrieval
 
-        (self.s.source_dir / "files" / "기관F_신규 사업.pdf").write_bytes(
-            fixtures.make_pdf([["신규 공고 하자보수 기간은 검수 후 24개월입니다."]]))
-        buf = io.StringIO(newline="")
-        csv.writer(buf).writerows([fixtures.CSV_HEADER, *fixtures.ROWS, [
-            "20240006", "0.0", "신규 사업", "", "기관F", "2024-09-01", "", "", "요약", "pdf", "기관F_신규 사업.pdf", "미리보기"]])
-        (self.s.source_dir / "data_list.csv").write_bytes(b"\xef\xbb\xbf" + buf.getvalue().encode("utf-8"))
+        self.add_original()
         state = self.run_with(backup=reused, restore_check=reused, regression=reused)
         self.assertEqual(state["status"], "complete", state["reason"])
         steps = {s["name"]: s for s in state["steps"]}
@@ -96,22 +123,126 @@ class SequenceTest(unittest.TestCase):
         self.assertTrue(again["reused"])
         self.assertEqual(again["provider_calls"], 0)
 
+    def add_original(self) -> str:
+        """Adds a new original, `기관F_신규 사업.pdf`, to the manifest; returns its source hash."""
+        path = self.s.source_dir / "files" / "기관F_신규 사업.pdf"
+        path.write_bytes(fixtures.make_pdf([["신규 공고 하자보수 기간은 검수 후 24개월입니다."]]))
+        buf = io.StringIO(newline="")
+        csv.writer(buf).writerows([fixtures.CSV_HEADER, *fixtures.ROWS, [
+            "20240006", "0.0", "신규 사업", "", "기관F", "2024-09-01", "", "", "요약", "pdf", "기관F_신규 사업.pdf", "미리보기"]])
+        (self.s.source_dir / "data_list.csv").write_bytes(b"\xef\xbb\xbf" + buf.getvalue().encode("utf-8"))
+        return ingestion.sha256_file(path)
+
     def reparse(self, ref, fail: str | None = None, **steps):
         """Runs maintenance while a parser change alters one original's output (its last element), or, with
         `fail`, makes reading it fail with that quarantine reason."""
-        key, parse = ingestion.input_key, ingestion.parse_pdf
+        with self.next_parser():
+            return self.run_with(**{"backup": reused, "restore_check": reused, "regression": reused,
+                                    "ingest": ingest_with(revised_parse, ref=ref.source_hash, fail=fail), **steps})
 
-        def next_parser(path):
-            raw, warnings, reason = parse(path)
-            if ingestion.sha256_file(path) == ref.source_hash:
-                if fail:
-                    return [], warnings, fail
-                raw = [{**e, "raw_text": e["raw_text"] + " (개정)"} if i == len(raw) - 1 else e for i, e in enumerate(raw)]
-            return raw, warnings, reason
+    def next_parser(self):
+        """A parser revision: every original's input key changes, so maintenance re-parses all of them."""
+        key = ingestion.input_key
+        return mock.patch.object(ingestion, "input_key", lambda s, src: key(s, src) + "-next")
 
-        with mock.patch.object(ingestion, "input_key", lambda s, src: key(s, src) + "-next"), \
-                mock.patch.object(ingestion, "parse_pdf", next_parser):
-            return self.run_with(**{"backup": reused, "restore_check": reused, "regression": reused, **steps})
+    def source_row(self, source_hash):
+        with store.open_db(self.s.db_path) as conn:
+            return (conn.execute("SELECT active_extraction_id, parse_status FROM sources WHERE source_hash = ?",
+                                 (source_hash,)).fetchone(),
+                    conn.execute("SELECT input_key, extraction_id, updated_at FROM extraction_inputs WHERE "
+                                 "source_hash = ?", (source_hash,)).fetchone())
+
+    def test_a_parse_that_never_returns_is_killed_and_the_run_ends_unverified(self):
+        ref = self.env.refs["기관A"]
+        # one original under two names, and a new one that has never been read
+        names = ["기관A_통합 정보시스템.pdf", "기관C_통합 정보시스템 사본.pdf", "기관F_신규 사업.pdf"]
+        filename = names[0]
+        before = self.source_row(ref.source_hash)
+        new = self.add_original()
+        self.s = dataclasses.replace(self.s, parse_timeout_seconds=2)
+        started = time.monotonic()
+        with self.next_parser():
+            state = self.run_with(backup=reused, restore_check=reused, regression=reused,
+                                  ingest=ingest_with(hang_on, ref=ref.source_hash, also=(new,)))
+        self.assertLess(time.monotonic() - started, 100)  # killed at the limit, not waited for
+        self.assertEqual(state["status"], "unverified", state["reason"])
+        self.assertIn(", ".join(names), state["reason"])
+        self.assertEqual(state["timed_out"], names)
+        detail = next(s for s in state["steps"] if s["name"] == "ingest")["detail"]
+        self.assertEqual(detail["timed_out"], names)
+        self.assertEqual(detail["reparsed"], detail["documents"] - len(names))  # every other one, in the child
+        self.assertEqual(detail["changed"], [])  # the others read the same; the new one is still unread
+        self.assertNotIn("pending", {s["status"] for s in state["steps"]})  # the remaining steps all ran
+        self.assertEqual(self.source_row(ref.source_hash), before)  # same extraction, no new input record
+        report = maintenance.root(self.s) / "reports" / state["run_id"]
+        self.assertIn(f"- {filename}", report.with_suffix(".md").read_text(encoding="utf-8"))
+        self.assertEqual(json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))["timed_out"], names)
+        self.assertEqual(multiprocessing.active_children(), [])
+
+    def unique_sources(self):
+        with store.open_db(self.s.db_path) as conn:
+            return conn.execute("SELECT COUNT(DISTINCT active_source_hash) FROM documents").fetchone()[0]
+
+    def start_hanging(self, res):
+        """Starts the button's run with one original's parse hanging; returns once that parse is running. The
+        patches stay until the test ends, since the run's thread reads them after this returns."""
+        ref = self.env.refs["기관A"]
+        marker = self.root / "hanging"
+        self.enterContext(self.next_parser())
+        self.enterContext(mock.patch.dict(maintenance.STEP_FUNCTIONS, backup=reused, restore_check=reused,
+                                          ingest=ingest_with(hang_on, ref=ref.source_hash, marker=str(marker))))
+        run_id = service.start_maintenance(res, self.env.verifier)
+        for _ in range(600):
+            if marker.exists():
+                break
+            time.sleep(0.1)
+        self.assertTrue(marker.exists(), "the stub parse never started")
+        progress = next(s for s in maintenance.last(self.s)["steps"] if s["name"] == "ingest")["detail"]["progress"]
+        self.assertEqual((progress["current"], progress["total"]), ("기관A_통합 정보시스템.pdf", self.unique_sources()))
+        self.assertTrue(progress["current_started_at"])
+        return run_id
+
+    def test_cancel_kills_a_hanging_parse_and_frees_the_slot(self):
+        res = service.Resources(self.s, transport=FakeTransport())
+        try:
+            with self.assertRaisesRegex(service.ServiceError, "실행 중인 유지보수가 없습니다"):
+                service.cancel_maintenance(res, self.env.verifier)
+            run_id = self.start_hanging(res)
+            asked = time.monotonic()
+            self.assertEqual(service.cancel_maintenance(res, self.env.verifier), run_id)
+            service._MAINTENANCE_JOB[0].join(10)
+            self.assertLess(time.monotonic() - asked, 5)
+            status = service.maintenance_status(res, self.env.verifier)
+            run = status["run"]
+            self.assertEqual((status["running"], status["cancelling"], run["status"], run["stopped_at"],
+                              run["cancelled_by"]), (False, False, "cancelled", "ingest", self.env.verifier.member_id))
+            self.assertTrue(run["cancelled_at"])
+            self.assertEqual({s["name"]: s["status"] for s in run["steps"]}["keyword"], "pending")
+            self.assertTrue((maintenance.root(self.s) / "reports" / f"{run_id}.md").exists())
+            self.assertEqual(multiprocessing.active_children(), [])
+            with self.assertRaisesRegex(service.ServiceError, "실행 중인 유지보수가 없습니다"):
+                service.cancel_maintenance(res, self.env.verifier)
+            with mock.patch.dict(maintenance.STEP_FUNCTIONS, {n: reused for n in maintenance.STEP_FUNCTIONS}):
+                again = service.start_maintenance(res, self.env.verifier)  # the slot is free right away
+                service._MAINTENANCE_JOB[0].join(10)
+            self.assertEqual(maintenance.last(self.s)["run_id"], again)
+            self.assertEqual(maintenance.last(self.s)["status"], "complete")
+        finally:
+            res.close()
+
+    def test_the_controlled_stop_kills_a_hanging_parse(self):
+        res = service.Resources(self.s, transport=FakeTransport())
+        try:
+            self.start_hanging(res)
+        finally:
+            asked = time.monotonic()
+            res.close()
+        self.assertLess(time.monotonic() - asked, 10)
+        self.assertFalse(service._MAINTENANCE_JOB[0].is_alive())
+        state = maintenance.last(self.s)
+        self.assertEqual((state["status"], state["stopped_at"]), ("failed", "ingest"))
+        self.assertIn("the service is stopping", state["reason"])
+        self.assertEqual(multiprocessing.active_children(), [])
 
     def test_the_served_extraction_reports_its_own_review_not_the_candidates(self):
         # review round 2, F5: a positive review of the reparsed candidate must not certify the served older text
@@ -337,6 +468,19 @@ class SequenceTest(unittest.TestCase):
             self.assertEqual((status["running"], status["run"]["status"]), (False, "complete"))
         finally:
             res.close()
+
+
+class ConverterTest(unittest.TestCase):
+    def test_the_converter_beside_the_interpreter_is_found_without_path(self):
+        # The Oct 10 hang: the service unit's PATH has no venv, so every HWP fell back to the HWP loader, which
+        # loops forever on one original
+        from rfp_assistant import settings
+
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "hwp5proc").write_text("")
+            with mock.patch.object(settings.sys, "executable", str(Path(d) / "python")), \
+                    mock.patch.dict(os.environ, {"PATH": ""}):
+                self.assertEqual(settings.default_converter(), Path(d) / "hwp5proc")
 
 
 if __name__ == "__main__":

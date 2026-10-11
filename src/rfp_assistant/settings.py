@@ -89,6 +89,9 @@ class Settings:
     reranker_precision: str = "fp32"  # "fp16"/"bf16" halve weights on a CUDA device; part of the trial/serving identity
     request_timeout_seconds: float = 60.0
     converter_timeout_seconds: float = 300.0
+    # Maintenance re-parses each original in a child process killed after this long; the original keeps its previous
+    # extraction and the run ends `unverified` (maintenance.ParseWorker).
+    parse_timeout_seconds: float = 120.0
     framing_margin_tokens: int = 200
     # Phase 3 operation: the bounded background executor and a fake-provider delay that makes races observable.
     request_workers: int = 6
@@ -130,9 +133,12 @@ def _abs_path(name: str, value: str) -> Path:
 
 
 def default_converter() -> Path | None:
-    exe = Path(sys.executable).parent / "Scripts" / "hwp5proc.exe"
-    if exe.exists():
-        return exe
+    """pyhwp's `hwp5proc` beside this interpreter (a conda env's Scripts, a venv's bin), else on PATH. The service
+    unit's PATH has no venv; without the look beside the interpreter every HWP fell back to the HWP loader."""
+    here = Path(sys.executable).parent
+    for exe in (here / "Scripts" / "hwp5proc.exe", here / "hwp5proc.exe", here / "hwp5proc"):
+        if exe.is_file():
+            return exe
     found = shutil.which("hwp5proc")
     return Path(found).resolve() if found else None
 
@@ -210,6 +216,8 @@ def validate(s: Settings) -> None:
         raise SettingsError("request_workers must be 1..6 and request_admission within workers..48")
     if s.fake_delay_seconds and s.provider != "fake":
         raise SettingsError("fake_delay_seconds applies only to provider 'fake'")
+    if not 0 < s.parse_timeout_seconds <= 3600:
+        raise SettingsError("parse_timeout_seconds must be within 0..3600")
     if not 0 <= s.fake_delay_seconds <= 120 or not 0 <= s.shutdown_wait_seconds <= 300:
         raise SettingsError("fake_delay_seconds must be within 0..120 and shutdown_wait_seconds within 0..300")
     s.data_dir.mkdir(parents=True, exist_ok=True)

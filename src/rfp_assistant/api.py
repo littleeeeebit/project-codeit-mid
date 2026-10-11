@@ -883,7 +883,7 @@ class RequestRef(BaseModel):
 
 class MaintenanceStep(_Read):
     name: Literal["backup", "restore_check", "ingest", "fidelity", "keyword", "embedding", "regression", "report"]
-    status: Literal["pending", "running", "done", "reused", "skipped", "failed", "needs_approval"]
+    status: Literal["pending", "running", "done", "reused", "skipped", "failed", "needs_approval", "cancelled"]
     started_at: str | None = None
     finished_at: str | None = None
     detail: dict[str, Any] = {}
@@ -895,19 +895,24 @@ class MaintenanceRun(_Read):
     actor: str
     started_at: str
     finished_at: str | None = None
-    status: Literal["running", "complete", "unverified", "failed", "needs_approval", "interrupted"]
+    status: Literal["running", "complete", "unverified", "failed", "needs_approval", "interrupted", "cancelled"]
     stopped_at: str | None = None
     reason: str | None = None
     steps: list[MaintenanceStep]
     serving: dict[str, Any] | None = None
     provider_calls: int | None = None
     reused: bool | None = None
+    timed_out: list[str] = Field(default=[], description="Originals whose parse hit the time limit; they keep their "
+                                 "previous extraction and the run ends unverified")
+    cancelled_by: str | None = None
+    cancelled_at: str | None = None
 
 
 class MaintenanceStatus(_Read):
     running: bool
     run: MaintenanceRun | None
     backup_root: str
+    cancelling: bool = Field(default=False, description="A cancel was requested and the live run has not stopped yet")
 
 
 class JudgeReference(_Read):
@@ -1353,6 +1358,12 @@ def _operation_routes(app: FastAPI) -> None:
         """Runs backup, restore check, ingest, fidelity, keyword, embedding and regression once, in order; a paid
         embedding stops at its estimate. Activates nothing."""
         return Started(run_id=service.start_maintenance(res, member))
+
+    @app.post("/api/verify/maintenance/cancel", response_model=Started)
+    def cancel_maintenance(res: Res, member: Member):
+        """Cancels the live run: a running re-parse is killed at once, any other step stops at its end. The run ends
+        `cancelled`; what it already wrote stays."""
+        return Started(run_id=service.cancel_maintenance(res, member))
 
     @app.get("/api/verify/experiments", response_model=Experiments)
     def experiments(res: Res, member: Member):

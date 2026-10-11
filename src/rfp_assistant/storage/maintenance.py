@@ -10,6 +10,9 @@ activated embedding model, run the regression table (`compare.regression`) and w
 * A paid embedding stops the sequence at its priced estimate (`needs_approval`) until the person approves it
   (`compare --approve`, or 실험 비교); the rerun then continues from where it reuses everything before.
 * A failed step stops the sequence, and the report names the step and the reason.
+* Every re-parse runs in a child process (`ParseWorker`) killed after `parse_timeout_seconds`: that original keeps
+  its extraction, the run goes on and ends `unverified`, naming it. A cancel kills a running parse at once and stops
+  every other step at its next boundary (`cancelled`); the controlled stop kills a running parse too.
 * Nothing here activates anything: the activated run, its index and its vectors keep serving, which the report
   checks. A rebuilt index serves only after the person activates its regression row.
 """
@@ -18,7 +21,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import multiprocessing
 import os
+import time
 import traceback
 import uuid
 from datetime import datetime, timezone
@@ -200,12 +205,98 @@ def step_restore_check(settings: Settings, ctx: dict, **_) -> dict:
     return {"checked_at": report["checked_at"], "checks": len(report["checks"])}
 
 
-def step_ingest(settings: Settings, ctx: dict, **_) -> dict:
+def _parse_child(conn, target) -> None:
+    """The child process: parses each (settings, src, original) the parent sends and returns the result, or the
+    exception with its traceback, through the pipe's pickling (no text decoding, so no filename can break it)."""
+    conn.send(("ready", None, ""))
+    while True:
+        try:
+            job = conn.recv()
+        except EOFError:
+            return
+        try:
+            out = ("ok", target(*job), "")
+        except Exception as exc:  # noqa: BLE001 - re-raised in the parent, where ingest records it per source
+            out = ("error", exc, traceback.format_exc()[-1500:])
+        try:
+            conn.send(out)
+        except Exception:  # noqa: BLE001 - an exception that does not pickle
+            conn.send(("error", RuntimeError(f"{type(out[1]).__name__}: {out[1]}"[:500]), out[2]))
+
+
+class ParseWorker:
+    """`ingest`'s parse callable for maintenance: each parse runs in one spawned child process (reused across files,
+    restarted after a kill), killed when it passes `parse_timeout_seconds` (`ParseTimedOut`) or as soon as `stop()`
+    is true (`Stopped`). A Python thread cannot be killed; a process can. Every DB write stays in the parent."""
+
+    POLL_SECONDS = 0.2
+    STARTUP_SECONDS = 120  # a spawned child imports the parsers before the first file's clock starts
+
+    def __init__(self, settings: Settings, stop=lambda: False, target=None) -> None:
+        from ..corpus import ingestion
+
+        self.limit, self.stop = settings.parse_timeout_seconds, stop
+        self.target = target or ingestion._parse_source
+        self.proc = self.conn = None
+
+    def _wait(self, deadline: float):
+        from ..corpus import ingestion
+
+        while not self.conn.poll(self.POLL_SECONDS):
+            if self.stop():
+                self.close()
+                raise ingestion.Stopped()
+            if time.monotonic() > deadline:
+                self.close()
+                raise ingestion.ParseTimedOut()
+        try:
+            kind, value, tb = self.conn.recv()
+        except EOFError:  # the child died on its own (a crash inside a parser library)
+            code = self.proc.exitcode
+            self.close()
+            raise ingestion.IngestionError(f"the parse process exited with code {code}") from None
+        if kind == "error":
+            value.add_note(f"in the parse process:\n{tb}")
+            raise value
+        return value
+
+    def __call__(self, settings: Settings, src: dict, original: Path):
+        if self.proc is None:
+            ctx = multiprocessing.get_context("spawn")  # never fork the serving process's threads and locks
+            self.conn, child = ctx.Pipe()
+            # ponytail: a kill ends the child only; a converter it started (hwp5proc) runs on to its own
+            # converter_timeout_seconds. Kill the process tree if converter hangs show up.
+            self.proc = ctx.Process(target=_parse_child, args=(child, self.target), daemon=True,
+                                    name="rfp-maintenance-parse")
+            self.proc.start()
+            child.close()
+            self._wait(time.monotonic() + self.STARTUP_SECONDS)
+        self.conn.send((settings, src, original))
+        return self._wait(time.monotonic() + self.limit)
+
+    def close(self) -> None:
+        if self.proc is not None:
+            self.proc.kill()
+            self.proc.join(10)
+            self.conn.close()
+        self.proc = self.conn = None
+
+
+def step_ingest(settings: Settings, ctx: dict, target=None, **_) -> dict:
     """Imports the manifest, then parses every original whose bytes, parser or inputs changed; the rest is reused.
     An original counts as changed only when its active extraction differs afterwards: a re-parse whose output is
-    identical keeps its extraction (and its review), so nothing downstream changes."""
+    identical keeps its extraction (and its review), so nothing downstream changes. Each parse runs in a
+    `ParseWorker` child (`target` replaces `_parse_source` there); one that times out keeps its extraction and is
+    listed in `timed_out`. Before each original the run state records the progress."""
     from ..corpus import ingestion
     from . import store
+
+    stop, progress = ctx.get("stop", lambda: False), ctx.get("progress", lambda **_: None)
+
+    def on_file(done: int, total: int, filename: str) -> None:
+        if stop():
+            raise ingestion.Stopped()
+        progress(done=done, total=total, current=filename, current_started_at=utcnow())
 
     store.init_schema(settings.db_path)
 
@@ -216,18 +307,25 @@ def step_ingest(settings: Settings, ctx: dict, **_) -> dict:
 
     before = active()
     manifest = ingestion.import_manifest(settings)
-    results = ingestion.ingest(settings)
+    worker = ParseWorker(settings, stop, target)
+    try:
+        results = ingestion.ingest(settings, parse=worker, progress=on_file)
+    finally:
+        worker.close()
     ingestion.write_ingest_report(settings, results)
+    ctx["timed_out"] = sorted({r["filename"] for r in results if r["status"] == "timed_out"})
     errors = [r for r in results if r["status"] == "error"]
     if errors:
         raise StepFailed(f"{len(errors)} originals failed to parse: "
                          + "; ".join(f"{r['filename']}: {r.get('reason')}" for r in errors)[:400])
     after = active()
-    changed = [r for r in results if before.get(r["source_hash"]) != after.get(r["source_hash"])]
+    changed = [r for r in results if r["status"] != "timed_out"  # a new original that timed out is still unread
+               and before.get(r["source_hash"]) != after.get(r["source_hash"])]
     ctx["changed_sources"] = sorted({r["source_hash"] for r in changed})
-    return {"status": "done" if changed else "reused", "documents": len(results),
-            "reparsed": sum(not r.get("reused") and r["status"] != "recovered" for r in results),
+    return {"status": "done" if changed or ctx["timed_out"] else "reused", "documents": len(results),
+            "reparsed": sum(not r.get("reused") and r["status"] not in ("recovered", "timed_out") for r in results),
             "changed": [{"filename": r["filename"], "status": r["status"]} for r in changed],
+            "timed_out": ctx["timed_out"], "time_limit_seconds": settings.parse_timeout_seconds,
             "audit_differences": manifest.get("audit_differences") or {}}
 
 
@@ -358,14 +456,23 @@ def start_state(actor: str) -> dict:
                        "reason": None} for n in STEPS]}
 
 
-def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: False,
+def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: False, cancelled=lambda: None,
         state: dict | None = None) -> dict:
-    """Runs every step in order and writes one report. Stops at the first failed step or paid estimate."""
+    """Runs every step in order and writes one report. Stops at the first failed step or paid estimate, or when
+    `cancelled()` returns who cancelled and when ({"by", "at"}): a running parse is killed, any other step finishes
+    first. Nothing already written is rolled back."""
+    from ..corpus import ingestion
     from ..evaluation import compare
 
     state = state or start_state(actor)
     started = state["started_at"]
-    ctx: dict = {}
+    ingest_step = next(s for s in state["steps"] if s["name"] == "ingest")
+
+    def progress(**p) -> None:
+        ingest_step["detail"] = {"progress": p}
+        _write(settings, state)
+
+    ctx: dict = {"stop": lambda: closing() or bool(cancelled()), "progress": progress}
     _write(settings, state)
     serving_before = _serving(settings)
     for step in state["steps"]:
@@ -373,6 +480,8 @@ def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: 
         step.update(status="running", started_at=utcnow())
         _write(settings, state)
         try:
+            if cancelled():
+                raise ingestion.Stopped()
             if closing():
                 raise StepFailed("the service is stopping; rerun maintenance to continue")
             if name == "report":
@@ -386,6 +495,16 @@ def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: 
         except NeedsApproval as exc:
             step.update(status="needs_approval", reason=str(exc), detail={"estimate": exc.estimate})
             state.update(status="needs_approval", stopped_at=name, reason=str(exc))
+        except ingestion.Stopped:  # the detail keeps the last progress: where ingest stopped
+            if who := cancelled():
+                reason = f"cancelled by {who['by']} at {who['at']}"
+                step.update(status="cancelled", reason=reason)
+                state.update(status="cancelled", stopped_at=name, reason=reason, cancelled_by=who["by"],
+                             cancelled_at=who["at"])
+            else:  # the controlled stop killed a running parse
+                reason = "the service is stopping; rerun maintenance to continue"
+                step.update(status="failed", reason=reason)
+                state.update(status="failed", stopped_at=name, reason=reason)
         except Exception as exc:  # noqa: BLE001 - a failed step stops the sequence with its reason
             reason = str(exc) if isinstance(exc, StepFailed) else f"{type(exc).__name__}: {exc}"
             step.update(status="failed", reason=reason[:600], detail={"traceback": traceback.format_exc()[-1500:]})
@@ -396,11 +515,20 @@ def run(settings: Settings, analyzer, transport, actor: str, *, closing=lambda: 
             break
     serving_after = _serving(settings)
     lost = next((s["detail"].get("needs_evidence_review") for s in state["steps"] if s["name"] == "regression"), None)
-    if state["status"] == "running" and lost:  # every step ran, but the comparison is not a verified one
-        state.update(status="unverified", reason=f"{len(lost)} question(s) left out of the rebuilt rows: a re-parse "
-                     f"replaced the extraction their evidence is pinned to; review it again ({', '.join(lost[:10])}"
-                     f"{' …' if len(lost) > 10 else ''})")
+    timed_out = ctx.get("timed_out") or []
+    unverified = []  # every step ran, but not every original or the comparison is a verified one
+    if timed_out:
+        unverified.append(f"{len(timed_out)} original(s) did not finish parsing within "
+                          f"{settings.parse_timeout_seconds:g} s and keep their previous extraction; the next run "
+                          f"retries them: {', '.join(timed_out)}")
+    if lost:
+        unverified.append(f"{len(lost)} question(s) left out of the rebuilt rows: a re-parse replaced the extraction "
+                          f"their evidence is pinned to; review it again ({', '.join(lost[:10])}"
+                          f"{' …' if len(lost) > 10 else ''})")
+    if state["status"] == "running" and unverified:
+        state.update(status="unverified", reason="; ".join(unverified))
     state.update(finished_at=utcnow(), status="complete" if state["status"] == "running" else state["status"],
+                 timed_out=timed_out,
                  serving={"before": serving_before, "after": serving_after,
                           "unchanged": serving_before == serving_after},
                  provider_calls=_paid_attempts(settings, started),
@@ -430,6 +558,9 @@ def report_md(state: dict) -> str:
         detail = s["reason"] or json.dumps({k: v for k, v in s["detail"].items() if k not in ("rows", "traceback")},
                                            ensure_ascii=False)
         lines.append(f"| {LABELS[s['name']]} | {s['status']} | {detail[:300].replace('|', '/')} |")
+    if state.get("timed_out"):
+        lines += ["", "## Timed out (previous extraction kept; retried on the next run)", "",
+                  *(f"- {f}" for f in state["timed_out"])]
     rows = next((s["detail"].get("rows") for s in state["steps"] if s["name"] == "regression"), None)
     if rows:
         lines += ["", "## Regression table", "", "| row | nDCG@5 dev | support dev | nDCG@5 whole | needle top-5 | "
