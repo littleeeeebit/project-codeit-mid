@@ -198,9 +198,9 @@ describe("plan and start", () => {
     fireEvent.click(ops.getByRole("button", { name: "비용 추정 무료" }));
     await act(async () => {});
     expect(calls.plan).toEqual([{ part: "held_out" }]);
-    expect(ops.getAllByRole("term").map((t) => `${t.textContent}=${t.nextSibling?.textContent}`)).toEqual([
-      "항목=120개", "번역 호출=4회 (37조각)", "Luna 판정 호출=120회", "Jev 호출=150회 · 가격 미제공", "최대 비용=$0.4200",
-      "judge_eval 남음=$3.0000"]);
+    const line = ops.getByText("최대 $0.4200").parentElement!;
+    expect([...line.children].map((c) => c.textContent)).toEqual([
+      "최대 $0.4200", "항목 120개 · 번역 4회 (37조각) · Luna 판정 120회 · Jev 150회", "judge_eval 남음 $3.0000 · Jev 가격 미제공"]);
     const start = ops.getByRole("button", { name: "평가 실행 · 유료" }) as HTMLButtonElement;
     expect(start.disabled).toBe(true);
     fireEvent.click(ops.getByRole("checkbox"));
@@ -227,7 +227,7 @@ describe("plan and start", () => {
     fireEvent.click(screen.getByRole("button", { name: "비용 추정 무료" }));
     await act(async () => {});
     expect(screen.getByText("실행할 수 없습니다: judge_eval 배정 부족")).toBeTruthy();
-    expect(screen.getByText("배정 안 됨")).toBeTruthy();
+    expect(screen.getByText(/judge_eval 남음 배정 안 됨/)).toBeTruthy();
     fireEvent.change(select, { target: { value: "held_out" } });
     expect(screen.queryByText(/실행할 수 없습니다/)).toBeNull();  // changing the part drops the estimate
     fireEvent.click(screen.getByRole("button", { name: "비용 추정 무료" }));

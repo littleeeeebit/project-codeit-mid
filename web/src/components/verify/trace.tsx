@@ -25,6 +25,32 @@ const EXCLUDED: Record<string, string> = {
   other_requirement_code: "다른 요구사항 코드", outside_scope: "범위 밖",
 };
 
+const CHANNEL: Record<string, string> = {
+  exact: "요구사항 코드 일치", bm25: "키워드(형태소 분석)", bm25_ws: "키워드(공백 분리)", dense: "의미 검색",
+  rrf: "키워드+의미 결합", rerank: "재정렬",
+};
+const FALLBACK: Record<string, string> = {
+  dense_index_unavailable: "의미 색인 없음", dense_index_mismatch: "의미 색인이 키워드 색인과 다른 판",
+  query_vector_unavailable: "캐시된 질의 벡터 없음", query_vector_dimension_mismatch: "질의 벡터 차원 불일치",
+  reranker_unavailable: "재정렬 모델 없음",
+};
+const PARSE: Record<string, string> = { parsed: "수집됨", quarantined: "격리됨" };
+const CONFIG: Record<string, string> = {
+  mode: "검색 방식", serving_mode: "운영 검색 방식", serving_run: "운영 실행", dense_version: "의미 색인 판",
+  index_version: "키워드 색인 판", limits: "덮어쓴 한도", effective_limits: "적용된 한도", prompt_version: "프롬프트 판",
+  model: "답변 모델",
+};
+const configValue = (k: string, v: unknown) =>
+  (k === "mode" || k === "serving_mode") && typeof v === "string" ? label(MODE, v) : typeof v === "string" ? v : JSON.stringify(v);
+
+/** "hybrid->kiwi_bm25:query_vector_unavailable" as "키워드+의미 결합 → 키워드(형태소 분석) · 캐시된 질의 벡터 없음". */
+function fallbackText(code: string | null | undefined): string {
+  if (!code) return "없음";
+  const [modes, reason = ""] = code.split(":");
+  const [from, to] = modes.split("->");
+  return `${label(MODE, from)} → ${label(MODE, to ?? "")} · ${label(FALLBACK, reason)}`;
+}
+
 function limitationText(code: string): string {
   const [head, ...rest] = code.split(":");
   const known: Record<string, string> = {
@@ -160,8 +186,7 @@ export function RunList({ runs, active, onOpen }: { runs: Summary[]; active: str
           <button type="button" onClick={() => onOpen(r.run_id)} aria-current={active === r.run_id || undefined}
                   className={cn("w-full border-l-4 px-3 py-3 text-left outline-none hover:bg-secondary/70 focus-visible:ring-3 focus-visible:ring-ring/50", active === r.run_id ? "border-primary bg-accent hover:bg-accent" : "border-transparent")}>
             <span className="block text-base font-semibold">{r.question}</span>
-            <span className="mt-1 block text-[13px] text-muted-foreground tabular-nums">{stamp(r.created_at)} · {r.member_id}</span>
-            <span className="mt-1 block font-mono text-[13px] text-muted-foreground">{r.run_id}</span>
+            <span className="mt-1 block text-[13px] text-muted-foreground tabular-nums" title={r.run_id}>{stamp(r.created_at)} · {r.member_id}</span>
           </button>
         </li>
       ))}
@@ -174,9 +199,9 @@ export function RunList({ runs, active, onOpen }: { runs: Summary[]; active: str
 function Stage({ n, title, value, active, onOpen }: { n: number; title: string; value: string; active: boolean; onOpen: () => void }) {
   return (
     <li className="min-w-0">
-      <button type="button" aria-pressed={active} onClick={onOpen} className={cn("h-full min-h-20 w-full rounded-lg border px-3 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50", active ? "border-primary bg-accent text-primary" : "border-input hover:bg-secondary")}>
-        <span className="block text-sm font-semibold">{n}. {title}</span>
-        <span className="mt-2 block text-base font-bold tabular-nums">{value}</span>
+      <button type="button" aria-pressed={active} onClick={onOpen} className={cn("h-full min-h-14 w-full border-b-2 px-1 pb-2 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50", active ? "border-primary text-primary" : "border-border text-foreground hover:border-muted-foreground")}>
+        <span className="block text-[13px] text-muted-foreground">{n}. {title}</span>
+        <span className="mt-0.5 block text-base font-bold tabular-nums">{value}</span>
       </button>
     </li>
   );
@@ -206,12 +231,10 @@ export function RunView({ runId }: { runId: string }) {
     <article className="space-y-6">
       <header className="space-y-3">
         <h3 className="text-lg font-bold leading-snug">{t.question}</h3>
-        <dl className="grid grid-cols-2 gap-3 rounded-xl border border-input p-4 text-sm sm:grid-cols-3">
-          {[["실행 시각", stamp(t.created_at)], ["실행자", t.member_id], ["기준일", t.as_of ?? "-"]].map(([k, v]) => <div key={k}><dt className="text-[13px] text-muted-foreground">{k}</dt><dd className="mt-1 font-semibold tabular-nums">{v}</dd></div>)}
-        </dl>
+        <p className="text-[13px] text-muted-foreground tabular-nums">{stamp(t.created_at)} · {t.member_id} 실행 · 기준일 {t.as_of ?? "-"}</p>
         <dl className="space-y-2 text-sm"><dt className="font-semibold">문서 범위</dt>{t.scope.map((s, i) => <dd key={String(s.doc_id)} className="flex gap-2"><span className="shrink-0 text-muted-foreground">{i + 1}.</span><span className="[overflow-wrap:anywhere]">{t.docs.find((d) => d.doc_id === s.doc_id)?.filename ?? String(s.doc_id)}</span></dd>)}</dl>
       </header>
-      <ol aria-label="검색 단계" className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+      <ol aria-label="검색 단계" className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 xl:grid-cols-5">
         <Stage n={1} title="수집·검수" value={`${parsed}/${t.docs.length} 수집`} active={stage === 1} onOpen={() => setStage(1)} />
         <Stage n={2} title="범위·분석" value={`${t.query_tokens.length}개 토큰`} active={stage === 2} onOpen={() => setStage(2)} />
         <Stage n={3} title="채널 순위" value={`${r.candidates.length}개 후보`} active={stage === 3} onOpen={() => setStage(3)} />
@@ -280,9 +303,9 @@ function DocsStage({ t }: { t: Run }) {
             {t.docs.map((d) => (
               <tr key={d.doc_id}>
                 <td className={td}>{d.filename ?? d.doc_id.slice(0, 8)}</td>
-                <td className={td}>{d.parse_status === "parsed" ? <StatusBadge tone="ok">수집됨</StatusBadge> : <StatusBadge tone="bad">{d.parse_status}</StatusBadge>}</td>
+                <td className={td}>{d.parse_status === "parsed" ? <StatusBadge tone="ok">수집됨</StatusBadge> : <StatusBadge tone="bad"><span title={d.parse_status}>{label(PARSE, d.parse_status)}</span></StatusBadge>}</td>
                 <td className={td}><StatusBadge tone={REVIEW_TONE[d.review_status] ?? "neutral"}>{label(REVIEW, d.review_status)}</StatusBadge></td>
-                <td className={td}>{d.reason_code ?? "-"}</td>
+                <td className={cn(td, d.reason_code && "font-mono text-xs")}>{d.reason_code ?? "-"}</td>
               </tr>
             ))}
           </Table>
@@ -307,12 +330,12 @@ function ChannelStage({ t }: { t: Run }) {
   return (
     <>
         <Section title={`채널 순위 · 후보 ${r.candidates.length}개`}>
-          <dl className="grid grid-cols-2 gap-3 text-sm">{[["요청 방식", label(MODE, t.config.mode)], ["실제 방식", label(MODE, r.mode)], ["대체 실행", r.fallback ?? "없음"], ["검색 소요", `${r.timings_ms.total ?? "-"} ms`]].map(([k,v]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="mt-1 font-semibold">{v}</dd></div>)}</dl>
+          <dl className="grid grid-cols-2 gap-3 text-sm">{[["요청 방식", label(MODE, t.config.mode)], ["실제 방식", label(MODE, r.mode)], ["대체 실행", fallbackText(r.fallback)], ["검색 소요", `${r.timings_ms.total ?? "-"} ms`]].map(([k,v]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="mt-1 font-semibold">{v}</dd></div>)}</dl>
           <p className="text-[13px] text-muted-foreground">점수는 채널 내 순위용 값입니다. 답변 신뢰도가 아닙니다.</p>
           <Table caption="채널 순위" head={["채널", "순위", "점수", "조각"]}>
             {r.candidates.map((c, i) => (
               <tr key={i}>
-                <td className={td}>{c.channel}</td>
+                <td className={td} title={c.channel}>{label(CHANNEL, c.channel)}</td>
                 <td className={cn(td, "tabular-nums")}>{c.rank}</td>
                 <td className={cn(td, "tabular-nums")}>{c.score ?? "-"}</td>
                 <td className={cn(td, "font-mono text-xs")}>{c.chunk_id.slice(0, 12)}</td>
@@ -395,9 +418,20 @@ export function CompareRuns({ runs }: { runs: Summary[] }) {
   const [b, setB] = useState(runs[0]?.run_id ?? "");
   const diff = usePoll(a && b && a !== b ? `cmp-${a}-${b}` : null,
     () => must(api.GET("/api/verify/compare", { params: { query: { a, b } } }), errorText), null);
+  const runA = usePoll(diff.data ? `run-${a}` : null, () => must(api.GET("/api/verify/traces/{run_id}", { params: { path: { run_id: a } } }), errorText), null);
+  const runB = usePoll(diff.data ? `run-${b}` : null, () => must(api.GET("/api/verify/traces/{run_id}", { params: { path: { run_id: b } } }), errorText), null);
   if (runs.length < 2) return <Empty>비교하려면 검색 추적 실행이 두 개 이상 필요합니다.</Empty>;
   const name = (r: Summary) => `${r.question.slice(0, 30)} · ${stamp(r.created_at)} · ${r.run_id.slice(-6)}`;
   const d = diff.data;
+  // A ranked chunk reads as its place in the documents when either run packed it as evidence; otherwise only its ID is known.
+  const where = (t: Run | null | undefined, other: Run | null | undefined, id: string | undefined) => {
+    if (!id) return "-";
+    const own = t?.retrieval.evidence.find((x) => x.chunk_id === id);
+    if (own) return `${own.evidence_id} · 문서 ${t!.scope.findIndex((s) => s.doc_id === own.doc_id) + 1} · ${locationShort(own.location)}`;
+    const seen = other?.retrieval.evidence.find((x) => x.chunk_id === id);
+    return seen ? `${locationShort(seen.location)} · 이 실행은 근거로 안 담음` : "근거로 담기지 않은 조각";
+  };
+  const moved = d ? Array.from({ length: Math.max(d.top5_a.length, d.top5_b.length) }, (_, i) => d.top5_a[i] !== d.top5_b[i]).filter(Boolean).length : 0;
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -414,25 +448,29 @@ export function CompareRuns({ runs }: { runs: Summary[] }) {
       {d && (
         <>
           {!(d.same_question && d.same_scope) && <Notice tone="warn">질문 또는 문서 범위가 다릅니다. 설정 효과만 비교하려면 같은 질문과 범위를 쓰세요.</Notice>}
-          <Table caption="추적 비교" head={["항목", "A", "B"]}>
-            {Object.entries(d.config_changes).sort().map(([k, [va, vb]]) => (
-              <tr key={k}><td className={cn(td, "font-medium")}>설정 {k}</td><td className={td}>{JSON.stringify(va)}</td><td className={td}>{JSON.stringify(vb)}</td></tr>
-            ))}
-            {([["근거 토큰", d.evidence_tokens], ["입력 추정 토큰", d.input_tokens], ["소요(ms)", d.total_ms]] as const).map(([k, [x, y]]) => (
-              <tr key={k}><td className={cn(td, "font-medium")}>{k}</td><td className={cn(td, "tabular-nums")}>{x ?? "-"}</td><td className={cn(td, "tabular-nums")}>{y ?? "-"}</td></tr>
-            ))}
-            <tr><td className={cn(td, "font-medium")}>공통 근거</td><td className={cn(td, "tabular-nums")} colSpan={2}>{d.evidence_common.length}개</td></tr>
-            <tr><td className={cn(td, "font-medium")}>한쪽에만 있는 근거</td><td className={cn(td, "tabular-nums")}>{d.evidence_only_a.length}개</td><td className={cn(td, "tabular-nums")}>{d.evidence_only_b.length}개</td></tr>
-          </Table>
-          {!Object.keys(d.config_changes).length && <p className="text-xs text-muted-foreground">설정 차이 없음</p>}
+          <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <span className={cn("text-xl font-bold", moved ? "text-warn" : "text-ok")}>{moved ? `상위 5개 중 ${moved}자리가 다름` : "상위 5개 순위가 같음"}</span>
+            <span className="text-sm">공통 근거 {d.evidence_common.length}개 · A에만 {d.evidence_only_a.length}개 · B에만 {d.evidence_only_b.length}개</span>
+            <span className="text-[13px] text-muted-foreground">{Object.keys(d.config_changes).length ? `설정 차이 ${Object.keys(d.config_changes).length}곳` : "설정 차이 없음"}</span>
+          </p>
           <Table caption="상위 5개 순위" head={["순위", "A", "B"]}>
             {Array.from({ length: Math.max(d.top5_a.length, d.top5_b.length) }, (_, i) => (
               <tr key={i}>
                 <td className={cn(td, "tabular-nums")}>{i + 1}</td>
-                <td className={cn(td, "font-mono text-xs", d.top5_a[i] !== d.top5_b[i] && "bg-warn-bg")}>{d.top5_a[i]?.slice(0, 12) ?? "-"}</td>
-                <td className={cn(td, "font-mono text-xs", d.top5_a[i] !== d.top5_b[i] && "bg-warn-bg")}>{d.top5_b[i]?.slice(0, 12) ?? "-"}</td>
+                <td className={cn(td, d.top5_a[i] !== d.top5_b[i] && "bg-warn-bg")} title={d.top5_a[i]}>{where(runA.data, runB.data, d.top5_a[i])}</td>
+                <td className={cn(td, d.top5_a[i] !== d.top5_b[i] && "bg-warn-bg")} title={d.top5_b[i]}>{where(runB.data, runA.data, d.top5_b[i])}</td>
               </tr>
             ))}
+          </Table>
+          <Table caption="추적 비교" head={["항목", "A", "B"]}>
+            {Object.entries(d.config_changes).sort().map(([k, [va, vb]]) => (
+              <tr key={k}><td className={cn(td, "font-medium")} title={k}>{label(CONFIG, k)}</td><td className={td}>{configValue(k, va)}</td><td className={td}>{configValue(k, vb)}</td></tr>
+            ))}
+            {([["근거 토큰", d.evidence_tokens], ["입력 추정 토큰", d.input_tokens], ["검색 소요(ms)", d.total_ms]] as const).map(([k, [x, y]]) => (
+              <tr key={k}><td className={cn(td, "font-medium")}>{k}</td><td className={cn(td, "tabular-nums")}>{x ?? "-"}</td><td className={cn(td, "tabular-nums")}>{y ?? "-"}</td></tr>
+            ))}
+            <tr><td className={cn(td, "font-medium")}>공통 근거</td><td className={cn(td, "tabular-nums")} colSpan={2}>{d.evidence_common.length}개</td></tr>
+            <tr><td className={cn(td, "font-medium")}>한쪽에만 있는 근거</td><td className={cn(td, "tabular-nums")}>{d.evidence_only_a.length}개</td><td className={cn(td, "tabular-nums")}>{d.evidence_only_b.length}개</td></tr>
           </Table>
         </>
       )}

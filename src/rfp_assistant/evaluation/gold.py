@@ -711,11 +711,11 @@ def candidate(settings: Settings, candidate_id: str, include_sealed: bool = Fals
 
 def recent(settings: Settings, limit: int = 20, include_sealed: bool = False) -> list[dict]:
     with open_db(settings.db_path) as conn:
-        rows = conn.execute("SELECT candidate_id, dataset, status, decided_by, decided_at, reject_json "
+        rows = conn.execute("SELECT candidate_id, dataset, status, decided_by, decided_at, reject_json, row_json "
                             "FROM gold_candidates WHERE status != 'pending' ORDER BY decided_at DESC").fetchall()
     rows = [r for r in rows if include_sealed or not is_sealed(r["dataset"])][:limit]
-    return [{"candidate_id": r["candidate_id"], "status": r["status"], "decided_by": r["decided_by"],
-             "decided_at": r["decided_at"],
+    return [{"candidate_id": r["candidate_id"], "question": json.loads(r["row_json"]).get("question"),
+             "status": r["status"], "decided_by": r["decided_by"], "decided_at": r["decided_at"],
              "categories": json.loads(r["reject_json"])["categories"] if r["reject_json"] else []} for r in rows]
 
 

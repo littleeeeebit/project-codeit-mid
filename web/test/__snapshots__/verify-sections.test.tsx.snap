@@ -152,19 +152,17 @@ div
         span aria-hidden="true"
         "자동 대조: 확인 필요"
       h3 "통합 정보시스템.hwp"
-      dl
-        div
-          dt "확인할 곳"
-          dd "2"
-        div
-          dt "전체 쪽"
-          dd "12"
-        div
-          dt "추출에만 있는 글자"
-          dd "40"
-        div
-          dt "인쇄본에만 있는 글자"
-          dd "1,234"
+      p
+        span
+          "확인할 곳 "
+          "2"
+        span
+          "전체 "
+          "12"
+          "쪽 · 추출에만 있는 글자 "
+          "40"
+          " · 인쇄본에만 있는 글자 "
+          "1,234"
       details
         summary
           "그림 포함 "
@@ -411,8 +409,7 @@ div
       span
         span aria-hidden="true"
         "2차 검토 대기"
-      h3 "사업 금액은 얼마인가요?"
-      p "dev-amount-r1"
+      h3 title="dev-amount-r1" "사업 금액은 얼마인가요?"
     section
       div
         h3 "필수 주장 2개"
@@ -421,25 +418,22 @@ div
           caption "필수 주장"
           thead
             tr
-              th scope="col" "주장"
-              th scope="col" "형식"
               th scope="col" "값"
+              th scope="col" "형식"
               th scope="col" "중요도"
               th scope="col" "근거 그룹"
           tbody
             tr
-              td "c1"
+              td title="c1" "130000000 · 원"
               td "숫자"
-              td "130000000 · 원"
               td
                 span
                   span aria-hidden="true"
                   "금액"
               td "g1, g2"
             tr
-              td
-              td "문구"
               td "부가세 포함"
+              td "문구"
               td "보통"
               td "g2"
     section
@@ -557,7 +551,7 @@ div
             td
               span
                 span aria-hidden="true"
-                "quarantined"
+                span title="quarantined" "격리됨"
             td
               span
                 span aria-hidden="true"
@@ -596,7 +590,7 @@ div
         dd "키워드(형태소 분석)"
       div
         dt "대체 실행"
-        dd "query vector not cached"
+        dd "query vector not cached →  · "
       div
         dt "검색 소요"
         dd "37 ms"
@@ -612,12 +606,12 @@ div
             th scope="col" "조각"
         tbody
           tr
-            td "bm25"
+            td title="bm25" "키워드(형태소 분석)"
             td "1"
             td "7.5"
             td "chunk-012345"
           tr
-            td "dense"
+            td title="dense" "의미 검색"
             td "2"
             td "-"
             td "chunk-fedcba"
@@ -643,16 +637,12 @@ exports[`trace run > every stage of a frozen run > stage 4 1`] = `
 article
   header
     h3 "하자보수 기간은?"
-    dl
-      div
-        dt "실행 시각"
-        dd "2026-10-06 10:11"
-      div
-        dt "실행자"
-        dd "verifier"
-      div
-        dt "기준일"
-        dd "2024-05-01"
+    p
+      "2026-10-06 10:11"
+      " · "
+      "verifier"
+      " 실행 · 기준일 "
+      "2024-05-01"
     dl
       dt "문서 범위"
       dd
