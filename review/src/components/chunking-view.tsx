@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import type { Candidate, ChunkingView as View, DocView, Sizes } from "@/lib/api";
 import { getJson } from "@/lib/api";
-import { Badge, Metric, Metrics, Summaries, columns } from "./ui";
+import { CHUNK, label } from "@/lib/labels";
+import { Badge, Metric, Metrics, Summaries, columns, useShown } from "./ui";
 import { NoteField } from "./note-field";
 
-export function ChunkingView({ view, notes, setNote }: {
+export function ChunkingView({ view, notes, setNote, decide }: {
   view: View;
   notes: Record<string, string>;
   setNote: (key: string, note: string) => void;
+  decide: React.ReactNode;
 }) {
   const [n, setN] = useState(view.documents[0]?.n ?? 0);
   const [loaded, setLoaded] = useState<DocView | null>(null);
@@ -26,6 +28,8 @@ export function ChunkingView({ view, notes, setNote }: {
   const doc = loaded?.n === n ? loaded : null;
   const error = failed?.n === n ? failed.message : "";
   const done = view.candidates.filter((c) => c.status === "complete");
+  const { shown: cands, all, picker } = useShown(view.candidates, 3);
+  const grid = columns(cands.length, all ? 300 : 280);
   const rows = doc ? doc.rows.filter((r) => !onlyDiff || r.differs) : [];
   const listed = view.documents.find((d) => d.n === n);
   return (
@@ -49,7 +53,7 @@ export function ChunkingView({ view, notes, setNote }: {
           <label className="flex min-w-0 items-center gap-2 text-[14px]">
             <span className="sr-only">문서</span>
             <select value={n} onChange={(e) => setN(Number(e.target.value))}
-                    className="h-10 max-w-[560px] rounded-[10px] border border-line bg-white px-3 text-[15px]">
+                    className="h-10 max-w-[420px] rounded-[10px] border border-line bg-white px-3 text-[15px]">
               {view.documents.map((d) => (
                 <option key={d.n} value={d.n}>
                   {d.differing ? `차이 ${d.differing}` : "같음"} · {d.title ?? d.doc_id}
@@ -61,13 +65,15 @@ export function ChunkingView({ view, notes, setNote }: {
             <input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} className="size-4" />
             차이 나는 경계만
           </label>
+          {picker}
+          {decide}
         </div>
         {error && <p className="text-bad">문서를 읽지 못했습니다: {error}</p>}
         {!doc && !error && <p className="py-10 text-center text-muted">불러오는 중…</p>}
         {doc && (
           <>
-            <div className="mt-2 grid gap-4 overflow-x-auto" style={columns(view.candidates.length)}>
-              {view.candidates.map((c) => {
+            <div className="mt-2 grid gap-4 overflow-x-auto" style={grid}>
+              {cands.map((c) => {
                 const d = doc.candidates[c.id];
                 return (
                   <div key={c.id} className="text-[14px]">
@@ -92,10 +98,10 @@ export function ChunkingView({ view, notes, setNote }: {
               {rows.map((r) => (
                 <li key={`${r.at.element}-${r.at.row}-${Object.values(r.cells)[0]?.chunk_id}`}
                     className={`grid gap-4 border-t border-line py-3 ${r.differs ? "" : "opacity-60"}`}
-                    style={columns(view.candidates.length)}>
-                  {view.candidates.map((c, i) => (
+                    style={grid}>
+                  {cands.map((c, i) => (
                     <ChunkCell key={c.id} c={c} cell={r.cells[c.id]} done={done.includes(c)} base={i === 0}
-                               same={i > 0 && !!r.cells[c.id] && r.cells[c.id]?.text === r.cells[view.candidates[0].id]?.text} />
+                               same={i > 0 && !!r.cells[c.id] && r.cells[c.id]?.text === r.cells[cands[0].id]?.text} />
                   ))}
                 </li>
               ))}
@@ -113,7 +119,7 @@ function ChunkCell({ c, cell, done, base, same }: {
   const [open, setOpen] = useState(false);
   if (!done) return <div className="text-[13px] text-muted">{c.label}: 결과 없음</div>;
   if (!cell) {
-    return <div className="self-start rounded-md bg-warn-bg px-2 py-1 text-[13px] text-warn">여기서 끝나는 조각 없음</div>;
+    return <div className="self-start border-l-[3px] border-warn pl-2 text-[13px] text-warn">여기서 끝나는 조각 없음</div>;
   }
   if (same) return <div className="self-start text-[13px] text-muted">기준과 같은 조각 · {cell.tokens} 토큰</div>;
   return (
@@ -121,7 +127,7 @@ function ChunkCell({ c, cell, done, base, same }: {
             className={`block min-w-0 self-start rounded-md border-l-[3px] pl-2 text-left ${base ? "border-line" : "border-primary"}`}>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted">
         <span className="tabular-nums">{cell.tokens} 토큰</span>
-        <span>{cell.type}</span>
+        <span title={cell.type}>{label(CHUNK, cell.type)}</span>
         {cell.title_lost && <Badge tone="warn">표 제목 빠짐</Badge>}
       </div>
       <p className={`mt-0.5 whitespace-pre-line break-words text-[14px] leading-relaxed ${open ? "" : "line-clamp-4"}`}>{cell.text}</p>
