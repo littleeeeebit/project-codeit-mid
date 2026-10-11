@@ -415,12 +415,15 @@ def decide(root: Path, body: dict, author: str) -> dict:
         record = {"schema": ACTION_SCHEMA, "id": uuid.uuid4().hex, "op": op, "author": author, "at": now,
                   "refs": refs, "types": types, "version": fold["version"] + (1 if changes else 0),
                   "reason": str(body.get("reason") or "").strip() or None}
-        append_jsonl(taxonomy_dir(root) / "history.jsonl", [record])
+        # The history record is the commit, so the snapshot is written first: a failed snapshot commits nothing and
+        # the same decision can be sent again. A snapshot left by a failed append is replaced by the next decision
+        # that reaches its version, since only history.jsonl counts.
         if changes:
             accepted = [t for i, t in fold["accepted"].items() if i not in refs] + types
             _write_json(taxonomy_dir(root) / "versions" / f"v{record['version']}.json",
                         {"schema": TAXONOMY_SCHEMA, "version": record["version"], "at": now, "by": author,
                          "change": op, "types": accepted})
+        append_jsonl(taxonomy_dir(root) / "history.jsonl", [record])
     return taxonomy_state(root)
 
 

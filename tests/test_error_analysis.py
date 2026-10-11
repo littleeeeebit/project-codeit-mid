@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from rfp_assistant.evaluation import error_analysis as ea
 from tests.test_stage_review import server
@@ -197,6 +198,27 @@ class DecisionTest(unittest.TestCase):
             self.assertEqual((gone["answers"], gone["deleted"]), (0, 1))
             with self.assertRaisesRegex(ea.ReviewInputError, "no live note"):
                 ea.decide(root, {"op": "rename", "ref": gone["id"], "name": "기한", "definition": "기한."}, "person")
+
+
+    def test_a_failed_version_snapshot_commits_nothing_and_the_same_decision_can_be_retried(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            view = make_run(root)
+            n = note(root, view, "q1", "base", "10%", "비율이 아니라 금액")
+            ea.propose(root, proposal(("금액 오류", "금액을 틀린다.", [n])))
+            ref = ea.taxonomy_state(root)["pending"][0]["ref"]
+            with mock.patch.object(ea, "_write_json", side_effect=OSError("disk full")), self.assertRaises(OSError):
+                ea.decide(root, {"op": "accept", "ref": ref}, "person")
+            state = ea.taxonomy_state(root)
+            self.assertEqual((state["version"], [t["ref"] for t in state["pending"]], state["accepted"]), (0, [ref], []))
+            # a failed history append leaves only an orphan snapshot, replaced when the decision is sent again
+            with mock.patch.object(ea, "append_jsonl", side_effect=OSError("disk full")), self.assertRaises(OSError):
+                ea.decide(root, {"op": "accept", "ref": ref, "name": "다른 이름"}, "person")
+            self.assertEqual(ea.taxonomy_state(root)["version"], 0)
+            ea.decide(root, {"op": "accept", "ref": ref}, "person")
+            history = ea.read_jsonl(ea.taxonomy_dir(root) / "history.jsonl")
+            snapshot = json.loads((ea.taxonomy_dir(root) / "versions" / "v1.json").read_text(encoding="utf-8"))
+            self.assertEqual(([h["version"] for h in history], [t["name"] for t in snapshot["types"]]), ([1], ["금액 오류"]))
 
 
 if __name__ == "__main__":

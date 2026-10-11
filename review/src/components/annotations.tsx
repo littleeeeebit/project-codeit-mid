@@ -13,6 +13,7 @@ type Pop =
   | { kind: "notes"; ids: string[]; x: number; y: number };
 
 type Ctx = {
+  version: number;
   notes: SpanNote[];
   reviewedMarks: Set<string>;
   send: (body: Record<string, unknown>) => Promise<void>;
@@ -85,6 +86,7 @@ export function AnnotationProvider({ run, children }: { run: string; children: R
   }, []);
 
   const ctx = useMemo<Ctx>(() => ({
+    version: state.version,
     notes: state.notes,
     reviewedMarks: new Set(state.reviewed.map((r) => pair(r.question, r.candidate))),
     send,
@@ -221,6 +223,12 @@ function NoteBox({ pop, onClose }: { pop: Pop; onClose: () => void }) {
       {error && <p role="alert" className="mt-2 text-[13px] text-bad">{error}</p>}
     </div>
   );
+}
+
+/** The note store's record count as last seen: it grows with every note, edit, deletion or reviewed mark, so
+ *  anything derived from the store on the server is read again when it changes. */
+export function useAnnotationVersion() {
+  return useAnnotations().version;
 }
 
 /** Reviewed: marked '검토함 · 문제 없음', or carrying at least one note. */

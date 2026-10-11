@@ -220,7 +220,7 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
     coverage_rep = _coverage_report(manifest_rep, human, identity)
     evaluation_rep = _evaluation_report(validation, frozen, retrieval_runs, answer_runs, sealed_runs, latency, checks)
     # Beside the gates, never in them: the person's failure types guide the next fix and move no pass line.
-    evaluation_rep["human_error_analysis"] = human = error_analysis.release_summary(settings.data_dir)
+    evaluation_rep["human_error_analysis"] = failure_types = error_analysis.release_summary(settings.data_dir)
     for name, data in (("manifest", release_manifest), ("coverage", coverage_rep), ("evaluation", evaluation_rep),
                        ("budget", _budget_report(snap, db))):
         write_text_atomic(out / f"{name}.json", json.dumps(data, ensure_ascii=False, indent=1, default=str))
@@ -229,7 +229,7 @@ def write_release_report(settings: Settings, release_id: str | None = None) -> P
     L += _dataset_and_run_lines(validation, frozen, retrieval_runs)
     L += _answer_lines(answer_runs, sealed_runs)
     L += _measurement_lines(latency, checks, hard, quality)
-    L += error_analysis.release_lines(human)
+    L += error_analysis.release_lines(failure_types)
     L += _budget_lines(snap, db)
     L += _walkthrough_and_restore_lines(walkthrough, browser, rid, restore)
     L.append("")

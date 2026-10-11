@@ -6,7 +6,7 @@ import { getJson, usd } from "@/lib/api";
 import { FACT_STATE, FIELD, label, TYPE, VALIDATION } from "@/lib/labels";
 import { Badge, LedgerLine, Metric, Metrics, NotedList, Segmented, Summaries, columns, useShown } from "./ui";
 import { NoteField } from "./note-field";
-import { Annotatable, AnnotationProvider, ReviewedMark, useReview } from "./annotations";
+import { Annotatable, AnnotationProvider, ReviewedMark, useAnnotationVersion, useReview } from "./annotations";
 
 const OUTCOME: Record<string, string> = {
   answered: "답변", insufficient_evidence: "근거 부족", clarification_required: "되묻기",
@@ -38,10 +38,16 @@ function Answers({ view, notes, setNote, decide }: Notes & { view: View; decide:
   const [at, setAt] = useState(0);
   const { shown: cands, all, picker } = useShown(view.candidates, 2);  // answers are long: two columns at most
   const review = useReview();
+  // Failure-type counts are computed on the server from the note store, so they are read again after every note,
+  // deletion or reviewed mark; only the newest read may set them, never one that lands after it.
   const [failures, setFailures] = useState<RunFailures | null>(null);
+  const annotations = useAnnotationVersion();
+  const asked = useRef(0);
   useEffect(() => {
-    getJson<RunFailures>(`/api/runs/${view.run_id}/failure-types`).then(setFailures, () => setFailures(null));
-  }, [view.run_id]);
+    const mine = ++asked.current;
+    getJson<RunFailures>(`/api/runs/${view.run_id}/failure-types`).then(
+      (f) => mine === asked.current && setFailures(f), () => mine === asked.current && setFailures(null));
+  }, [view.run_id, annotations]);
   const differing = view.questions.filter((q) => q.differs).length;
   const shown = filter === "all" ? view.questions : view.questions.filter((q) => q.differs);
   const reading = answersOf(shown, view.candidates);

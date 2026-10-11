@@ -242,6 +242,8 @@ class ReleaseReportTest(unittest.TestCase):
             self.assertIn(f"| 기한 오류 | 기한을 틀린다. | 1/1 (fewer than 3 cases) | `{notes.RUN}` 1/1 |", text)
             human = json.loads((path.parent / "evaluation.json").read_text(encoding="utf-8"))["human_error_analysis"]
             self.assertEqual((human["sealed_metric"], human["gate"], human["reviewed"]), (False, False, 1))
+            checked = json.loads((path.parent / "coverage.json").read_text(encoding="utf-8"))["human_checked_sources"]
+            self.assertIn(f"human-checked sources {checked} (", text)  # the Markdown and coverage.json agree
             self.assertIn("draft-", path.parent.name)
             self.assertIn("## Decision: **limited**", text)
             self.assertIn("no saved check results", text)
