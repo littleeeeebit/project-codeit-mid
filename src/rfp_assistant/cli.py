@@ -324,21 +324,10 @@ def cmd_stage_review(args, settings) -> int:
 def cmd_error_analysis(args, settings) -> int:
     from .evaluation import error_analysis
 
-    if args.action == "export":
-        out = error_analysis.export(settings.data_dir)
-        _print({k: out[k] for k in ("export_id", "bundle", "notes")})
+    out = error_analysis.run_cli(settings.data_dir, args.action, args.file)
+    _print({k: v for k, v in out.items() if k != "prompt"})
+    if "prompt" in out:
         print(out["prompt"])
-        return 0
-    if not args.file:
-        raise ValueError("error-analysis propose needs --file <proposal.json>")
-    path = Path(args.file)
-    if not path.is_file():
-        raise ValueError(f"no such file: {path}")
-    try:
-        proposal = json.loads(path.read_text(encoding="utf-8"))
-    except ValueError:
-        raise ValueError(f"{path} is not JSON") from None
-    _print(error_analysis.propose(settings.data_dir, proposal))
     return 0
 
 
@@ -1057,13 +1046,12 @@ def main(argv: list[str] | None = None) -> int:
 
             os.environ.setdefault("RFP_POSTGRES_TEST_DSN", server_dsn())
             return COMMANDS[args.command](args, load_settings(provider="fake", database_dsn_env="RFP_POSTGRES_TEST_DSN"))
-        if args.command == "stage-review" and args.stage == "chunking" and args.inputs_from:
-            # Chunking from an earlier run's frozen inputs reads no database (a Mac teammate's checkout has none).
+        if args.command == "error-analysis" or (args.command == "stage-review" and args.stage == "chunking"
+                                                and args.inputs_from):
+            # No database: error analysis reads files under <data>/review only, and chunking from an earlier run's
+            # frozen inputs reads none either (a Mac teammate's checkout has none).
             os.environ.setdefault("RFP_NO_DATABASE_DSN", "unused")
-            return cmd_stage_review(args, load_settings(provider="fake", database_dsn_env="RFP_NO_DATABASE_DSN"))
-        if args.command == "error-analysis":  # files under <data>/review only
-            os.environ.setdefault("RFP_NO_DATABASE_DSN", "unused")
-            return cmd_error_analysis(args, load_settings(provider="fake", database_dsn_env="RFP_NO_DATABASE_DSN"))
+            return COMMANDS[args.command](args, load_settings(provider="fake", database_dsn_env="RFP_NO_DATABASE_DSN"))
         settings = load_settings()
         with store.database_lifecycle(settings.db_path):
             if args.command != "init":

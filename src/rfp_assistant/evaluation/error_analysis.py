@@ -344,6 +344,22 @@ def propose(root: Path, proposal) -> dict:
             "next": "decide each type on the review app's 실패 유형 screen"}
 
 
+def run_cli(root: Path, action: str, file: str | None) -> dict:
+    """`error-analysis export` or `error-analysis propose --file <proposal.json>`."""
+    if action == "export":
+        return export(root)
+    if not file:
+        raise ReviewInputError("error-analysis propose needs --file <proposal.json>")
+    path = Path(file)
+    if not path.is_file():
+        raise ReviewInputError(f"no such file: {path}")
+    try:
+        proposal = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError:
+        raise ReviewInputError(f"{path} is not JSON") from None
+    return propose(root, proposal)
+
+
 def decide(root: Path, body: dict, author: str) -> dict:
     """One decision of the person on proposed or accepted types:
     accept {ref, name?, definition?}, rename {ref, name, definition}, merge {refs, name, definition},
