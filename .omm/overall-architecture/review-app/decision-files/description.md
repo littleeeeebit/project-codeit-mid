@@ -1,1 +1,0 @@
-`write_decision` writes `decisions/<run-id>.md` and then `.json` under the write lock; the `.json` marks the run decided. It returns a short agent prompt pointing at both files and at the span-notes file. Traffic runs take notes but no decision.

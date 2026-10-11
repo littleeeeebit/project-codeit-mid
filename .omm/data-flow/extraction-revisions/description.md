@@ -1,0 +1,4 @@
+`ingest_source` parses an original when its `input_key` changed (bytes, parser revision, native print, OCR cache, converter). `_parse_source` handles both formats:
+- HWP: pyhwp XML walk plus `ocr.merge_hwp`; on failure, `HwpHwpxLoader` (`pyhwp_failed`).
+- PDF: `parse_pdf` plus `ocr.merge`.
+`assign_revision` binds the extraction_id to the actual output and stores elements with source_order and location. A new revision resets review_status to unreviewed and leaves older artifacts for pinned gold rows and citations. A failed parse quarantines the source with a reason code. The ingest report goes to .runtime/reports/ingest-*.json.

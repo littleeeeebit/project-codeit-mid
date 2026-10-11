@@ -1,1 +1,0 @@
-The call may have executed but its cost is not known: a provider error after dispatch, no usage returned, a broken connection, a settle failure, or a process that died while dispatching. It keeps holding its reservation and blocks every new dispatch database-wide until it is resolved.

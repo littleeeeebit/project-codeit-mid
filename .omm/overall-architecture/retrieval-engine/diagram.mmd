@@ -1,14 +1,8 @@
 graph TD
-  chunk-profiles["Chunk profiles\nsrc/rfp_assistant/retrieval/chunking.py"]
-  keyword-index["Keyword index\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  serving-config["Serving activation\nsrc/rfp_assistant/service/service.py"]
-  query-vector["Query vector cache\nsrc/rfp_assistant/retrieval/dense.py"]
-  dense-index["pgvector dense index\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  reranker["Local reranker\nsrc/rfp_assistant/retrieval/dense.py"]
-  fuse-and-pack["Fuse and pack evidence\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  chunk-profiles -->|chunks per profile| keyword-index
-  serving-config -->|mode, limits, versions| fuse-and-pack
-  keyword-index -->|exact and BM25 hits| fuse-and-pack
-  query-vector -->|query embedding| dense-index
-  dense-index -->|in-scope neighbours| fuse-and-pack
-  reranker -->|rescored order| fuse-and-pack
+  serving-config["Activated serving config\nsrc/rfp_assistant/service/service.py"] -->|"mode, limits, versions"| keyword-index["KeywordIndex\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  keyword-index -->|"scope extractions"| scope-routing["Scope routing\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  scope-routing -->|"allowed rows"| lexical-channels["Exact and BM25 channels\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  scope-routing -->|"allowed rows"| dense-channel["Dense channel\nsrc/rfp_assistant/retrieval/dense.py"]
+  lexical-channels -->|"ranked candidates"| fusion-rerank["Fusion and rerank\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  dense-channel -->|"ranked candidates"| fusion-rerank
+  fusion-rerank -->|"final ranking"| evidence-packing["Evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]

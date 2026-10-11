@@ -1,12 +1,8 @@
 graph TD
-  request-status["Request status\nsrc/rfp_assistant/service/service.py"]
-  attempt-ledger["Attempt ledger states\nsrc/rfp_assistant/gateway/budget.py"]
-  serving-activation["Serving activation\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  update-fence["Update fence\nsrc/rfp_assistant/service/update.py"]
-  stage-review-run["Stage review run states\nsrc/rfp_assistant/evaluation/stage_review.py"]
-  request-status -->|derives billing_state| attempt-ledger
-  attempt-ledger -->|unknown blocks dispatch| request-status
-  serving-activation -->|mode and versions| request-status
-  update-fence -->|refuses new admission| request-status
-  attempt-ledger -->|open work refuses update| update-fence
-  stage-review-run -->|paid answers settle| attempt-ledger
+  request-status["Request status\nsrc/rfp_assistant/service/service.py"] -->|"dispatch guard reads"| attempt-billing["Attempt billing state\nsrc/rfp_assistant/gateway/budget.py"]
+  attempt-billing -->|"billing_state in result"| request-status
+  restart-recovery["Restart and shutdown recovery\nsrc/rfp_assistant/service/service.py"] -->|"interrupt unfinished"| request-status
+  restart-recovery -->|"dispatching to unknown"| attempt-billing
+  update-fence["Update fence\nsrc/rfp_assistant/service/update.py"] -->|"blocks admission"| request-status
+  update-fence -->|"blocks start"| maintenance-run["Maintenance run status\nsrc/rfp_assistant/storage/maintenance.py"]
+  attempt-billing -->|"open work blocks update"| update-fence

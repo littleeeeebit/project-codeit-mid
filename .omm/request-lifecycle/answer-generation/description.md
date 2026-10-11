@@ -1,0 +1,1 @@
+After `_checkpoint`, `_generate` calls `_metered_chat` with stage `generation`, prompt version `grounded-answer-13` and the member's model (gpt-5-mini by default). A frozen verifier run is capped at its consented estimate. Each streamed delta replaces `res.partials[request_id]`. The reservation becomes settled, released or unknown as described under paid-gateway/settlement.

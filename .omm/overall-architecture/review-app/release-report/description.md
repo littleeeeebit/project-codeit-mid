@@ -1,1 +1,0 @@
-`release.py` calls `error_analysis.release_summary(settings.data_dir)` and `release_lines` to add a "Human error analysis (not a sealed metric)" section, labeled gold or traffic. These counts never change a pass line.

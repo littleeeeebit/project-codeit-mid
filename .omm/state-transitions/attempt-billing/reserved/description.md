@@ -1,0 +1,1 @@
+Inserted by `reserve` after all admission checks; its maximum cost counts as pending against the cap and the envelope. A restart releases it ('never dispatched before restart').

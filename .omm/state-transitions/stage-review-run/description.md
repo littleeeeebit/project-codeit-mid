@@ -1,1 +1,0 @@
-Run folder state recorded in `run.json`. Free stages (retriever, chunking) go straight from worker output to a scored `view.json`, with no `state` field needed. Paid stages (generation, ocr) move through approval. A candidate refused for lack of CUDA, or one that failed, stays in the run with its reason; it is never hidden or ranked.

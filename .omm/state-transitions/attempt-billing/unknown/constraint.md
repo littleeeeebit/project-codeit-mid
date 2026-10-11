@@ -1,0 +1,1 @@
+Resolve unknown attempts (CLI `unresolved`, `settle`, `reconcile`) before expecting paid work to resume.

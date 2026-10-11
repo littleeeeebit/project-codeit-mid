@@ -1,1 +1,1 @@
-Written by `_finish` for any domain outcome stored as an answer: answered, `insufficient_evidence`, `ingestion_unavailable`, `budget_blocked`, metadata or inventory. `budget_blocked` uses the default `completed` request status.
+Terminal. `result_json.status` holds the domain outcome, e.g. answered, insufficient_evidence, ingestion_unavailable or budget_blocked. Note that budget_blocked keeps request status 'completed' because `fail` is called without a request_status there.

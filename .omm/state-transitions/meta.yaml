@@ -1,12 +1,11 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-11 06:52:30.523000+00:00
-update_count: 54
+updated: 2026-10-11 09:34:31.025000+00:00
+update_count: 56
 last_field: diagram
-git_commit: a5b74e05
-git_branch: traffic-sample-review
+git_commit: 19b378c8
+git_branch: maintenance-ingest-timeout-cancel-progress
 children:
 - attempt-billing
-- attempt-ledger
 - attempt-record
 - attempt-states
 - billing-attempt
@@ -15,19 +14,22 @@ children:
 - gold-candidate
 - gold-candidate-states
 - interrupted
+- maintenance-run
 - owner-reconcile
 - request-status
+- restart-recovery
 - running
 - serving-activation
 - source-review-states
-- stage-review-run
 - update-fence
 - update-states
 prev_diagram: "graph TD\r\n  request-status[\"Request status\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  billing-attempt[\"Ledger attempt state\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  stage-review-run[\"Stage review run state\\nsrc/rfp_assistant/evaluation/stage_review.py\"\
-  ]\r\n  taxonomy-decisions[\"Taxonomy and suggestions\\nsrc/rfp_assistant/evaluation/error_analysis.py\"\
-  ]\r\n  request-status -->|\"each paid stage reserves\"| billing-attempt\r\n  stage-review-run\
-  \ -->|\"worker answers reserve\"| billing-attempt\r\n  billing-attempt -->|\"rolls\
-  \ up billing_state\"| request-status\r\n  billing-attempt -->|\"unknown stops candidate\"\
-  | stage-review-run\r\n  stage-review-run -->|\"generation answers get notes\"| taxonomy-decisions"
+  ]\r\n  attempt-ledger[\"Attempt ledger states\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  serving-activation[\"Serving activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
+  ]\r\n  update-fence[\"Update fence\\nsrc/rfp_assistant/service/update.py\"]\r\n\
+  \  stage-review-run[\"Stage review run states\\nsrc/rfp_assistant/evaluation/stage_review.py\"\
+  ]\r\n  request-status -->|derives billing_state| attempt-ledger\r\n  attempt-ledger\
+  \ -->|unknown blocks dispatch| request-status\r\n  serving-activation -->|mode and\
+  \ versions| request-status\r\n  update-fence -->|refuses new admission| request-status\r\
+  \n  attempt-ledger -->|open work refuses update| update-fence\r\n  stage-review-run\
+  \ -->|paid answers settle| attempt-ledger"

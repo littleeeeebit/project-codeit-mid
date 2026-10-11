@@ -1,18 +1,21 @@
 created: 2026-10-04 13:34:42.449000+00:00
-updated: 2026-10-11T04:59:49.860Z
-update_count: 29
-last_field: description
+updated: 2026-10-11T09:34:21.649Z
+update_count: 31
+last_field: diagram
 kind: nested-class
 title: http-api
 children:
   - answer-sse
   - ask-routes
   - hub-login
+  - hub-oauth
   - hub-sign-in
   - login-store
   - route-groups
   - session-middleware
   - sign-in-routes
+  - sse-stream
+  - static-mount
   - stream-route
   - update-watch
 parentPath: []

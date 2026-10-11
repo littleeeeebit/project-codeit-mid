@@ -1,15 +1,9 @@
-created: 2026-10-11T06:52:35.948Z
-updated: 2026-10-11T06:52:36.264Z
+created: 2026-10-11 06:52:35.948000+00:00
+updated: 2026-10-11 06:52:36.264000+00:00
 update_count: 3
 last_field: context
 kind: nested-class
 title: traffic-review
 children:
-  - answer-shape
-  - exit-gate
-  - pseudonyms
-  - read-window
-  - sample-draw
-  - scrubber
-  - traffic-view
+- scrubber
 parentPath: []

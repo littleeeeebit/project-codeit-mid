@@ -1,0 +1,1 @@
+Each open stream is a sync generator iterated on Starlette's thread pool and does a PostgreSQL read (`request_status`) every 150 ms. That suits the six-member team, but stream count is bounded by the thread pool and by the 8-connection pool (`Target.max_connections`).

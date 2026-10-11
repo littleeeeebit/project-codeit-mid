@@ -1,1 +1,0 @@
-`<data>/review/runs/<stage>-<stamp>-<hex>/`. Run IDs must match `RUN_ID` (retriever, chunking, generation, ocr, traffic). A run is listed once `run.json` exists; writers create it last. The app never writes into a run folder except on import.

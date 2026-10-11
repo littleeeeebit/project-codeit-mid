@@ -1,0 +1,1 @@
+That tracing never affects behaviour was inferred from the README and `_guard` wrapping; individual failure paths inside tracing.py were not traced line by line.

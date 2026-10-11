@@ -1,1 +1,0 @@
-`app_settings.active_run` / `active_index`. Read by every request through `active_serving` and `run_settings`, so evaluation limits, not process settings, govern serving retrieval.

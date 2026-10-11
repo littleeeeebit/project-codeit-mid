@@ -1,21 +1,20 @@
 created: 2026-10-04 13:34:44.752000+00:00
-updated: 2026-10-11 06:52:23.155000+00:00
-update_count: 53
+updated: 2026-10-11 09:34:23.966000+00:00
+update_count: 55
 last_field: diagram
 kind: nested-class
 title: retrieval-engine
 children:
-- chunk-profiles
 - corpus-route
 - corpus-router
 - corpus-routing
 - dense-channel
-- dense-index
 - dense-search
-- fuse-and-pack
+- evidence-packing
 - fusion
 - fusion-rerank
 - keyword-index
+- lexical-channels
 - local-reranker
 - query-embedding
 - query-vector
@@ -24,15 +23,14 @@ children:
 - serving-activation
 - serving-config
 parentPath: []
-prev_diagram: "graph TD\r\n  keyword-index[\"KeywordIndex\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  scope-routing[\"Scope routing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  lexical-channels[\"Exact and BM25 channels\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+prev_diagram: "graph TD\r\n  chunk-profiles[\"Chunk profiles\\nsrc/rfp_assistant/retrieval/chunking.py\"\
+  ]\r\n  keyword-index[\"Keyword index\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  serving-config[\"Serving activation\\nsrc/rfp_assistant/service/service.py\"\
   ]\r\n  query-vector[\"Query vector cache\\nsrc/rfp_assistant/retrieval/dense.py\"\
-  ]\r\n  dense-search[\"pgvector search\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
-  ]\r\n  fusion-rerank[\"Fusion and reranker\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  evidence-packing[\"Evidence packing\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  keyword-index -->|\"rows per extraction\"| scope-routing\r\n  scope-routing\
-  \ -->|\"allowed row ids\"| lexical-channels\r\n  query-vector -->|\"verified vector\"\
-  | dense-search\r\n  scope-routing -->|\"allowed row ids\"| dense-search\r\n  lexical-channels\
-  \ -->|\"exact and BM25 ranks\"| fusion-rerank\r\n  dense-search -->|\"cosine ranks\"\
-  | fusion-rerank\r\n  fusion-rerank -->|\"final ranking\"| evidence-packing"
+  ]\r\n  dense-index[\"pgvector dense index\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
+  ]\r\n  reranker[\"Local reranker\\nsrc/rfp_assistant/retrieval/dense.py\"]\r\n \
+  \ fuse-and-pack[\"Fuse and pack evidence\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  chunk-profiles -->|chunks per profile| keyword-index\r\n  serving-config\
+  \ -->|mode, limits, versions| fuse-and-pack\r\n  keyword-index -->|exact and BM25\
+  \ hits| fuse-and-pack\r\n  query-vector -->|query embedding| dense-index\r\n  dense-index\
+  \ -->|in-scope neighbours| fuse-and-pack\r\n  reranker -->|rescored order| fuse-and-pack"

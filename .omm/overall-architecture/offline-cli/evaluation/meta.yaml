@@ -1,9 +1,0 @@
-created: 2026-10-11T06:52:26.581Z
-updated: 2026-10-11T06:52:26.582Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: evaluation
-children: []
-parentPath:
-  - offline-cli

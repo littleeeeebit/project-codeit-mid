@@ -1,1 +1,0 @@
-`run.json` is written before pricing. The CLI then calls `on_ledger('reprice')`, which opens the ledger connection only after the local work, to write `estimate.json` from the token bounds each candidate recorded. The app does not list the run yet. `reprice` can be repeated after a rate change, an expiry (24 h) or a failed pricing step.

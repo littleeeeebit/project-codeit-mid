@@ -1,0 +1,1 @@
+Grouping is done by the coding agent from exported files; the app and CLI only validate and display, and call no model.

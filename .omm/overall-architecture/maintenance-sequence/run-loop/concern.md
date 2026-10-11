@@ -1,0 +1,1 @@
+`_write(settings, state)` and `_serving(settings)` run before the try/except loop. If either raises, `run` exits without discarding its run_id from LIVE and state.json stays 'running'. `maintenance_status` then reports 'interrupted' because the thread is dead. The impact is low: `cancel_maintenance` checks for a live thread first.

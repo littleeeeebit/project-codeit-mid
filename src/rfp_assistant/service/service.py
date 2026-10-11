@@ -2508,7 +2508,21 @@ def maintenance_status(res: Resources, principal: Principal) -> dict:
     state = maintenance.last(res.settings)
     if state and state["status"] == "running" and not running:
         state = {**state, "status": "interrupted", "reason": state.get("reason") or "the process stopped mid-run"}
-    return {"running": running, "run": state, "backup_root": str(maintenance.backup_root(res.settings))}
+    return {"running": running, "run": state, "backup_root": str(maintenance.backup_root(res.settings)),
+            "cancelling": running and bool(state) and state["run_id"] in maintenance.CANCELS}
+
+
+def cancel_maintenance(res: Resources, principal: Principal, run_id: str) -> str:
+    """Cancels live run `run_id`, the one the screen shows: a late cancel of an earlier run never hits its successor."""
+    principal = _authorize(res, principal, "verifier")
+    from ..storage import maintenance
+
+    with _EVAL_LOCK:
+        if not any(t.is_alive() for t in _MAINTENANCE_JOB):
+            raise ServiceError("실행 중인 유지보수가 없습니다.")
+        if not maintenance.request_cancel(run_id, principal.member_id):
+            raise ServiceError(f"취소하려던 유지보수 {run_id}은(는) 이미 끝났습니다.")
+    return run_id
 
 
 def start_maintenance(res: Resources, principal: Principal) -> str:

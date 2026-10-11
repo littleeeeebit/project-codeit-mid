@@ -1,0 +1,1 @@
+Execution may have happened. It counts as pending, and while any unknown attempt exists, `mark_dispatching` refuses every PostgreSQL dispatch and `update_status` blocks updates.

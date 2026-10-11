@@ -1,0 +1,1 @@
+Exact requirement-code matches (`CODE_RE`, detail rows first) always stay ahead of other rankers. `_lexical_matches` runs Kiwi BM25 (K1), or whitespace BM25 (K0) in the verifier mode, and drops scope-redundant query terms; codes, digits and negations are never dropped. `_name_only` handles questions that only name the project by returning overview passages ranked by meaning.

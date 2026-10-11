@@ -1,51 +1,49 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-11 06:52:34.860000+00:00
-update_count: 54
+updated: 2026-10-11 09:34:35.293000+00:00
+update_count: 56
 last_field: diagram
-git_commit: a5b74e05
-git_branch: traffic-sample-review
+git_commit: 19b378c8
+git_branch: maintenance-ingest-timeout-cancel-progress
 children:
 - activation
+- activation-record
 - corpus-ingestion
 - embedding-set
+- evaluation-runs
 - extraction
-- extractions
-- failure-notes
+- extraction-revisions
 - fidelity-and-ocr
 - fidelity-check
 - fidelity-ocr
 - frozen-runs
 - index-build
-- indexes
 - ingest
 - keyword
+- keyword-index-build
 - maintenance-sequence
-- ocr-cache
 - ocr-merge
 - original-corpus
 - original-files
 - originals
 - preview
-- requests-store
 - retrieval-runs
 - retrieval-selection
 - review-store
 - run-selection
-- serving
+- serving-retrieval
 - source-originals
 - traffic-review
 - vector-sets
-prev_diagram: "graph TD\r\n  originals[\"Original RFP files\\n원본 데이터/files\"]\r\n\
-  \  extractions[\"Extractions and elements\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  keyword-indexes[\"Keyword index versions\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  vector-sets[\"pgvector sets\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
-  ]\r\n  retrieval-runs[\"Frozen retrieval runs\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  active-serving[\"Active serving config\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  answer-records[\"Requests and ledger\\nsrc/rfp_assistant/storage/store.py\"\
-  ]\r\n  review-store[\"Review notes and decisions\\nsrc/rfp_assistant/evaluation/error_analysis.py\"\
-  ]\r\n  originals -->|\"ingest parses\"| extractions\r\n  extractions -->|\"build-keyword\
-  \ chunks\"| keyword-indexes\r\n  keyword-indexes -->|\"build-dense embeds\"| vector-sets\r\
-  \n  keyword-indexes -->|\"evaluate-retrieval, compare\"| retrieval-runs\r\n  vector-sets\
-  \ -->|\"dense and hybrid rows\"| retrieval-runs\r\n  retrieval-runs -->|\"activate-run\
-  \ writes\"| active-serving\r\n  active-serving -->|\"read per request\"| answer-records\r\
-  \n  answer-records -->|\"generation run answers\"| review-store"
+prev_diagram: "graph TD\r\n  originals[\"Original HWP and PDF files\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  ocr-cache[\"OCR region cache\\nsrc/rfp_assistant/corpus/ocr.py\"]\r\n  extractions[\"\
+  Extractions and elements\\nsrc/rfp_assistant/corpus/ingestion.py\"]\r\n  indexes[\"\
+  Keyword index and vectors\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  serving[\"\
+  Activated serving row\\nsrc/rfp_assistant/evaluation/evaluation.py\"]\r\n  requests-store[\"\
+  Requests, traces, attempts\\nsrc/rfp_assistant/service/service.py\"]\r\n  traffic-review[\"\
+  Traffic review run\\nsrc/rfp_assistant/evaluation/traffic_review.py\"]\r\n  failure-notes[\"\
+  Notes and failure types\\nsrc/rfp_assistant/evaluation/error_analysis.py\"]\r\n\
+  \  originals -->|manifest, ingest| extractions\r\n  ocr-cache -->|image_text elements|\
+  \ extractions\r\n  extractions -->|build-keyword, build-dense| indexes\r\n  indexes\
+  \ -->|evaluate, activate-run| serving\r\n  serving -->|retrieval per request| requests-store\r\
+  \n  requests-store -->|read-only window| traffic-review\r\n  traffic-review -->|annotated\
+  \ answers| failure-notes"

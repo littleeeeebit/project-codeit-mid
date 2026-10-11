@@ -712,14 +712,15 @@
   }
  ],
  "orphans": [
+  "docs/history/maintenance-timeout-cancel/README.md",
   "docs/history/release-walkthrough/synthetic/answer-run-report.md",
   "docs/hwp-loader-preview-review.md"
  ],
  "counts": {
-  "docs": 39,
+  "docs": 40,
   "linked": 29,
   "read": 8,
-  "orphans": 2,
+  "orphans": 3,
   "pages": 2,
   "decisions": 41,
   "injectable_decisions": 9

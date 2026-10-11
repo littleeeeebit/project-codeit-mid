@@ -182,6 +182,56 @@ describe("maintenance", () => {
     expect(started).toBe(1);
     expect(screen.getByText("이미 실행 중")).toBeTruthy();
   });
+
+  const live = (over: Partial<Schemas["MaintenanceRun"]> = {}): Schemas["MaintenanceRun"] => ({
+    run_id: "M-2", actor: "owner", started_at: "2026-10-11T09:00:00Z", status: "running", timed_out: [],
+    steps: [step("backup", "reused"), step("restore_check", "reused"),
+            step("ingest", "running", { progress: { done: 59, total: 98, current: "케빈랩.hwp", current_started_at: "2026-10-11T09:01:30Z" } }),
+            step("fidelity", "pending"), step("keyword", "pending"), step("embedding", "pending"), step("regression", "pending"), step("report", "pending")],
+    ...over,
+  });
+
+  test("a live run shows n/total, the file being read, both elapsed times, and cancels", async () => {
+    vi.useFakeTimers({ now: Date.parse("2026-10-11T09:02:05Z"), toFake: ["Date"] });
+    const cancels: unknown[] = [];
+    stubApi(api, {
+      "GET /api/verify/maintenance": () => ({ backup_root: "D:/backups", running: true, run: live() }),
+      "POST /api/verify/maintenance/cancel": (opts) => { cancels.push((opts as { body?: unknown }).body); return { run_id: live().run_id }; },
+    });
+    render(<MaintenanceSection />);
+    await settle();
+    expect(screen.getByText("2:05 경과")).toBeTruthy();
+    expect(screen.getByText("60 / 98 읽는 중 · 케빈랩.hwp · 이 파일 0:35")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    await settle();
+    expect(cancels).toEqual([{ run_id: live().run_id }]);  // the run on screen, never "whatever runs now"
+    vi.useRealTimers();
+  });
+
+  test("a cancelled run names its step and who cancelled; timed-out originals are listed", async () => {
+    const steps = live().steps.map((s) => (s.name === "ingest" ? { ...s, status: "cancelled" as const, reason: "cancelled by owner" } : s));
+    stubApi(api, { "GET /api/verify/maintenance": () => ({ backup_root: "D:/backups", running: false, run: live({
+      status: "cancelled", stopped_at: "ingest", cancelled_by: "owner", cancelled_at: "2026-10-11T09:03:00Z", steps, timed_out: ["느린.hwp"] }) }) });
+    render(<MaintenanceSection />);
+    await settle();
+    expect(screen.getByRole("heading", { name: "매니페스트·수집에서 취소됨" })).toBeTruthy();
+    expect(screen.getByText(/owner이\(가\) 2026-10-11 09:03에 취소했습니다/)).toBeTruthy();
+    expect(screen.getByText("59 / 98까지 읽고 멈춤 · 케빈랩.hwp 읽던 중 취소")).toBeTruthy();
+    expect(screen.getByText(/다음 실행에서 다시 읽습니다: 느린.hwp/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "취소" })).toBeNull();
+  });
+
+  test("a run with a timed-out original ends unverified and says so once, in Korean", async () => {
+    const steps = live().steps.map((s) => ({ ...s, status: "done" as const,
+      detail: s.name === "ingest" ? { documents: 98, changed: [], timed_out: ["느린.hwp"], time_limit_seconds: 120 } : {} }));
+    stubApi(api, { "GET /api/verify/maintenance": () => ({ backup_root: "D:/backups", running: false, run: live({
+      status: "unverified", reason: "1 original(s) did not finish parsing within 120 s", steps, timed_out: ["느린.hwp"] }) }) });
+    render(<MaintenanceSection />);
+    await settle();
+    expect(screen.getByText(/시간 제한 안에 읽지 못한 원문 1개가 이전 추출로 남았습니다/)).toBeTruthy();
+    expect(screen.queryByText(/did not finish parsing/)).toBeNull();
+    expect(screen.getByText(/120초 안에 못 읽은 1개는 이전 추출 유지$/)).toBeTruthy();
+  });
 });
 
 const SOURCES: Schemas["TraceSources"] = {

@@ -1,1 +1,1 @@
-Inserted by `_create` with a runner slot held. A queued row has never dispatched anything, so cancelling it is conclusive and free. Trigger for leaving: the worker claim, `cancel_request` / `abandon_request`, `RequestRunner.shutdown`, or `recover_requests` on the next start.
+Row inserted by `_create` with a runner slot held. It is visible to `open_paid_work` and blocks updates. `abandon_request` cancels only in this state.

@@ -1,1 +1,1 @@
-Written by `_finish` with `request_status='failed'`: `clarification_required` from a `ServiceError`, `technical_error` from provider errors, validation failures, settlement failures or unexpected exceptions, and `_fail_unscheduled`. traffic_review reads a failed row's `error` prefix as the validation code.
+Terminal. Covers clarification_required (ServiceError), technical_error (provider failure, validation failure, unexpected exception) and unscheduled submissions. A billed failure is never retried automatically.

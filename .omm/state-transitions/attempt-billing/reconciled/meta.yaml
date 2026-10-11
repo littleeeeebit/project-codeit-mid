@@ -1,0 +1,9 @@
+created: 2026-10-11T09:34:33.456Z
+updated: 2026-10-11T09:34:33.457Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: reconciled
+children: []
+parentPath:
+  - attempt-billing

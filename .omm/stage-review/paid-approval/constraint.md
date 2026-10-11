@@ -1,0 +1,1 @@
+Paid resume runs through the gateway of the database it targets. On codeit, `bidmate.service` holds the lock and must be stopped for `resume` (25–40 min per 55-question candidate on 2026-10-10).

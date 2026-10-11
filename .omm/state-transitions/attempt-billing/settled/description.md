@@ -1,0 +1,1 @@
+Cost computed from usage with the reservation's stored rates. An overrun above the reservation freezes the ledger (`frozen_reason`).

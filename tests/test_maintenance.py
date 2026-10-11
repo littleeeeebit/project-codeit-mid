@@ -1,17 +1,23 @@
 """The maintenance sequence: order, reuse on a rerun, a stop at a failed step or a paid estimate, serving untouched."""
 
 import csv
+import dataclasses
 import io
+import json
+import multiprocessing
 import os
 import tempfile
 import threading
+import time
 import unittest
+from functools import partial
 from pathlib import Path
 from unittest import mock
 
 import psycopg
 
 from rfp_assistant.corpus import ingestion
+from rfp_assistant.evaluation import compare
 from rfp_assistant.gateway.generation import FakeTransport
 from rfp_assistant.retrieval.retrieval import KeywordIndex, build_keyword_index
 from rfp_assistant.service import service
@@ -21,6 +27,53 @@ from tests import fixtures
 
 def reused(*_, **__):
     return {"status": "reused"}
+
+
+# Parse targets run in the maintenance parse child, so they are module-level (picklable) functions.
+
+
+def revised_parse(settings, src, original, ref, fail=None):
+    """The next parser revision: one original's last element changes, or with `fail` reading it fails."""
+    raw, warnings, reason, fp = ingestion._parse_source(settings, src, original)
+    if src["source_hash"] == ref:
+        if fail:
+            return [], warnings, fail, fp
+        raw = [{**e, "raw_text": e["raw_text"] + " (개정)"} if i == len(raw) - 1 else e for i, e in enumerate(raw)]
+    return raw, warnings, reason, fp
+
+
+def hang_on(settings, src, original, ref, marker=None, also=()):
+    """Never returns for one original, and for those in `also` (touching `marker` first); parses every other one."""
+    if src["source_hash"] != ref and src["source_hash"] not in also:
+        return ingestion._parse_source(settings, src, original)
+    if marker:
+        Path(marker).touch()
+    while True:
+        time.sleep(1)
+
+
+def alive(pid: int) -> bool:
+    """Whether a process runs, without signalling it (os.kill on Windows would terminate it)."""
+    if os.name == "nt":
+        import ctypes
+
+        kernel = ctypes.windll.kernel32
+        handle = kernel.OpenProcess(0x00100000, False, pid)  # SYNCHRONIZE
+        if not handle:
+            return False
+        try:
+            return kernel.WaitForSingleObject(handle, 0) == 0x102  # WAIT_TIMEOUT: still running
+        finally:
+            kernel.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def ingest_with(target, **kw):
+    return partial(maintenance.step_ingest, target=partial(target, **kw))
 
 
 class SequenceTest(unittest.TestCase):
@@ -76,12 +129,7 @@ class SequenceTest(unittest.TestCase):
         self.assertEqual(state["provider_calls"], 0)
         self.assertEqual(self.statuses(state)["embedding"], "skipped")  # the fixture serves keyword retrieval
 
-        (self.s.source_dir / "files" / "기관F_신규 사업.pdf").write_bytes(
-            fixtures.make_pdf([["신규 공고 하자보수 기간은 검수 후 24개월입니다."]]))
-        buf = io.StringIO(newline="")
-        csv.writer(buf).writerows([fixtures.CSV_HEADER, *fixtures.ROWS, [
-            "20240006", "0.0", "신규 사업", "", "기관F", "2024-09-01", "", "", "요약", "pdf", "기관F_신규 사업.pdf", "미리보기"]])
-        (self.s.source_dir / "data_list.csv").write_bytes(b"\xef\xbb\xbf" + buf.getvalue().encode("utf-8"))
+        self.add_original()
         state = self.run_with(backup=reused, restore_check=reused, regression=reused)
         self.assertEqual(state["status"], "complete", state["reason"])
         steps = {s["name"]: s for s in state["steps"]}
@@ -96,22 +144,227 @@ class SequenceTest(unittest.TestCase):
         self.assertTrue(again["reused"])
         self.assertEqual(again["provider_calls"], 0)
 
+    def add_original(self) -> str:
+        """Adds a new original, `기관F_신규 사업.pdf`, to the manifest; returns its source hash."""
+        path = self.s.source_dir / "files" / "기관F_신규 사업.pdf"
+        path.write_bytes(fixtures.make_pdf([["신규 공고 하자보수 기간은 검수 후 24개월입니다."]]))
+        buf = io.StringIO(newline="")
+        csv.writer(buf).writerows([fixtures.CSV_HEADER, *fixtures.ROWS, [
+            "20240006", "0.0", "신규 사업", "", "기관F", "2024-09-01", "", "", "요약", "pdf", "기관F_신규 사업.pdf", "미리보기"]])
+        (self.s.source_dir / "data_list.csv").write_bytes(b"\xef\xbb\xbf" + buf.getvalue().encode("utf-8"))
+        return ingestion.sha256_file(path)
+
     def reparse(self, ref, fail: str | None = None, **steps):
         """Runs maintenance while a parser change alters one original's output (its last element), or, with
         `fail`, makes reading it fail with that quarantine reason."""
-        key, parse = ingestion.input_key, ingestion.parse_pdf
+        with self.next_parser():
+            return self.run_with(**{"backup": reused, "restore_check": reused, "regression": reused,
+                                    "ingest": ingest_with(revised_parse, ref=ref.source_hash, fail=fail), **steps})
 
-        def next_parser(path):
-            raw, warnings, reason = parse(path)
-            if ingestion.sha256_file(path) == ref.source_hash:
-                if fail:
-                    return [], warnings, fail
-                raw = [{**e, "raw_text": e["raw_text"] + " (개정)"} if i == len(raw) - 1 else e for i, e in enumerate(raw)]
-            return raw, warnings, reason
+    def next_parser(self):
+        """A parser revision: every original's input key changes, so maintenance re-parses all of them."""
+        key = ingestion.input_key
+        return mock.patch.object(ingestion, "input_key", lambda s, src: key(s, src) + "-next")
 
-        with mock.patch.object(ingestion, "input_key", lambda s, src: key(s, src) + "-next"), \
-                mock.patch.object(ingestion, "parse_pdf", next_parser):
-            return self.run_with(**{"backup": reused, "restore_check": reused, "regression": reused, **steps})
+    def source_row(self, source_hash):
+        with store.open_db(self.s.db_path) as conn:
+            return (conn.execute("SELECT active_extraction_id, parse_status FROM sources WHERE source_hash = ?",
+                                 (source_hash,)).fetchone(),
+                    conn.execute("SELECT input_key, extraction_id, updated_at FROM extraction_inputs WHERE "
+                                 "source_hash = ?", (source_hash,)).fetchone())
+
+    def test_a_parse_that_never_returns_is_killed_and_the_run_ends_unverified(self):
+        ref = self.env.refs["기관A"]
+        # one original under two names, and a new one that has never been read
+        names = ["기관A_통합 정보시스템.pdf", "기관C_통합 정보시스템 사본.pdf", "기관F_신규 사업.pdf"]
+        filename = names[0]
+        before = self.source_row(ref.source_hash)
+        new = self.add_original()
+        self.s = dataclasses.replace(self.s, parse_timeout_seconds=2)
+        started = time.monotonic()
+        with self.next_parser():
+            state = self.run_with(backup=reused, restore_check=reused, regression=reused,
+                                  ingest=ingest_with(hang_on, ref=ref.source_hash, also=(new,)))
+        self.assertLess(time.monotonic() - started, 100)  # killed at the limit, not waited for
+        self.assertEqual(state["status"], "unverified", state["reason"])
+        self.assertIn(", ".join(names), state["reason"])
+        self.assertEqual(state["timed_out"], names)
+        detail = next(s for s in state["steps"] if s["name"] == "ingest")["detail"]
+        self.assertEqual(detail["timed_out"], names)
+        self.assertEqual(detail["reparsed"], detail["documents"] - len(names))  # every other one, in the child
+        self.assertEqual(detail["changed"], [])  # the others read the same; the new one is still unread
+        self.assertNotIn("pending", {s["status"] for s in state["steps"]})  # the remaining steps all ran
+        self.assertEqual(self.source_row(ref.source_hash), before)  # same extraction, no new input record
+        report = maintenance.root(self.s) / "reports" / state["run_id"]
+        self.assertIn(f"- {filename}", report.with_suffix(".md").read_text(encoding="utf-8"))
+        self.assertEqual(json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))["timed_out"], names)
+        self.assertEqual(multiprocessing.active_children(), [])
+
+    def unique_sources(self):
+        with store.open_db(self.s.db_path) as conn:
+            return conn.execute("SELECT COUNT(DISTINCT active_source_hash) FROM documents").fetchone()[0]
+
+    def test_a_killed_parse_takes_its_converter_with_it(self):
+        # review round 1, F1: the converter's own timeout lives in the killed child, so it must die with it
+        import sys
+
+        pidfile, script = self.root / "converter.pid", self.root / "converter.py"
+        script.write_text(f"import os, time\nopen({str(pidfile)!r}, 'w').write(str(os.getpid()))\n"
+                          "while True:\n    time.sleep(1)\n", encoding="utf-8")
+        if os.name == "nt":
+            converter = self.root / "converter.cmd"
+            converter.write_text(f'@"{sys.executable}" "{script}" %*\n', encoding="utf-8")
+        else:
+            converter = script
+            script.write_text(f"#!{sys.executable}\n" + script.read_text(encoding="utf-8"), encoding="utf-8")
+            script.chmod(0o755)
+        s = dataclasses.replace(self.s, hwp_converter=converter, parse_timeout_seconds=3)
+        original = s.source_dir / "files" / "기관E_재난 관리 시스템.hwp"
+        worker = maintenance.ParseWorker(s)
+        with self.assertRaises(ingestion.ParseTimedOut):
+            worker(s, {"source_hash": ingestion.sha256_file(original), "format": "hwp"}, original)
+        pid = int(pidfile.read_text())
+        try:
+            for _ in range(50):
+                if not alive(pid):
+                    break
+                time.sleep(0.1)
+            self.assertFalse(alive(pid), f"converter {pid} outlived its killed parse")
+        finally:
+            if alive(pid):
+                os.kill(pid, 9)
+
+    def start_hanging(self, res):
+        """Starts the button's run with one original's parse hanging; returns once that parse is running. The
+        patches stay until the test ends, since the run's thread reads them after this returns."""
+        ref = self.env.refs["기관A"]
+        marker = self.root / "hanging"
+        self.enterContext(self.next_parser())
+        self.enterContext(mock.patch.dict(maintenance.STEP_FUNCTIONS, backup=reused, restore_check=reused,
+                                          ingest=ingest_with(hang_on, ref=ref.source_hash, marker=str(marker))))
+        run_id = service.start_maintenance(res, self.env.verifier)
+        for _ in range(600):
+            if marker.exists():
+                break
+            time.sleep(0.1)
+        self.assertTrue(marker.exists(), "the stub parse never started")
+        progress = next(s for s in maintenance.last(self.s)["steps"] if s["name"] == "ingest")["detail"]["progress"]
+        self.assertEqual((progress["current"], progress["total"]), ("기관A_통합 정보시스템.pdf", self.unique_sources()))
+        self.assertTrue(progress["current_started_at"])
+        return run_id
+
+    def test_cancel_kills_a_hanging_parse_and_frees_the_slot(self):
+        res = service.Resources(self.s, transport=FakeTransport())
+        try:
+            with self.assertRaisesRegex(service.ServiceError, "실행 중인 유지보수가 없습니다"):
+                service.cancel_maintenance(res, self.env.verifier, "M-20261011-000000-000000")
+            run_id = self.start_hanging(res)
+            asked = time.monotonic()
+            self.assertEqual(service.cancel_maintenance(res, self.env.verifier, run_id), run_id)
+            service._MAINTENANCE_JOB[0].join(10)
+            self.assertLess(time.monotonic() - asked, 5)
+            status = service.maintenance_status(res, self.env.verifier)
+            run = status["run"]
+            self.assertEqual((status["running"], status["cancelling"], run["status"], run["stopped_at"],
+                              run["cancelled_by"]), (False, False, "cancelled", "ingest", self.env.verifier.member_id))
+            self.assertTrue(run["cancelled_at"])
+            self.assertEqual({s["name"]: s["status"] for s in run["steps"]}["keyword"], "pending")
+            self.assertTrue((maintenance.root(self.s) / "reports" / f"{run_id}.md").exists())
+            self.assertEqual(multiprocessing.active_children(), [])
+            with self.assertRaisesRegex(service.ServiceError, "실행 중인 유지보수가 없습니다"):
+                service.cancel_maintenance(res, self.env.verifier, run_id)
+            with mock.patch.dict(maintenance.STEP_FUNCTIONS, {n: reused for n in maintenance.STEP_FUNCTIONS}):
+                again = service.start_maintenance(res, self.env.verifier)  # the slot is free right away
+                service._MAINTENANCE_JOB[0].join(10)
+            self.assertEqual(maintenance.last(self.s)["run_id"], again)
+            self.assertEqual(maintenance.last(self.s)["status"], "complete")
+        finally:
+            res.close()
+
+    def cancel_inside(self, res, **steps):
+        """Starts the button's run with every step reused, cancels it while `golden_counts` (the report step) or a
+        step given as "block" is blocked, releases it and returns the final state."""
+        entered, release = threading.Event(), threading.Event()
+
+        def block(*_, **__):
+            entered.set()
+            self.assertTrue(release.wait(30))
+            return {"status": "reused"}
+
+        def raise_after(exc):
+            def step(*a, **kw):
+                block()
+                raise exc
+            return step
+
+        fakes = {n: reused for n in maintenance.STEP_FUNCTIONS}
+        fakes.update({n: raise_after(f) if isinstance(f, Exception) else f for n, f in steps.items()})
+        golden = compare.golden_counts
+        with mock.patch.dict(maintenance.STEP_FUNCTIONS, fakes), \
+                mock.patch.object(compare, "golden_counts", lambda s: (block(), golden(s))[1]):
+            run_id = service.start_maintenance(res, self.env.verifier)
+            self.assertTrue(entered.wait(30))
+            self.assertEqual(service.cancel_maintenance(res, self.env.verifier, run_id), run_id)
+            self.assertTrue(service.maintenance_status(res, self.env.verifier)["cancelling"])
+            release.set()
+            service._MAINTENANCE_JOB[0].join(30)
+        self.assertNotIn(run_id, maintenance.CANCELS)
+        with self.assertRaisesRegex(service.ServiceError, "실행 중인 유지보수가 없습니다"):
+            service.cancel_maintenance(res, self.env.verifier, run_id)
+        return maintenance.last(self.s)
+
+    def test_a_late_or_repeated_cancel_of_an_earlier_run_never_stops_the_next(self):
+        # review round 2, F4: a cancel names the run the screen showed, so a delayed or replayed one misses run B
+        res = service.Resources(self.s, transport=FakeTransport())
+        try:
+            with mock.patch.dict(maintenance.STEP_FUNCTIONS, {n: reused for n in maintenance.STEP_FUNCTIONS}):
+                a = service.start_maintenance(res, self.env.verifier)  # the screen shows run A
+                service._MAINTENANCE_JOB[0].join(30)
+            b = self.start_hanging(res)  # often in A's second; the run id's random suffix keeps the two apart
+            self.assertNotEqual(a, b)
+            with self.assertRaisesRegex(service.ServiceError, f"취소하려던 유지보수 {a}은\\(는\\) 이미 끝났습니다"):
+                service.cancel_maintenance(res, self.env.verifier, a)  # A's cancel, delivered or replayed now
+            time.sleep(1)
+            self.assertTrue(service._MAINTENANCE_JOB[0].is_alive())
+            self.assertEqual((maintenance.last(self.s)["status"], b in maintenance.CANCELS), ("running", False))
+            self.assertEqual(service.cancel_maintenance(res, self.env.verifier, b), b)
+            service._MAINTENANCE_JOB[0].join(10)
+            self.assertEqual(maintenance.last(self.s)["status"], "cancelled")
+        finally:
+            res.close()
+
+    def test_a_cancel_admitted_during_the_last_step_or_as_a_step_stops_is_recorded(self):
+        # review round 1, F2: a cancel accepted after the run's last check must still reach its final state
+        res = service.Resources(self.s, transport=FakeTransport())
+        try:
+            state = self.cancel_inside(res)
+            self.assertEqual((state["status"], state["stopped_at"], state["cancelled_by"]),
+                             ("cancelled", "report", self.env.verifier.member_id))
+            self.assertIn("during its last step", state["reason"])
+            report = (maintenance.root(self.s) / "reports" / f"{state['run_id']}.md").read_text(encoding="utf-8")
+            self.assertIn("**cancelled** at `report`", report)
+            for name, exc, status in (("restore_check", maintenance.StepFailed("no restore"), "failed"),
+                                      ("embedding", maintenance.NeedsApproval({}, "approve e1"), "needs_approval")):
+                state = self.cancel_inside(res, **{name: exc})
+                self.assertEqual((state["status"], state["stopped_at"], state["cancelled_by"]),
+                                 (status, name, self.env.verifier.member_id))
+                self.assertIn(f"{exc}; cancelled by {self.env.verifier.member_id}", state["reason"])
+        finally:
+            res.close()
+
+    def test_the_controlled_stop_kills_a_hanging_parse(self):
+        res = service.Resources(self.s, transport=FakeTransport())
+        try:
+            self.start_hanging(res)
+        finally:
+            asked = time.monotonic()
+            res.close()
+        self.assertLess(time.monotonic() - asked, 10)
+        self.assertFalse(service._MAINTENANCE_JOB[0].is_alive())
+        state = maintenance.last(self.s)
+        self.assertEqual((state["status"], state["stopped_at"]), ("failed", "ingest"))
+        self.assertIn("the service is stopping", state["reason"])
+        self.assertEqual(multiprocessing.active_children(), [])
 
     def test_the_served_extraction_reports_its_own_review_not_the_candidates(self):
         # review round 2, F5: a positive review of the reparsed candidate must not certify the served older text
@@ -337,6 +590,19 @@ class SequenceTest(unittest.TestCase):
             self.assertEqual((status["running"], status["run"]["status"]), (False, "complete"))
         finally:
             res.close()
+
+
+class ConverterTest(unittest.TestCase):
+    def test_the_converter_beside_the_interpreter_is_found_without_path(self):
+        # The Oct 10 hang: the service unit's PATH has no venv, so every HWP fell back to the HWP loader, which
+        # loops forever on one original
+        from rfp_assistant import settings
+
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "hwp5proc").write_text("")
+            with mock.patch.object(settings.sys, "executable", str(Path(d) / "python")), \
+                    mock.patch.dict(os.environ, {"PATH": ""}):
+                self.assertEqual(settings.default_converter(), Path(d) / "hwp5proc")
 
 
 if __name__ == "__main__":

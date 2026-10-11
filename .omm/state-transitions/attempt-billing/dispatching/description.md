@@ -1,0 +1,1 @@
+Durable marker written in the same transaction as the request's stop check, before the network call. A process ending here leaves it for `recover` to mark unknown.

@@ -1,7 +1,7 @@
 created: 2026-10-10T12:41:54.539Z
-updated: 2026-10-11T01:14:52.044Z
-update_count: 4
-last_field: constraint
+updated: 2026-10-11T09:34:22.457Z
+update_count: 5
+last_field: description
 kind: nested-class
 title: update-watch
 children: []

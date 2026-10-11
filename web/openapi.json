@@ -752,6 +752,20 @@
     "title": "BudgetSnapshot",
     "type": "object"
    },
+   "CancelIn": {
+    "properties": {
+     "run_id": {
+      "description": "The run the screen shows; a cancel naming an earlier run is refused",
+      "title": "Run Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "run_id"
+    ],
+    "title": "CancelIn",
+    "type": "object"
+   },
    "Cancelled": {
     "properties": {
      "status": {
@@ -3976,6 +3990,28 @@
       "title": "Actor",
       "type": "string"
      },
+     "cancelled_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cancelled At"
+     },
+     "cancelled_by": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cancelled By"
+     },
      "finished_at": {
       "anyOf": [
        {
@@ -4047,7 +4083,8 @@
        "unverified",
        "failed",
        "needs_approval",
-       "interrupted"
+       "interrupted",
+       "cancelled"
       ],
       "title": "Status",
       "type": "string"
@@ -4069,6 +4106,15 @@
        }
       ],
       "title": "Stopped At"
+     },
+     "timed_out": {
+      "default": [],
+      "description": "Originals past the parse time limit (previous extraction kept)",
+      "items": {
+       "type": "string"
+      },
+      "title": "Timed Out",
+      "type": "array"
      }
     },
     "required": [
@@ -4086,6 +4132,12 @@
      "backup_root": {
       "title": "Backup Root",
       "type": "string"
+     },
+     "cancelling": {
+      "default": false,
+      "description": "A cancel was requested and the live run has not stopped yet",
+      "title": "Cancelling",
+      "type": "boolean"
      },
      "run": {
       "anyOf": [
@@ -4173,7 +4225,8 @@
        "reused",
        "skipped",
        "failed",
-       "needs_approval"
+       "needs_approval",
+       "cancelled"
       ],
       "title": "Status",
       "type": "string"
@@ -8235,6 +8288,45 @@
      }
     },
     "summary": "Maintenance Status"
+   }
+  },
+  "/api/verify/maintenance/cancel": {
+   "post": {
+    "description": "Cancels the named live run: a running re-parse is killed at once, any other step stops at its end.",
+    "operationId": "cancel_maintenance_api_verify_maintenance_cancel_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CancelIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Started"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Cancel Maintenance"
    }
   },
   "/api/verify/maintenance/start": {

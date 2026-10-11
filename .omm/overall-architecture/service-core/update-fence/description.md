@@ -1,0 +1,1 @@
+`res.update_fence` is `UpdateWatch.fenced`: true while an update request is being accepted, while the marker exists, or while the updater's result says running. `_refuse_while_updating` raises `UPDATING` from `RequestRunner.try_admit`, `_start_job` and `start_maintenance`, always under `_runner_lock`, so an accepted update never races a new paid admission.

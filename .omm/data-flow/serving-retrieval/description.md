@@ -1,0 +1,1 @@
+Each request reads `active_serving` fresh, so `Resources.index()` and `dense()` reload when the version changes and `retire_inactive` frees unused GPU models. A source re-parsed after activation keeps serving the extraction the index holds (`served_extraction`). Its citations show `extraction_revised` once `sources.active_extraction_id` has moved.

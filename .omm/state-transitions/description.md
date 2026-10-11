@@ -1,1 +1,7 @@
-Several state machines decide whether paid work may start, what the screen may show, and what a restart does. A request's status and its attempts' ledger states are separate. `_billing` derives the request's `billing_state` from its attempts, and the attempt ledger feeds back into admission: an unknown attempt blocks dispatch for everyone. The serving activation decides retrieval for every new request. The update fence and stage-review runs interact with both through the same ledger and admission lock.
+Five interacting lifecycles govern what may happen next:
+- the request row's status,
+- the ledger attempt's billing state,
+- the maintenance run's status in state.json,
+- the update fence,
+- startup and shutdown recovery.
+A cancel or interrupt never kills a provider call already sent; it only blocks the next dispatch, and the sent call still settles or stays unknown.
