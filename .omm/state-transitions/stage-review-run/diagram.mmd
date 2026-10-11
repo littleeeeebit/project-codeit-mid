@@ -1,13 +1,12 @@
 graph TD
-  frozen-inputs["Frozen inputs\nsrc/rfp_assistant/evaluation/stage_review.py"]
-  needs-approval["needs_approval\nsrc/rfp_assistant/evaluation/stage_review.py"]
-  approved-estimate["Approved estimate\nsrc/rfp_assistant/evaluation/stage_review_paid.py"]
-  stopped["stopped\nsrc/rfp_assistant/evaluation/stage_review.py"]
-  complete["complete\nsrc/rfp_assistant/evaluation/stage_review.py"]
-  frozen-inputs -->|"retriever or chunking scored"| complete
-  frozen-inputs -->|"paid stage priced"| needs-approval
-  needs-approval -->|"approve --approved-by"| approved-estimate
-  approved-estimate -->|"resume, all candidates done"| complete
-  approved-estimate -->|"resume, a candidate stops"| stopped
-  stopped -->|"resume within approval"| approved-estimate
-  stopped -->|"reprice voids approval"| needs-approval
+  frozen-inputs["Frozen inputs and workers\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  needs-approval["Needs approval\nsrc/rfp_assistant/evaluation/stage_review_paid.py"]
+  approved["Approved estimate\nsrc/rfp_assistant/evaluation/stage_review_paid.py"]
+  stopped["Stopped midway\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  complete["Complete and scored\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  frozen-inputs -->|free stage scored| complete
+  frozen-inputs -->|paid stage priced| needs-approval
+  needs-approval -->|approve with name| approved
+  approved -->|resume pays all| complete
+  approved -->|cap or unknown billing| stopped
+  stopped -->|reprice for remainder| needs-approval

@@ -1,1 +1,0 @@
-Priced from reported usage by `settle`, exactly once. A cost above the reservation freezes the ledger (`frozen_reason`), and all paid admission stops until the owner inspects it.

@@ -1,1 +1,1 @@
-`freeze` copies the serving activation, rows, elements or OCR image set into `inputs/`, and `input_hashes` records their digests. Every candidate reads the same inputs, and `recheck` refuses payment if they change.
+`stage_review.run` freezes the inputs (or copies them with `--inputs-from`), then for each ref runs one worktree checkout and an isolated worker process with no API keys. Free stages are scored by one shared scorer, and the run carries `ev.code_fingerprint()` as its scorer identity.

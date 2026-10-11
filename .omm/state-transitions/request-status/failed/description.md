@@ -1,1 +1,1 @@
-The request ended through `done(..., request_status='failed')`: a technical error, a validation failure, a model or settlement failure, a `ServiceError`, or a scheduling failure (`_fail_unscheduled`). Its billing still reflects any attempt that was settled or left unknown.
+Written by `_finish` with `request_status='failed'`: `clarification_required` from a `ServiceError`, `technical_error` from provider errors, validation failures, settlement failures or unexpected exceptions, and `_fail_unscheduled`. traffic_review reads a failed row's `error` prefix as the validation code.

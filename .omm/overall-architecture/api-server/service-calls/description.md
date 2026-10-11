@@ -1,0 +1,1 @@
+The service.py functions the routes call; see overall-architecture/service-core. Authorization is `_authorize` → `auth.require_any`. Every signed-in visitor holds every capability, while CLI and test callers may pass narrower principals.

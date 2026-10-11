@@ -1,1 +1,0 @@
-The durable marker written by `mark_dispatching` before the network call, in the same transaction as the request's stop check. If the process dies here, `budget.recover` makes the attempt `unknown`, because the provider may have executed.

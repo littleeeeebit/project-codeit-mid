@@ -1,1 +1,0 @@
-`postgres_backup.backup` writes a custom-format dump with a per-table manifest. `restore_check` restores it into the empty database named by `RFP_RESTORE_DATABASE_DSN`, verifies digests and references, publishes a receipt, and leaves paid admission disabled (`_disable_restored_control`). Records written after the dump's watermark must be reconciled before `paid on`.

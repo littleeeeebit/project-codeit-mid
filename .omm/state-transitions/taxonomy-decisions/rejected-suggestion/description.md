@@ -1,1 +1,0 @@
-Kept with an optional reason in a `suggestion-reject` history record. `suggest` refuses the same span again, and the next `suggest_export` bundle shows it under `rejected` with `why_rejected`.

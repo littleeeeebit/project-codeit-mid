@@ -1,0 +1,9 @@
+created: 2026-10-11T06:52:28.420Z
+updated: 2026-10-11T06:52:28.421Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: release-report
+children: []
+parentPath:
+  - review-app

@@ -1,0 +1,16 @@
+graph TD
+  review-ui["Review screens\nreview/src/app/page.tsx"]
+  review-server["Loopback HTTP server\nreview/server.py"]
+  run-folders["Run folders\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  span-notes["Span notes store\nsrc/rfp_assistant/evaluation/error_analysis.py"]
+  failure-taxonomy["Failure taxonomy\nsrc/rfp_assistant/evaluation/error_analysis.py"]
+  similar-cases["Similar-case suggestions\nsrc/rfp_assistant/evaluation/similar_cases.py"]
+  decision-files["Decision files\nreview/server.py"]
+  release-report["Release report\nsrc/rfp_assistant/evaluation/release.py"]
+  review-ui -->|fetch /api/runs and taxonomy| review-server
+  review-server -->|reads view.json| run-folders
+  review-server -->|appends note records| span-notes
+  span-notes -->|agent-grouped proposals| failure-taxonomy
+  failure-taxonomy -->|accepted types| similar-cases
+  review-server -->|writes md then json| decision-files
+  failure-taxonomy -->|release_summary counts| release-report

@@ -1,15 +1,15 @@
 graph TD
-  gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
+  owner-lock["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
   reserve["Atomic reservation\nsrc/rfp_assistant/gateway/budget.py"]
-  dispatch-marker["Dispatch marker\nsrc/rfp_assistant/gateway/budget.py"]
+  dispatch-guard["Dispatch marker and guard\nsrc/rfp_assistant/gateway/budget.py"]
   transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
   settlement["Settle, release or unknown\nsrc/rfp_assistant/gateway/budget.py"]
-  answer-validation["Answer validation\nsrc/rfp_assistant/gateway/generation.py"]
+  reconciliation["Recovery and reconciliation\nsrc/rfp_assistant/gateway/budget.py"]
   tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
-  gateway-owner -->|"owner_guard in admission"| reserve
-  reserve -->|"attempt_id when admitted"| dispatch-marker
-  dispatch-marker -->|"call after durable marker"| transport
-  gateway-owner -->|"owner_check before call"| transport
-  transport -->|"usage or ProviderError"| settlement
-  transport -->|"structured content"| answer-validation
-  transport -->|"generation span, usage"| tracing
+  owner-lock -->|owner_guard check| reserve
+  reserve -->|reserved attempt| dispatch-guard
+  owner-lock -->|owner_guard check| dispatch-guard
+  dispatch-guard -->|dispatching call| transport
+  transport -->|usage or error| settlement
+  reconciliation -->|unknown to reconciled| settlement
+  transport -->|generation spans| tracing

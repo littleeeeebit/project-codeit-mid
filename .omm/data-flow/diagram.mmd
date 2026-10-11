@@ -1,17 +1,16 @@
 graph TD
-  originals["Original RFP files\n원본 데이터/files"]
+  originals["Original HWP and PDF files\nsrc/rfp_assistant/corpus/ingestion.py"]
+  ocr-cache["OCR region cache\nsrc/rfp_assistant/corpus/ocr.py"]
   extractions["Extractions and elements\nsrc/rfp_assistant/corpus/ingestion.py"]
-  keyword-indexes["Keyword index versions\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  vector-sets["pgvector sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  retrieval-runs["Frozen retrieval runs\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  active-serving["Active serving config\nsrc/rfp_assistant/service/service.py"]
-  answer-records["Requests and ledger\nsrc/rfp_assistant/storage/store.py"]
-  review-store["Review notes and decisions\nsrc/rfp_assistant/evaluation/error_analysis.py"]
-  originals -->|"ingest parses"| extractions
-  extractions -->|"build-keyword chunks"| keyword-indexes
-  keyword-indexes -->|"build-dense embeds"| vector-sets
-  keyword-indexes -->|"evaluate-retrieval, compare"| retrieval-runs
-  vector-sets -->|"dense and hybrid rows"| retrieval-runs
-  retrieval-runs -->|"activate-run writes"| active-serving
-  active-serving -->|"read per request"| answer-records
-  answer-records -->|"generation run answers"| review-store
+  indexes["Keyword index and vectors\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  serving["Activated serving row\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  requests-store["Requests, traces, attempts\nsrc/rfp_assistant/service/service.py"]
+  traffic-review["Traffic review run\nsrc/rfp_assistant/evaluation/traffic_review.py"]
+  failure-notes["Notes and failure types\nsrc/rfp_assistant/evaluation/error_analysis.py"]
+  originals -->|manifest, ingest| extractions
+  ocr-cache -->|image_text elements| extractions
+  extractions -->|build-keyword, build-dense| indexes
+  indexes -->|evaluate, activate-run| serving
+  serving -->|retrieval per request| requests-store
+  requests-store -->|read-only window| traffic-review
+  traffic-review -->|annotated answers| failure-notes

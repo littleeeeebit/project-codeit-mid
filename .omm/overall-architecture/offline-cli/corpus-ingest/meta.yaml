@@ -1,0 +1,9 @@
+created: 2026-10-11T06:52:25.942Z
+updated: 2026-10-11T06:52:25.943Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: corpus-ingest
+children: []
+parentPath:
+  - offline-cli

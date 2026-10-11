@@ -1,0 +1,15 @@
+created: 2026-10-11T06:52:35.948Z
+updated: 2026-10-11T06:52:36.264Z
+update_count: 3
+last_field: context
+kind: nested-class
+title: traffic-review
+children:
+  - answer-shape
+  - exit-gate
+  - pseudonyms
+  - read-window
+  - sample-draw
+  - scrubber
+  - traffic-view
+parentPath: []

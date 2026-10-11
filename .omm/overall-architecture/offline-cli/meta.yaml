@@ -1,0 +1,15 @@
+created: 2026-10-11T06:52:25.589Z
+updated: 2026-10-11T06:52:25.810Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: offline-cli
+children:
+  - corpus-ingest
+  - evaluation
+  - fidelity
+  - index-build
+  - ocr
+  - stage-review
+  - traffic-review
+parentPath: []

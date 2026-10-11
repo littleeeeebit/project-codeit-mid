@@ -1,0 +1,1 @@
+`write_out` is the only writer into the run folder. It scrubs, serialises, and refuses the file (`ReviewError`, nothing written) if any member ID can still be recovered at any decoding level. It writes the gzip JSONL for inputs and plain JSON otherwise. Order is inputs, `view.json`, then `run.json`, so the app lists the run only when it is whole. Any exception removes the folder.

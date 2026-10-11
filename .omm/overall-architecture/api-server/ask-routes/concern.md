@@ -1,0 +1,1 @@
+The SSE endpoint is a synchronous generator. Each open stream holds one Starlette threadpool thread and runs a PostgreSQL read (`request_status`) every 150 ms until the request finishes. Six users are fine. Many long-lived streams would compete with the other sync routes for that threadpool. This was inferred from the code; it was not measured.

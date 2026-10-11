@@ -1,14 +1,15 @@
 graph TD
-  session-binding["Session binding\nsrc/rfp_assistant/service/service.py"]
-  resources["Resources owner\nsrc/rfp_assistant/service/service.py"]
-  request-runner["RequestRunner executor\nsrc/rfp_assistant/service/service.py"]
-  answer-pipeline["Answer pipeline\nsrc/rfp_assistant/service/service.py"]
-  background-jobs["Drafting, evaluation, maintenance\nsrc/rfp_assistant/service/drafting.py"]
-  update-watch["Update watch\nsrc/rfp_assistant/service/update.py"]
-  session-binding -->|"key, model contextvars"| answer-pipeline
-  request-runner -->|"run_queued request_id"| answer-pipeline
-  resources -->|"index, dense, transport"| answer-pipeline
-  update-watch -->|"fence refuses admission"| request-runner
-  update-watch -->|"fence refuses job start"| background-jobs
-  resources -->|"close joins and recovers"| background-jobs
-  resources -->|"shutdown interrupts queued"| request-runner
+  resources["Process owner Resources\nsrc/rfp_assistant/service/service.py"]
+  submit["submit_answer and _create\nsrc/rfp_assistant/service/service.py"]
+  runner["Bounded request runner\nsrc/rfp_assistant/service/service.py"]
+  execute["_execute_traced dispatcher\nsrc/rfp_assistant/service/service.py"]
+  free-answers["Metadata and inventory answers\nsrc/rfp_assistant/service/service.py"]
+  paid-answer["Paid answer pipeline\nsrc/rfp_assistant/service/service.py"]
+  background-jobs["Verifier background jobs\nsrc/rfp_assistant/service/service.py"]
+  submit -->|queued row, admitted slot| runner
+  submit -->|free modes inline| execute
+  runner -->|run_queued claim| execute
+  execute -->|metadata, inventory| free-answers
+  execute -->|single, compare, corpus| paid-answer
+  resources -->|index, dense, transport| paid-answer
+  resources -->|owns and joins| background-jobs

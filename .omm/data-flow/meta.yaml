@@ -1,48 +1,51 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-11 05:00:19.764000+00:00
-update_count: 52
+updated: 2026-10-11 06:52:34.860000+00:00
+update_count: 54
 last_field: diagram
-git_commit: 6e034f5
-git_branch: similar-case-proposals
+git_commit: a5b74e05
+git_branch: traffic-sample-review
 children:
 - activation
-- active-serving
-- answer-records
 - corpus-ingestion
 - embedding-set
 - extraction
 - extractions
+- failure-notes
 - fidelity-and-ocr
 - fidelity-check
 - fidelity-ocr
 - frozen-runs
 - index-build
+- indexes
 - ingest
 - keyword
-- keyword-indexes
 - maintenance-sequence
+- ocr-cache
 - ocr-merge
 - original-corpus
 - original-files
 - originals
 - preview
+- requests-store
 - retrieval-runs
 - retrieval-selection
 - review-store
 - run-selection
+- serving
 - source-originals
+- traffic-review
 - vector-sets
-prev_diagram: "graph TD\r\n  original-files[\"Original RFP files\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  extraction-elements[\"Extraction elements\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  keyword-chunks[\"Keyword index chunks\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
-  ]\r\n  vector-payloads[\"Embedding sets\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
+prev_diagram: "graph TD\r\n  originals[\"Original RFP files\\n원본 데이터/files\"]\r\n\
+  \  extractions[\"Extractions and elements\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  keyword-indexes[\"Keyword index versions\\nsrc/rfp_assistant/retrieval/retrieval.py\"\
+  ]\r\n  vector-sets[\"pgvector sets\\nsrc/rfp_assistant/retrieval/vector_store.py\"\
   ]\r\n  retrieval-runs[\"Frozen retrieval runs\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  active-run[\"Active run setting\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  answer-records[\"Request and attempt rows\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  review-notes[\"Review notes and taxonomy\\nsrc/rfp_assistant/evaluation/error_analysis.py\"\
-  ]\r\n  original-files -->|parse and OCR merge| extraction-elements\r\n  extraction-elements\
-  \ -->|chunk profile build| keyword-chunks\r\n  keyword-chunks -->|embed payloads|\
-  \ vector-payloads\r\n  keyword-chunks -->|scored against gold spans| retrieval-runs\r\
-  \n  vector-payloads -->|dense and hybrid runs| retrieval-runs\r\n  retrieval-runs\
-  \ -->|person activates| active-run\r\n  active-run -->|serving config per request|\
-  \ answer-records\r\n  answer-records -->|stage review answers annotated| review-notes"
+  ]\r\n  active-serving[\"Active serving config\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  answer-records[\"Requests and ledger\\nsrc/rfp_assistant/storage/store.py\"\
+  ]\r\n  review-store[\"Review notes and decisions\\nsrc/rfp_assistant/evaluation/error_analysis.py\"\
+  ]\r\n  originals -->|\"ingest parses\"| extractions\r\n  extractions -->|\"build-keyword\
+  \ chunks\"| keyword-indexes\r\n  keyword-indexes -->|\"build-dense embeds\"| vector-sets\r\
+  \n  keyword-indexes -->|\"evaluate-retrieval, compare\"| retrieval-runs\r\n  vector-sets\
+  \ -->|\"dense and hybrid rows\"| retrieval-runs\r\n  retrieval-runs -->|\"activate-run\
+  \ writes\"| active-serving\r\n  active-serving -->|\"read per request\"| answer-records\r\
+  \n  answer-records -->|\"generation run answers\"| review-store"

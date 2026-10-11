@@ -1,1 +1,1 @@
-Set by `cancel_request` while the request was queued, by a `_Stop('cancelled')` at a checkpoint or dispatch guard, or by `_finish` when a completed result met `cancel_requested`. Its outcome is kept as history and never attached as the current answer.
+Set directly from queued, or by `_finish` when a running request had `cancel_requested` (or stopped at a checkpoint). The result is stored for history and `may_attach` refuses to render it as the current answer.

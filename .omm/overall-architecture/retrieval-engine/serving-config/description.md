@@ -1,0 +1,1 @@
+`service.active_serving` reads `app_settings.active_run` (written by `evaluation.activate_decision`) and `active_index`. It falls back to the kiwi_bm25 default when no run is active, when the run's corpus route differs from the current `corpus_route_record()`, or when its embedding model is unknown. A stale-policy `hybrid_rerank` row serves as `hybrid`.

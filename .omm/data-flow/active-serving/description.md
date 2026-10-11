@@ -1,1 +1,0 @@
-`app_settings.active_run` holds the JSON from `serving_config`: run, mode, index, dense version, reranker, embedding, limits and eval version. `active_serving` applies runtime fallbacks: a stale corpus route, an unknown embedding model, or an old-policy HR run that is downgraded to H. `Resources.run_settings` then overrides the process settings with the run's measured limits.

@@ -1,6 +1,6 @@
 created: 2026-10-05 23:55:29.570000+00:00
-updated: 2026-10-11T05:00:10.782Z
-update_count: 16
+updated: 2026-10-11T06:52:31.221Z
+update_count: 18
 last_field: diagram
 kind: nested-class
 title: request-status
@@ -14,28 +14,30 @@ children:
 parentPath: []
 prev_diagram: "graph TD\r
 
-  \  queued[\"queued\\nsrc/rfp_assistant/service.py\"]\r
+  \  queued[\"queued\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  running[\"running\\nsrc/rfp_assistant/service.py\"]\r
+  \  running[\"running\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  completed[\"completed\\nsrc/rfp_assistant/service.py\"]\r
+  \  completed[\"completed\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  failed[\"failed\\nsrc/rfp_assistant/service.py\"]\r
+  \  failed[\"failed\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  cancelled[\"cancelled\\nsrc/rfp_assistant/service.py\"]\r
+  \  cancelled[\"cancelled\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  interrupted[\"interrupted\\nsrc/rfp_assistant/service.py\"]\r
+  \  interrupted[\"interrupted\\nsrc/rfp_assistant/service/service.py\"]\r
 
   \  queued -->|\"run_queued claims\"| running\r
 
-  \  queued -->|\"cancel before claim\"| cancelled\r
+  \  queued -->|\"cancel before dispatch\"| cancelled\r
 
   \  queued -->|\"shutdown or restart\"| interrupted\r
 
-  \  running -->|\"_finish domain outcome\"| completed\r
+  \  queued -->|\"submit failed\"| failed\r
 
-  \  running -->|\"technical or validation error\"| failed\r
+  \  running -->|\"_finish stores result\"| completed\r
 
-  \  running -->|\"cancel flag at finish\"| cancelled\r
+  \  running -->|\"error or refusal\"| failed\r
 
-  \  running -->|\"restart recovery\"| interrupted"
+  \  running -->|\"cancel_requested honored\"| cancelled\r
+
+  \  running -->|\"shutdown or restart\"| interrupted"

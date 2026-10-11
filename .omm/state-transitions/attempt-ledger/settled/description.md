@@ -1,0 +1,1 @@
+Actual cost from the usage at the frozen rates. Settling is idempotent. Cost above the reservation freezes the ledger (`frozen_reason`).

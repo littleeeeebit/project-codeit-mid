@@ -1,0 +1,1 @@
+`ocr.run` reads pictures embedded in HWP files and raster images in PDFs with PaddleOCR-VL on CUDA. Only regions flagged by its checks are re-read by gpt-5-mini from the `ocr` envelope. Results are cached per region under `.runtime/ocr/<hash>/`. The next `ingest` merges them as `image_text` elements (`ocr.merge_hwp` / `ocr.merge`). Internals were not traced in this pass.

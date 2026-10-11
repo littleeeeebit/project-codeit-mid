@@ -1,1 +1,1 @@
-Every approved candidate completed. `_score_paid` (or the immediate retriever and chunking scoring) wrote `view.json`, and `rescore` can regrade the stored outputs and re-read ledger spend without any call.
+Every approved candidate completed. `_score_paid` reads ledger spend and writes `view.json`. `rescore` can re-score stored outputs later with no calls.

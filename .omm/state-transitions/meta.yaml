@@ -1,11 +1,12 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-11 05:00:09.859000+00:00
-update_count: 52
+updated: 2026-10-11 06:52:30.523000+00:00
+update_count: 54
 last_field: diagram
-git_commit: 6e034f5
-git_branch: similar-case-proposals
+git_commit: a5b74e05
+git_branch: traffic-sample-review
 children:
 - attempt-billing
+- attempt-ledger
 - attempt-record
 - attempt-states
 - billing-attempt
@@ -20,15 +21,13 @@ children:
 - serving-activation
 - source-review-states
 - stage-review-run
-- taxonomy-decisions
 - update-fence
 - update-states
-prev_diagram: "graph TD\r\n  request-states[\"Request status\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  attempt-states[\"Billing attempt state\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  review-run-states[\"Stage review run state\\nsrc/rfp_assistant/evaluation/stage_review.py\"\
-  ]\r\n  taxonomy-states[\"Failure type state\\nsrc/rfp_assistant/evaluation/error_analysis.py\"\
-  ]\r\n  serving-activation[\"Serving activation\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
-  ]\r\n  request-states -->|each paid stage opens| attempt-states\r\n  attempt-states\
-  \ -->|billing_state precedence| request-states\r\n  review-run-states -->|answers\
-  \ via service.answer| request-states\r\n  review-run-states -->|generation answers\
-  \ annotated| taxonomy-states\r\n  serving-activation -->|pins retrieval for| request-states"
+prev_diagram: "graph TD\r\n  request-status[\"Request status\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  billing-attempt[\"Ledger attempt state\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  stage-review-run[\"Stage review run state\\nsrc/rfp_assistant/evaluation/stage_review.py\"\
+  ]\r\n  taxonomy-decisions[\"Taxonomy and suggestions\\nsrc/rfp_assistant/evaluation/error_analysis.py\"\
+  ]\r\n  request-status -->|\"each paid stage reserves\"| billing-attempt\r\n  stage-review-run\
+  \ -->|\"worker answers reserve\"| billing-attempt\r\n  billing-attempt -->|\"rolls\
+  \ up billing_state\"| request-status\r\n  billing-attempt -->|\"unknown stops candidate\"\
+  | stage-review-run\r\n  stage-review-run -->|\"generation answers get notes\"| taxonomy-decisions"

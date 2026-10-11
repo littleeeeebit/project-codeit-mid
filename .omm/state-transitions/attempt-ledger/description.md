@@ -1,0 +1,1 @@
+Column `attempts.state`, one row per paid provider call: generation, query rewrite, query embedding, and embedding, OCR or evaluation batches. Every transition bumps the ledger revision (`_bump`). `snapshot` counts open states as pending reservations against the cap.

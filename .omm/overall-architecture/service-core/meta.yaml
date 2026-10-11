@@ -1,6 +1,6 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-11T04:59:50.442Z
-update_count: 39
+updated: 2026-10-11T06:52:21.398Z
+update_count: 41
 last_field: diagram
 kind: nested-class
 title: service-core
@@ -13,12 +13,15 @@ children:
   - background-jobs
   - conversation-context
   - evidence-reader
+  - execute
+  - free-answers
   - metered-chat
   - paid-answer
   - partials
   - request-runner
   - resources
   - resources-owner
+  - runner
   - serving-config
   - session-binding
   - submit
@@ -28,39 +31,32 @@ children:
 parentPath: []
 prev_diagram: "graph TD\r
 
-  \  resources-owner[\"Resources
-  owner\\nsrc/rfp_assistant/service/service.py\"]\r
+  \  session-binding[\"Session
+  binding\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  request-runner[\"Bounded request
-  runner\\nsrc/rfp_assistant/service/service.py\"]\r
+  \  resources[\"Resources owner\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  answer-execution[\"Answer
-  execution\\nsrc/rfp_assistant/service/service.py\"]\r
+  \  request-runner[\"RequestRunner
+  executor\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  metered-chat[\"Metered chat
-  call\\nsrc/rfp_assistant/service/service.py\"]\r
+  \  answer-pipeline[\"Answer
+  pipeline\\nsrc/rfp_assistant/service/service.py\"]\r
 
-  \  answer-validation[\"Answer
-  validation\\nsrc/rfp_assistant/gateway/generation.py\"]\r
+  \  background-jobs[\"Drafting, evaluation,
+  maintenance\\nsrc/rfp_assistant/service/drafting.py\"]\r
 
-  \  background-jobs[\"Background
-  jobs\\nsrc/rfp_assistant/service/drafting.py\"]\r
+  \  update-watch[\"Update watch\\nsrc/rfp_assistant/service/update.py\"]\r
 
-  \  update-watch[\"Update watch and
-  fence\\nsrc/rfp_assistant/service/update.py\"]\r
+  \  session-binding -->|\"key, model contextvars\"| answer-pipeline\r
 
-  \  resources-owner -->|creates on first paid ask| request-runner\r
+  \  request-runner -->|\"run_queued request_id\"| answer-pipeline\r
 
-  \  request-runner -->|run_queued by request id| answer-execution\r
+  \  resources -->|\"index, dense, transport\"| answer-pipeline\r
 
-  \  answer-execution -->|rewrite and generate stages| metered-chat\r
+  \  update-watch -->|\"fence refuses admission\"| request-runner\r
 
-  \  metered-chat -->|provider response| answer-validation\r
+  \  update-watch -->|\"fence refuses job start\"| background-jobs\r
 
-  \  answer-validation -->|validated payload| answer-execution\r
+  \  resources -->|\"close joins and recovers\"| background-jobs\r
 
-  \  update-watch -->|fence checked at admission| request-runner\r
-
-  \  resources-owner -->|joins threads on close| background-jobs\r
-
-  \  update-watch -->|counts open paid work| resources-owner"
+  \  resources -->|\"shutdown interrupts queued\"| request-runner"

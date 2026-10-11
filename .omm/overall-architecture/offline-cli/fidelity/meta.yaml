@@ -1,0 +1,9 @@
+created: 2026-10-11T06:52:26.325Z
+updated: 2026-10-11T06:52:26.327Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: fidelity
+children: []
+parentPath:
+  - offline-cli

@@ -1,0 +1,1 @@
+`dense.load_reranker` / `LocalReranker` loads a pinned local cross-encoder only when the activated row is `hybrid_rerank`. `Resources.reranker()` reloads when the model, revision, length, concurrency or precision changes, and frees the GPU first. An inference error falls back to `hybrid` with the reason recorded. The current serving row does not rerank.

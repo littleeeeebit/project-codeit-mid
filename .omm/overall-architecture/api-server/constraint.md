@@ -1,0 +1,1 @@
+Exactly one worker. Sign-in sessions (`Login._sessions`), member API keys (`Resources.key_sources` / `member_keys`) and streamed partial answers (`Resources.partials`) exist only in this process's memory. A restart signs everyone out and requires each member to re-enter their key.

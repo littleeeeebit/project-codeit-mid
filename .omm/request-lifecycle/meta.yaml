@@ -1,24 +1,25 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-11 05:00:06.594000+00:00
-update_count: 54
+updated: 2026-10-11 06:52:28.832000+00:00
+update_count: 56
 last_field: diagram
-git_commit: 6e034f5
-git_branch: similar-case-proposals
+git_commit: a5b74e05
+git_branch: traffic-sample-review
 children:
 - answer-stream
 - answer-validation
 - ask-page
-- ask-post
+- ask-route
 - ask-submit
 - cancellation
 - evidence-retrieval
+- finish
 - finish-record
 - finish-request
 - finish-step
 - generate
 - langfuse-tracing
 - metered-call
-- metered-generation
+- metered-chat
 - ownership-and-polling
 - paid-answer
 - paid-answer-pipeline
@@ -26,32 +27,30 @@ children:
 - paid-call
 - persist-admit
 - poll-and-stream
-- retrieve-price
-- rewrite
 - run-queued
 - screen-attachment
 - screen-poll
 - status-poll
 - stream-and-poll
 - stream-poll
+- submit
 - submit-and-admit
 - submit-answer
 - turn-render
 - validate-and-finish
-- validate-finish
 - validation
-- worker-claim
-prev_diagram: "graph TD\r\n  ask-screen[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  session-gate[\"Session middleware\\nsrc/rfp_assistant/api.py\"]\r\n  submit-answer[\"\
-  Submit and persist\\nsrc/rfp_assistant/service/service.py\"]\r\n  worker-thread[\"\
-  Executor worker\\nsrc/rfp_assistant/service/service.py\"]\r\n  retrieval-stage[\"\
-  Retrieve and price\\nsrc/rfp_assistant/service/service.py\"]\r\n  generation-stage[\"\
-  Metered generation\\nsrc/rfp_assistant/service/service.py\"]\r\n  finish-record[\"\
-  Validate and finish\\nsrc/rfp_assistant/service/service.py\"]\r\n  stream-poll[\"\
-  Stream and status poll\\nweb/src/lib/use-answer-stream.ts\"]\r\n  ask-screen -->|POST\
-  \ /api/ask| session-gate\r\n  session-gate -->|bind key, model, scope| submit-answer\r\
-  \n  submit-answer -->|queued row, request id| worker-thread\r\n  worker-thread -->|claim\
-  \ queued to running| retrieval-stage\r\n  retrieval-stage -->|messages and estimate|\
-  \ generation-stage\r\n  generation-stage -->|deltas into partials| stream-poll\r\
-  \n  generation-stage -->|provider response| finish-record\r\n  finish-record -->|result_json,\
-  \ done event| stream-poll"
+- worker
+prev_diagram: "graph TD\r\n  ask-post[\"POST /api/ask\\nsrc/rfp_assistant/api.py\"\
+  ]\r\n  persist-admit[\"Persist and admit\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  worker-claim[\"Worker claim\\nsrc/rfp_assistant/service/service.py\"]\r\n\
+  \  rewrite[\"Follow-up rewrite\\nsrc/rfp_assistant/service/service.py\"]\r\n  retrieve-price[\"\
+  Retrieve and price\\nsrc/rfp_assistant/service/service.py\"]\r\n  metered-generation[\"\
+  Metered generation\\nsrc/rfp_assistant/service/service.py\"]\r\n  validate-finish[\"\
+  Validate and finish\\nsrc/rfp_assistant/service/service.py\"]\r\n  screen-poll[\"\
+  Poll and stream\\nweb/src/components/ask/ask-page.tsx\"]\r\n  ask-post -->|\"AnswerRequest,\
+  \ new generation_id\"| persist-admit\r\n  persist-admit -->|\"queued request_id\"\
+  | worker-claim\r\n  worker-claim -->|\"follow-up only\"| rewrite\r\n  worker-claim\
+  \ -->|\"first turn\"| retrieve-price\r\n  rewrite -->|\"standalone question\"| retrieve-price\r\
+  \n  retrieve-price -->|\"messages, estimate\"| metered-generation\r\n  metered-generation\
+  \ -->|\"response, partials\"| validate-finish\r\n  screen-poll -->|\"status poll,\
+  \ SSE\"| validate-finish"

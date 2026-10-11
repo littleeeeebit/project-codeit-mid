@@ -1,0 +1,1 @@
+`stage-review run traffic --since <date> --sample <n> --source-dsn-env <VAR>` is handled before the ref-based path in cli.py and calls `traffic_review.run`. It freezes real Ask answers read-only into a `traffic-*` run folder. See data-flow/traffic-review.
