@@ -1,5 +1,0 @@
-Before each step: if `CANCELS[run_id]` exists, raise `ingestion.Stopped`; if `closing()` (Resources closed), raise `StepFailed`. Outcomes:
-- `NeedsApproval` → step and run `needs_approval` with the estimate.
-- `Stopped` → `cancelled` (with cancelled_by and cancelled_at) when a cancel exists, otherwise `failed` 'the service is stopping'.
-- Any other exception → `failed` with the reason and a traceback tail.
-The loop breaks on the first non-running status. Under CANCEL_LOCK it then leaves LIVE and pops the cancel. A cancel admitted during the last step turns a still-running run into `cancelled`; a cancel admitted while the run was already stopping is appended to the reason. A running run with timed-out files or questions the regression lost becomes `unverified`, otherwise `complete`. `provider_calls` counts ledger attempts by `compare.MEMBER` plus Gemini attempts since start.

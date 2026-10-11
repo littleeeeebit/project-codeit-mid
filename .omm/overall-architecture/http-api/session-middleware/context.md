@@ -1,0 +1,1 @@
+The cookie path is `/api/` so the session never travels to the JupyterHub notebook servers on :8000 of the same host. Those servers run code from users who are not on the allowlist.

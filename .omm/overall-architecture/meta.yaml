@@ -1,66 +1,86 @@
 created: 2026-10-04 13:34:40.746000+00:00
-updated: 2026-10-11 09:34:19.982000+00:00
-update_count: 60
+updated: 2026-10-11T21:57:53.076Z
+update_count: 62
 last_field: diagram
-git_commit: 19b378c8
-git_branch: maintenance-ingest-timeout-cancel-progress
+git_commit: 80caf0d6
+git_branch: corpus-metadata-filter-list-answers
 children:
-- api
-- api-layer
-- api-routes
-- api-server
-- api-shell
-- budget-ledger
-- cli
-- corpus-pipeline
-- data-stores
-- evaluation
-- evaluation-suite
-- external-services
-- gateway
-- http
-- http-api
-- langfuse-tracing
-- maintenance-sequence
-- offline-cli
-- offline-pipelines
-- openai-transport
-- owner-cli
-- paid-gateway
-- persistence
-- postgres-storage
-- postgres-store
-- postgresql-store
-- provider-transport
-- retrieval
-- retrieval-engine
-- review-app
-- runtime-artifacts
-- screens
-- self-update
-- service
-- service-core
-- service-layer
-- stage-review
-- stage-review-app
-- storage
-- storage-layer
-- stores
-- tracing
-- web
-- web-pages
-- web-screens
-- workflows
-prev_diagram: "graph TD\r\n  consultant-screens[\"Consultant screens\\nweb/src/components/ask/ask-page.tsx\"\
-  ]\r\n  api-server[\"FastAPI server\\nsrc/rfp_assistant/api.py\"]\r\n  service-core[\"\
-  Service core\\nsrc/rfp_assistant/service/service.py\"]\r\n  retrieval-engine[\"\
-  Retrieval engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  paid-gateway[\"\
-  Paid gateway\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n  postgres-store[\"PostgreSQL\
-  \ store\\nsrc/rfp_assistant/storage/postgres.py\"]\r\n  offline-cli[\"Offline CLI\
-  \ pipelines\\nsrc/rfp_assistant/cli.py\"]\r\n  review-app[\"Stage review app\\nreview/server.py\"\
-  ]\r\n  consultant-screens -->|REST and SSE| api-server\r\n  api-server -->|member-bound\
-  \ service calls| service-core\r\n  service-core -->|scoped retrieval| retrieval-engine\r\
-  \n  service-core -->|reserve, dispatch, settle| paid-gateway\r\n  paid-gateway -->|attempt\
-  \ rows| postgres-store\r\n  service-core -->|requests and traces| postgres-store\r\
-  \n  retrieval-engine -->|chunks and vectors| postgres-store\r\n  offline-cli -->|ingest,\
-  \ index, activate| postgres-store\r\n  offline-cli -->|frozen run folders| review-app"
+  - api
+  - api-layer
+  - api-routes
+  - api-server
+  - api-shell
+  - budget-ledger
+  - cli
+  - corpus-pipeline
+  - data-stores
+  - evaluation
+  - evaluation-suite
+  - external-services
+  - gateway
+  - http
+  - http-api
+  - langfuse-tracing
+  - maintenance-sequence
+  - offline-cli
+  - offline-pipelines
+  - openai-transport
+  - owner-cli
+  - paid-gateway
+  - persistence
+  - postgres-storage
+  - postgres-store
+  - postgresql-store
+  - provider-transport
+  - retrieval
+  - retrieval-engine
+  - review-app
+  - runtime-artifacts
+  - screens
+  - self-update
+  - service
+  - service-core
+  - service-layer
+  - stage-review
+  - stage-review-app
+  - storage
+  - storage-layer
+  - stores
+  - tracing
+  - web
+  - web-pages
+  - web-screens
+  - workflows
+prev_diagram: "graph TD\r
+
+  \  web-screens[\"Next.js screens\\nweb/src\"] -->|\"fetch /api with session\"|
+  http-api[\"FastAPI app\\nsrc/rfp_assistant/api.py\"]\r
+
+  \  http-api -->|\"one service call per route\"| service-core[\"Service
+  core\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  owner-cli[\"Owner CLI\\nsrc/rfp_assistant/cli.py\"] -->|\"builds same
+  Resources\"| service-core\r
+
+  \  service-core -->|\"retrieve evidence\"| retrieval-engine[\"Retrieval
+  engine\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r
+
+  \  service-core -->|\"reserve, dispatch, settle\"| paid-gateway[\"Paid
+  gateway\\nsrc/rfp_assistant/gateway/budget.py\"]\r
+
+  \  retrieval-engine -->|\"paid query embedding\"| paid-gateway\r
+
+  \  service-core -->|\"start maintenance thread\"|
+  maintenance-sequence[\"Maintenance
+  sequence\\nsrc/rfp_assistant/storage/maintenance.py\"]\r
+
+  \  maintenance-sequence -->|\"rebuild index, embed\"| retrieval-engine\r
+
+  \  paid-gateway -->|\"attempts, advisory lock\"| postgres-store[\"PostgreSQL +
+  pgvector\\nsrc/rfp_assistant/storage/postgres.py\"]\r
+
+  \  service-core -->|\"requests, audit rows\"| postgres-store\r
+
+  \  retrieval-engine -->|\"chunks, vectors, activation\"| postgres-store\r
+
+  \  maintenance-sequence -->|\"extractions, backups\"| postgres-store"

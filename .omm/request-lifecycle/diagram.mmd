@@ -1,10 +1,17 @@
 graph TD
-  ask-composer["Ask composer\nweb/src/components/ask/ask-page.tsx"] -->|"POST /api/ask"| submit-admission["Validation and admission\nsrc/rfp_assistant/service/service.py"]
-  submit-admission -->|"queued row, executor"| runner-worker["Runner worker claim\nsrc/rfp_assistant/service/service.py"]
-  runner-worker -->|"follow-up only"| query-rewrite["Standalone rewrite\nsrc/rfp_assistant/gateway/generation.py"]
-  runner-worker -->|"scope and question"| evidence-retrieval["Retrieval and pricing\nsrc/rfp_assistant/service/service.py"]
-  query-rewrite -->|"rewritten question"| evidence-retrieval
-  evidence-retrieval -->|"messages, estimate"| answer-generation["Metered streamed answer\nsrc/rfp_assistant/service/service.py"]
-  answer-generation -->|"structured output"| answer-validation["Citation validation\nsrc/rfp_assistant/gateway/generation.py"]
-  answer-validation -->|"result_json, billing"| outcome-delivery["Poll, stream, attach\nweb/src/lib/use-answer-stream.ts"]
-  answer-generation -->|"partial text"| outcome-delivery
+  ask-screen["Ask screen\nweb/src/components/ask/ask-page.tsx"]
+  session-gate["Session gate\nsrc/rfp_assistant/api.py"]
+  submit-answer["submit_answer\nsrc/rfp_assistant/service/service.py"]
+  request-runner["RequestRunner\nsrc/rfp_assistant/service/service.py"]
+  execute-answer["_execute_traced\nsrc/rfp_assistant/service/service.py"]
+  request-record["requests row\nsrc/rfp_assistant/storage/store.py"]
+  answer-stream["Answer stream\nweb/src/lib/use-answer-stream.ts"]
+  ask-screen -->|POST /api/ask| session-gate
+  session-gate -->|member key context bound| submit-answer
+  submit-answer -->|insert queued snapshot| request-record
+  submit-answer -->|admit and submit id| request-runner
+  request-runner -->|claim queued to running| execute-answer
+  execute-answer -->|partial text in memory| answer-stream
+  execute-answer -->|_finish stores outcome| request-record
+  ask-screen -->|poll GET request| request-record
+  answer-stream -->|done event triggers reload| ask-screen

@@ -1,1 +1,0 @@
-Not written by `run`. `service.maintenance_status` reports it when state.json says running but no maintenance thread is alive in this process, e.g. after a restart mid-run.

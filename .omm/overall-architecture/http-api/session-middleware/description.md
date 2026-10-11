@@ -1,8 +1,1 @@
-`_Session` is a pure ASGI middleware applied to /api/* only, with checks in this order:
-1. A non-safe method from a foreign Origin gets 403. :8510 dev origins are trusted only when BIDMATE_LOCAL_MEMBER is set.
-2. `login.problem` (misconfiguration) gets 503.
-3. The /api/auth/login, /callback and /logout paths pass through.
-4. A missing session cookie gets 401.
-5. An `X-BidMate-Account` header that differs from the session gets 409 with `X-BidMate-Account-Changed`.
-6. A missing header on a non-safe method gets 428.
-Once the checks pass, `service.bind_request(res, member)` sets the contextvars KEY_SESSION, REQUEST_MODEL and BILLING_SCOPE for the request and every thread it starts (contextvars.copy_context), and resets them afterwards.
+`_Session.__call__` runs for every path that starts with `/api/`, in this order. (1) A non-GET/HEAD/OPTIONS call whose Origin host differs from the request Host gets 403. The dev origins `127.0.0.1:8510` and `localhost:8510` are trusted only when `BIDMATE_LOCAL_MEMBER` is set. (2) If `login.problem` is set (sign-in misconfigured), the call gets 503. (3) The `SIGN_IN` paths pass through. (4) Without a valid `bidmate_session` cookie, the call gets 401. (5) If `X-BidMate-Account` names a different member, the call gets 409 with `X-BidMate-Account-Changed: 1`. (6) A state-changing call without that header gets 428. Otherwise the middleware sets `scope.state.member` and calls `service.bind_request`, which sets the contextvars `KEY_SESSION`, `REQUEST_MODEL` and `BILLING_SCOPE` and resets them when the response ends. Because executor threads copy the context, a queued request keeps the key, model and billing scope its member had at submission.

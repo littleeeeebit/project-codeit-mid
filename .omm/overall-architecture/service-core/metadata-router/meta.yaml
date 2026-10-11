@@ -1,0 +1,9 @@
+created: 2026-10-11T21:57:55.903Z
+updated: 2026-10-11T21:57:56.034Z
+update_count: 2
+last_field: concern
+kind: nested-class
+title: metadata-router
+children: []
+parentPath:
+  - service-core

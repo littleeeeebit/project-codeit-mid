@@ -1,1 +1,1 @@
-Terminal. `result_json.status` holds the domain outcome, e.g. answered, insufficient_evidence, ingestion_unavailable or budget_blocked. Note that budget_blocked keeps request status 'completed' because `fail` is called without a request_status there.
+`_finish` with the default `request_status`. This includes domain outcomes such as `answered`, `insufficient_evidence` and `ingestion_unavailable`, and also `budget_blocked`. A refusal by the ledger or the dispatch check completes the request with an explanation; it does not fail it.

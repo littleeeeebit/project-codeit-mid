@@ -332,6 +332,40 @@ class Inventory(_Read):
     completeness_text: str
 
 
+class ListingReason(_Read):
+    field: str
+    reason: Literal["missing_amount", "zero_amount", "low_amount", "conflict", "missing_date", "unclassified",
+                    "missing_institution"]
+    label: str
+
+
+class ListingRow(_Read):
+    doc_id: str
+    source_hash: str
+    title: str | None
+    institution: str | None
+    institution_type: str | None
+    type_source: Literal["resolution", "classification"] | None
+    amount_krw: int | None
+    published_at: dict | None
+    bid_start: dict | None
+    bid_close: dict | None
+    description: str | None = None
+    evidence_ids: list[str] = []
+    note: str | None = None
+    reasons: list[ListingReason] = Field([], description="확인 필요 rows only: why the row is not counted")
+
+
+class Listing(_Read):
+    query: dict = Field(description="The validated query structure the server ran over metadata")
+    conditions: str
+    count: int
+    count_only: bool
+    fields: list[str] = Field(description="Fields the query filters or sorts on, in that order")
+    rows: list[ListingRow]
+    review: list[ListingRow] = Field(description="확인 필요: undecided values, never counted as matches")
+
+
 class Coverage(_Read):
     doc_id: str
     evidence: int | None = Field(None, description="Evidence units found; absent for basic information")
@@ -356,6 +390,7 @@ class Answer(_Read):
     mode: str
     facts: list[Fact]
     inventory: Inventory | None
+    listing: Listing | None = None
     coverage: list[Coverage]
     limitations: list[str]
 

@@ -9,15 +9,17 @@ import { cn } from "cn";
 import type { Answer, RequestView } from "@/lib/api";
 import {
   type Cite, citationNumbers, citedInOrder, ConflictTable, docLabel, EvidenceDetail, FactsTable, InventoryTable,
-  MissingTable, NextAction, RequestFooter, Sentences, StateHead,
+  ListingTable, MissingTable, NextAction, RequestFooter, Sentences, StateHead,
 } from "./answer-parts";
 
 export function AnswerBody({ view, answer, cite }: { view: RequestView; answer: Answer; cite: Cite }) {
+  // min-w-0: a wide table scrolls inside its box instead of widening the page
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <StateHead answer={answer} cite={cite} />
       <Sentences claims={answer.claims} cite={cite}
                  labelOf={(d) => (answer.mode === "compare" ? docLabel(answer, d) : "")} />
+      <ListingTable answer={answer} cite={cite} />
       <FactsTable answer={answer} />
       <InventoryTable answer={answer} onCite={(id) => cite.onCite?.(id)} />
       <ConflictTable answer={answer} cite={cite} />

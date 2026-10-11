@@ -159,6 +159,16 @@
       "title": "Limitations",
       "type": "array"
      },
+     "listing": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Listing"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "missing_fields": {
       "items": {
        "$ref": "#/components/schemas/MissingField"
@@ -3982,6 +3992,254 @@
      }
     },
     "title": "Latency",
+    "type": "object"
+   },
+   "Listing": {
+    "properties": {
+     "conditions": {
+      "title": "Conditions",
+      "type": "string"
+     },
+     "count": {
+      "title": "Count",
+      "type": "integer"
+     },
+     "count_only": {
+      "title": "Count Only",
+      "type": "boolean"
+     },
+     "fields": {
+      "description": "Fields the query filters or sorts on, in that order",
+      "items": {
+       "type": "string"
+      },
+      "title": "Fields",
+      "type": "array"
+     },
+     "query": {
+      "additionalProperties": true,
+      "description": "The validated query structure the server ran over metadata",
+      "title": "Query",
+      "type": "object"
+     },
+     "review": {
+      "description": "확인 필요: undecided values, never counted as matches",
+      "items": {
+       "$ref": "#/components/schemas/ListingRow"
+      },
+      "title": "Review",
+      "type": "array"
+     },
+     "rows": {
+      "items": {
+       "$ref": "#/components/schemas/ListingRow"
+      },
+      "title": "Rows",
+      "type": "array"
+     }
+    },
+    "required": [
+     "query",
+     "conditions",
+     "count",
+     "count_only",
+     "fields",
+     "rows",
+     "review"
+    ],
+    "title": "Listing",
+    "type": "object"
+   },
+   "ListingReason": {
+    "properties": {
+     "field": {
+      "title": "Field",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "reason": {
+      "enum": [
+       "missing_amount",
+       "zero_amount",
+       "low_amount",
+       "conflict",
+       "missing_date",
+       "unclassified",
+       "missing_institution"
+      ],
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "field",
+     "reason",
+     "label"
+    ],
+    "title": "ListingReason",
+    "type": "object"
+   },
+   "ListingRow": {
+    "properties": {
+     "amount_krw": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Amount Krw"
+     },
+     "bid_close": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bid Close"
+     },
+     "bid_start": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bid Start"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+     },
+     "evidence_ids": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Evidence Ids",
+      "type": "array"
+     },
+     "institution": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Institution"
+     },
+     "institution_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Institution Type"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "published_at": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Published At"
+     },
+     "reasons": {
+      "default": [],
+      "description": "확인 필요 rows only: why the row is not counted",
+      "items": {
+       "$ref": "#/components/schemas/ListingReason"
+      },
+      "title": "Reasons",
+      "type": "array"
+     },
+     "source_hash": {
+      "title": "Source Hash",
+      "type": "string"
+     },
+     "title": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Title"
+     },
+     "type_source": {
+      "anyOf": [
+       {
+        "enum": [
+         "resolution",
+         "classification"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Type Source"
+     }
+    },
+    "required": [
+     "doc_id",
+     "source_hash",
+     "title",
+     "institution",
+     "institution_type",
+     "type_source",
+     "amount_krw",
+     "published_at",
+     "bid_start",
+     "bid_close"
+    ],
+    "title": "ListingRow",
     "type": "object"
    },
    "MaintenanceRun": {

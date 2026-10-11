@@ -322,25 +322,34 @@ class FakeTransport:
     def __init__(self, responder: Callable[[list[dict]], ProviderResponse | Exception] | None = None,
                  embedder: Callable[[list[str], int], EmbeddingResponse | Exception] | None = None,
                  delay_seconds: float = 0.0,
-                 rewriter: Callable[[list[dict]], ProviderResponse | Exception] | None = None) -> None:
+                 rewriter: Callable[[list[dict]], ProviderResponse | Exception] | None = None,
+                 structured: dict[str, Callable[[list[dict]], ProviderResponse | Exception]] | None = None) -> None:
+        """`structured`: responders for a corpus metadata question's calls by schema name (metadata_query,
+        institution_types, project_descriptions); by default the question is not a metadata question."""
         self.responder = responder or _echo_first_evidence
         self.rewriter = rewriter or _join_last_question
+        self.structured = {**FAKE_STRUCTURED, **(structured or {})}
         self.embedder = embedder or fake_embeddings
         self.delay_seconds = delay_seconds  # makes races observable in browser and load checks
-        self.calls: list[dict] = []
+        self.calls: list[dict] = []  # answers and rewrites
+        self.query_calls: list[dict] = []  # a corpus question's metadata calls, by schema name as `kind`
         self.embed_calls: list[dict] = []
         self.closed = False
         self._calls_lock = threading.Lock()
 
     def chat(self, *, model, messages, response_format, max_completion_tokens, reasoning_effort,
              on_delta=None) -> ProviderResponse:
-        rewrite = response_format["json_schema"]["name"] == "standalone_query"
+        name = response_format["json_schema"]["name"]
+        rewrite = name == "standalone_query"
         with self._calls_lock:
-            self.calls.append({"model": model, "messages": messages, "reasoning_effort": reasoning_effort,
-                               "kind": "rewrite" if rewrite else "answer"})
+            (self.query_calls if name in self.structured else self.calls).append(
+                {"model": model, "messages": messages, "reasoning_effort": reasoning_effort,
+                 "kind": name if name in self.structured else "rewrite" if rewrite else "answer",
+                 "max_completion_tokens": max_completion_tokens})
         if self.delay_seconds:
             time.sleep(self.delay_seconds)
-        result = (self.rewriter if rewrite else self.responder)(messages)
+        responder = self.structured.get(name) or (self.rewriter if rewrite else self.responder)
+        result = responder(messages)
         if isinstance(result, Exception):
             raise result
         if on_delta and result.content:  # three deltas, as a streaming provider sends them
@@ -398,6 +407,34 @@ def _echo_first_evidence(messages: list[dict]) -> ProviderResponse:
     return ProviderResponse(json.dumps(payload, ensure_ascii=False), None, "stop",
                             {"prompt_tokens": prompt_tokens, "completion_tokens": 60, "cached_tokens": 0},
                             f"fake-{uuid.uuid4().hex}")  # providers never repeat a response ID
+
+
+def fake_json(body: dict, completion_tokens: int = 40, messages: list[dict] = ()) -> ProviderResponse:
+    """A finished structured response with usage, as the provider returns one."""
+    return ProviderResponse(json.dumps(body, ensure_ascii=False), None, "stop",
+                            {"prompt_tokens": sum(count_tokens(m["content"]) for m in messages) or 100,
+                             "completion_tokens": completion_tokens, "cached_tokens": 0}, f"fake-{uuid.uuid4().hex}")
+
+
+def _not_metadata(messages: list[dict]) -> ProviderResponse:
+    return fake_json({"metadata_question": False, "filters": [], "sort": None, "limit": None, "count_only": False},
+                     messages=messages)
+
+
+def _every_institution_other(messages: list[dict]) -> ProviderResponse:
+    names = json.loads(messages[-1]["content"])["institutions"]
+    return fake_json({"items": [{"institution": n, "type": "기타"} for n in names]}, messages=messages)
+
+
+def _first_words_of_passage(messages: list[dict]) -> ProviderResponse:
+    projects = json.loads(messages[-1]["content"])["projects"]
+    return fake_json({"items": [{"doc_id": p["doc_id"], "description": " ".join(p["passages"][0]["text"].split())[:60],
+                                 "evidence_ids": [p["passages"][0]["evidence_id"]]} for p in projects]},
+                     messages=messages)
+
+
+FAKE_STRUCTURED = {"metadata_query": _not_metadata, "institution_types": _every_institution_other,
+                   "project_descriptions": _first_words_of_passage}
 
 
 def _join_last_question(messages: list[dict]) -> ProviderResponse:

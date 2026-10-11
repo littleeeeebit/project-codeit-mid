@@ -1,7 +1,0 @@
-graph TD
-  run-running["running\nsrc/rfp_assistant/storage/maintenance.py"] -->|"all steps, nothing lost"| run-complete["complete\nsrc/rfp_assistant/storage/maintenance.py"]
-  run-running -->|"timeouts or lost questions"| run-unverified["unverified\nsrc/rfp_assistant/storage/maintenance.py"]
-  run-running -->|"step raised"| run-failed["failed\nsrc/rfp_assistant/storage/maintenance.py"]
-  run-running -->|"paid estimate"| run-needs-approval["needs_approval\nsrc/rfp_assistant/storage/maintenance.py"]
-  run-running -->|"admitted cancel"| run-cancelled["cancelled\nsrc/rfp_assistant/storage/maintenance.py"]
-  run-running -->|"thread gone"| run-interrupted["interrupted\nsrc/rfp_assistant/service/service.py"]

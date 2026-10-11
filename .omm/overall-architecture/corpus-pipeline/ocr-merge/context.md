@@ -1,0 +1,1 @@
+OCR design is decided (from memory notes): PaddleOCR-VL with a gpt-5-mini fallback on the personal key in the `ocr` envelope, and HWP text read from embedded pictures, not from Hancom prints.

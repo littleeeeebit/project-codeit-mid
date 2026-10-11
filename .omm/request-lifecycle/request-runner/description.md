@@ -1,0 +1,1 @@
+`RequestRunner.submit` schedules `run_queued(res, request_id)` on the executor inside a copied context. When the worker finishes, it always releases the semaphore slot and removes the future. Controlled shutdown (`Resources.close` → `RequestRunner.shutdown`) marks queued and possibly running rows `interrupted`. Startup recovery does the same for rows left by a crashed process.

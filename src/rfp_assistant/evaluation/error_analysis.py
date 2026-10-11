@@ -45,7 +45,7 @@ THIN = 3  # a type seen in fewer answers than this is marked: too few cases to k
 # development set, a traffic run holds real consultant answers (traffic_review.py).
 SOURCES = {"generation": "gold", "traffic": "traffic"}
 HANGUL = re.compile(r"[가-힣]")
-FIELD = re.compile(r"^(summary|next_action|claim\.(\d+)|conflict\.(\d+)\.(\d+)|missing\.(\d+))$")
+FIELD = re.compile(r"^(summary|next_action|claim\.(\d+)|conflict\.(\d+)\.(\d+)|missing\.(\d+)|listing\.(\d+))$")
 
 
 class ReviewInputError(ValueError):
@@ -198,6 +198,8 @@ def field_text(answer: dict, field: str) -> str | None:
             return answer["claims"][int(m.group(2))]["text"]
         if m.group(3):
             return answer["conflicts"][int(m.group(3))]["alternatives"][int(m.group(4))]["value"]
+        if m.group(6):  # a corpus metadata answer's description line of one listed project
+            return answer["listing"]["rows"][int(m.group(6))]["description"]
         return answer["missing"][int(m.group(5))]["field"]
     except (KeyError, IndexError, TypeError):
         return None

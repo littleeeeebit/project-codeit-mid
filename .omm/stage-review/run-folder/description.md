@@ -1,1 +1,0 @@
-`<data>/review/runs/<run-id>/` holds run.json (schema review-run-1, full commits, input and worker hashes, scorer fingerprint, host and packages per candidate), inputs/, candidates/<id>.json and view.json. `rescore` re-scores stored outputs and re-reads ledger spend without any call.

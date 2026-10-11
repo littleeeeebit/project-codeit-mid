@@ -1,0 +1,1 @@
+Review dispatch belongs to the wiki-agent app's Review Loop control. Never start a review from completion or delegate it to an external terminal.

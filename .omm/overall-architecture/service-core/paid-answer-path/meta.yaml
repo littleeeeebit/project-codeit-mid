@@ -1,0 +1,9 @@
+created: 2026-10-11T21:57:55.776Z
+updated: 2026-10-11T21:57:55.777Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: paid-answer-path
+children: []
+parentPath:
+  - service-core

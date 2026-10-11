@@ -265,6 +265,15 @@ def _purpose_used(conn: Connection, purpose: str) -> int:
         (purpose,)).fetchone()[0]
 
 
+def headroom(db: Path, purpose: str) -> int:
+    """What `reserve` could still admit for `purpose` now: the smaller of the cap's and the envelope's remainder.
+    A preflight for a sequence of calls (each still reserved on its own), never an admission."""
+    with open_db(db) as conn:
+        row, totals = _settings_row(conn), _totals(conn)
+        envelope = json.loads(row["envelopes_json"]).get(purpose, 0)
+        return min(row["cap_micro_usd"] - totals["spent"] - totals["pending"], envelope - _purpose_used(conn, purpose))
+
+
 def estimate(db: Path, model: str, input_tokens: int, max_output_tokens: int) -> int:
     with open_db(db) as conn:
         rates = json.loads(_settings_row(conn)["rates_json"]).get(model)

@@ -7,7 +7,7 @@ import { type Answer, api, errorText, type Evidence, originalHref, type RequestV
 import {
   BILLING, EVIDENCE_WARNING, FACT_STATE, FIELD, label, locationShort, locationText, MISSING_REASON, REQUEST, REVIEW,
   STATUS, usd,
-  when, won,
+  when, won, wonShort,
 } from "@/lib/format";
 import { must, usePoll } from "@/lib/use-poll";
 import { Section, Table, td } from "@/components/data-table";
@@ -214,6 +214,90 @@ export function FactsTable({ answer }: { answer: Answer }) {
   );
 }
 
+type ListingRow = NonNullable<Answer["listing"]>["rows"][number];
+const LISTING_DATES = ["published_at", "bid_start", "bid_close"];
+
+const PLACEHOLDER_KRW = 1_000_000;  // below this a CSV amount is a placeholder (metadata_query.MIN_AMOUNT_KRW)
+const LISTING_HEAD = ["사업", "발주 기관 · 유형", "사업 금액"];
+
+// Three columns fit the conversation's answer column: the type sits under the institution, and a long name wraps.
+function ListingCells({ row, dates }: { row: ListingRow; dates: string[] }) {
+  const amount = row.amount_krw;
+  return (
+    <>
+      <td className={cn(td, "min-w-28 [overflow-wrap:anywhere]")}>
+        <p>{row.institution ?? "미상"}</p>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          {row.institution_type ?? "미분류"}
+          {row.type_source === "resolution" && <StatusBadge tone="info" className="ml-1.5">검토자 수정</StatusBadge>}
+        </p>
+      </td>
+      <td className={cn(td, "text-right font-semibold whitespace-nowrap tabular-nums",
+                        amount != null && amount < PLACEHOLDER_KRW && "text-warn")} title={won(amount)}>
+        {amount == null ? "금액 없음" : amount < PLACEHOLDER_KRW ? won(amount) : wonShort(amount)}
+      </td>
+      {dates.map((f) => (
+        <td key={f} className={cn(td, "whitespace-nowrap tabular-nums")}>
+          {when((row as Record<string, unknown>)[f] as { value: string; precision: string } | null)}
+        </td>
+      ))}
+    </>
+  );
+}
+
+/** A corpus metadata question's answer: every project the query matched, each with one cited description line,
+ *  then 확인 필요 — projects whose value for a filtered or sorted field is missing, 0, a placeholder or in conflict,
+ *  which are never counted (DESIGN.md, 전체 문서 목록 답변). */
+export function ListingTable({ answer, cite }: { answer: Answer; cite: Cite }) {
+  const l = answer.listing;
+  if (!l) return null;
+  const dates = l.fields.filter((f) => LISTING_DATES.includes(f));
+  const head = [...LISTING_HEAD, ...dates.map((f) => label(FIELD, f))];
+  return (
+    <div className="space-y-8">
+      <Section title={`사업 ${l.count}개`} aside={<span className="text-[13px] text-muted-foreground">조건: {l.conditions}</span>}>
+        {l.rows.length > 0 && (
+          <Table caption="조건에 맞는 사업" head={head}>
+            {l.rows.map((row) => (
+              <tr key={row.doc_id}>
+                <td className={cn(td, "min-w-64")}>
+                  <p className="font-semibold [overflow-wrap:anywhere]">{row.title ?? "제목 없음"}</p>
+                  {row.description ? (
+                    <p className="mt-1 text-[15px] text-foreground/85 [overflow-wrap:anywhere]">
+                      {row.description}<Markers ids={row.evidence_ids} cite={cite} />
+                    </p>
+                  ) : row.note && <p className="mt-1 text-[13px] text-muted-foreground">{row.note}</p>}
+                </td>
+                <ListingCells row={row} dates={dates} />
+              </tr>
+            ))}
+          </Table>
+        )}
+      </Section>
+      {l.review.length > 0 && (
+        <Section title={`확인 필요 ${l.review.length}개`}
+                 aside={<span className="text-[13px] text-muted-foreground">값이 없거나 검토가 필요해 개수와 순위에 넣지 않았습니다</span>}>
+          <Table caption="확인 필요" head={head}>
+            {l.review.map((row) => (
+              <tr key={row.doc_id}>
+                <td className={cn(td, "min-w-64")}>
+                  <p className="font-medium [overflow-wrap:anywhere]">{row.title ?? "제목 없음"}</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1" aria-label="사유">  {/* under the title: no fourth column */}
+                    {row.reasons.map((r) => (
+                      <StatusBadge key={`${r.field}-${r.reason}`} tone="warn">{r.label}</StatusBadge>
+                    ))}
+                  </div>
+                </td>
+                <ListingCells row={row} dates={dates} />
+              </tr>
+            ))}
+          </Table>
+        </Section>
+      )}
+    </div>
+  );
+}
+
 type InventoryItem = NonNullable<Answer["inventory"]>["items"][number];
 
 /** Requirement rows grouped as the table shows them: by source-form prefix (SFR, PER, ...; 기타 when none) in
@@ -375,6 +459,7 @@ export function firstCited(lists: string[][], keep: (id: string) => boolean = ()
 /** Every evidence ID the answer cites, in first-cited order: what the markers number and the pane opens. */
 export function citedInOrder(a: Answer): string[] {
   return firstCited([a.summary_evidence_ids, ...a.claims.map((c) => c.evidence_ids),
+    ...(a.listing?.rows ?? []).map((r) => r.evidence_ids ?? []),
     ...a.conflicts.flatMap((c) => c.alternatives.map((alt) => alt.evidence_ids)),
     ...inventoryRows(a.inventory?.items ?? []).map((i) => (i.evidence_id ? [i.evidence_id] : []))],
   (id) => id in a.evidence);

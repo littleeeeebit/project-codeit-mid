@@ -1,1 +1,1 @@
-Terminal. Covers clarification_required (ServiceError), technical_error (provider failure, validation failure, unexpected exception) and unscheduled submissions. A billed failure is never retried automatically.
+Reached through `done(..., request_status='failed')`. Causes: provider errors, model output that fails validation, a rewrite that fails validation, a settlement failure, a missing key, consented-ceiling refusals, `ServiceError` raised as `clarification_required`, unexpected exceptions, and `_fail_unscheduled` when the executor refused the job.

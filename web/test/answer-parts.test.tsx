@@ -6,7 +6,7 @@ import { describe, expect, test, vi } from "vitest";
 import { api } from "@/lib/api";
 import {
   citationNumbers, citedInOrder, ConflictTable, docLabel, EvidenceBody, EvidenceDetail, FactsTable, firstCited,
-  InventoryTable, Markers, MissingTable, NextAction, RequestFooter, Sentences, StateHead,
+  InventoryTable, ListingTable, Markers, MissingTable, NextAction, RequestFooter, Sentences, StateHead,
 } from "@/components/ask/answer-parts";
 import { answer, DOC_A, DOC_B, evidence, stubApi, view } from "./fixtures";
 
@@ -212,5 +212,49 @@ describe("evidence", () => {
     await act(async () => {});
     expect(screen.getByRole("alert").textContent).toBe("근거를 찾을 수 없습니다.");
     expect(calls).toEqual([{ request_id: "r1", evidence_id: "E1" }, { request_id: "r1", evidence_id: "E2" }]);
+  });
+});
+
+describe("metadata list answer", () => {
+  const row = (over: object) => ({
+    doc_id: DOC_A, source_hash: "h", title: "학사 정보시스템 고도화", institution: "한국대학교", institution_type: "대학",
+    type_source: "classification" as const, amount_krw: 150_000_000, published_at: null, bid_start: null,
+    bid_close: { value: "2024-06-20", precision: "date" }, description: null, evidence_ids: [], note: null, reasons: [],
+    ...over,
+  });
+  const listing = {
+    query: {}, conditions: "기관 유형 = 대학 · 입찰 마감 ≥ 2024-06-01", count: 2, count_only: false,
+    fields: ["institution_type", "bid_close"],
+    rows: [row({ description: "학사 시스템을 고도화한다.", evidence_ids: ["P1"] }),
+           row({ doc_id: DOC_B, title: "연구관리 시스템", type_source: "resolution", note: "원문 색인 없음" })],
+    review: [row({ doc_id: "doc-c", title: "캠퍼스 안전 시스템", amount_krw: 0, bid_close: null,
+                   reasons: [{ field: "bid_close", reason: "missing_date" as const, label: "날짜 없음" }] })],
+  };
+
+  test("every row shows its institution type and amount, a cited description or why none, then 확인 필요", () => {
+    const onCite = vi.fn();
+    const a = answer({ listing, claims: [], summary_evidence_ids: [], evidence: { P1: {} } });
+    expect(citedInOrder(a)).toEqual(["P1"]);
+    render(<ListingTable answer={a} cite={{ numbers: citationNumbers(["P1"]), onCite }} />);
+    expect(screen.getByRole("heading", { name: "사업 2개" })).toBeTruthy();
+    expect(screen.getByText("조건: 기관 유형 = 대학 · 입찰 마감 ≥ 2024-06-01")).toBeTruthy();
+    const listed = screen.getByRole("table", { name: "조건에 맞는 사업" });
+    expect([...listed.querySelectorAll("th")].map((th) => th.textContent))
+      .toEqual(["사업", "발주 기관 · 유형", "사업 금액", "입찰 마감"]);
+    expect(listed.textContent).toContain("한국대학교대학");  // the type under the institution
+    expect(listed.textContent).toContain("1억 5,000만원");
+    expect(listed.textContent).toContain("원문 색인 없음");
+    expect(listed.textContent).toContain("검토자 수정");
+    fireEvent.click(screen.getByRole("button", { name: "근거 1 원문 보기" }));
+    expect(onCite).toHaveBeenCalledWith("P1");
+    const review = screen.getByRole("table", { name: "확인 필요" }).textContent;
+    expect(review).toContain("날짜 없음");
+    expect(review).toContain("0원");  // a placeholder amount is shown as is, never as 0만원
+    expect(review).not.toContain("0만원");
+    expect(screen.getByRole("heading", { name: "확인 필요 1개" })).toBeTruthy();
+  });
+
+  test("an answer without a listing renders nothing", () => {
+    expect(render(<ListingTable answer={answer()} cite={{ numbers: new Map() }} />).container.innerHTML).toBe("");
   });
 });

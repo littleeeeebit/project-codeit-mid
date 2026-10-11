@@ -1,8 +1,10 @@
 graph TD
-  request-status["Request status\nsrc/rfp_assistant/service/service.py"] -->|"dispatch guard reads"| attempt-billing["Attempt billing state\nsrc/rfp_assistant/gateway/budget.py"]
-  attempt-billing -->|"billing_state in result"| request-status
-  restart-recovery["Restart and shutdown recovery\nsrc/rfp_assistant/service/service.py"] -->|"interrupt unfinished"| request-status
-  restart-recovery -->|"dispatching to unknown"| attempt-billing
-  update-fence["Update fence\nsrc/rfp_assistant/service/update.py"] -->|"blocks admission"| request-status
-  update-fence -->|"blocks start"| maintenance-run["Maintenance run status\nsrc/rfp_assistant/storage/maintenance.py"]
-  attempt-billing -->|"open work blocks update"| update-fence
+  request-status["Request status\nsrc/rfp_assistant/service/service.py"]
+  attempt-state["Ledger attempt state\nsrc/rfp_assistant/gateway/budget.py"]
+  maintenance-run-status["Maintenance run status\nsrc/rfp_assistant/storage/maintenance.py"]
+  update-fence["Update fence\nsrc/rfp_assistant/service/update.py"]
+  request-status -->|cancel refuses next dispatch| attempt-state
+  attempt-state -->|unknown blocks new calls| request-status
+  update-fence -->|refuses new admission| request-status
+  attempt-state -->|open attempts refuse update| update-fence
+  maintenance-run-status -->|live job refuses update| update-fence

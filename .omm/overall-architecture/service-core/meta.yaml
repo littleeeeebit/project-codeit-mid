@@ -1,40 +1,54 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-11 09:34:22.836000+00:00
-update_count: 43
+updated: 2026-10-11T21:57:55.268Z
+update_count: 45
 last_field: diagram
 kind: nested-class
 title: service-core
 children:
-- answer-check
-- answer-execution
-- answer-pipeline
-- answer-validation
-- app-resources
-- background-jobs
-- conversation-context
-- evidence-reader
-- metered-chat
-- paid-answer
-- partials
-- request-runner
-- resources
-- resources-owner
-- serving-config
-- session-binding
-- submit
-- submit-answer
-- tracing
-- update-fence
-- update-watch
+  - answer-check
+  - answer-execution
+  - answer-pipeline
+  - answer-validation
+  - app-resources
+  - background-jobs
+  - conversation-context
+  - evidence-reader
+  - metadata-router
+  - metered-chat
+  - paid-answer
+  - paid-answer-path
+  - partials
+  - request-runner
+  - resources
+  - resources-owner
+  - serving-config
+  - session-binding
+  - submit
+  - submit-answer
+  - tracing
+  - update-fence
+  - update-watch
 parentPath: []
-prev_diagram: "graph TD\r\n  resources[\"Process owner Resources\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  submit[\"submit_answer and _create\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  runner[\"Bounded request runner\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  execute[\"_execute_traced dispatcher\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  free-answers[\"Metadata and inventory answers\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  paid-answer[\"Paid answer pipeline\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  background-jobs[\"Verifier background jobs\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  submit -->|queued row, admitted slot| runner\r\n  submit -->|free modes inline|\
-  \ execute\r\n  runner -->|run_queued claim| execute\r\n  execute -->|metadata, inventory|\
-  \ free-answers\r\n  execute -->|single, compare, corpus| paid-answer\r\n  resources\
-  \ -->|index, dense, transport| paid-answer\r\n  resources -->|owns and joins| background-jobs"
+prev_diagram: "graph TD\r
+
+  \  resources-owner[\"Process owner
+  Resources\\nsrc/rfp_assistant/service/service.py\"] -->|\"lazily creates\"|
+  request-runner[\"Bounded
+  RequestRunner\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  submit-answer[\"submit_answer\\nsrc/rfp_assistant/service/service.py\"]
+  -->|\"try_admit, queued row\"| request-runner\r
+
+  \  request-runner -->|\"run_queued on worker\"| paid-answer[\"_paid_answer
+  pipeline\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  paid-answer -->|\"rewrite and generation calls\"|
+  metered-chat[\"_metered_chat\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  update-fence[\"Update fence\\nsrc/rfp_assistant/service/update.py\"]
+  -->|\"refuse new paid work\"| request-runner\r
+
+  \  update-fence -->|\"refuse new jobs\"| background-jobs[\"Background
+  jobs\\nsrc/rfp_assistant/service/service.py\"]\r
+
+  \  resources-owner -->|\"close joins threads\"| background-jobs"

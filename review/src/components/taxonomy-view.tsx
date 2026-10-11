@@ -18,7 +18,7 @@ const NOT_ALL = "AI 제안은 모든 사례를 찾지 못합니다. 승인한 �
 const part = (field: string) => {
   const [kind, i] = field.split(".");
   return ({ summary: "요약", next_action: "다음 조치", claim: `주장 ${Number(i) + 1}`, conflict: "근거 충돌 값",
-            missing: "빠진 항목" } as Record<string, string>)[kind] ?? field;
+            missing: "빠진 항목", listing: `사업 설명 ${Number(i) + 1}` } as Record<string, string>)[kind] ?? field;
 };
 const OP: Record<string, string> = { accept: "수락", rename: "이름 바꿈", merge: "합침", split: "나눔", reject: "버림" };
 /** Replies can arrive out of order when decisions overlap; keep the one that saw more committed decisions. */

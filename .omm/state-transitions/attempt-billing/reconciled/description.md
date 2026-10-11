@@ -1,1 +1,0 @@
-Covered by an owner reconciliation over a closed interval and one billing scope. The provider total minus local settled cost is recorded as an adjustment. A late settle adds a compensating negative adjustment.

@@ -1,7 +1,10 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import type { Answer, Candidate, Claim, Evidence, GenerationQuestion, GenerationView as View, RunFailures } from "@/lib/api";
+import type {
+  Answer, Candidate, Claim, Evidence, GenerationQuestion, GenerationView as View, Listing, ListingDate, ListingRow,
+  RunFailures,
+} from "@/lib/api";
 import { getJson, usd } from "@/lib/api";
 import { FACT_STATE, FIELD, label, TYPE, VALIDATION } from "@/lib/labels";
 import { Badge, LedgerLine, Metric, Metrics, NotedList, Segmented, Summaries, columns, useShown } from "./ui";
@@ -340,6 +343,7 @@ function AnswerBody({ q, c, a, open, setOpen, large = false, read }: {
   const at = (field: string, text: string, className = "") =>
     <Annotatable q={q.key} c={c.id} field={field} text={text} className={className} />;
   const body = large ? "text-[17px]" : "text-[14px]";
+  const dates = a.listing?.fields ?? [];  // a run frozen before date columns were kept has none
   if (a.error) {
     return (
       <>
@@ -384,6 +388,35 @@ function AnswerBody({ q, c, a, open, setOpen, large = false, read }: {
           </ul>
         </div>
       ))}
+      {a.listing && (
+        <div className="mt-3">
+          <p className="text-[13px] text-muted">조건: {a.listing.conditions}</p>
+          <ol className="mt-1 flex flex-col gap-2">
+            {a.listing.rows.map((row, i) => (
+              <li key={i} className={`border-l-[3px] border-line pl-2 leading-relaxed ${body}`}>
+                <span className="font-semibold">{row.title}</span>
+                <span className="text-muted"> · {projectLine(row, dates)}</span>
+                {row.description ? (
+                  <span className="block">
+                    {at(`listing.${i}`, row.description, "break-words")}
+                    <Cites ids={row.evidence_ids} evidence={a.evidence ?? {}} open={open} setOpen={setOpen} />
+                  </span>
+                ) : (!a.listing!.count_only && <span className="block text-[13px] text-muted">{row.note ?? "설명 없음"}</span>)}
+              </li>
+            ))}
+          </ol>
+          {a.listing.review.length > 0 && (
+            <div className="mt-2 text-[13px] text-muted">
+              <span className="font-semibold text-warn">확인 필요</span>
+              <ul>
+                {a.listing.review.map((row, i) => (
+                  <li key={i}>{row.title} · {projectLine(row, dates)} ({(row.reasons ?? []).join(", ")})</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
       {!large && open && a.evidence?.[open] && <EvidencePanel id={open} e={a.evidence[open]} onClose={() => setOpen(null)} />}
       {a.next_action && (
         <p className={`mt-2 ${body}`}><span className="mr-1 font-semibold text-muted">다음 조치</span>{at("next_action", a.next_action)}</p>
@@ -414,6 +447,17 @@ function AnswerBody({ q, c, a, open, setOpen, large = false, read }: {
     </>
   );
 }
+
+/** A listed project's institution, type, amount and the dates the query filtered or sorted on, as the consultant's
+ *  table showed them (web/src/components/ask/answer-parts.tsx ListingCells). */
+const projectLine = (row: ListingRow, dates: Listing["fields"]) =>
+  [row.institution ?? "기관 없음",
+   (row.institution_type ?? "유형 미분류") + (row.type_source === "resolution" ? " (검토자 수정)" : ""),
+   row.amount_krw == null ? "금액 없음" : `${row.amount_krw.toLocaleString("ko-KR")}원`,
+   ...dates.map((f) => `${label(FIELD, f)} ${when(row[f])}`)].join(" · ");
+
+const when = (d: ListingDate) =>
+  !d ? "미상" : d.precision === "timestamp" ? d.value.slice(0, 16).replace("T", " ") : d.value;
 
 function ColumnHead({ c, a, read }: { c: Candidate; a: Answer; read?: () => void }) {
   return (

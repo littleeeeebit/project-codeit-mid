@@ -1,1 +1,1 @@
-Row inserted by `_create` with a runner slot held. It is visible to `open_paid_work` and blocks updates. `abandon_request` cancels only in this state.
+`_create` inserts this state for paid modes after a runner slot is taken. Nothing has been dispatched yet. The request leaves `queued` through the `run_queued` claim, `cancel_request` (to `cancelled`, with the result 'no paid call'), `_fail_unscheduled` (to `failed`), or `RequestRunner.shutdown` or `recover_requests` (to `interrupted`).

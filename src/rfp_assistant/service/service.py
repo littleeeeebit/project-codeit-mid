@@ -744,9 +744,28 @@ def _finish(res: Resources, request_id: str, result: AnswerResult, trace: dict, 
         else:
             status = row["status"]
         conn.execute("UPDATE requests SET status = ?, trace_json = ?, result_json = ?, updated_at = ? "
-                     "WHERE request_id = ?", (status, dumps(trace), dumps(asdict(result)), utcnow(), request_id))
+                     "WHERE request_id = ?", (status, dumps(trace), _envelope(result), utcnow(), request_id))
+        if result.listing is not None:
+            conn.execute("INSERT INTO request_listings(request_id, listing_json) VALUES (?, ?) ON CONFLICT(request_id) "
+                         "DO UPDATE SET listing_json = excluded.listing_json", (request_id, dumps(result.listing)))
     res.partials.pop(request_id, None)  # the stored outcome replaces what was streamed
     return result
+
+
+def _envelope(result: AnswerResult) -> str:
+    """result_json: the answer without its listing, which request_listings keeps, so a rolled-back version that
+    rebuilds every stored answer as AnswerResult(**result_json) still reads them all."""
+    stored = asdict(result)
+    stored.pop("listing")
+    return dumps(stored)
+
+
+def _stored_result(conn, request_id: str, result_json: str | None) -> dict | None:
+    """A stored answer with its listing joined back (`_envelope`)."""
+    if not result_json:
+        return None
+    listed = conn.execute("SELECT listing_json FROM request_listings WHERE request_id = ?", (request_id,)).fetchone()
+    return json.loads(result_json) | ({"listing": json.loads(listed["listing_json"])} if listed else {})
 
 
 def _evidence_map(evidence: list[EvidenceUnit]) -> dict[str, dict]:
@@ -872,7 +891,8 @@ def _cited_ids(result: dict) -> list[str]:
     return list(dict.fromkeys([*(result.get("summary_evidence_ids") or []),
                                *(i for c in result.get("claims") or [] for i in c["evidence_ids"]),
                                *(i for c in result.get("conflicts") or [] for a in c["alternatives"]
-                                 for i in a["evidence_ids"])]))
+                                 for i in a["evidence_ids"]),
+                               *(i for r in (result.get("listing") or {}).get("rows") or [] for i in r["evidence_ids"])]))
 
 
 def inventory_display_order(items: list[dict]) -> list[dict]:
@@ -914,6 +934,15 @@ def _answer_text(result: dict) -> str:
               .strip()[:INVENTORY_ROW_CHARACTERS]
               for n, i in enumerate(inventory_display_order((result.get("inventory") or {}).get("items") or []), 1)]
     lines += [f"{side(m['doc_id'])}{m['field']}: 확인되지 않음({m['reason']})" for m in result.get("missing_fields") or []]
+    listing = result.get("listing") or {}
+    won = lambda v: "금액 없음" if v is None else f"{v:,}원"  # noqa: E731
+    if listing:
+        lines.append(f"조건: {listing['conditions']}")
+    lines += [f"{n}. {r['title']} · {r['institution'] or '-'} · {r['institution_type'] or '유형 미분류'} · "
+              f"{won(r['amount_krw'])}" + (f" · {r['description']}" if r.get("description") else "")
+              for n, r in enumerate(listing.get("rows") or [], 1)]
+    lines += [f"확인 필요: {r['title']} · {won(r['amount_krw'])} ({', '.join(x['label'] for x in r['reasons'])})"
+              for r in listing.get("review") or []]
     return "\n".join(x for x in lines if x).strip()
 
 
@@ -937,7 +966,7 @@ def _conversation(res: Resources, principal: Principal,
                 raise ServiceError("이전 질문의 답변이 끝난 뒤에 이어서 질문할 수 있습니다.")
             if json.loads(row["scope_json"]) != scope:
                 raise ServiceError("대화 중에는 질문 범위를 바꿀 수 없습니다. 새 대화로 질문하세요.")
-            snap, result = json.loads(row["request_json"]), json.loads(row["result_json"] or "{}")
+            snap, result = json.loads(row["request_json"]), _stored_result(conn, previous, row["result_json"]) or {}
             if not turns:
                 units = result.get("evidence") or {}
                 carried = [EvidenceUnit(**units[i]) for i in _cited_ids(result) if i in units][:CARRIED_EVIDENCE]
@@ -991,7 +1020,8 @@ def answer(res: Resources, principal: Principal, request: AnswerRequest) -> Answ
     request_id, prior = _create(res, principal, request, question, "running")
     if prior is not None:
         if prior["result_json"]:
-            return AnswerResult(**json.loads(prior["result_json"]))
+            with open_db(res.settings.db_path) as conn:
+                return AnswerResult(**_stored_result(conn, prior["request_id"], prior["result_json"]))
         return AnswerResult(prior["request_id"], "in_progress", "이미 처리 중인 요청입니다.",
                             generation_id=request.generation_id, mode=request.mode)
     return _execute(res, principal, request_id, request, question)
@@ -1033,7 +1063,7 @@ def _fail_unscheduled(res: Resources, request_id: str, request: AnswerRequest, e
                           generation_id=request.generation_id, mode=request.mode)
     with open_db(res.settings.db_path) as conn, tx(conn, immediate=True):
         conn.execute("UPDATE requests SET status = 'failed', result_json = ?, updated_at = ? WHERE request_id = ? "
-                     "AND status = 'queued'", (dumps(asdict(result)), utcnow(), request_id))
+                     "AND status = 'queued'", (_envelope(result), utcnow(), request_id))
 
 
 def run_queued(res: Resources, request_id: str) -> None:
@@ -1138,7 +1168,10 @@ def _trace_outcome(root: tracing.Step, result: AnswerResult, trace: dict) -> Non
     """The answer as the trace output, and the free deterministic scores known for every exit path."""
     root.update(lambda: {"output": {k: getattr(result, k) for k in (
         "status", "standalone_question", "summary", "summary_evidence_ids", "claims", "missing_fields", "conflicts",
-        "next_action", "billing_state", "error")},
+        "next_action", "billing_state", "error")} | ({"listing": {
+            k: result.listing[k] for k in ("conditions", "count", "count_only")} | {
+            "rows": [r["title"] for r in result.listing["rows"]], "review": len(result.listing["review"])}}
+            if result.listing else {}),
         "level": "ERROR" if result.status == "technical_error" else "DEFAULT"})
     root.score_trace("insufficient_evidence", 1.0 if result.status == "insufficient_evidence" else 0.0, "BOOLEAN")
     if "retrieval" in trace:
@@ -1166,6 +1199,13 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
         if isinstance(question, AnswerResult):
             return question
         done = functools.partial(done, standalone_question=question)
+        principal = _checkpoint(res, request_id, principal)
+    if request.mode == "corpus" and frozen is None:  # a metadata question lists every match, never top-k passages
+        from . import metadata_answers
+
+        listed = metadata_answers.route(res, principal, request_id, request, question, trace, done)
+        if listed is not None:
+            return listed
         principal = _checkpoint(res, request_id, principal)
     try:
         prep, docs = _prepare_paid(res, principal, request_id, request, question, docs, frozen, history, carried)
@@ -1553,7 +1593,8 @@ def _view(conn, row: Row) -> RequestView:
     attempts, billing = _billing(conn, row["request_id"])
     snap = json.loads(row["request_json"]) if row["request_json"] else {}
     open_states = ("reserved", "dispatching", "unknown")
-    result = AnswerResult(**json.loads(row["result_json"])) if row["result_json"] else None
+    stored = _stored_result(conn, row["request_id"], row["result_json"])
+    result = AnswerResult(**stored) if stored else None
     return RequestView(
         request_id=row["request_id"], member_id=row["member_id"], status=row["status"],
         mode=row["mode"] or snap.get("mode") or "single", generation_id=row["generation_id"] or "",
@@ -1603,7 +1644,7 @@ def cancel_request(res: Resources, principal: Principal, request_id: str) -> str
             result = AnswerResult(request_id, "cancelled", "실행 전에 취소되었습니다. 유료 호출은 없습니다.",
                                   generation_id=snap.get("generation_id", ""), mode=snap.get("mode", "single"))
             conn.execute("UPDATE requests SET status = 'cancelled', cancel_requested = 1, result_json = ?, "
-                         "updated_at = ? WHERE request_id = ?", (dumps(asdict(result)), utcnow(), request_id))
+                         "updated_at = ? WHERE request_id = ?", (_envelope(result), utcnow(), request_id))
             return "cancelled"
         if row["status"] == "running":
             conn.execute("UPDATE requests SET cancel_requested = 1, updated_at = ? WHERE request_id = ?",
@@ -2151,13 +2192,13 @@ def export_request(res: Resources, principal: Principal, request_id: str) -> dic
         attempts = [dict(a) for a in conn.execute(
             "SELECT attempt_id, stage, purpose, model, state, reserved_micro_usd, settled_micro_usd, raw_usage_json, "
             "price_json, created_at, dispatched_at, finished_at FROM attempts WHERE request_id = ?", (request_id,))]
+        result = _stored_result(conn, request_id, row["result_json"]) or {}
     snap = json.loads(row["request_json"] or "{}")
     snap.pop("idempotency_key", None)
     return redact({"export_version": "request-export-1", "exported_at": utcnow(), "request_id": request_id,
                    "member_id": row["member_id"], "status": row["status"], "input": snap,
                    "input_hash": row["input_hash"], "config_hash": row["config_hash"],
-                   "trace": json.loads(row["trace_json"] or "{}"), "result": json.loads(row["result_json"] or "{}"),
-                   "attempts": attempts})
+                   "trace": json.loads(row["trace_json"] or "{}"), "result": result, "attempts": attempts})
 
 
 def export_verifier_run(res: Resources, principal: Principal, run_id: str) -> dict:

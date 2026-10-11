@@ -1,1 +1,0 @@
-Run status in maintenance state.json and in `MaintenanceRun.status`. Steps move pending → running → done, reused, skipped, failed, needs_approval or cancelled.

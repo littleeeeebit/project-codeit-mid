@@ -1,9 +1,17 @@
 graph TD
-  source-originals["Originals and data_list.csv\nsrc/rfp_assistant/corpus/ingestion.py"] -->|"manifest import, sha256"| extraction-revisions["Extraction revisions\nsrc/rfp_assistant/corpus/ingestion.py"]
-  fidelity-ocr["OCR and fidelity witness\nsrc/rfp_assistant/corpus/ocr.py"] -->|"image_text, review status"| extraction-revisions
-  extraction-revisions -->|"chunk active extractions"| keyword-index-build["Keyword index build\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  keyword-index-build -->|"chunk payloads"| vector-sets["Embedding vector sets\nsrc/rfp_assistant/retrieval/dense.py"]
-  keyword-index-build -->|"frozen index version"| evaluation-runs["Evaluated runs and tables\nsrc/rfp_assistant/evaluation/compare.py"]
-  vector-sets -->|"dense_version"| evaluation-runs
-  evaluation-runs -->|"person picks a row"| activation-record["Activation record\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  activation-record -->|"active_run, active_index"| serving-retrieval["Serving retrieval\nsrc/rfp_assistant/service/service.py"]
+  source-originals["RFP originals and CSV\n원본 데이터/files"]
+  extraction-records["Sources and extractions\nsrc/rfp_assistant/storage/store.py"]
+  keyword-index["Keyword index versions\nsrc/rfp_assistant/retrieval/retrieval.py"]
+  vector-sets["pgvector sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  activation-record["Activation record\nsrc/rfp_assistant/evaluation/evaluation.py"]
+  request-records["Requests and attempts\nsrc/rfp_assistant/storage/store.py"]
+  langfuse-traces["Langfuse traces\nsrc/rfp_assistant/gateway/tracing.py"]
+  review-runs["Review run folders\nsrc/rfp_assistant/evaluation/traffic_review.py"]
+  source-originals -->|ingest changed bytes| extraction-records
+  extraction-records -->|build-keyword chunks| keyword-index
+  keyword-index -->|embed uncached chunks| vector-sets
+  activation-record -->|pins served index| keyword-index
+  activation-record -->|pins dense version| vector-sets
+  keyword-index -->|packed evidence units| request-records
+  request-records -->|mirrored per request| langfuse-traces
+  request-records -->|read-only traffic sample| review-runs

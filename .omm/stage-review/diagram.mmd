@@ -1,9 +1,0 @@
-graph TD
-  cli-runner["stage-review CLI\nsrc/rfp_assistant/evaluation/stage_review.py"] -->|"git worktree per ref"| ref-worktrees["Ref worktrees\nsrc/rfp_assistant/evaluation/stage_review.py"]
-  ref-worktrees -->|"python -I worker, stripped env"| stage-worker["Stage worker\nsrc/rfp_assistant/evaluation/stage_review_worker.py"]
-  cli-runner -->|"estimate, approve, resume"| paid-approval["Paid stage approval\nsrc/rfp_assistant/evaluation/stage_review_paid.py"]
-  paid-approval -->|"key only when approved"| stage-worker
-  stage-worker -->|"candidate outputs"| run-folder["Run folder and view\nsrc/rfp_assistant/evaluation/stage_review.py"]
-  run-folder -->|"view.json, inputs"| review-server["Review app server\nreview/server.py"]
-  review-server -->|"notes, decisions"| annotation-store["Notes and taxonomy store\nsrc/rfp_assistant/evaluation/error_analysis.py"]
-  annotation-store -->|"export bundle, prompt"| agent-handoff["Coding agent handoff\nsrc/rfp_assistant/cli.py"]

@@ -1,7 +1,13 @@
 graph TD
-  gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"] -->|"owner_guard in each tx"| budget-admission["Reservation admission\nsrc/rfp_assistant/gateway/budget.py"]
-  budget-admission -->|"reserved attempt"| dispatch-marker["Dispatch marker\nsrc/rfp_assistant/gateway/budget.py"]
-  dispatch-marker -->|"dispatching, then call"| provider-transport["Provider transport\nsrc/rfp_assistant/gateway/generation.py"]
-  provider-transport -->|"usage or error"| settlement["Settle, release, unknown\nsrc/rfp_assistant/gateway/budget.py"]
-  startup-recovery["Startup recovery\nsrc/rfp_assistant/gateway/budget.py"] -->|"dispatching to unknown"| settlement
-  provider-transport -->|"generation spans"| langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
+  ledger-reservation["Reservation\nsrc/rfp_assistant/gateway/budget.py"]
+  dispatch-marker["Dispatch marker\nsrc/rfp_assistant/gateway/budget.py"]
+  openai-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
+  settlement["Settle, release, unknown\nsrc/rfp_assistant/gateway/budget.py"]
+  gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
+  langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
+  ledger-reservation -->|attempt reserved| dispatch-marker
+  dispatch-marker -->|attempt dispatching| openai-transport
+  openai-transport -->|usage or provider error| settlement
+  gateway-owner -->|owner_guard in transaction| ledger-reservation
+  gateway-owner -->|owner_check before call| openai-transport
+  openai-transport -->|generation span| langfuse-tracing

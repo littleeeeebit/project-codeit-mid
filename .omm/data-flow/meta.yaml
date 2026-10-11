@@ -1,17 +1,16 @@
 created: 2026-10-04 13:34:55.112000+00:00
-updated: 2026-10-11 09:34:35.293000+00:00
-update_count: 56
+updated: 2026-10-11 21:58:08.686000+00:00
+update_count: 58
 last_field: diagram
-git_commit: 19b378c8
-git_branch: maintenance-ingest-timeout-cancel-progress
+git_commit: 80caf0d6
+git_branch: corpus-metadata-filter-list-answers
 children:
 - activation
 - activation-record
 - corpus-ingestion
 - embedding-set
-- evaluation-runs
 - extraction
-- extraction-revisions
+- extraction-records
 - fidelity-and-ocr
 - fidelity-check
 - fidelity-ocr
@@ -19,31 +18,33 @@ children:
 - index-build
 - ingest
 - keyword
-- keyword-index-build
+- keyword-index
+- langfuse-traces
 - maintenance-sequence
 - ocr-merge
 - original-corpus
 - original-files
 - originals
 - preview
+- request-records
 - retrieval-runs
 - retrieval-selection
+- review-runs
 - review-store
 - run-selection
-- serving-retrieval
 - source-originals
 - traffic-review
 - vector-sets
-prev_diagram: "graph TD\r\n  originals[\"Original HWP and PDF files\\nsrc/rfp_assistant/corpus/ingestion.py\"\
-  ]\r\n  ocr-cache[\"OCR region cache\\nsrc/rfp_assistant/corpus/ocr.py\"]\r\n  extractions[\"\
-  Extractions and elements\\nsrc/rfp_assistant/corpus/ingestion.py\"]\r\n  indexes[\"\
-  Keyword index and vectors\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  serving[\"\
-  Activated serving row\\nsrc/rfp_assistant/evaluation/evaluation.py\"]\r\n  requests-store[\"\
-  Requests, traces, attempts\\nsrc/rfp_assistant/service/service.py\"]\r\n  traffic-review[\"\
-  Traffic review run\\nsrc/rfp_assistant/evaluation/traffic_review.py\"]\r\n  failure-notes[\"\
-  Notes and failure types\\nsrc/rfp_assistant/evaluation/error_analysis.py\"]\r\n\
-  \  originals -->|manifest, ingest| extractions\r\n  ocr-cache -->|image_text elements|\
-  \ extractions\r\n  extractions -->|build-keyword, build-dense| indexes\r\n  indexes\
-  \ -->|evaluate, activate-run| serving\r\n  serving -->|retrieval per request| requests-store\r\
-  \n  requests-store -->|read-only window| traffic-review\r\n  traffic-review -->|annotated\
-  \ answers| failure-notes"
+prev_diagram: "graph TD\r\n  source-originals[\"Originals and data_list.csv\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ] -->|\"manifest import, sha256\"| extraction-revisions[\"Extraction revisions\\\
+  nsrc/rfp_assistant/corpus/ingestion.py\"]\r\n  fidelity-ocr[\"OCR and fidelity witness\\\
+  nsrc/rfp_assistant/corpus/ocr.py\"] -->|\"image_text, review status\"| extraction-revisions\r\
+  \n  extraction-revisions -->|\"chunk active extractions\"| keyword-index-build[\"\
+  Keyword index build\\nsrc/rfp_assistant/retrieval/retrieval.py\"]\r\n  keyword-index-build\
+  \ -->|\"chunk payloads\"| vector-sets[\"Embedding vector sets\\nsrc/rfp_assistant/retrieval/dense.py\"\
+  ]\r\n  keyword-index-build -->|\"frozen index version\"| evaluation-runs[\"Evaluated\
+  \ runs and tables\\nsrc/rfp_assistant/evaluation/compare.py\"]\r\n  vector-sets\
+  \ -->|\"dense_version\"| evaluation-runs\r\n  evaluation-runs -->|\"person picks\
+  \ a row\"| activation-record[\"Activation record\\nsrc/rfp_assistant/evaluation/evaluation.py\"\
+  ]\r\n  activation-record -->|\"active_run, active_index\"| serving-retrieval[\"\
+  Serving retrieval\\nsrc/rfp_assistant/service/service.py\"]"

@@ -748,9 +748,10 @@ def _corpus_commands(sub) -> None:
     s.add_argument("--review-file", required=True)
     s = sub.add_parser("identity", help="CSV metadata versus the original's own institution/title cues")
     s.add_argument("--all", action="store_true", help="every association, not only conflicts/disagreements")
-    s = sub.add_parser("resolve-metadata", help="owner/reviewer canonical value for a conflicting field")
+    s = sub.add_parser("resolve-metadata", help="owner/reviewer canonical value for a conflicting field, or a "
+                                                "corrected institution type")
     s.add_argument("--doc-id", required=True)
-    s.add_argument("--field", required=True, choices=ingestion.CONFLICT_FIELDS)
+    s.add_argument("--field", required=True, choices=ingestion.RESOLVABLE_FIELDS)
     s.add_argument("--value", required=True, help="JSON value, e.g. '\"기관명\"' or 130000000")
     s.add_argument("--rationale", required=True)
     s.add_argument("--evidence", required=True, help="source/notice location supporting the value")

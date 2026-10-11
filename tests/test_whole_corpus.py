@@ -51,7 +51,7 @@ class CorpusAskTest(unittest.TestCase):
         with self.assertRaises(service.ServiceError):
             self.ask("하자보수 기간은 얼마인가요?", "corpus", [a])
 
-    def test_a_question_with_no_lexical_hit_returns_no_evidence_and_pays_nothing(self):
+    def test_a_question_with_no_lexical_hit_returns_no_evidence_and_pays_no_answer(self):
         index = KeywordIndex.load(self.env.settings)
         scope = corpus_scope(self.env.settings, index)
 
@@ -65,6 +65,8 @@ class CorpusAskTest(unittest.TestCase):
         r = self.ask("쿼크 글루온 플라스마")
         self.assertEqual(r.status, "insufficient_evidence")
         self.assertEqual(self.transport.calls, [])
+        # only the metadata translation every corpus question pays first; it found no metadata question
+        self.assertEqual([c["kind"] for c in self.transport.query_calls], ["metadata_query"])
 
     def test_a_question_naming_a_project_routes_to_its_documents(self):
         index = KeywordIndex.load(self.env.settings)

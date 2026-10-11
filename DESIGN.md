@@ -122,6 +122,31 @@ The owner found that selecting one or two documents before asking proves nothing
 - Picking a document switches the scope back to 선택한 문서. Changing the scope releases the owned request exactly like changing the selection.
 - Single-document and two-document comparison behaviour is unchanged. A corpus request with a scope, or a scoped request without one, is refused with 400/422.
 
+### 전체 문서 목록 답변 (metadata questions, 2026-10-11)
+
+Top-k passages can never list every project above an amount, every university's project or the cheapest one. Every 전체 문서 question therefore first goes through one structured model call (`service/metadata_query.py`) that either fills a fixed query structure or says the question is not a metadata question:
+
+- Filters (field, operator, values) combined with AND over `amount_krw`, `institution`, `institution_type`, `published_at`, `bid_start` and `bid_close`; operators `=`, `!=`, `>`, `>=`, `<`, `<=`, `between`, and `contains` for institution names only; an optional sort and limit; a count-only flag. Code validates every field, operator and value and normalises Korean amounts (1억 2천만원 → 120000000). No question wording is coded anywhere.
+- Code runs the query over every project's metadata. The model never picks the projects. A sort with a limit keeps every project tied at the edge, so 가장 싼 사업 can be several.
+- A filtered or sorted value that is missing, 0, below 1,000,000원, or in an unresolved conflict never matches and never wins an extreme. That project goes to 확인 필요 with its reason: 금액 없음, 0원 검토, 금액 검토, 출처 충돌, 날짜 없음 or 유형 미분류.
+- Institution types (대학, 지방자치단체, 중앙행정기관, 공공기관, 협회·단체, 연구기관, 의료기관, 기타) come from one classification of each distinct institution. It runs inside the first metadata question that meets an unclassified institution and is stored in `institution_types` with its model, request and date. `resolve-metadata --field institution_type` corrects one document's type. The correction applies to the next query without classifying again.
+- Each listed project gets one description line saying what the project builds or does, never what the document contains. The line is written from the project's three best chunks for 사업 개요 · 목적, because the best one alone is often a table of contents or a form. It cites the chunks it rests on, and a project whose chunks never say what it is stays undescribed (설명 없음). The lines are written in batches of 12, each reserved in the shared ledger, after a preflight checks that the allowance covers every batch. A batch whose output fails validation leaves only its own rows undescribed. A count-only question gets no descriptions.
+- Invalid model output, or "not a metadata question", answers from passages exactly as before, and the trace records why. Langfuse shows `metadata-query-translation` (raw output and the validated query, or the fallback reason), `classify-institutions`, `metadata-query` (conditions, matched count, 확인 필요 count and reasons) and one `describe-batch-N` per batch.
+- The listing is stored in `request_listings`, outside the answer's `result_json`. A rolled-back version rebuilds every stored answer from `result_json` alone, so it still reads these answers. It shows a metadata answer's summary without the list. Every reader in this version joins the listing back, including the traffic review's read-only snapshot.
+
+```
+사업 12개                                   조건: 사업 금액 ≥ 100,000,000원
+사업                                발주 기관 · 유형     사업 금액
+학사 정보시스템 고도화               한국대학교          1억 5,000만원
+  학사 행정 시스템을 통합 고도화하는 사업 [1] [2]   대학
+...
+확인 필요 3개           값이 없거나 검토가 필요해 개수와 순위에 넣지 않았습니다
+캠퍼스 안전 시스템                   서울시립대학교            0원
+  [0원 검토]                          대학
+```
+
+The table has three columns so it fits the conversation's answer column beside the evidence pane at 1440 px: the type sits under the institution, a long institution name wraps, and the 확인 필요 reasons sit under the title. An amount below 1,000,000원 is shown as written (0원, 1원) in the warning colour, never rounded to 0만원. Below about 600 px the table scrolls inside its own box.
+
 ### Result states
 
 Every answer opens with a status badge carrying its text label, and each state has its own body.

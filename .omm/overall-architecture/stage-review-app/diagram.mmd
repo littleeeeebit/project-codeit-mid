@@ -1,0 +1,15 @@
+graph TD
+  review-runner["Stage review runner\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  ref-worker["Per-ref worker\nsrc/rfp_assistant/evaluation/stage_review_worker.py"]
+  paid-approval["Estimate and approval\nsrc/rfp_assistant/evaluation/stage_review_paid.py"]
+  traffic-sampler["Traffic sampler\nsrc/rfp_assistant/evaluation/traffic_review.py"]
+  run-folder["Run folder\nsrc/rfp_assistant/evaluation/stage_review.py"]
+  review-server["Review server\nreview/server.py"]
+  annotation-store["Notes and failure types\nsrc/rfp_assistant/evaluation/error_analysis.py"]
+  review-runner -->|git worktree per ref| ref-worker
+  review-runner -->|paid stages stop| paid-approval
+  paid-approval -->|approved resume grants key| ref-worker
+  ref-worker -->|raw candidate output| run-folder
+  traffic-sampler -->|pseudonymized frozen requests| run-folder
+  review-server -->|reads runs, writes decisions| run-folder
+  review-server -->|span notes and taxonomy| annotation-store
