@@ -143,8 +143,10 @@ function Required({ q, candidates }: { q: GenerationQuestion; candidates: Candid
               {r.critical && <span className="mr-1 text-warn" title="틀리면 치명 오류">★</span>}{r.text}
             </td>
             {candidates.map((c) => {
-              const [text, tone] = VERDICT[verdict(c, r.claim_id) ?? ""] ?? ["—", "text-muted"];
-              return <td key={c.id} className={`whitespace-nowrap py-1.5 pr-3 font-semibold ${tone}`}>{text}</td>;
+              // No verdict reads as a dash; a verdict code with no label yet shows as itself rather than vanishing.
+              const v = verdict(c, r.claim_id);
+              const [text, tone] = (v && VERDICT[v]) || [v || "—", "text-muted"];
+              return <td key={c.id} className={`whitespace-nowrap py-1.5 pr-3 font-semibold ${tone}`} title={v}>{text}</td>;
             })}
           </tr>
         ))}

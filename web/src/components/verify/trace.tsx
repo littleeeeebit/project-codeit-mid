@@ -32,7 +32,7 @@ const CHANNEL: Record<string, string> = {
 const FALLBACK: Record<string, string> = {
   dense_index_unavailable: "의미 색인 없음", dense_index_mismatch: "의미 색인이 키워드 색인과 다른 판",
   query_vector_unavailable: "캐시된 질의 벡터 없음", query_vector_dimension_mismatch: "질의 벡터 차원 불일치",
-  reranker_unavailable: "재정렬 모델 없음",
+  reranker_unavailable: "재정렬 모델 없음", reranker_error: "재정렬 모델 오류",
 };
 const PARSE: Record<string, string> = { parsed: "수집됨", quarantined: "격리됨" };
 const CONFIG: Record<string, string> = {
@@ -43,12 +43,14 @@ const CONFIG: Record<string, string> = {
 const configValue = (k: string, v: unknown) =>
   (k === "mode" || k === "serving_mode") && typeof v === "string" ? label(MODE, v) : typeof v === "string" ? v : JSON.stringify(v);
 
-/** "hybrid->kiwi_bm25:query_vector_unavailable" as "키워드+의미 결합 → 키워드(형태소 분석) · 캐시된 질의 벡터 없음". */
+/** "hybrid->kiwi_bm25:query_vector_unavailable" as "키워드+의미 결합 → 키워드(형태소 분석) · 캐시된 질의 벡터 없음". Whatever follows
+ * the reason (a reranker's exception type and message) is kept; a fallback in any other shape is shown as written. */
 function fallbackText(code: string | null | undefined): string {
   if (!code) return "없음";
-  const [modes, reason = ""] = code.split(":");
-  const [from, to] = modes.split("->");
-  return `${label(MODE, from)} → ${label(MODE, to ?? "")} · ${label(FALLBACK, reason)}`;
+  const m = /^(\w+)->(\w+):(\w+)(?::([\s\S]*))?$/.exec(code);
+  if (!m) return code;
+  const [, from, to, reason, detail] = m;
+  return `${label(MODE, from)} → ${label(MODE, to)} · ${label(FALLBACK, reason)}${detail ? `: ${detail}` : ""}`;
 }
 
 function limitationText(code: string): string {
@@ -59,8 +61,10 @@ function limitationText(code: string): string {
     code_ambiguous: "요구사항 코드가 여러 곳", index_outdated: "색인이 문서 기록보다 오래됨 (build-keyword로 다시 만들기)", scope_redundant_terms: "범위와 겹쳐 뺀 검색어", linked_evidence_missing: "이어진 근거 일부 누락",
     idf: "전체 색인을 기준으로 단어 중요도 계산", expansion: "연결된 근거 조각을 함께 포함",
   };
-  if (known[head]) return `${known[head]}${rest.length && ["code_not_found", "code_detail_unavailable", "code_ambiguous", "scope_redundant_terms"].includes(head) ? ` (${rest.join(":")})` : ""}`;
-  if (rest.length && known[rest[0]]) return `${known[rest[0]]} (문서 ${head})`;
+  // The part after a known code (a requirement code, documents, a chunk and its reason) is kept; only the policy names
+  // after idf, expansion and compare are left out, since their label already says them.
+  if (known[head]) return `${known[head]}${rest.length && !["idf", "expansion", "compare"].includes(head) ? ` (${rest.join(":")})` : ""}`;
+  if (rest.length && known[rest[0]]) return `${limitationText(rest.join(":"))} (문서 ${head})`;
   return code;
 }
 
@@ -330,7 +334,7 @@ function ChannelStage({ t }: { t: Run }) {
   return (
     <>
         <Section title={`채널 순위 · 후보 ${r.candidates.length}개`}>
-          <dl className="grid grid-cols-2 gap-3 text-sm">{[["요청 방식", label(MODE, t.config.mode)], ["실제 방식", label(MODE, r.mode)], ["대체 실행", fallbackText(r.fallback)], ["검색 소요", `${r.timings_ms.total ?? "-"} ms`]].map(([k,v]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="mt-1 font-semibold">{v}</dd></div>)}</dl>
+          <dl className="grid grid-cols-2 gap-3 text-sm">{[["요청 방식", label(MODE, t.config.mode)], ["실제 방식", label(MODE, r.mode)], ["대체 실행", fallbackText(r.fallback), r.fallback ?? undefined], ["검색 소요", `${r.timings_ms.total ?? "-"} ms`]].map(([k, v, raw]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="mt-1 font-semibold [overflow-wrap:anywhere]" title={raw}>{v}</dd></div>)}</dl>
           <p className="text-[13px] text-muted-foreground">점수는 채널 내 순위용 값입니다. 답변 신뢰도가 아닙니다.</p>
           <Table caption="채널 순위" head={["채널", "순위", "점수", "조각"]}>
             {r.candidates.map((c, i) => (
@@ -423,10 +427,12 @@ export function CompareRuns({ runs }: { runs: Summary[] }) {
   if (runs.length < 2) return <Empty>비교하려면 검색 추적 실행이 두 개 이상 필요합니다.</Empty>;
   const name = (r: Summary) => `${r.question.slice(0, 30)} · ${stamp(r.created_at)} · ${r.run_id.slice(-6)}`;
   const d = diff.data;
-  // A ranked chunk reads as its place in the documents when either run packed it as evidence; otherwise only its ID is known.
-  const where = (t: Run | null | undefined, other: Run | null | undefined, id: string | undefined) => {
+  // A ranked chunk reads as its place in the documents when either run packed it as evidence. Until its own run has
+  // loaded (or when it failed to) nothing is known about its evidence, so only the chunk ID is shown.
+  const where = (t: Run | undefined, other: Run | undefined, id: string | undefined): React.ReactNode => {
     if (!id) return "-";
-    const own = t?.retrieval.evidence.find((x) => x.chunk_id === id);
+    if (!t) return <span className="font-mono text-xs">{id.slice(0, 12)}</span>;
+    const own = t.retrieval.evidence.find((x) => x.chunk_id === id);
     if (own) return `${own.evidence_id} · 문서 ${t!.scope.findIndex((s) => s.doc_id === own.doc_id) + 1} · ${locationShort(own.location)}`;
     const seen = other?.retrieval.evidence.find((x) => x.chunk_id === id);
     return seen ? `${locationShort(seen.location)} · 이 실행은 근거로 안 담음` : "근거로 담기지 않은 조각";
@@ -445,6 +451,9 @@ export function CompareRuns({ runs }: { runs: Summary[] }) {
       </div>
       {a === b && <p className="text-sm text-muted-foreground">서로 다른 실행을 고르세요.</p>}
       {diff.error && <Notice tone="bad">{diff.error}</Notice>}
+      {([["A", runA.error], ["B", runB.error]] as const).map(([side, e]) => e && (
+        <Notice key={side} tone="bad">실행 {side} 정보를 불러오지 못해 순위를 조각 ID로 표시합니다: {e}</Notice>
+      ))}
       {d && (
         <>
           {!(d.same_question && d.same_scope) && <Notice tone="warn">질문 또는 문서 범위가 다릅니다. 설정 효과만 비교하려면 같은 질문과 범위를 쓰세요.</Notice>}

@@ -590,7 +590,7 @@ div
         dd "키워드(형태소 분석)"
       div
         dt "대체 실행"
-        dd "query vector not cached →  · "
+        dd title="hybrid->kiwi_bm25:query_vector_unavailable" "키워드+의미 결합 → 키워드(형태소 분석) · 캐시된 질의 벡터 없음"
       div
         dt "검색 소요"
         dd "37 ms"
@@ -697,12 +697,12 @@ article
       span
         span aria-hidden="true"
         "제한 사항 "
-        "2"
+        "4"
         "건"
     details
       summary
         "검색 제한 "
-        "2"
+        "4"
         "건 보기"
       div
         table
@@ -718,6 +718,12 @@ article
             tr
               td "전체 검색"
               td "전체 색인을 기준으로 단어 중요도 계산"
+            tr
+              td "전체 검색"
+              td "색인에 없는 문서 (doc-9)"
+            tr
+              td "a.pdf"
+              td "이어진 근거 일부 누락 (chunk-77:token_budget)"
     dl
       div
         dt

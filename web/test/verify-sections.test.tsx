@@ -8,7 +8,7 @@ import { ExperimentsSection } from "@/components/verify/experiments";
 import { FidelityDetail, type Source } from "@/components/verify/fidelity";
 import { SecondReviewDetail, type Waiting } from "@/components/verify/gold";
 import { MaintenanceSection } from "@/components/verify/maintenance";
-import { RunView, TraceForm } from "@/components/verify/trace";
+import { CompareRuns, RunView, TraceForm } from "@/components/verify/trace";
 import { doc, DOC_A, DOC_B, stubApi } from "./fixtures";
 
 vi.mock("@/lib/api", async (original) => ({ ...(await original<object>()), api: { GET: vi.fn(), POST: vi.fn() } }));
@@ -234,8 +234,9 @@ const RUN: Schemas["TraceRun"] = {
   docs: [{ doc_id: DOC_A, filename: "a.pdf", parse_status: "parsed", review_status: "auto_verified" },
          { doc_id: DOC_B, filename: null, parse_status: "quarantined", review_status: "unreviewed", reason_code: "broken" }],
   retrieval: {
-    mode: "kiwi_bm25", fallback: "query vector not cached", evidence_tokens: 40, ranking: [], timings_ms: { total: 37 },
-    limitations: [`${DOC_A.slice(0, 8)}:code_not_found:SFR-001`, "idf"],
+    mode: "kiwi_bm25", fallback: "hybrid->kiwi_bm25:query_vector_unavailable", evidence_tokens: 40, ranking: [], timings_ms: { total: 37 },
+    limitations: [`${DOC_A.slice(0, 8)}:code_not_found:SFR-001`, "idf:whole_index", "scope_not_indexed:doc-9",
+                  `${DOC_A.slice(0, 8)}:linked_evidence_missing:chunk-77:token_budget`],
     candidates: [{ channel: "bm25", rank: 1, score: 7.5, chunk_id: "chunk-0123456789abcdef" },
                  { channel: "dense", rank: 2, score: null, chunk_id: "chunk-fedcba9876543210" }],
     excluded: [{ chunk_id: "chunk-aaaaaaaaaaaaaaaa", reason: "token_budget" }],
@@ -244,6 +245,59 @@ const RUN: Schemas["TraceRun"] = {
                  location: { format: "pdf", pages: [12], section_path: ["제3장"] } }],
   },
 };
+
+describe("trace fallback", () => {
+  const stage3 = async (fallback: string) => {
+    stubApi(api, { "GET /api/verify/traces/{run_id}": () => ({ ...RUN, retrieval: { ...RUN.retrieval, fallback } }) });
+    render(<RunView runId="T-1" />);
+    await settle();
+    fireEvent.click(within(screen.getByRole("list", { name: "검색 단계" })).getByRole("button", { name: /채널 순위/ }));
+    return screen.getByText("대체 실행").nextElementSibling!;
+  };
+
+  test("a reranker failure keeps its exception type and message", async () => {
+    const shown = await stage3("hybrid_rerank->hybrid:reranker_error:RuntimeError: CUDA out of memory");
+    expect(shown.textContent).toBe("키워드+의미 결합 후 재정렬 → 키워드+의미 결합 · 재정렬 모델 오류: RuntimeError: CUDA out of memory");
+    expect(shown.getAttribute("title")).toBe("hybrid_rerank->hybrid:reranker_error:RuntimeError: CUDA out of memory");
+  });
+
+  test("a fallback in no known shape is shown as written", async () => {
+    expect((await stage3("query vector not cached")).textContent).toBe("query vector not cached");
+  });
+});
+
+describe("trace comparison", () => {
+  const SUMMARIES = [{ run_id: "T-2", member_id: "v", config_id: "cfg-1", question: "하자보수 기간은?", created_at: "2026-10-06T11:00:00Z" },
+                     { run_id: "T-1", member_id: "v", config_id: "cfg-1", question: "하자보수 기간은?", created_at: "2026-10-06T10:00:00Z" }];
+  const PACKED = "chunk-0123456789abcdef";
+  const comparison = () => ({ same_question: true, same_scope: true, config_changes: {}, evidence_only_a: [], evidence_only_b: [],
+    evidence_common: ["x1:e1,e2"], top5_a: [PACKED], top5_b: [PACKED], evidence_tokens: [40, 40], input_tokens: [900, 900], total_ms: [37, 37] });
+  const rankOne = () => within(screen.getByRole("table", { name: "상위 5개 순위" })).getAllByRole("row")[1];
+
+  test("a ranked chunk keeps its ID while the runs load, then reads as its place", async () => {
+    let release = () => {};
+    const loaded = new Promise<void>((r) => { release = r; });
+    stubApi(api, { "GET /api/verify/compare": comparison,
+                   "GET /api/verify/traces/{run_id}": async (o) => { await loaded; return { ...RUN, run_id: String(o.params?.path?.run_id) }; } });
+    render(<CompareRuns runs={SUMMARIES} />);
+    await settle();
+    expect(rankOne().textContent).toBe(`1${PACKED.slice(0, 12)}${PACKED.slice(0, 12)}`);
+    expect(screen.queryByText(/근거로 (담기지 않은|안 담음)/)).toBeNull();
+    release();
+    await settle();
+    expect(rankOne().textContent).toBe("1E1 · 문서 1 · 12쪽E1 · 문서 1 · 12쪽");
+  });
+
+  test("a run that fails to load says so and never reads as unpacked", async () => {
+    stubApi(api, { "GET /api/verify/compare": comparison,
+                   "GET /api/verify/traces/{run_id}": (o) => o.params?.path?.run_id === "T-1" ? { error: { detail: "실행을 찾을 수 없습니다." } } : RUN });
+    render(<CompareRuns runs={SUMMARIES} />);
+    await settle();
+    expect(screen.getByText(/실행 A 정보를 불러오지 못해/)).toBeTruthy();
+    expect(rankOne().textContent).toBe(`1${PACKED.slice(0, 12)}E1 · 문서 1 · 12쪽`);
+    expect(screen.queryByText(/근거로 (담기지 않은|안 담음)/)).toBeNull();
+  });
+});
 
 describe("trace run", () => {
   test("every stage of a frozen run", async () => {
