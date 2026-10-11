@@ -17,6 +17,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from rfp_assistant.contracts import AnswerRequest
 from rfp_assistant.corpus import ingestion
 from rfp_assistant.gateway import budget, generation, tracing
+from rfp_assistant.service import metadata_answers as ma
 from rfp_assistant.service import metadata_query as mq
 from rfp_assistant.service import service
 from rfp_assistant.storage import store
@@ -375,16 +376,16 @@ class DescriptionTest(Base):
     QUESTION = "모든 사업 목록"
 
     def test_each_listed_project_gets_one_cited_line_from_its_overview_in_batches(self):
-        with mock.patch.object(service, "DESCRIBE_BATCH", 1):
+        with mock.patch.object(ma, "DESCRIBE_BATCH", 1):
             r = self.ask("5천만원 이상인 사업")
         described = [row for row in r.listing["rows"] if row["description"]]
         self.assertEqual({row["institution"] for row in described}, {"기관A", "기관C"})  # the indexed originals
         batches = [c for c in self.transport.query_calls if c["kind"] == "project_descriptions"]
         self.assertEqual(len(batches), 2)
-        self.assertEqual({c["max_completion_tokens"] for c in batches}, {service.DESCRIBE_MAX_OUTPUT_TOKENS})
+        self.assertEqual({c["max_completion_tokens"] for c in batches}, {ma.DESCRIBE_MAX_OUTPUT_TOKENS})
         asked = [p for c in batches for p in json.loads(c["messages"][-1]["content"])["projects"]]
         ids = [x["evidence_id"] for p in asked for x in p["passages"]]
-        self.assertTrue(all(1 <= len(p["passages"]) <= service.OVERVIEW_PASSAGES for p in asked))
+        self.assertTrue(all(1 <= len(p["passages"]) <= ma.OVERVIEW_PASSAGES for p in asked))
         self.assertEqual(len(ids), len(set(ids)))  # numbered across the whole list, never reused between batches
         for row in described:
             view = service.open_evidence(self.res, self.env.consultant, r.request_id, row["evidence_ids"][0])
@@ -407,7 +408,7 @@ class DescriptionTest(Base):
             return response
 
         self.transport.structured["project_descriptions"] = second_batch_cites_wrongly
-        with mock.patch.object(service, "DESCRIBE_BATCH", 1):
+        with mock.patch.object(ma, "DESCRIBE_BATCH", 1):
             r = self.ask(self.QUESTION)
         self.assertEqual(r.status, "answered", r.error)
         self.assertEqual(len(calls), 3)  # 기관A, 기관C (shared original) and 기관D; 기관E has no passage
@@ -446,7 +447,7 @@ class FallbackAndTraceTest(Base):
             self.assertEqual([s for s, _ in attempts], ["metadata_query", "generation"])
 
     def test_one_question_traces_translation_query_and_each_description_batch(self):
-        with mock.patch.object(service, "DESCRIBE_BATCH", 1):
+        with mock.patch.object(ma, "DESCRIBE_BATCH", 1):
             r = self.ask("5천만원 이상인 사업")
         self.res.close()  # flushes the spans
         spans = {s.name: s for s in self.exporter.get_finished_spans()}
