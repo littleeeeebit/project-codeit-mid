@@ -645,6 +645,12 @@
   },
   {
    "a": ".wiki/gold-drafting",
+   "b": "docs/rag/evaluation.md",
+   "kind": "reads",
+   "cross": true
+  },
+  {
+   "a": ".wiki/gold-drafting",
    "b": "docs/rag/golden-dataset.md",
    "kind": "reads",
    "cross": true
@@ -723,8 +729,8 @@
  ],
  "counts": {
   "docs": 40,
-  "linked": 29,
-  "read": 8,
+  "linked": 28,
+  "read": 9,
   "orphans": 3,
   "pages": 2,
   "decisions": 44,
