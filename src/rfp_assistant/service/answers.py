@@ -535,8 +535,8 @@ def _answer_row(settings: Settings, pinned: PinnedResources, run_id: str, finali
 
 
 def _link_validity(pinned: PinnedResources, request_id: str, result: dict, row: dict) -> dict[str, bool]:
-    """Each cited evidence ID opens on the server and resolves to the scoped original and its pinned extraction.
-    A resolving link says nothing about whether it supports the claim."""
+    """Each cited evidence ID opens on the server and resolves to the scoped original and its pinned extraction, or,
+    for a metadata unit, to a scoped document. A resolving link says nothing about whether it supports the claim."""
     hashes = {s["source_hash"] for s in row.get("scope") or []}
     out = {}
     for claim in result.get("claims") or []:
@@ -545,7 +545,8 @@ def _link_validity(pinned: PinnedResources, request_id: str, result: dict, row: 
                 continue
             try:
                 view = service.open_evidence(pinned, _principal(), request_id, eid)
-                out[eid] = bool(view.context) and view.source_hash in hashes and view.download_available
+                out[eid] = view.source_hash in hashes and (view.location.get("format") == "metadata"
+                                                           or bool(view.context) and view.download_available)
             except Exception:  # noqa: BLE001 - an unresolvable link is invalid, whatever the cause
                 out[eid] = False
     return out

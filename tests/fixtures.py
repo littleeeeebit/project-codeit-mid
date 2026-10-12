@@ -220,14 +220,18 @@ class Env:
     refs: dict[str, DocRef]
 
 
-def write_corpus(root: Path, rows=ROWS) -> Path:
+FILES = {"기관A_통합 정보시스템.pdf": PDF_A,
+         "기관C_통합 정보시스템 사본.pdf": PDF_A,  # byte-identical copy
+         "기관D_도서관 좌석 예약.pdf": PDF_D,
+         "기관E_재난 관리 시스템.hwp": b"\xd0\xcf\x11\xe0 not a real hwp"}
+
+
+def write_corpus(root: Path, rows=ROWS, originals: dict[str, bytes] | None = None) -> Path:
     source = root / "source"
     files = source / "files"
     files.mkdir(parents=True)
-    (files / "기관A_통합 정보시스템.pdf").write_bytes(PDF_A)
-    (files / "기관C_통합 정보시스템 사본.pdf").write_bytes(PDF_A)  # byte-identical copy
-    (files / "기관D_도서관 좌석 예약.pdf").write_bytes(PDF_D)
-    (files / "기관E_재난 관리 시스템.hwp").write_bytes(b"\xd0\xcf\x11\xe0 not a real hwp")
+    for name, data in (FILES if originals is None else originals).items():
+        (files / name).write_bytes(data)
     buf = io.StringIO(newline="")
     w = csv.writer(buf)
     w.writerow(CSV_HEADER)
@@ -236,8 +240,10 @@ def write_corpus(root: Path, rows=ROWS) -> Path:
     return source
 
 
-def make_env(root: Path, *, paid: bool = True, index: bool = True) -> Env:
-    source = write_corpus(root)
+def make_env(root: Path, *, paid: bool = True, index: bool = True, rows=ROWS,
+             originals: dict[str, bytes] | None = None) -> Env:
+    """`rows` and `originals` replace the corpus's CSV rows and original files together."""
+    source = write_corpus(root, rows, originals)
     settings = Settings(source_dir=source, data_dir=root / "data", database_dsn_env=database(),
                         hwp_converter=None, provider="fake", embedding_model="text-embedding-3-small",
                         embedding_dimensions=1536)

@@ -10,6 +10,9 @@ Institution types come from one classification per distinct institution (`classi
 its provenance in `institution_types`; a `resolve-metadata --field institution_type` correction of one document wins
 over it. Each listed project gets one description line written from its overview passage and citing it, in batches
 (`description_json_schema`), so a long list is neither refused nor truncated.
+
+The same fields, decided the same way, are stated per document as citable metadata units in every answer prompt
+(`metadata_statements`), so a follow-up can restate a listed project's amount, institution and dates with a citation.
 """
 
 from __future__ import annotations
@@ -348,6 +351,46 @@ def run_query(query: dict, rows: list[dict]) -> dict:
                 cut += 1
         matched = matched[:cut]
     return {"matched": matched, "review": review}
+
+
+EVIDENCE_FIELDS = ("amount_krw", "institution", "institution_type", "published_at", "bid_start", "bid_close")
+
+
+def _shown(field: str, v) -> str:
+    if v is None or v == "":
+        return "-"
+    if field == "amount_krw" and isinstance(v, (int, float)):
+        return f"{int(v):,}원"
+    if isinstance(v, dict) and "value" in v:  # dates are stored as {precision, value}
+        text = str(v["value"])
+        return text[:10] if v.get("precision") != "timestamp" or text[11:19] == "00:00:00" else \
+            text[:16].replace("T", " ")
+    return str(v)
+
+
+def metadata_statements(d: dict, types: dict[str, dict]) -> list[dict]:
+    """One citable statement per EVIDENCE_FIELDS field of a document (a `service._doc_rows` row): {field, value,
+    source, text}, from its effective metadata (a recorded resolution replaces the CSV value) and its institution
+    type. A value a query could not use (missing, 0, below MIN_AMOUNT_KRW, unclassified, in unresolved conflict) is
+    stated as 확인 필요 with its reason and the recorded values, never as a plain value. `source` is csv, resolution
+    or classification (the institution type's)."""
+    (row,) = metadata_rows([d], types)
+    pending = {c["field"]: c["values"] for c in d["quality"].get("provenance_conflicts", [])
+               if c["field"] not in d["resolutions"]}
+    out = []
+    for field in EVIDENCE_FIELDS:
+        problem = _decidable(row, field)[1]
+        if problem == "conflict" and field in pending:
+            recorded = " / ".join(dict.fromkeys(_shown(field, v) for v in pending[field].values()))
+        else:
+            recorded = _shown(field, row[field])
+        value = recorded
+        if problem:
+            value = f"확인 필요 ({REASONS[problem]}" + ("" if recorded == "-" else f", 기록된 값 {recorded}") + ")"
+        source = (row["type_source"] or "classification") if field == "institution_type" else \
+            "resolution" if field in d["resolutions"] else "csv"
+        out.append({"field": field, "value": value, "source": source, "text": f"{FIELD_LABELS[field]}: {value}"})
+    return out
 
 
 def describe_query(query: dict) -> str:

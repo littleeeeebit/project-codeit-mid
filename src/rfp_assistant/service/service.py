@@ -24,12 +24,13 @@ from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
-from . import auth
+from . import auth, metadata_query
 from ..gateway import budget, generation, tracing
 from ..corpus import fidelity
 from ..evaluation import gold
 from ..storage import postgres
 from ..retrieval import dense as dense_mod
+from ..retrieval.chunking import count_tokens
 from .auth import require_any
 from ..contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, EvidenceUnit, EvidenceView,
                         ManagedDownload, Principal, RequestView, RetrievalResult, TERMINAL_STATUSES)
@@ -818,7 +819,8 @@ def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retriev
             mode: str, price_query_embedding: bool = True, conversation: list[dict] | None = None) -> dict:
     with tracing.step("assemble-evidence", input={"question": question, "as_of": as_of, "mode": mode,
                                                   "doc_ids": [d["doc_id"] for d in docs]}) as packed:
-        messages = generation.build_messages(question, as_of, [_doc_brief(d) for d in docs], retrieval.evidence,
+        meta = metadata_evidence(res, docs)
+        messages = generation.build_messages(question, as_of, [_doc_brief(d) for d in docs], retrieval.evidence + meta,
                                              retrieval.limitations, mode=mode, conversation=conversation)
         rf = generation.answer_json_schema()
         tokens = generation.count_request_tokens(messages, rf, res.settings.framing_margin_tokens)
@@ -826,6 +828,7 @@ def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retriev
             "evidence": [{"evidence_id": e.evidence_id, "doc_id": e.doc_id, "chunk_id": e.chunk_id,
                           "location": e.location, "token_count": e.token_count, "text": e.quote}
                          for e in retrieval.evidence],
+            "metadata_evidence": [{"evidence_id": e.evidence_id, "doc_id": e.doc_id, "text": e.quote} for e in meta],
             "evidence_tokens": retrieval.evidence_tokens, "prompt_input_tokens": tokens,
             "limitations": retrieval.limitations, "excluded": retrieval.excluded}})
     try:  # an unknown rate leaves the estimate empty; admission then refuses with `unknown_rate`
@@ -841,7 +844,27 @@ def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retriev
     except budget.BudgetError:
         est = None
     return {"retrieval": retrieval, "messages": messages, "response_format": rf, "input_tokens": tokens,
-            "estimate_micro_usd": est, "docs": docs}
+            "estimate_micro_usd": est, "docs": docs, "metadata_evidence": meta}
+
+
+def metadata_evidence(res: Resources, docs: list[dict]) -> list[EvidenceUnit]:
+    """The citable metadata units of the documents in an answer prompt, M1, M2, ... in document order: one per typed
+    field (`metadata_query.metadata_statements`), from the effective metadata. A unit has no chunk: validation
+    compares its text with the document's current statement, as a passage's with the index."""
+    from .metadata_answers import _institution_types
+
+    types = _institution_types(res) if docs else {}
+    units: list[EvidenceUnit] = []
+    for d in docs:
+        for s in metadata_query.metadata_statements(d, types):
+            units.append(EvidenceUnit(f"M{len(units) + 1}", d["doc_id"], d["active_source_hash"], "", "", [], s["text"],
+                                      {"format": "metadata", "field": s["field"], "value": s["value"],
+                                       "source": s["source"]}, count_tokens(s["text"])))
+    return units
+
+
+def _is_metadata(e: EvidenceUnit) -> bool:
+    return (e.location or {}).get("format") == "metadata"
 
 
 def _doc_brief(d: dict) -> dict:
@@ -969,7 +992,9 @@ def _conversation(res: Resources, principal: Principal,
             snap, result = json.loads(row["request_json"]), _stored_result(conn, previous, row["result_json"]) or {}
             if not turns:
                 units = result.get("evidence") or {}
-                carried = [EvidenceUnit(**units[i]) for i in _cited_ids(result) if i in units][:CARRIED_EVIDENCE]
+                # metadata units are never carried: every document of the follow-up's prompt gets current ones
+                carried = [e for e in (EvidenceUnit(**units[i]) for i in _cited_ids(result) if i in units)
+                           if not _is_metadata(e)][:CARRIED_EVIDENCE]
             limit = LATEST_ANSWER_CHARACTERS if not turns else CONVERSATION_ANSWER_CHARACTERS
             turns.append({"question": result.get("standalone_question") or snap.get("question")
                           or FREE_TURNS.get(snap.get("mode"), ""),
@@ -1221,7 +1246,8 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
     _trace_retrieval(trace, prep, carried)
     coverage = prep.get("coverage") or [{"doc_id": d["doc_id"], "evidence": len(retrieval.evidence)} for d in docs]
     server_missing = missing_unavailable + _not_found(coverage, unavailable)
-    evidence_map = _evidence_map(retrieval.evidence)
+    citable = retrieval.evidence + prep["metadata_evidence"]
+    evidence_map = _evidence_map(citable)
     common = {"coverage": coverage, "limitations": retrieval.limitations}
     if not retrieval.evidence:
         where = "전체 문서" if request.mode == "corpus" else "선택한 문서"
@@ -1234,7 +1260,7 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
         return response
     represented = {c["doc_id"] for c in coverage if c.get("evidence")}
     try:
-        payload = _validated(res, response, retrieval, docs, represented if request.mode == "compare" else None)
+        payload = _validated(res, response, citable, docs, represented if request.mode == "compare" else None)
     except generation.TechnicalError as exc:
         trace["raw_output"] = (response.content or "")[:4000]
         return done("technical_error", "모델 응답을 검증하지 못했습니다. 비용은 기록되었으며 자동 재시도는 하지 않습니다.",
@@ -1298,14 +1324,19 @@ def _generate(res: Resources, principal: Principal, request_id: str, prep: dict,
         ceiling=frozen["estimate_micro_usd"] if frozen is not None else None, on_delta=streamed)
 
 
-def _validated(res: Resources, response, retrieval: RetrievalResult, docs: list[dict], required_doc_ids):
-    """The answer checked against the evidence it may cite, traced as the guardrail step; raises TechnicalError."""
-    stored = {e.evidence_id: _stored_quote(res, e) for e in retrieval.evidence}
+def _validated(res: Resources, response, evidence: list[EvidenceUnit], docs: list[dict], required_doc_ids):
+    """The answer checked against the evidence it may cite (passages and metadata units), traced as the guardrail
+    step; raises TechnicalError. A metadata unit's text must still be its document's statement in the stored
+    metadata now, as a passage's quote must still be its chunk in the index."""
+    current = {(u.doc_id, u.location["field"]): u.quote for u in metadata_evidence(
+        res, _doc_rows(res, [d["doc_id"] for d in docs]))} if any(_is_metadata(e) for e in evidence) else {}
+    stored = {e.evidence_id: current.get((e.doc_id, e.location.get("field"))) if _is_metadata(e)
+              else _stored_quote(res, e) for e in evidence}
     with tracing.step("validate-answer", "guardrail", input={
-            "allowed_evidence_ids": [e.evidence_id for e in retrieval.evidence],
+            "allowed_evidence_ids": [e.evidence_id for e in evidence],
             "allowed_doc_ids": sorted(d["doc_id"] for d in docs)}) as check:
         try:
-            payload = generation.validate_answer(response, retrieval.evidence, {d["doc_id"] for d in docs},
+            payload = generation.validate_answer(response, evidence, {d["doc_id"] for d in docs},
                                                  stored, required_doc_ids=required_doc_ids)
         except generation.TechnicalError as exc:
             check.update(output={"passed": False, "error": str(exc)[:300]}, level="ERROR",
@@ -1714,6 +1745,9 @@ def open_evidence(res: Resources, principal: Principal, request_id: str, evidenc
     if ev is None:
         raise ServiceError("요청에 없는 근거 ID입니다.")
     (doc,) = _doc_rows(res, [ev["doc_id"]])
+    if (ev.get("location") or {}).get("format") == "metadata":  # a metadata field, not a passage: no original
+        return EvidenceView(evidence_id, ev["doc_id"], doc["effective"]["title"], ev["quote"], [], ev["location"],
+                            doc["format"], False, ev["source_hash"], doc["review_status"])
     ordered = _ordered_elements(res, ev["extraction_id"])
     orders = {e["element_id"]: i for i, e in enumerate(ordered)}
     hit = [orders[i] for i in ev["element_ids"] if i in orders]

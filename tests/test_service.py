@@ -722,7 +722,9 @@ class ModesTest(Base):
         sides = {c["doc_id"]: c for c in r.coverage}
         self.assertGreaterEqual(sides[self.a.doc_id]["evidence"], 1)
         self.assertGreaterEqual(sides[self.d.doc_id]["evidence"], 1)
-        self.assertEqual(sorted(r.evidence), [f"E{i}" for i in range(1, len(r.evidence) + 1)])
+        passages = [e for e, ev in r.evidence.items() if ev["location"].get("format") != "metadata"]
+        self.assertEqual(sorted(passages), sorted(f"E{i}" for i in range(1, len(passages) + 1)))
+        self.assertEqual(len(r.evidence) - len(passages), 12)  # each side's six metadata units, M1-M12
         for side in sides.values():
             self.assertLessEqual(side["tokens"], self.settings.evidence_max_tokens)
         self.assertEqual({c["doc_id"] for c in r.claims}, {self.a.doc_id, self.d.doc_id})

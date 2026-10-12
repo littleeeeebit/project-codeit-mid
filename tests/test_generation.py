@@ -195,9 +195,10 @@ class SafetyTest(unittest.TestCase):
         self.assertEqual(validate([{"field": "f", "alternatives": [alt]}], None, "insufficient_evidence").status,
                          "insufficient_evidence")
 
-    def test_only_a_declared_absence_of_a_listed_missing_field_is_dropped(self):
+    def test_a_declared_absence_becomes_a_missing_field_of_its_document(self):
         # The owner's comparison: each side's absence was stated twice, as an uncited claim and a missing field. A
         # restatement is declared kind "absence"; text never decides it, so every uncited inference or fact fails.
+        # An absence is never shown: whatever its wording, it is listed as a missing field instead of failing the answer.
         ev = EvidenceUnit("E1", "A", "h", "x", "c", ["e"], "제안서 10부", {}, 5)
 
         def respond(claims, missing=()):
@@ -213,14 +214,24 @@ class SafetyTest(unittest.TestCase):
 
         fact = ("A는 제안서 10부를 요구한다", "source_fact", "A", ["E1"])
         absence = ("제안서  제출 부수", "absence", "B", [])  # exactly the listed field (whitespace aside)
+        def listed(payload):
+            return [(m.doc_id, m.field, m.reason) for m in payload.missing_fields]
+
         payload = validate(respond([fact, absence], missing=[("B", "제안서 제출 부수")]))
         self.assertEqual([c.text for c in payload.claims], [fact[0]])
-        for text, missing in (("B 문서의 예산은 충분하다", [("B", "일정")]),  # an assertion labelled absence
+        self.assertEqual(listed(payload), [("B", "제안서 제출 부수", "not_found_in_context")])  # no second entry
+        for text, missing in ((" Submission  copies:\nnot in the supplied passages ", []),  # nothing listed for B
+                              ("B 문서의 예산은 충분하다", [("B", "일정")]),  # an assertion labelled absence
                               ("B 문서의 예산은 충분하다", [("B", "예산")]),  # names the field, asserts more
                               ("B 문서에서는 제안서 제출 부수를 확인할 수 없다", [("B", "제안서 제출 부수")])):
-            with self.subTest(text=text, missing=missing), \
-                    self.assertRaisesRegex(generation.TechnicalError, "absence_not_listed"):
-                validate(respond([fact, (text, "absence", "B", [])], missing))
+            with self.subTest(text=text, missing=missing):
+                payload = validate(respond([fact, (text, "absence", "B", ["E1"]), (text, "absence", "B", [])],
+                                           missing))
+                self.assertEqual([c.text for c in payload.claims], [fact[0]])
+                self.assertEqual(listed(payload), [(d, f, "not_found_in_context") for d, f in missing]
+                                 + [("B", " ".join(text.split()), "not_found_in_context")])  # once, normalized
+        with self.assertRaisesRegex(generation.TechnicalError, "claim_outside_scope: C"):
+            validate(respond([fact, ("C의 예산", "absence", "C", [])]))  # an absence of a document out of scope
         for claims, missing in (
                 ([fact, absence[:1] + ("inference",) + absence[2:]], [("B", "제안서 제출 부수")]),  # undeclared
                 ([fact, ("B의 일정은 위험해 보인다", "inference", "B", [])], [("B", "예산")]),  # unrelated
@@ -229,10 +240,9 @@ class SafetyTest(unittest.TestCase):
             with self.subTest(claims=claims[1][0], missing=missing), \
                     self.assertRaisesRegex(generation.TechnicalError, "claim_without_evidence"):
                 validate(respond(claims, missing))
-        for missing in ([], [("A", "제안서 제출 부수")]):  # nothing listed for B
-            with self.subTest(missing=missing), \
-                    self.assertRaisesRegex(generation.TechnicalError, "absence_not_listed"):
-                validate(respond([fact, absence], missing))
+        payload = validate(respond([fact, absence], [("A", "제안서 제출 부수")]))  # listed for A, not for B
+        self.assertEqual(listed(payload), [("A", "제안서 제출 부수", "not_found_in_context"),
+                                           ("B", "제안서 제출 부수", "not_found_in_context")])
 
 
 class ApiKeyCheckTest(unittest.TestCase):
