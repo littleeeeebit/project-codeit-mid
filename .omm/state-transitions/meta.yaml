@@ -1,34 +1,34 @@
 created: 2026-10-04 13:34:51.920000+00:00
-updated: 2026-10-11 21:58:04.622000+00:00
-update_count: 58
+updated: 2026-10-12 02:27:27.760000+00:00
+update_count: 60
 last_field: diagram
-git_commit: 80caf0d6
-git_branch: corpus-metadata-filter-list-answers
+git_commit: f679ccb2
+git_branch: followup-absence-and-metadata-citations
 children:
 - attempt-billing
 - attempt-record
-- attempt-state
 - attempt-states
 - billing-attempt
 - billing-attempt-states
+- cancel-and-abandon
 - gateway-owner
 - gold-candidate
 - gold-candidate-states
 - interrupted
-- maintenance-run-status
+- maintenance-run
 - owner-reconcile
 - request-status
+- restart-recovery
 - running
 - serving-activation
 - source-review-states
 - update-fence
 - update-states
 prev_diagram: "graph TD\r\n  request-status[\"Request status\\nsrc/rfp_assistant/service/service.py\"\
-  ] -->|\"dispatch guard reads\"| attempt-billing[\"Attempt billing state\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  attempt-billing -->|\"billing_state in result\"| request-status\r\n  restart-recovery[\"\
-  Restart and shutdown recovery\\nsrc/rfp_assistant/service/service.py\"] -->|\"interrupt\
-  \ unfinished\"| request-status\r\n  restart-recovery -->|\"dispatching to unknown\"\
-  | attempt-billing\r\n  update-fence[\"Update fence\\nsrc/rfp_assistant/service/update.py\"\
-  ] -->|\"blocks admission\"| request-status\r\n  update-fence -->|\"blocks start\"\
-  | maintenance-run[\"Maintenance run status\\nsrc/rfp_assistant/storage/maintenance.py\"\
-  ]\r\n  attempt-billing -->|\"open work blocks update\"| update-fence"
+  ]\r\n  attempt-state[\"Ledger attempt state\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  maintenance-run-status[\"Maintenance run status\\nsrc/rfp_assistant/storage/maintenance.py\"\
+  ]\r\n  update-fence[\"Update fence\\nsrc/rfp_assistant/service/update.py\"]\r\n\
+  \  request-status -->|cancel refuses next dispatch| attempt-state\r\n  attempt-state\
+  \ -->|unknown blocks new calls| request-status\r\n  update-fence -->|refuses new\
+  \ admission| request-status\r\n  attempt-state -->|open attempts refuse update|\
+  \ update-fence\r\n  maintenance-run-status -->|live job refuses update| update-fence"

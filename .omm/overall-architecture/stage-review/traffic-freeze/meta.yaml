@@ -1,0 +1,9 @@
+created: 2026-10-12T02:27:24.313Z
+updated: 2026-10-12T02:27:24.314Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: traffic-freeze
+children: []
+parentPath:
+  - stage-review

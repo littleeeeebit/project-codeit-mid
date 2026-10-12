@@ -1,54 +1,46 @@
 created: 2026-10-05 03:34:17.912000+00:00
-updated: 2026-10-11T21:57:55.268Z
-update_count: 45
+updated: 2026-10-12 02:27:16.254000+00:00
+update_count: 47
 last_field: diagram
 kind: nested-class
 title: service-core
 children:
-  - answer-check
-  - answer-execution
-  - answer-pipeline
-  - answer-validation
-  - app-resources
-  - background-jobs
-  - conversation-context
-  - evidence-reader
-  - metadata-router
-  - metered-chat
-  - paid-answer
-  - paid-answer-path
-  - partials
-  - request-runner
-  - resources
-  - resources-owner
-  - serving-config
-  - session-binding
-  - submit
-  - submit-answer
-  - tracing
-  - update-fence
-  - update-watch
+- answer-check
+- answer-execution
+- answer-pipeline
+- answer-validation
+- app-resources
+- background-jobs
+- conversation-context
+- evidence-reader
+- key-sessions
+- metadata-listing
+- metadata-router
+- metered-chat
+- paid-answer
+- partials
+- request-runner
+- resources
+- resources-owner
+- serving-config
+- session-binding
+- submit
+- tracing
+- update-fence
+- update-watch
 parentPath: []
-prev_diagram: "graph TD\r
-
-  \  resources-owner[\"Process owner
-  Resources\\nsrc/rfp_assistant/service/service.py\"] -->|\"lazily creates\"|
-  request-runner[\"Bounded
-  RequestRunner\\nsrc/rfp_assistant/service/service.py\"]\r
-
-  \  submit-answer[\"submit_answer\\nsrc/rfp_assistant/service/service.py\"]
-  -->|\"try_admit, queued row\"| request-runner\r
-
-  \  request-runner -->|\"run_queued on worker\"| paid-answer[\"_paid_answer
-  pipeline\\nsrc/rfp_assistant/service/service.py\"]\r
-
-  \  paid-answer -->|\"rewrite and generation calls\"|
-  metered-chat[\"_metered_chat\\nsrc/rfp_assistant/service/service.py\"]\r
-
-  \  update-fence[\"Update fence\\nsrc/rfp_assistant/service/update.py\"]
-  -->|\"refuse new paid work\"| request-runner\r
-
-  \  update-fence -->|\"refuse new jobs\"| background-jobs[\"Background
-  jobs\\nsrc/rfp_assistant/service/service.py\"]\r
-
-  \  resources-owner -->|\"close joins threads\"| background-jobs"
+prev_diagram: "graph TD\r\n  resources-owner[\"Resources owner\\nsrc/rfp_assistant/service/service.py\"\
+  ]\r\n  submit-answer[\"submit_answer\\nsrc/rfp_assistant/service/service.py\"]\r\
+  \n  request-runner[\"RequestRunner\\nsrc/rfp_assistant/service/service.py\"]\r\n\
+  \  paid-answer-path[\"_paid_answer\\nsrc/rfp_assistant/service/service.py\"]\r\n\
+  \  metadata-router[\"Metadata listing router\\nsrc/rfp_assistant/service/metadata_answers.py\"\
+  ]\r\n  metered-chat[\"_metered_chat\\nsrc/rfp_assistant/service/service.py\"]\r\n\
+  \  background-jobs[\"Background jobs\\nsrc/rfp_assistant/service/service.py\"]\r\
+  \n  update-fence[\"Update fence\\nsrc/rfp_assistant/service/update.py\"]\r\n  resources-owner\
+  \ -->|creates on first use| request-runner\r\n  submit-answer -->|admit slot, enqueue\
+  \ id| request-runner\r\n  request-runner -->|run_queued executes| paid-answer-path\r\
+  \n  paid-answer-path -->|corpus questions first| metadata-router\r\n  paid-answer-path\
+  \ -->|rewrite and answer calls| metered-chat\r\n  metadata-router -->|translate,\
+  \ classify, describe| metered-chat\r\n  background-jobs -->|registered for join|\
+  \ resources-owner\r\n  update-fence -->|refuses new admission| submit-answer\r\n\
+  \  update-fence -->|refuses job start| background-jobs"

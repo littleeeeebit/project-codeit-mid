@@ -1,1 +1,1 @@
-`_finish` with the default `request_status`. This includes domain outcomes such as `answered`, `insufficient_evidence` and `ingestion_unavailable`, and also `budget_blocked`. A refusal by the ledger or the dispatch check completes the request with an explanation; it does not fail it.
+Every domain outcome stored by `_finish` with the default `request_status`: `answered`, `insufficient_evidence`, `conflicting_evidence`, `ingestion_unavailable` and `budget_blocked`. Domain status and execution status are separate fields. A `budget_blocked` answer is a completed request.

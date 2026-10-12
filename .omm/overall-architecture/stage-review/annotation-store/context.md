@@ -1,0 +1,1 @@
+Recorded decisions: a human sets the criteria and the AI expands them to more answers. Answers marked fine before a type existed are flagged for re-review. Counts appear in `release-report` as 'Human error analysis (not a sealed metric)' and never change a pass line.

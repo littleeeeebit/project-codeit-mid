@@ -1,0 +1,1 @@
+Verified float32 vectors keyed by payload hash, model, dimensions and prefix policy in pgvector (`embedding_payloads`), registered per index and model as embedding sets. Query vectors are cached the same way. Reranker scores are cached in `rerank_scores`, and finished comparison rows in `.runtime/compare/cells/`.

@@ -1,1 +1,0 @@
-`step_fidelity` checks every parsed HWP source that has no `fidelity_checks` row for its active extraction under the current `FIDELITY_VERSION`, skipping recovered sources. In practice that means the extractions ingest just created or changed. An `IngestionError` fails the step. This step needs the Windows Hancom printing setup.

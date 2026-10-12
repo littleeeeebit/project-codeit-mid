@@ -1,1 +1,1 @@
-`_create` inserts this state for paid modes after a runner slot is taken. Nothing has been dispatched yet. The request leaves `queued` through the `run_queued` claim, `cancel_request` (to `cancelled`, with the result 'no paid call'), `_fail_unscheduled` (to `failed`), or `RequestRunner.shutdown` or `recover_requests` (to `interrupted`).
+Inserted by `_create` after a runner slot was taken (`admitted` counts the slot before the row exists, which `open_paid_work` relies on). No paid call has happened yet. A cancel here is conclusive and free.

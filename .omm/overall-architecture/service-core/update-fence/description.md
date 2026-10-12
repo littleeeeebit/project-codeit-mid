@@ -1,1 +1,0 @@
-`Resources.update_fence` is bound to `UpdateWatch.fenced` by the API lifespan. `_refuse_while_updating` is called under `_runner_lock` in `RequestRunner.try_admit`, `_start_job` and `start_maintenance`. As a result, no new paid request or job starts once an update has been accepted or is in progress. See deployment-and-update for how the fence goes up and comes down.

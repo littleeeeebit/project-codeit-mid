@@ -16,11 +16,6 @@
       "lines": 84,
       "reason": "baseline at adoption"
     },
-    "review/src/lib/labels.ts": {
-      "dup": 6,
-      "lines": 43,
-      "reason": "review-ui-readable: the review app is a separate static build that never imports from web/, so it repeats web/src/lib/format.ts's fact-field and fact-state labels (FIELD, FACT_STATE) to show answer facts in Korean"
-    },
     "src/rfp_assistant/api.py": {
       "dup": 8,
       "lines": 1676,
@@ -68,7 +63,7 @@
     },
     "src/rfp_assistant/service/answers.py": {
       "dup": 0,
-      "lines": 1289,
+      "lines": 1288,
       "reason": "gpt5-mini-answer-embedding-comparison review round 1 F2/F3: 18 net measured lines retain the planned Holm family, withhold partial-population verdicts, and publish recorded per-row retrieval limits with only shared values marked fixed; focused statistical and comparison integration regressions cover these repairs; duplication allowance remains zero"
     },
     "src/rfp_assistant/service/service.py": {
@@ -90,11 +85,6 @@
       "dup": 6,
       "lines": 656,
       "reason": "baseline at adoption"
-    },
-    "web/src/lib/format.ts": {
-      "dup": 6,
-      "lines": 180,
-      "reason": "review-ui-readable: the other side of review/src/lib/labels.ts's FIELD and FACT_STATE copy; the two builds share no module"
     }
   },
   "new_file_max_lines": 800,

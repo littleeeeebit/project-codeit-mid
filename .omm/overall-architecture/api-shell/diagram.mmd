@@ -1,0 +1,5 @@
+graph TD
+  session-middleware["Session middleware\nsrc/rfp_assistant/api.py"] -->|"cookie to member name"| hub-login["JupyterHub OAuth login\nsrc/rfp_assistant/service/auth.py"]
+  session-middleware -->|"binds key, model, scope"| route-groups["Route groups\nsrc/rfp_assistant/api.py"]
+  route-groups -->|"status and update request"| update-watch["Update watch\nsrc/rfp_assistant/service/update.py"]
+  session-middleware -->|"non-/api paths pass"| static-export["Static screens\nweb/out"]

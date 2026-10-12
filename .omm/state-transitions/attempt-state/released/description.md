@@ -1,1 +1,0 @@
-The call was never sent. Causes: a dispatch-guard refusal (`stopped_before_dispatch:<reason>`), a missing provider or key (`provider_unavailable`), a confirmed pre-execution 4xx error, or restart recovery of a reserved row.

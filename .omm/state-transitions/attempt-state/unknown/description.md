@@ -1,1 +1,0 @@
-The call was dispatched but its outcome is unknown: a timeout, 5xx, connection loss, a stream that ended without usage, or a settlement exception. While any attempt is in this state, `mark_dispatching` refuses every new dispatch, `build-dense` refuses, and `open_paid_work` refuses updates. An operator resolves it with `settle_from_evidence` or `reconcile`.

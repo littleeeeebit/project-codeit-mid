@@ -1,0 +1,1 @@
+States of one `attempts` row (one paid provider call). `OPEN_STATES = reserved, dispatching, unknown` hold budget. Spent includes settled attempts plus adjustments, and pending includes open reservations. Every transition increments the ledger revision (`_bump`).

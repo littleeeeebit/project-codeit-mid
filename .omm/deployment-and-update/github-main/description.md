@@ -1,1 +1,0 @@
-`update.compare(running, fetch)` calls the public GitHub API for `littleeeeebit/project-codeit-mid` main without a token, at most two calls per 300 s poll. It returns how many commits main is ahead and up to 50 commit titles between the running commit (`service.build_head()` at startup) and main. Tests point `BIDMATE_UPDATE_GITHUB_API` at a stand-in server.

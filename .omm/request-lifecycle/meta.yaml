@@ -1,23 +1,25 @@
 created: 2026-10-04 13:34:48.815000+00:00
-updated: 2026-10-11 21:58:02.935000+00:00
-update_count: 60
+updated: 2026-10-12 02:27:25.887000+00:00
+update_count: 62
 last_field: diagram
-git_commit: 80caf0d6
-git_branch: corpus-metadata-filter-list-answers
+git_commit: f679ccb2
+git_branch: followup-absence-and-metadata-citations
 children:
 - answer-stream
 - answer-validation
 - ask-page
-- ask-screen
+- ask-route
 - ask-submit
 - cancellation
 - evidence-retrieval
-- execute-answer
+- finish-and-read
 - finish-record
 - finish-request
 - finish-step
+- follow-up-rewrite
 - generate
 - langfuse-tracing
+- metadata-route
 - metered-call
 - ownership-and-polling
 - paid-answer
@@ -26,12 +28,10 @@ children:
 - paid-call
 - persist-admit
 - poll-and-stream
-- request-record
-- request-runner
+- queued-worker
 - run-queued
 - screen-attachment
 - screen-poll
-- session-gate
 - status-poll
 - stream-and-poll
 - stream-poll
@@ -40,16 +40,16 @@ children:
 - turn-render
 - validate-and-finish
 - validation
-prev_diagram: "graph TD\r\n  ask-composer[\"Ask composer\\nweb/src/components/ask/ask-page.tsx\"\
-  ] -->|\"POST /api/ask\"| submit-admission[\"Validation and admission\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  submit-admission -->|\"queued row, executor\"| runner-worker[\"Runner worker\
-  \ claim\\nsrc/rfp_assistant/service/service.py\"]\r\n  runner-worker -->|\"follow-up\
-  \ only\"| query-rewrite[\"Standalone rewrite\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\n  runner-worker -->|\"scope and question\"| evidence-retrieval[\"Retrieval\
-  \ and pricing\\nsrc/rfp_assistant/service/service.py\"]\r\n  query-rewrite -->|\"\
-  rewritten question\"| evidence-retrieval\r\n  evidence-retrieval -->|\"messages,\
-  \ estimate\"| answer-generation[\"Metered streamed answer\\nsrc/rfp_assistant/service/service.py\"\
-  ]\r\n  answer-generation -->|\"structured output\"| answer-validation[\"Citation\
-  \ validation\\nsrc/rfp_assistant/gateway/generation.py\"]\r\n  answer-validation\
-  \ -->|\"result_json, billing\"| outcome-delivery[\"Poll, stream, attach\\nweb/src/lib/use-answer-stream.ts\"\
-  ]\r\n  answer-generation -->|\"partial text\"| outcome-delivery"
+prev_diagram: "graph TD\r\n  ask-screen[\"Ask screen\\nweb/src/components/ask/ask-page.tsx\"\
+  ]\r\n  session-gate[\"Session gate\\nsrc/rfp_assistant/api.py\"]\r\n  submit-answer[\"\
+  submit_answer\\nsrc/rfp_assistant/service/service.py\"]\r\n  request-runner[\"RequestRunner\\\
+  nsrc/rfp_assistant/service/service.py\"]\r\n  execute-answer[\"_execute_traced\\\
+  nsrc/rfp_assistant/service/service.py\"]\r\n  request-record[\"requests row\\nsrc/rfp_assistant/storage/store.py\"\
+  ]\r\n  answer-stream[\"Answer stream\\nweb/src/lib/use-answer-stream.ts\"]\r\n \
+  \ ask-screen -->|POST /api/ask| session-gate\r\n  session-gate -->|member key context\
+  \ bound| submit-answer\r\n  submit-answer -->|insert queued snapshot| request-record\r\
+  \n  submit-answer -->|admit and submit id| request-runner\r\n  request-runner -->|claim\
+  \ queued to running| execute-answer\r\n  execute-answer -->|partial text in memory|\
+  \ answer-stream\r\n  execute-answer -->|_finish stores outcome| request-record\r\
+  \n  ask-screen -->|poll GET request| request-record\r\n  answer-stream -->|done\
+  \ event triggers reload| ask-screen"

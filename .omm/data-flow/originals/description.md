@@ -1,0 +1,1 @@
+Originals in `원본 데이터/files` and the association list `data_list.csv`, ignored by Git (100 associations, 96 HWP and 4 PDF expected by `AUDIT_EXPECTED`; 98 active sources per the README). They are never modified. `GET /api/originals/{doc_id}/{source_hash}` downloads only managed pairs. Hancom prints for fidelity are kept in `.runtime/reviews/printed/`.

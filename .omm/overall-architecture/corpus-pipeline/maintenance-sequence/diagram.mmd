@@ -1,0 +1,8 @@
+graph TD
+  backup-restore["Backup and restore check\nmaintenance.step_backup"] -->|"verified dump first"| ingest-step["Ingest step\nmaintenance.step_ingest"]
+  ingest-step -->|"one original per job"| parse-worker["Parse child process\nmaintenance.ParseWorker"]
+  parse-worker -->|"result, error or kill"| ingest-step
+  ingest-step -->|"changed sources"| rebuild-steps["Fidelity, keyword, embedding\nmaintenance.step_keyword"]
+  rebuild-steps -->|"rebuilt index, vectors"| regression-step["Regression table\nmaintenance.step_regression"]
+  ingest-step -->|"per-file progress"| run-state["Run state and cancel\nmaintenance.run"]
+  regression-step -->|"report, unverified list"| run-state

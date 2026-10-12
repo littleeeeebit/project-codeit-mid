@@ -1,0 +1,1 @@
+`write_decision` records the chosen candidate (or none), a reason for each rejected one, and notes, as `.runtime/review/decisions/<run-id>.md` and `.json`. It copies a short prompt that points the coding agent at the file. An accepted retriever or chunking variant is reproduced with `compare` and `activate-run`. The variant file itself is not merged.

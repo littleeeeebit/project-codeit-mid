@@ -1,0 +1,1 @@
+`GET`/`PUT /api/settings/api-key` and `PUT /api/settings/model` for the member's own OpenAI key and answer model. `GET /api/budget` and `PUT /api/budget/limit` read and change the shared cumulative cap with a reason. The header also polls `/api/budget` and the update banner (`/api/update/status`, `POST /api/update`).

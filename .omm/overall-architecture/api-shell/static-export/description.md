@@ -1,0 +1,1 @@
+`StaticFiles(directory=web/out, html=True)` is mounted at `/` only when the export exists, so one process and one port serve both screens and API. The middleware passes non-`/api` paths through untouched, because the screens are public static files and only `/api/` carries the session.

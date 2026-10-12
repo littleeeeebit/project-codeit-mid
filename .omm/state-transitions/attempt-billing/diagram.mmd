@@ -1,0 +1,9 @@
+graph TD
+  reserved["Reserved\nbudget.reserve"] -->|"guard passes"| dispatching["Dispatching\nbudget.mark_dispatching"]
+  reserved -->|"guard refuses, no provider"| released["Released\nbudget.release"]
+  dispatching -->|"usage recorded"| settled["Settled\nbudget.settle"]
+  dispatching -->|"4xx before execution"| released
+  dispatching -->|"timeout, 5xx, no usage"| unknown["Unknown\nbudget.mark_unknown"]
+  unknown -->|"late usage evidence"| settled
+  unknown -->|"provider total import"| reconciled["Reconciled\nbudget.reconcile"]
+  reconciled -->|"late settlement offset"| settled

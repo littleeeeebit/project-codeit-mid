@@ -1,0 +1,1 @@
+A paid embedding (`step_embedding`) or a regression row stopped at its priced estimate. The person approves it (`compare --approve`) and reruns, and every finished step is reused.

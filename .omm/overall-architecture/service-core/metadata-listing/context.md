@@ -1,0 +1,1 @@
+The current branch `followup-absence-and-metadata-citations` makes a corpus follow-up keep the documents the previous answer cited only through metadata units. `prepare_answer` adds those documents to the prompt's document list, and `_with_carried` skips metadata units, so they are rebuilt from current values.

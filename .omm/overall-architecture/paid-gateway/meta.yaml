@@ -1,10 +1,11 @@
 created: 2026-10-05 04:06:18.173000+00:00
-updated: 2026-10-11 21:57:57.843000+00:00
-update_count: 46
+updated: 2026-10-12 02:27:19.012000+00:00
+update_count: 48
 last_field: diagram
 kind: nested-class
 title: paid-gateway
 children:
+- admission
 - answer-validation
 - budget-admission
 - budget-ledger
@@ -16,23 +17,24 @@ children:
 - key-sessions
 - langfuse-tracing
 - ledger
-- ledger-reservation
 - openai-transport
 - owner-ledger-cli
 - owner-reconciliation
 - provider-transport
 - reserve
 - settlement
+- startup-recovery
 - trace-export
 - tracing
 parentPath: []
-prev_diagram: "graph TD\r\n  gateway-owner[\"Gateway advisory lock\\nsrc/rfp_assistant/storage/postgres.py\"\
-  ] -->|\"owner_guard in each tx\"| budget-admission[\"Reservation admission\\nsrc/rfp_assistant/gateway/budget.py\"\
-  ]\r\n  budget-admission -->|\"reserved attempt\"| dispatch-marker[\"Dispatch marker\\\
-  nsrc/rfp_assistant/gateway/budget.py\"]\r\n  dispatch-marker -->|\"dispatching,\
-  \ then call\"| provider-transport[\"Provider transport\\nsrc/rfp_assistant/gateway/generation.py\"\
-  ]\r\n  provider-transport -->|\"usage or error\"| settlement[\"Settle, release,\
-  \ unknown\\nsrc/rfp_assistant/gateway/budget.py\"]\r\n  startup-recovery[\"Startup\
-  \ recovery\\nsrc/rfp_assistant/gateway/budget.py\"] -->|\"dispatching to unknown\"\
-  | settlement\r\n  provider-transport -->|\"generation spans\"| langfuse-tracing[\"\
-  Langfuse tracing\\nsrc/rfp_assistant/gateway/tracing.py\"]"
+prev_diagram: "graph TD\r\n  ledger-reservation[\"Reservation\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  dispatch-marker[\"Dispatch marker\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  openai-transport[\"OpenAI transport\\nsrc/rfp_assistant/gateway/generation.py\"\
+  ]\r\n  settlement[\"Settle, release, unknown\\nsrc/rfp_assistant/gateway/budget.py\"\
+  ]\r\n  gateway-owner[\"Gateway advisory lock\\nsrc/rfp_assistant/storage/postgres.py\"\
+  ]\r\n  langfuse-tracing[\"Langfuse tracing\\nsrc/rfp_assistant/gateway/tracing.py\"\
+  ]\r\n  ledger-reservation -->|attempt reserved| dispatch-marker\r\n  dispatch-marker\
+  \ -->|attempt dispatching| openai-transport\r\n  openai-transport -->|usage or provider\
+  \ error| settlement\r\n  gateway-owner -->|owner_guard in transaction| ledger-reservation\r\
+  \n  gateway-owner -->|owner_check before call| openai-transport\r\n  openai-transport\
+  \ -->|generation span| langfuse-tracing"

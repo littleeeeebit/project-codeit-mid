@@ -1,0 +1,1 @@
+The maximum cost (`max_cost` of input tokens plus maximum output at the recorded rates) is held against the cap and the envelope. At restart it becomes `released` ('never dispatched before restart').

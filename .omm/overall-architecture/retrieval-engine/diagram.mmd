@@ -1,14 +1,7 @@
 graph TD
-  active-serving["Activated serving config\nsrc/rfp_assistant/service/service.py"]
-  scope-routing["Scope and corpus routing\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  lexical-channel["Exact and Kiwi BM25\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  dense-channel["Dense search\nsrc/rfp_assistant/retrieval/dense.py"]
-  fusion-rerank["Fusion and rerank\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  evidence-packing["Evidence packing\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  active-serving -->|mode, limits, versions| scope-routing
-  scope-routing -->|allowed chunk rows| lexical-channel
-  scope-routing -->|allowed chunk rows| dense-channel
-  lexical-channel -->|no match skips dense| dense-channel
-  lexical-channel -->|BM25 and exact ranks| fusion-rerank
-  dense-channel -->|nearest neighbour ranks| fusion-rerank
-  fusion-rerank -->|ordered chunk ids| evidence-packing
+  corpus-routing["Corpus routing\nretrieval.route_corpus"] -->|"narrowed scope rows"| exact-codes["Requirement code match\nretrieval._exact_matches"]
+  exact-codes -->|"code hits first"| lexical-bm25["Kiwi BM25 channel\nretrieval._lexical_matches"]
+  lexical-bm25 -->|"gates dense in hybrid"| dense-search["pgvector search\nsrc/rfp_assistant/retrieval/vector_store.py"]
+  lexical-bm25 -->|"BM25 top-k ranks"| fusion-rerank["Fusion and rerank\nretrieval._candidates"]
+  dense-search -->|"cosine top-k ranks"| fusion-rerank
+  fusion-rerank -->|"ranked chunk rows"| evidence-packing["Evidence packing\nretrieval._pack_evidence"]

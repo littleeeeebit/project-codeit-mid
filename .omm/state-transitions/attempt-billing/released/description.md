@@ -1,0 +1,1 @@
+Provably not executed: refused before dispatch (`stopped_before_dispatch:<reason>`), no provider or key, or a 4xx raised before model execution (`confirmed_pre_execution`). Holds no budget.

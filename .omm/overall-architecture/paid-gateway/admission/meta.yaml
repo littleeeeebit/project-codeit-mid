@@ -1,0 +1,9 @@
+created: 2026-10-12T02:27:19.299Z
+updated: 2026-10-12T02:27:19.300Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: admission
+children: []
+parentPath:
+  - paid-gateway

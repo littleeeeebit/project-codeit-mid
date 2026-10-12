@@ -1,0 +1,9 @@
+created: 2026-10-12T02:27:13.903Z
+updated: 2026-10-12T02:27:13.904Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: answer-stream
+children: []
+parentPath:
+  - web-screens

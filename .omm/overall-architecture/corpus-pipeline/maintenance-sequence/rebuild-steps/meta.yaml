@@ -1,0 +1,10 @@
+created: 2026-10-12T02:27:22.920Z
+updated: 2026-10-12T02:27:22.921Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: rebuild-steps
+children: []
+parentPath:
+  - corpus-pipeline
+  - maintenance-sequence

@@ -1,1 +1,0 @@
-Inserted by `budget.reserve` with the maximum cost for the input tokens plus the maximum output tokens, at the ledger's rate snapshot. Restart recovery releases it because it was never dispatched.
