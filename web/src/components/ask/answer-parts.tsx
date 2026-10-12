@@ -5,7 +5,7 @@ import { AlertTriangle, Download, Info, OctagonX } from "lucide-react";
 import { cn } from "cn";
 import { type Answer, api, errorText, type Evidence, originalHref, type RequestView } from "@/lib/api";
 import {
-  BILLING, EVIDENCE_WARNING, FACT_STATE, FIELD, label, locationShort, locationText, METADATA_SOURCE, MISSING_REASON,
+  BILLING, EVIDENCE_WARNING, FACT_STATE, FIELD, label, locationShort, locationText, MISSING_REASON,
   REQUEST, REVIEW, STATUS, usd,
   when, won, wonShort,
 } from "@/lib/format";
@@ -13,6 +13,11 @@ import { must, usePoll } from "@/lib/use-poll";
 import { Section, Table, td } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
+
+/** Where a cited metadata value comes from (`location.source` of a metadata citation). */
+const METADATA_SOURCE: Record<string, string> = {
+  csv: "CSV 기본 정보", resolution: "검토자 정정", classification: "기관 유형 분류",
+};
 
 /** Which selected document (1 or 2) a claim belongs to, in a comparison. */
 export function docLabel(a: Answer, docId: string): string {

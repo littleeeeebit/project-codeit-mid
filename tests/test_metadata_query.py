@@ -706,7 +706,7 @@ QUESTION_TYPES = {"highest": "예산 규모가 제일 큰 사업 세 개만 뽑�
 ABSENCES = ("Contract period: not in the supplied passages", "Nothing supplied gives  the submission deadline")
 
 
-class ListFollowUpTest(unittest.TestCase):
+class ListFollowUpTest(Base):
     """Generated two-turn conversations: a listing, then a follow-up about the project it listed first. Every project
     has its own indexed original, so the follow-up's prompt holds the project's passages and its metadata units."""
 
@@ -727,15 +727,6 @@ class ListFollowUpTest(unittest.TestCase):
         self.transport = generation.FakeTransport(structured={"metadata_query": translator,
                                                               "institution_types": classifier})
         self.res = service.Resources(self.env.settings, transport=self.transport)
-
-    def tearDown(self):
-        self.res.close()
-        self.tmp.cleanup()
-
-    def ask(self, question, previous=""):
-        return service.answer(self.res, self.env.consultant, AnswerRequest(
-            idempotency_key=str(uuid.uuid4()), generation_id="g", question=question, scope=[], mode="corpus",
-            as_of=AS_OF, previous_request_id=previous))
 
     def test_a_follow_up_about_a_listed_project_restates_its_amount_from_metadata(self):
         self.assertTrue(set(QUESTION_TYPES.values()) <= set(PINNED))

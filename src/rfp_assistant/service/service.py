@@ -24,13 +24,12 @@ from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
-from . import auth, metadata_query
+from . import auth, metadata_answers  # metadata_answers imports this module back; both use the other only in calls
 from ..gateway import budget, generation, tracing
 from ..corpus import fidelity
 from ..evaluation import gold
 from ..storage import postgres
 from ..retrieval import dense as dense_mod
-from ..retrieval.chunking import count_tokens
 from .auth import require_any
 from ..contracts import (AnswerRequest, AnswerResult, BudgetSnapshot, DocRef, EvidenceUnit, EvidenceView,
                         ManagedDownload, Principal, RequestView, RetrievalResult, TERMINAL_STATUSES)
@@ -819,7 +818,7 @@ def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retriev
             mode: str, price_query_embedding: bool = True, conversation: list[dict] | None = None) -> dict:
     with tracing.step("assemble-evidence", input={"question": question, "as_of": as_of, "mode": mode,
                                                   "doc_ids": [d["doc_id"] for d in docs]}) as packed:
-        meta = metadata_evidence(res, docs)
+        meta = metadata_answers.evidence_units(res, docs)
         messages = generation.build_messages(question, as_of, [_doc_brief(d) for d in docs], retrieval.evidence + meta,
                                              retrieval.limitations, mode=mode, conversation=conversation)
         rf = generation.answer_json_schema()
@@ -845,26 +844,6 @@ def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retriev
         est = None
     return {"retrieval": retrieval, "messages": messages, "response_format": rf, "input_tokens": tokens,
             "estimate_micro_usd": est, "docs": docs, "metadata_evidence": meta}
-
-
-def metadata_evidence(res: Resources, docs: list[dict]) -> list[EvidenceUnit]:
-    """The citable metadata units of the documents in an answer prompt, M1, M2, ... in document order: one per typed
-    field (`metadata_query.metadata_statements`), from the effective metadata. A unit has no chunk: validation
-    compares its text with the document's current statement, as a passage's with the index."""
-    from .metadata_answers import _institution_types
-
-    types = _institution_types(res) if docs else {}
-    units: list[EvidenceUnit] = []
-    for d in docs:
-        for s in metadata_query.metadata_statements(d, types):
-            units.append(EvidenceUnit(f"M{len(units) + 1}", d["doc_id"], d["active_source_hash"], "", "", [], s["text"],
-                                      {"format": "metadata", "field": s["field"], "value": s["value"],
-                                       "source": s["source"]}, count_tokens(s["text"])))
-    return units
-
-
-def _is_metadata(e: EvidenceUnit) -> bool:
-    return (e.location or {}).get("format") == "metadata"
 
 
 def _doc_brief(d: dict) -> dict:
@@ -994,7 +973,7 @@ def _conversation(res: Resources, principal: Principal,
                 units = result.get("evidence") or {}
                 # metadata units are never carried: every document of the follow-up's prompt gets current ones
                 carried = [e for e in (EvidenceUnit(**units[i]) for i in _cited_ids(result) if i in units)
-                           if not _is_metadata(e)][:CARRIED_EVIDENCE]
+                           if not metadata_answers.is_unit(e)][:CARRIED_EVIDENCE]
             limit = LATEST_ANSWER_CHARACTERS if not turns else CONVERSATION_ANSWER_CHARACTERS
             turns.append({"question": result.get("standalone_question") or snap.get("question")
                           or FREE_TURNS.get(snap.get("mode"), ""),
@@ -1226,8 +1205,6 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
         done = functools.partial(done, standalone_question=question)
         principal = _checkpoint(res, request_id, principal)
     if request.mode == "corpus" and frozen is None:  # a metadata question lists every match, never top-k passages
-        from . import metadata_answers
-
         listed = metadata_answers.route(res, principal, request_id, request, question, trace, done)
         if listed is not None:
             return listed
@@ -1328,10 +1305,9 @@ def _validated(res: Resources, response, evidence: list[EvidenceUnit], docs: lis
     """The answer checked against the evidence it may cite (passages and metadata units), traced as the guardrail
     step; raises TechnicalError. A metadata unit's text must still be its document's statement in the stored
     metadata now, as a passage's quote must still be its chunk in the index."""
-    current = {(u.doc_id, u.location["field"]): u.quote for u in metadata_evidence(
-        res, _doc_rows(res, [d["doc_id"] for d in docs]))} if any(_is_metadata(e) for e in evidence) else {}
-    stored = {e.evidence_id: current.get((e.doc_id, e.location.get("field"))) if _is_metadata(e)
-              else _stored_quote(res, e) for e in evidence}
+    current = metadata_answers.current_statements(res, evidence, docs)
+    stored = {e.evidence_id: current[e.evidence_id] if e.evidence_id in current else _stored_quote(res, e)
+              for e in evidence}
     with tracing.step("validate-answer", "guardrail", input={
             "allowed_evidence_ids": [e.evidence_id for e in evidence],
             "allowed_doc_ids": sorted(d["doc_id"] for d in docs)}) as check:

@@ -540,9 +540,7 @@ def _link_validity(pinned: PinnedResources, request_id: str, result: dict, row: 
     hashes = {s["source_hash"] for s in row.get("scope") or []}
     out = {}
     for claim in result.get("claims") or []:
-        for eid in claim.get("evidence_ids") or []:
-            if eid in out:
-                continue
+        for eid in [e for e in claim.get("evidence_ids") or [] if e not in out]:
             try:
                 view = service.open_evidence(pinned, _principal(), request_id, eid)
                 out[eid] = view.source_hash in hashes and (view.location.get("format") == "metadata"

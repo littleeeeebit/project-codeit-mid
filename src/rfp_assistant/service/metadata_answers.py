@@ -1,6 +1,7 @@
 """Corpus metadata questions answered over metadata: the model's query translation, institution-type classification,
 the deterministic query (`metadata_query`) and one cited description line per matched project, each a Langfuse span
-and each paid call reserved in the shared ledger before it is sent. The service's answer path calls `route`."""
+and each paid call reserved in the shared ledger before it is sent. The service's answer path calls `route`, and takes
+every answer prompt's citable metadata units from `evidence_units`."""
 
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ from . import metadata_query as mq
 from . import service
 from ..contracts import AnswerRequest, AnswerResult, EvidenceUnit, Principal
 from ..gateway import budget, generation, tracing
+from ..retrieval.chunking import count_tokens
 from ..storage.store import open_db, tx, utcnow
 
 QUERY_MAX_OUTPUT_TOKENS = 2000  # reasoning included; the output is one small query object
@@ -110,6 +112,34 @@ def _listing_row(row: dict, described: dict, units: dict, count_only: bool) -> d
 def _institution_types(res: service.Resources) -> dict[str, dict]:
     with open_db(res.settings.db_path) as conn:
         return {r["institution"]: dict(r) for r in conn.execute("SELECT * FROM institution_types")}
+
+
+def evidence_units(res: service.Resources, docs: list[dict]) -> list[EvidenceUnit]:
+    """The citable metadata units of the documents in an answer prompt, M1, M2, ... in document order: one per typed
+    field (`metadata_query.metadata_statements`), from the effective metadata. A unit has no chunk: validation
+    compares its text with the document's current statement (`current_statements`), as a passage's with the index."""
+    types = _institution_types(res) if docs else {}
+    units: list[EvidenceUnit] = []
+    for d in docs:
+        for s in mq.metadata_statements(d, types):
+            units.append(EvidenceUnit(f"M{len(units) + 1}", d["doc_id"], d["active_source_hash"], "", "", [], s["text"],
+                                      {"format": "metadata", "field": s["field"], "value": s["value"],
+                                       "source": s["source"]}, count_tokens(s["text"])))
+    return units
+
+
+def is_unit(e: EvidenceUnit) -> bool:
+    return (e.location or {}).get("format") == "metadata"
+
+
+def current_statements(res: service.Resources, evidence: list[EvidenceUnit], docs: list[dict]) -> dict[str, str | None]:
+    """Each metadata unit of `evidence` by ID: its document's statement of that field in the stored metadata now."""
+    units = [e for e in evidence if is_unit(e)]
+    if not units:
+        return {}
+    now = {(u.doc_id, u.location["field"]): u.quote
+           for u in evidence_units(res, service._doc_rows(res, [d["doc_id"] for d in docs]))}
+    return {e.evidence_id: now.get((e.doc_id, e.location["field"])) for e in units}
 
 
 def _classify_institutions(res: service.Resources, principal: Principal, request_id: str, names: list[str],

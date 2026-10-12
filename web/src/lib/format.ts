@@ -57,11 +57,6 @@ export const FIELD: Record<string, string> = {
   published_at: "공개 일자", bid_start: "입찰 시작", bid_close: "입찰 마감", institution_type: "기관 유형",
 };
 
-/** Where a cited metadata value comes from (`location.source` of a metadata citation). */
-export const METADATA_SOURCE: Record<string, string> = {
-  csv: "CSV 기본 정보", resolution: "검토자 정정", classification: "기관 유형 분류",
-};
-
 export const FACT_STATE: Record<string, string> = {
   known: "기록됨", unknown: "값 없음", conflict: "충돌(원문 확인 필요)", zero_review: "0원(검토 필요)",
   resolved: "검토자 확인값",
