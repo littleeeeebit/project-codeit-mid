@@ -1,1 +1,1 @@
-The prompt version is `generation.PROMPT_VERSION = grounded-answer-13`. The rewrite uses `REWRITE_PROMPT_VERSION` and `validate_rewrite`.
+The prompt version is `generation.PROMPT_VERSION = grounded-answer-14`. Citable evidence is passages (`E`) plus each prompt document's metadata units (`M`, `service.metadata_evidence`); an `absence` claim becomes a missing field. The rewrite uses `REWRITE_PROMPT_VERSION` and `validate_rewrite`.
