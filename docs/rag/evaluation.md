@@ -45,6 +45,18 @@ Every evaluation reads the same `gold-2` row; there are no per-evaluation copies
 
 `row_evaluations` lists, for each row, the evaluations it belongs to and the required fields it lacks for each one. It also gives the answer state and the review level, and both come only from recorded fields. The answer is `approved` only when the review records `answer_approved` (set by `gold decide --answer-approved`). Any other present `expected_answer` is a `draft`. Every row from before this field reports a draft answer. A reviewer's kind (`ai` or `human`) comes from `gold decide` / `gold second-review --reviewer-kind`. A row without it reports `unrecorded` and is never shown as AI- or human-reviewed. Reviewer names are not evidence of either. The drafter's kind comes from `generation_provenance.method`.
 
+### Verifying a gold-2 change before merge
+
+codeit runs only merged code, so a gold-2 change cannot be checked there before its merge, and SSH to codeit is no evidence for an open PR. The pre-merge evidence is local and fixed: `python -B tools/verify.py gold-contract`, with `RFP_SOURCE_DIR`, `RFP_DATA_DIR` and `RFP_DATABASE_DSN` set to the configured corpus (in the verification service's `env_file`, or in the process environment for a manual run). A change to the gold-2 validator, the review queue, the release report or `gold_reviews` is not ready for review until this flow passes on its head. The flow:
+
+1. Runs the gold-2 validator, review-queue and sealed tests on isolated test databases.
+2. Copies into a private test database exactly what the report reads from the configured database: sources, documents, the gold queue and review log, and every element of each extraction the dev rows name. A full dump of the corpus outlasts the restore limit. It also copies (never links) `datasets/`, because validation writes `dev.validation.json` beside the dataset.
+3. Produces the dev report twice on that copy, once with the merge base's code (a temporary `git worktree`) and once with the head. The legacy report (`ok`, label, targets, answerability, positions, rejected rows, errors) must be identical. This is what "existing errors and label unchanged" means, whatever state the local extractions are in.
+4. Checks the head's three judgments against a recount of the dataset file and against the merge base's frozen state.
+5. Hashes every file under the configured `datasets/` before and after; any change fails the flow.
+
+Never run `validate-gold` on the live data directory to check a change. The CLI first runs `assign_families`, which rewrites `families.json` and turns a frozen manifest's family map stale.
+
 ## Negative coverage minimum (proposal, not adopted)
 
 No Negative minimum is adopted, and the code slot `NEGATIVE_COVERAGE_POLICY` stays empty. This section is a proposal for the owner to decide.

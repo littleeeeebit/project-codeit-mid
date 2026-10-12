@@ -594,6 +594,141 @@ def evaluation_release(ctx: Context) -> dict:
     return {"gold-and-answers": gold_answers, "backup-and-report": release_tests, "cli-walkthrough": walk}
 
 
+GOLD_LEGACY_KEYS = ("ok", "rows", "dataset_sha256", "label", "targets", "metadata_stratum", "answerability",
+                    "source_positions", "rejected_rows", "errors")
+
+
+def tree_sha(root: Path) -> dict[str, str]:
+    return {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in sorted(root.rglob("*")) if p.is_file()} if root.is_dir() else {}
+
+
+def merge_base() -> str:
+    for ref in ("origin/main", "main"):
+        out = subprocess.run(["git", "merge-base", "HEAD", ref], cwd=REPO, capture_output=True, text=True)
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    raise RuntimeError("no merge base with origin/main or main to compare the gold report against")
+
+
+def gold_database_copy(source_dsn: str, rows: list[dict]) -> str:
+    """DSN of a private test database holding the application schema and only what the gold report reads: sources,
+    documents, the gold queue and review log, and every element of each extraction the dev rows name. A full dump
+    of the corpus (chunks, vectors, 400k+ elements) outlasts the restore limit; nothing else is looked up."""
+    from psycopg import sql
+    from tests import fixtures
+
+    extractions = sorted({x for r in rows for x in [s.get("extraction_id") for s in r.get("scope") or []]
+                          + [a.get("extraction_id") for g in r.get("evidence_groups") or [] for a in g.get("alternatives") or []]
+                          if x})
+    target = os.environ[fixtures.database(ready=True)]
+    only = sql.SQL(" WHERE extraction_id = ANY({})").format(sql.Literal(extractions))
+    with psycopg.connect(source_dsn) as src, psycopg.connect(target) as dst:
+        for table, where in (("sources", sql.SQL("")), ("extractions", only), ("documents", sql.SQL("")),
+                             ("elements", only), ("gold_candidates", sql.SQL("")), ("gold_reviews", sql.SQL(""))):
+            columns = lambda conn: [r[0] for r in conn.execute(  # noqa: E731
+                "SELECT column_name FROM information_schema.columns WHERE table_name = %s ORDER BY ordinal_position",
+                (table,))]
+            shared = sql.SQL(", ").join(map(sql.Identifier, [c for c in columns(src) if c in set(columns(dst))]))
+            with src.cursor().copy(sql.SQL("COPY (SELECT {} FROM {}{}) TO STDOUT").format(
+                    shared, sql.Identifier(table), where)) as out, dst.cursor().copy(
+                    sql.SQL("COPY {} ({}) FROM STDIN").format(sql.Identifier(table), shared)) as into:
+                for block in out:
+                    into.write(block)
+    return target
+
+
+def gold_report(ctx: Context, name: str, code_src: Path, datasets: Path, dsn: str, init: bool) -> dict | None:
+    """The dev report `code_src` produces on a private copy of `datasets` (copied, never linked: validation writes
+    dev.validation.json beside the dataset) and the database copy `dsn`."""
+    data = ctx.work / name
+    shutil.copytree(datasets, data / "datasets")
+    out = ctx.work / f"{name}.json"
+    code, _ = ctx.run(name, [ctx.python, "-B", str(REPO / "tools" / "verification" / "gold_contract.py"), str(data),
+                             dsn, str(out), *(["--init"] if init else [])], 600,
+                      env={**ctx.env, "PYTHONPATH": str(code_src)})
+    return json.loads(out.read_text(encoding="utf-8")) if code == 0 and out.exists() else None
+
+
+def gold_judgments(head: dict, base: dict, rows: list[dict]) -> list[str]:
+    """Where the head's three judgments disagree with the dataset file or with the merge base."""
+    cov, problems = head.get("coverage") or {}, []
+    if not all(k in head for k in ("validity", "coverage", "frozen", "row_evaluations")):
+        return ["a validity, coverage, frozen or row_evaluations section is missing"]
+    if head["validity"] != {"ok": head["ok"], "errors": len(head["errors"]), "rejected_rows": len(head["rejected_rows"])}:
+        problems.append("validity disagrees with ok/errors/rejected_rows")
+    answerability = {a: sum(r.get("answerability") == a for r in rows) for a in cov["answerability"]}
+    premise = sum(r.get("question_type") == "missing_false_premise" and r.get("answerability") == "answerable"
+                  for r in rows)
+    if (cov["rows"], cov["answerability"]) != (len(rows), answerability):
+        problems.append(f"coverage counts {cov['answerability']} differ from the file {answerability}")
+    if (cov["premise_refutation_answerable"], cov["negative"]["unanswerable"]) != (premise, answerability["unanswerable"]):
+        problems.append("premise refutations are not counted apart from unanswerable rows")
+    if cov["negative"]["policy"] == "unset" and (cov["sufficiency"] != "undecided"
+                                                 or not any("policy unset" in g for g in cov["gaps"])):
+        problems.append(f"policy unset but sufficiency {cov['sufficiency']}")
+    if head["frozen"].get("frozen") and head["frozen"].get("current") != base.get("frozen_dataset_current"):
+        problems.append("frozen state differs from the merge base's frozen_dataset")
+    if len(head["row_evaluations"]) != len(rows):
+        problems.append("row_evaluations does not list every row")
+    kinds = sum(bool((r.get("review") or {}).get("reviewer_kind")) for r in rows)
+    if sum(d["review"]["reviewer"] in ("ai", "human") for d in head["row_evaluations"]) != kinds:
+        problems.append("a reviewer kind is shown that the row does not record")
+    if cov["answers"]["approved"] > sum((r.get("review") or {}).get("answer_approved") is True for r in rows):
+        problems.append("an answer is shown approved without a recorded approval")
+    return problems
+
+
+@flow("gold-contract")
+def gold_contract(ctx: Context) -> dict:
+    """The gold-2 tests, then the dev report on an isolated copy of the configured corpus: the head against the merge
+    base's code on the same copy, and the configured runtime's dataset files byte-identical afterwards. Pre-merge
+    evidence for gold changes: codeit only runs merged code."""
+    unit = ctx.unit("gold-tests", ["tests.test_evaluation.ValidatorTest", "tests.test_evaluation.GoldQueueTest",
+                                   "tests.test_evaluation.SealedTest"])
+    data, dsn = ctx.config.get("RFP_DATA_DIR"), ctx.config.get("RFP_DATABASE_DSN")
+    real = Path(data).resolve() / "datasets" if data else None
+    if not dsn or real is None or not (real / "dev.jsonl").is_file():
+        if os.environ.get("WIKI_VERIFICATION_ENVIRONMENT"):
+            raise RuntimeError("gold-contract needs RFP_DATA_DIR (holding datasets/dev.jsonl) and RFP_DATABASE_DSN "
+                               "in the env_file (copied to .env)")
+        need = (False, "needs a configured corpus: RFP_DATA_DIR holding datasets/dev.jsonl and RFP_DATABASE_DSN")
+        return {"gold-unit": unit, "legacy-unchanged": need, "three-judgments": need, "runtime-untouched": need}
+    origin = ctx.config_source.get("RFP_DATA_DIR")
+    before = tree_sha(real)
+    rows = [json.loads(line) for line in (real / "dev.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    copy = gold_database_copy(dsn, rows)
+    base_sha, wt = merge_base(), ctx.work / "base-code"
+    ctx.run("base-worktree", ["git", "worktree", "add", "--detach", str(wt), base_sha], 120)
+    try:
+        base = gold_report(ctx, "gold-base", wt / "src", real, copy, init=False)
+    finally:
+        ctx.run("base-worktree-remove", ["git", "worktree", "remove", "--force", str(wt)], 120)
+    head = gold_report(ctx, "gold-head", REPO / "src", real, copy, init=True)
+    corpus = {"kind": f"configured corpus from {origin} (isolated copy)"}
+    if head is None or base is None:
+        missing = (False, f"no report from {'the head' if head is None else 'the merge base ' + base_sha[:12]}")
+        return {"gold-unit": unit, "legacy-unchanged": missing, "three-judgments": missing,
+                "runtime-untouched": (tree_sha(real) == before, "dataset files compared byte for byte")}
+    differ = [k for k in GOLD_LEGACY_KEYS if head[k] != base[k]]
+    legacy = (not differ, f"{corpus['kind']}: against merge base {base_sha[:12]}: "
+                          f"{'differs in ' + ', '.join(differ) if differ else 'identical'} "
+                          f"(ok {head['ok']}, label {head['label']}, {len(head['errors'])} errors)")
+    problems, cov = gold_judgments(head, base, rows), head.get("coverage") or {}
+    negative = cov.get("negative") or {}
+    judgments = (not problems, f"{len(rows)} rows: unanswerable {negative.get('unanswerable')}, ambiguous "
+                               f"{negative.get('ambiguous')}, conflicting {negative.get('conflicting')}, "
+                               f"premise-refutation answerable {cov.get('premise_refutation_answerable')}; policy "
+                               f"{negative.get('policy')}, sufficiency {cov.get('sufficiency')}; frozen "
+                               f"{head.get('frozen')}; reviewer kinds {cov.get('reviewer_kind')}; answers "
+                               f"{cov.get('answers')}" + (f"; PROBLEMS: {'; '.join(problems)}" if problems else ""))
+    after = tree_sha(real)
+    changed = sorted(k for k in before.keys() | after.keys() if before.get(k) != after.get(k))
+    untouched = (not changed, f"{len(before)} files under the configured datasets/ byte-identical"
+                 if not changed else f"changed: {changed}")
+    return {"gold-unit": unit, "legacy-unchanged": legacy, "three-judgments": judgments, "runtime-untouched": untouched}
+
+
 @flow("stage-review")
 def stage_review(ctx: Context) -> dict:
     """The run-folder contract tests, then review/server.py itself serving a fixture run (no database or npm)."""
