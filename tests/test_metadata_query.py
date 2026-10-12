@@ -680,6 +680,24 @@ class MetadataCitationTest(Base):
         self.assertEqual((view.quote, view.context, view.download_available, view.location["format"]),
                          ("사업 금액: 130,000,000원", [], False, "metadata"))
 
+    def test_a_corpus_follow_up_keeps_a_document_its_previous_answer_cited_only_by_metadata(self):
+        def as_asked(messages):  # the follow-up as its own query: fresh retrieval finds only D's passages
+            return reply({"query": json.loads(messages[-1]["content"])["follow_up"]}, messages)
+        self.transport.rewriter = as_asked
+        self.transport.responder = cite_metadata(self.a.doc_id, "amount_krw")
+        previous = self.ask("하자보수 기간")
+        for turn in (2, 3):
+            with self.subTest(turn=turn):
+                r = self.ask("도서관 좌석 예약 시스템", previous=previous.request_id)
+                self.assertEqual(r.status, "answered", r.error)
+                messages = [c for c in self.transport.calls if c["kind"] == "answer"][-1]["messages"]
+                passages = [e for e in json.loads(messages[-1]["content"])["evidence"]
+                            if e["location"].get("format") != "metadata"]
+                self.assertEqual({e["doc_id"] for e in passages}, {self.d.doc_id})
+                self.assertEqual([r.evidence[i]["quote"] for i in r.claims[0]["evidence_ids"]],
+                                 ["사업 금액: 130,000,000원"])
+                previous = r
+
     def test_a_metadata_unit_of_another_document_is_a_scope_mismatch(self):
         self.transport.responder = cite_metadata(self.d.doc_id, "amount_krw", claim_doc=self.a.doc_id)
         r = self.scoped([self.a, self.d], "compare")

@@ -778,7 +778,8 @@ def prepare_answer(res: Resources, principal: Principal, question: str, scope: l
                    carried: list[EvidenceUnit] = ()) -> dict:
     """Retrieval plus exact prompt counting and the maximum reservation estimate. Free unless `allow_paid`
     lets a dense mode pay for an uncached query embedding. `mode`/`limits` come from a frozen verifier
-    configuration. With `all_documents` the prompt names only the documents whose passages were retrieved.
+    configuration. With `all_documents` the prompt names only the documents whose passages were retrieved or carried,
+    or whose metadata the previous answer cited.
     A follow-up passes its `conversation` and the previous answer's `carried` evidence (`_with_carried`)."""
     principal = _authorize(res, principal, "consultant", "verifier")
     if all_documents:
@@ -786,10 +787,10 @@ def prepare_answer(res: Resources, principal: Principal, question: str, scope: l
                              limits=limits, all_documents=True)
         retrieval = _with_carried(res, retrieval, carried)
         cited = [e.doc_id for e in retrieval.evidence]
-        order = list(dict.fromkeys(cited))
+        order = list(dict.fromkeys(cited + [e.doc_id for e in carried if metadata_answers.is_unit(e)]))
         docs = sorted(_doc_rows(res, order), key=lambda d: order.index(d["doc_id"]))
         prep = _priced(res, question, as_of, docs, retrieval, "corpus", conversation=conversation)
-        prep["coverage"] = [{"doc_id": d, "evidence": cited.count(d)} for d in order]
+        prep["coverage"] = [{"doc_id": d, "evidence": cited.count(d)} for d in dict.fromkeys(cited)]
         return prep
     docs = _resolve_scope(res, scope)
     retrieval = retrieve(res, principal, question, scope, request_id=request_id, allow_paid=allow_paid, mode=mode,
@@ -802,10 +803,10 @@ def _with_carried(res: Resources, retrieval: RetrievalResult, carried: list[Evid
                   doc_ids: set[str] | None = None) -> RetrievalResult:
     """A follow-up's evidence: the fresh retrieval first, then the previous answer's cited units it lacks, renumbered
     after it, so restating that answer can cite every fact again. A unit whose chunk left the serving index is
-    dropped: its quote could no longer be checked."""
+    dropped: its quote could no longer be checked. Metadata units are not passages: their documents get current ones."""
     have = {e.chunk_id for e in retrieval.evidence}
-    extra = [e for e in carried if e.chunk_id not in have and (doc_ids is None or e.doc_id in doc_ids)
-             and _stored_quote(res, e) is not None]
+    extra = [e for e in carried if not metadata_answers.is_unit(e) and e.chunk_id not in have
+             and (doc_ids is None or e.doc_id in doc_ids) and _stored_quote(res, e) is not None]
     if not extra:
         return retrieval
     n = len(retrieval.evidence)
@@ -971,9 +972,10 @@ def _conversation(res: Resources, principal: Principal,
             snap, result = json.loads(row["request_json"]), _stored_result(conn, previous, row["result_json"]) or {}
             if not turns:
                 units = result.get("evidence") or {}
-                # metadata units are never carried: every document of the follow-up's prompt gets current ones
-                carried = [e for e in (EvidenceUnit(**units[i]) for i in _cited_ids(result) if i in units)
-                           if not metadata_answers.is_unit(e)][:CARRIED_EVIDENCE]
+                cited = [EvidenceUnit(**units[i]) for i in _cited_ids(result) if i in units]
+                # a cited metadata unit carries only its document, whose units the follow-up rebuilds from current values
+                carried = ([e for e in cited if not metadata_answers.is_unit(e)][:CARRIED_EVIDENCE]
+                           + [e for e in cited if metadata_answers.is_unit(e)])
             limit = LATEST_ANSWER_CHARACTERS if not turns else CONVERSATION_ANSWER_CHARACTERS
             turns.append({"question": result.get("standalone_question") or snap.get("question")
                           or FREE_TURNS.get(snap.get("mode"), ""),
