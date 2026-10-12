@@ -58,6 +58,28 @@ Most questions must demand more than copying a sentence. Difficulty must still b
 
 This is a schema illustration, not an accepted gold row. Use `answerable`, `unanswerable`, `ambiguous`, and `conflicting` according to the available originals and permitted scope. Store required evidence alternatives when more than one passage supports the same fact. Do not make mutable chunk IDs the only evidence labels.
 
+## Outside gold-2
+
+Two answer behaviours the service now has cannot be expressed as a `gold-2` row. Gold-2 scopes one or two documents (the validator refuses anything else), and every row is one standalone question with no conversation-history field. Their gold rows are not implemented. This section records the gap, the scenarios a benchmark would need and a minimal extension.
+
+- All-document metadata list answers (PR #45). In all-documents mode, a metadata question such as a budget or institution filter lists every matching project, each with a one-line cited description. A one-document `metadata` row with `expected_states` cannot say "these projects and no others".
+- Follow-up turns (PR #46). A follow-up is rewritten into a standalone question: it resolves a reference such as "그 사업" and restates the earlier answer's facts with citations, metadata evidence included. Gold-2 has no prior turn to resolve against.
+
+Scenarios needed:
+
+1. List completeness under a filter: an all-documents question such as "사업 예산이 10억 이상인 사업". The expected answer is the exact member set, with no extra project and none missing. A project whose amount is unknown is neither silently included nor silently dropped.
+2. Superlative over the corpus ("사업 예산이 가장 높은 사업"), with the single expected member and how ties are handled.
+3. A follow-up after a list or superlative answer ("그 사업에 대해 쉽고 자세히 알려줘"). It resolves "that project" to the expected document, restates the earlier cited facts (amount, institution, dates) with citations, and makes no absence claim about a fact the earlier turn showed.
+4. A follow-up whose reference matches more than one earlier member, which should ask for clarification.
+
+Minimal schema extension (a proposal, not implemented):
+
+- Corpus scope: `scope` may be `{"corpus": "all", "filter": {...}, "corpus_manifest_sha256": ...}` instead of one or two documents. Membership depends on the corpus version, so the row pins it.
+- Prior turns: `prior_turns` is a list of `{question, expected_answer_ref}`. Each entry points at the earlier turn's own gold row or its recorded claims, so a follow-up is scored against what the user was actually shown.
+- Expected list membership: `expected_members` is a list of `{doc_id, source_hash}` with `membership: "exact"`, plus per-member required claims on the metadata fields. Documents whose filtered field is unknown go in a separate `unknown_members` list.
+
+These rows would serve E2E and generation (membership precision and recall, restated claims). The ambiguous follow-up would serve Negative. They would need their own question types and targets beside the existing ones.
+
 ## Failure modes and prevention
 
 | Failure | Prevention |
