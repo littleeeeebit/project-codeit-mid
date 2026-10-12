@@ -25,8 +25,8 @@ import re
 import uuid
 from pathlib import Path
 
-from .evaluation import (GOLD_DATASETS, METADATA_TYPES, OPERATIONAL_TYPES, SEALED_SPLITS, GoldChecker, RowChecker,
-                         dataset_path, split_of)
+from .evaluation import (GOLD_DATASETS, METADATA_TYPES, OPERATIONAL_TYPES, REVIEWER_KINDS, SEALED_SPLITS,
+                         GoldChecker, RowChecker, dataset_path, split_of)
 from ..corpus.ingestion import CODE_RE, QUARANTINE_TEXT, nfc
 from ..storage.postgres import Connection, Row
 from ..settings import Settings
@@ -287,12 +287,19 @@ def dataset_rows(conn: Connection, dataset: str) -> list[dict]:
         second = [r for r in reviews if r["kind"] == "second"]
         # Only a corrected revision can clear a disagreement, including in older review histories.
         second = next((r for r in second if r["decision"] == "disagree"), second[-1] if second else None)
-        review = dict(row.get("review") or {})
+        # The reviewer's kind and the answer's approval come from the review log only, never from the draft.
+        review = {k: v for k, v in (row.get("review") or {}).items() if k not in ("reviewer_kind", "answer_approved")}
         review.update(reviewed_by=c["decided_by"], approved_at=c["decided_at"], status="approved",
                       original_inspected=bool(first and first["original_inspected"]),
                       disputed=bool(review.get("disputed")) or bool(first and first["decision"] == "approve:disputed"),
                       second_review={"reviewer": second["reviewer"], "agreed": second["decision"] == "agree",
                                      "note": second["note"], "at": second["created_at"]} if second else None)
+        if first and first["reviewer_kind"]:  # older reviews recorded none: their rows render unchanged
+            review["reviewer_kind"] = first["reviewer_kind"]
+        if first and first["answer_approved"]:
+            review["answer_approved"] = True
+        if second and second["reviewer_kind"]:
+            review["second_review"]["reviewer_kind"] = second["reviewer_kind"]
         row.update(review=review, candidate_id=c["candidate_id"], batch_id=c["batch_id"])
         out.append(row)
     return out
@@ -312,10 +319,18 @@ def _write_rejection(settings: Settings, conn: Connection, candidate_id: str) ->
 
 
 def _record_review(conn: Connection, candidate_id: str, reviewer: str, kind: str, decision: str,
-                   original_inspected: bool, note: str, at: str) -> None:
+                   original_inspected: bool, note: str, at: str, reviewer_kind: str | None = None,
+                   answer_approved: bool = False) -> None:
     conn.execute("INSERT INTO gold_reviews(review_id, candidate_id, reviewer, kind, decision, original_inspected, "
-                 "note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                 (str(uuid.uuid4()), candidate_id, reviewer, kind, decision, int(original_inspected), note, at))
+                 "note, created_at, reviewer_kind, answer_approved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                 (str(uuid.uuid4()), candidate_id, reviewer, kind, decision, int(original_inspected), note, at,
+                  reviewer_kind, 1 if answer_approved else None))
+
+
+def _reviewer_kind(kind: str | None) -> str | None:
+    if kind is not None and kind not in REVIEWER_KINDS:
+        raise GoldError(f"reviewer kind must be one of {REVIEWER_KINDS}")
+    return kind
 
 
 # ---------------------------------------------------------------- operations
@@ -509,11 +524,15 @@ def _sealed_refusal(dataset: str, include_sealed: bool) -> None:
 
 def decide(settings: Settings, candidate_id: str, decision: str, reviewer: str, expected_sha: str,
            categories: list[str] | None = None, note: str = "", *, original_inspected: bool = False,
-           disputed: bool = False, include_sealed: bool = False) -> dict:
+           disputed: bool = False, include_sealed: bool = False, reviewer_kind: str | None = None,
+           answer_approved: bool = False) -> dict:
     """First decision wins. expected_sha is the row version the reviewer saw. A gold-2 approval also states that
-    the reviewer inspected the original; `disputed` asks for an independent second review before the row counts."""
+    the reviewer inspected the original; `disputed` asks for an independent second review before the row counts.
+    `reviewer_kind` (ai/human) and `answer_approved` (the expected answer too, not only the labels) are recorded only
+    when given; without them the row reports its reviewer kind unrecorded and its answer a draft."""
     if decision not in ("approve", "reject"):
         raise GoldError("decision must be approve or reject")
+    _reviewer_kind(reviewer_kind)
     categories = list(dict.fromkeys(categories or []))
     note = (note or "").strip()
     if decision == "reject":
@@ -541,6 +560,9 @@ def decide(settings: Settings, candidate_id: str, decision: str, reviewer: str, 
             raise GoldError("초안을 만든 모델은 자기 질문을 승인할 수 없습니다.")
         if is_gold(c["dataset"]) and decision == "approve" and not original_inspected:
             raise GoldError("원문을 직접 확인했다고 표시해야 승인할 수 있습니다.")
+        if answer_approved and not (is_gold(c["dataset"]) and decision == "approve"
+                                    and str(row.get("expected_answer") or "").strip()):
+            raise GoldError("기대 답변 승인은 기대 답변이 있는 평가 질문을 승인할 때만 기록합니다.")
         now = utcnow()
         conn.execute(
             "UPDATE gold_candidates SET status = ?, decided_by = ?, decided_at = ?, reject_json = ?, context_json = ? "
@@ -550,7 +572,7 @@ def decide(settings: Settings, candidate_id: str, decision: str, reviewer: str, 
              dumps(source_context(conn, row)), candidate_id))
         _record_review(conn, candidate_id, reviewer, "decision",
                        "approve:disputed" if decision == "approve" and disputed else decision,
-                       original_inspected, note, now)
+                       original_inspected, note, now, reviewer_kind, answer_approved)
         if decision == "approve":
             write_jsonl_atomic(dataset_path(settings, c["dataset"]), dataset_rows(conn, c["dataset"]))
         else:
@@ -560,13 +582,14 @@ def decide(settings: Settings, candidate_id: str, decision: str, reviewer: str, 
 
 
 def second_review(settings: Settings, candidate_id: str, reviewer: str, agreed: bool, note: str, *,
-                  include_sealed: bool = False) -> dict:
+                  include_sealed: bool = False, reviewer_kind: str | None = None) -> dict:
     """An independent second check of an approved gold row (disputed deadlines, amounts, institutions, mandatory
     conditions, conflicts). Appended to the review log; a disagreement keeps the row out of valid gold until a
     corrected revision is approved."""
     note = (note or "").strip()
     if not note:
         raise GoldError("2차 검토에는 확인 내용을 적어야 합니다.")
+    _reviewer_kind(reviewer_kind)
     with open_db(settings.db_path) as conn, tx(conn, immediate=True):
         c = conn.execute("SELECT * FROM gold_candidates WHERE candidate_id = ?", (candidate_id,)).fetchone()
         if c is None or not is_gold(c["dataset"]) or c["status"] != "approved":
@@ -576,7 +599,8 @@ def second_review(settings: Settings, candidate_id: str, reviewer: str, agreed: 
         if (reviewer in (c["drafted_by"], c["decided_by"]) or not reviewer.strip()
                 or (prov.get("method") == "llm" and reviewer == prov.get("model"))):
             raise GoldError("2차 검토자는 초안 작성자·1차 검토자와 달라야 합니다.")
-        _record_review(conn, candidate_id, reviewer, "second", "agree" if agreed else "disagree", True, note, utcnow())
+        _record_review(conn, candidate_id, reviewer, "second", "agree" if agreed else "disagree", True, note, utcnow(),
+                       reviewer_kind)
         write_jsonl_atomic(dataset_path(settings, c["dataset"]), dataset_rows(conn, c["dataset"]))
     return {"candidate_id": candidate_id, "second_review": "agree" if agreed else "disagree"}
 

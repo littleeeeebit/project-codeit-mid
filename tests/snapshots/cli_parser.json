@@ -76,6 +76,10 @@
   {"name": ["--out"], "dest": "out", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--select"], "dest": "select", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"}
  ],
+ "error-analysis": [
+  {"name": "action", "dest": "action", "default": null, "required": true, "choices": ["export", "propose", "suggest"], "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": ["--file"], "dest": "file", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"}
+ ],
  "evaluate-retrieval": [
   {"name": ["--dataset"], "dest": "dataset", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--runs"], "dest": "runs", "default": "K0,K1,D,H", "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
@@ -119,6 +123,8 @@
   {"name": ["--expected-sha"], "dest": "expected_sha", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--original-inspected"], "dest": "original_inspected", "default": false, "required": false, "choices": null, "type": null, "nargs": 0, "action": "_StoreTrueAction"},
   {"name": ["--disputed"], "dest": "disputed", "default": false, "required": false, "choices": null, "type": null, "nargs": 0, "action": "_StoreTrueAction"},
+  {"name": ["--reviewer-kind"], "dest": "reviewer_kind", "default": null, "required": false, "choices": ["ai", "human"], "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": ["--answer-approved"], "dest": "answer_approved", "default": false, "required": false, "choices": null, "type": null, "nargs": 0, "action": "_StoreTrueAction"},
   {"name": ["--category"], "dest": "category", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_AppendAction"},
   {"name": ["--note"], "dest": "note", "default": "", "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--agree"], "dest": "agree", "default": false, "required": false, "choices": null, "type": null, "nargs": 0, "action": "_StoreTrueAction"},
@@ -222,7 +228,7 @@
  ],
  "resolve-metadata": [
   {"name": ["--doc-id"], "dest": "doc_id", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
-  {"name": ["--field"], "dest": "field", "default": null, "required": true, "choices": ["institution", "title", "notice", "bid_close", "amount_krw"], "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": ["--field"], "dest": "field", "default": null, "required": true, "choices": ["institution", "title", "notice", "bid_close", "amount_krw", "institution_type"], "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--value"], "dest": "value", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--rationale"], "dest": "rationale", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--evidence"], "dest": "evidence", "default": null, "required": true, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
@@ -276,12 +282,15 @@
  ],
  "stage-review": [
   {"name": "action", "dest": "action", "default": null, "required": true, "choices": ["run", "approve", "resume", "rescore", "reprice"], "type": null, "nargs": null, "action": "_StoreAction"},
-  {"name": "stage", "dest": "stage", "default": null, "required": false, "choices": ["retriever", "chunking", "generation", "ocr"], "type": null, "nargs": "?", "action": "_StoreAction"},
+  {"name": "stage", "dest": "stage", "default": null, "required": false, "choices": ["retriever", "chunking", "generation", "ocr", "traffic"], "type": null, "nargs": "?", "action": "_StoreAction"},
   {"name": ["--base"], "dest": "base", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--cand"], "dest": "cand", "default": [], "required": false, "choices": null, "type": null, "nargs": null, "action": "_AppendAction"},
   {"name": ["--inputs-from"], "dest": "inputs_from", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--run"], "dest": "run", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--approved-by"], "dest": "approved_by", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": ["--since"], "dest": "since", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
+  {"name": ["--sample"], "dest": "sample", "default": null, "required": false, "choices": null, "type": "int", "nargs": null, "action": "_StoreAction"},
+  {"name": ["--source-dsn-env"], "dest": "source_dsn_env", "default": "RFP_DATABASE_DSN", "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"},
   {"name": ["--ledger-dsn-env"], "dest": "ledger_dsn_env", "default": null, "required": false, "choices": null, "type": null, "nargs": null, "action": "_StoreAction"}
  ],
  "trial-reranker": [

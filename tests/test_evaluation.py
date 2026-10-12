@@ -667,6 +667,8 @@ class ValidatorTest(Phase4Case):
         manifest = evaluation.freeze_dataset(self.s, "dev", "owner", "development set for phase 4")
         self.assertEqual(manifest["rows"], 4)
         self.assertTrue(evaluation.frozen_dataset(self.s, "dev")["current"])
+        saved = json.loads((self.s.data_dir / "datasets" / "dev.validation.json").read_text(encoding="utf-8"))
+        self.assertEqual((saved["frozen"]["frozen"], saved["frozen"]["current"]), (True, True))  # after the freeze
         p4.write(self.env, "dev", rows[:3])
         self.assertFalse(evaluation.frozen_dataset(self.s, "dev")["current"])
         rows[0]["review"]["reviewed_by"] = "agent-a"
@@ -674,8 +676,106 @@ class ValidatorTest(Phase4Case):
         with self.assertRaises(evaluation.EvaluationError):
             evaluation.freeze_dataset(self.s, "dev", "owner", "again")
 
+    def test_coverage_counts_negatives_by_answerability_and_leaves_sufficiency_undecided(self):
+        premise = p4.deadline_row(self.env, "dev-premise", "마감이 6월 말이라던데 맞나요?", qtype="missing_false_premise")
+        p4.write(self.env, "dev", self.dev_rows() + [premise])
+        report = evaluation.validate_gold(self.s, "dev")
+        self.assertTrue(report["ok"], report["errors"])
+        cov = report["coverage"]
+        # The refuted premise the source answers is answerable; only the verified absence is unanswerable.
+        self.assertEqual(cov["question_type"]["missing_false_premise"], 2)
+        self.assertEqual((cov["answerability"]["unanswerable"], cov["premise_refutation_answerable"]), (1, 1))
+        self.assertEqual((cov["evaluations"]["negative"], cov["negative"]["policy"], cov["sufficiency"]),
+                         (1, "unset", "undecided"))
+        self.assertEqual((report["validity"]["ok"], report["frozen"]), (True, {"frozen": False}))
+
+    def test_a_set_without_negatives_reports_the_gap_and_an_unset_policy(self):
+        p4.write(self.env, "dev", self.dev_rows()[:3])
+        cov = evaluation.validate_gold(self.s, "dev")["coverage"]
+        for gap in ("negative: no row serves it", "negative: no unanswerable rows", "negative: no ambiguous rows",
+                    "negative: policy unset (no minimum adopted)"):
+            self.assertIn(gap, cov["gaps"])
+        self.assertEqual(cov["sufficiency"], "undecided")
+        with mock.patch.object(evaluation, "NEGATIVE_COVERAGE_POLICY", {"unanswerable": 1}):
+            cov = evaluation.validate_gold(self.s, "dev")["coverage"]
+        self.assertEqual((cov["sufficiency"], cov["negative"]["policy"]), ("not met", {"unanswerable": 1}))
+        self.assertIn("negative: unanswerable 0/1 rows", cov["gaps"])
+
+    def test_each_evaluation_reports_its_own_missing_fields(self):
+        amount, absent = p4.amount_row(self.env), p4.absent_row(self.env)
+        self.assertEqual(evaluation.row_evaluations(amount),  # no expected_answer needed by any of them
+                         {"retrieval": [], "generation": [], "grounding": [], "e2e": []})
+        self.assertEqual(evaluation.row_evaluations({**amount, "required_claims": []})["generation"],
+                         ["required_claims"])
+        no_groups = evaluation.row_evaluations({**amount, "evidence_groups": []})
+        self.assertEqual({ev for ev, missing in no_groups.items() if missing},
+                         {"retrieval", "generation", "grounding", "e2e"})
+        self.assertEqual(evaluation.row_evaluations({**absent, "negative_validation": None}),
+                         {"e2e": ["negative_validation"], "negative": ["negative_validation"]})
+        p4.write(self.env, "dev", [{**amount, "required_claims": []}, absent])
+        report = evaluation.validate_gold(self.s, "dev")
+        entry = {d["question_id"]: d for d in report["row_evaluations"]}
+        self.assertEqual((entry["dev-amount"]["valid"], entry["dev-amount"]["evaluations"]["generation"]),
+                         (False, ["required_claims"]))
+        self.assertEqual((entry["dev-absent"]["valid"], entry["dev-absent"]["evaluations"]),
+                         (True, {"e2e": [], "negative": []}))
+        self.assertEqual(report["coverage"]["evaluations"]["generation"], 0)
+
+    def test_review_level_and_answer_state_come_only_from_recorded_fields(self):
+        rows = self.dev_rows()
+        rows[0]["expected_answer"] = "1억 3천만 원(부가가치세 포함)"
+        p4.write(self.env, "dev", rows)
+        report = evaluation.validate_gold(self.s, "dev")
+        self.assertTrue(report["ok"], report["errors"])  # rows without the optional fields still validate
+        entry = {d["question_id"]: d for d in report["row_evaluations"]}
+        self.assertEqual(entry["dev-amount"]["review"],
+                         {"drafter": "human", "reviewer": "unrecorded", "second_reviewer": None})
+        self.assertEqual((entry["dev-amount"]["answer"], entry["dev-deadline"]["answer"]), ("draft", "none"))
+        rows[0]["review"].update(reviewer_kind="ai", answer_approved=True)
+        rows[1]["review"].update(reviewer_kind="robot", answer_approved=True)  # no expected answer to approve
+        p4.write(self.env, "dev", rows)
+        report = evaluation.validate_gold(self.s, "dev")
+        entry = {d["question_id"]: d for d in report["row_evaluations"]}
+        self.assertEqual((entry["dev-amount"]["review"]["reviewer"], entry["dev-amount"]["answer"]), ("ai", "approved"))
+        errors = " ".join(report["errors"])
+        for needle in ("reviewer_kind must be one of", "answer_approved is true and needs an expected_answer"):
+            self.assertIn(needle, errors)
+
+    def test_absence_seen_only_in_search_output_is_no_label(self):
+        absent = p4.absent_row(self.env)
+        absent["negative_validation"]["methods"] = ["keyword:지체상금", "retrieval:top-20"]
+        p4.write(self.env, "dev", [absent])
+        self.assertTrue(any("no-evidence label" in e for e in evaluation.validate_gold(self.s, "dev")["errors"]))
+
 
 class GoldQueueTest(Phase4Case):
+    def test_the_reviewer_records_its_kind_and_the_answer_approval(self):
+        claimed = p4.deadline_row(self.env, reviewed=False)
+        claimed["review"]["reviewer_kind"] = "human"  # a draft cannot state who will review it
+        with self.assertRaises(gold.GoldError):
+            self.submit("kinds-claimed", [claimed], "dev")
+        amount = p4.amount_row(self.env, reviewed=False, expected_answer="1억 3천만 원(부가가치세 포함)")
+        self.submit("kinds", [amount, p4.deadline_row(self.env, reviewed=False)], "dev")
+        a, d = gold.candidate(self.s, "dev-amount-r1"), gold.candidate(self.s, "dev-deadline-r1")
+        with self.assertRaises(gold.GoldError):  # the row has no expected answer to approve
+            gold.decide(self.s, d["candidate_id"], "approve", "person-b", d["row_sha256"], original_inspected=True,
+                        answer_approved=True)
+        gold.decide(self.s, a["candidate_id"], "approve", "person-b", a["row_sha256"], original_inspected=True,
+                    disputed=True, reviewer_kind="human", answer_approved=True)
+        gold.second_review(self.s, a["candidate_id"], "ai-review:codex", True, "원문 확인", reviewer_kind="ai")
+        gold.decide(self.s, d["candidate_id"], "approve", "person-b", d["row_sha256"], original_inspected=True)
+        report = evaluation.validate_gold_v2(self.s, "dev")
+        self.assertTrue(report["ok"], report["errors"])
+        entry = {e["question_id"]: e for e in report["row_evaluations"]}
+        self.assertEqual((entry["dev-amount"]["review"], entry["dev-amount"]["answer"]),
+                         ({"drafter": "human", "reviewer": "human", "second_reviewer": "ai"}, "approved"))
+        self.assertEqual((entry["dev-deadline"]["review"]["reviewer"], entry["dev-deadline"]["answer"]),
+                         ("unrecorded", "none"))
+        log = store.read_jsonl(evaluation.export_review_log(self.s, "dev")[0])  # unrecorded keys stay out of the log
+        self.assertEqual([("reviewer_kind" in r, "answer_approved" in r) for r in log],
+                         [(True, True), (True, False), (False, False)])
+        self.assertEqual(gold.check(self.s), [])
+
     def test_a_later_disagreement_blocks_an_ordinary_approval(self):
         self.submit('ordinary-approval', [p4.amount_row(self.env, reviewed=False)], 'dev')
         c = gold.candidate(self.s, 'dev-amount-r1')
