@@ -5,8 +5,8 @@ import { AlertTriangle, Download, Info, OctagonX } from "lucide-react";
 import { cn } from "cn";
 import { type Answer, api, errorText, type Evidence, originalHref, type RequestView } from "@/lib/api";
 import {
-  BILLING, EVIDENCE_WARNING, FACT_STATE, FIELD, label, locationShort, locationText, MISSING_REASON, REQUEST, REVIEW,
-  STATUS, usd,
+  BILLING, EVIDENCE_WARNING, FACT_STATE, FIELD, label, locationShort, locationText, METADATA_SOURCE, MISSING_REASON,
+  REQUEST, REVIEW, STATUS, usd,
   when, won, wonShort,
 } from "@/lib/format";
 import { must, usePoll } from "@/lib/use-poll";
@@ -385,6 +385,31 @@ export function EvidenceDetail({ requestId, evidenceId, number }: {
 }
 
 export function EvidenceBody({ ev, number }: { ev: Evidence; number?: number }) {
+  return ev.location.format === "metadata" ? <MetadataEvidence ev={ev} number={number} /> : <QuoteEvidence ev={ev} number={number} />;
+}
+
+/** A cited metadata field: its name, value and source. Not a passage, so no quote, context or original file. */
+function MetadataEvidence({ ev, number }: { ev: Evidence; number?: number }) {
+  const loc = ev.location as { field?: string; value?: string; source?: string };
+  return (
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <h3 className="text-lg font-bold">
+          {number ? <>근거 <span className="text-primary">{number}</span> 기본 정보</> : <>기본 정보 <span className="ml-1 text-primary">{ev.evidence_id}</span></>}
+        </h3>
+        <p className="text-base font-semibold">{ev.title || "제목 없음"}</p>
+        <p className="text-[13px] text-muted-foreground">원문 인용이 아니라 사업 목록에 기록된 기본 정보입니다.</p>
+      </div>
+      <dl className="space-y-1 border-l-4 border-primary pl-4">
+        <dt className="text-sm text-muted-foreground">{label(FIELD, loc.field)}</dt>
+        <dd className="text-xl font-bold tabular-nums [overflow-wrap:anywhere]">{loc.value}</dd>
+      </dl>
+      <p className="text-sm">출처 · {label(METADATA_SOURCE, loc.source)}</p>
+    </div>
+  );
+}
+
+function QuoteEvidence({ ev, number }: { ev: Evidence; number?: number }) {
   const [around, setAround] = useState(false);
   const [fullQuote, setFullQuote] = useState(false);
   const paragraphs = ev.context.length ? ev.context : [{ element_id: "q", text: ev.quote, cited: true, location: {} }];

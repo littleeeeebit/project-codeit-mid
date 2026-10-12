@@ -54,7 +54,12 @@ export const EVIDENCE_WARNING: Record<string, string> = {
 
 export const FIELD: Record<string, string> = {
   title: "사업명", institution: "발주 기관", notice: "공고 번호", revision: "공고 차수", amount_krw: "사업 금액",
-  published_at: "공개 일자", bid_start: "입찰 시작", bid_close: "입찰 마감",
+  published_at: "공개 일자", bid_start: "입찰 시작", bid_close: "입찰 마감", institution_type: "기관 유형",
+};
+
+/** Where a cited metadata value comes from (`location.source` of a metadata citation). */
+export const METADATA_SOURCE: Record<string, string> = {
+  csv: "CSV 기본 정보", resolution: "검토자 정정", classification: "기관 유형 분류",
 };
 
 export const FACT_STATE: Record<string, string> = {
