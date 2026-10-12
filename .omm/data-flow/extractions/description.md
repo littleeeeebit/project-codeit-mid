@@ -1,0 +1,1 @@
+`elements.jsonl` artifacts under `.runtime/extracted/<source_hash>/<fingerprint>/` plus the `extractions`, `elements` and `extraction_inputs` rows. Review status is per source and reset by a new revision. `metadata_resolutions` hold canonical values with a rationale, and search, filters and prompts use them while `csv_metadata` keeps the CSV values.

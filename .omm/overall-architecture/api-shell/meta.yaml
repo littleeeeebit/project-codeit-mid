@@ -1,8 +1,13 @@
 created: 2026-10-05T03:34:17.647Z
-updated: 2026-10-07T04:46:44.752Z
-update_count: 3
-last_field: description
+updated: 2026-10-12T02:27:14.877Z
+update_count: 6
+last_field: concern
 kind: nested-class
 title: api-shell
-children: []
+children:
+  - hub-login
+  - route-groups
+  - session-middleware
+  - static-export
+  - update-watch
 parentPath: []

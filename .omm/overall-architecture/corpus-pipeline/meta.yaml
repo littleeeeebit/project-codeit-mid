@@ -1,43 +1,32 @@
 created: 2026-10-06 09:08:45.737000+00:00
-updated: 2026-10-11T21:57:59.332Z
-update_count: 19
+updated: 2026-10-12 02:27:20.559000+00:00
+update_count: 21
 last_field: diagram
 kind: nested-class
 title: corpus-pipeline
 children:
-  - chunk-index
-  - extraction-revisions
-  - fidelity-check
-  - hwp-loader-fallback
-  - hwp-xml-walker
-  - image-ocr
-  - manifest-import
-  - ocr-and-fidelity
-  - ocr-merge
-  - ocr-regions
-  - review-and-recovery
-  - revision-assignment
-  - run-activation
-  - source-parsing
+- dense-build
+- extraction-revisions
+- fidelity-check
+- hwp-loader-fallback
+- hwp-xml-walker
+- image-ocr
+- ingestion
+- keyword-build
+- maintenance-sequence
+- ocr-and-fidelity
+- ocr-merge
+- ocr-regions
+- review-and-recovery
+- revision-assignment
+- run-activation
 parentPath: []
-prev_diagram: "graph TD\r
-
-  \  manifest-import[\"Manifest
-  import\\nsrc/rfp_assistant/corpus/ingestion.py\"] -->|\"documents, sources
-  rows\"| hwp-parsing[\"HWP parsing\\nsrc/rfp_assistant/corpus/ingestion.py\"]\r
-
-  \  manifest-import -->|\"documents, sources rows\"| pdf-parsing[\"PDF
-  parsing\\nsrc/rfp_assistant/corpus/ingestion.py\"]\r
-
-  \  image-ocr[\"Image OCR cache\\nsrc/rfp_assistant/corpus/ocr.py\"]
-  -->|\"image_text at markers\"| hwp-parsing\r
-
-  \  image-ocr -->|\"image_text by anchors\"| pdf-parsing\r
-
-  \  hwp-parsing -->|\"raw elements\"| extraction-revisions[\"Extraction
-  revisions\\nsrc/rfp_assistant/corpus/ingestion.py\"]\r
-
-  \  pdf-parsing -->|\"raw elements\"| extraction-revisions\r
-
-  \  extraction-revisions -->|\"active extraction\"| fidelity-check[\"HWP
-  fidelity check\\nsrc/rfp_assistant/corpus/fidelity.py\"]"
+prev_diagram: "graph TD\r\n  manifest-import[\"Manifest import\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  source-parsing[\"HWP and PDF parsing\\nsrc/rfp_assistant/corpus/ingestion.py\"\
+  ]\r\n  ocr-merge[\"OCR text merge\\nsrc/rfp_assistant/corpus/ocr.py\"]\r\n  fidelity-check[\"\
+  Fidelity check\\nsrc/rfp_assistant/corpus/fidelity.py\"]\r\n  chunk-index[\"Chunking\
+  \ and keyword index\\nsrc/rfp_assistant/retrieval/chunking.py\"]\r\n  manifest-import\
+  \ -->|hashed unique sources| source-parsing\r\n  ocr-merge -->|image_text elements|\
+  \ source-parsing\r\n  source-parsing -->|active HWP extraction| fidelity-check\r\
+  \n  source-parsing -->|ordered elements| chunk-index\r\n  fidelity-check -->|auto\
+  \ review status| chunk-index"

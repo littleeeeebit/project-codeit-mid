@@ -191,6 +191,19 @@ describe("evidence", () => {
     expect(screen.getByRole("button", { name: "긴 인용문 접기" })).toBeTruthy();
   });
 
+  test("a metadata citation shows its field, value and source, with no quote or original file", () => {
+    const meta = evidence({ evidence_id: "M2", quote: "사업 금액: 14,107,009,000원", context: [], download_available: false,
+                            location: { format: "metadata", field: "amount_krw", value: "14,107,009,000원", source: "resolution" } });
+    const { container } = render(<EvidenceBody ev={meta} number={2} />);
+    expect(screen.getByRole("heading").textContent).toBe("근거 2 기본 정보");
+    expect(container.querySelector("dt")?.textContent).toBe("사업 금액");
+    expect(container.querySelector("dd")?.textContent).toBe("14,107,009,000원");
+    expect(container.textContent).toContain("출처 · 검토자 정정");
+    expect(container.querySelector("blockquote")).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
   test("a quote of more than twelve lines is folded too", () => {
     render(<EvidenceBody ev={evidence({ context: [], quote: Array(13).fill("줄").join("\n") })} />);
     expect(screen.getByRole("button", { name: "인용문 일부 표시 · 전체 펼치기" })).toBeTruthy();

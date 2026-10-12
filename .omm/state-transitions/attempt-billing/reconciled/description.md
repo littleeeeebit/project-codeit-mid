@@ -1,0 +1,1 @@
+Covered by a reconciliation: a closed, non-overlapping interval for one billing scope, recording the provider total minus local settled cost as an adjustment. Attempts with no recorded project must be explicitly included or excluded. It stops holding a reservation.

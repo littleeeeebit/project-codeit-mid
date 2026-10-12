@@ -1,1 +1,0 @@
-`tools/infra/bidmate.service` runs uvicorn with one worker on codeit (:8501). `/etc/bidmate/server.env` holds the sign-in and update settings, and PostgreSQL starts through `tools/infra/start-postgresql.sh`. On a restart, the new `Resources` acquires the gateway lock and runs recovery (interrupted requests, unknown attempts), and members must re-enter their in-memory API keys.

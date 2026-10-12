@@ -1,1 +1,1 @@
-These are the lifecycle states of a `requests` row. Every transition is a guarded `UPDATE` inside `tx(immediate=True)`. Paid modes start in `queued`. Free modes start directly in `running`.
+Statuses of a `requests` row as written by `_create`, `run_queued`, `_finish`, `cancel_request`, `RequestRunner.shutdown` and `recover_requests`. `TERMINAL_STATUSES` gate whether a follow-up may continue a turn. Only rows with `request_json` are listed or interrupted by shutdown.

@@ -1,0 +1,1 @@
+Published before `start_maintenance` returns. If no maintenance thread is alive, the status endpoint reports it as `interrupted` (the process stopped mid-run).

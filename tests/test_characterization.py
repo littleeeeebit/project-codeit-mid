@@ -770,7 +770,7 @@ class ValidateAnswerTest(unittest.TestCase):
             ({"response": generation.ProviderResponse("{}", None, "content_filter", {}, "r")},
              "incomplete_output: finish_reason=content_filter"),
             ({"response": generation.ProviderResponse("", None, "stop", {}, "r")}, "incomplete_output: finish_reason=stop"),
-            ({"payload": self.claim(kind="absence")}, f"absence_not_listed: {self.A}"),
+            ({"payload": self.claim(kind="absence", doc_id="doc-y")}, "claim_outside_scope: doc-y"),
             ({"payload": self.claim(doc_id="doc-z")}, "claim_outside_scope: doc-z"),
             ({"payload": self.claim(evidence_ids=[])}, "claim_without_evidence"),
             ({"payload": self.claim(evidence_ids=["E9"])}, "unknown_evidence_id: E9"),
@@ -798,7 +798,8 @@ class ValidateAnswerTest(unittest.TestCase):
 
     def test_a_valid_answer(self):
         listed = {"claims": self.good()["claims"] + [
-            {"text": " 하자  기간 ", "kind": "absence", "doc_id": self.B, "evidence_ids": []},
+            {"text": " 하자  기간 ", "kind": "absence", "doc_id": self.B, "evidence_ids": []},  # listed already: once
+            {"text": "기간 (E2)", "kind": "absence", "doc_id": self.A, "evidence_ids": ["E1"]},  # listed for A
             {"text": "비교", "kind": "inference", "doc_id": self.B, "evidence_ids": ["E1", "E2"]}],
             "missing_fields": [{"doc_id": self.B, "field": "하자 기간", "reason": "not_found_in_context"}]}
         payload = self.validate(listed, required={self.A, self.B})
@@ -806,7 +807,8 @@ class ValidateAnswerTest(unittest.TestCase):
             "status": "answered", "summary": "기간은 12개월", "summary_evidence_ids": ["E1"],
             "claims": [{"text": "12개월", "kind": "source_fact", "doc_id": self.A, "evidence_ids": ["E1"]},
                        {"text": "비교", "kind": "inference", "doc_id": self.B, "evidence_ids": ["E1", "E2"]}],
-            "missing_fields": [{"doc_id": self.B, "field": "하자 기간", "reason": "not_found_in_context"}],
+            "missing_fields": [{"doc_id": self.B, "field": "하자 기간", "reason": "not_found_in_context"},
+                               {"doc_id": self.A, "field": "기간", "reason": "not_found_in_context"}],
             "conflicts": [], "next_action": None})
 
 
@@ -1040,9 +1042,10 @@ class LoadCheckTest(unittest.TestCase):
     def estimate(self, r) -> int:
         """The maximum reservation and the cap built from it. The fixture PDFs' bytes differ in every process (their
         source hashes, and the ids derived from them, with them), which moves the packed prompt by a token now and
-        then: the estimate is 8544 micro-USD (gpt-5-mini) within a few, the cap is always four of it plus half of one."""
+        then: the estimate is 8718 micro-USD (gpt-5-mini) within a few, the cap is always four of it plus half of one.
+        (Prompt 14 and the document's metadata units added 174 to the 8544 of prompt 13.)"""
         est = r["max_reservation_micro_usd"]
-        self.assertLessEqual(abs(est - 8544), 8)
+        self.assertLessEqual(abs(est - 8718), 8)
         self.assertEqual((r["affordable_at_once"], r["cap_micro_usd"]), (4, 4 * est + est // 2))
         return est
 

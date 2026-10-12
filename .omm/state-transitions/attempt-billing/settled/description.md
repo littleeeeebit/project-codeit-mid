@@ -1,0 +1,1 @@
+The cost computed from usage (prompt, cached, completion, cache-write tokens) at the attempt's own recorded rates, exactly once, with the `response_id` stored. A settled cost above the reservation freezes all paid admission (`frozen_reason`) until someone inspects it.

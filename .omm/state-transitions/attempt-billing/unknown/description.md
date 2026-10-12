@@ -1,0 +1,1 @@
+Possibly billed with no usage. It keeps holding its reservation, and in PostgreSQL it blocks every new dispatch database-wide until resolved. The CLI lists it (`unresolved`) and resolves it with `settle` from evidence or `reconcile`. Answer evaluation and stage review stop on a new unknown and never resend it.

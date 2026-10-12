@@ -1,0 +1,6 @@
+graph TD
+  running["Running\nmaintenance.start_state"] -->|"paid estimate needed"| needs-approval["Needs approval\nmaintenance.NeedsApproval"]
+  running -->|"step raised or stop"| failed["Failed\nmaintenance.StepFailed"]
+  running -->|"cancel admitted"| cancelled["Cancelled\nmaintenance.request_cancel"]
+  running -->|"timeouts or lost questions"| unverified["Unverified\nmaintenance.run"]
+  running -->|"every step done"| complete["Complete\nmaintenance.run"]

@@ -1,0 +1,1 @@
+Every step ran, but some originals timed out (they keep their previous extraction and are retried next run), or questions lost their pinned evidence in the rebuilt rows and need review again.

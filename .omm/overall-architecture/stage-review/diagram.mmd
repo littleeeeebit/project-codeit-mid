@@ -1,0 +1,8 @@
+graph TD
+  review-runner["Stage review runner\nsrc/rfp_assistant/evaluation/stage_review.py"] -->|"worktree, frozen inputs"| candidate-worker["Candidate worker process\nsrc/rfp_assistant/evaluation/stage_review_worker.py"]
+  review-runner -->|"estimate.json"| paid-approval["Paid approval\nsrc/rfp_assistant/evaluation/stage_review_paid.py"]
+  paid-approval -->|"key only after approve"| candidate-worker
+  traffic-freeze["Traffic sample freeze\nsrc/rfp_assistant/evaluation/traffic_review.py"] -->|"pseudonymized run folder"| review-server["Review app server\nreview/server.py"]
+  review-runner -->|"view.json run folder"| review-server
+  review-server -->|"append-only span notes"| annotation-store["Annotations and taxonomy\nsrc/rfp_assistant/evaluation/error_analysis.py"]
+  review-server -->|"decision md and json"| decision-files["Decision files\n.runtime/review/decisions"]

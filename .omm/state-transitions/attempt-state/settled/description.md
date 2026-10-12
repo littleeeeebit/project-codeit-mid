@@ -1,1 +1,0 @@
-Set by `settle` with the actual usage cost and response id, exactly once. A cost above the reservation sets `frozen_reason`, which stops new paid work until inspected.

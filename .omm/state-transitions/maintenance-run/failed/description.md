@@ -1,0 +1,1 @@
+The first failing step's reason (a `StepFailed` message or an exception with traceback) and `stopped_at`. Also used when the service's controlled stop killed a parse ('rerun maintenance to continue').

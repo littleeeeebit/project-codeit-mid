@@ -1,0 +1,1 @@
+The parse time limit and the cancel exist because `M-20261010-233122` re-parsed 59 of 98 originals in 94 s, after which one thread ran at 100% CPU for over 7 hours (recorded decision).

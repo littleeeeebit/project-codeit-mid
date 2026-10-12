@@ -1,0 +1,1 @@
+`compare.regression` scores K1 and the serving configuration on both the served and the rebuilt index. A row that needs paid approval stops the run, and an incomplete row fails it. `needs_evidence_review` lists questions whose pinned evidence a re-parse replaced, and the run then ends `unverified` naming them.

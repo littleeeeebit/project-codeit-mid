@@ -14,10 +14,10 @@ from typing import Callable, Protocol
 
 from pydantic import ValidationError
 
-from ..contracts import AnswerPayload, EvidenceUnit
+from ..contracts import AnswerPayload, EvidenceUnit, MissingField
 from ..retrieval.chunking import count_tokens
 
-PROMPT_VERSION = "grounded-answer-13"  # 4: atomic obligations, per-document citations, conflict action; 5: corpus mode
+PROMPT_VERSION = "grounded-answer-14"  # 4: atomic obligations, per-document citations, conflict action; 5: corpus mode
 # 6: every claim cites evidence; absence goes to missing_fields only; 7: a restated absence is declared kind "absence"
 # 8: an "absence" claim's text is exactly its missing field; 9: absences go only to missing_fields
 # 10: a comparison inference may also cite the other compared document's evidence
@@ -25,6 +25,8 @@ PROMPT_VERSION = "grounded-answer-13"  # 4: atomic obligations, per-document cit
 # 12: a follow-up sees the earlier conversation; restating an earlier answer keeps all of its facts;
 #     an actor owns a function only where the evidence names it; no evidence IDs inside the text
 # 13: validation rejects a conflict answer without conflicts, two alternatives per conflict, or a next action
+# 14: each document's typed metadata is citable (metadata evidence units, M IDs); an absence claim becomes a missing
+#     field of its document instead of failing the answer
 COUNT_METHOD = "tiktoken:o200k_base+per_message_4+schema+margin"
 PER_MESSAGE_TOKENS = 4
 
@@ -36,9 +38,12 @@ Respect the selected document IDs, source versions, and as-of date.
 Attach supplied evidence IDs to every material factual claim.
 Every claim, an inference too, cites at least one supplied evidence ID of its doc_id.
 State what the evidence does not show only as a missing_fields entry of that doc_id, never as a claim.
-A claim that repeats such an entry anyway must use kind "absence", the same doc_id, and as its text
-exactly that entry's field; it is not shown. An absence with no such entry fails the whole answer.
-Never use "absence" for anything else.
+A claim that states such an absence anyway must use kind "absence" and the same doc_id; it is not shown,
+and its text is listed as a missing field of that document. Never use "absence" for anything else.
+Evidence whose location format is metadata states one field of a document's typed metadata (amount,
+institution, institution type, publication date, bid start and bid close) as the project list records it,
+reviewer corrections applied. A fact about those fields cites that metadata evidence ID.
+A metadata unit that marks its value for review states that it needs review; never give it as a plain value.
 Never invent dates, amounts, eligibility, requirement IDs, page numbers,
 submission methods, document names, or currently-open bid status.
 Preserve units, VAT treatment, conditions, exceptions, and mandatory wording.
@@ -83,6 +88,7 @@ and the evidence the previous answer cited is supplied again under new IDs.
 When the question asks to restate, simplify or explain an earlier answer, restate every claim of that answer
 as a claim of your own in plainer words, none dropped or merged away, keeping each number, condition, method
 and actor and citing the supplied evidence; then add only what the evidence supports.
+Restating an earlier list answer, cite the metadata evidence IDs for each project's amount, institution and dates.
 Plain wording may explain a term only as the evidence describes it.
 
 Return a short conclusion, supported claims, missing information,
@@ -465,7 +471,8 @@ def build_messages(question: str, as_of: str, docs: list[dict], evidence: list[E
                                 for d in docs},
         "evidence": [{"evidence_id": e.evidence_id, "doc_id": e.doc_id, "source_hash": e.source_hash[:16],
                       "location": {k: v for k, v in e.location.items() if k in
-                                   ("format", "page", "page_label", "section_path", "table_ordinal", "path")},
+                                   ("format", "page", "page_label", "section_path", "table_ordinal", "path",
+                                    "field")},
                       "text": e.quote} for e in evidence],
     }
     return [{"role": "system", "content": SYSTEM_PROMPT},
@@ -555,21 +562,29 @@ def _parsed_payload(response: ProviderResponse) -> AnswerPayload:
         raise TechnicalError(f"schema_invalid: {exc.errors()[:3]}") from None
 
 
-def _without_listed_absences(payload: AnswerPayload) -> AnswerPayload:
-    """A claim declared "absence" is dropped (never shown) only when its text is exactly the field of a missing_fields
-    entry of its own document, so it carries nothing beyond that listed absence; any other "absence" claim fails.
-    Whatever their text, uncited source facts and inferences still fail the whole answer afterwards."""
+def _absences_as_missing_fields(payload: AnswerPayload, allowed_doc_ids: set[str]) -> AnswerPayload:
+    """A claim declared "absence" is never shown. Its whitespace-normalized text becomes a missing_fields entry of its
+    own document (`not_found_in_context`) unless that document already lists it, so the absence, or a real fact
+    mislabelled as one, stays visible in the missing-fields table instead of failing the paid answer. An absence of a document
+    outside the scope fails; uncited source facts and inferences still fail the whole answer afterwards."""
 
     def squash(text: str) -> str:
-        return " ".join(text.split())
+        return " ".join(_without_ids(text).split())
 
-    listed = {(m.doc_id, squash(m.field)) for m in payload.missing_fields}
-    for claim in payload.claims:
-        if claim.kind == "absence" and (claim.doc_id, squash(claim.text)) not in listed:
-            raise TechnicalError(f"absence_not_listed: {claim.doc_id}")
-    if any(c.kind == "absence" for c in payload.claims):
-        payload = payload.model_copy(update={"claims": [c for c in payload.claims if c.kind != "absence"]})
-    return payload
+    absences = [c for c in payload.claims if c.kind == "absence"]
+    if not absences:
+        return payload
+    missing = list(payload.missing_fields)
+    listed = {(m.doc_id, squash(m.field)) for m in missing}
+    for claim in absences:
+        if claim.doc_id not in allowed_doc_ids:
+            raise TechnicalError(f"claim_outside_scope: {claim.doc_id}")
+        key = (claim.doc_id, squash(claim.text))
+        if key[1] and key not in listed:
+            listed.add(key)
+            missing.append(MissingField(doc_id=claim.doc_id, field=key[1], reason="not_found_in_context"))
+    return payload.model_copy(update={"claims": [c for c in payload.claims if c.kind != "absence"],
+                                      "missing_fields": missing})
 
 
 def status_problem(answer: dict) -> str | None:
@@ -590,9 +605,10 @@ def status_problem(answer: dict) -> str | None:
 
 def validate_answer(response: ProviderResponse, evidence: list[EvidenceUnit], allowed_doc_ids: set[str],
                     stored_quotes: dict[str, str], required_doc_ids: set[str] | None = None) -> AnswerPayload:
-    """`required_doc_ids`, given only for a comparison: each of these documents must appear in a claim or a missing
-    field, and an inference may also cite them (it compares the sides) as long as it cites its own document too."""
-    payload = _without_listed_absences(_parsed_payload(response))
+    """`stored_quotes`: each evidence ID's text as stored now (a passage in the index, a metadata unit's current
+    statement). `required_doc_ids`, given only for a comparison: each of these documents must appear in a claim or a
+    missing field, and an inference may also cite them (it compares the sides) as long as it cites its own document."""
+    payload = _absences_as_missing_fields(_parsed_payload(response), allowed_doc_ids)
     problem = status_problem(payload.model_dump())
     if problem:
         raise TechnicalError(problem)
@@ -647,7 +663,7 @@ def validate_answer(response: ProviderResponse, evidence: list[EvidenceUnit], al
         c.model_copy(update={"text": _without_ids(c.text)}) for c in payload.claims]})
 
 
-INLINE_IDS = re.compile(r"\s*[\[(]E\d+(?:\s*,\s*E\d+)*[\])]")
+INLINE_IDS = re.compile(r"\s*[\[(][EM]\d+(?:\s*,\s*[EM]\d+)*[\])]")  # passage (E) and metadata (M) IDs
 
 
 def _without_ids(text: str) -> str:

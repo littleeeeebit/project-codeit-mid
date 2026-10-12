@@ -1,1 +1,0 @@
-`RFP_SOURCE_DIR` defaults to `<repo>/원본 데이터` and holds `data_list.csv` and `files/` with about 100 HWP and PDF RFPs. They are read-only and never modified. Content hashes identify sources, and the same hashes pin them in `migration_validation` and the backup manifests. The originals, `.env` and the runtime are ignored by Git and do not exist in a linked worktree.

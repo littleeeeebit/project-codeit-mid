@@ -1,9 +1,0 @@
-created: 2026-10-11T21:58:02.015Z
-updated: 2026-10-11T21:58:02.016Z
-update_count: 1
-last_field: description
-kind: nested-class
-title: annotation-store
-children: []
-parentPath:
-  - stage-review-app

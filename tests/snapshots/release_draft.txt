@@ -20,7 +20,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 ## Release manifest
 
 - code: Git `rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr` (uncommitted changes: False), package source `cccccccccccccccc`; metric code `mmmmmmmmmmmmmmmm`
-- model gpt-5-mini, reasoning low, output cap 4000, prompt grounded-answer-13, rates None, settings `<id1>`
+- model gpt-5-mini, reasoning low, output cap 4000, prompt grounded-answer-14, rates None, settings `<id1>`
 - serving: keyword default (kiwi_bm25), no activated run, keyword index `<id2>`, dense `None`, reranker None; fallback kiwi_bm25
 - dependencies: requirements-lock.txt `<id3>`; hardware {'machine': 'fixture'}
 - freeze: none (draft release)
@@ -72,6 +72,11 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 | negative/ambiguous handling >= 0.90 | not measured | n/a |
 | full-answer p95 < 15 s at six users (real provider) | not measured | no real latency sample |
 
+## Human error analysis (not a sealed metric)
+
+- Failure types the person named and accepted from their own span notes on stage-review generation runs (gold: development questions) and on traffic runs (traffic: real consultant answers, a rule-based sample that does not cover every request). They say what to fix next; they are not a release gate, not a sealed-set measurement and do not move any pass line above.
+- no accepted failure type yet: write notes in the review app, then `python -m rfp_assistant.cli error-analysis export` and decide the proposal on 실패 유형
+
 ## Budget
 
 - spent $<n> of the $<n> allowance (<n>%); pending $<n> (unknown $<n>); cap $<n>; paid enabled True; last reconciliation never; dates 2026-09-30..2026-10-28
@@ -116,7 +121,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
  "model": "gpt-5-mini",
  "reasoning_effort": "low",
  "max_output_tokens": 4000,
- "prompt_version": "grounded-answer-13",
+ "prompt_version": "grounded-answer-14",
  "rate_version": null,
  "active_run": null,
  "serving": {
@@ -298,7 +303,18 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
  "answer_runs": [],
  "sealed_runs": [],
  "latency": [],
- "checks": {}
+ "checks": {},
+ "human_error_analysis": {
+  "sealed_metric": false,
+  "gate": false,
+  "version": 0,
+  "reviewed": 0,
+  "reviewed_by_run": {},
+  "reviewed_by_source": {},
+  "types": [],
+  "pending": 0,
+  "thin": 3
+ }
 }
 ----- budget.json -----
 {

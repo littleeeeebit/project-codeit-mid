@@ -1,17 +1,12 @@
 graph TD
-  ask-screen["Ask screen\nweb/src/components/ask/ask-page.tsx"]
-  session-gate["Session gate\nsrc/rfp_assistant/api.py"]
-  submit-answer["submit_answer\nsrc/rfp_assistant/service/service.py"]
-  request-runner["RequestRunner\nsrc/rfp_assistant/service/service.py"]
-  execute-answer["_execute_traced\nsrc/rfp_assistant/service/service.py"]
-  request-record["requests row\nsrc/rfp_assistant/storage/store.py"]
-  answer-stream["Answer stream\nweb/src/lib/use-answer-stream.ts"]
-  ask-screen -->|POST /api/ask| session-gate
-  session-gate -->|member key context bound| submit-answer
-  submit-answer -->|insert queued snapshot| request-record
-  submit-answer -->|admit and submit id| request-runner
-  request-runner -->|claim queued to running| execute-answer
-  execute-answer -->|partial text in memory| answer-stream
-  execute-answer -->|_finish stores outcome| request-record
-  ask-screen -->|poll GET request| request-record
-  answer-stream -->|done event triggers reload| ask-screen
+  ask-route["POST /api/ask\nsrc/rfp_assistant/api.py"] -->|"AnswerRequest, new generation_id"| submit-answer["Admission and persistence\nservice.submit_answer"]
+  submit-answer -->|"free modes inline"| finish-and-read["Store and read outcome\nservice._finish"]
+  submit-answer -->|"queued row, executor slot"| queued-worker["Worker claim\nservice.run_queued"]
+  queued-worker -->|"previous_request_id set"| follow-up-rewrite["Follow-up rewrite\nservice._rewrite"]
+  queued-worker -->|"corpus mode"| metadata-route["Metadata route\nmetadata_answers.route"]
+  queued-worker -->|"single or compare"| paid-answer["Retrieve and generate\nservice._paid_answer"]
+  follow-up-rewrite -->|"standalone question"| paid-answer
+  metadata-route -->|"not a metadata query"| paid-answer
+  metadata-route -->|"listing answer"| finish-and-read
+  paid-answer -->|"streamed JSON output"| answer-validation["Citation validation\ngeneration.validate_answer"]
+  answer-validation -->|"payload or technical_error"| finish-and-read

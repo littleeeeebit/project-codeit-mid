@@ -1,1 +1,0 @@
-Each set is a group of pgvector rows tagged with model, dimensions and prefix policy. There is also a query-vector cache keyed by text, model and dimensions. Sets are built by `build-dense`, by `compare` matrices, or by maintenance `step_embedding`. Local GPU models build for free. API models stop at a priced estimate until it is approved.

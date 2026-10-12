@@ -1,0 +1,9 @@
+created: 2026-10-12T02:27:21.269Z
+updated: 2026-10-12T02:27:21.270Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: keyword-build
+children: []
+parentPath:
+  - corpus-pipeline

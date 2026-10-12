@@ -1,0 +1,1 @@
+`budget.recover` runs only after a new process acquires the gateway lock (`Resources._own`). `dispatching` attempts become `unknown` ('process ended during dispatch') and `reserved` ones become `released`, and Gemini's `external_attempts` get the same treatment. `recover_requests` marks queued and running requests `interrupted`. Nothing is replayed.

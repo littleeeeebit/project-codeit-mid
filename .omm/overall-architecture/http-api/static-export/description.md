@@ -1,1 +1,0 @@
-`StaticFiles(directory=web/out, html=True)` is mounted at `/` only when `web/out` exists (after `cd web; npm run build`). Paths outside `/api/` skip `_Session`, so the static screens load without a session. Their first API call returns 401, and the client's `expired` middleware then navigates to `/api/auth/login`.

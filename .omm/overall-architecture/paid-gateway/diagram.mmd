@@ -1,13 +1,7 @@
 graph TD
-  ledger-reservation["Reservation\nsrc/rfp_assistant/gateway/budget.py"]
-  dispatch-marker["Dispatch marker\nsrc/rfp_assistant/gateway/budget.py"]
-  openai-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
-  settlement["Settle, release, unknown\nsrc/rfp_assistant/gateway/budget.py"]
-  gateway-owner["Gateway advisory lock\nsrc/rfp_assistant/storage/postgres.py"]
-  langfuse-tracing["Langfuse tracing\nsrc/rfp_assistant/gateway/tracing.py"]
-  ledger-reservation -->|attempt reserved| dispatch-marker
-  dispatch-marker -->|attempt dispatching| openai-transport
-  openai-transport -->|usage or provider error| settlement
-  gateway-owner -->|owner_guard in transaction| ledger-reservation
-  gateway-owner -->|owner_check before call| openai-transport
-  openai-transport -->|generation span| langfuse-tracing
+  gateway-owner["Gateway advisory lock\npostgres.GatewayOwner"] -->|"owner_guard in tx"| admission["Reservation\nbudget.reserve"]
+  admission -->|"attempt reserved"| dispatch-guard["Dispatch marker\nbudget.mark_dispatching"]
+  dispatch-guard -->|"state dispatching"| openai-transport["OpenAI transport\nsrc/rfp_assistant/gateway/generation.py"]
+  gateway-owner -->|"owner_check before call"| openai-transport
+  openai-transport -->|"usage or provider error"| settlement["Settle, release, unknown\nbudget.settle"]
+  startup-recovery["Startup recovery\nbudget.recover"] -->|"orphans to unknown/released"| settlement

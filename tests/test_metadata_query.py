@@ -570,5 +570,205 @@ class RollbackTest(Base):
         self.assertIn(f"listing.{described}", similar_cases.answer_fields(shown))
 
 
+def metadata_units(messages, doc_id=None) -> list[dict]:
+    """The metadata units an answer prompt supplies (of one document)."""
+    evidence = json.loads(messages[-1]["content"])["evidence"]
+    return [e for e in evidence if e["location"].get("format") == "metadata" and doc_id in (None, e["doc_id"])]
+
+
+def cite_metadata(doc_id: str, field: str, claim_doc: str | None = None, absences=(), before=None):
+    """A fake answer model restating `doc_id`'s `field` from its metadata unit (as a claim of `claim_doc`, by default
+    the same document), plus `absences` declared for that document. `before(unit)` runs as the call is made."""
+    def respond(messages):
+        (unit,) = [u for u in metadata_units(messages, doc_id) if u["location"]["field"] == field]
+        if before:
+            before(unit)
+        owner = claim_doc or doc_id
+        return reply({"status": "answered", "summary": unit["text"], "summary_evidence_ids": [unit["evidence_id"]],
+                      "claims": [{"text": unit["text"], "kind": "source_fact", "doc_id": owner,
+                                  "evidence_ids": [unit["evidence_id"]]}]
+                      + [{"text": t, "kind": "absence", "doc_id": doc_id, "evidence_ids": []} for t in absences],
+                      "missing_fields": [], "conflicts": [], "next_action": None}, messages)
+    return respond
+
+
+class MetadataStatementTest(unittest.TestCase):
+    def doc(self, conflicts=None, resolutions=None, **meta):
+        base = {"title": "t", "institution": "기관X", "amount_krw": 130_000_000,
+                "published_at": {"value": "2024-08-08T00:00:00+09:00", "precision": "timestamp"},
+                "bid_start": {"value": "2024-08-20", "precision": "date"},
+                "bid_close": {"value": "2024-09-09T15:00:00+09:00", "precision": "timestamp"}, **meta}
+        resolutions = resolutions or {}
+        return {"doc_id": "d", "active_source_hash": "h", "resolutions": resolutions,
+                "effective": {**base, **{f: r["value"] for f, r in resolutions.items()}},
+                "quality": {"provenance_conflicts": [{"field": f, "values": v} for f, v in (conflicts or {}).items()]}}
+
+    def statements(self, d, types=None):
+        return {s["field"]: (s["text"], s["source"]) for s in mq.metadata_statements(
+            d, {"기관X": {"type": "공공기관"}} if types is None else types)}
+
+    def test_known_values_are_stated_with_their_source(self):
+        self.assertEqual(self.statements(self.doc()), {
+            "amount_krw": ("사업 금액: 130,000,000원", "csv"), "institution": ("발주 기관: 기관X", "csv"),
+            "institution_type": ("기관 유형: 공공기관", "classification"),
+            "published_at": ("공개 일자: 2024-08-08", "csv"), "bid_start": ("입찰 시작일: 2024-08-20", "csv"),
+            "bid_close": ("입찰 마감일: 2024-09-09 15:00", "csv")})
+        corrected = self.doc(conflicts={"amount_krw": {"x": 1, "y": 2}}, resolutions={
+            "amount_krw": {"value": 90_000_000}, "institution_type": {"value": "대학"}})
+        got = self.statements(corrected)
+        self.assertEqual(got["amount_krw"], ("사업 금액: 90,000,000원", "resolution"))
+        self.assertEqual(got["institution_type"], ("기관 유형: 대학", "resolution"))
+
+    def test_a_value_no_query_may_use_is_stated_as_needing_review_never_as_a_plain_value(self):
+        cases = {
+            "사업 금액: 확인 필요 (0원 검토, 기록된 값 0원)": self.doc(amount_krw=0),
+            "사업 금액: 확인 필요 (금액 검토, 기록된 값 1원)": self.doc(amount_krw=1),
+            "사업 금액: 확인 필요 (금액 없음)": self.doc(amount_krw=None),
+            "사업 금액: 확인 필요 (출처 충돌, 기록된 값 100,000,000원 / 200,000,000원)":
+                self.doc(conflicts={"amount_krw": {"x": 100_000_000, "y": 200_000_000}}),
+        }
+        for text, d in cases.items():
+            self.assertEqual(self.statements(d)["amount_krw"][0], text)
+        got = self.statements(self.doc(bid_start=None), types={})
+        self.assertEqual(got["bid_start"][0], "입찰 시작일: 확인 필요 (날짜 없음)")
+        self.assertEqual(got["institution_type"], ("기관 유형: 확인 필요 (유형 미분류)", "classification"))
+
+
+class MetadataCitationTest(Base):
+    """Every answer prompt states each of its documents' typed metadata as citable units, validated like passages."""
+
+    def setUp(self):
+        super().setUp()
+        self.transport.structured["metadata_query"] = lambda m: reply({**model(), "metadata_question": False}, m)
+        self.a, self.d = self.env.refs["기관A"], self.env.refs["기관D"]
+
+    def scoped(self, scope, mode="single", previous=""):
+        return service.answer(self.res, self.env.consultant, AnswerRequest(
+            idempotency_key=str(uuid.uuid4()), generation_id="g", question="하자보수 기간은 얼마인가요?", scope=scope,
+            mode=mode, as_of=AS_OF, previous_request_id=previous))
+
+    def test_every_document_of_every_prompt_gets_metadata_units_apart_from_the_passages(self):
+        single = self.scoped([self.a])
+        asked = {"single": single, "compare": self.scoped([self.a, self.d], "compare"), "corpus": self.ask("하자보수 기간"),
+                 "follow-up": self.scoped([self.a], previous=single.request_id)}
+        prompts = [c["messages"] for c in self.transport.calls if c["kind"] == "answer"]
+        self.assertEqual(len(prompts), 4)
+        for (mode, r), messages in zip(asked.items(), prompts):
+            with self.subTest(mode=mode):
+                self.assertEqual(r.status, "answered", r.error)
+                request = json.loads(messages[-1]["content"])
+                units = metadata_units(messages)
+                self.assertEqual(sorted((u["doc_id"], u["location"]["field"]) for u in units),
+                                 sorted((d["doc_id"], f) for d in request["selected_documents"]
+                                        for f in mq.EVIDENCE_FIELDS))
+                passages = [e["evidence_id"] for e in request["evidence"] if e not in units]
+                self.assertTrue(passages and all(i.startswith("E") for i in passages))
+                self.assertEqual([u["evidence_id"] for u in units], [f"M{i}" for i in range(1, len(units) + 1)])
+                for d in request["selected_documents"]:  # each document's IDs list its metadata units too
+                    self.assertTrue({u["evidence_id"] for u in units if u["doc_id"] == d["doc_id"]}
+                                    <= set(request["evidence_ids_by_doc"][d["doc_id"]]))
+
+    def test_a_metadata_citation_is_served_and_opens_as_metadata(self):
+        self.transport.responder = cite_metadata(self.a.doc_id, "amount_krw")
+        r = self.scoped([self.a])
+        self.assertEqual(r.status, "answered", r.error)
+        (eid,) = r.claims[0]["evidence_ids"]
+        self.assertEqual(r.claims[0]["text"], "사업 금액: 130,000,000원")
+        self.assertEqual(r.evidence[eid]["location"], {"format": "metadata", "field": "amount_krw",
+                                                       "value": "130,000,000원", "source": "csv"})
+        view = service.open_evidence(self.res, self.env.consultant, r.request_id, eid)
+        self.assertEqual((view.quote, view.context, view.download_available, view.location["format"]),
+                         ("사업 금액: 130,000,000원", [], False, "metadata"))
+
+    def test_a_corpus_follow_up_keeps_a_document_its_previous_answer_cited_only_by_metadata(self):
+        def as_asked(messages):  # the follow-up as its own query: fresh retrieval finds only D's passages
+            return reply({"query": json.loads(messages[-1]["content"])["follow_up"]}, messages)
+        self.transport.rewriter = as_asked
+        self.transport.responder = cite_metadata(self.a.doc_id, "amount_krw")
+        previous = self.ask("하자보수 기간")
+        for turn in (2, 3):
+            with self.subTest(turn=turn):
+                r = self.ask("도서관 좌석 예약 시스템", previous=previous.request_id)
+                self.assertEqual(r.status, "answered", r.error)
+                messages = [c for c in self.transport.calls if c["kind"] == "answer"][-1]["messages"]
+                passages = [e for e in json.loads(messages[-1]["content"])["evidence"]
+                            if e["location"].get("format") != "metadata"]
+                self.assertEqual({e["doc_id"] for e in passages}, {self.d.doc_id})
+                self.assertEqual([r.evidence[i]["quote"] for i in r.claims[0]["evidence_ids"]],
+                                 ["사업 금액: 130,000,000원"])
+                previous = r
+
+    def test_a_metadata_unit_of_another_document_is_a_scope_mismatch(self):
+        self.transport.responder = cite_metadata(self.d.doc_id, "amount_krw", claim_doc=self.a.doc_id)
+        r = self.scoped([self.a, self.d], "compare")
+        self.assertEqual(r.status, "technical_error")
+        self.assertRegex(r.error, r"^evidence_scope_mismatch: M\d+ belongs to another document$")
+
+    def test_a_metadata_unit_is_checked_against_the_metadata_stored_when_the_answer_is_validated(self):
+        def corrected(unit):  # a reviewer corrects the type while the answer is being written
+            ingestion.resolve_metadata(self.env.settings, self.a.doc_id, "institution_type", "연구기관", "fixture",
+                                       "기관 홈페이지", "reviewer")
+        self.transport.responder = cite_metadata(self.a.doc_id, "institution_type", before=corrected)
+        r = self.scoped([self.a])
+        self.assertEqual(r.status, "technical_error")
+        self.assertRegex(r.error, r"^evidence_quote_mismatch: M\d+$")
+        self.transport.responder = cite_metadata(self.a.doc_id, "institution_type")
+        again = self.scoped([self.a])
+        self.assertEqual((again.status, again.claims[0]["text"]), ("answered", "기관 유형: 연구기관"))
+
+
+# Every metadata question type of the pinned set, by one pinned question of that type.
+QUESTION_TYPES = {"highest": "예산 규모가 제일 큰 사업 세 개만 뽑아줘", "lowest": "가장 싼 사업",
+                  "threshold above": "5천만원 이상인 사업", "threshold below": "오천만원도 안 되는 저예산 사업들",
+                  "institution type": "지자체 발주 사업 보여줘", "combined": "대학에서 낸 제안서 중 1억 이상인 제안서"}
+ABSENCES = ("Contract period: not in the supplied passages", "Nothing supplied gives  the submission deadline")
+
+
+class ListFollowUpTest(Base):
+    """Generated two-turn conversations: a listing, then a follow-up about the project it listed first. Every project
+    has its own indexed original, so the follow-up's prompt holds the project's passages and its metadata units."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        rows, originals = [], {}
+        for i, (title, inst, amt, published, close, _) in enumerate(PROJECTS):
+            name = f"P{i:02d}_{title}.pdf"
+            originals[name] = fixtures.make_pdf([["제안요청서", "Ⅰ. 사업 개요", f"사업명: {title}",
+                                                  f"{title} 시스템을 구축하고 운영한다."]])
+            rows.append([f"2024{i:04d}", "0.0", title, "" if amt is None else f"{amt}.0", inst, published or "", "",
+                         close or "", "요약", "pdf", name, "미리보기"])
+        self.env = fixtures.make_env(Path(self.tmp.name), rows=rows, originals=originals)
+        def translator(messages):  # a pinned question is a metadata question; the follow-up is not
+            asked = json.loads(messages[-1]["content"])["question"]
+            return reply(PINNED[asked][0] if asked in PINNED else {**model(), "metadata_question": False}, messages)
+
+        self.transport = generation.FakeTransport(structured={"metadata_query": translator,
+                                                              "institution_types": classifier})
+        self.res = service.Resources(self.env.settings, transport=self.transport)
+
+    def test_a_follow_up_about_a_listed_project_restates_its_amount_from_metadata(self):
+        self.assertTrue(set(QUESTION_TYPES.values()) <= set(PINNED))
+        for kind, question in QUESTION_TYPES.items():
+            with self.subTest(kind=kind):
+                listed = self.ask(question)
+                self.assertEqual(listed.status, "answered", listed.error)
+                project = listed.listing["rows"][0]  # the project comes from the listing, never fixed in the test
+                self.assertTrue(project["evidence_ids"], "its description passages carry it into the follow-up")
+                self.transport.responder = cite_metadata(project["doc_id"], "amount_krw", absences=ABSENCES)
+                r = self.ask("첫 번째로 나온 사업을 처음 보는 사람도 알도록 풀어서 설명해 줘", listed.request_id)
+                self.assertEqual(r.status, "answered", r.error)
+                (claim,) = r.claims  # the absences are never shown
+                (eid,) = claim["evidence_ids"]
+                unit = r.evidence[eid]
+                self.assertEqual((claim["doc_id"], unit["doc_id"], unit["location"]["format"],
+                                  unit["location"]["field"]), (project["doc_id"],) * 2 + ("metadata", "amount_krw"))
+                amount = project["amount_krw"]
+                self.assertEqual(claim["text"], f"사업 금액: {amount:,}원" if amount and amount >= mq.MIN_AMOUNT_KRW
+                                 else unit["quote"])
+                self.assertEqual([m for m in r.missing_fields if m["doc_id"] == project["doc_id"]],
+                                 [{"doc_id": project["doc_id"], "field": " ".join(t.split()),
+                                   "reason": "not_found_in_context"} for t in ABSENCES])
+
+
 if __name__ == "__main__":
     unittest.main()

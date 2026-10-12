@@ -1,0 +1,1 @@
+Sign-in sessions (`auth.Login._sessions`) and members' API keys (`Resources.member_keys` / transport sessions) live only in process memory. A restart or update signs everyone out and requires keys to be entered again. The README documents this as intended.

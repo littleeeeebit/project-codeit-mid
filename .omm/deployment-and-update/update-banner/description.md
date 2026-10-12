@@ -1,1 +1,0 @@
-The header banner shows `UpdateStatus` from `GET /api/update/status`: commits ahead, why paid work blocks an update, and the last result. It sends `POST /api/update` when a member asks. The component was identified by its route usage and file name and was not read line by line.

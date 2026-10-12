@@ -1,0 +1,1 @@
+This branch (`followup-absence-and-metadata-citations`) is changing how a corpus follow-up keeps documents the previous answer cited only by metadata.

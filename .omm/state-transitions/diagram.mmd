@@ -1,10 +1,8 @@
 graph TD
-  request-status["Request status\nsrc/rfp_assistant/service/service.py"]
-  attempt-state["Ledger attempt state\nsrc/rfp_assistant/gateway/budget.py"]
-  maintenance-run-status["Maintenance run status\nsrc/rfp_assistant/storage/maintenance.py"]
-  update-fence["Update fence\nsrc/rfp_assistant/service/update.py"]
-  request-status -->|cancel refuses next dispatch| attempt-state
-  attempt-state -->|unknown blocks new calls| request-status
-  update-fence -->|refuses new admission| request-status
-  attempt-state -->|open attempts refuse update| update-fence
-  maintenance-run-status -->|live job refuses update| update-fence
+  cancel-and-abandon["Cancel and abandon\nservice.cancel_request"] -->|"cancel_requested = 1"| request-status["Request status\nrequests.status"]
+  request-status -->|"_stop_reason in dispatch tx"| attempt-billing["Attempt billing state\nattempts.state"]
+  restart-recovery["Restart recovery\nservice.recover_requests"] -->|"queued, running to interrupted"| request-status
+  restart-recovery -->|"dispatching to unknown"| attempt-billing
+  update-fence["Update fence\nupdate.UpdateWatch.fenced"] -->|"blocks new admission"| request-status
+  update-fence -->|"waits for open attempts"| attempt-billing
+  maintenance-run["Maintenance run state\n.runtime/maintenance/state.json"] -->|"paid embedding via ledger"| attempt-billing

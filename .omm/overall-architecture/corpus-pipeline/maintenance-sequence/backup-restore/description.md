@@ -1,0 +1,1 @@
+`step_backup` takes a PostgreSQL dump and records it. `step_restore_check` restores it into a scratch database (`rfp_mrestore_*`) and compares stable table contents (ignoring the volatile `audit_events`) before any write step runs. The scratch database is dropped afterwards.

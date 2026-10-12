@@ -7,7 +7,6 @@ title: http-api
 children:
 - answer-sse
 - ask-routes
-- dataset-routes
 - hub-login
 - hub-sign-in
 - login-store
@@ -15,10 +14,8 @@ children:
 - session-middleware
 - sign-in-routes
 - sse-stream
-- static-export
 - stream-route
 - update-watch
-- verify-routes
 parentPath: []
 prev_diagram: "graph TD\r\n  session-middleware[\"Session gate\\nsrc/rfp_assistant/api.py\"\
   ] -->|\"open sign-in paths\"| hub-oauth[\"JupyterHub OAuth\\nsrc/rfp_assistant/service/auth.py\"\

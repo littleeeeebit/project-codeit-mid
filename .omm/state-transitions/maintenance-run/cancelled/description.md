@@ -1,0 +1,1 @@
+The 취소 button sends `POST /api/verify/maintenance/cancel` with the shown run ID. A running parse is killed at once, and other steps stop at their end. A cancel admitted during the last step still ends the run cancelled, with the reason saying so.

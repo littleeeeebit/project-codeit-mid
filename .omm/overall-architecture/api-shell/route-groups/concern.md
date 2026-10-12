@@ -1,0 +1,1 @@
+Each open answer stream re-reads the request row (and its attempts) from PostgreSQL about 7 times a second through `request_status` until the request finishes. The cost is fine for six members but grows with concurrent streams.

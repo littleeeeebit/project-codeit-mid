@@ -1,0 +1,1 @@
+`POST /api/requests/{id}/cancel` → `cancel_request` (owner only). `POST /abandon` → `abandon_request`, which cancels only while the request is still `queued`. The screen abandons its latest turn when the conversation is left, so it never pays for an answer nobody will see, while a running answer finishes and stays in history.

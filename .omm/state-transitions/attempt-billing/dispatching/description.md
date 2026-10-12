@@ -1,0 +1,1 @@
+A durable marker written before the network call, in the same transaction as the request stop check. At restart it becomes `unknown`, because the call may have executed.

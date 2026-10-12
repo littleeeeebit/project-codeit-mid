@@ -1,0 +1,1 @@
+Requirement codes in the question (`CODE_RE`, for example `SFR-001`) select rows whose `requirement_key` matches, detail rows first. They stay ahead of every ranker in the final ranking. Missing, summary-only or ambiguous codes are noted as `code_not_found`, `code_detail_unavailable` or `code_ambiguous`.

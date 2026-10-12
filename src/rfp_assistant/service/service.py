@@ -24,7 +24,7 @@ from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
-from . import auth
+from . import auth, metadata_answers  # metadata_answers imports this module back; both use the other only in calls
 from ..gateway import budget, generation, tracing
 from ..corpus import fidelity
 from ..evaluation import gold
@@ -778,7 +778,8 @@ def prepare_answer(res: Resources, principal: Principal, question: str, scope: l
                    carried: list[EvidenceUnit] = ()) -> dict:
     """Retrieval plus exact prompt counting and the maximum reservation estimate. Free unless `allow_paid`
     lets a dense mode pay for an uncached query embedding. `mode`/`limits` come from a frozen verifier
-    configuration. With `all_documents` the prompt names only the documents whose passages were retrieved.
+    configuration. With `all_documents` the prompt names only the documents whose passages were retrieved or carried,
+    or whose metadata the previous answer cited.
     A follow-up passes its `conversation` and the previous answer's `carried` evidence (`_with_carried`)."""
     principal = _authorize(res, principal, "consultant", "verifier")
     if all_documents:
@@ -786,10 +787,10 @@ def prepare_answer(res: Resources, principal: Principal, question: str, scope: l
                              limits=limits, all_documents=True)
         retrieval = _with_carried(res, retrieval, carried)
         cited = [e.doc_id for e in retrieval.evidence]
-        order = list(dict.fromkeys(cited))
+        order = list(dict.fromkeys(cited + [e.doc_id for e in carried if metadata_answers.is_unit(e)]))
         docs = sorted(_doc_rows(res, order), key=lambda d: order.index(d["doc_id"]))
         prep = _priced(res, question, as_of, docs, retrieval, "corpus", conversation=conversation)
-        prep["coverage"] = [{"doc_id": d, "evidence": cited.count(d)} for d in order]
+        prep["coverage"] = [{"doc_id": d, "evidence": cited.count(d)} for d in dict.fromkeys(cited)]
         return prep
     docs = _resolve_scope(res, scope)
     retrieval = retrieve(res, principal, question, scope, request_id=request_id, allow_paid=allow_paid, mode=mode,
@@ -802,10 +803,10 @@ def _with_carried(res: Resources, retrieval: RetrievalResult, carried: list[Evid
                   doc_ids: set[str] | None = None) -> RetrievalResult:
     """A follow-up's evidence: the fresh retrieval first, then the previous answer's cited units it lacks, renumbered
     after it, so restating that answer can cite every fact again. A unit whose chunk left the serving index is
-    dropped: its quote could no longer be checked."""
+    dropped: its quote could no longer be checked. Metadata units are not passages: their documents get current ones."""
     have = {e.chunk_id for e in retrieval.evidence}
-    extra = [e for e in carried if e.chunk_id not in have and (doc_ids is None or e.doc_id in doc_ids)
-             and _stored_quote(res, e) is not None]
+    extra = [e for e in carried if not metadata_answers.is_unit(e) and e.chunk_id not in have
+             and (doc_ids is None or e.doc_id in doc_ids) and _stored_quote(res, e) is not None]
     if not extra:
         return retrieval
     n = len(retrieval.evidence)
@@ -818,7 +819,8 @@ def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retriev
             mode: str, price_query_embedding: bool = True, conversation: list[dict] | None = None) -> dict:
     with tracing.step("assemble-evidence", input={"question": question, "as_of": as_of, "mode": mode,
                                                   "doc_ids": [d["doc_id"] for d in docs]}) as packed:
-        messages = generation.build_messages(question, as_of, [_doc_brief(d) for d in docs], retrieval.evidence,
+        meta = metadata_answers.evidence_units(res, docs)
+        messages = generation.build_messages(question, as_of, [_doc_brief(d) for d in docs], retrieval.evidence + meta,
                                              retrieval.limitations, mode=mode, conversation=conversation)
         rf = generation.answer_json_schema()
         tokens = generation.count_request_tokens(messages, rf, res.settings.framing_margin_tokens)
@@ -826,6 +828,7 @@ def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retriev
             "evidence": [{"evidence_id": e.evidence_id, "doc_id": e.doc_id, "chunk_id": e.chunk_id,
                           "location": e.location, "token_count": e.token_count, "text": e.quote}
                          for e in retrieval.evidence],
+            "metadata_evidence": [{"evidence_id": e.evidence_id, "doc_id": e.doc_id, "text": e.quote} for e in meta],
             "evidence_tokens": retrieval.evidence_tokens, "prompt_input_tokens": tokens,
             "limitations": retrieval.limitations, "excluded": retrieval.excluded}})
     try:  # an unknown rate leaves the estimate empty; admission then refuses with `unknown_rate`
@@ -841,7 +844,7 @@ def _priced(res: Resources, question: str, as_of: str, docs: list[dict], retriev
     except budget.BudgetError:
         est = None
     return {"retrieval": retrieval, "messages": messages, "response_format": rf, "input_tokens": tokens,
-            "estimate_micro_usd": est, "docs": docs}
+            "estimate_micro_usd": est, "docs": docs, "metadata_evidence": meta}
 
 
 def _doc_brief(d: dict) -> dict:
@@ -969,7 +972,10 @@ def _conversation(res: Resources, principal: Principal,
             snap, result = json.loads(row["request_json"]), _stored_result(conn, previous, row["result_json"]) or {}
             if not turns:
                 units = result.get("evidence") or {}
-                carried = [EvidenceUnit(**units[i]) for i in _cited_ids(result) if i in units][:CARRIED_EVIDENCE]
+                cited = [EvidenceUnit(**units[i]) for i in _cited_ids(result) if i in units]
+                # a cited metadata unit carries only its document, whose units the follow-up rebuilds from current values
+                carried = ([e for e in cited if not metadata_answers.is_unit(e)][:CARRIED_EVIDENCE]
+                           + [e for e in cited if metadata_answers.is_unit(e)])
             limit = LATEST_ANSWER_CHARACTERS if not turns else CONVERSATION_ANSWER_CHARACTERS
             turns.append({"question": result.get("standalone_question") or snap.get("question")
                           or FREE_TURNS.get(snap.get("mode"), ""),
@@ -1201,8 +1207,6 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
         done = functools.partial(done, standalone_question=question)
         principal = _checkpoint(res, request_id, principal)
     if request.mode == "corpus" and frozen is None:  # a metadata question lists every match, never top-k passages
-        from . import metadata_answers
-
         listed = metadata_answers.route(res, principal, request_id, request, question, trace, done)
         if listed is not None:
             return listed
@@ -1221,7 +1225,8 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
     _trace_retrieval(trace, prep, carried)
     coverage = prep.get("coverage") or [{"doc_id": d["doc_id"], "evidence": len(retrieval.evidence)} for d in docs]
     server_missing = missing_unavailable + _not_found(coverage, unavailable)
-    evidence_map = _evidence_map(retrieval.evidence)
+    citable = retrieval.evidence + prep["metadata_evidence"]
+    evidence_map = _evidence_map(citable)
     common = {"coverage": coverage, "limitations": retrieval.limitations}
     if not retrieval.evidence:
         where = "전체 문서" if request.mode == "corpus" else "선택한 문서"
@@ -1234,7 +1239,7 @@ def _paid_answer(res: Resources, principal: Principal, request_id: str, request:
         return response
     represented = {c["doc_id"] for c in coverage if c.get("evidence")}
     try:
-        payload = _validated(res, response, retrieval, docs, represented if request.mode == "compare" else None)
+        payload = _validated(res, response, citable, docs, represented if request.mode == "compare" else None)
     except generation.TechnicalError as exc:
         trace["raw_output"] = (response.content or "")[:4000]
         return done("technical_error", "모델 응답을 검증하지 못했습니다. 비용은 기록되었으며 자동 재시도는 하지 않습니다.",
@@ -1298,14 +1303,18 @@ def _generate(res: Resources, principal: Principal, request_id: str, prep: dict,
         ceiling=frozen["estimate_micro_usd"] if frozen is not None else None, on_delta=streamed)
 
 
-def _validated(res: Resources, response, retrieval: RetrievalResult, docs: list[dict], required_doc_ids):
-    """The answer checked against the evidence it may cite, traced as the guardrail step; raises TechnicalError."""
-    stored = {e.evidence_id: _stored_quote(res, e) for e in retrieval.evidence}
+def _validated(res: Resources, response, evidence: list[EvidenceUnit], docs: list[dict], required_doc_ids):
+    """The answer checked against the evidence it may cite (passages and metadata units), traced as the guardrail
+    step; raises TechnicalError. A metadata unit's text must still be its document's statement in the stored
+    metadata now, as a passage's quote must still be its chunk in the index."""
+    current = metadata_answers.current_statements(res, evidence, docs)
+    stored = {e.evidence_id: current[e.evidence_id] if e.evidence_id in current else _stored_quote(res, e)
+              for e in evidence}
     with tracing.step("validate-answer", "guardrail", input={
-            "allowed_evidence_ids": [e.evidence_id for e in retrieval.evidence],
+            "allowed_evidence_ids": [e.evidence_id for e in evidence],
             "allowed_doc_ids": sorted(d["doc_id"] for d in docs)}) as check:
         try:
-            payload = generation.validate_answer(response, retrieval.evidence, {d["doc_id"] for d in docs},
+            payload = generation.validate_answer(response, evidence, {d["doc_id"] for d in docs},
                                                  stored, required_doc_ids=required_doc_ids)
         except generation.TechnicalError as exc:
             check.update(output={"passed": False, "error": str(exc)[:300]}, level="ERROR",
@@ -1714,6 +1723,9 @@ def open_evidence(res: Resources, principal: Principal, request_id: str, evidenc
     if ev is None:
         raise ServiceError("요청에 없는 근거 ID입니다.")
     (doc,) = _doc_rows(res, [ev["doc_id"]])
+    if (ev.get("location") or {}).get("format") == "metadata":  # a metadata field, not a passage: no original
+        return EvidenceView(evidence_id, ev["doc_id"], doc["effective"]["title"], ev["quote"], [], ev["location"],
+                            doc["format"], False, ev["source_hash"], doc["review_status"])
     ordered = _ordered_elements(res, ev["extraction_id"])
     orders = {e["element_id"]: i for i, e in enumerate(ordered)}
     hit = [orders[i] for i in ev["element_ids"] if i in orders]

@@ -15,7 +15,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 ## Release manifest
 
 - code: Git `rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr` (uncommitted changes: False), package source `cccccccccccccccc`; metric code `mmmmmmmmmmmmmmmm`
-- model gpt-5-mini, reasoning low, output cap 4000, prompt grounded-answer-13, rates None, settings `<id2>`
+- model gpt-5-mini, reasoning low, output cap 4000, prompt grounded-answer-14, rates None, settings `<id2>`
 - serving: run `K1-<id3>` (kiwi_bm25), keyword index `<id4>`, dense `None`, reranker None; fallback kiwi_bm25
 - dependencies: requirements-lock.txt `<id5>`; hardware {'machine': 'fixture'}
 - freeze: {'freeze_id': 'F-<id1>', 'frozen_at': '<time>', 'selected_run_id': 'K1-<id3>', 'decided_by': 'owner', 'post_test': False}
@@ -69,6 +69,11 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 | negative/ambiguous handling >= 0.90 | not measured | {'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None} |
 | full-answer p95 < 15 s at six users (real provider) | not measured | no real latency sample |
 
+## Human error analysis (not a sealed metric)
+
+- Failure types the person named and accepted from their own span notes on stage-review generation runs (gold: development questions) and on traffic runs (traffic: real consultant answers, a rule-based sample that does not cover every request). They say what to fix next; they are not a release gate, not a sealed-set measurement and do not move any pass line above.
+- no accepted failure type yet: write notes in the review app, then `python -m rfp_assistant.cli error-analysis export` and decide the proposal on 실패 유형
+
 ## Budget
 
 - spent $<n> of the $<n> allowance (<n>%); pending $<n> (unknown $<n>); cap $<n>; paid enabled True; last reconciliation never; dates 2026-09-30..2026-10-28
@@ -107,7 +112,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
  "model": "gpt-5-mini",
  "reasoning_effort": "low",
  "max_output_tokens": 4000,
- "prompt_version": "grounded-answer-13",
+ "prompt_version": "grounded-answer-14",
  "rate_version": null,
  "active_run": {
   "activated_at": "<time>",
@@ -1276,7 +1281,18 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
   }
  ],
- "checks": {}
+ "checks": {},
+ "human_error_analysis": {
+  "sealed_metric": false,
+  "gate": false,
+  "version": 0,
+  "reviewed": 0,
+  "reviewed_by_run": {},
+  "reviewed_by_source": {},
+  "types": [],
+  "pending": 0,
+  "thin": 3
+ }
 }
 ----- budget.json -----
 {
@@ -1413,7 +1429,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
  | no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases | pass | 0 observed wrong, 0 contested or awaiting blind review |
  | no selected-scope leakage | pass | claims/evidence outside scope 0, wrong-scope candidates 0 |
  | managed evidence links resolve | pass | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
-@@ -89,11 +90,12 @@
+@@ -94,11 +95,12 @@
   "generated_at": "<time>",
   "status": "limited",
   "reasons": [
@@ -1428,7 +1444,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
   ],
   "evidence_label": "sealed pilot",
   "code": {
-@@ -191,7 +193,9 @@
+@@ -196,7 +198,9 @@
   "hardware": {
    "machine": "fixture"
   },
@@ -1439,7 +1455,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
   "freeze": {
    "freeze_id": "F-<id1>",
    "frozen_at": "<time>",
-@@ -204,7 +208,7 @@
+@@ -209,7 +213,7 @@
     "key": "automated_invariants",
     "kind": "hard",
     "ok": null,
@@ -1448,11 +1464,11 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    },
    {
     "key": "critical_wrong",
-@@ -1275,7 +1279,17 @@
+@@ -1280,7 +1284,17 @@
     "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
    }
   ],
-- "checks": {}
+- "checks": {},
 + "checks": {
 +  "check-all": {
 +   "phase": "all",
@@ -1463,10 +1479,10 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 +    "source_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 +   }
 +  }
-+ }
- }
- ----- budget.json -----
- {
++ },
+  "human_error_analysis": {
+   "sealed_metric": false,
+   "gate": false,
 ===== run 3 =====
 --- run 1
 +++ run 3
@@ -1494,7 +1510,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
  | no critical wrong deadline/amount/mandatory condition/institution in reviewed release cases | pass | 0 observed wrong, 0 contested or awaiting blind review |
  | no selected-scope leakage | pass | claims/evidence outside scope 0, wrong-scope candidates 0 |
  | managed evidence links resolve | pass | {'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]} |
-@@ -89,7 +88,6 @@
+@@ -94,7 +93,6 @@
   "generated_at": "<time>",
   "status": "limited",
   "reasons": [
@@ -1502,7 +1518,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    "quality target not measured: multi-evidence complete coverage@20 >= 0.80 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
    "quality target not measured: negative/ambiguous handling >= 0.90 ({'numerator': 0, 'denominator': 0, 'rate': None, 'wilson95': None})",
    "quality target not measured: full-answer p95 < 15 s at six users (real provider) (no real latency sample)",
-@@ -203,8 +201,8 @@
+@@ -208,8 +206,8 @@
    {
     "key": "automated_invariants",
     "kind": "hard",
@@ -1513,11 +1529,11 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    },
    {
     "key": "critical_wrong",
-@@ -1275,7 +1273,19 @@
+@@ -1280,7 +1278,19 @@
     "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
    }
   ],
-- "checks": {}
+- "checks": {},
 + "checks": {
 +  "check-all": {
 +   "phase": "all",
@@ -1530,10 +1546,10 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 +    "git_dirty": false
 +   }
 +  }
-+ }
- }
- ----- budget.json -----
- {
++ },
+  "human_error_analysis": {
+   "sealed_metric": false,
+   "gate": false,
 ===== run 4 =====
 --- run 1
 +++ run 4
@@ -1554,12 +1570,12 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 -- evidence is sealed pilot, not a sealed evaluation of reviewed gold
 +- evidence is no answer evaluation for the current candidate, not a sealed evaluation of reviewed gold
 +- stale evidence not counted: sealed run S-<id2>: prompt_version changed since the freeze
-+- stale evidence not counted: development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-13', the candidate uses 'grounded-answer-changed'
++- stale evidence not counted: development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-14', the candidate uses 'grounded-answer-changed'
 
  ## Release manifest
 
  - code: Git `rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr` (uncommitted changes: False), package source `cccccccccccccccc`; metric code `mmmmmmmmmmmmmmmm`
--- model gpt-5-mini, reasoning low, output cap 4000, prompt grounded-answer-13, rates None, settings `<id2>`
+-- model gpt-5-mini, reasoning low, output cap 4000, prompt grounded-answer-14, rates None, settings `<id2>`
 -- serving: run `K1-<id3>` (kiwi_bm25), keyword index `<id4>`, dense `None`, reranker None; fallback kiwi_bm25
 -- dependencies: requirements-lock.txt `<id5>`; hardware {'machine': 'fixture'}
 -- freeze: {'freeze_id': 'F-<id1>', 'frozen_at': '<time>', 'selected_run_id': 'K1-<id3>', 'decided_by': 'owner', 'post_test': False}
@@ -1630,8 +1646,8 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 +| negative/ambiguous handling >= 0.90 | not measured | n/a |
  | full-answer p95 < 15 s at six users (real provider) | not measured | no real latency sample |
 
- ## Budget
-@@ -89,24 +94,29 @@
+ ## Human error analysis (not a sealed metric)
+@@ -94,24 +99,29 @@
   "generated_at": "<time>",
   "status": "limited",
   "reasons": [
@@ -1648,7 +1664,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 -  "evidence is sealed pilot, not a sealed evaluation of reviewed gold"
 +  "evidence is no answer evaluation for the current candidate, not a sealed evaluation of reviewed gold",
 +  "stale evidence not counted: sealed run S-<id2>: prompt_version changed since the freeze",
-+  "stale evidence not counted: development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-13', the candidate uses 'grounded-answer-changed'"
++  "stale evidence not counted: development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-14', the candidate uses 'grounded-answer-changed'"
   ],
 - "evidence_label": "sealed pilot",
 + "evidence_label": "no answer evaluation for the current candidate",
@@ -1663,12 +1679,12 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
   "model": "gpt-5-mini",
   "reasoning_effort": "low",
   "max_output_tokens": 4000,
-- "prompt_version": "grounded-answer-13",
+- "prompt_version": "grounded-answer-14",
 + "prompt_version": "grounded-answer-changed",
   "rate_version": null,
   "active_run": {
    "activated_at": "<time>",
-@@ -115,7 +125,7 @@
+@@ -120,7 +130,7 @@
    "eval_version": "retrieval-eval-4",
    "fallback_mode": "kiwi_bm25",
    "finalist_run_id": null,
@@ -1677,7 +1693,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    "label": "K1",
    "limits": {
     "channel_top_k": 20,
-@@ -137,7 +147,7 @@
+@@ -142,7 +152,7 @@
    },
    "mode": "kiwi_bm25",
    "reranker": null,
@@ -1686,7 +1702,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
   },
   "serving": {
    "activated_at": "<time>",
-@@ -146,7 +156,7 @@
+@@ -151,7 +161,7 @@
    "eval_version": "retrieval-eval-4",
    "fallback_mode": "kiwi_bm25",
    "finalist_run_id": null,
@@ -1695,7 +1711,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    "label": "K1",
    "limits": {
     "channel_top_k": 20,
-@@ -168,9 +178,9 @@
+@@ -173,9 +183,9 @@
    },
    "mode": "kiwi_bm25",
    "reranker": null,
@@ -1707,14 +1723,14 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
   "datasets": {
    "dev": {
     "dataset_sha256": "<id11>",
-@@ -191,11 +201,14 @@
+@@ -196,11 +206,14 @@
   "hardware": {
    "machine": "fixture"
   },
 - "stale_evidence": [],
 + "stale_evidence": [
 +  "sealed run S-<id2>: prompt_version changed since the freeze",
-+  "development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-13', the candidate uses 'grounded-answer-changed'"
++  "development answer run A-<id3>: A-<id3> used prompt_version 'grounded-answer-14', the candidate uses 'grounded-answer-changed'"
 + ],
   "freeze": {
    "freeze_id": "F-<id1>",
@@ -1724,7 +1740,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    "decided_by": "owner",
    "post_test": false
   },
-@@ -203,28 +216,26 @@
+@@ -208,28 +221,26 @@
    {
     "key": "automated_invariants",
     "kind": "hard",
@@ -1761,7 +1777,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    },
    {
     "key": "admission_cap",
-@@ -240,6 +251,14 @@
+@@ -245,6 +256,14 @@
    },
    {
     "key": "single_hit@20",
@@ -1776,7 +1792,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
     "kind": "quality",
     "ok": true,
     "evidence": "{'numerator': 1, 'denominator': 1, 'rate': 1.0, 'wilson95': [0.2065, 1.0]}",
-@@ -247,37 +266,22 @@
+@@ -252,37 +271,22 @@
     "denominator": 1
    },
    {
@@ -1819,7 +1835,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    },
    {
     "key": "answer_p95",
-@@ -610,7 +614,7 @@
+@@ -615,7 +619,7 @@
   },
   "retrieval_runs": [
    {
@@ -1828,7 +1844,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
     "label": "K1",
     "mode": "kiwi_bm25",
     "dataset_sha256": "<id11>",
-@@ -658,12 +662,12 @@
+@@ -663,12 +667,12 @@
   ],
   "answer_runs": [
    {
@@ -1843,7 +1859,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
       "mode": "kiwi_bm25",
       "completed": 4,
       "of": 4,
-@@ -959,13 +963,13 @@
+@@ -964,13 +968,13 @@
   ],
   "sealed_runs": [
    {
@@ -1859,7 +1875,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
       "mode": "kiwi_bm25",
       "completed": 1,
       "of": 1,
-@@ -1259,9 +1263,9 @@
+@@ -1264,9 +1268,9 @@
      }
     ],
     "serving": {
@@ -1871,11 +1887,11 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
     },
     "hardware": {
      "machine": "fixture"
-@@ -1275,7 +1279,19 @@
+@@ -1280,7 +1284,19 @@
     "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
    }
   ],
-- "checks": {}
+- "checks": {},
 + "checks": {
 +  "check-all": {
 +   "phase": "all",
@@ -1888,7 +1904,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 +    "git_dirty": false
 +   }
 +  }
-+ }
- }
- ----- budget.json -----
- {
++ },
+  "human_error_analysis": {
+   "sealed_metric": false,
+   "gate": false,

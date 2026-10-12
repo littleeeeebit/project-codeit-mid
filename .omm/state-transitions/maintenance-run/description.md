@@ -1,0 +1,1 @@
+The `status` field of `.runtime/maintenance/state.json`, written by `maintenance.run` after every step change, and read by `GET /api/verify/maintenance` through `service.maintenance_status`.

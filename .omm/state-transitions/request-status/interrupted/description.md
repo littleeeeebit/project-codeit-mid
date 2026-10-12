@@ -1,1 +1,1 @@
-Set by a controlled shutdown (`RequestRunner.shutdown`) or by restart recovery (`recover_requests`, run when a new process acquires the gateway). Requests are never replayed automatically; the member asks again.
+Set by `RequestRunner.shutdown` (queued always, running if workers did not finish within `shutdown_wait_seconds`) and by `recover_requests` at the next start. A worker still inside a provider call when marked interrupted will finish and settle, but `_finish` keeps `interrupted`. Nothing is ever replayed automatically.

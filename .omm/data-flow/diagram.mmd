@@ -1,17 +1,10 @@
 graph TD
-  source-originals["RFP originals and CSV\n원본 데이터/files"]
-  extraction-records["Sources and extractions\nsrc/rfp_assistant/storage/store.py"]
-  keyword-index["Keyword index versions\nsrc/rfp_assistant/retrieval/retrieval.py"]
-  vector-sets["pgvector sets\nsrc/rfp_assistant/retrieval/vector_store.py"]
-  activation-record["Activation record\nsrc/rfp_assistant/evaluation/evaluation.py"]
-  request-records["Requests and attempts\nsrc/rfp_assistant/storage/store.py"]
-  langfuse-traces["Langfuse traces\nsrc/rfp_assistant/gateway/tracing.py"]
-  review-runs["Review run folders\nsrc/rfp_assistant/evaluation/traffic_review.py"]
-  source-originals -->|ingest changed bytes| extraction-records
-  extraction-records -->|build-keyword chunks| keyword-index
-  keyword-index -->|embed uncached chunks| vector-sets
-  activation-record -->|pins served index| keyword-index
-  activation-record -->|pins dense version| vector-sets
-  keyword-index -->|packed evidence units| request-records
-  request-records -->|mirrored per request| langfuse-traces
-  request-records -->|read-only traffic sample| review-runs
+  originals["Original HWP and PDF\nRFP_SOURCE_DIR/files"] -->|"sha256, parse, OCR merge"| extractions["Extractions and elements\n.runtime/extracted"]
+  extractions -->|"chunk profile, Kiwi tokens"| keyword-index["Keyword index\n.runtime/indexes"]
+  keyword-index -->|"payload hashes"| embedding-sets["Embedding sets\nembedding_payloads table"]
+  keyword-index -->|"index_version"| serving-activation["Serving activation\napp_settings.active_run"]
+  embedding-sets -->|"dense_version"| serving-activation
+  evaluation-artifacts["Gold sets and runs\n.runtime/datasets and runs"] -->|"person's activation"| serving-activation
+  serving-activation -->|"active_serving per request"| request-records["Request records\nrequests table"]
+  request-records -->|"read-only pseudonymized"| review-runs["Review runs and notes\n.runtime/review"]
+  review-runs -->|"failure types in report"| evaluation-artifacts
