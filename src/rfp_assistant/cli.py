@@ -711,12 +711,13 @@ def cmd_gold(args, settings) -> int:
         c = gold.candidate(settings, args.candidate_id or "", include_sealed=True)
         _print(gold.decide(settings, c["candidate_id"], args.decision or "", args.reviewer, args.expected_sha
                            or c["row_sha256"], args.category, args.note, original_inspected=args.original_inspected,
-                           disputed=args.disputed, include_sealed=True))
+                           disputed=args.disputed, include_sealed=True, reviewer_kind=args.reviewer_kind,
+                           answer_approved=args.answer_approved))
     elif args.action == "second-review":
         if args.agree == args.disagree:
             raise gold.GoldError("pass exactly one of --agree or --disagree")
         _print(gold.second_review(settings, args.candidate_id or "", args.reviewer, args.agree, args.note,
-                                  include_sealed=True))
+                                  include_sealed=True, reviewer_kind=args.reviewer_kind))
     else:
         _print(gold.status(settings))
     return 0
@@ -989,6 +990,11 @@ def _dataset_and_operation_commands(sub) -> None:
     s.add_argument("--expected-sha", help="decide: row version shown by `gold show` (default: current)")
     s.add_argument("--original-inspected", action="store_true", help="decide: the original was inspected")
     s.add_argument("--disputed", action="store_true", help="decide: needs an independent second review")
+    s.add_argument("--reviewer-kind", choices=list(evaluation.REVIEWER_KINDS),
+                   help="decide / second-review: record whether the reviewer is an AI agent or a person "
+                        "(unrecorded when omitted)")
+    s.add_argument("--answer-approved", action="store_true",
+                   help="decide (approve): the expected answer was checked and approved too, not only the labels")
     s.add_argument("--category", action="append", help="decide (reject): rejection category, repeatable")
     s.add_argument("--note", default="", help="decide / second-review: note")
     s.add_argument("--agree", action="store_true", help="second-review")

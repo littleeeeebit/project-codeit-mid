@@ -382,6 +382,46 @@
    ]
   },
   {
+   "id": "gold-contract",
+   "title": "Gold-2 contract before merge: per-evaluation fields, three judgments, unchanged legacy report on the real dev set",
+   "kind": "command",
+   "command": "python -B tools/verify.py gold-contract",
+   "paths": [
+    "src/rfp_assistant/cli.py",
+    "src/rfp_assistant/evaluation/evaluation.py",
+    "src/rfp_assistant/evaluation/gold.py",
+    "src/rfp_assistant/evaluation/release.py",
+    "src/rfp_assistant/storage/store.py",
+    "tests/release_fixtures.py",
+    "tests/test_evaluation.py",
+    "tools/verification/gold_contract.py",
+    "tools/verify.py",
+    "verification.json"
+   ],
+   "environments": [
+    "dataset",
+    "settings"
+   ],
+   "assertions": [
+    {
+     "id": "gold-unit",
+     "expected": "Gold-2 validator, review-queue and sealed tests pass (tests.test_evaluation ValidatorTest, GoldQueueTest, SealedTest)"
+    },
+    {
+     "id": "legacy-unchanged",
+     "expected": "On an isolated copy of the configured corpus (a private test database holding the sources, documents, gold queue, review log and the elements of every extraction the dev rows name; datasets/ copied), the head's dev report equals the merge base's report on the same copy in ok, rows, dataset hash, label, targets, metadata stratum, answerability, source positions, rejected rows and errors"
+    },
+    {
+     "id": "three-judgments",
+     "expected": "The head's dev report has validity, coverage, frozen and row_evaluations; coverage recounts the dataset file, counts unanswerable only by answerability and answerable missing_false_premise rows apart as premise refutations; an unset Negative policy leaves sufficiency undecided with the gap listed; frozen state matches the merge base's frozen_dataset; no reviewer kind or answer approval is shown that the row does not record"
+    },
+    {
+     "id": "runtime-untouched",
+     "expected": "Every file under the configured data dir's datasets/ is byte-identical before and after the flow (frozen manifests, family map, review log, dev.validation.json)"
+    }
+   ]
+  },
+  {
    "id": "stage-review",
    "title": "Stage review: run-folder contract, and review/server.py importing a run and writing a decision",
    "kind": "command",

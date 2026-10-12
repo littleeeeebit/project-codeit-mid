@@ -449,7 +449,8 @@ def _evaluation_report(validation: dict, frozen: dict, retrieval_runs: list[dict
         "validation": {n: None if v is None else {k: v[k] for k in ("ok", "rows", "label", "targets",
                                                                     "metadata_stratum", "answerability",
                                                                     "source_positions")}
-                                                 | {"errors": len(v["errors"])} for n, v in validation.items()},
+                                                 | {"errors": len(v["errors"]), "coverage": v.get("coverage")}
+                       for n, v in validation.items()},
         "frozen": frozen, "retrieval_runs": [{k: r.get(k) for k in (
             "run_id", "label", "mode", "dataset_sha256", "population_size", "scored", "hit@20", "complete@20",
             "packed_complete", "ndcg@5", "mrr", "critical_failures", "wrong_scope", "latency_ms",
@@ -508,7 +509,9 @@ def _dataset_and_run_lines(validation: dict, frozen: dict, retrieval_runs: list[
         L.append(f"- `{n}`: " + ("missing" if v is None else
                                  f"{v['rows']} rows, valid {v['ok']} ({len(v['errors'])} errors), label **{v['label']}**, "
                                  f"targets met {sum(t['met'] for t in v['targets'].values())}/{len(v['targets'])}, "
-                                 f"metadata stratum {v['metadata_stratum']}, positions {v['source_positions']}")
+                                 f"metadata stratum {v['metadata_stratum']}, positions {v['source_positions']}, "
+                                 f"benchmark sufficiency {(v.get('coverage') or {}).get('sufficiency', 'not reported')}"
+                                 f" (Negative policy {((v.get('coverage') or {}).get('negative') or {}).get('policy', '-')})")
                  + (f"; frozen `{f['dataset_sha256'][:12]}` (current {f['current']})" if f else "; not frozen"))
     L += ["", "## Retrieval runs (development, retrieval only)", "",
           "| Run | Mode | Scored | hit@20 single | complete@20 multi | nDCG@5 | MRR | Critical | Wrong scope | p95 ms |",

@@ -294,6 +294,10 @@ CREATE TABLE IF NOT EXISTS gold_reviews (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS gold_reviews_candidate ON gold_reviews(candidate_id, created_at);
+-- Optional, nullable additions that version-6 code never reads, so the version stays (a bump would refuse older
+-- checkouts on the shared database): the reviewer's kind and the expected answer's approval, when recorded.
+ALTER TABLE gold_reviews ADD COLUMN IF NOT EXISTS reviewer_kind TEXT CHECK (reviewer_kind IN ('ai', 'human'));
+ALTER TABLE gold_reviews ADD COLUMN IF NOT EXISTS answer_approved INTEGER;
 CREATE TABLE IF NOT EXISTS eval_estimates (
     estimate_id TEXT PRIMARY KEY,
     action TEXT NOT NULL,

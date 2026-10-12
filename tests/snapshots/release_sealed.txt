@@ -29,8 +29,8 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 
 ## Datasets
 
-- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}; frozen `<id6>` (current True)
-- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}; frozen `<id7>` (current True)
+- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}, benchmark sufficiency undecided (Negative policy unset); frozen `<id6>` (current True)
+- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}, benchmark sufficiency undecided (Negative policy unset); frozen `<id7>` (current True)
 
 ## Retrieval runs (development, retrieval only)
 
@@ -410,7 +410,69 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
     "late": 2,
     "none": 1
    },
-   "errors": 0
+   "errors": 0,
+   "coverage": {
+    "rows": 4,
+    "question_type": {
+     "cross_document": 0,
+     "direct_fact": 1,
+     "exact_identifier": 0,
+     "metadata_direct": 0,
+     "missing_false_premise": 1,
+     "multi_passage": 0,
+     "revision_conflict": 0,
+     "semantic_paraphrase": 1,
+     "table_numeric": 1
+    },
+    "answerability": {
+     "answerable": 3,
+     "unanswerable": 1,
+     "ambiguous": 0,
+     "conflicting": 0
+    },
+    "mode": {
+     "single": 4,
+     "compare": 0,
+     "metadata": 0
+    },
+    "evaluations": {
+     "retrieval": 3,
+     "generation": 3,
+     "grounding": 3,
+     "e2e": 4,
+     "negative": 1
+    },
+    "premise_refutation_answerable": 0,
+    "negative": {
+     "policy": "unset",
+     "unanswerable": 1,
+     "ambiguous": 0,
+     "conflicting": 0
+    },
+    "answers": {
+     "none": 4,
+     "draft": 0,
+     "approved": 0
+    },
+    "reviewer_kind": {
+     "unrecorded": 4
+    },
+    "sufficiency": "undecided",
+    "gaps": [
+     "direct_fact: 1/12 rows",
+     "semantic_paraphrase: 1/9 rows",
+     "exact_identifier: 0/6 rows",
+     "table_numeric: 1/9 rows",
+     "multi_passage: 0/6 rows",
+     "cross_document: 0/6 rows",
+     "missing_false_premise: 1/6 rows",
+     "revision_conflict: 0/6 rows",
+     "negative: no ambiguous rows",
+     "negative: no conflicting rows",
+     "negative: policy unset (no minimum adopted)",
+     "outside gold-2: all-document metadata list answers and follow-up turns (docs/rag/golden-dataset.md, 'Outside gold-2')"
+    ]
+   }
   },
   "test": {
    "ok": true,
@@ -471,7 +533,71 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
     "late": 1,
     "none": 0
    },
-   "errors": 0
+   "errors": 0,
+   "coverage": {
+    "rows": 1,
+    "question_type": {
+     "cross_document": 0,
+     "direct_fact": 1,
+     "exact_identifier": 0,
+     "metadata_direct": 0,
+     "missing_false_premise": 0,
+     "multi_passage": 0,
+     "revision_conflict": 0,
+     "semantic_paraphrase": 0,
+     "table_numeric": 0
+    },
+    "answerability": {
+     "answerable": 1,
+     "unanswerable": 0,
+     "ambiguous": 0,
+     "conflicting": 0
+    },
+    "mode": {
+     "single": 1,
+     "compare": 0,
+     "metadata": 0
+    },
+    "evaluations": {
+     "retrieval": 1,
+     "generation": 1,
+     "grounding": 1,
+     "e2e": 1,
+     "negative": 0
+    },
+    "premise_refutation_answerable": 0,
+    "negative": {
+     "policy": "unset",
+     "unanswerable": 0,
+     "ambiguous": 0,
+     "conflicting": 0
+    },
+    "answers": {
+     "none": 1,
+     "draft": 0,
+     "approved": 0
+    },
+    "reviewer_kind": {
+     "unrecorded": 1
+    },
+    "sufficiency": "undecided",
+    "gaps": [
+     "direct_fact: 1/12 rows",
+     "semantic_paraphrase: 0/9 rows",
+     "exact_identifier: 0/6 rows",
+     "table_numeric: 0/9 rows",
+     "multi_passage: 0/6 rows",
+     "cross_document: 0/6 rows",
+     "missing_false_premise: 0/6 rows",
+     "revision_conflict: 0/6 rows",
+     "negative: no row serves it",
+     "negative: no unanswerable rows",
+     "negative: no ambiguous rows",
+     "negative: no conflicting rows",
+     "negative: policy unset (no minimum adopted)",
+     "outside gold-2: all-document metadata list answers and follow-up turns (docs/rag/golden-dataset.md, 'Outside gold-2')"
+    ]
+   }
   }
  },
  "frozen": {
@@ -1464,7 +1590,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    },
    {
     "key": "critical_wrong",
-@@ -1280,7 +1284,17 @@
+@@ -1406,7 +1410,17 @@
     "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
    }
   ],
@@ -1529,7 +1655,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    },
    {
     "key": "critical_wrong",
-@@ -1280,7 +1278,19 @@
+@@ -1406,7 +1404,19 @@
     "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
    }
   ],
@@ -1590,10 +1716,10 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
 
  ## Datasets
 
--- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}; frozen `<id6>` (current True)
--- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}; frozen `<id7>` (current True)
-+- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}; frozen `<id8>` (current True)
-+- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}; frozen `<id9>` (current True)
+-- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}, benchmark sufficiency undecided (Negative policy unset); frozen `<id6>` (current True)
+-- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}, benchmark sufficiency undecided (Negative policy unset); frozen `<id7>` (current True)
++- `dev`: 4 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 1, 'late': 2, 'none': 1}, benchmark sufficiency undecided (Negative policy unset); frozen `<id8>` (current True)
++- `test`: 1 rows, valid True (0 errors), label **pilot**, targets met 0/8, metadata stratum 0, positions {'early': 0, 'middle': 0, 'late': 1, 'none': 0}, benchmark sufficiency undecided (Negative policy unset); frozen `<id9>` (current True)
 
  ## Retrieval runs (development, retrieval only)
 
@@ -1835,7 +1961,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
    },
    {
     "key": "answer_p95",
-@@ -615,7 +619,7 @@
+@@ -741,7 +745,7 @@
   },
   "retrieval_runs": [
    {
@@ -1844,7 +1970,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
     "label": "K1",
     "mode": "kiwi_bm25",
     "dataset_sha256": "<id11>",
-@@ -663,12 +667,12 @@
+@@ -789,12 +793,12 @@
   ],
   "answer_runs": [
    {
@@ -1859,7 +1985,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
       "mode": "kiwi_bm25",
       "completed": 4,
       "of": 4,
-@@ -964,13 +968,13 @@
+@@ -1090,13 +1094,13 @@
   ],
   "sealed_runs": [
    {
@@ -1875,7 +2001,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
       "mode": "kiwi_bm25",
       "completed": 1,
       "of": 1,
-@@ -1264,9 +1268,9 @@
+@@ -1390,9 +1394,9 @@
      }
     ],
     "serving": {
@@ -1887,7 +2013,7 @@ Generated <time> from `data/` state. Every figure is read from recorded evidence
     },
     "hardware": {
      "machine": "fixture"
-@@ -1280,7 +1284,19 @@
+@@ -1406,7 +1410,19 @@
     "note": "preliminary latency sample of full answers under concurrent members; not an SLA"
    }
   ],

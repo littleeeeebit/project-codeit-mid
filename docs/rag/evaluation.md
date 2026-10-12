@@ -23,6 +23,50 @@ For a single required fact, hit@k is whether any valid supporting passage is pre
 
 Use graded relevance for nDCG when labels justify it: complete support, partial useful support, and irrelevant. State grades and aggregation. Exclude unanswerable and metadata-only questions from passage recall denominators, and report them in their own strata. Inspect retrieved evidence before calling an answer-generation failure a retrieval failure.
 
+## One gold-2 row, five evaluations
+
+Every evaluation reads the same `gold-2` row; there are no per-evaluation copies of the dataset. Evidence stays a source-span label (source hash, extraction, element, offsets or cells, quote) that does not depend on chunks. `EVALUATION_FIELDS` in `evaluation.py` records which fields each evaluation needs for each answerability. A metadata-mode row uses the `metadata` key whatever its answerability.
+
+| Evaluation | answerable | unanswerable / ambiguous | conflicting | metadata |
+| --- | --- | --- | --- | --- |
+| Retrieval (hit@k, recall, nDCG, MRR) | question, scope, evidence_groups | not served | question, scope, evidence_groups | not served |
+| Generation (required-claim correctness) | question, scope, required_claims, evidence_groups | not served | not served | question, scope, metadata_fields, expected_states |
+| Grounding (citation support, link validity) | question, scope, evidence_groups | not served | question, scope, evidence_groups | not served |
+| E2E (row pass) | question, scope, expected_status, evidence_groups | question, scope, expected_status, negative_validation | question, scope, expected_status, evidence_groups | question, scope, expected_status, expected_states |
+| Negative (expected status/action) | not served | question, scope, expected_status, negative_validation | question, scope, expected_status, evidence_groups | not served |
+
+`expected_answer` is optional for all five. The current deterministic metrics score the typed `required_claims` against the answer and never compare it with a reference text. An evaluation that does compare against a reference answer would add `expected_answer` to its entry. Its rows would then report the field as missing.
+
+`validate-gold --dataset dev|test` reports three separate judgments:
+
+- `validity`: schema validity, the same `ok`, errors and rejected rows as before. `label` (gold/pilot against the per-type targets) keeps its meaning.
+- `coverage`: counts over every row in the file (as the type targets count them) by question type, answerability, mode and the evaluations each row serves, with the gaps listed. A row counts as unanswerable only when `answerability == "unanswerable"`. A `missing_false_premise` row the source answers, for example by refuting a wrong premise, is an answerable premise-refutation case (`premise_refutation_answerable`). The Negative counts are unanswerable, ambiguous and conflicting. While no Negative policy is adopted, the report shows `policy: unset`, and benchmark `sufficiency` stays `undecided`, never met.
+- `frozen`: whether a manifest exists and still matches the dataset, review log and family map (`frozen_dataset`). A freeze pins bytes. It never says that the benchmark is sufficient.
+
+`row_evaluations` lists, for each row, the evaluations it belongs to and the required fields it lacks for each one. It also gives the answer state and the review level, and both come only from recorded fields. The answer is `approved` only when the review records `answer_approved` (set by `gold decide --answer-approved`). Any other present `expected_answer` is a `draft`. Every row from before this field reports a draft answer. A reviewer's kind (`ai` or `human`) comes from `gold decide` / `gold second-review --reviewer-kind`. A row without it reports `unrecorded` and is never shown as AI- or human-reviewed. Reviewer names are not evidence of either. The drafter's kind comes from `generation_provenance.method`.
+
+### Verifying a gold-2 change before merge
+
+codeit runs only merged code, so a gold-2 change cannot be checked there before its merge, and SSH to codeit is no evidence for an open PR. The pre-merge evidence is local and fixed: `python -B tools/verify.py gold-contract`, with `RFP_SOURCE_DIR`, `RFP_DATA_DIR` and `RFP_DATABASE_DSN` set to the configured corpus (in the verification service's `env_file`, or in the process environment for a manual run). A change to the gold-2 validator, the review queue, the release report or `gold_reviews` is not ready for review until this flow passes on its head. The flow:
+
+1. Runs the gold-2 validator, review-queue and sealed tests on isolated test databases.
+2. Copies into a private test database exactly what the report reads from the configured database: sources, documents, the gold queue and review log, and every element of each extraction the dev rows name. A full dump of the corpus outlasts the restore limit. It also copies (never links) `datasets/`, because validation writes `dev.validation.json` beside the dataset.
+3. Produces the dev report twice on that copy, once with the merge base's code (a temporary `git worktree`) and once with the head. The legacy report (`ok`, label, targets, answerability, positions, rejected rows, errors) must be identical. This is what "existing errors and label unchanged" means, whatever state the local extractions are in.
+4. Checks the head's three judgments against a recount of the dataset file and against the merge base's frozen state.
+5. Hashes every file under the configured `datasets/` before and after; any change fails the flow.
+
+Never run `validate-gold` on the live data directory to check a change. The CLI first runs `assign_families`, which rewrites `families.json` and turns a frozen manifest's family map stale.
+
+## Negative coverage minimum (proposal, not adopted)
+
+No Negative minimum is adopted, and the code slot `NEGATIVE_COVERAGE_POLICY` stays empty. This section is a proposal for the owner to decide.
+
+- The existing pattern is 6 rows per split for each smaller question type (`GOLD_TYPE_TARGETS`). Applied to answerability, that gives 6 unanswerable and 6 ambiguous rows per split. Twelve Negatives can show whether abstention works at all. They cannot demonstrate the 0.90 negative-handling gate: even with every row correct, the Wilson 95% lower bound is 12/(12+1.96²) = 0.757.
+- With all n rows correct, the Wilson 95% lower bound is n/(n+z²), with z = 1.96. It reaches 0.90 only when n ≥ 9z² = 34.6, so about 35 Negatives per split (34 → 0.898, 35 → 0.901). One wrong answer moves the requirement higher.
+- The current development release gate rests on a denominator of 1. The only Negative-like dev row is a single `conflicting` comparison. The release report's "Expected negative status" reads 0/1 (Wilson 95% [0%, 79.35%]), and dev has no unanswerable or ambiguous row.
+
+A proposal consistent with both points: require at least 6 unanswerable and 6 ambiguous rows per split for diagnosis, and treat the 0.90 gate as undecidable below about 35 Negatives per split. Adopting either number is a separate decision. Until then the report keeps saying `policy unset` and `sufficiency: undecided`.
+
 ## Avoid a deceptively easy benchmark
 
 Follow the [golden dataset plan](golden-dataset.md): 120 reviewed questions, half sealed for the final test, family-level separation, mostly paraphrase/table/code/exception/comparison cases. The audit found two pairs of byte-identical originals with different associated metadata; group them before splitting and use the conflicts as realistic tests.

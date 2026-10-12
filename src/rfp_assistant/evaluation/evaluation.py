@@ -10,6 +10,7 @@ import random
 import re
 import time
 import uuid
+from collections import Counter
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -1967,6 +1968,9 @@ METADATA_STRATUM = "metadata_direct"  # answered from typed CSV metadata; never 
 GOLD_TYPES = set(GOLD_TYPE_TARGETS) | {METADATA_STRATUM}
 EXPECTED_STATUS = {"answerable": ("answered",), "unanswerable": ("insufficient_evidence", "clarification_required"),
                    "ambiguous": ("clarification_required",), "conflicting": ("conflicting_evidence",)}
+REVIEWER_KINDS = ("ai", "human")  # optional `review.reviewer_kind`; a row without it reports the kind unrecorded
+# negative_validation method kinds (`kind` or `kind:detail`) that read the original; search output alone is no label
+ORIGINAL_READ_METHODS = ("full_original_read", "read")
 CLAIM_MATCH_TYPES = ("number", "date", "text")
 CRITICAL_KINDS = ("deadline", "amount", "mandatory_condition", "institution")
 METADATA_FIELDS = ("title", "institution", "notice", "revision", "amount_krw", "published_at", "bid_start",
@@ -2425,8 +2429,14 @@ class GoldChecker:
             else:
                 if set(scoped) - set(nv.get("scope_searched") or []):
                     e.append(f"{tag}: negative_validation must search every scoped document")
-                if not nv.get("methods"):
+                methods = nv.get("methods") or []
+                methods = methods if isinstance(methods, list) else [methods]
+                if not methods:
                     e.append(f"{tag}: negative_validation must record how absence was checked")
+                elif not any(str(m).split(":", 1)[0].strip() in ORIGINAL_READ_METHODS for m in methods):
+                    e.append(f"{tag}: absence seen only in search or retrieval output is a no-evidence label; "
+                             f"negative_validation.methods must include a reading of the original "
+                             f"{ORIGINAL_READ_METHODS}")
                 if nv.get("original_complete") is not True:
                     e.append(f"{tag}: absence needs an original complete enough to establish it")
                 if not str(nv.get("rationale") or "").strip():
@@ -2447,8 +2457,17 @@ class GoldChecker:
             e.append(f"{tag}: generation_provenance.method must be human or llm")
         elif prov["method"] == "llm" and not all(prov.get(k) for k in ("model", "prompt_version", "source_set_hash")):
             e.append(f"{tag}: an LLM draft records its model, prompt version and source-set hash")
+        second = review.get("second_review") or {}
+        for key, kind in (("review.reviewer_kind", review.get("reviewer_kind")),
+                          ("review.second_review.reviewer_kind", second.get("reviewer_kind"))):
+            if kind is not None and kind not in REVIEWER_KINDS:
+                e.append(f"{tag}: {key} must be one of {REVIEWER_KINDS}")
+        if "answer_approved" in review and (review["answer_approved"] is not True
+                                            or not str(row.get("expected_answer") or "").strip()):
+            e.append(f"{tag}: review.answer_approved is true and needs an expected_answer")
         if not require_review:
-            if review.get("reviewed_by") or review.get("approved_at"):
+            if (review.get("reviewed_by") or review.get("approved_at") or review.get("reviewer_kind")
+                    or "answer_approved" in review):
                 e.append(f"{tag}: drafts cannot carry a review")
             return e
         reviewer = str(review.get("reviewed_by") or "").strip()
@@ -2482,10 +2501,105 @@ def _split_leak(row: dict, tag: str, other_name: str, other: list[dict]) -> list
     return []
 
 
+# The gold-2 fields each evaluation reads from the one shared row, keyed by answerability (`metadata` for a
+# metadata-mode row); an evaluation without the row's key does not serve it. `expected_answer` is in no entry: the
+# deterministic metrics score typed `required_claims`, and an evaluation that compares against a reference answer
+# would list it here.
+_ASKED = ("question", "scope")
+_NEGATIVE = (*_ASKED, "expected_status", "negative_validation")
+_CONFLICT = (*_ASKED, "expected_status", "evidence_groups")
+EVALUATION_FIELDS: dict[str, dict[str, tuple[str, ...]]] = {
+    "retrieval": {"answerable": (*_ASKED, "evidence_groups"), "conflicting": (*_ASKED, "evidence_groups")},
+    "generation": {"answerable": (*_ASKED, "required_claims", "evidence_groups"),
+                   "metadata": (*_ASKED, "metadata_fields", "expected_states")},
+    "grounding": {"answerable": (*_ASKED, "evidence_groups"), "conflicting": (*_ASKED, "evidence_groups")},
+    "e2e": {"answerable": (*_ASKED, "expected_status", "evidence_groups"), "unanswerable": _NEGATIVE,
+            "ambiguous": _NEGATIVE, "conflicting": _CONFLICT,
+            "metadata": (*_ASKED, "expected_status", "expected_states")},
+    "negative": {"unanswerable": _NEGATIVE, "ambiguous": _NEGATIVE, "conflicting": _CONFLICT},
+}
+NEGATIVE_ANSWERABILITY = ("unanswerable", "ambiguous", "conflicting")
+# Minimum Negative rows per split by answerability. None: no policy adopted (the proposal in docs/rag/evaluation.md
+# is not adopted), so benchmark sufficiency stays undecided.
+NEGATIVE_COVERAGE_POLICY: dict[str, int] | None = None
+OUTSIDE_GOLD2 = ("outside gold-2: all-document metadata list answers and follow-up turns "
+                 "(docs/rag/golden-dataset.md, 'Outside gold-2')")
+
+
+def row_evaluations(row: dict) -> dict[str, list[str]]:
+    """Each evaluation this row's answerability belongs to, with the required fields the row lacks (empty: served)."""
+    key = "metadata" if row.get("mode") == "metadata" else row.get("answerability")
+    return {ev: [f for f in need[key] if row.get(f) in (None, "", [], {})]
+            for ev, need in EVALUATION_FIELDS.items() if key in need}
+
+
+def review_level(row: dict) -> dict:
+    """Drafter and reviewers only as recorded: a reviewer's kind is `unrecorded` unless the row states it."""
+    review = row.get("review") or {}
+    second = review.get("second_review") or None
+    approved = review.get("status") == "approved" and bool(review.get("reviewed_by"))
+    return {"drafter": (row.get("generation_provenance") or {}).get("method") or "unrecorded",
+            "reviewer": (review.get("reviewer_kind") or "unrecorded") if approved else "unreviewed",
+            "second_reviewer": (second.get("reviewer_kind") or "unrecorded") if second else None}
+
+
+def answer_state(row: dict) -> str:
+    """`approved` only where the review records the expected answer's approval; otherwise a present answer is a draft."""
+    if not str(row.get("expected_answer") or "").strip():
+        return "none"
+    review = row.get("review") or {}
+    return "approved" if review.get("status") == "approved" and review.get("answer_approved") is True else "draft"
+
+
+def gold_coverage(rows: list[dict]) -> dict:
+    """Benchmark coverage of every row, as the type targets count them (validity is its own judgment): distributions,
+    served evaluations and gaps. Unanswerable means `answerability == "unanswerable"`; a refuted premise the source
+    answers is an answerable premise-refutation case. Sufficiency stays `undecided` while the Negative policy is unset."""
+    def count(key: str, values) -> dict:
+        return {v: sum(r.get(key) == v for r in rows) for v in values}
+    types = count("question_type", sorted(GOLD_TYPES))
+    served = [row_evaluations(r) for r in rows]
+    evaluations = {ev: sum(ev in s and not s[ev] for s in served) for ev in EVALUATION_FIELDS}
+    negative = count("answerability", NEGATIVE_ANSWERABILITY)
+    gaps = [f"{t}: {types[t]}/{n} rows" for t, n in GOLD_TYPE_TARGETS.items() if types[t] < n]
+    gaps += [f"{ev}: no row serves it" for ev, n in evaluations.items() if not n]
+    gaps += [f"negative: no {a} rows" for a in NEGATIVE_ANSWERABILITY if not negative[a]]
+    policy = NEGATIVE_COVERAGE_POLICY
+    if policy is None:
+        gaps.append("negative: policy unset (no minimum adopted)")
+        sufficiency = "undecided"
+    else:
+        short = [f"negative: {a} {negative.get(a, 0)}/{n} rows" for a, n in policy.items() if negative.get(a, 0) < n]
+        gaps += short
+        sufficiency = "met" if not short and all(types[t] >= n for t, n in GOLD_TYPE_TARGETS.items()) else "not met"
+    return {"rows": len(rows), "question_type": types, "answerability": count("answerability", EXPECTED_STATUS),
+            "mode": count("mode", ("single", "compare", "metadata")), "evaluations": evaluations,
+            "premise_refutation_answerable": sum(r.get("question_type") == "missing_false_premise"
+                                                 and r.get("answerability") == "answerable" for r in rows),
+            "negative": {"policy": "unset" if policy is None else policy, **negative},
+            "answers": {s: sum(answer_state(r) == s for r in rows) for s in ("none", "draft", "approved")},
+            "reviewer_kind": dict(Counter(review_level(r)["reviewer"] for r in rows)),
+            "sufficiency": sufficiency, "gaps": gaps + [OUTSIDE_GOLD2]}
+
+
+def frozen_status(settings: Settings, name: str) -> dict:
+    """Whether the split is frozen and still matches its manifest. A freeze pins bytes; it judges no coverage."""
+    f = frozen_dataset(settings, name)
+    return {"frozen": False} if f is None else {"frozen": True, "current": f["current"], "changed": f["changed"],
+                                                "dataset_sha256": f["dataset_sha256"], "frozen_at": f.get("frozen_at")}
+
+
+def _write_validation(settings: Settings, name: str, report: dict) -> None:
+    write_text_atomic(dataset_path(settings, name).with_suffix(".validation.json"),
+                      json.dumps(report, ensure_ascii=False, indent=1))
+
+
 def validate_gold_v2(settings: Settings, name: str) -> dict:
     """Accepted gold only: independently reviewed against the original, quotes present in the pinned extraction,
     families inside one split, no question repeated or paraphrased across splits. The report counts types against
-    the phase-4 targets and source positions; a smaller valid set is labeled `pilot`, never `gold`."""
+    the phase-4 targets and source positions; a smaller valid set is labeled `pilot`, never `gold`. Three separate
+    judgments follow: `validity` (schema), `coverage` (benchmark distributions, gaps, sufficiency) and `frozen`
+    (manifest state); `row_evaluations` lists per row the evaluations it serves and the fields each one lacks."""
     if name not in GOLD_DATASETS:
         raise EvaluationError(f"{name} is not a gold-2 dataset")
     path = dataset_path(settings, name)
@@ -2500,6 +2614,7 @@ def validate_gold_v2(settings: Settings, name: str) -> dict:
     errors: list[str] = []
     rejected: dict[str, list[str]] = {}
     positions = {"early": 0, "middle": 0, "late": 0, "none": 0}
+    details: list[dict] = []
     with open_db(settings.db_path) as conn:
         checker = GoldChecker(settings, conn)
         leaks = checker.family_leaks()
@@ -2524,6 +2639,8 @@ def validate_gold_v2(settings: Settings, name: str) -> dict:
             if errs:
                 rejected[qid] = errs
                 errors += errs
+            details.append({"question_id": qid, "valid": not errs, "evaluations": row_evaluations(row),
+                            "answer": answer_state(row), "review": review_level(row)})
             if row.get("mode") != "metadata":
                 positions[checker.row_position(row) or "none"] += 1
     types = {t: sum(r.get("question_type") == t for r in rows) for t in sorted(GOLD_TYPES)}
@@ -2536,8 +2653,11 @@ def validate_gold_v2(settings: Settings, name: str) -> dict:
               "answerability": {a: sum(r.get("answerability") == a for r in rows) for a in EXPECTED_STATUS},
               "source_positions": positions, "rejected_rows": [{"question_id": k, "errors": v}
                                                                for k, v in rejected.items()],
-              "errors": errors, "validated_at": utcnow()}
-    write_text_atomic(path.with_suffix(".validation.json"), json.dumps(report, ensure_ascii=False, indent=1))
+              "errors": errors, "validated_at": utcnow(),
+              "validity": {"ok": ok, "errors": len(errors), "rejected_rows": len(rejected)},
+              "coverage": gold_coverage(rows), "frozen": frozen_status(settings, name),
+              "row_evaluations": details}
+    _write_validation(settings, name, report)
     return report
 
 
@@ -2553,8 +2673,11 @@ def _review_log_text(settings: Settings, name: str) -> str:
     with open_db(settings.db_path) as conn:
         rows = [dict(r) for r in conn.execute(
             "SELECT r.review_id, r.candidate_id, r.reviewer, r.kind, r.decision, r.original_inspected, r.note, "
-            "r.created_at FROM gold_reviews r JOIN gold_candidates c ON c.candidate_id = r.candidate_id "
-            "WHERE c.dataset = ? ORDER BY r.created_at, r.review_id", (name,))]
+            "r.created_at, r.reviewer_kind, r.answer_approved FROM gold_reviews r JOIN gold_candidates c "
+            "ON c.candidate_id = r.candidate_id WHERE c.dataset = ? ORDER BY r.created_at, r.review_id", (name,))]
+    # The later optional columns appear only when recorded, so logs (and frozen hashes) of older reviews stay as is.
+    rows = [{k: v for k, v in r.items() if v is not None or k not in ("reviewer_kind", "answer_approved")}
+            for r in rows]
     return "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
 
 
@@ -2588,6 +2711,8 @@ def freeze_dataset(settings: Settings, name: str, actor: str, reason: str) -> di
                 "families_sha256": _families_sha(settings),
                 "frozen_by": actor, "reason": reason.strip(), "frozen_at": utcnow()}
     write_text_atomic(gold_manifest_path(settings, name), json.dumps(manifest, ensure_ascii=False, indent=1))
+    report["frozen"] = frozen_status(settings, name)  # the review log export and this manifest postdate validation
+    _write_validation(settings, name, report)
     record_audit(settings, actor, "freeze_dataset", name, reason, {k: manifest[k] for k in (
         "dataset_sha256", "rows", "label", "review_log_sha256")})
     return manifest
