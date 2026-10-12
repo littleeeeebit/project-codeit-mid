@@ -220,17 +220,16 @@ class Env:
     refs: dict[str, DocRef]
 
 
-FILES = {"기관A_통합 정보시스템.pdf": PDF_A,
-         "기관C_통합 정보시스템 사본.pdf": PDF_A,  # byte-identical copy
-         "기관D_도서관 좌석 예약.pdf": PDF_D,
-         "기관E_재난 관리 시스템.hwp": b"\xd0\xcf\x11\xe0 not a real hwp"}
-
-
 def write_corpus(root: Path, rows=ROWS, originals: dict[str, bytes] | None = None) -> Path:
     source = root / "source"
     files = source / "files"
     files.mkdir(parents=True)
-    for name, data in (FILES if originals is None else originals).items():
+    if originals is None:  # built per call: tests patch PDF_A
+        originals = {"기관A_통합 정보시스템.pdf": PDF_A,
+                     "기관C_통합 정보시스템 사본.pdf": PDF_A,  # byte-identical copy
+                     "기관D_도서관 좌석 예약.pdf": PDF_D,
+                     "기관E_재난 관리 시스템.hwp": b"\xd0\xcf\x11\xe0 not a real hwp"}
+    for name, data in originals.items():
         (files / name).write_bytes(data)
     buf = io.StringIO(newline="")
     w = csv.writer(buf)
